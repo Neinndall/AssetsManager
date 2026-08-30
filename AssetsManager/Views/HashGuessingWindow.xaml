@@ -80,8 +80,8 @@
                               SelectionChanged="DomainSelector_SelectionChanged">
                         <ComboBoxItem Content="Game" Tag="Game"/>
                         <ComboBoxItem Content="Lcu" Tag="Lcu"/>
+                        <ComboBoxItem Content="Bin" Tag="Bin"/>
                         <!-- Temporarily hidden; keep available for later reactivation. -->
-                        <!-- <ComboBoxItem Content="Bin" Tag="Bin"/> -->
                         <!-- <ComboBoxItem Content="Rst" Tag="Rst"/> -->
                     </ComboBox>
 

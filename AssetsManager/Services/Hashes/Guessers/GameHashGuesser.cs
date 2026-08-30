@@ -882,6 +882,27 @@ namespace AssetsManager.Services.Hashes.Guessers
                         string sub = stem[(baseChar.Length + 1)..];
                         if (sub.Length > 0) actions.Add(sub);
                     }
+
+                    Match containerMatch = Regex.Match(
+                        rel,
+                        @"^(?:skins|themes)/(?<container>[^/]+)/animations/",
+                        RegexOptions.IgnoreCase);
+                    if (containerMatch.Success)
+                    {
+                        string container = containerMatch.Groups["container"].Value;
+                        AddAnimationActionAfterPrefix($"{character}_{container}_");
+                        if (baseChar != null) AddAnimationActionAfterPrefix($"{baseChar}_{container}_");
+                    }
+
+                    Match skinToken = Regex.Match(stem, @"(?:^|_)skin\d+_(?<action>.+)$", RegexOptions.IgnoreCase);
+                    if (skinToken.Success) actions.Add(skinToken.Groups["action"].Value);
+
+                    void AddAnimationActionAfterPrefix(string prefix)
+                    {
+                        if (!stem.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return;
+                        string action = stem[prefix.Length..];
+                        if (action.Length > 0) actions.Add(action);
+                    }
                 }
 
                 return actions.OrderBy(a => a, StringComparer.OrdinalIgnoreCase).ToList();
@@ -1879,6 +1900,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 EnumerateAnimationPaths(
                     character,
                     sourceSkin,
+                    IsThemeAnimationContext(character, sourceSkin),
                     unresolved,
                     engine.UnknownHashes,
                     cancellationToken),
@@ -1903,8 +1925,12 @@ namespace AssetsManager.Services.Hashes.Guessers
             int checkedCandidates = 0;
             foreach (string animationCharacter in characters)
             foreach (string skin in EnumerateAnimationSkins(animationCharacter))
-            foreach (string action in GetCharacterAnimationActions(animationCharacter))
-            foreach (string candidate in EnumerateAnimationCandidates(animationCharacter, skin, action))
+            foreach (string action in EnumerateFallbackActions(animationCharacter))
+            foreach (string candidate in EnumerateAnimationCandidates(
+                         animationCharacter,
+                         skin,
+                         action,
+                         IsThemeAnimationContext(animationCharacter, skin)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!emittedCandidates.Add(candidate)) continue;
@@ -1930,16 +1956,29 @@ namespace AssetsManager.Services.Hashes.Guessers
                     yield return sourceSkin;
                 }
 
-                foreach (string candidate in GetChampionSkinNames(animationCharacter, cancellationToken))
+                IEnumerable<string> knownSkins = GetChampionSkinNames(animationCharacter, cancellationToken);
+                foreach (string candidate in OrderAnimationContainers(sourceSkin, knownSkins))
                     if (!candidate.Equals(sourceSkin, StringComparison.OrdinalIgnoreCase)) yield return candidate;
             }
+
+            IReadOnlyList<string> EnumerateFallbackActions(string animationCharacter) =>
+                Corpus.GetOrCreate($"fallback-animation-actions/{animationCharacter.ToLowerInvariant()}", _ =>
+                    GetCharacterAnimationActions(animationCharacter)
+                        .Concat(GetGlobalAnimationActions(cancellationToken))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList());
 
             static IEnumerable<string> EnumerateAnimationCandidates(
                 string animationCharacter,
                 string skin,
-                string action)
+                string action,
+                bool includeThemeLayout)
             {
-                foreach (string candidate in EnumerateAnimationNameVariants(animationCharacter, skin, action))
+                foreach (string candidate in EnumerateAnimationNameVariants(
+                             animationCharacter,
+                             skin,
+                             action,
+                             includeThemeLayout: includeThemeLayout))
                     yield return candidate;
 
                 if (!action.Equals("recall", StringComparison.OrdinalIgnoreCase)) yield break;
@@ -2253,6 +2292,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         if (engine.RemainingUnknownCount == 0) break;
                         CheckSpecialBin($"{animPrefix}{action}.anm");
                     }
+
                 }
             }
 
@@ -2591,6 +2631,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private IEnumerable<string> EnumerateAnimationPaths(
             string character,
             string skin,
+            bool includeThemeLayout,
             IReadOnlyList<AnimationFileLink> links,
             IReadOnlyCollection<ulong> unknownHashes,
             CancellationToken cancellationToken)
@@ -2609,7 +2650,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!attemptedNames.Add(name)) continue;
-                foreach (string path in MatchAnimationVariants(name, character, skin, remaining, prefixes, suffixes))
+                foreach (string path in MatchAnimationVariants(name, character, skin, remaining, prefixes, suffixes, includeThemeLayout))
                     yield return path;
                 if (remaining.Count == 0) yield break;
             }
@@ -2629,7 +2670,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 cancellationToken.ThrowIfCancellationRequested();
                 string name = GetBasename(candidate.Path);
                 if (!attemptedNames.Add(name)) continue;
-                foreach (string path in MatchAnimationVariants(name, character, skin, remaining, DefaultPrefixModifiers, DefaultSuffixModifiers))
+                foreach (string path in MatchAnimationVariants(name, character, skin, remaining, DefaultPrefixModifiers, DefaultSuffixModifiers, includeThemeLayout))
                     yield return path;
                 if (remaining.Count == 0) yield break;
             }
@@ -2685,6 +2726,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     if (nameHashes.Contains(Fnv1a.HashLower(prefixed))) yield return prefixed;
                 }
             }
+
         }
 
         private static HashSet<string> GetReusableAnimationPrefixes(IEnumerable<string> names)
@@ -2777,9 +2819,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             string skin,
             ISet<ulong> remaining,
             IReadOnlyList<string> prefixes = null,
-            IReadOnlyList<string> suffixes = null)
+            IReadOnlyList<string> suffixes = null,
+            bool includeThemeLayout = false)
         {
-            foreach (string path in EnumerateAnimationNameVariants(character, skin, name, prefixes, suffixes))
+            foreach (string path in EnumerateAnimationNameVariants(character, skin, name, prefixes, suffixes, includeThemeLayout))
             {
                 if (remaining.Remove(XxHash64Ext.Hash(PathUtils.NormalizePath(path))))
                     yield return path;
@@ -2787,7 +2830,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             string converted = Regex.Replace(name, @"skin\d+", skin, RegexOptions.IgnoreCase);
             if (converted.Equals(name, StringComparison.OrdinalIgnoreCase)) yield break;
-            foreach (string path in EnumerateAnimationNameVariants(character, skin, converted, prefixes, suffixes))
+            foreach (string path in EnumerateAnimationNameVariants(character, skin, converted, prefixes, suffixes, includeThemeLayout))
                 if (remaining.Remove(XxHash64Ext.Hash(PathUtils.NormalizePath(path))))
                     yield return path;
         }
@@ -2797,7 +2840,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             string skin,
             string name,
             IReadOnlyList<string> prefixModifiers = null,
-            IReadOnlyList<string> suffixModifiers = null)
+            IReadOnlyList<string> suffixModifiers = null,
+            bool includeThemeLayout = false)
         {
             string stem = name.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
             if (string.IsNullOrWhiteSpace(stem) || stem.Contains('/') || stem.Contains('\\')) yield break;
@@ -2813,17 +2857,57 @@ namespace AssetsManager.Services.Hashes.Guessers
                 string s = pre + stem + suf;
                 foreach (string root in AnimationRootPrefixes)
                 {
-                    yield return $"{root}/characters/{character}/skins/{sk}/animations/{s}.anm";
-                    yield return $"{root}/characters/{character}/skins/{sk}/animations/{character}_{s}.anm";
-                    yield return $"{root}/characters/{character}/skins/{sk}/animations/{character}_{sk}_{s}.anm";
-                    yield return $"{root}/characters/{character}/skins/{sk}/animations/{sk}_{s}.anm";
-                    if (character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+                    if (includeThemeLayout)
                     {
-                        string baseCharacter = character[5..];
-                        yield return $"{root}/characters/{character}/skins/{sk}/animations/{baseCharacter}_{s}.anm";
-                        yield return $"{root}/characters/{character}/skins/{sk}/animations/{baseCharacter}_{sk}_{s}.anm";
+                        yield return $"{root}/characters/{character}/themes/{sk}/animations/{s}.anm";
+                        yield return $"{root}/characters/{character}/themes/{sk}/animations/{character}_{s}.anm";
+                        yield return $"{root}/characters/{character}/themes/{sk}/animations/{character}_{sk}_{s}.anm";
+                        yield return $"{root}/characters/{character}/themes/{sk}/animations/{sk}_{s}.anm";
+                    }
+                    else
+                    {
+                        yield return $"{root}/characters/{character}/skins/{sk}/animations/{s}.anm";
+                        yield return $"{root}/characters/{character}/skins/{sk}/animations/{character}_{s}.anm";
+                        yield return $"{root}/characters/{character}/skins/{sk}/animations/{character}_{sk}_{s}.anm";
+                        yield return $"{root}/characters/{character}/skins/{sk}/animations/{sk}_{s}.anm";
+                        if (character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string baseCharacter = character[5..];
+                            yield return $"{root}/characters/{character}/skins/{sk}/animations/{baseCharacter}_{s}.anm";
+                            yield return $"{root}/characters/{character}/skins/{sk}/animations/{baseCharacter}_{sk}_{s}.anm";
+                        }
                     }
                 }
+            }
+        }
+
+        private static bool IsThemeAnimationContext(string character, string container)
+        {
+            return character.StartsWith("pet", StringComparison.OrdinalIgnoreCase) &&
+                   !container.Equals("root", StringComparison.OrdinalIgnoreCase) &&
+                   !container.Equals("shared", StringComparison.OrdinalIgnoreCase) &&
+                   !(container.StartsWith("skin", StringComparison.OrdinalIgnoreCase) &&
+                     container.Length > 4 && container.Skip(4).All(char.IsDigit));
+        }
+
+        private static IEnumerable<string> OrderAnimationContainers(string sourceContainer, IEnumerable<string> containers)
+        {
+            int sourceNumber = -1;
+            Match sourceMatch = Regex.Match(sourceContainer ?? string.Empty, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
+            if (sourceMatch.Success) int.TryParse(sourceMatch.Groups[1].Value, out sourceNumber);
+
+            return containers
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(container => AnimationContainerDistance(container))
+                .ThenBy(container => container, StringComparer.OrdinalIgnoreCase);
+
+            int AnimationContainerDistance(string container)
+            {
+                if (sourceNumber < 0) return int.MaxValue;
+                Match match = Regex.Match(container, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
+                return match.Success && int.TryParse(match.Groups[1].Value, out int number)
+                    ? Math.Abs(number - sourceNumber)
+                    : int.MaxValue;
             }
         }
 

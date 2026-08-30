@@ -630,6 +630,50 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GameAnimationBinLinksResolveCompanionThemeLayout()
+        {
+            const string clipName = "petdoughcat_sushi_dance_loop";
+            const string expected = "assets/characters/petdoughcat/themes/sushi/animations/petdoughcat_sushi_dance_loop.anm";
+            var game = new GameHashGuesser(
+                new HashFile(HashGuessDomain.Game, Array.Empty<string>()),
+                null,
+                hash => hash == Fnv1a.HashLower(clipName) ? clipName : null);
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(CreateAnimationBin(clipName, XxHash64Ext.Hash(expected))),
+                "data/characters/petdoughcat/animations/sushi.bin",
+                "TFTMap22.wad.client",
+                0x999cUL);
+
+            AssertResolved(engine, expected);
+            Assert.Equal(HashGuessStrategy.AnimationBinLink, Assert.Single(engine.Matches).Value.Strategy);
+        }
+
+        [Fact]
+        public void GameAnimationBinLinksPrioritizeAdjacentSkinWithGlobalAction()
+        {
+            const string expected = "assets/characters/tristana/skins/skin80/animations/transform_to_run_fast.anm";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/yasuo/skins/skin01/animations/transform_to_run_fast.anm",
+                "assets/characters/tristana/skins/skin80/tristana_skin80_tx_cm.tex"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(CreateAnimationBin("unresolved_clip_name", XxHash64Ext.Hash(expected))),
+                "data/characters/tristana/animations/skin79.bin",
+                "Tristana.wad.client",
+                0x999dUL);
+
+            AssertResolved(engine, expected);
+            Assert.Equal(HashGuessStrategy.BinEntry, Assert.Single(engine.Matches).Value.Strategy);
+        }
+
+        [Fact]
         public void GameAnimationBinLinksFindClipPathOutsideClipDataMap()
         {
             const string expected = "assets/characters/fiora/skins/skin30/animations/idle.anm";

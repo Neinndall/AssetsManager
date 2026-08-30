@@ -52,8 +52,8 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             }
 
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string hashesDirectory = Path.Combine(localAppData, "AssetsManager", "hashes");
-            string unknownsPath = Path.Combine(localAppData, "AssetsManager", "hash_lab", "unknowns.game.txt");
+            string hashesDirectory = options.HashesDirectory ?? Path.Combine(localAppData, "AssetsManager", "hashes");
+            string unknownsPath = options.UnknownsPath ?? Path.Combine(localAppData, "AssetsManager", "hash_lab", "unknowns.game.txt");
             string gameHashesPath = Path.Combine(hashesDirectory, "hashes.game.txt");
             string lcuHashesPath = Path.Combine(hashesDirectory, "hashes.lcu.txt");
 
@@ -93,6 +93,9 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 Console.WriteLine($"Could not enumerate GAME WADs: {exception.Message}");
                 return;
             }
+            string[] grepWadPaths = string.IsNullOrWhiteSpace(options.WadContains)
+                ? wadPaths
+                : wadPaths.Where(path => path.Contains(options.WadContains, StringComparison.OrdinalIgnoreCase)).ToArray();
 
             string gameDirectory = Directory.Exists(Path.Combine(options.PbeRoot, "Game"))
                 ? Path.Combine(options.PbeRoot, "Game")
@@ -109,6 +112,8 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             Console.WriteLine("Persistence:        disabled (all engines and results are in memory)");
             if (options.MaxWads != int.MaxValue)
                 Console.WriteLine("Grep scope note: --max-wads limits GrepWad only; inventory and location scans remain full.");
+            if (!string.IsNullOrWhiteSpace(options.WadContains))
+                Console.WriteLine($"Grep WAD filter:   '{options.WadContains}' ({grepWadPaths.Length:N0} matching WADs)");
 
             HashWadInventory inventory = BuildInventory(gameGuesser, wadPaths);
             HashSet<ulong> observedUnknowns = inventory.Hashes
@@ -143,7 +148,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 var evidence = new List<StructuralEvidence>();
                 grepResult = RunGrepPass(
                     "GAME GrepWad / in-memory target",
-                    wadPaths,
+                    grepWadPaths,
                     targetUnknowns,
                     resolvedPaths,
                     binNames,
@@ -209,7 +214,10 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 if (args[index].StartsWith("--", StringComparison.Ordinal))
                 {
                     if (args[index].Equals("--max-wads", StringComparison.OrdinalIgnoreCase) ||
-                        args[index].Equals("--basic-budget", StringComparison.OrdinalIgnoreCase))
+                        args[index].Equals("--basic-budget", StringComparison.OrdinalIgnoreCase) ||
+                        args[index].Equals("--hashes-directory", StringComparison.OrdinalIgnoreCase) ||
+                        args[index].Equals("--unknowns-path", StringComparison.OrdinalIgnoreCase) ||
+                        args[index].Equals("--wad-contains", StringComparison.OrdinalIgnoreCase))
                         index++;
                     continue;
                 }
@@ -227,7 +235,10 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 args.Any(value => value.Equals("--include-observed", StringComparison.OrdinalIgnoreCase)),
                 args.Any(value => value.Equals("--skip-basic", StringComparison.OrdinalIgnoreCase)),
                 args.Any(value => value.Equals("--skip-cache-probe", StringComparison.OrdinalIgnoreCase)),
-                args.Any(value => value.Equals("--skip-grep", StringComparison.OrdinalIgnoreCase)));
+                args.Any(value => value.Equals("--skip-grep", StringComparison.OrdinalIgnoreCase)),
+                ParseString(args, "--hashes-directory"),
+                ParseString(args, "--unknowns-path"),
+                ParseString(args, "--wad-contains"));
         }
 
         private static int ParseInt(string[] args, string option, int fallback)
@@ -236,6 +247,12 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             if (index < 0 || index + 1 >= args.Length || !int.TryParse(args[index + 1], out int value))
                 return fallback;
             return Math.Max(1, value);
+        }
+
+        private static string ParseString(string[] args, string option)
+        {
+            int index = Array.FindIndex(args, value => value.Equals(option, StringComparison.OrdinalIgnoreCase));
+            return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
         }
 
         private static IReadOnlyDictionary<ulong, string> MergeResolvedPaths(
@@ -1087,7 +1104,10 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             bool IncludeObserved,
             bool SkipBasic,
             bool SkipCacheProbe,
-            bool SkipGrep);
+            bool SkipGrep,
+            string HashesDirectory,
+            string UnknownsPath,
+            string WadContains);
 
         private sealed record UnknownLocation(
             ulong Hash,
