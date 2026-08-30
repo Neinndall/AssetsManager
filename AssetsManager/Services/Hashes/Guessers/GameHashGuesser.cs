@@ -2218,8 +2218,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 ? new[] { champ }
                 : new[] { champ, $"jade_{champ}" };
 
-            Span<char> pathBuffer = stackalloc char[256];
-
             foreach (string alias in aliases)
             {
                 CheckSpecialBin($"data/characters/{alias}/{alias}.bin");
@@ -2250,31 +2248,10 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckSpecialBin($"data/characters/{alias}/animations/{skin}.bin");
 
                     string animPrefix = $"assets/characters/{alias}/skins/{skin}/animations/";
-                    if (animPrefix.Length < pathBuffer.Length - 64)
+                    foreach (string action in globalActions)
                     {
-                        animPrefix.AsSpan().CopyTo(pathBuffer);
-                        int pLen = animPrefix.Length;
-
-                        foreach (string action in globalActions)
-                        {
-                            if (engine.RemainingUnknownCount == 0) break;
-                            if (pLen + action.Length + 4 >= pathBuffer.Length) continue;
-
-                            action.AsSpan().CopyTo(pathBuffer[pLen..]);
-                            int fullLen = pLen + action.Length;
-                            pathBuffer[fullLen] = '.';
-                            pathBuffer[fullLen + 1] = 'a';
-                            pathBuffer[fullLen + 2] = 'n';
-                            pathBuffer[fullLen + 3] = 'm';
-                            fullLen += 4;
-
-                            ReadOnlySpan<char> fullSpan = pathBuffer[..fullLen];
-                            ulong hash = XxHash64Ext.Hash(fullSpan);
-                            if (engine.UnknownHashes.Contains(hash))
-                            {
-                                Check(engine, fullSpan.ToString(), HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                            }
-                        }
+                        if (engine.RemainingUnknownCount == 0) break;
+                        CheckSpecialBin($"{animPrefix}{action}.anm");
                     }
                 }
             }
