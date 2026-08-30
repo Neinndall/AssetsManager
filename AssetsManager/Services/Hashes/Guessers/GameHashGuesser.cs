@@ -736,7 +736,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             "run_to_idle", "run_fast_to_idle", "winddown_to_idle", "signature_move_to_idle"
         };
 
-        private const int MaxGlobalAnimationActions = 5_000;
+        private const int MaxGlobalAnimationActions = 4_000;
 
         private IReadOnlyList<string> GetGlobalAnimationActions(CancellationToken cancellationToken = default)
         {
