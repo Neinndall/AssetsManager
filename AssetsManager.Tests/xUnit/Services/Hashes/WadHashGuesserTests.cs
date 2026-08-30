@@ -2763,5 +2763,29 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains(engine.Matches.Values, m => m.Path == expectedBin);
             Assert.Equal(0, engine.RemainingUnknownCount);
         }
+
+        [Fact]
+        public void GameGrepWadResolvesTristanaSkin80AnimationLearnedFromAnotherChampionCorpus()
+        {
+            const string expectedAnim = "assets/characters/tristana/skins/skin80/animations/run_homeguard_to_run_fast.anm";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/yasuo/skins/skin01/animations/run_homeguard_to_run_fast.anm",
+                "assets/characters/tristana/skins/skin01/tristana_skin01_tx_cm.tex"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expectedAnim);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
+                "data/test.bin",
+                "Tristana.wad.client",
+                1);
+
+            AssertResolved(engine, expectedAnim);
+            HashGuessMatch match = Assert.Single(engine.Matches).Value;
+            Assert.Equal(HashGuessStrategy.BinEntry, match.Strategy);
+            Assert.Equal("Tristana.wad.client", match.SourceWadPath);
+        }
     }
 }

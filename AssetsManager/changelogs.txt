@@ -43,6 +43,7 @@ New Features
   - Hash Guessing Lab / Added a dedicated 'Search Unknown Hashes' action to scan local WAD files and build the unknown hash dictionary independently.
   - Hash Guessing Lab / Added a dedicated Banner Guess action for esports sponsored banner hashes.
   - Hash Guessing Lab / GAME WAD grep now follows animation BIN `mAnimationFilePath` WadChunkLinks and derives contextual `.anm` GAME candidates from the known path corpus, including skin-number variants.
+  - Hash Guessing Lab / Added cross-champion dynamic animation stem learning to GAME WAD grep and special skin scans, deriving global action tokens, transition sub-actions (_to_), and clean suffixes from known animation paths.
   - Hash Guessing Lab / GAME shader guessing now discovers executable-referenced HLSL families and immediate `_0` variants for generated platform targets.
   - Hash Guessing Lab / Added the GAME Custom Guess button with a focused BIN-basename wordlist attack using deterministic 30,000-entry build lists.
   - Hash Guessing Lab / GAME Custom now also targets deterministic basename substitutions from `data/*.bin` paths.

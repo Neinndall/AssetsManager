@@ -736,6 +736,96 @@ namespace AssetsManager.Services.Hashes.Guessers
             "run_to_idle", "run_fast_to_idle", "winddown_to_idle", "signature_move_to_idle"
         };
 
+        private const int MaxGlobalAnimationActions = 3_000;
+
+        private IReadOnlyList<string> GetGlobalAnimationActions(CancellationToken cancellationToken = default)
+        {
+            return Corpus.GetOrCreate("global-animation-actions", knownPaths =>
+            {
+                var actionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (string defaultAction in DefaultAnimationActions)
+                    actionCounts[defaultAction] = int.MaxValue;
+
+                for (int pathIndex = 0; pathIndex < knownPaths.Count; pathIndex++)
+                {
+                    if ((pathIndex & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
+                    string path = knownPaths[pathIndex];
+                    if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ||
+                        !path.Contains("/characters/", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    string basename = GetBasename(path);
+                    if (basename.Length <= 4) continue;
+                    string stem = basename[..^4].ToLowerInvariant();
+
+                    int dotIdx = stem.IndexOf('.');
+                    if (dotIdx > 0) stem = stem[..dotIdx];
+
+                    if (stem.Length < 2 || stem.Length > 45) continue;
+                    if (stem.All(char.IsDigit) || (stem.Length == 16 && stem.All(c => char.IsAsciiHexDigitLower(c)))) continue;
+
+                    bool isValid = true;
+                    for (int i = 0; i < stem.Length; i++)
+                    {
+                        char c = stem[i];
+                        if (!char.IsAsciiLetterOrDigit(c) && c != '_') { isValid = false; break; }
+                    }
+                    if (!isValid) continue;
+
+                    AddCount(stem);
+
+                    int skinIdx = stem.IndexOf("skin", StringComparison.OrdinalIgnoreCase);
+                    if (skinIdx >= 0)
+                    {
+                        int afterSkin = stem.IndexOf('_', skinIdx);
+                        if (afterSkin > 0 && afterSkin < stem.Length - 1)
+                        {
+                            string sub = stem[(afterSkin + 1)..];
+                            if (sub.Length >= 2 && sub.Length <= 45 && !sub.All(char.IsDigit))
+                                AddCount(sub);
+                        }
+                    }
+                    else
+                    {
+                        int firstUnderscore = stem.IndexOf('_');
+                        if (firstUnderscore > 0 && firstUnderscore < stem.Length - 1)
+                        {
+                            string sub = stem[(firstUnderscore + 1)..];
+                            if (sub.Length >= 2 && sub.Length <= 45 && !sub.All(char.IsDigit))
+                                AddCount(sub);
+                        }
+                    }
+
+                    int toIdx = stem.IndexOf("_to_", StringComparison.OrdinalIgnoreCase);
+                    if (toIdx > 0 && toIdx < stem.Length - 4)
+                    {
+                        string part1 = stem[..toIdx];
+                        string part2 = stem[(toIdx + 4)..];
+                        if (part1.Length >= 2 && part1.Length <= 45) AddCount(part1);
+                        if (part2.Length >= 2 && part2.Length <= 45) AddCount(part2);
+                    }
+                }
+
+                return actionCounts
+                    .OrderByDescending(kv => kv.Value)
+                    .Take(MaxGlobalAnimationActions)
+                    .Select(kv => kv.Key)
+                    .OrderBy(a => a, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                void AddCount(string action)
+                {
+                    if (actionCounts.TryGetValue(action, out int count))
+                    {
+                        if (count < int.MaxValue) actionCounts[action] = count + 1;
+                    }
+                    else
+                    {
+                        actionCounts[action] = 1;
+                    }
+                }
+            });
+        }
+
         private IReadOnlyList<string> GetCharacterAnimationActions(string character)
         {
             return Corpus.GetOrCreate($"champion-animation-actions/{character.ToLowerInvariant()}", knownPaths =>
@@ -2147,13 +2237,20 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 var dynamicSkins = GetChampionSkinNames(alias, cancellationToken);
+                var globalActions = GetGlobalAnimationActions(cancellationToken);
                 foreach (string skin in dynamicSkins)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    if (engine.RemainingUnknownCount == 0) break;
+
                     CheckSpecialBin($"data/characters/{alias}/skins/{skin}.bin");
                     CheckSpecialBin($"data/characters/{alias}/animations/{skin}.bin");
-                    foreach (string action in DefaultAnimationActions)
+
+                    foreach (string action in globalActions)
+                    {
+                        if (engine.RemainingUnknownCount == 0) break;
                         CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/{action}.anm");
+                    }
                 }
             }
 
