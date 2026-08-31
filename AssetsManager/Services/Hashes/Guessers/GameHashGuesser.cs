@@ -712,39 +712,25 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCount;
         }
 
-        private static readonly string[] DefaultAnimationActions = new[]
-        {
-            "idle", "idle1", "idle2", "idle3", "idle4", "idle_in",
-            "run", "run_fast", "run_base", "walk",
-            "attack1", "attack2", "attack3", "attack4", "crit",
-            "spell", "spell1", "spell2", "spell3", "spell4",
-            "spell1a", "spell2a", "spell3a", "spell4a",
-            "spell1b", "spell2b", "spell3b", "spell4b",
-            "spell1c", "spell2c", "spell3c", "spell4c",
-            "spell1_cast", "spell2_cast", "spell3_cast", "spell4_cast",
-            "spell1_windup", "spell2_windup", "spell3_windup", "spell4_windup",
-            "spell1_loop", "spell2_loop", "spell3_loop", "spell4_loop",
-            "spell1_winddown", "spell2_winddown", "spell3_winddown", "spell4_winddown",
-            "death", "death2", "recall", "recall_windup",
-            "dance", "taunt", "laugh", "joke",
-            "channel", "channel_windup", "channel_loop", "channel_winddown",
-            "celebration", "spawn", "homeguard", "respawn",
-            "signature_move", "winddown", "run_homeguard", "idle_variant1", "idle_variant2",
-            "attack_fast", "attack_crit",
-            "attack1_to_idle", "attack2_to_idle", "attack1_to_run", "attack2_to_run",
-            "attack1_to_run_fast", "attack2_to_run_fast", "idle_to_run", "idle_to_run_fast",
-            "run_to_idle", "run_fast_to_idle", "winddown_to_idle", "signature_move_to_idle"
-        };
-
         private const int MaxGlobalAnimationActions = 3_000;
+
+        private static readonly string[] BaseAnimationActions =
+        {
+            "idle", "idle1", "idle2", "run", "run_fast", "walk",
+            "attack1", "attack2", "attack3", "crit",
+            "spell1", "spell2", "spell3", "spell4",
+            "death", "recall", "dance", "taunt", "laugh", "joke",
+            "channel", "spawn", "signature_move"
+        };
 
         private IReadOnlyList<string> GetGlobalAnimationActions(CancellationToken cancellationToken = default)
         {
             return Corpus.GetOrCreate("global-animation-actions", knownPaths =>
             {
                 var actionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                foreach (string defaultAction in DefaultAnimationActions)
-                    actionCounts[defaultAction] = int.MaxValue;
+                var animRegex = new Regex(
+                    @"^(?:assets|data)/characters/(?<char>[^/]+)/(?:skins/(?<skin>[^/]+)|themes/(?<theme>[^/]+)|animations)/animations/(?<file>[^/]+)\.anm$",
+                    RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
                 for (int pathIndex = 0; pathIndex < knownPaths.Count; pathIndex++)
                 {
@@ -772,6 +758,29 @@ namespace AssetsManager.Services.Hashes.Guessers
                     if (!isValid) continue;
 
                     AddCount(stem);
+
+                    Match m = animRegex.Match(path);
+                    if (m.Success)
+                    {
+                        string charName = m.Groups["char"].Value.ToLowerInvariant();
+                        string container = (m.Groups["skin"].Success ? m.Groups["skin"].Value : (m.Groups["theme"].Success ? m.Groups["theme"].Value : null))?.ToLowerInvariant();
+
+                        if (!string.IsNullOrEmpty(container) && stem.StartsWith($"{charName}_{container}_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string action = stem[(charName.Length + container.Length + 2)..];
+                            if (action.Length >= 2) AddCount(action);
+                        }
+                        else if (stem.StartsWith($"{charName}_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string action = stem[(charName.Length + 1)..];
+                            if (action.Length >= 2) AddCount(action);
+                        }
+                        else if (!string.IsNullOrEmpty(container) && stem.StartsWith($"{container}_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string action = stem[(container.Length + 1)..];
+                            if (action.Length >= 2) AddCount(action);
+                        }
+                    }
 
                     int skinIdx = stem.IndexOf("skin", StringComparison.OrdinalIgnoreCase);
                     if (skinIdx >= 0)
@@ -805,6 +814,12 @@ namespace AssetsManager.Services.Hashes.Guessers
                     }
                 }
 
+                if (actionCounts.Count == 0)
+                {
+                    foreach (string baseAction in BaseAnimationActions)
+                        actionCounts[baseAction] = 1;
+                }
+
                 return actionCounts
                     .OrderByDescending(kv => kv.Value)
                     .Take(MaxGlobalAnimationActions)
@@ -830,7 +845,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             return Corpus.GetOrCreate($"champion-animation-actions/{character.ToLowerInvariant()}", knownPaths =>
             {
-                var actions = new HashSet<string>(DefaultAnimationActions, StringComparer.OrdinalIgnoreCase);
+                var actions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 string baseChar = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? character[5..]
                     : (character.StartsWith("tft_", StringComparison.OrdinalIgnoreCase) || (character.StartsWith("tft", StringComparison.OrdinalIgnoreCase) && character.Length > 5 && character.Contains('_'))) ? character[(character.IndexOf('_') + 1)..]
@@ -903,6 +918,12 @@ namespace AssetsManager.Services.Hashes.Guessers
                         string action = stem[prefix.Length..];
                         if (action.Length > 0) actions.Add(action);
                     }
+                }
+
+                if (actions.Count == 0)
+                {
+                    foreach (string globalAction in GetGlobalAnimationActions())
+                        actions.Add(globalAction);
                 }
 
                 return actions.OrderBy(a => a, StringComparer.OrdinalIgnoreCase).ToList();
@@ -1856,7 +1877,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             cancellationToken.ThrowIfCancellationRequested();
             var animationBinPathRegex = new Regex(
-                @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.(?:bin|inibin)$",
+                @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?|themes/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.(?:bin|inibin)$",
                 RegexOptions.IgnoreCase);
             Match context = animationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
             if (!context.Success || data.Array is null || data.Count == 0) return;
@@ -1923,23 +1944,59 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             var emittedCandidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int checkedCandidates = 0;
+
+            var namedActions = EnumerateAnimationNameCandidates(
+                character,
+                unresolved,
+                remainingHashes,
+                cancellationToken)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (namedActions.Count > 0)
+            {
+                foreach (string animationCharacter in characters)
+                foreach (string skin in EnumerateAnimationSkins(animationCharacter))
+                {
+                    if (remainingHashes.Count == 0 || engine.RemainingUnknownCount == 0) return;
+                    bool isTheme = IsThemeAnimationContext(animationCharacter, skin);
+                    foreach (string action in namedActions)
+                    foreach (string candidate in EnumerateAnimationCandidates(
+                                 animationCharacter,
+                                 skin,
+                                 action,
+                                 isTheme))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!emittedCandidates.Add(candidate)) continue;
+                        ulong hash = XxHash64Ext.Hash(candidate);
+                        if (remainingHashes.Remove(hash) && engine.UnknownHashes.Contains(hash))
+                            Check(engine, candidate, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                    }
+                }
+            }
+
             foreach (string animationCharacter in characters)
             foreach (string skin in EnumerateAnimationSkins(animationCharacter))
-            foreach (string action in EnumerateFallbackActions(animationCharacter))
-            foreach (string candidate in EnumerateAnimationCandidates(
-                         animationCharacter,
-                         skin,
-                         action,
-                         IsThemeAnimationContext(animationCharacter, skin)))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!emittedCandidates.Add(candidate)) continue;
-                if (checkedCandidates++ >= AnimationBinFallbackCandidateBudget ||
-                    remainingHashes.Count == 0 || engine.RemainingUnknownCount == 0) return;
+                if (remainingHashes.Count == 0 || engine.RemainingUnknownCount == 0) return;
+                bool isTheme = IsThemeAnimationContext(animationCharacter, skin);
+                foreach (string action in EnumerateActionsForSkin(animationCharacter, skin))
+                foreach (string candidate in EnumerateAnimationCandidates(
+                             animationCharacter,
+                             skin,
+                             action,
+                             isTheme))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!emittedCandidates.Add(candidate)) continue;
+                    if (checkedCandidates++ >= AnimationBinFallbackCandidateBudget ||
+                        remainingHashes.Count == 0 || engine.RemainingUnknownCount == 0) return;
 
-                ulong hash = XxHash64Ext.Hash(candidate);
-                if (remainingHashes.Remove(hash) && engine.UnknownHashes.Contains(hash))
-                    Check(engine, candidate, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                    ulong hash = XxHash64Ext.Hash(candidate);
+                    if (remainingHashes.Remove(hash) && engine.UnknownHashes.Contains(hash))
+                        Check(engine, candidate, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                }
             }
 
             void AddAnimationCharacter(string value)
@@ -1959,6 +2016,17 @@ namespace AssetsManager.Services.Hashes.Guessers
                 IEnumerable<string> knownSkins = GetChampionSkinNames(animationCharacter, cancellationToken);
                 foreach (string candidate in OrderAnimationContainers(sourceSkin, knownSkins))
                     if (!candidate.Equals(sourceSkin, StringComparison.OrdinalIgnoreCase)) yield return candidate;
+            }
+
+            IEnumerable<string> EnumerateActionsForSkin(string animChar, string sk)
+            {
+                bool isTargetSkin = !string.IsNullOrEmpty(sourceSkin) &&
+                                    sk.Equals(sourceSkin, StringComparison.OrdinalIgnoreCase);
+                if (isTargetSkin || string.IsNullOrEmpty(sourceSkin))
+                {
+                    return EnumerateFallbackActions(animChar);
+                }
+                return GetCharacterAnimationActions(animChar);
             }
 
             IReadOnlyList<string> EnumerateFallbackActions(string animationCharacter) =>
@@ -2433,6 +2501,16 @@ namespace AssetsManager.Services.Hashes.Guessers
                     string compact = new(stem.Where(char.IsLetterOrDigit).ToArray());
                     if (compact.Length > 0) Add(Fnv1a.HashLower(compact), stem);
                 }
+                if (index.Count == 0)
+                {
+                    foreach (string baseAction in BaseAnimationActions)
+                    {
+                        Add(Fnv1a.HashLower(baseAction), baseAction);
+                        string compact = new(baseAction.Where(char.IsLetterOrDigit).ToArray());
+                        if (compact.Length > 0) Add(Fnv1a.HashLower(compact), baseAction);
+                    }
+                }
+
                 return index;
 
                 void Add(uint hash, string stem)
@@ -2853,8 +2931,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (string sk in skinsToTry)
             foreach (string pre in prefixModifiers ?? DefaultPrefixModifiers)
             foreach (string suf in suffixModifiers ?? DefaultSuffixModifiers)
+            foreach (string s in ExpandAnimationStemVariants(pre + stem + suf))
             {
-                string s = pre + stem + suf;
                 foreach (string root in AnimationRootPrefixes)
                 {
                     if (includeThemeLayout)
@@ -2879,6 +2957,21 @@ namespace AssetsManager.Services.Hashes.Guessers
                     }
                 }
             }
+        }
+
+        private static IEnumerable<string> ExpandAnimationStemVariants(string stem)
+        {
+            yield return stem;
+            if (stem.Contains("variant", StringComparison.OrdinalIgnoreCase))
+                yield return stem.Replace("variant", "varient", StringComparison.OrdinalIgnoreCase);
+            if (stem.Contains("spawn", StringComparison.OrdinalIgnoreCase))
+                yield return stem.Replace("spawn", "spwan", StringComparison.OrdinalIgnoreCase);
+            if (stem.Contains("_in", StringComparison.OrdinalIgnoreCase))
+                yield return stem.Replace("_in", "in", StringComparison.OrdinalIgnoreCase);
+            if (stem.Contains("_out", StringComparison.OrdinalIgnoreCase))
+                yield return stem.Replace("_out", "out", StringComparison.OrdinalIgnoreCase);
+            if (stem.Contains("_cycle", StringComparison.OrdinalIgnoreCase))
+                yield return stem.Replace("_cycle", "cycle", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsThemeAnimationContext(string character, string container)
