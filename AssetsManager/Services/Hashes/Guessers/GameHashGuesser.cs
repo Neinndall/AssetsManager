@@ -32,6 +32,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int CustomCharacterTexSampleSize = 20_000;
         private const int CustomWordAdditionSampleSize = 20_000;
         private const int CustomFocusedPathSampleSize = 20_000;
+        private const int CustomAnimationSampleSize = 30_000;
         private const int CustomBinCandidateBudget = 100_000_000;
         private const int CustomDataBinCandidateBudget = 100_000_000;
         private const int CustomCharacterDdsCandidateBudget = 100_000_000;
@@ -40,6 +41,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int CustomWordlistCandidateBudget = 100_000_000;
         private const int CustomWordAdditionCandidateBudget = 150_000_000;
         private const int CustomShaderCandidateBudget = 100_000_000;
+        private const int CustomAnimationCandidateBudget = 250_000_000;
         private const int SkinGroupCandidateBudget = 150_000_000;
         private const int SuffixSubstitutionCandidateBudget = 150_000_000;
         private const int CharacterSubstitutionCandidateBudget = 150_000_000;
@@ -419,6 +421,20 @@ namespace AssetsManager.Services.Hashes.Guessers
                     candidateBudget: CustomShaderCandidateBudget,
                     progress: count => progress?.Report(engine.CreateProgress(
                         "GAME Custom: shader vocabulary attack", progressOffset + count)));
+                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            }
+
+            if (ShouldRun("game-custom-animations"))
+            {
+                progress?.Report(engine.CreateProgress(
+                    "GAME Custom: animation actions build-list", checkedCandidates));
+                int progressOffset = checkedCandidates;
+                checkedCandidates += SubstituteAnimationBuildListWords(
+                    engine,
+                    cancellationToken,
+                    candidateBudget: CustomAnimationCandidateBudget,
+                    progress: count => progress?.Report(engine.CreateProgress(
+                        "GAME Custom: animation actions build-list", progressOffset + count)));
             }
 
             return checkedCandidates;
@@ -715,7 +731,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCount;
         }
 
-        private const int MaxGlobalAnimationActions = 3_000;
+        private const int MaxGlobalAnimationActions = 10_000;
 
         private static readonly string[] BaseAnimationActions =
         {
@@ -795,9 +811,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                     }
                 }
 
-                if (actionCounts.Count == 0)
+                foreach (string baseAction in BaseAnimationActions)
                 {
-                    foreach (string baseAction in BaseAnimationActions)
+                    if (!actionCounts.ContainsKey(baseAction))
                         actionCounts[baseAction] = 1;
                 }
 
@@ -820,6 +836,33 @@ namespace AssetsManager.Services.Hashes.Guessers
                     }
                 }
             });
+        }
+
+        private IReadOnlyList<string> GetExpandedGlobalAnimationActions(CancellationToken cancellationToken = default)
+        {
+            return Corpus.GetOrCreate("expanded-global-animation-actions", _ =>
+            {
+                IReadOnlyList<string> actions = GetGlobalAnimationActions(cancellationToken);
+                var expandedActions = new HashSet<string>(actions, StringComparer.OrdinalIgnoreCase);
+                foreach (string action in actions)
+                {
+                    foreach (Range range in action.AsSpan().Split('_'))
+                    {
+                        ReadOnlySpan<char> word = action.AsSpan(range);
+                        if (word.Length >= 2 && word.ContainsAnyExceptInRange('0', '9'))
+                            expandedActions.Add(word.ToString());
+                    }
+                }
+
+                return expandedActions.OrderBy(action => action, StringComparer.OrdinalIgnoreCase).ToList();
+            });
+        }
+
+        private IReadOnlyList<byte[]> GetExpandedGlobalAnimationActionBytes(CancellationToken cancellationToken = default)
+        {
+            return Corpus.GetOrCreate(
+                "expanded-global-animation-action-bytes",
+                _ => GetExpandedGlobalAnimationActions(cancellationToken).Select(Encoding.UTF8.GetBytes).ToList());
         }
 
         private IReadOnlyList<string> GetCharacterAnimationActions(string character)
@@ -1704,7 +1747,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                 }
-                GuessSpecialSkinBinPaths(engine, sourceWadPath, sourceChunkHash, cancellationToken);
+
+                GuessChampionSpecialBins(engine, sourceWadPath, cancellationToken);
                 return;
             }
 
@@ -2295,10 +2339,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             });
         }
 
-        private void GuessSpecialSkinBinPaths(
+        private void GuessChampionSpecialBins(
             HashGuessEngine engine,
             string sourceWadPath,
-            ulong sourceChunkHash,
             CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(sourceWadPath) ||
@@ -2310,26 +2353,26 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (parts.Length != 3 || !parts[1].Equals("wad", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            string wadName = parts[0];
-            if (string.IsNullOrEmpty(wadName))
+            string champName = parts[0];
+            if (string.IsNullOrEmpty(champName))
                 return;
 
-            ConcurrentDictionary<string, byte> scannedWadCharacters = _scannedWadCharacters.GetValue(
+            ConcurrentDictionary<string, byte> scannedCharacters = _scannedWadCharacters.GetValue(
                 engine,
                 _ => new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase));
-            if (!scannedWadCharacters.TryAdd(wadName, 0)) return;
+            if (!scannedCharacters.TryAdd(champName, 0)) return;
 
-            string champ = wadName.ToLowerInvariant();
+            string champ = champName.ToLowerInvariant();
             string[] aliases = champ.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ||
                                champ.StartsWith("pet", StringComparison.OrdinalIgnoreCase)
                 ? new[] { champ }
                 : new[] { champ, $"jade_{champ}" };
 
-            const int maxAnimationPathChars = 300;
-            Span<byte> animationPathUtf8 = stackalloc byte[Encoding.UTF8.GetMaxByteCount(maxAnimationPathChars)];
-
             foreach (string alias in aliases)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (engine.RemainingUnknownCount == 0) break;
+
                 CheckSpecialBin($"data/characters/{alias}/{alias}.bin");
                 CheckSpecialBin($"data/characters/{alias}/skins/root.bin");
                 CheckSpecialBin($"gameplay.hol{alias}ncvc.bin");
@@ -2343,30 +2386,11 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 for (int s = 0; s <= 350; s++)
                 {
+                    if (engine.RemainingUnknownCount == 0) break;
                     CheckSpecialBin($"gameplay.{alias}skin{s}viewcontroller.bin");
                 }
 
                 var dynamicSkins = GetChampionSkinNames(alias, cancellationToken);
-                var globalActions = Corpus.GetOrCreate("expanded-global-animation-actions", _ =>
-                {
-                    IReadOnlyList<string> actions = GetGlobalAnimationActions(cancellationToken);
-                    var expandedActions = new HashSet<string>(actions, StringComparer.OrdinalIgnoreCase);
-                    foreach (string action in actions)
-                    {
-                        foreach (Range range in action.AsSpan().Split('_'))
-                        {
-                            ReadOnlySpan<char> word = action.AsSpan(range);
-                            if (word.Length >= 2 && word.ContainsAnyExceptInRange('0', '9'))
-                                expandedActions.Add(word.ToString());
-                        }
-                    }
-
-                    return expandedActions.OrderBy(action => action, StringComparer.OrdinalIgnoreCase).ToList();
-                });
-                var globalActionBytes = Corpus.GetOrCreate(
-                    "expanded-global-animation-action-bytes",
-                    _ => globalActions.Select(Encoding.UTF8.GetBytes).ToList());
-
                 foreach (string skin in dynamicSkins)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -2374,51 +2398,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                     CheckSpecialBin($"data/characters/{alias}/skins/{skin}.bin");
                     CheckSpecialBin($"data/characters/{alias}/animations/{skin}.bin");
-
-                    string animPrefix = $"assets/characters/{alias}/skins/{skin}/animations/";
-                    if (animPrefix.Length + 100 <= maxAnimationPathChars)
-                    {
-                        int prefixByteLength = Encoding.UTF8.GetBytes(animPrefix, animationPathUtf8);
-
-                        for (int actionIndex = 0; actionIndex < globalActions.Count; actionIndex++)
-                        {
-                            if (engine.RemainingUnknownCount == 0) break;
-                            string action = globalActions[actionIndex];
-                            int totalLength = animPrefix.Length + action.Length + 4;
-                            if (totalLength <= maxAnimationPathChars)
-                            {
-                                ulong hash = HashAnimationPath(
-                                    animationPathUtf8,
-                                    prefixByteLength,
-                                    globalActionBytes[actionIndex]);
-                                if (engine.UnknownHashes.Contains(hash))
-                                {
-                                    Check(engine, $"{animPrefix}{action}.anm", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                                }
-                            }
-                            else
-                            {
-                                CheckSpecialBin($"{animPrefix}{action}.anm");
-                            }
-                        }
-                    }
-                    else
-                    {
-                        foreach (string action in globalActions)
-                        {
-                            if (engine.RemainingUnknownCount == 0) break;
-                            CheckSpecialBin($"{animPrefix}{action}.anm");
-                        }
-                    }
                 }
-            }
-
-            static ulong HashAnimationPath(Span<byte> destination, int prefixLength, ReadOnlySpan<byte> action)
-            {
-                ReadOnlySpan<byte> extension = ".anm"u8;
-                action.CopyTo(destination[prefixLength..]);
-                extension.CopyTo(destination[(prefixLength + action.Length)..]);
-                return XxHash64.HashToUInt64(destination[..(prefixLength + action.Length + extension.Length)]);
             }
 
             void CheckSpecialBin(string path)
@@ -2426,9 +2406,40 @@ namespace AssetsManager.Services.Hashes.Guessers
                 ulong hash = XxHash64Ext.Hash(path);
                 if (engine.UnknownHashes.Contains(hash))
                 {
-                    Check(engine, path, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                    Check(engine, path, HashGuessStrategy.BinEntry, sourceWadPath);
                 }
             }
+        }
+
+        internal int SubstituteAnimationBuildListWords(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int candidateBudget = CustomAnimationCandidateBudget,
+            Action<int> progress = null)
+        {
+            IReadOnlyList<string> animPaths = Corpus.GetOrCreate(
+                "custom-character-anm-paths",
+                paths => paths
+                    .Where(path => (path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase)
+                                 || path.StartsWith("data/characters/", StringComparison.OrdinalIgnoreCase))
+                                 && path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
+                    .ToList());
+
+            IReadOnlyList<string> words = GetExpandedGlobalAnimationActions(cancellationToken);
+            if (animPaths.Count == 0 || words.Count == 0) return 0;
+
+            IReadOnlyList<string> seedPaths = animPaths.Take(CustomAnimationSampleSize).ToList();
+
+            return _SubstituteBasenameWords(
+                engine,
+                seedPaths,
+                words,
+                oldWordCount: 1,
+                newWordCount: 1,
+                cancellationToken,
+                candidateBudget: candidateBudget,
+                source: "GAME Custom: animation actions build-list",
+                progress: progress);
         }
 
         private IReadOnlyDictionary<string, IReadOnlyList<string>> GetChampionSkinMap(CancellationToken cancellationToken)

@@ -2802,15 +2802,33 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
-        public void GameGrepWadResolvesTristanaHallOfLegendsSkin80Assets()
+        public void GameCustomAttacksResolvesAnimationBuildListSubMethod()
         {
             const string expectedAnim = "assets/characters/tristana/skins/skin80/animations/signature_move.anm";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/tristana/skins/skin80/animations/idle.anm"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expectedAnim);
+
+            game.RunCustomAttacks(
+                engine,
+                null,
+                CancellationToken.None,
+                new HashSet<string> { "game-custom-animations" });
+
+            AssertResolved(engine, expectedAnim);
+        }
+
+        [Fact]
+        public void GameGrepWadResolvesTristanaHallOfLegendsSkin80Bin()
+        {
             const string expectedBin = "data/characters/tristana/skins/skin80.bin";
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
             {
                 "assets/characters/tristana/skins/skin01/tristana_skin01_tx_cm.tex"
             }));
-            var engine = CreateEngine(HashGuessDomain.Game, expectedAnim, expectedBin);
+            var engine = CreateEngine(HashGuessDomain.Game, expectedBin);
 
             game.GrepWad(
                 engine,
@@ -2819,33 +2837,31 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 "Champions/Tristana.wad.client",
                 1);
 
-            Assert.Contains(engine.Matches.Values, m => m.Path == expectedAnim);
             Assert.Contains(engine.Matches.Values, m => m.Path == expectedBin);
             Assert.Equal(0, engine.RemainingUnknownCount);
         }
 
         [Fact]
-        public void GameGrepWadResolvesTristanaSkin80AnimationLearnedFromAnotherChampionCorpus()
+        public void GameCustomAttacksResolvesTristanaSkin80AnimationLearnedFromAnotherChampionCorpus()
         {
             const string expectedAnim = "assets/characters/tristana/skins/skin80/animations/run_homeguard_to_run_fast.anm";
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
             {
                 "assets/characters/yasuo/skins/skin01/animations/run_homeguard_to_run_fast.anm",
-                "assets/characters/tristana/skins/skin01/tristana_skin01_tx_cm.tex"
+                "assets/characters/tristana/skins/skin80/animations/idle.anm"
             }));
             var engine = CreateEngine(HashGuessDomain.Game, expectedAnim);
 
-            game.GrepWad(
+            game.RunCustomAttacks(
                 engine,
-                new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
-                "data/test.bin",
-                "Champions/Tristana.wad.client",
-                1);
+                null,
+                CancellationToken.None,
+                new HashSet<string> { "game-custom-animations" });
 
             AssertResolved(engine, expectedAnim);
             HashGuessMatch match = Assert.Single(engine.Matches).Value;
-            Assert.Equal(HashGuessStrategy.BinEntry, match.Strategy);
-            Assert.Equal("Champions/Tristana.wad.client", match.SourceWadPath);
+            Assert.Equal(HashGuessStrategy.WordlistVariant, match.Strategy);
+            Assert.Equal("GAME Custom: animation actions build-list", match.SourceWadPath);
         }
     }
 }
