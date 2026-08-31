@@ -40,7 +40,6 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int CustomWordlistCandidateBudget = 100_000_000;
         private const int CustomWordAdditionCandidateBudget = 150_000_000;
         private const int CustomShaderCandidateBudget = 100_000_000;
-        private const int CustomAnimationCandidateBudget = 500_000_000;
         private const int SkinGroupCandidateBudget = 150_000_000;
         private const int SuffixSubstitutionCandidateBudget = 150_000_000;
         private const int CharacterSubstitutionCandidateBudget = 150_000_000;
@@ -428,12 +427,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                 progress?.Report(engine.CreateProgress(
                     "GAME Custom: animation actions build-list", checkedCandidates));
                 int progressOffset = checkedCandidates;
-                checkedCandidates += SubstituteAnimationBuildListWords(
+                long animationCheckedCandidates = SubstituteAnimationBuildListWords(
                     engine,
                     cancellationToken,
-                    candidateBudget: CustomAnimationCandidateBudget,
                     progress: count => progress?.Report(engine.CreateProgress(
-                        "GAME Custom: animation actions build-list", progressOffset + count)));
+                        "GAME Custom: animation actions build-list",
+                        (int)Math.Min(int.MaxValue, progressOffset + count))));
+                checkedCandidates = (int)Math.Min(int.MaxValue, checkedCandidates + animationCheckedCandidates);
             }
 
             return checkedCandidates;
@@ -2411,11 +2411,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        internal int SubstituteAnimationBuildListWords(
+        internal long SubstituteAnimationBuildListWords(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
-            int candidateBudget = CustomAnimationCandidateBudget,
-            Action<int> progress = null)
+            long candidateBudget = long.MaxValue,
+            Action<long> progress = null)
         {
             if (engine.RemainingUnknownCount == 0 || candidateBudget <= 0) return 0;
 
@@ -2431,9 +2431,13 @@ namespace AssetsManager.Services.Hashes.Guessers
             IReadOnlyList<string> words = GetExpandedGlobalAnimationActions(cancellationToken);
             if (animPaths.Count == 0 || words.Count == 0) return 0;
 
+            IReadOnlyList<string> prioritizedWords = GetGlobalAnimationActions(cancellationToken)
+                .Concat(words)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
             IReadOnlyDictionary<string, IReadOnlyList<string>> wordsByFamily = Corpus.GetOrCreate(
-                "expanded-animation-actions-by-family",
-                _ => words
+                "expanded-animation-actions-by-family-v2",
+                _ => prioritizedWords
                     .GroupBy(ActionFamily, StringComparer.OrdinalIgnoreCase)
                     .Where(group => group.Key.Length > 0)
                     .ToDictionary(
@@ -2447,7 +2451,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList());
 
-            int checkedCandidates = 0;
+            long checkedCandidates = 0;
             int processedFormats = 0;
             var formats = new HashSet<(string Prefix, string Suffix, string Family, bool WholeBasename)>();
             var tokenRegex = new Regex(@"[^/_.-]+", RegexOptions.Compiled);
@@ -2468,28 +2472,52 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
             }
 
-            foreach (var format in formats
-                         .OrderBy(value => value.Family, StringComparer.Ordinal)
-                         .ThenBy(value => value.Suffix, StringComparer.Ordinal)
-                         .ThenBy(value => value.Prefix, StringComparer.Ordinal))
+            var orderedFormats = formats
+                .OrderBy(value => value.Family, StringComparer.Ordinal)
+                .ThenBy(value => value.Suffix, StringComparer.Ordinal)
+                .ThenBy(value => value.Prefix, StringComparer.Ordinal)
+                .ToList();
+            var wordPools = new Dictionary<(string Family, bool WholeBasename), IReadOnlyList<string>>();
+            const int wordBatchSize = 64;
+            for (int wordOffset = 0; ; wordOffset += wordBatchSize)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                int remaining = candidateBudget - checkedCandidates;
-                if (remaining <= 0 || engine.RemainingUnknownCount == 0) break;
+                long roundCandidateCount = 0;
+                foreach (var format in orderedFormats)
+                {
+                    var poolKey = (format.Family, format.WholeBasename);
+                    if (!wordPools.TryGetValue(poolKey, out IReadOnlyList<string> pool))
+                    {
+                        IEnumerable<string> poolWords = wordsByFamily[format.Family];
+                        if (format.WholeBasename) poolWords = poolWords.Concat(crossFamilyWords);
+                        pool = poolWords.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                        wordPools[poolKey] = pool;
+                    }
 
-                IEnumerable<string> relevantWords = wordsByFamily[format.Family];
-                if (format.WholeBasename)
-                    relevantWords = relevantWords.Concat(crossFamilyWords);
-                IEnumerable<string> candidates = relevantWords
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Select(word => format.Prefix + word + format.Suffix);
-                checkedCandidates += CheckIter(
-                    engine,
-                    candidates.Take(remaining),
-                    HashGuessStrategy.WordlistVariant,
-                    "GAME Custom: animation actions build-list",
-                    cancellationToken);
-                if ((++processedFormats & 0xff) == 0) progress?.Invoke(checkedCandidates);
+                    roundCandidateCount += Math.Max(0, Math.Min(wordBatchSize, pool.Count - wordOffset));
+                }
+
+                if (roundCandidateCount == 0
+                    || roundCandidateCount > candidateBudget - checkedCandidates
+                    || engine.RemainingUnknownCount == 0) break;
+
+                foreach (var format in orderedFormats)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    IReadOnlyList<string> pool = wordPools[(format.Family, format.WholeBasename)];
+                    int batchCount = Math.Min(wordBatchSize, pool.Count - wordOffset);
+                    if (batchCount <= 0) continue;
+                    IEnumerable<string> candidates = pool
+                        .Skip(wordOffset)
+                        .Take(batchCount)
+                        .Select(word => format.Prefix + word + format.Suffix);
+                    checkedCandidates += CheckIter(
+                        engine,
+                        candidates,
+                        HashGuessStrategy.WordlistVariant,
+                        "GAME Custom: animation actions build-list",
+                        cancellationToken);
+                    if ((++processedFormats & 0xff) == 0) progress?.Invoke(checkedCandidates);
+                }
             }
 
             progress?.Invoke(checkedCandidates);

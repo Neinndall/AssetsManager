@@ -2878,7 +2878,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             }));
             var engine = CreateEngine(HashGuessDomain.Game, run, runFast);
 
-            int checkedCandidates = game.SubstituteAnimationBuildListWords(
+            long checkedCandidates = game.SubstituteAnimationBuildListWords(
                 engine,
                 CancellationToken.None,
                 candidateBudget: 10_000);

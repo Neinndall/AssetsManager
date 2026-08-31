@@ -88,7 +88,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
-  - Hash Guessing Lab / GAME Custom now prioritizes a larger frequency-ranked animation vocabulary across every champion and skin without exhausting its candidate budget on global combinations.
+  - Hash Guessing Lab / GAME Custom now exhaustively distributes its animation vocabulary in equal rounds across every champion and skin without a global candidate limit.
   - Monitor / Watcher: Preserved active pagination page and synchronized PageInfo display when validating or updating monitored assets.
   - Api Center / Added in-place image replacement with Drag & Drop support and inline title editing for Pass Rewards cards.
   - Monitor / Api Center: Added dedicated Target Client Environment (PBE / LIVE) in Advanced Settings, completely decoupling API service connection and catalog extraction from general explorer preferences.
