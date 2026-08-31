@@ -2342,9 +2342,24 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 var dynamicSkins = GetChampionSkinNames(alias, cancellationToken);
-                var globalActions = GetGlobalAnimationActions(cancellationToken);
+                var globalActions = Corpus.GetOrCreate("expanded-global-animation-actions", _ =>
+                {
+                    IReadOnlyList<string> actions = GetGlobalAnimationActions(cancellationToken);
+                    var expandedActions = new HashSet<string>(actions, StringComparer.OrdinalIgnoreCase);
+                    foreach (string action in actions)
+                    {
+                        foreach (Range range in action.AsSpan().Split('_'))
+                        {
+                            ReadOnlySpan<char> word = action.AsSpan(range);
+                            if (word.Length >= 2 && word.ContainsAnyExceptInRange('0', '9'))
+                                expandedActions.Add(word.ToString());
+                        }
+                    }
+
+                    return expandedActions.OrderBy(action => action, StringComparer.OrdinalIgnoreCase).ToList();
+                });
                 var globalActionBytes = Corpus.GetOrCreate(
-                    "global-animation-action-bytes",
+                    "expanded-global-animation-action-bytes",
                     _ => globalActions.Select(Encoding.UTF8.GetBytes).ToList());
 
                 foreach (string skin in dynamicSkins)
