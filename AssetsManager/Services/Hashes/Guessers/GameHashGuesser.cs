@@ -27,23 +27,12 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs" };
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
         private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scannedWadCharacters = new();
-        private const int CustomBinSampleSize = 30_000;
-        private const int CustomCharacterDdsSampleSize = 25_000;
-        private const int CustomCharacterTexSampleSize = 20_000;
-        private const int CustomWordAdditionSampleSize = 20_000;
-        private const int CustomFocusedPathSampleSize = 20_000;
-        private const int CustomBinCandidateBudget = 100_000_000;
-        private const int CustomDataBinCandidateBudget = 100_000_000;
-        private const int CustomCharacterDdsCandidateBudget = 100_000_000;
-        private const int CustomCharacterTexCandidateBudget = 100_000_000;
-        private const int CustomSwordlistCandidateBudget = 100_000_000;
-        private const int CustomWordlistCandidateBudget = 100_000_000;
-        private const int CustomWordAdditionCandidateBudget = 150_000_000;
-        private const int CustomShaderCandidateBudget = 100_000_000;
-        private const int SkinGroupCandidateBudget = 150_000_000;
-        private const int SuffixSubstitutionCandidateBudget = 150_000_000;
-        private const int CharacterSubstitutionCandidateBudget = 150_000_000;
-        private const int SkinNumberSubstitutionCandidateBudget = 150_000_000;
+        private const int MaxCustomBuildListWords = 50_000;
+        private const int MaxCustomBinWords = 20_000;
+        private const int MaxCustomDataBinWords = 20_000;
+        private const int MaxCustomSwordlistWords = 20_000;
+        private const int MaxCustomDdsWords = 20_000;
+        private const int MaxCustomTexWords = 20_000;
         private const int EsportsBannerSingleCandidateBudget = 2_000_000;
         private const int EsportsBannerCompoundCandidateBudget = 10_000_000;
         private const int EsportsBannerDoubleCandidateBudget = 2_000_000;
@@ -183,16 +172,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                 "custom-bin-wordlist",
                 _ => HashGuessEngine.BuildWordlist(binNames));
 
-            IReadOnlyList<string> seedBins = binPaths.Take(CustomBinSampleSize).ToList();
-            IReadOnlyList<string> words = binWordlist.Take(CustomBinSampleSize).ToList();
-            return _SubstituteBasenameWords(
+            return SubstituteBasenameWordsExhaustive(
                 engine,
-                seedBins,
-                words,
+                binPaths,
+                binWordlist.Take(MaxCustomBinWords),
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: CustomBinCandidateBudget,
                 source: "GAME Custom: BIN basename wordlist",
                 progress);
         }
@@ -215,16 +201,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                 "custom-data-bin-wordlist",
                 _ => HashGuessEngine.BuildWordlist(dataNames));
 
-            IReadOnlyList<string> seedDataBins = dataPaths.Take(CustomBinSampleSize).ToList();
-            IReadOnlyList<string> words = dataWordlist.Take(CustomBinSampleSize).ToList();
-            return _SubstituteBasenameWords(
+            return SubstituteBasenameWordsExhaustive(
                 engine,
-                seedDataBins,
-                words,
+                dataPaths,
+                dataWordlist.Take(MaxCustomDataBinWords),
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: CustomDataBinCandidateBudget,
                 source: "GAME Custom: data BIN basename wordlist",
                 progress);
         }
@@ -247,16 +230,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                 "custom-character-dds-wordlist",
                 _ => HashGuessEngine.BuildWordlist(characterDdsNames));
 
-            IReadOnlyList<string> seedDdsPaths = characterDdsPaths.Take(CustomCharacterDdsSampleSize).ToList();
-            IReadOnlyList<string> words = characterDdsWordlist.Take(CustomCharacterDdsSampleSize).ToList();
-            return _SubstituteBasenameWords(
+            return SubstituteBasenameWordsExhaustive(
                 engine,
-                seedDdsPaths,
-                words,
+                characterDdsPaths,
+                characterDdsWordlist.Take(MaxCustomDdsWords),
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: CustomCharacterDdsCandidateBudget,
                 source: "GAME Custom: character DDS basename wordlist",
                 progress);
         }
@@ -279,16 +259,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                 "custom-character-tex-wordlist",
                 _ => HashGuessEngine.BuildWordlist(characterTexNames));
 
-            IReadOnlyList<string> seedTexPaths = characterTexPaths.Take(CustomCharacterTexSampleSize).ToList();
-            IReadOnlyList<string> words = characterTexWordlist.Take(CustomCharacterTexSampleSize).ToList();
-            return _SubstituteBasenameWords(
+            return SubstituteBasenameWordsExhaustive(
                 engine,
-                seedTexPaths,
-                words,
+                characterTexPaths,
+                characterTexWordlist.Take(MaxCustomTexWords),
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: CustomCharacterTexCandidateBudget,
                 source: "GAME Custom: character TEX basename wordlist",
                 progress);
         }
@@ -298,17 +275,14 @@ namespace AssetsManager.Services.Hashes.Guessers
             CancellationToken cancellationToken,
             Action<int> progress = null)
         {
-            IReadOnlyList<string> paths = Corpus.GetOrCreate(
-                "custom-focused-wordlist-paths",
-                values => values.Take(CustomFocusedPathSampleSize).ToList());
-            return _SubstituteBasenameWords(
+            IReadOnlyList<string> paths = Corpus.GetOrCreate("custom-focused-wordlist-paths", values => values.ToList());
+            return SubstituteBasenameWordsExhaustive(
                 engine,
                 paths,
-                BuildSwordlist(),
+                BuildSwordlist().Take(MaxCustomSwordlistWords),
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: CustomSwordlistCandidateBudget,
                 source: "GAME Custom: SwordList basename substitution",
                 progress);
         }
@@ -318,17 +292,14 @@ namespace AssetsManager.Services.Hashes.Guessers
             CancellationToken cancellationToken,
             Action<int> progress = null)
         {
-            IReadOnlyList<string> paths = Corpus.GetOrCreate(
-                "custom-focused-wordlist-paths",
-                values => values.Take(CustomFocusedPathSampleSize).ToList());
-            return _SubstituteBasenameWords(
+            IReadOnlyList<string> paths = Corpus.GetOrCreate("custom-focused-wordlist-paths", values => values.ToList());
+            return SubstituteBasenameWordsExhaustive(
                 engine,
                 paths,
                 BuildWordlist(),
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: CustomWordlistCandidateBudget,
                 source: "GAME Custom: WordList basename substitution",
                 progress);
         }
@@ -416,7 +387,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 checkedCandidates += SubstituteShaderVocabWords(
                     engine,
                     cancellationToken,
-                    candidateBudget: CustomShaderCandidateBudget,
                     progress: count => progress?.Report(engine.CreateProgress(
                         "GAME Custom: shader vocabulary attack", progressOffset + count)));
                 if (engine.RemainingUnknownCount == 0) return checkedCandidates;
@@ -442,10 +412,9 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal int SubstituteShaderVocabWords(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
-            int candidateBudget = CustomShaderCandidateBudget,
             Action<int> progress = null)
         {
-            if (engine.RemainingUnknownCount == 0 || candidateBudget <= 0) return 0;
+            if (engine.RemainingUnknownCount == 0) return 0;
 
             var shaderPattern = new Regex(@".*\.[pv]s(?:_[23]_0|(?=$|[.-]))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
             IReadOnlyList<string> shaderPaths = Corpus.GetOrCreate(
@@ -464,16 +433,49 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             if (shaderPaths.Count == 0 || shaderWordlist.Count == 0) return 0;
 
-            return _SubstituteBasenameWords(
+            return SubstituteBasenameWordsExhaustive(
                 engine,
                 shaderPaths,
                 shaderWordlist,
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: candidateBudget,
                 source: "GAME Custom: shader vocabulary attack",
                 progress: progress);
+        }
+
+        private int SubstituteBasenameWordsExhaustive(
+            HashGuessEngine engine,
+            IEnumerable<string> paths,
+            IEnumerable<string> words,
+            int oldWordCount,
+            int newWordCount,
+            CancellationToken cancellationToken,
+            string source,
+            Action<int> progress = null)
+        {
+            if (newWordCount != 1) throw new ArgumentOutOfRangeException(nameof(newWordCount));
+            IReadOnlyList<(string Prefix, string Suffix)> formats = BuildBasenameWordFormats(paths, oldWordCount, newWordCount)
+                .OrderBy(format => format.Prefix, StringComparer.Ordinal)
+                .ThenBy(format => format.Suffix, StringComparer.Ordinal)
+                .ToList();
+            IReadOnlyList<string> wordList = words.Take(MaxCustomBuildListWords).ToList();
+            if (formats.Count == 0 || wordList.Count == 0) return 0;
+
+            long checkedCount = 0;
+            foreach ((string prefix, string suffix) in formats)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                checkedCount += CheckIter(
+                    engine,
+                    wordList.Select(word => prefix + word + suffix),
+                    HashGuessStrategy.WordlistVariant,
+                    source);
+                progress?.Invoke((int)Math.Min(int.MaxValue, checkedCount));
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+
+            return (int)Math.Min(int.MaxValue, checkedCount);
         }
 
         internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
@@ -493,8 +495,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 source: "GAME basename word addition");
         }
 
-        internal IEnumerable<HashGuessCandidate> SubstituteCharacter(int candidateBudget = CharacterSubstitutionCandidateBudget) => GenerateCharacterSubstitutionCandidates(candidateBudget);
-        internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers(int candidateBudget = SkinNumberSubstitutionCandidateBudget) => GenerateSkinNumberCandidates(candidateBudget);
+        internal IEnumerable<HashGuessCandidate> SubstituteCharacter(int candidateBudget = int.MaxValue) => GenerateCharacterSubstitutionCandidates(candidateBudget);
+        internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers(int candidateBudget = int.MaxValue) => GenerateSkinNumberCandidates(candidateBudget);
         internal IEnumerable<HashGuessCandidate> SubstituteSuffixes(int candidateBudget = int.MaxValue) => GenerateSuffixCandidates(candidateBudget);
         internal int SubstituteLang(
             HashGuessEngine engine,
@@ -1342,11 +1344,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-chromas"))
                 checkedCandidates += await GuessSkinGroupsBinUsingChromas(engine, rootDirectory, cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-suffixes"))
-                checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(SuffixSubstitutionCandidateBudget), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
+                checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-skinnumbers"))
                 checkedCandidates += CheckCandidates(
                     engine,
-                    SubstituteSkinNumbers(SkinNumberSubstitutionCandidateBudget),
+                    SubstituteSkinNumbers(),
                     "GAME skin number combinations",
                     cancellationToken,
                     progress,
@@ -1354,7 +1356,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-characters"))
                 checkedCandidates += CheckCandidates(
                     engine,
-                    SubstituteCharacter(CharacterSubstitutionCandidateBudget),
+                    SubstituteCharacter(),
                     "GAME character substitution",
                     cancellationToken,
                     progress,
@@ -1365,7 +1367,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 checkedCandidates += AddBasenameWord(
                     engine,
                     cancellationToken,
-                    candidateBudget: CustomWordAdditionCandidateBudget);
+                    candidateBudget: int.MaxValue);
                 progress?.Report(engine.CreateProgress("GAME basename word addition", checkedCandidates));
             }
 
@@ -1446,10 +1448,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                         foreach (var combination in GetCombinations(tokens, length))
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            if (generated >= SkinGroupCandidateBudget) return generated;
                             string suffix = string.Concat(combination.SelectMany(value => value).OrderBy(value => value, StringComparer.Ordinal));
                             Check(engine, "data/" + pair.Key + suffix + ".bin", HashGuessStrategy.ChromaGroupVariant, "Local skins.json chroma groups");
-                            generated++;
+                            if (generated < int.MaxValue) generated++;
                             if ((generated % 5000) == 0)
                             {
                                 progress?.Report(engine.CreateProgress(stageName, progressOffset + generated));
@@ -1543,9 +1544,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     {
                         foreach (var combination in GetCombinations(skins, length))
                         {
-                            if (generated >= SkinGroupCandidateBudget) return generated;
                             Check(engine, $"data/{pair.Key}{string.Concat(combination)}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
-                            generated++;
+                            if (generated < int.MaxValue) generated++;
                             if ((generated % 5000) == 0)
                             {
                                 progress?.Report(engine.CreateProgress(stageName, progressOffset + generated));

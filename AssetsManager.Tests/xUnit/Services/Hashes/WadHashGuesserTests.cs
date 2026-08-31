@@ -2502,6 +2502,25 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GameCustomCharacterTexWordlistAttackReachesPathsBeyondFormerSampleLimit()
+        {
+            var paths = Enumerable.Range(0, 20_001)
+                .Select(index => $"assets/characters/champ{index:D5}/skins/base/idle.tex")
+                .Concat(new[]
+                {
+                    "assets/characters/ahri/skins/base/run.tex",
+                    "assets/characters/zyra/skins/base/idle.tex"
+                });
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, paths));
+            const string expected = "assets/characters/zyra/skins/base/run.tex";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.SubstituteCharacterTexBasenameWords(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
         public void GameWordAdditionUsesDeterministicGameLists()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]

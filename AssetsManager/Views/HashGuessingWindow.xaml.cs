@@ -155,20 +155,20 @@ namespace AssetsManager.Views
                 Id = "game-custom",
                 DomainIndex = 0,
                 Name = "Game Custom Guess",
-                Description = "Permutations and word variations across 30,000 BIN, DDS, TEX and custom shader paths.",
+                Description = "Exhaustive permutations and word variations across BIN, DDS, TEX, shader and animation paths.",
                 Category = "Deep Search",
                 IconKind = MaterialIconKind.FlaskOutline,
-                BadgeText = "🚀 FAST (~15s)",
-                BadgeBrush = accentTeal,
-                EstimatedTime = "~15s"
+                BadgeText = "⏳ EXHAUSTIVE",
+                BadgeBrush = accentOrange,
+                EstimatedTime = "Variable"
             };
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-bin", Name = "SubstituteBinBasenameWords", Description = "30,000 top BIN samples word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-databin", Name = "SubstituteDataBinBasenameWords", Description = "data/*.bin basename word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-dds", Name = "SubstituteCharacterDdsBasenameWords", Description = "Character .dds texture word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-tex", Name = "SubstituteCharacterTexBasenameWords", Description = "Character .tex texture word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-swordlist", Name = "SubstituteSwordlistBasenameWords", Description = "Full corpus basename words substitution matrix", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-shaders", Name = "SubstituteShaderVocabWords", Description = "Custom shader vocabulary and compound names", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-animations", Name = "SubstituteAnimationBuildListWords", Description = "Animation actions build-list (loop_in, tokens) across skins", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-bin", Name = "SubstituteBinBasenameWords", Description = "All BIN basename word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-databin", Name = "SubstituteDataBinBasenameWords", Description = "All data/*.bin basename word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-dds", Name = "SubstituteCharacterDdsBasenameWords", Description = "All character .dds texture word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-tex", Name = "SubstituteCharacterTexBasenameWords", Description = "All character .tex texture word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-swordlist", Name = "SubstituteSwordlistBasenameWords", Description = "Full corpus basename words substitution matrix", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-shaders", Name = "SubstituteShaderVocabWords", Description = "Custom shader vocabulary and compound names", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-animations", Name = "SubstituteAnimationBuildListWords", Description = "Animation actions build-list (loop_in, tokens) across skins", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             _allMethods.Add(gameCustom);
 
             // LCU (Domain 1)
