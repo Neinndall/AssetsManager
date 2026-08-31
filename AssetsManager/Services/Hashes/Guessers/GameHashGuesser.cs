@@ -2945,14 +2945,14 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             foreach (string path in EnumerateAnimationNameVariants(character, skin, name, prefixes, suffixes, includeThemeLayout))
             {
-                if (remaining.Remove(XxHash64Ext.Hash(PathUtils.NormalizePath(path))))
+                if (remaining.Remove(XxHash64Ext.Hash(path)))
                     yield return path;
             }
 
             string converted = Regex.Replace(name, @"skin\d+", skin, RegexOptions.IgnoreCase);
             if (converted.Equals(name, StringComparison.OrdinalIgnoreCase)) yield break;
             foreach (string path in EnumerateAnimationNameVariants(character, skin, converted, prefixes, suffixes, includeThemeLayout))
-                if (remaining.Remove(XxHash64Ext.Hash(PathUtils.NormalizePath(path))))
+                if (remaining.Remove(XxHash64Ext.Hash(path)))
                     yield return path;
         }
 
@@ -2968,7 +2968,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (string.IsNullOrWhiteSpace(stem) || stem.Contains('/') || stem.Contains('\\')) yield break;
             stem = stem.ToLowerInvariant();
 
-            string paddedSkin = Regex.IsMatch(skin, @"^skin\d$") ? "skin0" + skin[4..] : (Regex.IsMatch(skin, @"^skin0\d$") ? "skin" + skin[5..] : skin);
+            string paddedSkin = skin.Length == 5 && skin.StartsWith("skin", StringComparison.OrdinalIgnoreCase) && char.IsDigit(skin[4])
+                ? "skin0" + skin[4..]
+                : skin.Length == 6 && skin.StartsWith("skin0", StringComparison.OrdinalIgnoreCase) && char.IsDigit(skin[5])
+                    ? "skin" + skin[5..]
+                    : skin;
             string[] skinsToTry = string.Equals(skin, paddedSkin, StringComparison.OrdinalIgnoreCase) ? new[] { skin } : new[] { skin, paddedSkin };
 
             foreach (string sk in skinsToTry)
