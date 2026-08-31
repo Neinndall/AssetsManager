@@ -5,11 +5,14 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Utils;
 using AssetsManager.Views.Controls.Explorer;
 using AssetsManager.Views.Helpers;
 using Microsoft.Win32;
@@ -22,12 +25,41 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isExpanded;
         private bool _isSelected;
         private bool _isMultiSelected;
+        private ImageSource _thumbnail;
+        private bool _isImageFile;
+        private bool _isTexturePreviewActive;
 
         public string Name { get; set; }
         public string FullPath { get; set; }
         public bool IsFile { get; set; }
         public MaterialIconKind IconKind { get; set; }
         public Brush IconColor { get; set; }
+
+        public bool IsImageFile
+        {
+            get => _isImageFile;
+            set => SetProperty(ref _isImageFile, value);
+        }
+
+        public ImageSource Thumbnail
+        {
+            get => _thumbnail;
+            set
+            {
+                if (SetProperty(ref _thumbnail, value))
+                {
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasThumbnail)));
+                }
+            }
+        }
+
+        public bool HasThumbnail => _thumbnail != null;
+
+        public bool IsTexturePreviewActive
+        {
+            get => _isTexturePreviewActive;
+            set => SetProperty(ref _isTexturePreviewActive, value);
+        }
 
         public bool IsExpanded
         {
@@ -54,11 +86,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        private void SetProperty(ref bool field, bool value, [CallerMemberName] string propertyName = null)
+        private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
         {
-            if (field == value) return;
+            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
             field = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            return true;
         }
     }
 
@@ -72,6 +105,9 @@ namespace AssetsManager.Views.Controls.Viewer
         private ProjectExplorerNode _currentFolderNode;
         private readonly List<ProjectExplorerNode> _allNodes = new List<ProjectExplorerNode>();
         private readonly ObservableCollection<ProjectExplorerNode> _folderOnlyNodes = new ObservableCollection<ProjectExplorerNode>();
+        private bool _isTexturePreviewEnabled;
+        private readonly Dictionary<string, ImageSource> _thumbnailCache = new(StringComparer.OrdinalIgnoreCase);
+        private CancellationTokenSource _thumbnailCts;
         
         private readonly SolidColorBrush _folderBrush = new SolidColorBrush(Color.FromRgb(255, 179, 0)); // Accent Orange/Gold
         private readonly SolidColorBrush _modelBrush = new SolidColorBrush(Color.FromRgb(3, 169, 244));  // Accent DodgerBlue
@@ -81,6 +117,27 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly SolidColorBrush _skeletonBrush = new SolidColorBrush(Color.FromRgb(233, 30, 99)); // Accent Pink
 
         public string CurrentRootFolder => _currentRootFolder;
+
+        public bool IsTexturePreviewEnabled
+        {
+            get => _isTexturePreviewEnabled;
+            set
+            {
+                if (_isTexturePreviewEnabled != value)
+                {
+                    _isTexturePreviewEnabled = value;
+                    if (TexturePreviewToggle != null)
+                    {
+                        TexturePreviewToggle.IsChecked = value;
+                    }
+                    UpdateNodesPreviewState();
+                    if (_isTexturePreviewEnabled)
+                    {
+                        LoadThumbnailsForCurrentFolder();
+                    }
+                }
+            }
+        }
 
         public ViewerProjectExplorerControl()
         {
@@ -239,7 +296,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     {
                         color = _animBrush;
                     }
-                    else if (ext == ".dds" || ext == ".tex" || ext == ".png" || ext == ".jpg" || ext == ".tga")
+                    bool isImage = ext == ".dds" || ext == ".tex" || ext == ".png" || ext == ".jpg" || ext == ".tga";
+                    if (isImage)
                     {
                         color = _imageBrush;
                     }
@@ -249,6 +307,8 @@ namespace AssetsManager.Views.Controls.Viewer
                         Name = Path.GetFileName(file),
                         FullPath = file,
                         IsFile = true,
+                        IsImageFile = isImage,
+                        IsTexturePreviewActive = isImage && _isTexturePreviewEnabled,
                         IconKind = icon,
                         IconColor = color
                     };
@@ -294,6 +354,11 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             FilesListBox.ItemsSource = matchingFiles;
+            UpdateNodesPreviewState();
+            if (_isTexturePreviewEnabled)
+            {
+                LoadThumbnailsForCurrentFolder();
+            }
         }
 
         private ProjectExplorerNode FilterFolderNodeRecursive(
@@ -438,6 +503,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 FilesListBox.ItemsSource = folderNode.Children;
             }
             UpdateBreadcrumbs(folderNode);
+            UpdateNodesPreviewState();
+            if (_isTexturePreviewEnabled)
+            {
+                LoadThumbnailsForCurrentFolder();
+            }
         }
 
         public void ShowImagePreview(string filePath, BitmapSource image)
@@ -657,6 +727,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void ClearWorkspace()
         {
+            _thumbnailCts?.Cancel();
+            lock (_thumbnailCache)
+            {
+                _thumbnailCache.Clear();
+            }
+
             _allNodes.Clear();
             _folderOnlyNodes.Clear();
             _currentRootFolder = null;
@@ -665,6 +741,95 @@ namespace AssetsManager.Views.Controls.Viewer
             ClearImagePreview();
             Breadcrumbs.Clear();
             SearchBox.Text = string.Empty;
+        }
+
+        private void TexturePreviewToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _isTexturePreviewEnabled = TexturePreviewToggle.IsChecked == true;
+            UpdateNodesPreviewState();
+            if (_isTexturePreviewEnabled)
+            {
+                LoadThumbnailsForCurrentFolder();
+            }
+        }
+
+        private void UpdateNodesPreviewState()
+        {
+            if (FilesListBox.ItemsSource is IEnumerable<ProjectExplorerNode> nodes)
+            {
+                foreach (var node in nodes)
+                {
+                    if (node.IsImageFile)
+                    {
+                        node.IsTexturePreviewActive = _isTexturePreviewEnabled;
+                    }
+                }
+            }
+        }
+
+        private void LoadThumbnailsForCurrentFolder()
+        {
+            if (!_isTexturePreviewEnabled || FilesListBox.ItemsSource == null) return;
+
+            _thumbnailCts?.Cancel();
+            _thumbnailCts = new CancellationTokenSource();
+            var token = _thumbnailCts.Token;
+
+            var imageNodes = FilesListBox.ItemsSource.OfType<ProjectExplorerNode>()
+                .Where(n => n.IsImageFile && n.Thumbnail == null)
+                .ToList();
+
+            if (imageNodes.Count == 0) return;
+
+            Task.Run(() =>
+            {
+                foreach (var node in imageNodes)
+                {
+                    if (token.IsCancellationRequested) break;
+
+                    ImageSource thumbnail = null;
+                    lock (_thumbnailCache)
+                    {
+                        if (_thumbnailCache.TryGetValue(node.FullPath, out var cached))
+                        {
+                            thumbnail = cached;
+                        }
+                    }
+
+                    if (thumbnail == null)
+                    {
+                        try
+                        {
+                            var bmp = TextureUtils.LoadTextureFromFile(node.FullPath, 96, 96);
+                            if (bmp != null)
+                            {
+                                if (bmp.CanFreeze) bmp.Freeze();
+                                thumbnail = bmp;
+                                lock (_thumbnailCache)
+                                {
+                                    _thumbnailCache[node.FullPath] = thumbnail;
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // Ignored: corrupt or unsupported texture
+                        }
+                    }
+
+                    if (thumbnail != null && !token.IsCancellationRequested)
+                    {
+                        var loaded = thumbnail;
+                        Dispatcher.InvokeAsync(() =>
+                        {
+                            if (!token.IsCancellationRequested)
+                            {
+                                node.Thumbnail = loaded;
+                            }
+                        }, System.Windows.Threading.DispatcherPriority.Background);
+                    }
+                }
+            }, token);
         }
 
         private ProjectExplorerNode FindRootNodeFor(ProjectExplorerNode node)
