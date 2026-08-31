@@ -2320,7 +2320,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 ? new[] { champ }
                 : new[] { champ, $"jade_{champ}" };
 
-            Span<char> animPathBuffer = stackalloc char[300];
+            const int animationPathBufferLength = 300;
+            Span<byte> animPathBuffer = stackalloc byte[Encoding.UTF8.GetMaxByteCount(animationPathBufferLength)];
 
             foreach (string alias in aliases)
             {
@@ -2342,6 +2343,9 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 var dynamicSkins = GetChampionSkinNames(alias, cancellationToken);
                 var globalActions = GetGlobalAnimationActions(cancellationToken);
+                var globalActionBytes = Corpus.GetOrCreate(
+                    "global-animation-action-bytes",
+                    _ => globalActions.Select(Encoding.UTF8.GetBytes).ToList());
 
                 foreach (string skin in dynamicSkins)
                 {
@@ -2352,24 +2356,25 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckSpecialBin($"data/characters/{alias}/animations/{skin}.bin");
 
                     string animPrefix = $"assets/characters/{alias}/skins/{skin}/animations/";
-                    if (animPrefix.Length + 100 <= animPathBuffer.Length)
+                    if (animPrefix.Length + 100 <= animationPathBufferLength)
                     {
-                        animPrefix.AsSpan().CopyTo(animPathBuffer);
-                        int prefixLen = animPrefix.Length;
+                        int prefixByteLength = Encoding.UTF8.GetBytes(animPrefix, animPathBuffer);
 
-                        foreach (string action in globalActions)
+                        for (int actionIndex = 0; actionIndex < globalActions.Count; actionIndex++)
                         {
                             if (engine.RemainingUnknownCount == 0) break;
-                            int totalLen = prefixLen + action.Length + 4;
-                            if (totalLen <= animPathBuffer.Length)
+                            string action = globalActions[actionIndex];
+                            int totalLength = animPrefix.Length + action.Length + 4;
+                            if (totalLength <= animationPathBufferLength)
                             {
-                                action.AsSpan().CopyTo(animPathBuffer[prefixLen..]);
-                                ".anm".AsSpan().CopyTo(animPathBuffer[(prefixLen + action.Length)..]);
-                                ReadOnlySpan<char> pathSpan = animPathBuffer[..totalLen];
-                                ulong hash = XxHash64Ext.Hash(pathSpan);
+                                byte[] actionBytes = globalActionBytes[actionIndex];
+                                actionBytes.CopyTo(animPathBuffer[prefixByteLength..]);
+                                ".anm"u8.CopyTo(animPathBuffer[(prefixByteLength + actionBytes.Length)..]);
+                                int totalByteLength = prefixByteLength + actionBytes.Length + 4;
+                                ulong hash = XxHash64.HashToUInt64(animPathBuffer[..totalByteLength]);
                                 if (engine.UnknownHashes.Contains(hash))
                                 {
-                                    Check(engine, pathSpan.ToString(), HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                                    Check(engine, $"{animPrefix}{action}.anm", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
                                 }
                             }
                             else
