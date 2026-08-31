@@ -2320,8 +2320,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 ? new[] { champ }
                 : new[] { champ, $"jade_{champ}" };
 
-            const int animationPathBufferLength = 300;
-            Span<byte> animPathBuffer = stackalloc byte[Encoding.UTF8.GetMaxByteCount(animationPathBufferLength)];
+            const int maxAnimationPathChars = 300;
+            Span<byte> animationPathUtf8 = stackalloc byte[Encoding.UTF8.GetMaxByteCount(maxAnimationPathChars)];
 
             foreach (string alias in aliases)
             {
@@ -2342,9 +2342,24 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 var dynamicSkins = GetChampionSkinNames(alias, cancellationToken);
-                var globalActions = GetGlobalAnimationActions(cancellationToken);
+                var globalActions = Corpus.GetOrCreate("expanded-global-animation-actions", _ =>
+                {
+                    IReadOnlyList<string> actions = GetGlobalAnimationActions(cancellationToken);
+                    var expandedActions = new HashSet<string>(actions, StringComparer.OrdinalIgnoreCase);
+                    foreach (string action in actions)
+                    {
+                        foreach (Range range in action.AsSpan().Split('_'))
+                        {
+                            ReadOnlySpan<char> word = action.AsSpan(range);
+                            if (word.Length >= 2 && word.ContainsAnyExceptInRange('0', '9'))
+                                expandedActions.Add(word.ToString());
+                        }
+                    }
+
+                    return expandedActions.OrderBy(action => action, StringComparer.OrdinalIgnoreCase).ToList();
+                });
                 var globalActionBytes = Corpus.GetOrCreate(
-                    "global-animation-action-bytes",
+                    "expanded-global-animation-action-bytes",
                     _ => globalActions.Select(Encoding.UTF8.GetBytes).ToList());
 
                 foreach (string skin in dynamicSkins)
@@ -2356,22 +2371,21 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckSpecialBin($"data/characters/{alias}/animations/{skin}.bin");
 
                     string animPrefix = $"assets/characters/{alias}/skins/{skin}/animations/";
-                    if (animPrefix.Length + 100 <= animationPathBufferLength)
+                    if (animPrefix.Length + 100 <= maxAnimationPathChars)
                     {
-                        int prefixByteLength = Encoding.UTF8.GetBytes(animPrefix, animPathBuffer);
+                        int prefixByteLength = Encoding.UTF8.GetBytes(animPrefix, animationPathUtf8);
 
                         for (int actionIndex = 0; actionIndex < globalActions.Count; actionIndex++)
                         {
                             if (engine.RemainingUnknownCount == 0) break;
                             string action = globalActions[actionIndex];
                             int totalLength = animPrefix.Length + action.Length + 4;
-                            if (totalLength <= animationPathBufferLength)
+                            if (totalLength <= maxAnimationPathChars)
                             {
-                                byte[] actionBytes = globalActionBytes[actionIndex];
-                                actionBytes.CopyTo(animPathBuffer[prefixByteLength..]);
-                                ".anm"u8.CopyTo(animPathBuffer[(prefixByteLength + actionBytes.Length)..]);
-                                int totalByteLength = prefixByteLength + actionBytes.Length + 4;
-                                ulong hash = XxHash64.HashToUInt64(animPathBuffer[..totalByteLength]);
+                                ulong hash = HashAnimationPath(
+                                    animationPathUtf8,
+                                    prefixByteLength,
+                                    globalActionBytes[actionIndex]);
                                 if (engine.UnknownHashes.Contains(hash))
                                 {
                                     Check(engine, $"{animPrefix}{action}.anm", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
@@ -2392,6 +2406,14 @@ namespace AssetsManager.Services.Hashes.Guessers
                         }
                     }
                 }
+            }
+
+            static ulong HashAnimationPath(Span<byte> destination, int prefixLength, ReadOnlySpan<byte> action)
+            {
+                ReadOnlySpan<byte> extension = ".anm"u8;
+                action.CopyTo(destination[prefixLength..]);
+                extension.CopyTo(destination[(prefixLength + action.Length)..]);
+                return XxHash64.HashToUInt64(destination[..(prefixLength + action.Length + extension.Length)]);
             }
 
             void CheckSpecialBin(string path)
