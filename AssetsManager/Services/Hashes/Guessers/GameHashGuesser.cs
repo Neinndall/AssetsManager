@@ -41,7 +41,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int CustomWordlistCandidateBudget = 100_000_000;
         private const int CustomWordAdditionCandidateBudget = 150_000_000;
         private const int CustomShaderCandidateBudget = 100_000_000;
-        private const int CustomAnimationCandidateBudget = 250_000_000;
+        private const int CustomAnimationCandidateBudget = 100_000_000;
         private const int SkinGroupCandidateBudget = 150_000_000;
         private const int SuffixSubstitutionCandidateBudget = 150_000_000;
         private const int CharacterSubstitutionCandidateBudget = 150_000_000;
