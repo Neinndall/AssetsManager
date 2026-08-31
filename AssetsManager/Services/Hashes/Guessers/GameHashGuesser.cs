@@ -32,7 +32,6 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int CustomCharacterTexSampleSize = 20_000;
         private const int CustomWordAdditionSampleSize = 20_000;
         private const int CustomFocusedPathSampleSize = 20_000;
-        private const int CustomAnimationSampleSize = 30_000;
         private const int CustomBinCandidateBudget = 100_000_000;
         private const int CustomDataBinCandidateBudget = 100_000_000;
         private const int CustomCharacterDdsCandidateBudget = 100_000_000;
@@ -41,7 +40,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int CustomWordlistCandidateBudget = 100_000_000;
         private const int CustomWordAdditionCandidateBudget = 150_000_000;
         private const int CustomShaderCandidateBudget = 100_000_000;
-        private const int CustomAnimationCandidateBudget = 100_000_000;
+        private const int CustomAnimationCandidateBudget = 500_000_000;
         private const int SkinGroupCandidateBudget = 150_000_000;
         private const int SuffixSubstitutionCandidateBudget = 150_000_000;
         private const int CharacterSubstitutionCandidateBudget = 150_000_000;
@@ -731,7 +730,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCount;
         }
 
-        private const int MaxGlobalAnimationActions = 10_000;
+        private const int MaxGlobalAnimationWords = 100_000;
 
         private static readonly string[] BaseAnimationActions =
         {
@@ -748,7 +747,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 var actionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 var animRegex = new Regex(
-                    @"^(?:assets|data)/characters/(?<char>[^/]+)/(?:skins/(?<skin>[^/]+)|themes/(?<theme>[^/]+)|animations)/animations/(?<file>[^/]+)\.anm$",
+                    @"^(?:assets|data)/characters/(?<char>[^/]+)/(?:(?:skins/(?<skin>[^/]+)|themes/(?<theme>[^/]+))/animations/|animations/)(?<file>[^/]+)\.anm$",
                     RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
                 for (int pathIndex = 0; pathIndex < knownPaths.Count; pathIndex++)
@@ -756,7 +755,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     if ((pathIndex & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
                     string path = knownPaths[pathIndex];
                     if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ||
-                        !path.Contains("/characters/", StringComparison.OrdinalIgnoreCase)) continue;
+                        !path.Contains("/characters/", StringComparison.OrdinalIgnoreCase) ||
+                        !path.Contains("/animations/", StringComparison.OrdinalIgnoreCase)) continue;
 
                     string basename = GetBasename(path);
                     if (basename.Length <= 4) continue;
@@ -819,9 +819,9 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 return actionCounts
                     .OrderByDescending(kv => kv.Value)
-                    .Take(MaxGlobalAnimationActions)
+                    .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                    .Take(MaxGlobalAnimationWords)
                     .Select(kv => kv.Key)
-                    .OrderBy(a => a, StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
                 void AddCount(string action)
@@ -2417,29 +2417,92 @@ namespace AssetsManager.Services.Hashes.Guessers
             int candidateBudget = CustomAnimationCandidateBudget,
             Action<int> progress = null)
         {
+            if (engine.RemainingUnknownCount == 0 || candidateBudget <= 0) return 0;
+
             IReadOnlyList<string> animPaths = Corpus.GetOrCreate(
                 "custom-character-anm-paths",
                 paths => paths
                     .Where(path => (path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase)
                                  || path.StartsWith("data/characters/", StringComparison.OrdinalIgnoreCase))
+                                 && path.Contains("/animations/", StringComparison.OrdinalIgnoreCase)
                                  && path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
                     .ToList());
 
             IReadOnlyList<string> words = GetExpandedGlobalAnimationActions(cancellationToken);
             if (animPaths.Count == 0 || words.Count == 0) return 0;
 
-            IReadOnlyList<string> seedPaths = animPaths.Take(CustomAnimationSampleSize).ToList();
+            IReadOnlyDictionary<string, IReadOnlyList<string>> wordsByFamily = Corpus.GetOrCreate(
+                "expanded-animation-actions-by-family",
+                _ => words
+                    .GroupBy(ActionFamily, StringComparer.OrdinalIgnoreCase)
+                    .Where(group => group.Key.Length > 0)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => (IReadOnlyList<string>)group.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+                        StringComparer.OrdinalIgnoreCase));
+            IReadOnlyList<string> crossFamilyWords = Corpus.GetOrCreate(
+                "prioritized-cross-family-animation-actions",
+                _ => BaseAnimationActions
+                    .Concat(GetGlobalAnimationActions(cancellationToken).Take(2_048))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList());
 
-            return _SubstituteBasenameWords(
-                engine,
-                seedPaths,
-                words,
-                oldWordCount: 1,
-                newWordCount: 1,
-                cancellationToken,
-                candidateBudget: candidateBudget,
-                source: "GAME Custom: animation actions build-list",
-                progress: progress);
+            int checkedCandidates = 0;
+            int processedFormats = 0;
+            var formats = new HashSet<(string Prefix, string Suffix, string Family, bool WholeBasename)>();
+            var tokenRegex = new Regex(@"[^/_.-]+", RegexOptions.Compiled);
+            foreach (string path in animPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int basenameStart = path.LastIndexOf('/') + 1;
+                int extensionStart = path.LastIndexOf('.');
+                if (extensionStart <= basenameStart) continue;
+
+                foreach (Match match in tokenRegex.Matches(path, basenameStart))
+                {
+                    if (match.Index >= extensionStart) break;
+                    string family = ActionFamily(match.Value);
+                    if (family.Length == 0 || !wordsByFamily.ContainsKey(family)) continue;
+                    bool wholeBasename = match.Index == basenameStart && match.Index + match.Length == extensionStart;
+                    formats.Add((path[..match.Index], path[(match.Index + match.Length)..], family, wholeBasename));
+                }
+            }
+
+            foreach (var format in formats
+                         .OrderBy(value => value.Family, StringComparer.Ordinal)
+                         .ThenBy(value => value.Suffix, StringComparer.Ordinal)
+                         .ThenBy(value => value.Prefix, StringComparer.Ordinal))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int remaining = candidateBudget - checkedCandidates;
+                if (remaining <= 0 || engine.RemainingUnknownCount == 0) break;
+
+                IEnumerable<string> relevantWords = wordsByFamily[format.Family];
+                if (format.WholeBasename)
+                    relevantWords = relevantWords.Concat(crossFamilyWords);
+                IEnumerable<string> candidates = relevantWords
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Select(word => format.Prefix + word + format.Suffix);
+                checkedCandidates += CheckIter(
+                    engine,
+                    candidates.Take(remaining),
+                    HashGuessStrategy.WordlistVariant,
+                    "GAME Custom: animation actions build-list",
+                    cancellationToken);
+                if ((++processedFormats & 0xff) == 0) progress?.Invoke(checkedCandidates);
+            }
+
+            progress?.Invoke(checkedCandidates);
+            return checkedCandidates;
+
+            static string ActionFamily(string action)
+            {
+                int separator = action.IndexOfAny('_', '-', '.');
+                ReadOnlySpan<char> head = separator >= 0 ? action.AsSpan(0, separator) : action.AsSpan();
+                int length = head.Length;
+                while (length > 0 && char.IsDigit(head[length - 1])) length--;
+                return length == 0 ? string.Empty : head[..length].ToString().ToLowerInvariant();
+            }
         }
 
         private IReadOnlyDictionary<string, IReadOnlyList<string>> GetChampionSkinMap(CancellationToken cancellationToken)

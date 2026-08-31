@@ -2863,5 +2863,29 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(HashGuessStrategy.WordlistVariant, match.Strategy);
             Assert.Equal("GAME Custom: animation actions build-list", match.SourceWadPath);
         }
+
+        [Fact]
+        public void GameCustomAnimationBuildListPrioritizesRelatedAttackActionsAcrossAllPaths()
+        {
+            const string run = "assets/characters/tristana/skins/skin80/animations/attack_crit_to_run.anm";
+            const string runFast = "assets/characters/tristana/skins/skin80/animations/attack_crit_to_run_fast.anm";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/aatrox/skins/base/animations/idle.anm",
+                "assets/characters/milio/skins/base/animations/attack_crit.anm",
+                "assets/characters/tristana/skins/skin80/animations/attack2_to_run.anm",
+                "assets/characters/tristana/skins/skin80/animations/attack2_to_run_fast.anm"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, run, runFast);
+
+            int checkedCandidates = game.SubstituteAnimationBuildListWords(
+                engine,
+                CancellationToken.None,
+                candidateBudget: 10_000);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Equal(new[] { run, runFast }.OrderBy(path => path), engine.Matches.Values.Select(match => match.Path).OrderBy(path => path));
+            Assert.InRange(checkedCandidates, 1, 10_000);
+        }
     }
 }
