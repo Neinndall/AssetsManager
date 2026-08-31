@@ -537,7 +537,7 @@ namespace AssetsManager.Views
                     await RunAsync(HashGuessMode.GrepGame);
                     break;
                 case "game-scan":
-                    await RunScanUnknownsAsync(HashGuessDomain.Game);
+                    await RunScanUnknownsAsync(0);
                     break;
                 case "game-basic":
                     await RunAsync(HashGuessMode.GameBasic);
@@ -578,12 +578,12 @@ namespace AssetsManager.Views
                     await RunAsync(HashGuessMode.GrepLcu);
                     break;
                 case "lcu-scan":
-                    await RunScanUnknownsAsync(HashGuessDomain.Lcu);
+                    await RunScanUnknownsAsync(1);
                     break;
 
                 // BIN
                 case "bin-inventory":
-                    await RunInternalAsync(InternalHashAction.Inventory, selectedSubMethods);
+                    await RunScanUnknownsAsync(2);
                     break;
                 case "bin-context":
                     await RunInternalAsync(InternalHashAction.Content, selectedSubMethods);
@@ -594,7 +594,7 @@ namespace AssetsManager.Views
 
                 // RST
                 case "rst-inventory":
-                    await RunInternalAsync(InternalHashAction.Inventory, selectedSubMethods);
+                    await RunScanUnknownsAsync(3);
                     break;
                 case "rst-content":
                     await RunInternalAsync(InternalHashAction.Content, selectedSubMethods);
@@ -979,60 +979,45 @@ namespace AssetsManager.Views
                         _viewModel.ProgressValue = p.ProcessedWads * 100d / p.TotalWads;
                         _viewModel.ProgressText = $"{_viewModel.ProgressValue:F0}%";
                     }
-                    else if (p.CheckedCandidates > 0)
-                    {
-                        _viewModel.IsProgressIndeterminate = false;
-                        _viewModel.ProgressText = $"{p.CheckedCandidates:N0} checked";
-                    }
                     else
                     {
                         _viewModel.IsProgressIndeterminate = true;
+                        _viewModel.ProgressText = p.CheckedCandidates > 0 ? $"{p.CheckedCandidates:N0} checked" : "Running";
                     }
 
                     string timeText = FormatElapsedTime(stopwatch.Elapsed);
-                    _viewModel.StatusText = $"{p.CurrentStage} · {p.FoundMatches:N0} found · Time: {timeText}";
 
                     if (p.TotalWads > 0)
                     {
                         string stage = string.IsNullOrEmpty(p.CurrentStage) ? "WAD" : p.CurrentStage;
                         string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {stage} · {p.FoundMatches:N0} found";
+                        _viewModel.StatusText = $"{p.CurrentStage} · {p.FoundMatches:N0} found · Time: {timeText}";
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
                     }
                     else
                     {
-                        string statusMsg = $"Hash Lab: {domainName} {action} · {p.FoundMatches:N0} found";
+                        string stageName = !string.IsNullOrEmpty(p.CurrentStage) ? p.CurrentStage : (_viewModel.SelectedMethod?.Name ?? $"{domainName} {action}");
+                        _viewModel.StatusText = $"{stageName} · {p.FoundMatches:N0} found · Time: {timeText}";
+                        string statusMsg = $"Hash Lab: {stageName} · {p.FoundMatches:N0} found";
                         string customProgressText = p.CheckedCandidates > 0 ? $"{p.CheckedCandidates:N0} checked" : null;
-                        _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, 0, 0, $"{domainName} {action} · {p.FoundMatches:N0} found", customProgressText);
+                        _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, 0, 0, $"{stageName} · {p.FoundMatches:N0} found", customProgressText);
                     }
                 });
 
-                if (action == InternalHashAction.Inventory)
+                InternalHashRunResult result = action switch
                 {
-                    var inv = await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, effectiveToken);
-                    stopwatch.Stop();
-                    string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
-                    _viewModel.ProgressValue = 100;
-                    _viewModel.ProgressText = "100%";
-                    _viewModel.IsProgressIndeterminate = false;
-                    _viewModel.StatusText = $"Completed {domainName} inventory in {elapsedTime}: {inv.ScannedBins} BIN / {inv.ScannedStringTables} RST parsed.";
-                }
-                else
-                {
-                    InternalHashRunResult result = action switch
-                    {
-                        InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods),
-                        InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods),
-                        _ => throw new ArgumentOutOfRangeException(nameof(action))
-                    };
+                    InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods),
+                    InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods),
+                    _ => throw new ArgumentOutOfRangeException(nameof(action))
+                };
 
-                    stopwatch.Stop();
-                    string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
-                    _viewModel.Matches.AddRange(result.Matches.Where(m => displayedMatchHashes.Add(m.Hash)));
-                    _viewModel.ProgressValue = 100;
-                    _viewModel.ProgressText = "100%";
-                    _viewModel.IsProgressIndeterminate = false;
-                    _viewModel.StatusText = $"Completed {domainName} {action} in {elapsedTime}: {result.Matches.Count:N0} matches discovered.";
-                }
+                stopwatch.Stop();
+                string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
+                _viewModel.Matches.AddRange(result.Matches.Where(m => displayedMatchHashes.Add(m.Hash)));
+                _viewModel.ProgressValue = 100;
+                _viewModel.ProgressText = "100%";
+                _viewModel.IsProgressIndeterminate = false;
+                _viewModel.StatusText = $"Completed {domainName} {action} in {elapsedTime}: {result.Matches.Count:N0} matches discovered.";
 
                 UpdateUnknownCountAsync();
             }
@@ -1073,7 +1058,7 @@ namespace AssetsManager.Views
             return $"{elapsed.TotalSeconds:F1}s";
         }
 
-        private async Task RunScanUnknownsAsync(HashGuessDomain domain)
+        private async Task RunScanUnknownsAsync(int domainIndex)
         {
             if (_viewModel.IsRunning) return;
 
@@ -1083,6 +1068,15 @@ namespace AssetsManager.Views
                 _messageBoxService.ShowError("Hash Guessing Lab", "Please configure the LoL PBE Install Directory in Settings first.", Window.GetWindow(this));
                 return;
             }
+
+            string domainName = domainIndex switch
+            {
+                0 => "Game",
+                1 => "Lcu",
+                2 => "Bin",
+                3 => "Rst",
+                _ => "Game"
+            };
 
             var taskToken = _taskCancellationManager != null ? _taskCancellationManager.PrepareNewOperation() : CancellationToken.None;
             var runCancellation = new CancellationTokenSource();
@@ -1094,33 +1088,67 @@ namespace AssetsManager.Views
             _viewModel.ProgressValue = 0;
             _viewModel.ProgressText = "Scanning";
             _viewModel.IsProgressIndeterminate = true;
-            _viewModel.StatusText = $"Scanning {domain} WADs for unknown chunks...";
-            _progressUIManager?.OnHashGuessingStarted($"Scanning {domain} Unknowns", "Preparing WADs...");
+            _viewModel.StatusText = $"Scanning {domainName} WADs for unknown chunks...";
+            _progressUIManager?.OnHashGuessingStarted($"Scanning {domainName} Unknowns", "Preparing WADs...");
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             try
             {
-                var progress = new Progress<HashGuessProgress>(p =>
+                if (domainIndex < 2)
                 {
-                    if (p.TotalWads > 0)
+                    var domain = domainIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
+                    var progress = new Progress<HashGuessProgress>(p =>
                     {
-                        _viewModel.IsProgressIndeterminate = false;
-                        _viewModel.ProgressValue = p.ProcessedWads * 100d / p.TotalWads;
-                        _viewModel.ProgressText = $"{_viewModel.ProgressValue:F0}%";
-                        string timeText = FormatElapsedTime(stopwatch.Elapsed);
-                        string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {p.CurrentWad}";
-                        _viewModel.StatusText = $"{statusMsg} · Time: {timeText}";
-                        _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
-                    }
-                });
-                var summary = await _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, progress, effectiveToken);
-                stopwatch.Stop();
-                string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
-                _viewModel.ProgressValue = 100;
-                _viewModel.ProgressText = "100%";
-                _viewModel.IsProgressIndeterminate = false;
-                _viewModel.StatusText = $"Completed in {elapsedTime}: Found {summary.Total:N0} unknown hashes in scope ({summary.Current:N0} in current patch).";
+                        if (p.TotalWads > 0)
+                        {
+                            _viewModel.IsProgressIndeterminate = false;
+                            _viewModel.ProgressValue = p.ProcessedWads * 100d / p.TotalWads;
+                            _viewModel.ProgressText = $"{_viewModel.ProgressValue:F0}%";
+                            string timeText = FormatElapsedTime(stopwatch.Elapsed);
+                            string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {p.CurrentWad}";
+                            _viewModel.StatusText = $"{statusMsg} · Time: {timeText}";
+                            _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
+                        }
+                    });
+                    var summary = await _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, progress, effectiveToken);
+                    stopwatch.Stop();
+                    string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
+                    _viewModel.ProgressValue = 100;
+                    _viewModel.ProgressText = "100%";
+                    _viewModel.IsProgressIndeterminate = false;
+                    _viewModel.StatusText = $"Completed in {elapsedTime}: Found {summary.Total:N0} unknown hashes in scope ({summary.Current:N0} in current patch).";
+                }
+                else
+                {
+                    bool includeBin = domainIndex == 2;
+                    bool includeRst = domainIndex == 3;
+                    var progress = new Progress<InternalHashProgress>(p =>
+                    {
+                        if (p.TotalWads > 0)
+                        {
+                            _viewModel.IsProgressIndeterminate = false;
+                            _viewModel.ProgressValue = p.ProcessedWads * 100d / p.TotalWads;
+                            _viewModel.ProgressText = $"{_viewModel.ProgressValue:F0}%";
+                            string timeText = FormatElapsedTime(stopwatch.Elapsed);
+                            string stage = string.IsNullOrEmpty(p.CurrentStage) ? "WAD" : p.CurrentStage;
+                            string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {stage}";
+                            _viewModel.StatusText = $"{statusMsg} · Time: {timeText}";
+                            _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
+                        }
+                    });
+                    await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, effectiveToken);
+                    var summary = await _binRstHashGuessingService.GetSummaryAsync(effectiveToken);
+                    stopwatch.Stop();
+                    string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
+                    _viewModel.ProgressValue = 100;
+                    _viewModel.ProgressText = "100%";
+                    _viewModel.IsProgressIndeterminate = false;
+                    _viewModel.StatusText = includeBin
+                        ? $"Completed in {elapsedTime}: Found {summary.BinTotal:N0} unknown hashes in scope ({summary.BinEntries:N0} entries, {summary.BinFields:N0} fields, {summary.BinTypes:N0} types)."
+                        : $"Completed in {elapsedTime}: Found {summary.RstTotal:N0} unknown hashes in scope ({summary.RstXxh3:N0} XXH3, {summary.RstXxh64:N0} XXH64).";
+                }
+
                 UpdateUnknownCountAsync();
             }
             catch (OperationCanceledException)
@@ -1172,7 +1200,6 @@ namespace AssetsManager.Views
 
         private enum InternalHashAction
         {
-            Inventory,
             Content,
             Structural
         }

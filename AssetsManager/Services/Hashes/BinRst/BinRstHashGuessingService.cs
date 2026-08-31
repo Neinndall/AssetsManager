@@ -166,7 +166,7 @@ namespace AssetsManager.Services.Hashes
                         ProcessedWads = index + 1,
                         TotalWads = wads.Length + looseBins.Length,
                         ProcessedFiles = scannedBins + scannedRst,
-                        CurrentStage = $"Building inventory: {Path.GetFileName(wadPath)}",
+                        CurrentStage = Path.GetFileName(wadPath),
                         Elapsed = stopwatch.Elapsed
                     });
                 }
@@ -199,7 +199,7 @@ namespace AssetsManager.Services.Hashes
                             ProcessedWads = wads.Length + index + 1,
                             TotalWads = wads.Length + looseBins.Length,
                             ProcessedFiles = scannedBins + scannedRst,
-                            CurrentStage = "Building BIN inventory",
+                            CurrentStage = Path.GetFileName(binPath),
                             Elapsed = stopwatch.Elapsed
                         });
                     }
