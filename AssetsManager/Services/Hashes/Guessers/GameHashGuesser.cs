@@ -2305,9 +2305,14 @@ namespace AssetsManager.Services.Hashes.Guessers
                 !sourceWadPath.Contains("champions", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            string wadName = Path.GetFileNameWithoutExtension(sourceWadPath);
-            if (wadName.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
-                wadName = Path.GetFileNameWithoutExtension(wadName);
+            string fileName = Path.GetFileName(sourceWadPath);
+            string[] parts = fileName.Split('.');
+            if (parts.Length != 3 || !parts[1].Equals("wad", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            string wadName = parts[0];
+            if (string.IsNullOrEmpty(wadName))
+                return;
 
             ConcurrentDictionary<string, byte> scannedWadCharacters = _scannedWadCharacters.GetValue(
                 engine,

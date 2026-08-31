@@ -2789,15 +2789,16 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         public void GameSpecialSkinBinPathsIgnoresNonChampionWads()
         {
             var game = new GameHashGuesser();
-            var engine = CreateEngine(HashGuessDomain.Game, "data/characters/data/skins/root.bin", "data/characters/global/skins/root.bin");
+            var engine = CreateEngine(HashGuessDomain.Game, "data/characters/data/skins/root.bin", "data/characters/global/skins/root.bin", "data/characters/ahri/skins/skin01.bin");
 
             game.GrepWad(engine, new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")), "data/test.bin", "DATA/FINAL/Global.wad.client", 1);
             game.GrepWad(engine, new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")), "data/test.bin", "DATA/FINAL/Maps/Shipping/Map11.wad.client", 2);
             game.GrepWad(engine, new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")), "data/test.bin", "DATA/FINAL/Data.wad.client", 3);
             game.GrepWad(engine, new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")), "data/test.bin", "Plugins/Bootstrap.windows.wad.client", 4);
+            game.GrepWad(engine, new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")), "data/test.bin", "Champions/Ahri.es_ES.wad.client", 5);
 
             Assert.Empty(engine.Matches);
-            Assert.Equal(2, engine.RemainingUnknownCount);
+            Assert.Equal(3, engine.RemainingUnknownCount);
         }
 
         [Fact]
