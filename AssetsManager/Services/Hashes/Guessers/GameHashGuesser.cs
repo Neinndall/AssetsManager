@@ -2301,13 +2301,13 @@ namespace AssetsManager.Services.Hashes.Guessers
             ulong sourceChunkHash,
             CancellationToken cancellationToken)
         {
-            if (string.IsNullOrEmpty(sourceWadPath)) return;
+            if (string.IsNullOrEmpty(sourceWadPath) ||
+                !sourceWadPath.Contains("champions", StringComparison.OrdinalIgnoreCase))
+                return;
+
             string wadName = Path.GetFileNameWithoutExtension(sourceWadPath);
             if (wadName.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
                 wadName = Path.GetFileNameWithoutExtension(wadName);
-            if (wadName.Equals("global", StringComparison.OrdinalIgnoreCase) ||
-                wadName.StartsWith("map", StringComparison.OrdinalIgnoreCase))
-                return;
 
             ConcurrentDictionary<string, byte> scannedWadCharacters = _scannedWadCharacters.GetValue(
                 engine,

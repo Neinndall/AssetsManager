@@ -2751,7 +2751,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 engine,
                 new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
                 "data/test.bin",
-                "XinZhao.wad.client",
+                "Champions/XinZhao.wad.client",
                 1);
 
             AssertResolved(engine, jadeBin);
@@ -2768,7 +2768,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 firstEngine,
                 new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
                 "data/test.bin",
-                "Ahri.wad.client",
+                "Champions/Ahri.wad.client",
                 1);
             AssertResolved(firstEngine, firstExpected);
 
@@ -2779,10 +2779,25 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 secondEngine,
                 new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
                 "data/test.bin",
-                "Ahri.wad.client",
+                "Champions/Ahri.wad.client",
                 2);
 
             AssertResolved(secondEngine, secondExpected);
+        }
+
+        [Fact]
+        public void GameSpecialSkinBinPathsIgnoresNonChampionWads()
+        {
+            var game = new GameHashGuesser();
+            var engine = CreateEngine(HashGuessDomain.Game, "data/characters/data/skins/root.bin", "data/characters/global/skins/root.bin");
+
+            game.GrepWad(engine, new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")), "data/test.bin", "DATA/FINAL/Global.wad.client", 1);
+            game.GrepWad(engine, new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")), "data/test.bin", "DATA/FINAL/Maps/Shipping/Map11.wad.client", 2);
+            game.GrepWad(engine, new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")), "data/test.bin", "DATA/FINAL/Data.wad.client", 3);
+            game.GrepWad(engine, new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")), "data/test.bin", "Plugins/Bootstrap.windows.wad.client", 4);
+
+            Assert.Empty(engine.Matches);
+            Assert.Equal(2, engine.RemainingUnknownCount);
         }
 
         [Fact]
@@ -2800,7 +2815,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 engine,
                 new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
                 "data/test.bin",
-                "Tristana.wad.client",
+                "Champions/Tristana.wad.client",
                 1);
 
             Assert.Contains(engine.Matches.Values, m => m.Path == expectedAnim);
@@ -2823,13 +2838,13 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 engine,
                 new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
                 "data/test.bin",
-                "Tristana.wad.client",
+                "Champions/Tristana.wad.client",
                 1);
 
             AssertResolved(engine, expectedAnim);
             HashGuessMatch match = Assert.Single(engine.Matches).Value;
             Assert.Equal(HashGuessStrategy.BinEntry, match.Strategy);
-            Assert.Equal("Tristana.wad.client", match.SourceWadPath);
+            Assert.Equal("Champions/Tristana.wad.client", match.SourceWadPath);
         }
     }
 }

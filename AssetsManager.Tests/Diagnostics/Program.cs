@@ -36,6 +36,16 @@ namespace AssetsManager.Tests.Diagnostics
                 await GameBaselineDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "game-grep-anm-profile", StringComparison.OrdinalIgnoreCase))
+            {
+                GameGrepAnmProfileDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "game-grep-full-profile", StringComparison.OrdinalIgnoreCase))
+            {
+                GameGrepFullProfileDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "anm-audit", StringComparison.OrdinalIgnoreCase))
             {
                 string path = @"C:\Users\danielpriego\AppData\Local\AssetsManager\hashes\hashes.game.txt";
