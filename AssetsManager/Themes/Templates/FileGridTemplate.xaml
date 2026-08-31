@@ -3,100 +3,121 @@
                     xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF">
 
     <!-- ================================================================= -->
-    <!-- FILE EXPLORER GRID ITEM TEMPLATE (CARD)                           -->
+    <!-- FILE EXPLORER GRID ITEM TEMPLATE (CLEAN MODERN GALLERY)           -->
     <!-- ================================================================= -->
     <DataTemplate x:Key="FileGridItemTemplate">
-        <Border Margin="6" Width="130" Height="160" CornerRadius="10"
-                Background="{StaticResource CardBackground}"
-                BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Style.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                            <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-
+        <Border x:Name="CardBorder" 
+                Margin="4" 
+                Width="116" 
+                Height="128" 
+                CornerRadius="8"
+                Background="Transparent"
+                BorderThickness="0"
+                Cursor="Hand"
+                Padding="4">
+            
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>   <!-- Thumbnail -->
-                    <RowDefinition Height="Auto"/> <!-- Label -->
+                    <RowDefinition Height="72"/>   <!-- Fixed Icon / Thumbnail Viewport -->
+                    <RowDefinition Height="32"/>   <!-- Fixed Title Area (1 or 2 lines) -->
+                    <RowDefinition Height="16"/>   <!-- Fixed Metadata / Counts Area -->
                 </Grid.RowDefinitions>
 
-                <!-- Thumbnail Area -->
-                <Border Grid.Row="0" CornerRadius="10,10,0,0" Background="{StaticResource SidebarBackground}" Opacity="0.5" ClipToBounds="True">
-                    <Grid>
-                        <!-- Placeholder/Loading Icon -->
-                        <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" 
-                                                    Width="48" Height="48" Foreground="{StaticResource TextMuted}"
-                                                    RenderTransformOrigin="0.5,0.5"
-                                                    Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}">
-                            <materialIcons:MaterialIcon.RenderTransform>
-                                <RotateTransform Angle="0"/>
-                            </materialIcons:MaterialIcon.RenderTransform>
-                            <materialIcons:MaterialIcon.Style>
-                                <Style TargetType="materialIcons:MaterialIcon">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Node.Name}" Value="Loading...">
-                                            <DataTrigger.EnterActions>
-                                                <BeginStoryboard Storyboard="{StaticResource SpinningIconAnimation}"/>
-                                            </DataTrigger.EnterActions>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </materialIcons:MaterialIcon.Style>
-                        </materialIcons:MaterialIcon>
-                        
-                        <!-- Real Image Preview -->
-                        <Border CornerRadius="10,10,0,0" Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
-                            <Border.Background>
-                                <ImageBrush ImageSource="{Binding ImagePreview}" Stretch="UniformToFill"/>
-                            </Border.Background>
-                        </Border>
+                <!-- 1. Thumbnail / Icon Presentation (Fixed height ensures 100% horizontal alignment across rows) -->
+                <Grid Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- A. Placeholder / File / Folder Icon -->
+                    <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" 
+                                                Width="52" Height="52" 
+                                                Foreground="{StaticResource TextSecondary}"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                RenderTransformOrigin="0.5,0.5"
+                                                Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}">
+                        <materialIcons:MaterialIcon.RenderTransform>
+                            <RotateTransform Angle="0"/>
+                        </materialIcons:MaterialIcon.RenderTransform>
+                        <materialIcons:MaterialIcon.Style>
+                            <Style TargetType="materialIcons:MaterialIcon">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Node.Name}" Value="Loading...">
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard Storyboard="{StaticResource SpinningIconAnimation}"/>
+                                        </DataTrigger.EnterActions>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </materialIcons:MaterialIcon.Style>
+                    </materialIcons:MaterialIcon>
+                    
+                    <!-- B. Real Image Preview -->
+                    <Border CornerRadius="8" 
+                            ClipToBounds="True" 
+                            Width="72" Height="72"
+                            Background="#080C14"
+                            Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
+                        <Image Source="{Binding ImagePreview}" 
+                               Stretch="Uniform" 
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"/>
+                    </Border>
+                </Grid>
 
-                        <!-- Top Type Badge -->
-                        <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6" 
-                                Background="#CC000000" CornerRadius="3" Padding="4,1">
-                            <TextBlock Text="{Binding FileExtensionDisplay}" FontSize="8" FontWeight="SemiBold" Foreground="White"/>
-                        </Border>
-                    </Grid>
-                </Border>
+                <!-- 2. File / Folder Name (Fixed height & Top-aligned: sits directly below the icon, no sagging) -->
+                <TextBlock Grid.Row="1" 
+                           Text="{Binding DisplayNameShort}" 
+                           ToolTip="{Binding Node.DisplayName}"
+                           FontSize="10.5" 
+                           FontWeight="Medium" 
+                           Foreground="{StaticResource TextPrimary}" 
+                           TextTrimming="CharacterEllipsis" 
+                           TextWrapping="Wrap" 
+                           MaxHeight="28" 
+                           LineHeight="14"
+                           Margin="0,2,0,0"
+                           TextAlignment="Center" 
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Top"/>
 
-                <!-- Label Area -->
-                <Border Grid.Row="1" Padding="8,4,8,8">
-                    <StackPanel HorizontalAlignment="Center">
-                        <TextBlock Text="{Binding DisplayNameShort}" FontSize="11" FontWeight="SemiBold" 
-                                   Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" 
-                                   TextWrapping="Wrap" Height="36" LineHeight="14"
-                                   TextAlignment="Center" HorizontalAlignment="Center"/>
-                        
-                        <!-- Small indicators -->
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsFolder, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,4,0,0" HorizontalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Visibility="{Binding FolderCount, Converter={StaticResource CountToVisibilityConverter}}" Margin="0,0,8,0">
-                                <materialIcons:MaterialIcon Kind="FolderOutline" Width="10" Height="10" Foreground="{StaticResource AccentOrange}" Margin="0,0,3,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding FolderCount}" FontSize="9" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Visibility="{Binding AssetCount, Converter={StaticResource CountToVisibilityConverter}}">
-                                <materialIcons:MaterialIcon Kind="CubeOutline" Width="10" Height="10" Foreground="{StaticResource AccentGreen}" Margin="0,0,3,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding AssetCount}" FontSize="9" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </StackPanel>
+                <!-- 3. Folder Sub-item Indicator -->
+                <StackPanel Grid.Row="2" 
+                            Orientation="Horizontal" 
+                            HorizontalAlignment="Center" 
+                            VerticalAlignment="Center"
+                            Visibility="{Binding IsFolder, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding FolderCount, Converter={StaticResource CountToVisibilityConverter}}" Margin="0,0,6,0">
+                        <materialIcons:MaterialIcon Kind="FolderOutline" Width="10" Height="10" Foreground="{StaticResource AccentOrange}" Margin="0,0,2,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding FolderCount}" FontSize="8.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                     </StackPanel>
-                </Border>
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding AssetCount, Converter={StaticResource CountToVisibilityConverter}}">
+                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="10" Height="10" Foreground="{StaticResource AccentGreen}" Margin="0,0,2,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding AssetCount}" FontSize="8.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
 
-                <!-- Selection Overlay (Now at the top of the Z-stack) -->
-                <Border Grid.RowSpan="2" BorderThickness="1.5" CornerRadius="10" 
-                        BorderBrush="{StaticResource AccentBrush}" IsHitTestVisible="False"
-                        Visibility="{Binding IsMultiSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                <materialIcons:MaterialIcon Grid.RowSpan="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" 
-                                            Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
-                                            Margin="0,0,12,12" 
+                <!-- 4. Selection Check Badge (Top-Right) -->
+                <materialIcons:MaterialIcon Grid.RowSpan="3" 
+                                            Kind="CheckCircle" 
+                                            Foreground="{StaticResource AccentBrush}" 
+                                            Width="16" Height="16" 
+                                            HorizontalAlignment="Right" 
+                                            VerticalAlignment="Top" 
+                                            Margin="0,2,2,0" 
+                                            IsHitTestVisible="False"
                                             Visibility="{Binding IsMultiSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </Grid>
         </Border>
+        
+        <DataTemplate.Triggers>
+            <!-- Hover Effect: Smooth HoverColor highlight -->
+            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+            </DataTrigger>
+            
+            <!-- Selection Effect: Identical HoverColor without border -->
+            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                <Setter TargetName="CardBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+            </DataTrigger>
+        </DataTemplate.Triggers>
     </DataTemplate>
 
 </ResourceDictionary>
