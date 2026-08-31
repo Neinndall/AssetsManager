@@ -409,7 +409,7 @@ public sealed class ManifestDownloader : IDisposable
                 lastReportedChunks = currentDoneChunks;
                 lastUpdateProgressTimestamp = now;
 
-                string displayFile = lastActiveFileName;
+                string displayFile = lastActiveFileName ?? (filesToPatchList.Count > 0 ? filesToPatchList[0].FileInfo.Name : string.Empty);
                 string chunkProgress = "";
 
                 if (lastActivePhysicalPath != null && initialChunksPerFile.TryGetValue(lastActivePhysicalPath, out int totalForFile) && totalForFile > 0)
@@ -418,10 +418,6 @@ public sealed class ManifestDownloader : IDisposable
                     int doneForFile = Math.Max(0, totalForFile - pending);
                     chunkProgress = $"|{doneForFile}/{totalForFile}";
                 }
-                else if (displayFile == null && filesToPatchList.Count > 0)
-                {
-                    displayFile = filesToPatchList[0].FileInfo.Name;
-                }
 
                 int displayCompletedFiles = Math.Min(Math.Max(1, completedFilesCount + 1), totalFilesToPatch);
                 if (currentDoneChunks >= totalChunks)
@@ -429,7 +425,7 @@ public sealed class ManifestDownloader : IDisposable
                     displayCompletedFiles = totalFilesToPatch;
                 }
 
-                string message = $"{displayCompletedFiles} of {totalFilesToPatch} files: {displayFile ?? "Finalizing..."}{chunkProgress}";
+                string message = $"{displayCompletedFiles} of {totalFilesToPatch} files: {displayFile}{chunkProgress}";
                 ProgressChanged?.Invoke("Updating", currentDoneChunks, totalChunks, message);
             }
         }
