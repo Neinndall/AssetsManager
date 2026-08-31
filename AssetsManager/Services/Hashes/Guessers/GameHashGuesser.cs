@@ -50,6 +50,9 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int EsportsBannerInsertionCandidateBudget = 750_000;
         private const int EsportsBannerDoubleWordLimit = 96;
         private const int AnimationBinFallbackCandidateBudget = 100_000;
+        private static readonly Regex AnimationBinPathRegex = new(
+            @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?|themes/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.(?:bin|inibin)$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private readonly record struct AnimationFileLink(uint NameHash, ulong PathHash, string Path);
 
         private readonly LogService _logService;
@@ -1687,8 +1690,19 @@ namespace AssetsManager.Services.Hashes.Guessers
                 GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash, cancellationToken);
                 if (data.Array is not null && data.Count >= sizeof(int) && FileTypeDetector.IsPropertyBin(data.AsSpan()))
                 {
-                    GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
-                    GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
+                    BinTree cachedTree = null;
+                    BinTree GetCachedBinTree()
+                    {
+                        if (cachedTree == null)
+                        {
+                            using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
+                            cachedTree = new BinTree(stream);
+                        }
+                        return cachedTree;
+                    }
+
+                    GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
+                    GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                 }
                 GuessSpecialSkinBinPaths(engine, sourceWadPath, sourceChunkHash, cancellationToken);
                 return;
@@ -1851,13 +1865,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             string sourcePath,
             string sourceWadPath,
             ulong sourceChunkHash,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Func<BinTree> binTreeFactory = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var animationBinPathRegex = new Regex(
-                @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?|themes/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.(?:bin|inibin)$",
-                RegexOptions.IgnoreCase);
-            Match context = animationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
+            Match context = AnimationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
             if (!context.Success || data.Array is null || data.Count == 0) return;
 
             string character = context.Groups["character"].Value.ToLowerInvariant();
@@ -1866,8 +1878,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             var links = new HashSet<AnimationFileLink>();
             try
             {
-                using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
-                var tree = new BinTree(stream);
+                BinTree tree = binTreeFactory != null
+                    ? binTreeFactory()
+                    : new BinTree(new MemoryStream(data.Array, data.Offset, data.Count, writable: false));
+                if (tree == null) return;
                 cancellationToken.ThrowIfCancellationRequested();
                 foreach (AnimationFileLink link in EnumerateAnimationFileLinks(tree))
                 {
@@ -2162,7 +2176,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             string sourcePath,
             string sourceWadPath,
             ulong sourceChunkHash,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Func<BinTree> binTreeFactory = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (data.Array is null || data.Count == 0) return;
@@ -2180,8 +2195,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             var unresolved = new HashSet<ulong>();
             try
             {
-                using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
-                var tree = new BinTree(stream);
+                BinTree tree = binTreeFactory != null
+                    ? binTreeFactory()
+                    : new BinTree(new MemoryStream(data.Array, data.Offset, data.Count, writable: false));
+                if (tree == null) return;
                 cancellationToken.ThrowIfCancellationRequested();
                 foreach (ulong link in EnumerateChunkLinks(tree))
                 {
@@ -2303,6 +2320,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 ? new[] { champ }
                 : new[] { champ, $"jade_{champ}" };
 
+            Span<char> animPathBuffer = stackalloc char[300];
+
             foreach (string alias in aliases)
             {
                 CheckSpecialBin($"data/characters/{alias}/{alias}.bin");
@@ -2333,10 +2352,39 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckSpecialBin($"data/characters/{alias}/animations/{skin}.bin");
 
                     string animPrefix = $"assets/characters/{alias}/skins/{skin}/animations/";
-                    foreach (string action in globalActions)
+                    if (animPrefix.Length + 100 <= animPathBuffer.Length)
                     {
-                        if (engine.RemainingUnknownCount == 0) break;
-                        CheckSpecialBin($"{animPrefix}{action}.anm");
+                        animPrefix.AsSpan().CopyTo(animPathBuffer);
+                        int prefixLen = animPrefix.Length;
+
+                        foreach (string action in globalActions)
+                        {
+                            if (engine.RemainingUnknownCount == 0) break;
+                            int totalLen = prefixLen + action.Length + 4;
+                            if (totalLen <= animPathBuffer.Length)
+                            {
+                                action.AsSpan().CopyTo(animPathBuffer[prefixLen..]);
+                                ".anm".AsSpan().CopyTo(animPathBuffer[(prefixLen + action.Length)..]);
+                                ReadOnlySpan<char> pathSpan = animPathBuffer[..totalLen];
+                                ulong hash = XxHash64Ext.Hash(pathSpan);
+                                if (engine.UnknownHashes.Contains(hash))
+                                {
+                                    Check(engine, pathSpan.ToString(), HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                                }
+                            }
+                            else
+                            {
+                                CheckSpecialBin($"{animPrefix}{action}.anm");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        foreach (string action in globalActions)
+                        {
+                            if (engine.RemainingUnknownCount == 0) break;
+                            CheckSpecialBin($"{animPrefix}{action}.anm");
+                        }
                     }
                 }
             }
