@@ -369,11 +369,13 @@ public sealed class ManifestDownloader : IDisposable
             .ToDictionary(x => x.Id, x => x.Chunks);
 
         int completedChunks = 0;
+        int completedFilesCount = resizeOnlyFiles.Count;
         int totalFilesToPatch = filesToPatchList.Count;
-        int visualFileIndex = 0;
         int lastReportedChunks = -1;
         long lastUpdateProgressTimestamp = 0;
         var uiLock = new object();
+        string lastActivePhysicalPath = null;
+        string lastActiveFileName = null;
 
         long totalDownloaded = 0;
         long wastedBytes = 0;
@@ -385,15 +387,14 @@ public sealed class ManifestDownloader : IDisposable
         var openHandles = new ConcurrentDictionary<string, Lazy<SafeFileHandle>>();
         var pendingPerFile = new ConcurrentDictionary<string, int>(initialChunksPerFile);
 
-        void ReportUpdateProgress(int currentDoneChunks)
+        void ReportUpdateProgress(int currentDoneChunks, string physicalPath = null, string fileName = null)
         {
             lock (uiLock)
             {
-                while (visualFileIndex < filesToPatchList.Count
-                       && pendingPerFile.TryGetValue(filesToPatchList[visualFileIndex].PhysicalPath, out int remaining)
-                       && remaining == 0)
+                if (physicalPath != null)
                 {
-                    visualFileIndex++;
+                    lastActivePhysicalPath = physicalPath;
+                    lastActiveFileName = fileName;
                 }
 
                 long now = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -407,12 +408,28 @@ public sealed class ManifestDownloader : IDisposable
 
                 lastReportedChunks = currentDoneChunks;
                 lastUpdateProgressTimestamp = now;
-                int reportIndex = Math.Min(visualFileIndex, totalFilesToPatch - 1);
-                FilePatchTask reportFile = filesToPatchList[reportIndex];
-                pendingPerFile.TryGetValue(reportFile.PhysicalPath, out int pending);
-                int totalForFile = initialChunksPerFile[reportFile.PhysicalPath];
-                int doneForFile = totalForFile - pending;
-                string message = $"{Math.Min(visualFileIndex + 1, totalFilesToPatch)} of {totalFilesToPatch} files: {reportFile.FileInfo.Name}|{doneForFile}/{totalForFile}";
+
+                string displayFile = lastActiveFileName;
+                string chunkProgress = "";
+
+                if (lastActivePhysicalPath != null && initialChunksPerFile.TryGetValue(lastActivePhysicalPath, out int totalForFile) && totalForFile > 0)
+                {
+                    pendingPerFile.TryGetValue(lastActivePhysicalPath, out int pending);
+                    int doneForFile = Math.Max(0, totalForFile - pending);
+                    chunkProgress = $"|{doneForFile}/{totalForFile}";
+                }
+                else if (displayFile == null && filesToPatchList.Count > 0)
+                {
+                    displayFile = filesToPatchList[0].FileInfo.Name;
+                }
+
+                int displayCompletedFiles = Math.Min(Math.Max(1, completedFilesCount + 1), totalFilesToPatch);
+                if (currentDoneChunks >= totalChunks)
+                {
+                    displayCompletedFiles = totalFilesToPatch;
+                }
+
+                string message = $"{displayCompletedFiles} of {totalFilesToPatch} files: {displayFile ?? "Finalizing..."}{chunkProgress}";
                 ProgressChanged?.Invoke("Updating", currentDoneChunks, totalChunks, message);
             }
         }
@@ -431,7 +448,8 @@ public sealed class ManifestDownloader : IDisposable
                     FileShare.ReadWrite);
                 RandomAccess.SetLength(handle, (long)resizeOnlyFile.FileInfo.FileSize);
                 pendingPerFile[resizeOnlyFile.PhysicalPath] = 0;
-                ReportUpdateProgress(Interlocked.Increment(ref completedChunks));
+                Interlocked.Increment(ref completedFilesCount);
+                ReportUpdateProgress(Interlocked.Increment(ref completedChunks), resizeOnlyFile.PhysicalPath, resizeOnlyFile.FileInfo.Name);
             }
 
             CancellationToken updateToken = cancellationToken;
@@ -575,13 +593,14 @@ public sealed class ManifestDownloader : IDisposable
 
                                                         if (rem == 0)
                                                         {
+                                                            Interlocked.Increment(ref completedFilesCount);
                                                             if (openHandles.TryRemove(target.PhysicalPath, out var lazyHnd))
                                                             {
                                                                 if (lazyHnd.IsValueCreated) lazyHnd.Value.Dispose();
                                                             }
                                                         }
 
-                                                        ReportUpdateProgress(currentDoneChunks);
+                                                        ReportUpdateProgress(currentDoneChunks, target.PhysicalPath, target.FileInfo.Name);
                                                     }
                                                 }
                                                 finally { ArrayPool<byte>.Shared.Return(decompBuffer); }
