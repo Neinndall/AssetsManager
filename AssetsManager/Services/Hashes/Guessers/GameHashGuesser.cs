@@ -782,35 +782,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                         }
                     }
 
-                    int skinIdx = stem.IndexOf("skin", StringComparison.OrdinalIgnoreCase);
-                    if (skinIdx >= 0)
+                    int sep = stem.IndexOf('_');
+                    while (sep >= 0 && sep < stem.Length - 1)
                     {
-                        int afterSkin = stem.IndexOf('_', skinIdx);
-                        if (afterSkin > 0 && afterSkin < stem.Length - 1)
-                        {
-                            string sub = stem[(afterSkin + 1)..];
-                            if (sub.Length >= 2 && sub.Length <= 100 && !sub.All(char.IsDigit))
-                                AddCount(sub);
-                        }
-                    }
-                    else
-                    {
-                        int firstUnderscore = stem.IndexOf('_');
-                        if (firstUnderscore > 0 && firstUnderscore < stem.Length - 1)
-                        {
-                            string sub = stem[(firstUnderscore + 1)..];
-                            if (sub.Length >= 2 && sub.Length <= 100 && !sub.All(char.IsDigit))
-                                AddCount(sub);
-                        }
-                    }
-
-                    int toIdx = stem.IndexOf("_to_", StringComparison.OrdinalIgnoreCase);
-                    if (toIdx > 0 && toIdx < stem.Length - 4)
-                    {
-                        string part1 = stem[..toIdx];
-                        string part2 = stem[(toIdx + 4)..];
-                        if (part1.Length >= 2 && part1.Length <= 100) AddCount(part1);
-                        if (part2.Length >= 2 && part2.Length <= 100) AddCount(part2);
+                        string sub = stem[(sep + 1)..];
+                        if (sub.Length >= 2 && sub.Length <= 100 && !sub.All(char.IsDigit))
+                            AddCount(sub);
+                        sep = stem.IndexOf('_', sep + 1);
                     }
                 }
 
@@ -2360,7 +2338,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                         if (engine.RemainingUnknownCount == 0) break;
                         CheckSpecialBin($"{animPrefix}{action}.anm");
                     }
-
                 }
             }
 
@@ -2500,6 +2477,19 @@ namespace AssetsManager.Services.Hashes.Guessers
                     Add(Fnv1a.HashLower(stem), stem);
                     string compact = new(stem.Where(char.IsLetterOrDigit).ToArray());
                     if (compact.Length > 0) Add(Fnv1a.HashLower(compact), stem);
+
+                    int sep = stem.IndexOf('_');
+                    while (sep >= 0 && sep < stem.Length - 1)
+                    {
+                        string sub = stem[(sep + 1)..];
+                        if (sub.Length >= 2)
+                        {
+                            Add(Fnv1a.HashLower(sub), sub);
+                            string compactSub = new(sub.Where(char.IsLetterOrDigit).ToArray());
+                            if (compactSub.Length > 0) Add(Fnv1a.HashLower(compactSub), sub);
+                        }
+                        sep = stem.IndexOf('_', sep + 1);
+                    }
                 }
                 if (index.Count == 0)
                 {
