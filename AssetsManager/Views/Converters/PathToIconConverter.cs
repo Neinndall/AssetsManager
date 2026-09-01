@@ -167,9 +167,9 @@ namespace AssetsManager.Views.Converters
                 return knownIcon;
             }
 
-            var lowerPath = virtualPath.ToLowerInvariant();
-            if (lowerPath.Contains("javascript") || lowerPath.Contains("/js/")) return MaterialIconKind.LanguageJavascript;
-            if (lowerPath.Contains("/css/")) return MaterialIconKind.LanguageCss3;
+            if (virtualPath.Contains("javascript", StringComparison.OrdinalIgnoreCase) ||
+                virtualPath.Contains("/js/", StringComparison.OrdinalIgnoreCase)) return MaterialIconKind.LanguageJavascript;
+            if (virtualPath.Contains("/css/", StringComparison.OrdinalIgnoreCase)) return MaterialIconKind.LanguageCss3;
 
             if (string.IsNullOrEmpty(extension))
             {

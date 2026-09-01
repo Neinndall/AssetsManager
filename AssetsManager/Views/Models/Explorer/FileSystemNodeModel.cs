@@ -127,12 +127,11 @@ namespace AssetsManager.Views.Models.Explorer
                 if (Type == NodeType.WadFile)
                 {
                     if (string.IsNullOrEmpty(Name)) return string.Empty;
-                    string lowerName = Name.ToLowerInvariant();
-                    if (lowerName.EndsWith(".wad.client"))
+                    if (Name.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
                     {
                         return Name.Substring(0, Name.Length - ".wad.client".Length);
                     }
-                    else if (lowerName.EndsWith(".wad"))
+                    else if (Name.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
                     {
                         return Name.Substring(0, Name.Length - ".wad".Length);
                     }
@@ -299,12 +298,13 @@ namespace AssetsManager.Views.Models.Explorer
             }
             else
             {
-                string lowerPath = path.ToLowerInvariant();
-                if (lowerPath.EndsWith(".wad") || lowerPath.EndsWith(".wad.client"))
+                if (path.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) ||
+                    path.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
                 {
                     Type = NodeType.WadFile;
                 }
-                else if (lowerPath.EndsWith(".wpk") || lowerPath.EndsWith(".bnk"))
+                else if (path.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase) ||
+                         path.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
                 {
                     Type = NodeType.SoundBank;
                     Children.Add(new FileSystemNodeModel()); // Add dummy child
@@ -329,8 +329,8 @@ namespace AssetsManager.Views.Models.Explorer
             }
             else
             {
-                string lowerName = name.ToLowerInvariant();
-                if (lowerName.EndsWith(".wpk") || lowerName.EndsWith(".bnk"))
+                if (name.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
                 {
                     Type = NodeType.SoundBank;
                     Children.Add(new FileSystemNodeModel()); // Add dummy child
