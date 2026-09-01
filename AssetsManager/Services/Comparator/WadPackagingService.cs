@@ -74,7 +74,7 @@ namespace AssetsManager.Services.Comparator
                     }
                     else
                     {
-                        string potentialPath = Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
+                        string potentialPath = PathUtils.NormalizeSeparators(Path.Combine(sourceWadDirectory, binStrategy.TargetWadName));
                         if (File.Exists(PathUtils.ResolveWadPath(newPbePath, potentialPath)) || File.Exists(PathUtils.ResolveWadPath(oldPbePath, potentialPath)))
                         {
                             targetWadRelativePath = potentialPath;

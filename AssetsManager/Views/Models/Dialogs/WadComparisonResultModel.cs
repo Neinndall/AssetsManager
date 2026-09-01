@@ -253,7 +253,7 @@ namespace AssetsManager.Views.Models.Dialogs
             foreach (var diff in diffs)
             {
                 string path = diff.Path ?? string.Empty;
-                string lower = path.Replace('\\', '/').ToLowerInvariant();
+                string normalizedPath = PathUtils.NormalizeSeparators(path);
 
                 // 1. Unknown Hashes & Payload
                 if (IsHexHash(path) || path.StartsWith("[unknown_", StringComparison.OrdinalIgnoreCase)) unknownHashes++;
@@ -275,12 +275,12 @@ namespace AssetsManager.Views.Models.Dialogs
                 {
                     bool match = i switch
                     {
-                        0 => lower.Contains("characters/"),
-                        1 => lower.Contains("ux/") || lower.Contains("loot") || lower.Contains("emotes") || lower.Contains("lol-game-data"),
-                        2 => lower.EndsWith(".bin") || lower.EndsWith(".inibin") || lower.Contains("data/"),
-                        3 => lower.Contains("tft") || lower.Contains("sets/set"),
-                        4 => SupportedFileTypes.IsAudio(path) || lower.Contains("audio/") || lower.Contains("sound/"),
-                        5 => lower.Contains("maps/") || lower.Contains("map11") || lower.Contains("map12") || lower.Contains("map22"),
+                        0 => normalizedPath.Contains("characters/", StringComparison.OrdinalIgnoreCase),
+                        1 => normalizedPath.Contains("ux/", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("loot", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("emotes", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("lol-game-data", StringComparison.OrdinalIgnoreCase),
+                        2 => normalizedPath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) || normalizedPath.EndsWith(".inibin", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("data/", StringComparison.OrdinalIgnoreCase),
+                        3 => normalizedPath.Contains("tft", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("sets/set", StringComparison.OrdinalIgnoreCase),
+                        4 => SupportedFileTypes.IsAudio(path) || normalizedPath.Contains("audio/", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("sound/", StringComparison.OrdinalIgnoreCase),
+                        5 => normalizedPath.Contains("maps/", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("map11", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("map12", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("map22", StringComparison.OrdinalIgnoreCase),
                         _ => false
                     };
 
@@ -295,7 +295,7 @@ namespace AssetsManager.Views.Models.Dialogs
                 // 3. Asset Categories
                 for (int i = 0; i < categories.Length; i++)
                 {
-                    if (categories[i].Match(lower))
+                    if (categories[i].Match(normalizedPath))
                     {
                         categories[i].Count++;
                         categories[i].Size += delta;

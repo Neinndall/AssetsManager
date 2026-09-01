@@ -350,8 +350,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return null;
             }
 
-            string virtualPath = dependencyPath
-                .Replace('\\', '/')
+            string virtualPath = PathUtils.NormalizeSeparators(dependencyPath)
                 .TrimStart('/')
                 .ToLowerInvariant();
             if (!virtualPath.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
@@ -378,7 +377,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return null;
             }
 
-            string assetPath = assetTexturePath.Replace('\\', '/').TrimStart('/');
+            string assetPath = PathUtils.NormalizeSeparators(assetTexturePath).TrimStart('/');
             string characterPrefix = $"assets/characters/{characterRoot.Name}/";
 
             string candidateRoot = null;
@@ -769,6 +768,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             Regex.Replace(value?.ToLowerInvariant() ?? string.Empty, @"[^a-z0-9]", string.Empty);
 
         private static string NormalizeAssetPath(string value) =>
-            value?.Replace('\\', '/').Trim().ToLowerInvariant() ?? string.Empty;
+            PathUtils.NormalizeSeparators(value).Trim().ToLowerInvariant();
     }
 }

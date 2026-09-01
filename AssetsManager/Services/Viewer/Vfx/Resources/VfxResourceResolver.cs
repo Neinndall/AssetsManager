@@ -356,7 +356,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         }
 
         private static string CreateKey(string path, string directory)
-            => path.Replace('\\', '/').ToLowerInvariant() + "|" + Path.GetFullPath(directory);
+            => PathUtils.NormalizeSeparators(path).ToLowerInvariant() + "|" + Path.GetFullPath(directory);
 
     }
 

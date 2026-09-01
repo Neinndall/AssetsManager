@@ -286,12 +286,12 @@ namespace AssetsManager.Services.Audio
                 potential.Add((basePart + "_audio.bnk", AudioDependencyType.AudioBnk));
             }
 
-            string siblingDir = Path.GetDirectoryName(pathForStrategy)?.Replace('\\', '/') ?? string.Empty;
+            string siblingDir = PathUtils.NormalizeSeparators(Path.GetDirectoryName(pathForStrategy));
             foreach (var (siblingFileName, siblingType) in potential)
             {
                 string siblingVirtualPath = string.IsNullOrEmpty(siblingDir)
                     ? siblingFileName
-                    : Path.Combine(siblingDir, siblingFileName).Replace('\\', '/');
+                    : PathUtils.NormalizeSeparators(Path.Combine(siblingDir, siblingFileName));
 
                 siblings.Add(new AudioDependencyInfo
                 {
@@ -330,7 +330,7 @@ namespace AssetsManager.Services.Audio
                 }
                 else if (!string.IsNullOrEmpty(sourceWadDirectory))
                 {
-                    targetWadRelativePath = Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
+                    targetWadRelativePath = PathUtils.NormalizeSeparators(Path.Combine(sourceWadDirectory, binStrategy.TargetWadName));
                 }
 
                 deps.Add(new AudioDependencyInfo
@@ -628,7 +628,7 @@ namespace AssetsManager.Services.Audio
                 {
                     targetWadRelativePath = string.IsNullOrEmpty(sourceWadDirectory)
                         ? binStrategy.TargetWadName
-                        : Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
+                        : PathUtils.NormalizeSeparators(Path.Combine(sourceWadDirectory, binStrategy.TargetWadName));
                 }
 
                 string targetWadFullPath = Path.Combine(basePath, targetWadRelativePath);

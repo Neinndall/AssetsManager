@@ -401,15 +401,13 @@ namespace AssetsManager.Services.Explorer
                     foreach (var file in files.OrderBy(f => f))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        string lowerFile = file.ToLowerInvariant();
-
                         bool keepFile = false;
-                        if (lowerFile.EndsWith(".wad.client"))
+                        if (file.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
                         {
                             if (node.VirtualPath.StartsWith(Path.Combine(currentRootPath, "Game")))
                                 keepFile = true;
                         }
-                        else if (lowerFile.EndsWith(".wad"))
+                        else if (file.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
                         {
                             if (node.VirtualPath.StartsWith(Path.Combine(currentRootPath, "Plugins")))
                                 keepFile = true;
@@ -567,7 +565,7 @@ namespace AssetsManager.Services.Explorer
             VirtualTreeBuildIndex buildIndex,
             DiffStatus status = DiffStatus.Unchanged)
         {
-            string normalizedPath = virtualPath.Replace('\\', '/');
+            string normalizedPath = PathUtils.NormalizeSeparators(virtualPath);
             int lastSlash = normalizedPath.LastIndexOf('/');
             
             FileSystemNodeModel parentNode;

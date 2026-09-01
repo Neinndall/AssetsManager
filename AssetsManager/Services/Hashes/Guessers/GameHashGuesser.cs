@@ -1755,7 +1755,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (extension == "preload")
             {
                 string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
-                string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
+                string directory = PathUtils.NormalizeSeparators(Path.GetDirectoryName(sourcePath));
 
                 foreach (Match match in Regex.Matches(text, @"Name=""([^""]+)"""))
                 {
@@ -1794,7 +1794,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (extension is "hls" or "ps_2_0" or "ps_3_0" or "vs_2_0" or "vs_3_0")
             {
                 string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
-                string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
+                string directory = PathUtils.NormalizeSeparators(Path.GetDirectoryName(sourcePath));
                 if (string.IsNullOrEmpty(directory)) return;
                 foreach (Match match in Regex.Matches(text, @"#include ""([^""]+)"""))
                 {
@@ -1809,7 +1809,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (extension == "atlas")
             {
                 string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
-                string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
+                string directory = PathUtils.NormalizeSeparators(Path.GetDirectoryName(sourcePath));
                 if (string.IsNullOrEmpty(directory)) return;
                 foreach (string line in text.Split('\n'))
                 {
@@ -2728,7 +2728,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 string dir = Path.GetDirectoryName(PathUtils.NormalizePath(sourcePath));
                 if (!string.IsNullOrEmpty(dir))
-                    candidateDirs.Add(dir.Replace('\\', '/'));
+                    candidateDirs.Add(PathUtils.NormalizeSeparators(dir));
             }
 
             if (candidateDirs.Count == 0 && atlas.TextureHashes.Count > 0)
@@ -2799,7 +2799,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
                     {
                         string norm = PathUtils.NormalizePath(path);
-                        string dir = Path.GetDirectoryName(norm)?.Replace('\\', '/');
+                        string dir = PathUtils.NormalizeSeparators(Path.GetDirectoryName(norm));
                         if (!string.IsNullOrEmpty(dir))
                             dict[XxHash64Ext.Hash(norm)] = dir;
                     }
@@ -2819,7 +2819,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     {
                         string dir = Path.GetDirectoryName(PathUtils.NormalizePath(path));
                         if (!string.IsNullOrEmpty(dir))
-                            dirs.Add(dir.Replace('\\', '/'));
+                            dirs.Add(PathUtils.NormalizeSeparators(dir));
                     }
                 }
                 return dirs.OrderBy(d => d, StringComparer.OrdinalIgnoreCase).ToList();

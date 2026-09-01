@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Viewer.Vfx.Resources
 {
@@ -164,7 +165,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
         private static string Normalize(string path)
         {
-            string value = path.Replace('\\', '/').TrimStart('/');
+            string value = PathUtils.NormalizeSeparators(path).TrimStart('/');
             if (value.StartsWith("data/", StringComparison.OrdinalIgnoreCase)) value = value[5..];
             if (value.StartsWith("assets/", StringComparison.OrdinalIgnoreCase)) value = value[7..];
             return value;

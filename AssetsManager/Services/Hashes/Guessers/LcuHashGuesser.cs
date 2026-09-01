@@ -257,7 +257,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             // Frontend developer README files across active plugin directories
             var knownPluginDirs = KnownPaths
                 .Where(p => p.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase))
-                .Select(p => Path.GetDirectoryName(p)?.Replace('\\', '/'))
+                .Select(p => PathUtils.NormalizeSeparators(Path.GetDirectoryName(p)))
                 .Where(d => !string.IsNullOrEmpty(d))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
 
@@ -452,7 +452,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             int checkedCount = 0;
             const string source = "LCU universal plugin modifier attack";
 
-            var dirGroups = pathList.GroupBy(p => Path.GetDirectoryName(p)?.Replace('\\', '/'))
+            var dirGroups = pathList.GroupBy(p => PathUtils.NormalizeSeparators(Path.GetDirectoryName(p)))
                 .Where(g => !string.IsNullOrEmpty(g.Key));
 
             foreach (var group in dirGroups)
@@ -574,7 +574,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 string source = $"Scoped plugin {plugin}";
 
                 var dirGroups = pluginPaths
-                    .GroupBy(p => Path.GetDirectoryName(p)?.Replace('\\', '/'))
+                    .GroupBy(p => PathUtils.NormalizeSeparators(Path.GetDirectoryName(p)))
                     .Where(g => !string.IsNullOrEmpty(g.Key))
                     .ToList();
 
@@ -662,7 +662,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     var numberedPaths = pluginPaths.Where(p => Regex.IsMatch(Path.GetFileNameWithoutExtension(p), @"\d+")).Take(300);
                     foreach (var path in numberedPaths)
                     {
-                        string dir = Path.GetDirectoryName(path)?.Replace('\\', '/');
+                        string dir = PathUtils.NormalizeSeparators(Path.GetDirectoryName(path));
                         string baseName = Path.GetFileNameWithoutExtension(path);
                         string ext = Path.GetExtension(path);
                         if (string.IsNullOrEmpty(dir)) continue;
@@ -1240,7 +1240,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             int separator = sourcePath.LastIndexOf('/');
             if (separator < 0) return string.Empty;
             var segments = new List<string>(sourcePath[..separator].Split('/', StringSplitOptions.RemoveEmptyEntries));
-            foreach (string segment in relativePath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries))
+            foreach (string segment in PathUtils.NormalizeSeparators(relativePath).Split('/', StringSplitOptions.RemoveEmptyEntries))
             {
                 if (segment == ".") continue;
                 if (segment == "..")

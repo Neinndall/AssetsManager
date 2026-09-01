@@ -288,6 +288,15 @@ namespace AssetsManager.Utils
         }
 
         /// <summary>
+        /// Converts mixed path separators to forward slashes without changing path casing or segments.
+        /// </summary>
+        public static string NormalizeSeparators(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            return path.Contains('\\') ? path.Replace('\\', '/') : path;
+        }
+
+        /// <summary>
         /// Normalizes a path by replacing backslashes with forward slashes and converting to lowercase.
         /// Intended for internal WAD virtual paths (e.g. "plugins/rcp-be-lol-game-data/...").
         /// </summary>
@@ -295,7 +304,7 @@ namespace AssetsManager.Utils
         {
             if (string.IsNullOrWhiteSpace(path)) return string.Empty;
             // Repeated separators are significant in Riot's historical GAME hashes.
-            return path.Trim().Replace('\\', '/').ToLowerInvariant();
+            return NormalizeSeparators(path.Trim()).ToLowerInvariant();
         }
 
         /// <summary>
@@ -312,7 +321,7 @@ namespace AssetsManager.Utils
         public static string NormalizeVirtualPath(string path)
         {
             var segments = new Stack<string>();
-            foreach (string segment in path.Split('/'))
+            foreach (string segment in NormalizeSeparators(path).Split('/'))
             {
                 if (segment.Length == 0 || segment == ".") continue;
                 if (segment == "..")

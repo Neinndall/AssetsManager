@@ -390,7 +390,7 @@ namespace AssetsManager.Services.Hashes
             string.IsNullOrEmpty(value) ? value : char.ToUpperInvariant(value[0]) + value[1..];
 
         internal static string NormalizeCandidate(string value) =>
-            value?.Trim().Replace('\\', '/') ?? string.Empty;
+            PathUtils.NormalizeSeparators(value?.Trim());
 
         private static InternalHashEvidenceOrigin GetEvidenceOrigin(InternalHashEvidence evidence) => evidence switch
         {
