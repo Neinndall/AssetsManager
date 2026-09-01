@@ -11,7 +11,6 @@ namespace AssetsManager.Views.Models.Monitor
 
         private ObservableCollection<BackupModel> _allBackups;
         private bool _isBusy;
-        private bool _isLoading;
         private int _totalBackupsCount;
         private string _totalStorageSize;
         private string _activeClientEnvironment;
@@ -31,12 +30,6 @@ namespace AssetsManager.Views.Models.Monitor
         {
             get => _isBusy;
             set { if (_isBusy != value) { _isBusy = value; OnPropertyChanged(); } }
-        }
-
-        public bool IsLoading
-        {
-            get => _isLoading;
-            set { if (_isLoading != value) { _isLoading = value; OnPropertyChanged(); } }
         }
 
         public int TotalBackupsCount

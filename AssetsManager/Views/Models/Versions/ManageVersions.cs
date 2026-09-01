@@ -134,14 +134,20 @@ namespace AssetsManager.Views.Models.Versions
             if (_versionService != null)
             {
                 var allFiles = await _versionService.GetVersionFilesAsync();
-                var sortedFiles = allFiles
-                    .OrderByDescending(f => FormatUtils.ParseDate(f.Date, "dd/MM/yyyy HH:mm:ss"))
-                    .ThenBy(f => f.FileName)
-                    .ToList();
+                var preparedLists = await Task.Run(() =>
+                {
+                    var sortedFiles = allFiles
+                        .OrderByDescending(f => FormatUtils.ParseDate(f.Date, "dd/MM/yyyy HH:mm:ss"))
+                        .ThenBy(f => f.FileName)
+                        .ToList();
 
-                AllLeagueClientVersions = sortedFiles.Where(f => f.Category == "league-client").ToList();
-                var gameClientCategories = new[] { "lol-game-client" };
-                AllLoLGameClientVersions = sortedFiles.Where(f => gameClientCategories.Contains(f.Category)).ToList();
+                    return (
+                        LeagueClient: sortedFiles.Where(f => f.Category == "league-client").ToList(),
+                        GameClient: sortedFiles.Where(f => f.Category == "lol-game-client").ToList());
+                });
+
+                AllLeagueClientVersions = preparedLists.LeagueClient;
+                AllLoLGameClientVersions = preparedLists.GameClient;
 
                 LeagueClientPaginator.SetFullList(AllLeagueClientVersions);
                 LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions);

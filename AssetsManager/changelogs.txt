@@ -88,6 +88,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Monitor / Version manifests now load without blocking navigation, while brief backup refreshes no longer flash a loading indicator.
   - Hash Guessing Lab / GAME Custom and Extended now cover every path without global candidate cutoffs while bounding custom vocabularies to 50,000 words and BIN/DDS/TEX/SwordList to 20,000.
   - Hash Guessing Lab / GAME Custom now exhaustively distributes its animation vocabulary in equal rounds across every champion and skin without a global candidate limit.
   - Monitor / Watcher: Preserved active pagination page and synchronized PageInfo display when validating or updating monitored assets.

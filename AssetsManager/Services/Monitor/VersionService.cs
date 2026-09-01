@@ -216,29 +216,32 @@ namespace AssetsManager.Services.Monitor
 
         public async Task<List<VersionFileInfo>> GetVersionFilesAsync()
         {
-            var versionFiles = new List<VersionFileInfo>();
             string versionsRootPath = _directoriesCreator.VersionsPath;
-            if (!Directory.Exists(versionsRootPath)) return versionFiles;
+            if (!Directory.Exists(versionsRootPath)) return new List<VersionFileInfo>();
 
-            try
+            return await Task.Run(() =>
             {
-                foreach (string directory in Directory.EnumerateDirectories(versionsRootPath, "*", SearchOption.AllDirectories))
+                var versionFiles = new List<VersionFileInfo>();
+                try
                 {
-                    string category = new DirectoryInfo(directory).Name;
-                    foreach (string filePath in Directory.EnumerateFiles(directory, "*.txt"))
+                    foreach (string directory in Directory.EnumerateDirectories(versionsRootPath, "*", SearchOption.AllDirectories))
                     {
-                        versionFiles.Add(new VersionFileInfo
+                        string category = new DirectoryInfo(directory).Name;
+                        foreach (string filePath in Directory.EnumerateFiles(directory, "*.txt"))
                         {
-                            FileName = Path.GetFileName(filePath),
-                            Content = await File.ReadAllTextAsync(filePath),
-                            Category = category,
-                            Date = File.GetCreationTime(filePath).ToString("dd/MM/yyyy HH:mm:ss")
-                        });
+                            versionFiles.Add(new VersionFileInfo
+                            {
+                                FileName = Path.GetFileName(filePath),
+                                Content = File.ReadAllText(filePath),
+                                Category = category,
+                                Date = File.GetCreationTime(filePath).ToString("dd/MM/yyyy HH:mm:ss")
+                            });
+                        }
                     }
                 }
-            }
-            catch (Exception ex) { _logService.LogError(ex, "Error loading version files"); }
-            return versionFiles;
+                catch (Exception ex) { _logService.LogError(ex, "Error loading version files"); }
+                return versionFiles;
+            });
         }
 
         public bool DeleteVersionFiles(IEnumerable<VersionFileInfo> versionFiles)

@@ -107,11 +107,6 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (BackupManager == null) return;
 
-            if (_loadedBackups.Count == 0 && ViewModel != null)
-            {
-                ViewModel.IsLoading = true;
-            }
-
             try
             {
                 _loadCancellation?.Cancel();
@@ -127,13 +122,6 @@ namespace AssetsManager.Views.Controls.Monitor
             catch (Exception ex)
             {
                 LogService.LogError(ex, "Error loading backups.");
-            }
-            finally
-            {
-                if (ViewModel != null)
-                {
-                    ViewModel.IsLoading = false;
-                }
             }
         }
 
