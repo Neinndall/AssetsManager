@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Tests.xUnit.Infrastructure;
 using AssetsManager.Views.Models.Wad;
+using LeagueToolkit.Core.Wad;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Comparator
@@ -45,6 +47,75 @@ namespace AssetsManager.Tests.xUnit.Services.Comparator
                     diffs,
                     bridge.CreateDirectory("old"),
                     bridge.CreateDirectory("new"),
+                    bridge.CreateDirectory("old-output"),
+                    bridge.CreateDirectory("new-output")));
+        }
+
+        [Fact]
+        public async Task PackagingAllowsMissingOldWadForNewChunk()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            string oldDirectory = bridge.CreateDirectory("old");
+            string newDirectory = bridge.CreateDirectory("new");
+            string wadPath = bridge.BakeWad(newDirectory, "test.wad", ("assets/test.json", "new content"));
+            ulong newPathHash;
+            using (var wad = new WadFile(wadPath))
+            {
+                newPathHash = wad.Chunks.Keys.Single();
+            }
+
+            var diffs = new[]
+            {
+                new SerializableChunkDiff
+                {
+                    Type = ChunkDiffType.New,
+                    NewPath = "assets/test.json",
+                    NewPathHash = newPathHash,
+                    SourceWadFile = "test.wad"
+                }
+            };
+            string newOutput = bridge.CreateDirectory("new-output");
+
+            await bridge.CreatePackager().CreateLeanWadPackageAsync(
+                diffs,
+                oldDirectory,
+                newDirectory,
+                bridge.CreateDirectory("old-output"),
+                newOutput);
+
+            Assert.True(File.Exists(Path.Combine(newOutput, "test.wad", $"{newPathHash:X16}.chunk")));
+        }
+
+        [Fact]
+        public async Task PackagingRejectsMissingOldWadForModifiedChunk()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            string newDirectory = bridge.CreateDirectory("new");
+            string wadPath = bridge.BakeWad(newDirectory, "test.wad", ("assets/test.json", "new content"));
+            ulong pathHash;
+            using (var wad = new WadFile(wadPath))
+            {
+                pathHash = wad.Chunks.Keys.Single();
+            }
+
+            var diffs = new[]
+            {
+                new SerializableChunkDiff
+                {
+                    Type = ChunkDiffType.Modified,
+                    OldPath = "assets/test.json",
+                    NewPath = "assets/test.json",
+                    OldPathHash = pathHash,
+                    NewPathHash = pathHash,
+                    SourceWadFile = "test.wad"
+                }
+            };
+
+            await Assert.ThrowsAsync<FileNotFoundException>(() =>
+                bridge.CreatePackager().CreateLeanWadPackageAsync(
+                    diffs,
+                    bridge.CreateDirectory("old"),
+                    newDirectory,
                     bridge.CreateDirectory("old-output"),
                     bridge.CreateDirectory("new-output")));
         }

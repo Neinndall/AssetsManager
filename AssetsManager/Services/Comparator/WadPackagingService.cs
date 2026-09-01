@@ -134,7 +134,7 @@ namespace AssetsManager.Services.Comparator
                             OldCompressionType = dep.OldCompressionType ?? dep.CompressionType,
                             NewCompressionType = dep.NewCompressionType ?? dep.CompressionType,
                             SourceWadFile = dep.SourceWad, 
-                            Type = ChunkDiffType.Modified 
+                            Type = dep.OldPathHash != 0 ? ChunkDiffType.Modified : ChunkDiffType.New
                         });
                     }
                 }
@@ -150,7 +150,7 @@ namespace AssetsManager.Services.Comparator
 
                 string sourceOldWadPath = PathUtils.ResolveWadPath(oldPbePath, wadFileRelativePath);
                 var oldChunksToSave = wadGroup
-                    .Where(d => d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.Removed)
+                    .Where(d => (d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.Removed) && d.OldPathHash != 0)
                     .ToList();
                 if (oldChunksToSave.Any())
                 {
@@ -162,7 +162,7 @@ namespace AssetsManager.Services.Comparator
 
                 string sourceNewWadPath = PathUtils.ResolveWadPath(newPbePath, wadFileRelativePath);
                 var newChunksToSave = wadGroup
-                    .Where(d => d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.New)
+                    .Where(d => (d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.New) && d.NewPathHash != 0)
                     .ToList();
                 if (newChunksToSave.Any())
                 {

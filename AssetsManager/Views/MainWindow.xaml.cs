@@ -349,6 +349,10 @@ namespace AssetsManager.Views
                         await _comparisonHistoryService.EnsureArchivedAsync(
                             serializableDiffs, oldPath, newPath, version, displayName);
                     }
+                    catch (FileNotFoundException ex)
+                    {
+                        _logService.LogError(ex, "Failed to auto-save comparison history because a required BASE container is missing.");
+                    }
                     catch (Exception ex)
                     {
                         _logService.LogError(ex, "Failed to auto-save comparison history.");
