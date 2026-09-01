@@ -72,12 +72,12 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (MonitorService == null) return;
 
-            string filter = txtSearch.Text.Trim().ToLower();
+            string filter = txtSearch.Text.Trim();
             var filtered = MonitorService.MonitoredAssets
                 .Where(u => string.IsNullOrEmpty(filter) || 
-                            u.Alias.ToLower().Contains(filter) || 
-                            u.WadName.ToLower().Contains(filter) ||
-                            u.AssetPath.ToLower().Contains(filter))
+                            (u.Alias?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                            (u.WadName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                            (u.AssetPath?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false))
                 .ToList();
 
             ViewModel.Paginator.SetFullList(filtered);

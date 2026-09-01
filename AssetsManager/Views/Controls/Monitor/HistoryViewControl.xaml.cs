@@ -74,13 +74,13 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (AppSettings != null)
             {
-                string filter = txtSearch.Text.Trim().ToLower();
+                string filter = txtSearch.Text.Trim();
                 var entries = AppSettings.DiffHistory
                     .Where(e => string.IsNullOrEmpty(filter) || 
-                                (e.FileName != null && e.FileName.ToLower().Contains(filter)) ||
-                                (e.DisplayName != null && e.DisplayName.ToLower().Contains(filter)) ||
-                                (e.Version != null && e.Version.ToLower().Contains(filter)) ||
-                                (e.ReferenceId != null && e.ReferenceId.ToLower().Contains(filter)))
+                                (e.FileName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                                (e.DisplayName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                                (e.Version?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                                (e.ReferenceId?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false))
                     .OrderByDescending(e => e.Timestamp);
 
                 _viewModel.LoadHistory(entries);
