@@ -138,6 +138,9 @@
                         </Thumb>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="Role" Value="Padding">
+                            <Setter TargetName="PART_HeaderGripper" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter Property="Background" Value="{StaticResource HoverColor}"/>
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
@@ -147,6 +150,9 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- Implicit default style for GridViewColumnHeader (avoids default OS white filler header) -->
+    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}"/>
 
     <!-- Shared ListView style for GridView-backed tables -->
     <Style x:Key="ModernTableListView" TargetType="ListView">

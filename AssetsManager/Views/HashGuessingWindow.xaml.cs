@@ -455,18 +455,13 @@ namespace AssetsManager.Views
             }
 
             var scrollViewer = FindScrollViewer(ResultsListView);
-            if (scrollViewer == null || scrollViewer.ViewportWidth <= 0)
-            {
-                return;
-            }
+            double availableWidth = scrollViewer?.ViewportWidth > 0 ? scrollViewer.ViewportWidth : ResultsListView.ActualWidth;
+            if (availableWidth <= 0) return;
 
-            double precedingWidth = gridView.Columns.Take(4).Sum(column => column.ActualWidth);
-            double sourceWadWidth = Math.Max(100, scrollViewer.ViewportWidth - precedingWidth);
+            double precedingWidth = gridView.Columns.Take(4).Sum(c => c.ActualWidth > 0 ? c.ActualWidth : (double.IsNaN(c.Width) ? 0 : c.Width));
+            double sourceWadWidth = Math.Max(100, availableWidth - precedingWidth);
 
-            if (Math.Abs(gridView.Columns[4].Width - sourceWadWidth) < 0.5)
-            {
-                return;
-            }
+            if (Math.Abs(gridView.Columns[4].Width - sourceWadWidth) < 0.5) return;
 
             _isUpdatingResultsColumns = true;
             try
