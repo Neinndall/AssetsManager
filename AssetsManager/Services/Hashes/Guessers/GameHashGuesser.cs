@@ -1539,38 +1539,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             int progressOffset = 0) =>
             GuessSkinGroupsBinLocalAsync(engine, cancellationToken, progress, progressOffset);
 
-        private List<string> ExtractWordsFromDirectoryJsons(string rootDirectory, CancellationToken cancellationToken)
-        {
-            var words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            try
-            {
-                if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory)) return words.ToList();
-                var regex = new Regex(@"[a-zA-Z0-9_]{3,20}", RegexOptions.Compiled);
-                foreach (string file in Directory.EnumerateFiles(rootDirectory, "*.json", SearchOption.AllDirectories).Take(100))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    try
-                    {
-                        if (new FileInfo(file).Length > 2 * 1024 * 1024) continue;
-                        foreach (Match match in regex.Matches(File.ReadAllText(file)))
-                        {
-                            string word = match.Value.ToLowerInvariant();
-                            if (word.Length >= 4 && !int.TryParse(word, out _)) words.Add(word);
-                        }
-                    }
-                    catch (Exception exception) when (exception is not OperationCanceledException)
-                    {
-                        _logService?.LogDebug($"Hash Lab skipped JSON word source '{file}': {exception.Message}");
-                    }
-                }
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                _logService.LogError(exception, $"Hash Lab could not enumerate JSON word sources under '{rootDirectory}'.");
-            }
-            return words.ToList();
-        }
-
         internal override void GrepWad(
             HashGuessEngine engine,
             ArraySegment<byte> data,
