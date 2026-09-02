@@ -611,20 +611,23 @@ namespace AssetsManager.Services.Hashes.Guessers
             IReadOnlyList<string> wordsList = words.ToList();
             if (formats.Count == 0 || wordsList.Count == 0) return 0;
 
-            int checkedCount = 0;
+            long checkedCount = 0;
             foreach (string format in ProgressIterator(formats, format => format, cancellationToken))
             {
-                int remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
-                if (remaining <= 0) return checkedCount;
+                int remaining = candidateBudget == int.MaxValue
+                    ? int.MaxValue
+                    : (int)Math.Max(0, candidateBudget - checkedCount);
+                if (remaining <= 0) return (int)Math.Min(int.MaxValue, checkedCount);
 
                 IEnumerable<string> candidates = EnumerateBasenameWordCandidates(format, wordsList, newWordCount, cancellationToken);
                 if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
 
                 checkedCount += CheckIter(engine, candidates, strategy, source);
-                progress?.Invoke(checkedCount);
-                if (engine.RemainingUnknownCount == 0) return checkedCount;
+                int reportedCount = (int)Math.Min(int.MaxValue, checkedCount);
+                progress?.Invoke(reportedCount);
+                if (engine.RemainingUnknownCount == 0) return reportedCount;
             }
-            return checkedCount;
+            return (int)Math.Min(int.MaxValue, checkedCount);
         }
 
         internal static IReadOnlyList<string> BuildWordAdditionFormats(IEnumerable<string> paths)
