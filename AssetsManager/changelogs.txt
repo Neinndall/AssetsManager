@@ -88,6 +88,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Guessing Lab progress now refreshes at a consistent rate across GAME, LCU, BIN, and RST methods.
   - Explorer and comparison views now reduce temporary path allocations during large scans and result classification.
   - Monitor / Watcher and History searches now avoid temporary text allocations while filtering.
   - Monitor / Version manifests now load without blocking navigation, while brief backup refreshes no longer flash a loading indicator.
