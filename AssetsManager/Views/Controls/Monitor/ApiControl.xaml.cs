@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -45,6 +46,7 @@ namespace AssetsManager.Views.Controls.Monitor
             
             _viewModel = new ApiModel();
             DataContext = _viewModel;
+            _viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
             this.Loaded += ApiControl_Loaded;
             this.Unloaded += ApiControl_Unloaded;
@@ -157,7 +159,9 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 if (prog != null && !string.IsNullOrEmpty(prog.Id))
                 {
-                    ViewModel.ManualPassId = prog.Id;
+                    _isSyncingBrowserSelection = true;
+                    try { ViewModel.ManualPassId = prog.Id; }
+                    finally { _isSyncingBrowserSelection = false; }
                 }
 
                 string rewardsPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_rewards.json");
@@ -174,6 +178,66 @@ namespace AssetsManager.Views.Controls.Monitor
                 }
             }
             catch (Exception ex) { LogService.LogError(ex, "Failed to load pass from browser selection."); }
+        }
+
+        private string FindPassNameByTrackId(string trackId)
+        {
+            if (string.IsNullOrWhiteSpace(trackId) || DirectoriesCreator == null || !Directory.Exists(DirectoriesCreator.ApiCachePath))
+                return null;
+
+            try
+            {
+                var files = Directory.GetFiles(DirectoriesCreator.ApiCachePath, "*_progression.json");
+                foreach (var file in files)
+                {
+                    var json = File.ReadAllText(file);
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("id", out var idProp) &&
+                        string.Equals(idProp.GetString(), trackId.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        string baseName = Path.GetFileName(file).Replace("_progression.json", "");
+                        return PathUtils.CleanPassName(baseName, forUI: true);
+                    }
+                }
+            }
+            catch { /* Ignore */ }
+
+            return null;
+        }
+
+        private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ApiModel.ManualPassId))
+            {
+                if (_isSyncingBrowserSelection) return;
+
+                string currentId = ViewModel?.ManualPassId?.Trim();
+                if (string.IsNullOrEmpty(currentId))
+                {
+                    _isSyncingBrowserSelection = true;
+                    try { ViewModel.SelectedPass = null; }
+                    finally { _isSyncingBrowserSelection = false; }
+                    return;
+                }
+
+                string matchingPass = FindPassNameByTrackId(currentId);
+                if (!string.IsNullOrEmpty(matchingPass) && ViewModel.AvailablePasses != null && ViewModel.AvailablePasses.Contains(matchingPass))
+                {
+                    if (ViewModel.SelectedPass != matchingPass)
+                    {
+                        ViewModel.SelectedPass = matchingPass;
+                    }
+                }
+                else
+                {
+                    if (ViewModel.SelectedPass != null)
+                    {
+                        _isSyncingBrowserSelection = true;
+                        try { ViewModel.SelectedPass = null; }
+                        finally { _isSyncingBrowserSelection = false; }
+                    }
+                }
+            }
         }
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
@@ -720,9 +784,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 {
                     await ProcessPassRewardsDataAsync(progression, rewardsResponse);
 
-                    string passToSelect = !string.IsNullOrEmpty(eventName)
-                        ? PathUtils.CleanPassName(eventName, forUI: true)
-                        : PathUtils.CleanPassName(progression.Name, forUI: true);
+                    string passToSelect = FindPassNameByTrackId(progression.Id)
+                        ?? (!string.IsNullOrEmpty(eventName) ? PathUtils.CleanPassName(eventName, forUI: true) : PathUtils.CleanPassName(progression.Name, forUI: true));
 
                     // Refresh the browser list and synchronize selection with the fetched pass
                     await LoadAvailablePassesAsync(passToSelect);
