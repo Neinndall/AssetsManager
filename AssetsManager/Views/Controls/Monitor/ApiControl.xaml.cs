@@ -46,7 +46,6 @@ namespace AssetsManager.Views.Controls.Monitor
             
             _viewModel = new ApiModel();
             DataContext = _viewModel;
-            _viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
             this.Loaded += ApiControl_Loaded;
             this.Unloaded += ApiControl_Unloaded;
@@ -58,6 +57,12 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void ApiControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (_viewModel != null)
+            {
+                _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+                _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+            }
+
             if (_lcuConnectionTimer != null)
             {
                 _lcuConnectionTimer.Tick -= LcuConnectionTimer_Tick;
@@ -681,6 +686,11 @@ namespace AssetsManager.Views.Controls.Monitor
             if (AppSettings != null)
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+
+            if (_viewModel != null)
+            {
+                _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
             }
         }
 
