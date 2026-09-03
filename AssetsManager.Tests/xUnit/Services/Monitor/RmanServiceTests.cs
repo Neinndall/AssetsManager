@@ -46,6 +46,35 @@ public sealed class RmanServiceTests
     }
 
     [Fact]
+    public void RejectsExcessiveBodySizes()
+    {
+        byte[] excessiveUncompressed = CreateRman();
+        BinaryPrimitives.WriteUInt32LittleEndian(excessiveUncompressed.AsSpan(24, 4), (uint)RmanService.MaxUncompressedBodySize + 1);
+        Assert.Throws<InvalidDataException>(() => new RmanService().Parse(excessiveUncompressed));
+
+        byte[] excessiveCompressed = CreateRman();
+        BinaryPrimitives.WriteUInt32LittleEndian(excessiveCompressed.AsSpan(12, 4), (uint)RmanService.MaxCompressedBodySize + 1);
+        Assert.Throws<InvalidDataException>(() => new RmanService().Parse(excessiveCompressed));
+    }
+
+    [Fact]
+    public void RejectsMissingOrTruncatedFile()
+    {
+        Assert.Throws<FileNotFoundException>(() => new RmanService().Parse(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".manifest")));
+
+        string tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(tempFile, "RMAN"u8.ToArray());
+            Assert.Throws<InvalidDataException>(() => new RmanService().Parse(tempFile));
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
     public void RejectsCorruptCompressedBodyAndTruncatedSignature()
     {
         byte[] corrupt = CreateRman();

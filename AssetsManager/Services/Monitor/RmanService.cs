@@ -13,6 +13,10 @@ namespace AssetsManager.Services.Monitor;
 
 public sealed class RmanService
 {
+    public const int MaxManifestFileSize = 256 * 1024 * 1024;     // 256 MB max file on disk
+    public const int MaxCompressedBodySize = 256 * 1024 * 1024;   // 256 MB max compressed payload
+    public const int MaxUncompressedBodySize = 512 * 1024 * 1024; // 512 MB max uncompressed body
+
     private const int HeaderSize = 28;
     private const int SignatureSize = 256;
     private const byte SupportedMajorVersion = 2;
@@ -22,7 +26,16 @@ public sealed class RmanService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         cancellationToken.ThrowIfCancellationRequested();
+
+        var fileInfo = new FileInfo(filePath);
+        if (!fileInfo.Exists)
+            throw new FileNotFoundException("RMAN manifest file was not found.", filePath);
+
+        if (fileInfo.Length > MaxManifestFileSize)
+            throw new InvalidDataException($"RMAN manifest file size ({fileInfo.Length} bytes) exceeds maximum permitted limit ({MaxManifestFileSize} bytes).");
+
         byte[] rawData = File.ReadAllBytes(filePath);
+
         cancellationToken.ThrowIfCancellationRequested();
         return Parse(rawData, cancellationToken);
     }
@@ -50,8 +63,8 @@ public sealed class RmanService
         uint uncompressedSizeValue = BinaryPrimitives.ReadUInt32LittleEndian(header[24..28]);
 
         int contentOffset = GetPositiveInt32(contentOffsetValue, "content offset");
-        int compressedSize = GetPositiveInt32(compressedSizeValue, "compressed body size");
-        int uncompressedSize = GetPositiveInt32(uncompressedSizeValue, "uncompressed body size");
+        int compressedSize = GetBoundedInt32(compressedSizeValue, MaxCompressedBodySize, "compressed body size");
+        int uncompressedSize = GetBoundedInt32(uncompressedSizeValue, MaxUncompressedBodySize, "uncompressed body size");
         if (contentOffset < HeaderSize)
             throw new InvalidDataException($"Invalid RMAN content offset: {contentOffset}.");
 
@@ -87,6 +100,13 @@ public sealed class RmanService
         {
             ArrayPool<byte>.Shared.Return(uncompressedBody);
         }
+    }
+
+    private static int GetBoundedInt32(uint value, int maxValue, string fieldName)
+    {
+        if (value == 0 || value > (uint)maxValue)
+            throw new InvalidDataException($"Invalid RMAN {fieldName}: {value} (max allowed: {maxValue}).");
+        return (int)value;
     }
 
     private static int GetPositiveInt32(uint value, string fieldName)
