@@ -490,20 +490,21 @@ namespace AssetsManager.Services.Monitor
 
             if (response != null)
             {
+                string passIdentifier = !string.IsNullOrEmpty(overrideName) ? overrideName : eventId;
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    string passIdentifier = !string.IsNullOrEmpty(overrideName) ? overrideName : eventId;
                     _logService.LogWarning($"Pass '{passIdentifier}' was not found on Riot servers or may be inactive or temporarily removed.");
                 }
                 else
                 {
-                    _logService.LogError($"Failed to retrieve Pass progression for '{eventId}'. Server returned status: {response.StatusCode}");
+                    _logService.LogError($"Failed to retrieve pass progression for '{passIdentifier}'. Server returned status: {response.StatusCode}");
                 }
                 return (null, response.StatusCode);
             }
             else
             {
-                _logService.LogError($"Failed to retrieve Pass progression for '{eventId}'. The server response was empty or null.");
+                string passIdentifier = !string.IsNullOrEmpty(overrideName) ? overrideName : eventId;
+                _logService.LogError($"Failed to retrieve pass progression for '{passIdentifier}'. The server response was empty or null.");
                 return (null, null);
             }
         }
@@ -606,7 +607,7 @@ namespace AssetsManager.Services.Monitor
                             string name = ev.TryGetProperty("localizedName", out var n) ? n.GetString() : null;
                             if (!string.IsNullOrEmpty(name))
                             {
-                                _logService.Log($"Found name for event ID: {name}");
+                                _logService.Log($"Found pass name '{name}' with ID: {trackConfigId}");
                                 return name;
                             }
                         }
