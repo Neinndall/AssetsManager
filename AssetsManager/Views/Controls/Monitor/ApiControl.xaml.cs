@@ -646,8 +646,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 eventName = await RiotApiService.GetPassNameFromHubAsync(eventId);
             }
 
-            string passIdentifier = !string.IsNullOrEmpty(eventName) ? eventName : eventId;
-            LogService.Log($"Starting pass rewards fetch process for '{passIdentifier}'...");
+            LogService.Log("Starting pass rewards fetch process...");
 
             ViewModel.IsBusy = true;
             ViewModel.StatusText = "Status: Fetching pass progression...";
@@ -663,7 +662,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 {
                     CustomMessageBoxService.ShowWarning(
                         "Pass Unavailable",
-                        $"Pass '{passIdentifier}' was not found on Riot servers.\n\nIt may be inactive or temporarily removed, or the ID is no longer active.",
+                        "The pass was not found on Riot servers.\n\nIt may be inactive or temporarily removed, or the ID is no longer active.",
                         Window.GetWindow(this));
                 }
                 else

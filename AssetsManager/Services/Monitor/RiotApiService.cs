@@ -490,21 +490,19 @@ namespace AssetsManager.Services.Monitor
 
             if (response != null)
             {
-                string passIdentifier = !string.IsNullOrEmpty(overrideName) ? overrideName : eventId;
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    _logService.LogWarning($"Pass '{passIdentifier}' was not found on Riot servers or may be inactive or temporarily removed.");
+                    _logService.LogWarning("The pass was not found on Riot servers or may be inactive or temporarily removed.");
                 }
                 else
                 {
-                    _logService.LogError($"Failed to retrieve pass progression for '{passIdentifier}'. Server returned status: {response.StatusCode}");
+                    _logService.LogError($"Failed to retrieve pass progression. Server returned status: {response.StatusCode}");
                 }
                 return (null, response.StatusCode);
             }
             else
             {
-                string passIdentifier = !string.IsNullOrEmpty(overrideName) ? overrideName : eventId;
-                _logService.LogError($"Failed to retrieve pass progression for '{passIdentifier}'. The server response was empty or null.");
+                _logService.LogError("Failed to retrieve pass progression. The server response was empty or null.");
                 return (null, null);
             }
         }
