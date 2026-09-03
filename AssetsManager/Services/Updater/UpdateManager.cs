@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Reflection;
+using System.Threading;
 using System.Windows;
 using Newtonsoft.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,28 +33,51 @@ namespace AssetsManager.Services.Updater
             _updateExtractor = updateExtractor;
             _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
+
+            if (!_httpClient.DefaultRequestHeaders.UserAgent.Any(h => string.Equals(h.Product?.Name, "AssetsManager", StringComparison.OrdinalIgnoreCase)))
+            {
+                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("AssetsManager");
+            }
         }
 
-        public async Task CheckForUpdatesAsync(Window owner = null, bool showNoUpdatesMessage = true)
+        public async Task CheckForUpdatesAsync(Window owner = null, bool showNoUpdatesMessage = true, CancellationToken cancellationToken = default)
         {
             string currentVersionRaw = Assembly.GetExecutingAssembly().GetName().Version.ToString();
             string apiUrl = "https://api.github.com/repos/Neinndall/AssetsManager/releases/latest";
             string downloadUrl = "";
             long totalBytes = 0;
 
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("AssetsManager");
-
             try
             {
                 // Llamamos a _directoriesCreator para crear la carpeta de update cache
                 _directoriesCreator.CreateDirectory(_directoriesCreator.UpdateCachePath);
 
-                var response = await _httpClient.GetStringAsync(apiUrl);
+                var response = await _httpClient.GetStringAsync(apiUrl, cancellationToken);
                 var releaseData = JsonConvert.DeserializeObject<dynamic>(response);
 
-                string latestVersionRaw = releaseData.tag_name;
-                downloadUrl = releaseData.assets[0].browser_download_url;
-                totalBytes = releaseData.assets[0].size;
+                string latestVersionRaw = releaseData?.tag_name != null ? (string)releaseData.tag_name : null;
+                var assets = releaseData?.assets;
+                if (string.IsNullOrEmpty(latestVersionRaw) || assets == null || assets.Count == 0)
+                {
+                    _logService.LogWarning("Update check returned no usable release (missing tag or assets).");
+                    if (showNoUpdatesMessage)
+                    {
+                        _customMessageBoxService.ShowInfo("Updates", "No updates available.", owner);
+                    }
+                    return;
+                }
+
+                downloadUrl = (string)assets[0].browser_download_url;
+                totalBytes = (long?)assets[0].size ?? 0;
+                if (string.IsNullOrEmpty(downloadUrl))
+                {
+                    _logService.LogWarning("Update check returned a release without download URL.");
+                    if (showNoUpdatesMessage)
+                    {
+                        _customMessageBoxService.ShowInfo("Updates", "No updates available.", owner);
+                    }
+                    return;
+                }
 
                 string parsedCurrentVersion = Regex.Match(currentVersionRaw, @"\d+(\.\d+){1,3}").Value;
                 string parsedLatestVersion = Regex.Match(latestVersionRaw.ToString(), @"\d+(\.\d+){1,3}").Value;
@@ -88,60 +112,13 @@ namespace AssetsManager.Services.Updater
                         string downloadPath = Path.Combine(_directoriesCreator.UpdateCachePath, fileName);
 
                         // Check if the file already exists and has the correct size
-                        if (File.Exists(downloadPath) && new FileInfo(downloadPath).Length == totalBytes)
+                        if (File.Exists(downloadPath) && totalBytes > 0 && new FileInfo(downloadPath).Length == totalBytes)
                         {
                             _logService.Log("Update package already exists and has the correct size. Skipping download.");
                         }
                         else
                         {
-                            UpdateProgressWindow progressWindow = null;
-                            await Application.Current.Dispatcher.InvokeAsync(() =>
-                            {
-                                progressWindow = _serviceProvider.GetRequiredService<UpdateProgressWindow>();
-                                progressWindow.Show();
-                                progressWindow.UpdateLayout();
-                            });
-
-                            string downloadSize = $"{(totalBytes / 1024.0 / 1024.0):0.00} MB";
-
-                            await progressWindow.Dispatcher.InvokeAsync(() =>
-                            {
-                                progressWindow.SetProgress(0, $"Downloading {downloadSize}...");
-                            });
-                            await Task.Delay(500);
-
-                            using (var responseDownload = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
-                            {
-                                responseDownload.EnsureSuccessStatusCode();
-                                long bytesDownloaded = 0;
-
-                                using (var fs = new FileStream(downloadPath, FileMode.Create))
-                                {
-                                    byte[] buffer = new byte[8192];
-                                    int bytesRead;
-
-                                    using (var stream = await responseDownload.Content.ReadAsStreamAsync())
-                                    {
-                                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                                        {
-                                            await fs.WriteAsync(buffer, 0, bytesRead);
-                                            bytesDownloaded += bytesRead;
-
-                                            if (totalBytes > 0)
-                                            {
-                                                int progressPercentage = (int)((bytesDownloaded * 100.0) / totalBytes);
-                                                await progressWindow.Dispatcher.InvokeAsync(() =>
-                                                {
-                                                    progressWindow.SetProgress(progressPercentage, $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
-                                                });
-                                            }
-                                        }
-                                    }
-                                }
-                                await Task.Delay(1200);
-
-                                await progressWindow.Dispatcher.InvokeAsync(() => { progressWindow.Close(); });
-                            }
+                            await DownloadPackageWithProgressAsync(downloadUrl, downloadPath, totalBytes, owner, cancellationToken);
                         }
 
                         var dialog = _serviceProvider.GetRequiredService<UpdateModeDialog>();
@@ -150,14 +127,8 @@ namespace AssetsManager.Services.Updater
 
                         if (dialogResult == true)
                         {
-                            if (dialog.SelectedMode == UpdateMode.CleanWithSaving)
-                            {
-                                await _updateExtractor.ExtractAndRestart(downloadPath, true, owner);
-                            }
-                            else if (dialog.SelectedMode == UpdateMode.CleanWithoutSaving)
-                            {
-                                await _updateExtractor.ExtractAndRestart(downloadPath, false, owner);
-                            }
+                            bool saveSettings = dialog.SelectedMode == UpdateMode.CleanWithSaving;
+                            await _updateExtractor.ExtractAndRestart(downloadPath, saveSettings, owner);
                         }
                         else
                         {
@@ -170,6 +141,10 @@ namespace AssetsManager.Services.Updater
                     _customMessageBoxService.ShowInfo("Updates", "No updates available.", owner);
                 }
             }
+            catch (OperationCanceledException)
+            {
+                _logService.Log("Update check was canceled.");
+            }
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Error checking for updates in UpdateManager.");
@@ -177,7 +152,7 @@ namespace AssetsManager.Services.Updater
             }
         }
 
-        public async Task DownloadAndInstallDevelopmentBuildAsync(string downloadUrl, long totalBytes, string shortSha, Window owner)
+        public async Task DownloadAndInstallDevelopmentBuildAsync(string downloadUrl, long totalBytes, string shortSha, Window owner, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -185,53 +160,7 @@ namespace AssetsManager.Services.Updater
                 _directoriesCreator.CreateDirectory(_directoriesCreator.UpdateCachePath);
                 string downloadPath = Path.Combine(_directoriesCreator.UpdateCachePath, fileName);
 
-                UpdateProgressWindow progressWindow = null;
-                await Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    progressWindow = _serviceProvider.GetRequiredService<UpdateProgressWindow>();
-                    if (owner != null) progressWindow.Owner = owner;
-                    progressWindow.Show();
-                    progressWindow.UpdateLayout();
-                });
-
-                string downloadSize = $"{(totalBytes / 1024.0 / 1024.0):0.00} MB";
-
-                await progressWindow.Dispatcher.InvokeAsync(() =>
-                {
-                    progressWindow.SetProgress(0, $"Downloading {downloadSize}...");
-                });
-
-                using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
-                {
-                    response.EnsureSuccessStatusCode();
-                    long bytesDownloaded = 0;
-
-                    using (var fs = new FileStream(downloadPath, FileMode.Create))
-                    {
-                        byte[] buffer = new byte[8192];
-                        int bytesRead;
-
-                        using (var stream = await response.Content.ReadAsStreamAsync())
-                        {
-                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                            {
-                                await fs.WriteAsync(buffer, 0, bytesRead);
-                                bytesDownloaded += bytesRead;
-
-                                if (totalBytes > 0)
-                                {
-                                    int progressPercentage = (int)((bytesDownloaded * 100.0) / totalBytes);
-                                    await progressWindow.Dispatcher.InvokeAsync(() =>
-                                    {
-                                        progressWindow.SetProgress(progressPercentage, $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-
-                await progressWindow.Dispatcher.InvokeAsync(() => progressWindow.Close());
+                await DownloadPackageWithProgressAsync(downloadUrl, downloadPath, totalBytes, owner, cancellationToken);
 
                 var dialog = _serviceProvider.GetRequiredService<UpdateModeDialog>();
                 dialog.Owner = owner;
@@ -243,6 +172,10 @@ namespace AssetsManager.Services.Updater
                     await _updateExtractor.ExtractAndRestart(downloadPath, saveSettings, owner);
                 }
             }
+            catch (OperationCanceledException)
+            {
+                _logService.Log("Development build download was canceled.");
+            }
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to download and install development build.");
@@ -250,25 +183,98 @@ namespace AssetsManager.Services.Updater
             }
         }
 
+        private async Task DownloadPackageWithProgressAsync(string downloadUrl, string downloadPath, long totalBytes, Window owner, CancellationToken cancellationToken)
+        {
+            UpdateProgressWindow progressWindow = null;
+            try
+            {
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    progressWindow = _serviceProvider.GetRequiredService<UpdateProgressWindow>();
+                    if (owner != null) progressWindow.Owner = owner;
+                    progressWindow.Show();
+                    progressWindow.UpdateLayout();
+                });
+
+                string downloadSize = totalBytes > 0 ? $"{(totalBytes / 1024.0 / 1024.0):0.00} MB" : "Unknown size";
+                progressWindow.SetProgress(0, $"Downloading {downloadSize}...");
+                await Task.Delay(300, cancellationToken);
+
+                using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                {
+                    response.EnsureSuccessStatusCode();
+                    long effectiveTotalBytes = totalBytes > 0 ? totalBytes : (response.Content.Headers.ContentLength ?? 0);
+                    long bytesDownloaded = 0;
+                    int lastReportedPercentage = -1;
+                    long lastReportTicks = 0;
+
+                    using (var fs = new FileStream(downloadPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+                    {
+                        byte[] buffer = new byte[81920];
+                        int bytesRead;
+
+                        using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
+                        {
+                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+                            {
+                                await fs.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                                bytesDownloaded += bytesRead;
+
+                                if (effectiveTotalBytes > 0)
+                                {
+                                    int progressPercentage = (int)((bytesDownloaded * 100.0) / effectiveTotalBytes);
+                                    long nowTicks = DateTime.UtcNow.Ticks;
+                                    if (progressPercentage != lastReportedPercentage && nowTicks - lastReportTicks >= TimeSpan.FromMilliseconds(100).Ticks)
+                                    {
+                                        lastReportedPercentage = progressPercentage;
+                                        lastReportTicks = nowTicks;
+                                        long snapshot = bytesDownloaded;
+                                        progressWindow.SetProgress(progressPercentage, $"Downloading... {(snapshot / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Guarantee 100% is displayed on completion
+                    progressWindow.SetProgress(100, $"Downloading... {downloadSize} / {downloadSize}");
+                    await Task.Delay(500, cancellationToken);
+                }
+            }
+            catch
+            {
+                if (File.Exists(downloadPath))
+                {
+                    try { File.Delete(downloadPath); } catch { /* best-effort cleanup */ }
+                }
+                throw;
+            }
+            finally
+            {
+                if (progressWindow != null)
+                {
+                    await progressWindow.Dispatcher.InvokeAsync(() => progressWindow.Close());
+                }
+            }
+        }
+
         private string _lastReleaseEtag;
         private string _lastLatestVersionRaw;
 
-        public async Task<(bool, string)> IsNewVersionAvailableAsync()
+        public async Task<(bool, string)> IsNewVersionAvailableAsync(CancellationToken cancellationToken = default)
         {
             string currentVersionRaw = Assembly.GetExecutingAssembly().GetName().Version.ToString();
             string apiUrl = "https://api.github.com/repos/Neinndall/AssetsManager/releases/latest";
 
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("AssetsManager");
-
             try
             {
-                var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+                using var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
                 if (!string.IsNullOrEmpty(_lastReleaseEtag))
                 {
                     request.Headers.TryAddWithoutValidation("If-None-Match", _lastReleaseEtag);
                 }
 
-                var response = await _httpClient.SendAsync(request);
+                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
                 string latestVersionRaw;
 
@@ -278,7 +284,7 @@ namespace AssetsManager.Services.Updater
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
                 {
-                    string webTag = await ResolveLatestVersionViaWebRedirectAsync();
+                    string webTag = await ResolveLatestVersionViaWebRedirectAsync(cancellationToken);
                     if (!string.IsNullOrEmpty(webTag))
                     {
                         latestVersionRaw = webTag;
@@ -302,9 +308,13 @@ namespace AssetsManager.Services.Updater
                         _lastReleaseEtag = response.Headers.ETag.Tag;
                     }
 
-                    var content = await response.Content.ReadAsStringAsync();
+                    var content = await response.Content.ReadAsStringAsync(cancellationToken);
                     var releaseData = JsonConvert.DeserializeObject<dynamic>(content);
-                    latestVersionRaw = releaseData.tag_name;
+                    latestVersionRaw = releaseData?.tag_name != null ? (string)releaseData.tag_name : null;
+                    if (string.IsNullOrEmpty(latestVersionRaw))
+                    {
+                        return (false, null);
+                    }
                     _lastLatestVersionRaw = latestVersionRaw;
                 }
 
@@ -324,6 +334,10 @@ namespace AssetsManager.Services.Updater
                     return (true, latestVersionRaw);
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // Canceled cleanly
+            }
             catch (Exception ex)
             {
                 _logService.LogWarning($"Could not check for new version: {ex.Message}");
@@ -332,28 +346,20 @@ namespace AssetsManager.Services.Updater
             return (false, null);
         }
 
-        private async Task<string> ResolveLatestVersionViaWebRedirectAsync()
+        private async Task<string> ResolveLatestVersionViaWebRedirectAsync(CancellationToken cancellationToken = default)
         {
             try
             {
-                using var handler = new HttpClientHandler { AllowAutoRedirect = false };
-                using var client = new HttpClient(handler);
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("AssetsManager");
+                using var response = await _httpClient.GetAsync("https://github.com/Neinndall/AssetsManager/releases/latest", HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                response.EnsureSuccessStatusCode();
 
-                using var response = await client.GetAsync("https://github.com/Neinndall/AssetsManager/releases/latest");
-                if (response.StatusCode == System.Net.HttpStatusCode.Redirect ||
-                    response.StatusCode == System.Net.HttpStatusCode.MovedPermanently ||
-                    response.StatusCode == System.Net.HttpStatusCode.Found ||
-                    response.StatusCode == System.Net.HttpStatusCode.SeeOther)
+                var finalUri = response.RequestMessage?.RequestUri;
+                if (finalUri != null)
                 {
-                    var location = response.Headers.Location?.ToString();
-                    if (!string.IsNullOrEmpty(location))
+                    string tag = finalUri.Segments.LastOrDefault()?.Trim('/');
+                    if (!string.IsNullOrEmpty(tag) && !string.Equals(tag, "latest", StringComparison.OrdinalIgnoreCase))
                     {
-                        string tag = location.Split('/').LastOrDefault();
-                        if (!string.IsNullOrEmpty(tag))
-                        {
-                            return tag;
-                        }
+                        return tag;
                     }
                 }
             }
