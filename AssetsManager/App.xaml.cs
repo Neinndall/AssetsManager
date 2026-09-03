@@ -90,7 +90,9 @@ namespace AssetsManager
               }
           };
           
-          return new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(5) };
+          var client = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(5) };
+          client.DefaultRequestHeaders.UserAgent.ParseAdd("AssetsManager");
+          return client;
       });
 
       // Utils Services

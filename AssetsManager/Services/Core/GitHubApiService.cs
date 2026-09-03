@@ -25,7 +25,6 @@ namespace AssetsManager.Services.Core
         private readonly DirectoriesCreator _directoriesCreator;
         private const string RepoOwner = "Neinndall";
         private const string RepoName = "AssetsManager";
-        private const string UserAgent = "AssetsManager-Update-Client";
 
         // Persistent Cache and Rate Limit
         private readonly string _cacheFilePath;
@@ -41,11 +40,6 @@ namespace AssetsManager.Services.Core
             _httpClient = httpClient;
             _logService = logService;
             _directoriesCreator = directoriesCreator;
-
-            if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
-            {
-                _httpClient.DefaultRequestHeaders.Add("User-Agent", UserAgent);
-            }
 
             if (_directoriesCreator != null)
             {

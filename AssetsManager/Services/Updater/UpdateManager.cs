@@ -33,11 +33,6 @@ namespace AssetsManager.Services.Updater
             _updateExtractor = updateExtractor;
             _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
-
-            if (!_httpClient.DefaultRequestHeaders.UserAgent.Any(h => string.Equals(h.Product?.Name, "AssetsManager", StringComparison.OrdinalIgnoreCase)))
-            {
-                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("AssetsManager");
-            }
         }
 
         public async Task CheckForUpdatesAsync(Window owner = null, bool showNoUpdatesMessage = true, CancellationToken cancellationToken = default)
