@@ -396,7 +396,7 @@ namespace AssetsManager.Views.Controls.Comparator
                 else await WadComparatorService.CompareSingleWadAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, ViewModel.TargetVersion, cancellationToken);
             }
             catch (OperationCanceledException) { LogService.LogWarning("WAD comparison cancelled."); }
-            catch (Exception ex) { LogService.LogError(ex, "Comparison error."); CustomMessageBoxService.ShowError("Error", ex.Message, Window.GetWindow(this)); }
+            catch (Exception ex) { LogService.LogError(ex, "Comparison error."); CustomMessageBoxService.ShowError("Error", "Comparison error:\n" + ex.Message, Window.GetWindow(this)); }
             finally { ViewModel.IsComparing = false; }
         }
     }

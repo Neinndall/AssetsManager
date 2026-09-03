@@ -910,7 +910,7 @@ namespace AssetsManager.Views
                 _viewModel.IsProgressIndeterminate = false;
                 _logService.LogError(ex, "Unexpected error during hash guessing.");
                 _viewModel.StatusText = "Error during hash guessing execution.";
-                _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
+                _messageBoxService.ShowError("Hash Guessing Lab", "An error occurred during hash guessing:\n" + ex.Message, Window.GetWindow(this));
             }
             finally
             {
@@ -1038,7 +1038,7 @@ namespace AssetsManager.Views
                 _viewModel.IsProgressIndeterminate = false;
                 _logService.LogError(ex, $"Failed to execute {domainName} {action}.");
                 _viewModel.StatusText = $"Error: {ex.Message}";
-                _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
+                _messageBoxService.ShowError("Hash Guessing Lab", "Could not complete the operation:\n" + ex.Message, Window.GetWindow(this));
             }
             finally
             {
@@ -1174,7 +1174,7 @@ namespace AssetsManager.Views
                 _viewModel.IsProgressIndeterminate = false;
                 _logService.LogError(ex, "Failed to scan unknown hashes.");
                 _viewModel.StatusText = $"Error: {ex.Message}";
-                _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
+                _messageBoxService.ShowError("Hash Guessing Lab", "Could not complete the unknown-hash scan:\n" + ex.Message, Window.GetWindow(this));
             }
             finally
             {

@@ -340,6 +340,9 @@ Improvements
   - Home / Status badges (READY / SETUP / MISSING) are now pinned to the right edge of each card header without clipping at any window width.
   - Home / Each card now shows a subtle accent-colored corner watermark of its module that does not affect the layout.
   - Core / PBE maintenance, Automated CDN tracking and background news checks now also run once at application startup, gated by their own Advanced settings and frequencies, so enabled features report updates even when the app is closed before the next timer tick.
+  - Update downloads now report smoother progress and handle interruptions cleanly.
+  - Asset Tracker downloads now verify file integrity and remove incomplete files automatically.
+  - Input and confirmation dialogs now support Enter/Escape keys with automatic focus.
 
 Changes
   - Benchmark / Added a MapGeo memory diagnostic that reports WPF geometry, texture, managed and renderer CPU-copy estimates by loading phase.
@@ -535,3 +538,6 @@ Bug Fixes
   - Hash Lab: Fixed shader variant guessing to generate low consecutive permutation indices and broaden HLSL path prefixes in Wad Path Grep.
   - Hash Lab: GAME and LCU attacks now stop promptly when Cancel is pressed, including WAD path scanning.
   - Monitor / API Center: Fixed background placeholder icons remaining visible behind transparent reward and store card artwork.
+  - Fixed update checks failing with an error when release data is temporarily incomplete.
+  - Fixed version verification freezing or running out of memory on corrupted manifests.
+  - Fixed audio previews leaving background conversions running after switching files.
