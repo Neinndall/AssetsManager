@@ -125,29 +125,36 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void PassBrowser_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (ViewModel.SelectedPass == null) return;
+            if (ViewModel?.SelectedPass == null || DirectoriesCreator == null) return;
 
             // Use centralized utility to reconstruct the filename from the UI name
             string cleanName = PathUtils.CleanPassName(ViewModel.SelectedPass.Replace(" ", "_"));
             string fileName = $"{cleanName}_progression.json";
             
             string progPath = Path.Combine(DirectoriesCreator.ApiCachePath, fileName);
-            string rewardsPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_rewards.json");
-
-            if (!File.Exists(progPath) || !File.Exists(rewardsPath)) return;
+            if (!File.Exists(progPath)) return;
 
             try
             {
                 var progJson = await File.ReadAllTextAsync(progPath);
-                var rewardsJson = await File.ReadAllTextAsync(rewardsPath);
-
                 var prog = await Task.Run(() => JsonSerializer.Deserialize<ProgressionResponse>(progJson));
-                var rewards = await Task.Run(() => JsonSerializer.Deserialize<RewardsResponse>(rewardsJson));
 
-                if (prog != null && rewards != null)
+                if (prog != null && !string.IsNullOrEmpty(prog.Id))
                 {
-                    await ProcessPassRewardsDataAsync(prog, rewards);
-                    LogService.LogSuccess($"Loaded cached pass: {ViewModel.SelectedPass}");
+                    ViewModel.ManualPassId = prog.Id;
+                }
+
+                string rewardsPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_rewards.json");
+                if (File.Exists(rewardsPath))
+                {
+                    var rewardsJson = await File.ReadAllTextAsync(rewardsPath);
+                    var rewards = await Task.Run(() => JsonSerializer.Deserialize<RewardsResponse>(rewardsJson));
+
+                    if (prog != null && rewards != null)
+                    {
+                        await ProcessPassRewardsDataAsync(prog, rewards);
+                        LogService.LogSuccess($"Loaded cached pass: {ViewModel.SelectedPass}");
+                    }
                 }
             }
             catch (Exception ex) { LogService.LogError(ex, "Failed to load pass from browser selection."); }
