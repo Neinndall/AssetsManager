@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -17,7 +17,7 @@ namespace AssetsManager.Services.Core
         private readonly Dispatcher _dispatcher;
         private readonly ILogger _logger;
 
-        private readonly Queue<LogEntry> _pendingLogs = new Queue<LogEntry>();
+        private readonly ConcurrentQueue<LogEntry> _pendingLogs = new ConcurrentQueue<LogEntry>();
 
         public enum LogLevel
         {
@@ -177,7 +177,7 @@ namespace AssetsManager.Services.Core
                 return;
             }
 
-            _dispatcher.Invoke(() =>
+            _dispatcher.InvokeAsync(() =>
             {
                 AppendToLog(logEntry);
             });
