@@ -33,6 +33,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private DispatcherTimer _lcuConnectionTimer;
         private Task _cachedDataLoadTask;
+        private bool _isSyncingBrowserSelection;
 
         // The state model for this view (Container Pattern: Owner)
         private readonly ApiModel _viewModel;
@@ -100,7 +101,7 @@ namespace AssetsManager.Views.Controls.Monitor
             );
         }
 
-        private async Task LoadAvailablePassesAsync()
+        private async Task LoadAvailablePassesAsync(string passToSelect = null)
         {
             if (DirectoriesCreator == null) return;
 
@@ -117,14 +118,29 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 Dispatcher.Invoke(() =>
                 {
-                    ViewModel.AvailablePasses.Clear();
-                    foreach (var name in passNames) ViewModel.AvailablePasses.Add(name);
+                    string targetSelection = passToSelect ?? ViewModel.SelectedPass;
+                    _isSyncingBrowserSelection = true;
+                    try
+                    {
+                        ViewModel.AvailablePasses.Clear();
+                        foreach (var name in passNames) ViewModel.AvailablePasses.Add(name);
+
+                        if (!string.IsNullOrEmpty(targetSelection) && ViewModel.AvailablePasses.Contains(targetSelection))
+                        {
+                            ViewModel.SelectedPass = targetSelection;
+                        }
+                    }
+                    finally
+                    {
+                        _isSyncingBrowserSelection = false;
+                    }
                 });
             });
         }
 
         private async void PassBrowser_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isSyncingBrowserSelection) return;
             if (ViewModel?.SelectedPass == null || DirectoriesCreator == null) return;
 
             // Use centralized utility to reconstruct the filename from the UI name
@@ -703,8 +719,13 @@ namespace AssetsManager.Views.Controls.Monitor
                 if (progression != null && rewardsResponse != null)
                 {
                     await ProcessPassRewardsDataAsync(progression, rewardsResponse);
-                    // Refresh the browser list since we just saved a new (or updated) pass
-                    await LoadAvailablePassesAsync();
+
+                    string passToSelect = !string.IsNullOrEmpty(eventName)
+                        ? PathUtils.CleanPassName(eventName, forUI: true)
+                        : PathUtils.CleanPassName(progression.Name, forUI: true);
+
+                    // Refresh the browser list and synchronize selection with the fetched pass
+                    await LoadAvailablePassesAsync(passToSelect);
                 }
             }
             catch (Exception ex)
