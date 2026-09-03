@@ -101,6 +101,7 @@ Improvements
   - Api Center / Added in-place image replacement with Drag & Drop support and inline title editing for Pass Rewards cards.
   - Monitor / Api Center: Added dedicated Target Client Environment (PBE / LIVE) in Advanced Settings, completely decoupling API service connection and catalog extraction from general explorer preferences.
   - Monitor / Api Center: Added Offline Cache Persistence toggle in Advanced Settings to automatically load and render cached sales, mythic shop, and event rewards without requiring an active League client session.
+  - Monitor / Api Center: Improved Pass fetch feedback with clear warning dialogs and cleaner logs when a pass is inactive or temporarily unavailable.
   - Hash Guessing Lab / Standardized WAD Grep progress feedback to match the application-wide 'Scanning X of Y WADs' format with synchronized percentage and time tracking.
   - Hash Guessing Lab / Optimized dotted BIN scanning in WAD Grep to target canonical Riot loadouts directly with zero memory overhead.
   - Monitor / Version verification now reuses local scan buffers and limits Blake3 output to the required chunk-ID prefix; an explicit diagnostic reports scan metrics when requested.

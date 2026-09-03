@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
@@ -614,7 +615,6 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsPassRewards_Click(object sender, RoutedEventArgs e)
         {
-            if (LogService != null) LogService.Log("Starting pass rewards fetch process...");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
@@ -646,15 +646,45 @@ namespace AssetsManager.Views.Controls.Monitor
                 eventName = await RiotApiService.GetPassNameFromHubAsync(eventId);
             }
 
-            ViewModel.IsBusy = true;
-            ViewModel.StatusText = "Status: Fetching pass data...";
-            string progressionJson = await RiotApiService.GetPassRewardsProgressionAsync(eventId, eventName);
-            string rewardsJson = await RiotApiService.GetPassRewardsRewardsAsync();
+            LogService.Log($"Starting pass rewards fetch process for ID: {eventId}...");
 
-            if (string.IsNullOrEmpty(progressionJson) || string.IsNullOrEmpty(rewardsJson))
+            ViewModel.IsBusy = true;
+            ViewModel.StatusText = "Status: Fetching pass progression...";
+            var (progressionJson, statusCode) = await RiotApiService.GetPassRewardsProgressionAsync(eventId, eventName);
+
+            if (string.IsNullOrEmpty(progressionJson))
             {
                 ViewModel.IsBusy = false;
-                CustomMessageBoxService.ShowError("Error", "Could not retrieve pass progression or rewards data.", Window.GetWindow(this));
+                ViewModel.StatusText = "Status: LCU Connected";
+                UpdateAuthenticationStatus();
+
+                if (statusCode == HttpStatusCode.NotFound)
+                {
+                    CustomMessageBoxService.ShowWarning(
+                        "Pass Unavailable",
+                        $"The pass with ID '{eventId}' was not found on Riot servers (404 Not Found).\n\nRiot may have temporarily removed or not yet enabled this pass, or the ID is no longer active.",
+                        Window.GetWindow(this));
+                }
+                else
+                {
+                    string errorDetail = statusCode.HasValue ? $"Server returned status: {statusCode.Value}" : "The server response was empty or unreachable.";
+                    CustomMessageBoxService.ShowError(
+                        "Error",
+                        $"Could not retrieve pass progression.\n\n{errorDetail}",
+                        Window.GetWindow(this));
+                }
+                return;
+            }
+
+            ViewModel.StatusText = "Status: Fetching pass rewards...";
+            string rewardsJson = await RiotApiService.GetPassRewardsRewardsAsync();
+
+            if (string.IsNullOrEmpty(rewardsJson))
+            {
+                ViewModel.IsBusy = false;
+                ViewModel.StatusText = "Status: LCU Connected";
+                UpdateAuthenticationStatus();
+                CustomMessageBoxService.ShowError("Error", "Could not retrieve pass rewards catalog from the server.", Window.GetWindow(this));
                 return;
             }
 

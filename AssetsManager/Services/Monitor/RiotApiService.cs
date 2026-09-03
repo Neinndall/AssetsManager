@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
@@ -451,7 +452,7 @@ namespace AssetsManager.Services.Monitor
             return null;
         }
 
-        public async Task<string> GetPassRewardsProgressionAsync(string eventId, string overrideName = null)
+        public async Task<(string Json, HttpStatusCode? StatusCode)> GetPassRewardsProgressionAsync(string eventId, string overrideName = null)
         {
             var response = await MakeRemoteRequestAsync("progression", eventId: eventId);
             if (response != null && response.IsSuccessStatusCode)
@@ -484,18 +485,26 @@ namespace AssetsManager.Services.Monitor
                 await File.WriteAllTextAsync(Path.Combine(_directoriesCreator.ApiCachePath, fileName), json);
 
                 _logService.LogSuccess($"Pass rewards progression for {fileName} retrieved and cached successfully.");
-                return json;
+                return (json, response.StatusCode);
             }
 
             if (response != null)
             {
-                _logService.LogError($"Failed to retrieve Pass progression. Server returned status: {response.StatusCode}");
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    _logService.LogWarning($"Pass '{eventId}' was not found on Riot servers (404 NotFound). The pass may be inactive or temporarily removed.");
+                }
+                else
+                {
+                    _logService.LogError($"Failed to retrieve Pass progression for '{eventId}'. Server returned status: {response.StatusCode}");
+                }
+                return (null, response.StatusCode);
             }
             else
             {
-                _logService.LogError("Failed to retrieve Pass progression. The server response was empty or null.");
+                _logService.LogError($"Failed to retrieve Pass progression for '{eventId}'. The server response was empty or null.");
+                return (null, null);
             }
-            return null;
         }
 
         private string SanitizeFileName(string fileName)
@@ -516,6 +525,15 @@ namespace AssetsManager.Services.Monitor
                 _directoriesCreator.CreateDirectory(_directoriesCreator.ApiCachePath);
                 await File.WriteAllTextAsync(Path.Combine(_directoriesCreator.ApiCachePath, "pass_rewards.json"), json);
                 return json;
+            }
+
+            if (response != null)
+            {
+                _logService.LogError($"Failed to retrieve pass rewards catalog. Server returned status: {response.StatusCode}");
+            }
+            else
+            {
+                _logService.LogError("Failed to retrieve pass rewards catalog. The server response was empty or null.");
             }
             return null;
         }
@@ -596,7 +614,6 @@ namespace AssetsManager.Services.Monitor
             }
             catch (Exception ex) { _logService.LogError(ex, $"Error parsing event-hub from {node.SourceWadPath}"); }
             
-            _logService.LogWarning($"[EventHub] Could not find a localized name for ID {trackConfigId} in the Hub.");
             return null;
         }
 
