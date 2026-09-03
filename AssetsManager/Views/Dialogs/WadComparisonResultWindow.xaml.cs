@@ -28,7 +28,6 @@ namespace AssetsManager.Views.Dialogs
     {
         private List<SerializableChunkDiff> _serializableDiffs;
         private readonly CustomMessageBoxService _customMessageBoxService;
-        private readonly AssetDownloader _assetDownloaderService;
         private readonly LogService _logService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private readonly DiffViewService _diffViewService;
@@ -52,7 +51,6 @@ namespace AssetsManager.Views.Dialogs
 
         public WadComparisonResultWindow(
             CustomMessageBoxService customMessageBoxService,
-            AssetDownloader assetDownloaderService,
             LogService logService,
             ComparisonHistoryService comparisonHistoryService,
             DiffViewService diffViewService,
@@ -69,7 +67,6 @@ namespace AssetsManager.Views.Dialogs
             DataContext = _viewModel;
 
             _customMessageBoxService = customMessageBoxService;
-            _assetDownloaderService = assetDownloaderService;
             _logService = logService;
             _comparisonHistoryService = comparisonHistoryService;
             _diffViewService = diffViewService;
