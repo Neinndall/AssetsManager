@@ -492,7 +492,8 @@ namespace AssetsManager.Services.Monitor
             {
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
-                    _logService.LogWarning($"Pass '{eventId}' was not found on Riot servers (404 NotFound). The pass may be inactive or temporarily removed.");
+                    string passIdentifier = !string.IsNullOrEmpty(overrideName) ? overrideName : eventId;
+                    _logService.LogWarning($"Pass '{passIdentifier}' was not found on Riot servers or may be inactive or temporarily removed.");
                 }
                 else
                 {

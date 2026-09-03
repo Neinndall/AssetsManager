@@ -660,9 +660,10 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 if (statusCode == HttpStatusCode.NotFound)
                 {
+                    string passIdentifier = !string.IsNullOrEmpty(eventName) ? eventName : eventId;
                     CustomMessageBoxService.ShowWarning(
                         "Pass Unavailable",
-                        $"The pass with ID '{eventId}' was not found on Riot servers (404 Not Found).\n\nRiot may have temporarily removed or not yet enabled this pass, or the ID is no longer active.",
+                        $"Pass '{passIdentifier}' was not found on Riot servers.\n\nIt may be inactive or temporarily removed, or the ID is no longer active.",
                         Window.GetWindow(this));
                 }
                 else
