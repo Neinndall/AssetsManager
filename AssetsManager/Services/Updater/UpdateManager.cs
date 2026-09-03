@@ -5,7 +5,6 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Reflection;
-using System.Threading;
 using System.Windows;
 using Newtonsoft.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,7 +34,7 @@ namespace AssetsManager.Services.Updater
             _customMessageBoxService = customMessageBoxService;
         }
 
-        public async Task CheckForUpdatesAsync(Window owner = null, bool showNoUpdatesMessage = true, CancellationToken cancellationToken = default)
+        public async Task CheckForUpdatesAsync(Window owner = null, bool showNoUpdatesMessage = true)
         {
             string currentVersionRaw = Assembly.GetExecutingAssembly().GetName().Version.ToString();
             string apiUrl = "https://api.github.com/repos/Neinndall/AssetsManager/releases/latest";
@@ -47,7 +46,7 @@ namespace AssetsManager.Services.Updater
                 // Llamamos a _directoriesCreator para crear la carpeta de update cache
                 _directoriesCreator.CreateDirectory(_directoriesCreator.UpdateCachePath);
 
-                var response = await _httpClient.GetStringAsync(apiUrl, cancellationToken);
+                var response = await _httpClient.GetStringAsync(apiUrl);
                 var releaseData = JsonConvert.DeserializeObject<dynamic>(response);
 
                 string latestVersionRaw = releaseData?.tag_name != null ? (string)releaseData.tag_name : null;
@@ -113,7 +112,7 @@ namespace AssetsManager.Services.Updater
                         }
                         else
                         {
-                            await DownloadPackageWithProgressAsync(downloadUrl, downloadPath, totalBytes, owner, cancellationToken);
+                            await DownloadPackageWithProgressAsync(downloadUrl, downloadPath, totalBytes, owner);
                         }
 
                         var dialog = _serviceProvider.GetRequiredService<UpdateModeDialog>();
@@ -147,7 +146,7 @@ namespace AssetsManager.Services.Updater
             }
         }
 
-        public async Task DownloadAndInstallDevelopmentBuildAsync(string downloadUrl, long totalBytes, string shortSha, Window owner, CancellationToken cancellationToken = default)
+        public async Task DownloadAndInstallDevelopmentBuildAsync(string downloadUrl, long totalBytes, string shortSha, Window owner)
         {
             try
             {
@@ -155,7 +154,7 @@ namespace AssetsManager.Services.Updater
                 _directoriesCreator.CreateDirectory(_directoriesCreator.UpdateCachePath);
                 string downloadPath = Path.Combine(_directoriesCreator.UpdateCachePath, fileName);
 
-                await DownloadPackageWithProgressAsync(downloadUrl, downloadPath, totalBytes, owner, cancellationToken);
+                await DownloadPackageWithProgressAsync(downloadUrl, downloadPath, totalBytes, owner);
 
                 var dialog = _serviceProvider.GetRequiredService<UpdateModeDialog>();
                 dialog.Owner = owner;
@@ -178,7 +177,7 @@ namespace AssetsManager.Services.Updater
             }
         }
 
-        private async Task DownloadPackageWithProgressAsync(string downloadUrl, string downloadPath, long totalBytes, Window owner, CancellationToken cancellationToken)
+        private async Task DownloadPackageWithProgressAsync(string downloadUrl, string downloadPath, long totalBytes, Window owner)
         {
             UpdateProgressWindow progressWindow = null;
             try
@@ -193,9 +192,9 @@ namespace AssetsManager.Services.Updater
 
                 string downloadSize = totalBytes > 0 ? $"{(totalBytes / 1024.0 / 1024.0):0.00} MB" : "Unknown size";
                 progressWindow.SetProgress(0, $"Downloading {downloadSize}...");
-                await Task.Delay(300, cancellationToken);
+                await Task.Delay(300);
 
-                using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+                using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
                 {
                     response.EnsureSuccessStatusCode();
                     long effectiveTotalBytes = totalBytes > 0 ? totalBytes : (response.Content.Headers.ContentLength ?? 0);
@@ -208,11 +207,11 @@ namespace AssetsManager.Services.Updater
                         byte[] buffer = new byte[81920];
                         int bytesRead;
 
-                        using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
+                        using (var stream = await response.Content.ReadAsStreamAsync())
                         {
-                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+                            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                             {
-                                await fs.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                                await fs.WriteAsync(buffer, 0, bytesRead);
                                 bytesDownloaded += bytesRead;
 
                                 if (effectiveTotalBytes > 0)
@@ -233,7 +232,7 @@ namespace AssetsManager.Services.Updater
 
                     // Guarantee 100% is displayed on completion
                     progressWindow.SetProgress(100, $"Downloading... {downloadSize} / {downloadSize}");
-                    await Task.Delay(500, cancellationToken);
+                    await Task.Delay(500);
                 }
             }
             catch
@@ -256,7 +255,7 @@ namespace AssetsManager.Services.Updater
         private string _lastReleaseEtag;
         private string _lastLatestVersionRaw;
 
-        public async Task<(bool, string)> IsNewVersionAvailableAsync(CancellationToken cancellationToken = default)
+        public async Task<(bool, string)> IsNewVersionAvailableAsync()
         {
             string currentVersionRaw = Assembly.GetExecutingAssembly().GetName().Version.ToString();
             string apiUrl = "https://api.github.com/repos/Neinndall/AssetsManager/releases/latest";
@@ -269,7 +268,7 @@ namespace AssetsManager.Services.Updater
                     request.Headers.TryAddWithoutValidation("If-None-Match", _lastReleaseEtag);
                 }
 
-                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
 
                 string latestVersionRaw;
 
@@ -279,7 +278,7 @@ namespace AssetsManager.Services.Updater
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
                 {
-                    string webTag = await ResolveLatestVersionViaWebRedirectAsync(cancellationToken);
+                    string webTag = await ResolveLatestVersionViaWebRedirectAsync();
                     if (!string.IsNullOrEmpty(webTag))
                     {
                         latestVersionRaw = webTag;
@@ -303,7 +302,7 @@ namespace AssetsManager.Services.Updater
                         _lastReleaseEtag = response.Headers.ETag.Tag;
                     }
 
-                    var content = await response.Content.ReadAsStringAsync(cancellationToken);
+                    var content = await response.Content.ReadAsStringAsync();
                     var releaseData = JsonConvert.DeserializeObject<dynamic>(content);
                     latestVersionRaw = releaseData?.tag_name != null ? (string)releaseData.tag_name : null;
                     if (string.IsNullOrEmpty(latestVersionRaw))
@@ -341,11 +340,11 @@ namespace AssetsManager.Services.Updater
             return (false, null);
         }
 
-        private async Task<string> ResolveLatestVersionViaWebRedirectAsync(CancellationToken cancellationToken = default)
+        private async Task<string> ResolveLatestVersionViaWebRedirectAsync()
         {
             try
             {
-                using var response = await _httpClient.GetAsync("https://github.com/Neinndall/AssetsManager/releases/latest", HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                using var response = await _httpClient.GetAsync("https://github.com/Neinndall/AssetsManager/releases/latest", HttpCompletionOption.ResponseHeadersRead);
                 response.EnsureSuccessStatusCode();
 
                 var finalUri = response.RequestMessage?.RequestUri;

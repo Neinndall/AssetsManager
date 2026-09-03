@@ -142,21 +142,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             return bundle;
         }
 
-        public async Task<Bundle> LoadAsync(string skinBinPath, LogService log, CancellationToken cancellationToken = default)
-        {
-            await _catalogGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try
-            {
-                return await Task.Run(
-                    () => LoadCore(skinBinPath, log, cancellationToken),
-                    cancellationToken).ConfigureAwait(false);
-            }
-            finally
-            {
-                _catalogGate.Release();
-            }
-        }
-
         public VfxPlaybackRuntime PreparePlayback(
             VfxSystemDefinition definition,
             string searchDirectory,

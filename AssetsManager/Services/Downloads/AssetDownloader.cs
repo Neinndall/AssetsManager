@@ -25,6 +25,7 @@ namespace AssetsManager.Services.Downloads
 
         public async Task DownloadAssetToCustomPathAsync(string url, string fullDestinationPath)
         {
+            bool completed = false;
             try
             {
                 string dir = Path.GetDirectoryName(fullDestinationPath);
@@ -33,19 +34,32 @@ namespace AssetsManager.Services.Downloads
                     _directoriesCreator.CreateDirectory(dir);
                 }
 
-                var response = await _httpClient.GetAsync(url);
+                using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
                 response.EnsureSuccessStatusCode(); // This will throw on non-2xx status codes
 
-                await using (var fs = new FileStream(fullDestinationPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                long? expectedLength = response.Content.Headers.ContentLength;
+                await using var fs = new FileStream(fullDestinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
+                await response.Content.CopyToAsync(fs);
+
+                if (expectedLength.HasValue && fs.Length != expectedLength.Value)
                 {
-                    await response.Content.CopyToAsync(fs);
+                    throw new IOException($"Incomplete download from {url}: received {fs.Length}/{expectedLength.Value} bytes.");
                 }
+
+                completed = true;
             }
             catch (Exception ex)
             {
                 // Now this single block catches network errors, file errors, and HTTP errors (like 404)
                 _logService.LogError(ex, $"Failed to download asset from {url}");
                 throw; // Re-throw to be caught by the calling method
+            }
+            finally
+            {
+                if (!completed && File.Exists(fullDestinationPath))
+                {
+                    try { File.Delete(fullDestinationPath); } catch { /* best-effort cleanup of partial file */ }
+                }
             }
         }
 

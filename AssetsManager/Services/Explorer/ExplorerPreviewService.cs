@@ -306,7 +306,7 @@ namespace AssetsManager.Services.Explorer
             {
                 if (extension == ".wem")
                 {
-                    byte[] wavData = await _audioConversionService.ConvertAudioToFormatAsync(data, ".wem", AudioExportFormat.Wav);
+                    byte[] wavData = await _audioConversionService.ConvertAudioToFormatAsync(data, ".wem", AudioExportFormat.Wav, previewRequest.CancellationToken);
                     ThrowIfPreviewIsObsolete(previewRequest);
                     if (wavData != null)
                     {
