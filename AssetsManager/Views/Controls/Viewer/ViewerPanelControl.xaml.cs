@@ -413,7 +413,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
-                LogService.LogError(ex, "Error during ViewerPanelControl.Cleanup");
+                LogService.LogDebug($"Notice during ViewerPanelControl.Cleanup: {ex.Message}");
             }
         }
 

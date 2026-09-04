@@ -223,7 +223,7 @@ namespace AssetsManager.Views
             }
             catch (Exception ex)
             {
-                _logService?.LogError(ex, "Error during ViewerWindow.CleanupResources");
+                _logService.LogDebug($"Notice during ViewerWindow.CleanupResources: {ex.Message}");
             }
             finally
             {
@@ -233,7 +233,7 @@ namespace AssetsManager.Views
                 }
                 catch (Exception ex)
                 {
-                    _logService?.LogError(ex, "Error during VfxLoadingService cleanup");
+                    _logService.LogDebug($"Notice during VfxLoadingService cleanup: {ex.Message}");
                 }
             }
         }

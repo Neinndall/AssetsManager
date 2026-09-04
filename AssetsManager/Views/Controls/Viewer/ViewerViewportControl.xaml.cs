@@ -644,7 +644,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
-                LogService?.LogError(ex, "Error during ViewerViewportControl.Cleanup");
+                LogService.LogDebug($"Notice during ViewerViewportControl.Cleanup: {ex.Message}");
             }
         }
 
@@ -665,7 +665,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
-                LogService?.LogError(ex, $"Failed to release ViewerViewport {componentName}.");
+                LogService.LogDebug($"Notice releasing ViewerViewport {componentName}: {ex.Message}");
             }
         }
 
