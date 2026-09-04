@@ -43,6 +43,16 @@ namespace AssetsManager.Services.Hashes.Guessers
             @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?|themes/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.(?:bin|inibin)$",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private readonly record struct AnimationFileLink(uint NameHash, ulong PathHash, string Path);
+        private static readonly Regex SkinPathRegex = new(
+            @"characters/(?<champ>[^/]+)/skins/(?<skin>base|skin0*(?<num>\d+))",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly string[] SkinTextureSuffixes =
+        {
+            "_tx.tex", "_tx_cm.tex", "_cm_tx.tex", "_tx_cm2.tex", "_cm.tex", ".tex", "_d.tex",
+            "_base_tx.tex", "_base_tx_cm.tex", "_base_cm_tx.tex", "_diffuse.tex",
+            "_tx.dds", "_tx_cm.dds", "_cm_tx.dds", "_tx_cm2.dds", "_cm.dds", ".dds",
+            "_tx_cm.project_jade.tex", "_tx_cm2.project_jade.tex", "_tx.project_jade.tex", ".project_jade.tex"
+        };
 
         private readonly LogService _logService;
         private readonly Func<uint, string> _resolveBinHash;
@@ -1687,6 +1697,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                     GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
+                    GuessSkinCharacterBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                 }
 
                 GuessChampionSpecialBins(engine, sourceWadPath, cancellationToken);
@@ -1854,11 +1865,27 @@ namespace AssetsManager.Services.Hashes.Guessers
             Func<BinTree> binTreeFactory = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Match context = AnimationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
-            if (!context.Success || data.Array is null || data.Count == 0) return;
+            if (data.Array is null || data.Count == 0) return;
 
-            string character = context.Groups["character"].Value.ToLowerInvariant();
-            string sourceSkin = context.Groups["skin"].Value.ToLowerInvariant();
+            Match context = AnimationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
+            string character;
+            string sourceSkin;
+            if (context.Success)
+            {
+                character = context.Groups["character"].Value.ToLowerInvariant();
+                sourceSkin = context.Groups["skin"].Value.ToLowerInvariant();
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(sourceWadPath) ||
+                    !sourceWadPath.Contains("champions", StringComparison.OrdinalIgnoreCase)) return;
+                string fileName = Path.GetFileName(sourceWadPath);
+                int dot = fileName.IndexOf('.');
+                string champ = dot >= 0 ? fileName[..dot] : fileName;
+                if (string.IsNullOrEmpty(champ)) return;
+                character = champ.ToLowerInvariant();
+                sourceSkin = "skin0";
+            }
 
             var links = new HashSet<AnimationFileLink>();
             try
@@ -2209,6 +2236,355 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (unresolved.Remove(hash))
                 {
                     Check(engine, candidate, HashGuessStrategy.BannerVariant, sourceWadPath, sourceChunkHash);
+                }
+            }
+        }
+
+        private void GuessSkinCharacterBinChunkLinks(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken,
+            Func<BinTree> binTreeFactory = null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (data.Array is null || data.Count == 0 || engine.RemainingUnknownCount == 0) return;
+
+            BinTree tree;
+            try
+            {
+                tree = binTreeFactory != null
+                    ? binTreeFactory()
+                    : new BinTree(new MemoryStream(data.Array, data.Offset, data.Count, writable: false));
+                if (tree == null) return;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logService?.LogDebug($"GAME skin character BIN link scan skipped '{sourcePath}': {exception.Message}");
+                return;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            void CollectChunkLinks(BinTreeProperty prop, HashSet<ulong> hashes)
+            {
+                switch (prop)
+                {
+                    case BinTreeWadChunkLink link:
+                        if (link.Value != 0 && engine.UnknownHashes.Contains(link.Value))
+                            hashes.Add(link.Value);
+                        break;
+                    case BinTreeStruct str:
+                        foreach (BinTreeProperty p in str.Properties.Values)
+                            CollectChunkLinks(p, hashes);
+                        break;
+                    case BinTreeContainer container:
+                        foreach (BinTreeProperty p in container.Elements)
+                            CollectChunkLinks(p, hashes);
+                        break;
+                }
+            }
+
+            foreach (BinTreeObject obj in tree.Objects.Values)
+            {
+                if (obj.ClassHash != 0x9b67e9f6) continue;
+
+                var targetTexHashes = new HashSet<ulong>();
+                string simpleSkin = null;
+                string skeleton = null;
+                if (obj.Properties.TryGetValue(0x45ff5904, out BinTreeProperty meshProp) &&
+                    meshProp is BinTreeStruct meshStruct)
+                {
+                    CollectChunkLinks(meshStruct, targetTexHashes);
+                    if (meshStruct.Properties.TryGetValue(0xd6a00df6, out BinTreeProperty skinProp) &&
+                        skinProp is BinTreeString skinStr)
+                    {
+                        simpleSkin = skinStr.Value;
+                    }
+                    if (meshStruct.Properties.TryGetValue(0xb14c976e, out BinTreeProperty skelProp) &&
+                        skelProp is BinTreeString skelStr)
+                    {
+                        skeleton = skelStr.Value;
+                    }
+                }
+
+                if (obj.Properties.TryGetValue(0xa24d4513, out BinTreeProperty baseTexProp))
+                {
+                    CollectChunkLinks(baseTexProp, targetTexHashes);
+                }
+                if (obj.Properties.TryGetValue(0x3c6468f4, out BinTreeProperty rootTexProp))
+                {
+                    CollectChunkLinks(rootTexProp, targetTexHashes);
+                }
+                if (obj.Properties.TryGetValue(0x8979bca4, out BinTreeProperty matProp))
+                {
+                    CollectChunkLinks(matProp, targetTexHashes);
+                }
+
+                ulong targetAvatarHash = 0;
+                if (obj.Properties.TryGetValue(0x089aff69, out BinTreeProperty avProp) &&
+                    avProp is BinTreeWadChunkLink avLink)
+                {
+                    targetAvatarHash = avLink.Value;
+                }
+
+                var loadscreenHashes = new List<ulong>();
+                foreach (uint loadPropId in new[] { 0x97f7188d, 0xbc8eefad })
+                {
+                    if (obj.Properties.TryGetValue(loadPropId, out BinTreeProperty loadEmb) &&
+                        loadEmb is BinTreeStruct loadStruct &&
+                        loadStruct.Properties.TryGetValue(0xb35135fa, out BinTreeProperty lsProp) &&
+                        lsProp is BinTreeWadChunkLink lsLink &&
+                        lsLink.Value != 0)
+                    {
+                        loadscreenHashes.Add(lsLink.Value);
+                    }
+                }
+
+                string skinName = null;
+                if (obj.Properties.TryGetValue(0x2d78c328, out BinTreeProperty nameProp) &&
+                    nameProp is BinTreeString nameStr)
+                {
+                    skinName = nameStr.Value;
+                }
+
+                string refPath = !string.IsNullOrEmpty(simpleSkin) ? simpleSkin : skeleton;
+                if (string.IsNullOrEmpty(refPath)) continue;
+
+                refPath = refPath.Replace('\\', '/').ToLowerInvariant();
+                int lastSlash = refPath.LastIndexOf('/');
+                string dir = lastSlash >= 0 ? refPath[..(lastSlash + 1)] : "";
+                if (dir.EndsWith("/rig/", StringComparison.OrdinalIgnoreCase)) dir = dir[..^4];
+
+                string fileStem = lastSlash >= 0 ? refPath[(lastSlash + 1)..] : refPath;
+                int dot = fileStem.IndexOf('.');
+                if (dot >= 0) fileStem = fileStem[..dot];
+
+                Match champMatch = SkinPathRegex.Match(dir);
+                string champ = champMatch.Success ? champMatch.Groups["champ"].Value.ToLowerInvariant() : "";
+                string cleanChamp = champ.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? champ[5..] : champ;
+
+                var candidateDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { dir };
+                if (dir.Contains("/jade_", StringComparison.OrdinalIgnoreCase))
+                    candidateDirs.Add(dir.Replace("/jade_", "/", StringComparison.OrdinalIgnoreCase));
+                if (dir.StartsWith("assets/", StringComparison.OrdinalIgnoreCase))
+                    candidateDirs.Add("data/" + dir[7..]);
+                else if (dir.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
+                    candidateDirs.Add("assets/" + dir[5..]);
+                else
+                {
+                    candidateDirs.Add("assets/" + dir);
+                    candidateDirs.Add("data/" + dir);
+                }
+
+                Match skinFolderMatch = Regex.Match(dir, @"/skins/skin30*(?<num>\d+)/", RegexOptions.IgnoreCase);
+                if (skinFolderMatch.Success)
+                {
+                    string num = skinFolderMatch.Groups["num"].Value;
+                    string skinPad = num.Length == 1 ? $"skin0{num}" : $"skin{num}";
+                    string skinRaw = $"skin{num}";
+                    var baseDirs = candidateDirs.ToList();
+                    foreach (string bd in baseDirs)
+                    {
+                        candidateDirs.Add(Regex.Replace(bd, @"/skins/skin30*\d+/", $"/skins/{skinPad}/", RegexOptions.IgnoreCase));
+                        candidateDirs.Add(Regex.Replace(bd, @"/skins/skin30*\d+/", $"/skins/{skinRaw}/", RegexOptions.IgnoreCase));
+                    }
+                }
+
+                var candidateStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { fileStem };
+                if (fileStem.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+                    candidateStems.Add(fileStem[5..]);
+                else
+                    candidateStems.Add("jade_" + fileStem);
+
+                var champAliases = new List<string>();
+                if (!string.IsNullOrEmpty(cleanChamp))
+                {
+                    champAliases.Add(cleanChamp);
+                    if (cleanChamp == "xinzhao")
+                    {
+                        champAliases.Add("xenzhao");
+                        champAliases.Add("xinzhaorework");
+                    }
+                    else if (cleanChamp == "orianna")
+                    {
+                        champAliases.Add("oriana");
+                    }
+
+                    foreach (string ca in champAliases)
+                    {
+                        candidateStems.Add($"{ca}_base");
+                        candidateStems.Add($"{ca}_classic");
+                        candidateStems.Add($"{ca}_tx");
+                        candidateStems.Add($"{ca}_v2");
+                        candidateStems.Add(ca);
+                        candidateStems.Add($"jade_{ca}_base");
+                        candidateStems.Add($"jade_{ca}_classic");
+
+                        string skinFolder = champMatch.Success ? champMatch.Groups["skin"].Value.ToLowerInvariant() : "";
+                        if (!string.IsNullOrEmpty(skinFolder))
+                        {
+                            candidateStems.Add($"{ca}_{skinFolder}");
+                            candidateStems.Add($"jade_{ca}_{skinFolder}");
+                            Match numM = Regex.Match(skinFolder, @"\d+");
+                            if (numM.Success)
+                            {
+                                string numVal = numM.Value;
+                                string sPad = numVal.Length == 1 ? $"skin0{numVal}" : $"skin{numVal}";
+                                candidateStems.Add($"{ca}_{sPad}");
+                                candidateStems.Add($"jade_{ca}_{sPad}");
+                                candidateStems.Add($"{ca}_skin{numVal}");
+                                candidateStems.Add($"jade_{ca}_skin{numVal}");
+                            }
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(skinName))
+                {
+                    string cleanName = skinName.ToLowerInvariant();
+                    candidateStems.Add(cleanName);
+                    candidateStems.Add(cleanName.Replace(' ', '_'));
+                    candidateStems.Add(cleanName.Replace(" ", ""));
+                    string[] parts = cleanName.Split(new[] { '_', ' ', '-' }, StringSplitOptions.RemoveEmptyEntries);
+                    var meaningfulTokens = parts.Where(p => p != "jade" && p != "classic" && p.Length >= 3).ToList();
+                    foreach (string t in meaningfulTokens)
+                    {
+                        candidateStems.Add(t);
+                        foreach (string ca in champAliases)
+                        {
+                            candidateStems.Add($"{ca}_{t}");
+                            candidateStems.Add($"jade_{ca}_{t}");
+                            candidateStems.Add($"{t}_{ca}");
+                            candidateStems.Add($"{t}_jade_{ca}");
+                        }
+                    }
+                    if (parts.Length >= 2)
+                    {
+                        candidateStems.Add($"{parts[0]}_{parts[^1]}");
+                        candidateStems.Add($"{parts[^1]}_{parts[0]}");
+                    }
+                }
+
+                string[] stemParts = fileStem.Split('_', StringSplitOptions.RemoveEmptyEntries);
+                var stemTokens = stemParts.Where(p => p != "jade" && p != "classic" && p != "rg" && p != cleanChamp && p.Length >= 3).ToList();
+                foreach (string st in stemTokens)
+                {
+                    candidateStems.Add(st);
+                    foreach (string ca in champAliases)
+                    {
+                        candidateStems.Add($"{ca}_{st}");
+                        candidateStems.Add($"jade_{ca}_{st}");
+                        candidateStems.Add($"{st}_{ca}");
+                        candidateStems.Add($"{st}_jade_{ca}");
+                    }
+                }
+
+                var allStems = candidateStems.ToList();
+                foreach (string s in allStems)
+                {
+                    candidateStems.Add(s + "_base");
+                    candidateStems.Add(s + "_tx");
+                    candidateStems.Add(s + "_base_tx");
+                    candidateStems.Add("2x_" + s);
+                    candidateStems.Add("4x_" + s);
+                    if (s.Contains("royalguard", StringComparison.OrdinalIgnoreCase) || s.Contains("royal_guard", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidateStems.Add("fiora_musketeer");
+                        candidateStems.Add("fiora_musketeer_tx");
+                    }
+                    if (s.Contains("nightraven", StringComparison.OrdinalIgnoreCase) || s.Contains("night_raven", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidateStems.Add("fiora_zorro");
+                        candidateStems.Add("fiora_zorro_tx");
+                    }
+                    if (s.Contains("hextech", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidateStems.Add("galio_hextech");
+                        candidateStems.Add("galio_hextech_tx");
+                    }
+                    if (s.Contains("lumberjack", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidateStems.Add("sion_lumberjack");
+                        candidateStems.Add("sion_lumberjack_tx");
+                    }
+                }
+
+                if (targetTexHashes.Count > 0)
+                {
+                    foreach (string cDir in candidateDirs)
+                    {
+                        if (targetTexHashes.Count == 0 || engine.RemainingUnknownCount == 0) break;
+                        foreach (string cStem in candidateStems)
+                        {
+                            if (targetTexHashes.Count == 0 || engine.RemainingUnknownCount == 0) break;
+                            foreach (string suf in SkinTextureSuffixes)
+                            {
+                                string candidatePath = cDir + cStem + suf;
+                                ulong hash = XxHash64Ext.Hash(candidatePath);
+                                if (targetTexHashes.Remove(hash) && engine.UnknownHashes.Contains(hash))
+                                {
+                                    Check(engine, candidatePath, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                                    if (targetTexHashes.Count == 0) break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (champMatch.Success)
+                {
+                    string skinFolder = champMatch.Groups["skin"].Value.ToLowerInvariant();
+                    string skinNum = champMatch.Groups["num"].Success ? champMatch.Groups["num"].Value : "0";
+
+                    if (targetAvatarHash != 0 && engine.UnknownHashes.Contains(targetAvatarHash))
+                    {
+                        string[] avatarCandidates =
+                        {
+                            $"assets/characters/{champ}/hud/{champ}_circle_{skinNum}.tex",
+                            $"assets/characters/{cleanChamp}/hud/{cleanChamp}_circle_{skinNum}.tex",
+                            $"assets/characters/{champ}/hud/{champ}_square_{skinNum}.tex",
+                            $"assets/characters/{cleanChamp}/hud/{cleanChamp}_square_{skinNum}.tex",
+                            $"assets/characters/{champ}/hud/{champ}_circle.tex",
+                            $"assets/characters/{cleanChamp}/hud/{cleanChamp}_circle.tex",
+                            $"assets/characters/{champ}/hud/{champ}_circle_0.tex",
+                            $"assets/characters/{cleanChamp}/hud/{cleanChamp}_circle_0.tex"
+                        };
+                        foreach (string avPath in avatarCandidates)
+                        {
+                            if (XxHash64Ext.Hash(avPath) == targetAvatarHash)
+                            {
+                                Check(engine, avPath, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                                break;
+                            }
+                        }
+                    }
+
+                    foreach (ulong lsHash in loadscreenHashes)
+                    {
+                        if (lsHash != 0 && engine.UnknownHashes.Contains(lsHash))
+                        {
+                            string[] lsCandidates =
+                            {
+                                $"assets/characters/{champ}/skins/{skinFolder}/{champ}loadscreen_{skinNum}.tex",
+                                $"assets/characters/{cleanChamp}/skins/{skinFolder}/{cleanChamp}loadscreen_{skinNum}.tex",
+                                $"assets/characters/{champ}/skins/{skinFolder}/{champ}loadscreen_{skinNum}_le.tex",
+                                $"assets/characters/{cleanChamp}/skins/{skinFolder}/{cleanChamp}loadscreen_{skinNum}_le.tex",
+                                $"assets/characters/{champ}/skins/{skinFolder}/{champ}_loadscreen_{skinNum}.tex",
+                                $"assets/characters/{cleanChamp}/skins/{skinFolder}/{cleanChamp}_loadscreen_{skinNum}.tex"
+                            };
+                            foreach (string lsPath in lsCandidates)
+                            {
+                                if (XxHash64Ext.Hash(lsPath) == lsHash)
+                                {
+                                    Check(engine, lsPath, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
