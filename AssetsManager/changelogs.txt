@@ -548,5 +548,5 @@ Bug Fixes
   - Fixed 3D Mesh Analyzer Old Viewport badge displaying '2 models' in split mode instead of the loaded model filename.
   - Fixed 3D Mesh Analyzer model highlighting for Silk.NET OpenGL using ColorTint and AlphaCutoff to display green (added), red (removed), and blue (modified) topological differences.
   - WAD Comparison / Unified the 'Ready' progress hold delay to 300ms across all file comparisons (3D meshes, text/data, textures, audio banks, and batch comparisons) for smooth visual transitions.
-  - 3D Mesh Analyzer / Updated the viewport container background to #18181B, matching the main Viewer standard dark theme down to the pixel.
+  - 3D Mesh Analyzer / Updated the viewport container background to use the SidebarBackground theme resource, matching the main Viewer.
   - 3D Mesh Analyzer / Synchronized camera framing to automatically focus and scale to loaded model bounds on open.

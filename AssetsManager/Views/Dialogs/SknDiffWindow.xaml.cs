@@ -81,7 +81,6 @@ namespace AssetsManager.Views.Dialogs
 
             // Initial focus on origin
             Loaded += (s, e) => ResetCharacterCameras();
-            Dispatcher.BeginInvoke(new Action(() => ResetCharacterCameras()), System.Windows.Threading.DispatcherPriority.Loaded);
 
             if (OldViewport.OpenTkControl != null)
             {
@@ -103,15 +102,12 @@ namespace AssetsManager.Views.Dialogs
             if (OldViewport.OpenTkControl != null && OldViewport.OpenTkControl.IsLoaded)
             {
                 OldViewport.OpenTkControl.InvalidateVisual();
-                if (_oldRenderedFrames < 2)
+                if (_oldRenderedFrames < 2 && OldViewport.OpenTkControl.Framebuffer > 0)
                 {
-                    if (OldViewport.OpenTkControl.Framebuffer > 0)
+                    _oldRenderedFrames++;
+                    if (_oldRenderedFrames >= 2)
                     {
-                        _oldRenderedFrames++;
-                        if (_oldRenderedFrames >= 2)
-                        {
-                            OldViewport.OpenTkControl.Opacity = 1.0;
-                        }
+                        OldViewport.OpenTkControl.Opacity = 1.0;
                     }
                 }
             }
@@ -119,15 +115,12 @@ namespace AssetsManager.Views.Dialogs
             if (NewViewport.OpenTkControl != null && NewViewport.OpenTkControl.IsLoaded)
             {
                 NewViewport.OpenTkControl.InvalidateVisual();
-                if (_newRenderedFrames < 2)
+                if (_newRenderedFrames < 2 && NewViewport.OpenTkControl.Framebuffer > 0)
                 {
-                    if (NewViewport.OpenTkControl.Framebuffer > 0)
+                    _newRenderedFrames++;
+                    if (_newRenderedFrames >= 2)
                     {
-                        _newRenderedFrames++;
-                        if (_newRenderedFrames >= 2)
-                        {
-                            NewViewport.OpenTkControl.Opacity = 1.0;
-                        }
+                        NewViewport.OpenTkControl.Opacity = 1.0;
                     }
                 }
             }
