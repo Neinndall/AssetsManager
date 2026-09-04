@@ -661,10 +661,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     $"assets/characters/{character}/hud/{character}_square.dds",
                     $"assets/characters/{character}/hud/{character}_square.tex",
                     $"assets/characters/{character}/hud/{character}_square_301.tex",
-                    $"assets/characters/{character}/skins/base/{character}.skl",
-                    $"assets/characters/{character}/skins/base/{character}.skn",
                     $"assets/characters/{character}/skins/base/{character}_base_tx_cm.tex",
-                    $"assets/characters/{character}/skins/base/{character}_tx_cm.tex",
                     $"assets/characters/{character}/skins/base/{character}loadscreen.tex",
                     $"assets/characters/{character}/skins/base/{character}_loadscreen.tex",
                     $"characters/{character}"
@@ -683,9 +680,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 checkedCount += CheckCharacterPaths(
                     Enumerable.Range(1, 9).Select(skin =>
                         $"data/characters/{character}/animations/skin{skin:D2}.bin"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"data/characters/{character}/{character}_multi_skins_skin{skin}.bin"));
                 checkedCount += CheckCharacterPaths(
                     Enumerable.Range(0, nskins).Select(skin =>
                         $"assets/characters/{character}/hud/{character}_circle_{skin}.tex"));
@@ -711,25 +705,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         $"assets/characters/{character}/skins/skin{skin:D2}/{character}_loadscreen_{skin}_le.tex"));
                 checkedCount += CheckCharacterPaths(
                     Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}.skn"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}.skl"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(1, 9).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin}/{character}_skin{skin}.skn"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(1, 9).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin}/{character}_skin{skin}.skl"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
                         $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_tx_cm.tex"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_tx_nm.tex"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_mask_tx_cm.tex"));
                 checkedCount += CheckCharacterPaths(
                     from skin in Enumerable.Range(0, nskins)
                     from tier in new[] { "starter", "signature", "premium", "base" }
