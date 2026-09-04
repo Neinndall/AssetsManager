@@ -1865,27 +1865,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             Func<BinTree> binTreeFactory = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (data.Array is null || data.Count == 0) return;
-
             Match context = AnimationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
-            string character;
-            string sourceSkin;
-            if (context.Success)
-            {
-                character = context.Groups["character"].Value.ToLowerInvariant();
-                sourceSkin = context.Groups["skin"].Value.ToLowerInvariant();
-            }
-            else
-            {
-                if (string.IsNullOrEmpty(sourceWadPath) ||
-                    !sourceWadPath.Contains("champions", StringComparison.OrdinalIgnoreCase)) return;
-                string fileName = Path.GetFileName(sourceWadPath);
-                int dot = fileName.IndexOf('.');
-                string champ = dot >= 0 ? fileName[..dot] : fileName;
-                if (string.IsNullOrEmpty(champ)) return;
-                character = champ.ToLowerInvariant();
-                sourceSkin = "skin0";
-            }
+            if (!context.Success || data.Array is null || data.Count == 0) return;
+
+            string character = context.Groups["character"].Value.ToLowerInvariant();
+            string sourceSkin = context.Groups["skin"].Value.ToLowerInvariant();
 
             var links = new HashSet<AnimationFileLink>();
             try
