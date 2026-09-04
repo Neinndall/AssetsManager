@@ -97,10 +97,27 @@ void main() { FragColor = uColor; }";
         public void Dispose()
         {
             if (!_ready) return;
-            _gl.DeleteBuffer(_vbo);
-            _gl.DeleteVertexArray(_vao);
-            _gl.DeleteProgram(_program);
-            _ready = false;
+
+            try
+            {
+                if (_vbo != 0) _gl?.DeleteBuffer(_vbo);
+                if (_vao != 0) _gl?.DeleteVertexArray(_vao);
+                if (_program != 0) _gl?.DeleteProgram(_program);
+            }
+            catch (Silk.NET.Core.Loader.SymbolLoadingException)
+            {
+                // The OpenGL context owns these handles and reclaims them on teardown.
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                _vbo = 0;
+                _vao = 0;
+                _program = 0;
+                _ready = false;
+            }
         }
     }
 }

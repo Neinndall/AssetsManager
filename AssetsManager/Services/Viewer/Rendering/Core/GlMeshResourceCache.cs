@@ -631,29 +631,46 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         public void Dispose()
         {
-            foreach (SharedTexture texture in _sharedTextures.Values)
-                _gl.DeleteTexture(texture.Id);
-            _sharedTextures.Clear();
-
-            foreach (SharedTexture texture in _sharedLightmapTextures.Values)
-                _gl.DeleteTexture(texture.Id);
-            _sharedLightmapTextures.Clear();
-
-            foreach (PartResources resources in _liveResources)
+            try
             {
-                DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
-                DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
-                DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
-                DeleteHandle(resources.LightmapVbo, _gl.DeleteBuffer);
-                DeleteHandle(resources.ColorVbo, _gl.DeleteBuffer);
-                DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
-                DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
-            }
-            _liveResources.Clear();
-            _pendingReleases.Clear();
+                foreach (SharedTexture texture in _sharedTextures.Values)
+                    _gl.DeleteTexture(texture.Id);
+                _sharedTextures.Clear();
 
-            if (WhiteTexture != 0)
-                _gl.DeleteTexture(WhiteTexture);
+                foreach (SharedTexture texture in _sharedLightmapTextures.Values)
+                    _gl.DeleteTexture(texture.Id);
+                _sharedLightmapTextures.Clear();
+
+                foreach (PartResources resources in _liveResources)
+                {
+                    DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
+                    DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
+                    DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
+                    DeleteHandle(resources.LightmapVbo, _gl.DeleteBuffer);
+                    DeleteHandle(resources.ColorVbo, _gl.DeleteBuffer);
+                    DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
+                    DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
+                }
+                _liveResources.Clear();
+                _pendingReleases.Clear();
+
+                if (WhiteTexture != 0)
+                    _gl.DeleteTexture(WhiteTexture);
+            }
+            catch (Silk.NET.Core.Loader.SymbolLoadingException)
+            {
+                // The OpenGL context owns these handles and reclaims them on teardown.
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                _sharedTextures.Clear();
+                _sharedLightmapTextures.Clear();
+                _liveResources.Clear();
+                _pendingReleases.Clear();
+            }
         }
     }
 }

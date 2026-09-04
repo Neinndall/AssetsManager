@@ -505,13 +505,28 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             if (!_ready) return;
 
-            _resources.Dispose();
-            if (_boneBuffer != 0)
-                _gl.DeleteBuffer(_boneBuffer);
-            _boneBuffer = 0;
-            if (_program != 0)
-                _gl.DeleteProgram(_program);
-            _ready = false;
+            try
+            {
+                _resources?.Dispose();
+                if (_boneBuffer != 0)
+                    _gl?.DeleteBuffer(_boneBuffer);
+                _boneBuffer = 0;
+                if (_program != 0)
+                    _gl?.DeleteProgram(_program);
+            }
+            catch (Silk.NET.Core.Loader.SymbolLoadingException)
+            {
+                // The OpenGL context owns these handles and reclaims them on teardown.
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                _boneBuffer = 0;
+                _program = 0;
+                _ready = false;
+            }
         }
     }
 }

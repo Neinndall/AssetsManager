@@ -621,25 +621,51 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 _skyVisual = null;
                 _groundVisual = null;
-                // Liberar el renderizador de OpenGL
-                _meshRenderer?.Dispose();
+
+                // Liberar los recursos de renderizado OpenGL de forma aislada
+                var meshRenderer = _meshRenderer;
                 _meshRenderer = null;
+                RunReleaseStep(nameof(GlMeshRenderer), () => meshRenderer?.Dispose(), gpuBound: true);
 
-                _gridRenderer?.Dispose();
+                var gridRenderer = _gridRenderer;
                 _gridRenderer = null;
+                RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
 
-                _vfxRenderer?.Dispose();
+                var vfxRenderer = _vfxRenderer;
                 _vfxRenderer = null;
                 _selectedVfxSystem = null;
+                RunReleaseStep(nameof(VfxRenderSession), () => vfxRenderer?.Dispose(), gpuBound: true);
 
-                _gl?.Dispose();
+                var gl = _gl;
                 _gl = null;
-                OpenTkControl.Dispose();
+                RunReleaseStep("OpenGL API", () => gl?.Dispose());
 
+                RunReleaseStep(nameof(OpenTkControl), OpenTkControl.Dispose, gpuBound: true);
             }
             catch (Exception ex)
             {
-                LogService.LogError(ex, "Error during ViewerViewportControl.Cleanup");
+                LogService?.LogError(ex, "Error during ViewerViewportControl.Cleanup");
+            }
+        }
+
+        private void RunReleaseStep(string componentName, Action release, bool gpuBound = false)
+        {
+            if (release == null) return;
+
+            try
+            {
+                release();
+            }
+            catch (Silk.NET.Core.Loader.SymbolLoadingException) when (gpuBound)
+            {
+                // El contexto de OpenGL ya se desmontó en WPF; el driver libera los recursos asociados.
+            }
+            catch (ObjectDisposedException) when (gpuBound)
+            {
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, $"Failed to release ViewerViewport {componentName}.");
             }
         }
 
