@@ -2427,11 +2427,22 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 foreach (string tok in rawMat.Split('_', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 {
-                    if (tok.Length >= 3 && tok != "matcap" && tok != "inst" && tok != "mat" &&
-                        tok != "holographic" && tok != "iridescent")
+                    if (tok.Length >= 3 && tok != "matcap" && tok != "inst" && tok != "mat")
                     {
                         stems.Add(tok);
                         stems.Add(tok + "_mask");
+                        if (tok == "holographic" || tok == "holo")
+                        {
+                            stems.Add("holo");
+                            stems.Add("hologram");
+                            stems.Add("holomask");
+                            stems.Add("holoscroll");
+                        }
+                        else if (tok == "iridescent")
+                        {
+                            stems.Add("iridescentgradient");
+                            stems.Add("iridescenttex");
+                        }
                     }
                 }
 
