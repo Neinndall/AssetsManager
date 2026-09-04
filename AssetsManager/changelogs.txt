@@ -542,3 +542,11 @@ Bug Fixes
   - Fixed update checks failing with an error when release data is temporarily incomplete.
   - Fixed version verification freezing or running out of memory on corrupted manifests.
   - Fixed audio previews leaving background conversions running after switching files.
+  - Fixed 3D Mesh Analyzer displaying an uninitialized grey viewport upon opening by initializing the OpenGL surface at opacity 0 until the framebuffer is allocated and rendered.
+  - Fixed 3D Mesh Analyzer camera controls and viewport rendering freezing after the Silk.NET OpenGL migration by maintaining an active rendering loop.
+  - Fixed 3D Mesh Analyzer single-model view incorrectly creating a combined scene and displaying a model badge on the empty viewport side.
+  - Fixed 3D Mesh Analyzer Old Viewport badge displaying '2 models' in split mode instead of the loaded model filename.
+  - Fixed 3D Mesh Analyzer model highlighting for Silk.NET OpenGL using ColorTint and AlphaCutoff to display green (added), red (removed), and blue (modified) topological differences.
+  - WAD Comparison / Unified the 'Ready' progress hold delay to 300ms across all file comparisons (3D meshes, text/data, textures, audio banks, and batch comparisons) for smooth visual transitions.
+  - 3D Mesh Analyzer / Updated the viewport container background to #18181B, matching the main Viewer standard dark theme down to the pixel.
+  - 3D Mesh Analyzer / Synchronized camera framing to automatically focus and scale to loaded model bounds on open.
