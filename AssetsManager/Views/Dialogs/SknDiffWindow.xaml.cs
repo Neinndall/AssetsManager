@@ -27,8 +27,9 @@ namespace AssetsManager.Views.Dialogs
         
         private SceneModel _oldScene;
         private SceneModel _newScene;
+        private SceneModel _combinedNewScene;
         private readonly List<MeshPartDiffItem> _partItems = new();
-        private readonly List<ModelVisual3D> _diffOverlays = new();
+        private readonly List<SceneModel> _diffOverlayScenes = new();
         private readonly Dictionary<string, MeshGeometry3D> _addedGeometryCache = new();
         private readonly Dictionary<string, MeshGeometry3D> _removedGeometryCache = new();
 
@@ -79,12 +80,64 @@ namespace AssetsManager.Views.Dialogs
             NewViewport.Viewport3D.Camera.Changed += _newCameraChangedHandler;
 
             // Initial focus on origin
+            Loaded += (s, e) => ResetCharacterCameras();
             Dispatcher.BeginInvoke(new Action(() => ResetCharacterCameras()), System.Windows.Threading.DispatcherPriority.Loaded);
+
+            if (OldViewport.OpenTkControl != null)
+            {
+                OldViewport.OpenTkControl.Opacity = 0;
+            }
+            if (NewViewport.OpenTkControl != null)
+            {
+                NewViewport.OpenTkControl.Opacity = 0;
+            }
+
+            CompositionTarget.Rendering += OnDiffRendering;
+        }
+
+        private int _oldRenderedFrames = 0;
+        private int _newRenderedFrames = 0;
+
+        private void OnDiffRendering(object sender, EventArgs e)
+        {
+            if (OldViewport.OpenTkControl != null && OldViewport.OpenTkControl.IsLoaded)
+            {
+                OldViewport.OpenTkControl.InvalidateVisual();
+                if (_oldRenderedFrames < 2)
+                {
+                    if (OldViewport.OpenTkControl.Framebuffer > 0)
+                    {
+                        _oldRenderedFrames++;
+                        if (_oldRenderedFrames >= 2)
+                        {
+                            OldViewport.OpenTkControl.Opacity = 1.0;
+                        }
+                    }
+                }
+            }
+
+            if (NewViewport.OpenTkControl != null && NewViewport.OpenTkControl.IsLoaded)
+            {
+                NewViewport.OpenTkControl.InvalidateVisual();
+                if (_newRenderedFrames < 2)
+                {
+                    if (NewViewport.OpenTkControl.Framebuffer > 0)
+                    {
+                        _newRenderedFrames++;
+                        if (_newRenderedFrames >= 2)
+                        {
+                            NewViewport.OpenTkControl.Opacity = 1.0;
+                        }
+                    }
+                }
+            }
         }
 
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
+
+            CompositionTarget.Rendering -= OnDiffRendering;
 
             // Unwire diff toolbar events
             OldViewport.CombinedModeToggled -= Viewport_CombinedModeToggled;
@@ -119,7 +172,11 @@ namespace AssetsManager.Views.Dialogs
 
             // Clear lists and scenes
             _partItems.Clear();
-            _diffOverlays.Clear();
+            foreach (var overlay in _diffOverlayScenes)
+            {
+                overlay.Dispose();
+            }
+            _diffOverlayScenes.Clear();
             _addedGeometryCache.Clear();
             _removedGeometryCache.Clear();
             if (_oldScene != null)
@@ -132,19 +189,39 @@ namespace AssetsManager.Views.Dialogs
                 _newScene.Dispose();
                 _newScene = null;
             }
+            if (_combinedNewScene != null)
+            {
+                _combinedNewScene.Dispose();
+                _combinedNewScene = null;
+            }
         }
 
         private void ResetCharacterCameras()
         {
-            var position = new Point3D(0, 130, 280);
-            var lookDir = new Vector3D(0, -40, -280);
-            var upDir = new Vector3D(0, 1, 0);
-
             _isSyncing = true;
             try
             {
-                SetCamera(OldViewport, position, lookDir, upDir);
-                SetCamera(NewViewport, position, lookDir, upDir);
+                if (NewViewport != null && _newScene != null)
+                {
+                    NewViewport.ResetCamera(false);
+                    if (OldViewport != null)
+                    {
+                        SyncCameras(NewViewport, OldViewport);
+                    }
+                }
+                else if (OldViewport != null && _oldScene != null)
+                {
+                    OldViewport.ResetCamera(false);
+                    if (NewViewport != null)
+                    {
+                        SyncCameras(OldViewport, NewViewport);
+                    }
+                }
+                else
+                {
+                    if (OldViewport != null) OldViewport.ResetCamera(false);
+                    if (NewViewport != null) NewViewport.ResetCamera(false);
+                }
             }
             finally
             {
@@ -193,6 +270,16 @@ namespace AssetsManager.Views.Dialogs
 
             OldViewport.ClearModels();
             NewViewport.ClearModels();
+            if (_combinedNewScene != null)
+            {
+                _combinedNewScene.Dispose();
+                _combinedNewScene = null;
+            }
+            foreach (var overlay in _diffOverlayScenes)
+            {
+                overlay.Dispose();
+            }
+            _diffOverlayScenes.Clear();
             _addedGeometryCache.Clear();
             _removedGeometryCache.Clear();
 
@@ -208,11 +295,46 @@ namespace AssetsManager.Views.Dialogs
                 if (loadingWindow != null) await loadingWindow.SetStateAndRenderAsync(DiffLoadingState.ParsingNewModel);
                 _newScene = await LoadModelFromBytesAsync(newData, newPath, "NEW");
                 if (_newScene != null) NewViewport.AddModel(_newScene);
+
+                if (_oldScene != null)
+                {
+                    _combinedNewScene = await LoadModelFromBytesAsync(newData, newPath, "COMBINED_NEW");
+                    if (_combinedNewScene != null)
+                    {
+                        _combinedNewScene.IsVisible = false;
+                        OldViewport.AddModel(_combinedNewScene);
+                    }
+                }
             }
 
             if (loadingWindow != null) await loadingWindow.SetStateAndRenderAsync(DiffLoadingState.Comparing3DGeometry);
             CompareModels();
             BuildMeshPartsList();
+            ResetCharacterCameras();
+
+            int oldCount = 0;
+            if (_oldScene != null)
+            {
+                oldCount = 1;
+            }
+            string oldName = string.Empty;
+            if (oldPath != null)
+            {
+                oldName = Path.GetFileName(oldPath);
+            }
+            OldViewport.ViewModel.UpdateSceneDisplay(oldCount, oldName);
+
+            int newCount = 0;
+            if (_newScene != null)
+            {
+                newCount = 1;
+            }
+            string newName = string.Empty;
+            if (newPath != null)
+            {
+                newName = Path.GetFileName(newPath);
+            }
+            NewViewport.ViewModel.UpdateSceneDisplay(newCount, newName);
         }
 
         private async Task<SceneModel> LoadModelFromBytesAsync(byte[] data, string path, string label)
@@ -225,28 +347,57 @@ namespace AssetsManager.Views.Dialogs
                 if (scene != null)
                 {
                     scene.Name = Path.GetFileNameWithoutExtension(path);
+                    scene.PositionY = SceneElements.GroundLevel;
                 }
                 try { File.Delete(tempFile); } catch { }
                 return scene;
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"[3D-DIFF] [{label}] Failed to load model: {path}");
+                if (_logService != null)
+                {
+                    _logService.LogError(ex, $"[3D-DIFF] [{label}] Failed to load model: {path}");
+                }
                 return null;
             }
         }
 
         private void CompareModels()
         {
-            if (_oldScene == null || _newScene == null) return;
+            if (_oldScene == null && _newScene == null)
+            {
+                VertexDeltaLabel.Text = "0";
+                FaceDeltaLabel.Text = "0";
+                return;
+            }
 
-            int oldVertices = _oldScene.SkinnedMesh.VerticesView.VertexCount;
-            int newVertices = _newScene.SkinnedMesh.VerticesView.VertexCount;
-            int oldIndices = _oldScene.SkinnedMesh.Indices.Count;
-            int newIndices = _newScene.SkinnedMesh.Indices.Count;
+            if (_oldScene == null && _newScene != null)
+            {
+                int newVertices = _newScene.SkinnedMesh.VerticesView.VertexCount;
+                int newIndices = _newScene.SkinnedMesh.Indices.Count;
+                VertexDeltaLabel.Text = $"{newVertices:N0} (New)";
+                FaceDeltaLabel.Text = $"{(newIndices / 3):N0} (New)";
+                UpdateVisualHighlighting();
+                return;
+            }
 
-            VertexDeltaLabel.Text = $"{newVertices} ({(newVertices - oldVertices):+0;-0;0})";
-            FaceDeltaLabel.Text = $"{newIndices / 3} ({((newIndices - oldIndices) / 3):+0;-0;0})";
+            if (_oldScene != null && _newScene == null)
+            {
+                int oldVertices = _oldScene.SkinnedMesh.VerticesView.VertexCount;
+                int oldIndices = _oldScene.SkinnedMesh.Indices.Count;
+                VertexDeltaLabel.Text = $"{oldVertices:N0} (Removed)";
+                FaceDeltaLabel.Text = $"{(oldIndices / 3):N0} (Removed)";
+                UpdateVisualHighlighting();
+                return;
+            }
+
+            int oldVerticesCount = _oldScene.SkinnedMesh.VerticesView.VertexCount;
+            int newVerticesCount = _newScene.SkinnedMesh.VerticesView.VertexCount;
+            int oldIndicesCount = _oldScene.SkinnedMesh.Indices.Count;
+            int newIndicesCount = _newScene.SkinnedMesh.Indices.Count;
+
+            VertexDeltaLabel.Text = $"{newVerticesCount:N0} ({(newVerticesCount - oldVerticesCount):+0;-0;0})";
+            FaceDeltaLabel.Text = $"{(newIndicesCount / 3):N0} ({((newIndicesCount - oldIndicesCount) / 3):+0;-0;0})";
 
             PrecalculateGeometryDiffs();
             UpdateVisualHighlighting();
@@ -254,32 +405,82 @@ namespace AssetsManager.Views.Dialogs
 
         private void UpdateVisualHighlighting()
         {
-            if (_oldScene == null || _newScene == null) return;
+            if (_oldScene == null && _newScene == null) return;
 
             bool isGhostMode = OldViewport.IsGhostModeChecked;
             bool isCombined = OldViewport.IsCombinedModeChecked;
 
             // Clear old overlays
-            foreach (var overlay in _diffOverlays)
+            foreach (var overlay in _diffOverlayScenes)
             {
-                if (OldViewport.Viewport3D.Children.Contains(overlay))
-                    OldViewport.Viewport3D.Children.Remove(overlay);
-                if (NewViewport.Viewport3D.Children.Contains(overlay))
-                    NewViewport.Viewport3D.Children.Remove(overlay);
+                OldViewport.RemoveModel(overlay);
+                NewViewport.RemoveModel(overlay);
+                overlay.Dispose();
             }
-            _diffOverlays.Clear();
+            _diffOverlayScenes.Clear();
+
+            if (_oldScene == null && _newScene != null)
+            {
+                foreach (var newPart in _newScene.Parts)
+                {
+                    var partItem = _partItems.FirstOrDefault(i => i.Name == newPart.Name);
+                    bool userVisible = true;
+                    if (partItem != null)
+                    {
+                        userVisible = partItem.IsVisible;
+                    }
+                    newPart.IsVisible = userVisible;
+                    double greenOpacity = 1.0;
+                    if (isGhostMode)
+                    {
+                        greenOpacity = 0.7;
+                    }
+                    HighlightPart(newPart, Colors.Green, greenOpacity);
+                }
+                return;
+            }
+
+            if (_oldScene != null && _newScene == null)
+            {
+                foreach (var oldPart in _oldScene.Parts)
+                {
+                    var partItem = _partItems.FirstOrDefault(i => i.Name == oldPart.Name);
+                    bool userVisible = true;
+                    if (partItem != null)
+                    {
+                        userVisible = partItem.IsVisible;
+                    }
+                    oldPart.IsVisible = userVisible;
+                    double ghostOpacity = 0.5;
+                    if (isGhostMode)
+                    {
+                        ghostOpacity = 0.2;
+                    }
+                    HighlightPart(oldPart, Colors.Red, ghostOpacity);
+                }
+                return;
+            }
 
             foreach (var newPart in _newScene.Parts)
             {
                 var oldPart = _oldScene.Parts.FirstOrDefault(p => p.Name == newPart.Name);
                 var partItem = _partItems.FirstOrDefault(i => i.Name == newPart.Name);
-                bool userVisible = partItem?.IsVisible ?? true;
+                bool userVisible = true;
+                if (partItem != null)
+                {
+                    userVisible = partItem.IsVisible;
+                }
 
                 if (oldPart == null)
                 {
                     // [NEW]
                     newPart.IsVisible = userVisible;
-                    HighlightPart(newPart, Colors.Green, isGhostMode ? 0.7 : 1.0);
+                    double greenOpacity = 1.0;
+                    if (isGhostMode)
+                    {
+                        greenOpacity = 0.7;
+                    }
+                    HighlightPart(newPart, Colors.Green, greenOpacity);
                 }
                 else if (!ArePartsEqual(oldPart, newPart))
                 {
@@ -292,42 +493,57 @@ namespace AssetsManager.Views.Dialogs
                     // Check cache for newly added geometry pieces inside this modified part (e.g. piercings)
                     if (_addedGeometryCache.TryGetValue(newPart.Name, out var addedMesh))
                     {
-                        var greenBrush = new SolidColorBrush(Colors.Green) { Opacity = 1.0 };
-                        greenBrush.Freeze();
-                        var greenMaterial = new MaterialGroup();
-                        greenMaterial.Children.Add(new DiffuseMaterial(greenBrush));
-                        greenMaterial.Children.Add(new SpecularMaterial(Brushes.White, 40.0));
-                        greenMaterial.Freeze();
-
-                        var addedModel = new GeometryModel3D(addedMesh, greenMaterial) { BackMaterial = greenMaterial };
-                        var addedVisual = new ModelVisual3D { Content = addedModel };
-
-                        NewViewport.Viewport3D.Children.Add(addedVisual);
-                        _diffOverlays.Add(addedVisual);
+                        var addedPart = new ModelPart("AddedOverlay_" + newPart.Name, new GeometryModel3D(addedMesh, null))
+                        {
+                            ColorTint = new System.Numerics.Vector4(0f, 1f, 0f, 1f),
+                            AlphaCutoff = 0.5f
+                        };
+                        var overlayScene = new SceneModel
+                        {
+                            Name = "AddedOverlay_" + newPart.Name,
+                            IsVisible = true,
+                            PositionY = SceneElements.GroundLevel
+                        };
+                        overlayScene.AddPart(addedPart);
+                        NewViewport.AddModel(overlayScene);
+                        _diffOverlayScenes.Add(overlayScene);
 
                         if (isCombined)
                         {
-                            var combinedAddedVisual = new ModelVisual3D { Content = addedModel };
-                            OldViewport.Viewport3D.Children.Add(combinedAddedVisual);
-                            _diffOverlays.Add(combinedAddedVisual);
+                            var combinedAddedPart = new ModelPart("CombinedAddedOverlay_" + newPart.Name, new GeometryModel3D(addedMesh, null))
+                            {
+                                ColorTint = new System.Numerics.Vector4(0f, 1f, 0f, 1f),
+                                AlphaCutoff = 0.5f
+                            };
+                            var combinedOverlayScene = new SceneModel
+                            {
+                                Name = "CombinedAddedOverlay_" + newPart.Name,
+                                IsVisible = true,
+                                PositionY = SceneElements.GroundLevel
+                            };
+                            combinedOverlayScene.AddPart(combinedAddedPart);
+                            OldViewport.AddModel(combinedOverlayScene);
+                            _diffOverlayScenes.Add(combinedOverlayScene);
                         }
                     }
 
                     // Check cache for newly deleted geometry pieces inside this modified part
                     if (_removedGeometryCache.TryGetValue(newPart.Name, out var removedMesh))
                     {
-                        var redBrush = new SolidColorBrush(Colors.Red) { Opacity = 0.8 };
-                        redBrush.Freeze();
-                        var redMaterial = new MaterialGroup();
-                        redMaterial.Children.Add(new DiffuseMaterial(redBrush));
-                        redMaterial.Children.Add(new SpecularMaterial(Brushes.White, 40.0));
-                        redMaterial.Freeze();
-
-                        var removedModel = new GeometryModel3D(removedMesh, redMaterial) { BackMaterial = redMaterial };
-                        var removedVisual = new ModelVisual3D { Content = removedModel };
-
-                        OldViewport.Viewport3D.Children.Add(removedVisual);
-                        _diffOverlays.Add(removedVisual);
+                        var removedPart = new ModelPart("RemovedOverlay_" + newPart.Name, new GeometryModel3D(removedMesh, null))
+                        {
+                            ColorTint = new System.Numerics.Vector4(1f, 0f, 0f, 0.8f),
+                            AlphaCutoff = 0f
+                        };
+                        var overlayScene = new SceneModel
+                        {
+                            Name = "RemovedOverlay_" + newPart.Name,
+                            IsVisible = true,
+                            PositionY = SceneElements.GroundLevel
+                        };
+                        overlayScene.AddPart(removedPart);
+                        OldViewport.AddModel(overlayScene);
+                        _diffOverlayScenes.Add(overlayScene);
                     }
                 }
                 else
@@ -357,10 +573,37 @@ namespace AssetsManager.Views.Dialogs
                 {
                     // [REMOVED]
                     var partItem = _partItems.FirstOrDefault(i => i.Name == oldPart.Name);
-                    bool userVisible = partItem?.IsVisible ?? true;
+                    bool userVisible = true;
+                    if (partItem != null)
+                    {
+                        userVisible = partItem.IsVisible;
+                    }
 
                     oldPart.IsVisible = userVisible;
-                    HighlightPart(oldPart, Colors.Red, isGhostMode ? 0.2 : 0.5);
+                    double redOpacity = 0.5;
+                    if (isGhostMode)
+                    {
+                        redOpacity = 0.2;
+                    }
+                    HighlightPart(oldPart, Colors.Red, redOpacity);
+                }
+            }
+
+            if (_combinedNewScene != null)
+            {
+                _combinedNewScene.IsVisible = isCombined;
+                if (isCombined)
+                {
+                    foreach (var combPart in _combinedNewScene.Parts)
+                    {
+                        var matchingPart = _newScene.Parts.FirstOrDefault(p => p.Name == combPart.Name);
+                        if (matchingPart != null)
+                        {
+                            combPart.IsVisible = matchingPart.IsVisible;
+                            combPart.ColorTint = matchingPart.ColorTint;
+                            combPart.AlphaCutoff = matchingPart.AlphaCutoff;
+                        }
+                    }
                 }
             }
         }
@@ -409,8 +652,19 @@ namespace AssetsManager.Views.Dialogs
             materialGroup.Children.Add(new SpecularMaterial(specBrush, 40.0));
             materialGroup.Freeze();
 
-            part.Geometry.Material = materialGroup;
-            part.Geometry.BackMaterial = materialGroup;
+            if (part.Geometry != null)
+            {
+                part.Geometry.Material = materialGroup;
+                part.Geometry.BackMaterial = materialGroup;
+            }
+
+            part.ColorTint = new System.Numerics.Vector4(color.R / 255f, color.G / 255f, color.B / 255f, (float)opacity);
+            float alphaCutoff = 0.5f;
+            if (opacity < 1.0)
+            {
+                alphaCutoff = 0f;
+            }
+            part.AlphaCutoff = alphaCutoff;
         }
 
         private bool _isSyncingToolbarVisibility = false;
@@ -517,11 +771,9 @@ namespace AssetsManager.Views.Dialogs
 
             if (isCombined)
             {
-                // Remove _newScene from NewViewport, add to OldViewport
-                NewViewport.Viewport3D.Children.Remove(_newScene.RootVisual);
-                if (!OldViewport.Viewport3D.Children.Contains(_newScene.RootVisual))
+                if (_combinedNewScene != null)
                 {
-                    OldViewport.Viewport3D.Children.Add(_newScene.RootVisual);
+                    _combinedNewScene.IsVisible = true;
                 }
 
                 // Collapse NewViewport and GridSplitter
@@ -530,14 +782,14 @@ namespace AssetsManager.Views.Dialogs
 
                 // Span OldViewport to fill all columns
                 Grid.SetColumnSpan(OldViewportContainer, 3);
+
+                OldViewport.ViewModel.UpdateSceneDisplay(2, OldFileNameLabel.Text);
             }
             else
             {
-                // Remove _newScene from OldViewport, add back to NewViewport
-                OldViewport.Viewport3D.Children.Remove(_newScene.RootVisual);
-                if (!NewViewport.Viewport3D.Children.Contains(_newScene.RootVisual))
+                if (_combinedNewScene != null)
                 {
-                    NewViewport.Viewport3D.Children.Add(_newScene.RootVisual);
+                    _combinedNewScene.IsVisible = false;
                 }
 
                 // Restore span and visibility
@@ -547,6 +799,13 @@ namespace AssetsManager.Views.Dialogs
 
                 // Sync cameras immediately to ensure alignment
                 SyncCameras(OldViewport, NewViewport);
+
+                int oldCount = 0;
+                if (_oldScene != null)
+                {
+                    oldCount = 1;
+                }
+                OldViewport.ViewModel.UpdateSceneDisplay(oldCount, OldFileNameLabel.Text);
             }
 
             // Update highlighting to hide unchanged parts of _oldScene in combined mode
@@ -593,8 +852,17 @@ namespace AssetsManager.Views.Dialogs
             {
                 var item = new MeshPartDiffItem { Name = name, IsVisible = true };
 
-                var oldPart = _oldScene?.Parts.FirstOrDefault(p => p.Name == name);
-                var newPart = _newScene?.Parts.FirstOrDefault(p => p.Name == name);
+                ModelPart oldPart = null;
+                if (_oldScene != null)
+                {
+                    oldPart = _oldScene.Parts.FirstOrDefault(p => p.Name == name);
+                }
+
+                ModelPart newPart = null;
+                if (_newScene != null)
+                {
+                    newPart = _newScene.Parts.FirstOrDefault(p => p.Name == name);
+                }
 
                 SolidColorBrush diffBrush;
                 if (oldPart == null && newPart != null)

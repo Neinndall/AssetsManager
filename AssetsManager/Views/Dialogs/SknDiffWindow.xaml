@@ -68,7 +68,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Old Version Viewport -->
-                <Border Grid.Column="0" x:Name="OldViewportContainer" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                <Border Grid.Column="0" x:Name="OldViewportContainer" Style="{StaticResource SettingsCard}" Padding="0" Background="#18181B">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -99,7 +99,7 @@
                 <GridSplitter Grid.Column="1" x:Name="ViewportSplitter" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext" ShowsPreview="False"/>
 
                 <!-- New Version Viewport -->
-                <Border Grid.Column="2" x:Name="NewViewportContainer" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                <Border Grid.Column="2" x:Name="NewViewportContainer" Style="{StaticResource SettingsCard}" Padding="0" Background="#18181B">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>

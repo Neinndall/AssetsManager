@@ -214,7 +214,7 @@ namespace AssetsManager.Services.Core
 
                 // [PROGRESS] 100% Reached before opening window
                 await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-                await Task.Delay(350);
+                await Task.Delay(300);
                 diffWindow.ShowDialog();
             }
             catch (Exception ex)
@@ -291,7 +291,7 @@ namespace AssetsManager.Services.Core
 
             // [PROGRESS] 100% Reached before opening window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(350);
+            await Task.Delay(300);
             diffWindow.ShowDialog();
         }
 
@@ -307,7 +307,7 @@ namespace AssetsManager.Services.Core
             
             // [PROGRESS] 100% Reached before opening window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(350);
+            await Task.Delay(300);
             imageDiffWindow.ShowDialog();
         }
 
@@ -330,7 +330,7 @@ namespace AssetsManager.Services.Core
 
             // [PROGRESS] 100% Reached before opening window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(350);
+            await Task.Delay(300);
             
             // Close loading window before ShowDialog to prevent it from staying open (ShowDialog is blocking)
             loadingWindow.Close();
@@ -452,10 +452,8 @@ namespace AssetsManager.Services.Core
 
             // [PROGRESS] 100% Reached before opening batch window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(350);
-
+            await Task.Delay(300);
             await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-
             await showWindowAction(preparedItems);
         }
     }
