@@ -100,19 +100,13 @@ namespace AssetsManager.Views.Models.Versions
             _paginator = LeagueClientPaginator;
 
             DateTime today = DateTime.Today;
-            ManifestDateOptions = new ObservableCollection<ManifestDateOption>(
-                new[] { new ManifestDateOption(null, "All") }
-                    .Concat(Enumerable.Range(0, 7).Select(offset =>
-                {
-                    DateTime date = today.AddDays(-offset);
-                    string label = offset switch
-                    {
-                        0 => "Today",
-                        1 => "Yesterday",
-                        _ => $"{offset} days ago"
-                    };
-                    return new ManifestDateOption(date, $"{label} - {date:dd/MM/yyyy}");
-                })));
+            DateTime yesterday = today.AddDays(-1);
+            ManifestDateOptions = new ObservableCollection<ManifestDateOption>
+            {
+                new ManifestDateOption(null, "All"),
+                new ManifestDateOption(today, $"Today - {today:dd/MM/yyyy}"),
+                new ManifestDateOption(yesterday, $"Yesterday - {yesterday:dd/MM/yyyy}")
+            };
             SelectedManifestDate = ManifestDateOptions[0];
 
             AvailableLocales = new ObservableCollection<LocaleOption>
