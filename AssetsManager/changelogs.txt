@@ -88,7 +88,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
-  - Hash Guessing Lab / GAME WAD grep now resolves modern champion skin submeshes, materials, and augment border textures from BIN metadata.
+  - Hash Guessing Lab now resolves modern champion skin submeshes, materials, and loadscreen augment borders.
   - Hash Guessing Lab results table header now maintains theme consistency without visual artifacts during window resizing.
   - Hash Guessing Lab removes an unused GAME vocabulary scan path.
   - GAME Custom basename attacks now share the standard exhaustive substitution engine without truncating source paths.

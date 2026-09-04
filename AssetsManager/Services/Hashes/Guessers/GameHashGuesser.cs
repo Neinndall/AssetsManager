@@ -696,6 +696,14 @@ namespace AssetsManager.Services.Hashes.Guessers
                 checkedCount += CheckCharacterPaths(
                     Enumerable.Range(0, nskins).Select(skin =>
                         $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_tx_cm.tex"));
+                checkedCount += CheckCharacterPaths(
+                    from skin in Enumerable.Range(0, nskins)
+                    from tier in new[] { "starter", "signature", "premium", "base" }
+                    select $"assets/characters/{character}/skins/skin{skin:D2}/ui/{character}_skin{skin:D2}_loadscreen_augments_border_{tier}.tex");
+                checkedCount += CheckCharacterPaths(
+                    from skin in Enumerable.Range(1, 9)
+                    from tier in new[] { "starter", "signature", "premium", "base" }
+                    select $"assets/characters/{character}/skins/skin{skin}/ui/{character}_skin{skin}_loadscreen_augments_border_{tier}.tex");
                 if (character.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
                 {
                     checkedCount += CheckCharacterPaths(
@@ -2292,8 +2300,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             var submeshesBySkin = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            string detectedChamp = null;
-            string detectedSkin = null;
 
             foreach (BinTreeObject obj in tree.Objects.Values)
             {
@@ -2323,10 +2329,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                         Match m = SkinPathRegex.Match(refSkin.Replace('\\', '/'));
                         if (m.Success)
                         {
-                            detectedChamp = m.Groups["champ"].Value.ToLowerInvariant();
-                            detectedSkin = m.Groups["skin"].Value.ToLowerInvariant();
-                            if (!submeshesBySkin.TryGetValue(detectedSkin, out var smSet))
-                                submeshesBySkin[detectedSkin] = smSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            string sKey = m.Groups["skin"].Value.ToLowerInvariant();
+                            if (!submeshesBySkin.TryGetValue(sKey, out var smSet))
+                                submeshesBySkin[sKey] = smSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                             if (meshStruct.Properties.TryGetValue(0x2d7b4ab4, out BinTreeProperty smListProp) &&
                                 smListProp is BinTreeString smListStr)
@@ -2627,64 +2632,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                             {
                                 Check(engine, c3, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
                                 break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Scan Augment Borders (0x38eee8e5)
-            foreach (BinTreeObject obj in tree.Objects.Values)
-            {
-                if (obj.ClassHash != 0x38eee8e5 || engine.RemainingUnknownCount == 0) continue;
-
-                ulong borderLink = 0;
-                if (obj.Properties.TryGetValue(0x1f523237, out BinTreeProperty pBorder) &&
-                    pBorder is BinTreeStruct sBorder &&
-                    sBorder.Properties.TryGetValue(0xe7b947a0, out BinTreeProperty pLk) &&
-                    pLk is BinTreeWadChunkLink lk)
-                {
-                    borderLink = lk.Value;
-                }
-
-                if (borderLink != 0 && engine.UnknownHashes.Contains(borderLink))
-                {
-                    string tier = null;
-                    if (obj.Properties.TryGetValue(0x242ed7dc, out BinTreeProperty pTier) &&
-                        pTier is BinTreeStruct sTier &&
-                        sTier.Properties.TryGetValue(0x13bddc7b, out BinTreeProperty pCode) &&
-                        pCode is BinTreeU32 uCode)
-                    {
-                        tier = uCode.Value switch
-                        {
-                            0xeabc => "starter",
-                            0xeabd => "signature",
-                            0xeabe => "premium",
-                            _ => null
-                        };
-                    }
-
-                    string[] candidateTiers = tier != null
-                        ? new[] { tier }
-                        : new[] { "starter", "signature", "premium", "base" };
-
-                    var candidateSkins = submeshesBySkin.Keys.Count > 0
-                        ? submeshesBySkin.Keys.ToList()
-                        : (!string.IsNullOrEmpty(detectedSkin) ? new List<string> { detectedSkin } : new List<string>());
-
-                    if (!string.IsNullOrEmpty(detectedChamp))
-                    {
-                        foreach (string sKey in candidateSkins)
-                        {
-                            if (!engine.UnknownHashes.Contains(borderLink)) break;
-                            foreach (string t in candidateTiers)
-                            {
-                                string c = $"assets/characters/{detectedChamp}/skins/{sKey}/ui/{detectedChamp}_{sKey}_loadscreen_augments_border_{t}.tex";
-                                if (XxHash64Ext.Hash(c) == borderLink)
-                                {
-                                    Check(engine, c, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                                    break;
-                                }
                             }
                         }
                     }
