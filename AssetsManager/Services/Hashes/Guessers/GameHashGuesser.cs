@@ -2307,26 +2307,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CollectChunkLinks(matProp, targetTexHashes);
                 }
 
-                ulong targetAvatarHash = 0;
-                if (obj.Properties.TryGetValue(0x089aff69, out BinTreeProperty avProp) &&
-                    avProp is BinTreeWadChunkLink avLink)
-                {
-                    targetAvatarHash = avLink.Value;
-                }
-
-                var loadscreenHashes = new List<ulong>();
-                foreach (uint loadPropId in new[] { 0x97f7188d, 0xbc8eefad })
-                {
-                    if (obj.Properties.TryGetValue(loadPropId, out BinTreeProperty loadEmb) &&
-                        loadEmb is BinTreeStruct loadStruct &&
-                        loadStruct.Properties.TryGetValue(0xb35135fa, out BinTreeProperty lsProp) &&
-                        lsProp is BinTreeWadChunkLink lsLink &&
-                        lsLink.Value != 0)
-                    {
-                        loadscreenHashes.Add(lsLink.Value);
-                    }
-                }
-
                 string skinName = null;
                 if (obj.Properties.TryGetValue(0x2d78c328, out BinTreeProperty nameProp) &&
                     nameProp is BinTreeString nameStr)
@@ -2335,6 +2315,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 string refPath = !string.IsNullOrEmpty(simpleSkin) ? simpleSkin : skeleton;
+
                 if (string.IsNullOrEmpty(refPath)) continue;
 
                 refPath = refPath.Replace('\\', '/').ToLowerInvariant();
@@ -2399,34 +2380,13 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                     foreach (string ca in champAliases)
                     {
-                        candidateStems.Add($"{ca}_base");
-                        candidateStems.Add($"{ca}_classic");
-                        candidateStems.Add($"{ca}_tx");
-                        candidateStems.Add($"{ca}_v2");
                         candidateStems.Add(ca);
-                        candidateStems.Add($"jade_{ca}_base");
-                        candidateStems.Add($"jade_{ca}_classic");
-
-                        string skinFolder = champMatch.Success ? champMatch.Groups["skin"].Value.ToLowerInvariant() : "";
-                        if (!string.IsNullOrEmpty(skinFolder))
-                        {
-                            candidateStems.Add($"{ca}_{skinFolder}");
-                            candidateStems.Add($"jade_{ca}_{skinFolder}");
-                            Match numM = Regex.Match(skinFolder, @"\d+");
-                            if (numM.Success)
-                            {
-                                string numVal = numM.Value;
-                                string sPad = numVal.Length == 1 ? $"skin0{numVal}" : $"skin{numVal}";
-                                candidateStems.Add($"{ca}_{sPad}");
-                                candidateStems.Add($"jade_{ca}_{sPad}");
-                                candidateStems.Add($"{ca}_skin{numVal}");
-                                candidateStems.Add($"jade_{ca}_skin{numVal}");
-                            }
-                        }
+                        candidateStems.Add($"{ca}_tx");
                     }
                 }
 
                 if (!string.IsNullOrEmpty(skinName))
+
                 {
                     string cleanName = skinName.ToLowerInvariant();
                     candidateStems.Add(cleanName);
@@ -2517,63 +2477,11 @@ namespace AssetsManager.Services.Hashes.Guessers
                         }
                     }
                 }
-
-                if (champMatch.Success)
-                {
-                    string skinFolder = champMatch.Groups["skin"].Value.ToLowerInvariant();
-                    string skinNum = champMatch.Groups["num"].Success ? champMatch.Groups["num"].Value : "0";
-
-                    if (targetAvatarHash != 0 && engine.UnknownHashes.Contains(targetAvatarHash))
-                    {
-                        string[] avatarCandidates =
-                        {
-                            $"assets/characters/{champ}/hud/{champ}_circle_{skinNum}.tex",
-                            $"assets/characters/{cleanChamp}/hud/{cleanChamp}_circle_{skinNum}.tex",
-                            $"assets/characters/{champ}/hud/{champ}_square_{skinNum}.tex",
-                            $"assets/characters/{cleanChamp}/hud/{cleanChamp}_square_{skinNum}.tex",
-                            $"assets/characters/{champ}/hud/{champ}_circle.tex",
-                            $"assets/characters/{cleanChamp}/hud/{cleanChamp}_circle.tex",
-                            $"assets/characters/{champ}/hud/{champ}_circle_0.tex",
-                            $"assets/characters/{cleanChamp}/hud/{cleanChamp}_circle_0.tex"
-                        };
-                        foreach (string avPath in avatarCandidates)
-                        {
-                            if (XxHash64Ext.Hash(avPath) == targetAvatarHash)
-                            {
-                                Check(engine, avPath, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                                break;
-                            }
-                        }
-                    }
-
-                    foreach (ulong lsHash in loadscreenHashes)
-                    {
-                        if (lsHash != 0 && engine.UnknownHashes.Contains(lsHash))
-                        {
-                            string[] lsCandidates =
-                            {
-                                $"assets/characters/{champ}/skins/{skinFolder}/{champ}loadscreen_{skinNum}.tex",
-                                $"assets/characters/{cleanChamp}/skins/{skinFolder}/{cleanChamp}loadscreen_{skinNum}.tex",
-                                $"assets/characters/{champ}/skins/{skinFolder}/{champ}loadscreen_{skinNum}_le.tex",
-                                $"assets/characters/{cleanChamp}/skins/{skinFolder}/{cleanChamp}loadscreen_{skinNum}_le.tex",
-                                $"assets/characters/{champ}/skins/{skinFolder}/{champ}_loadscreen_{skinNum}.tex",
-                                $"assets/characters/{cleanChamp}/skins/{skinFolder}/{cleanChamp}_loadscreen_{skinNum}.tex"
-                            };
-                            foreach (string lsPath in lsCandidates)
-                            {
-                                if (XxHash64Ext.Hash(lsPath) == lsHash)
-                                {
-                                    Check(engine, lsPath, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
 
         internal int GuessRegaliaAssets(
+
             HashGuessEngine engine,
             CancellationToken cancellationToken,
             Action<int> progress = null)
