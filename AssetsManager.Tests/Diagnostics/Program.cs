@@ -90,6 +90,11 @@ namespace AssetsManager.Tests.Diagnostics
                 GameChunkLinkInspectorDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "bin-dump", StringComparison.OrdinalIgnoreCase))
+            {
+                await BinDumpDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "quick-hash-check", StringComparison.OrdinalIgnoreCase))
             {
                 QuickHashCheck.Run(args.Skip(1).ToArray());

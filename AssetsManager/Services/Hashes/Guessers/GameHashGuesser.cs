@@ -59,7 +59,9 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly string[] MaterialTextureSuffixes =
         {
             "_tx_cm.tex", "_mask_tx_cm.tex", "_matcap.tex", "_mask.tex", "_scroll.tex",
-            ".tex", "_tx.tex", "_tx_cm.dds", "_mask.dds", "_matcap.dds"
+            ".tex", "_tx.tex", "_tx_cm.dds", "_mask.dds", "_matcap.dds",
+            "_additivescroll_mask.tex", "_additivescroll.tex", "_scroll_mask.tex",
+            "_pattern_mask.tex", "_empowered_tx_cm.tex", "_empowered_matcap.tex"
         };
 
 
@@ -2266,6 +2268,30 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
+        private static void HarvestSubmeshTokens(string text, HashSet<string> smSet)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return;
+            foreach (string sm in text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                string smLow = sm.ToLowerInvariant();
+                if (smLow.Length >= 3)
+                {
+                    smSet.Add(smLow);
+                    string[] parts = smLow.Split('_', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 1)
+                    {
+                        for (int i = 1; i < parts.Length; i++)
+                            smSet.Add(string.Join('_', parts.Take(i)));
+                        foreach (string part in parts)
+                        {
+                            if (part.Length >= 3 && part != "top" && part != "low" && part != "bot")
+                                smSet.Add(part);
+                        }
+                    }
+                }
+            }
+        }
+
         private void GuessSkinCharacterBinChunkLinks(
             HashGuessEngine engine,
             ArraySegment<byte> data,
@@ -2338,7 +2364,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     string simpleSkin = null;
                     string skeleton = null;
 
-                    if (obj.Properties.TryGetValue(0x45ff5904, out BinTreeProperty meshProp) &&
+                    if ((obj.Properties.TryGetValue(0x45ff5904, out BinTreeProperty meshProp) ||
+                         obj.Properties.TryGetValue(0x5337242d, out meshProp)) &&
                         meshProp is BinTreeStruct meshStruct)
                     {
                         CollectChunkLinks(meshStruct, targetTexHashes);
@@ -2363,27 +2390,23 @@ namespace AssetsManager.Services.Hashes.Guessers
                                 if (!submeshesBySkin.TryGetValue(sKey, out var smSet))
                                     submeshesBySkin[sKey] = smSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                                // Harvest submeshes from all space-separated strings in meshStruct (submeshList, initialSubmeshToHide, etc.)
+                                // Harvest submeshes from strings and override containers (submeshRenderOrder, materialOverride, etc.)
                                 foreach (BinTreeProperty p in meshStruct.Properties.Values)
                                 {
-                                    if (p is BinTreeString sVal && !string.IsNullOrWhiteSpace(sVal.Value))
+                                    if (p is BinTreeString sVal)
                                     {
-                                        foreach (string sm in sVal.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                        HarvestSubmeshTokens(sVal.Value, smSet);
+                                    }
+                                    else if (p is BinTreeContainer container)
+                                    {
+                                        foreach (BinTreeProperty elem in container.Elements)
                                         {
-                                            string smLow = sm.ToLowerInvariant();
-                                            if (smLow.Length >= 3)
+                                            if (elem is BinTreeStruct elemStruct)
                                             {
-                                                smSet.Add(smLow);
-                                                string[] parts = smLow.Split('_', StringSplitOptions.RemoveEmptyEntries);
-                                                if (parts.Length > 1)
+                                                foreach (BinTreeProperty ep in elemStruct.Properties.Values)
                                                 {
-                                                    for (int i = 1; i < parts.Length; i++)
-                                                        smSet.Add(string.Join('_', parts.Take(i)));
-                                                    foreach (string part in parts)
-                                                    {
-                                                        if (part.Length >= 3 && part != "top" && part != "low")
-                                                            smSet.Add(part);
-                                                    }
+                                                    if (ep is BinTreeString subStr)
+                                                        HarvestSubmeshTokens(subStr.Value, smSet);
                                                 }
                                             }
                                         }
@@ -2393,12 +2416,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                         }
                     }
 
-                    if (obj.Properties.TryGetValue(0xa24d4513, out BinTreeProperty baseTexProp))
-                        CollectChunkLinks(baseTexProp, targetTexHashes);
-                    if (obj.Properties.TryGetValue(0x3c6468f4, out BinTreeProperty rootTexProp))
-                        CollectChunkLinks(rootTexProp, targetTexHashes);
-                    if (obj.Properties.TryGetValue(0x8979bca4, out BinTreeProperty matProp))
-                        CollectChunkLinks(matProp, targetTexHashes);
+                    foreach (BinTreeProperty p in obj.Properties.Values)
+                        CollectChunkLinks(p, targetTexHashes);
 
                     if (targetTexHashes.Count > 0)
                     {
@@ -2485,6 +2504,22 @@ namespace AssetsManager.Services.Hashes.Guessers
                         stems.Add(pfx + "_f2");
                         stems.Add(pfx + "_f3");
                         stems.Add(pfx + "_f4");
+                        stems.Add(pfx + "_f2_f3");
+                        stems.Add(pfx + "_f1_f2");
+                        stems.Add(pfx + "_empowered");
+                        stems.Add(pfx + "_reset");
+                        stems.Add("empowered_" + pfx);
+                    }
+                    else
+                    {
+                        stems.Add(st + "_empowered");
+                        stems.Add(st + "_reset");
+                        stems.Add(st + "_f1");
+                        stems.Add(st + "_f2");
+                        stems.Add(st + "_f3");
+                        stems.Add(st + "_f2_f3");
+                        stems.Add(st + "_f1_f2");
+                        stems.Add("empowered_" + st);
                     }
                 }
 

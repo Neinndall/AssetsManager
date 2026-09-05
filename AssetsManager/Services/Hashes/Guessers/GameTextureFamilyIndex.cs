@@ -76,7 +76,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (var obj in tree.Objects.Values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (obj.ClassHash != 0xff9d3409 && obj.ClassHash != 0x9b67e9f6) continue;
+                if (obj.ClassHash != 0xff9d3409 && obj.ClassHash != 0x9b67e9f6 && obj.ClassHash != 0x27dd6361) continue;
                 foreach (var property in obj.Properties.Values.SelectMany(Enumerate))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -93,8 +93,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (var obj in tree.Objects.Values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                // Texture context must come from a material or skin definition.
-                if (obj.ClassHash != 0xff9d3409 && obj.ClassHash != 0x9b67e9f6) continue;
+                // Texture context must come from a material, skin or gear definition.
+                if (obj.ClassHash != 0xff9d3409 && obj.ClassHash != 0x9b67e9f6 && obj.ClassHash != 0x27dd6361) continue;
                 var localDirectories = new HashSet<string>(StringComparer.Ordinal);
                 bool localUnknown = false;
                 foreach (var property in obj.Properties.Values.SelectMany(Enumerate))
