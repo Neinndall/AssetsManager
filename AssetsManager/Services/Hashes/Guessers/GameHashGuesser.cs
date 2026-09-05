@@ -58,10 +58,13 @@ namespace AssetsManager.Services.Hashes.Guessers
         };
         private static readonly string[] MaterialTextureSuffixes =
         {
-            "_tx_cm.tex", "_mask_tx_cm.tex", "_matcap.tex", "_mask.tex", "_scroll.tex",
-            ".tex", "_tx.tex", "_tx_cm.dds", "_mask.dds", "_matcap.dds",
-            "_additivescroll_mask.tex", "_additivescroll.tex", "_scroll_mask.tex",
-            "_pattern_mask.tex", "_empowered_tx_cm.tex", "_empowered_matcap.tex"
+            "_tx_cm.tex", "_tx.tex", ".tex",
+            "_tx_cm.dds", "_tx.dds", ".dds"
+        };
+
+        private static readonly string[] MaterialRoleDescriptors =
+        {
+            "", "_mask", "_scroll", "_scrollmask", "_flowmap", "_matcap", "_pattern", "_additivescroll"
         };
 
 
@@ -2537,25 +2540,29 @@ namespace AssetsManager.Services.Hashes.Guessers
                     foreach (string st in stems)
                     {
                         if (!engine.UnknownHashes.Contains(unk)) break;
-                        foreach (string suf in MaterialTextureSuffixes)
+                        foreach (string desc in MaterialRoleDescriptors)
                         {
-                            string c1 = $"{baseDir}{mChamp}_{mSkin}_{st}{suf}";
-                            if (XxHash64Ext.Hash(c1) == unk)
+                            if (!engine.UnknownHashes.Contains(unk)) break;
+                            foreach (string suf in MaterialTextureSuffixes)
                             {
-                                Check(engine, c1, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                                break;
-                            }
-                            string c2 = $"{baseDir}{mChamp}_{st}{suf}";
-                            if (XxHash64Ext.Hash(c2) == unk)
-                            {
-                                Check(engine, c2, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                                break;
-                            }
-                            string c3 = $"{baseDir}{st}{suf}";
-                            if (XxHash64Ext.Hash(c3) == unk)
-                            {
-                                Check(engine, c3, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                                break;
+                                string c1 = $"{baseDir}{mChamp}_{mSkin}_{st}{desc}{suf}";
+                                if (XxHash64Ext.Hash(c1) == unk)
+                                {
+                                    Check(engine, c1, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                                    break;
+                                }
+                                string c2 = $"{baseDir}{mChamp}_{st}{desc}{suf}";
+                                if (XxHash64Ext.Hash(c2) == unk)
+                                {
+                                    Check(engine, c2, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                                    break;
+                                }
+                                string c3 = $"{baseDir}{st}{desc}{suf}";
+                                if (XxHash64Ext.Hash(c3) == unk)
+                                {
+                                    Check(engine, c3, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                                    break;
+                                }
                             }
                         }
                     }
