@@ -1596,6 +1596,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             int progressOffset = 0) =>
             GuessSkinGroupsBinLocalAsync(engine, cancellationToken, progress, progressOffset);
 
+        internal override bool ShouldGrepExtension(string extension) =>
+            extension is not ("dds" or "jpg" or "png" or "tga" or "ttf" or "otf" or "ogg" or "webm" or
+                "anm" or "skl" or "skn" or "scb" or "sco" or "troybin" or "bnk" or "wpk" or "tex");
+
         internal override void GrepWad(
             HashGuessEngine engine,
             ArraySegment<byte> data,
@@ -1634,8 +1638,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (engine.RemainingUnknownCount == 0) return;
 
             string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
-            if (extension is "dds" or "jpg" or "png" or "tga" or "ttf" or "otf" or "ogg" or "webm" or
-                "anm" or "skl" or "skn" or "scb" or "sco" or "troybin" or "bnk" or "wpk" or "tex")
+            if (!ShouldGrepExtension(extension))
             {
                 return; // don't grep filetypes known to not contain full paths
             }

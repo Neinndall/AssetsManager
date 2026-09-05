@@ -145,6 +145,9 @@ namespace AssetsManager.Services.Hashes
                             if (chunkExt.Length == 0 && inferredExtensions.TryGetValue(chunk.PathHash, out string cachedExtension))
                                 chunkExt = cachedExtension;
 
+                            if (_hashResolverService.IsKnownHash(chunk.PathHash) && chunkExt.Length > 0 && !guesser.ShouldGrepExtension(chunkExt))
+                                continue;
+
                             try
                             {
                                 using var dataOwner = wad.LoadChunkDecompressed(chunk);

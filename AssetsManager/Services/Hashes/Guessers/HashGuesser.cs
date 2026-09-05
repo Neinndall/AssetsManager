@@ -171,6 +171,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
+        internal virtual bool ShouldGrepExtension(string extension) => true;
+
         internal abstract IReadOnlyList<string> BuildWordlist();
         internal void GrepWad(
             HashGuessEngine engine,

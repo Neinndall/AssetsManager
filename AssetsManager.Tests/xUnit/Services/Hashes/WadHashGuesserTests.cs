@@ -151,6 +151,37 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(1, engine.RemainingUnknownCount);
         }
 
+        [Theory]
+        [InlineData("bin", true)]
+        [InlineData("inibin", true)]
+        [InlineData("json", true)]
+        [InlineData("manifest", true)]
+        [InlineData("dds", false)]
+        [InlineData("tex", false)]
+        [InlineData("anm", false)]
+        [InlineData("skn", false)]
+        [InlineData("wpk", false)]
+        [InlineData("bnk", false)]
+        public void GameGuesserDistinguishesGreppableExtensions(string extension, bool expected)
+        {
+            var game = new GameHashGuesser();
+            Assert.Equal(expected, game.ShouldGrepExtension(extension));
+        }
+
+        [Theory]
+        [InlineData("json", true)]
+        [InlineData("js", true)]
+        [InlineData("html", true)]
+        [InlineData("png", false)]
+        [InlineData("ogg", false)]
+        [InlineData("mp3", false)]
+        [InlineData("webm", false)]
+        public void LcuGuesserDistinguishesGreppableExtensions(string extension, bool expected)
+        {
+            var lcu = new LcuHashGuesser(Array.Empty<string>(), null);
+            Assert.Equal(expected, lcu.ShouldGrepExtension(extension));
+        }
+
         [Fact]
         public void EngineTelemetryCountsCheckedAndDiscardedCandidates()
         {

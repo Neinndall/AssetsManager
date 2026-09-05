@@ -840,6 +840,11 @@ namespace AssetsManager.Services.Hashes.Guessers
                 source: "Generated numeric variant",
                 progress: progress);
 
+        internal override bool ShouldGrepExtension(string extension) =>
+            extension is not ("png" or "jpg" or "jpeg" or "webp" or "gif" or "svg" or "ico" or
+                "ttf" or "otf" or "woff" or "woff2" or "eot" or
+                "ogg" or "mp3" or "wav" or "webm" or "mp4" or "dds" or "tga");
+
         internal override void GrepWad(
             HashGuessEngine engine,
             ArraySegment<byte> data,
@@ -850,9 +855,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             cancellationToken.ThrowIfCancellationRequested();
             string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
-            if (extension is "png" or "jpg" or "jpeg" or "webp" or "gif" or "svg" or "ico" or
-                "ttf" or "otf" or "woff" or "woff2" or "eot" or
-                "ogg" or "mp3" or "wav" or "webm" or "mp4" or "dds" or "tga")
+            if (!ShouldGrepExtension(extension))
             {
                 return;
             }
