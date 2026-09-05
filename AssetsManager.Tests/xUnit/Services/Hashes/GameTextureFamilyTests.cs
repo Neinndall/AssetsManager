@@ -97,6 +97,22 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(Target, Assert.Single(engine.Matches).Value.Path);
         }
 
+        [Theory]
+        [InlineData(1)]
+        [InlineData(2)]
+        [InlineData(5)]
+        public void TextureBuildListChecksEntireBudgetAndReportsActualAttempts(long budget)
+        {
+            var index = new GameTextureFamilyIndex(Corpus, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { 42 });
+            long reported = -1;
+
+            long attempts = index.RunBuildList(engine, CancellationToken.None, budget, count => reported = count);
+
+            Assert.Equal(budget, engine.CheckedCandidates);
+            Assert.Equal(engine.CheckedCandidates, attempts);
+            Assert.Equal(attempts, reported);
+        }
         [Fact]
         public void GameCustomAttacksResolvesTextureBuildListSubMethod()
         {

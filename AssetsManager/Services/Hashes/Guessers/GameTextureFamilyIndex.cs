@@ -197,7 +197,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     foreach (string prefix in _allPrefixes)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        if (engine.RemainingUnknownCount == 0 || ++checkedCandidates >= candidateBudget) break;
+                        if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) break;
 
                         engine.CheckPrefixSuffix(
                             prefix,
@@ -205,6 +205,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                             HashGuessStrategy.WordlistVariant,
                             "GAME Custom: texture build-list");
 
+                        checkedCandidates++;
                         if ((checkedCandidates & 0x3fff) == 0) progress?.Invoke(checkedCandidates);
                     }
                     if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) break;
