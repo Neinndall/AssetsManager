@@ -550,3 +550,4 @@ Bug Fixes
   - WAD Comparison / Unified the 'Ready' progress hold delay to 300ms across all file comparisons (3D meshes, text/data, textures, audio banks, and batch comparisons) for smooth visual transitions.
   - 3D Mesh Analyzer / Updated the viewport container background to use the SidebarBackground theme resource, matching the main Viewer.
   - 3D Mesh Analyzer / Synchronized camera framing to automatically focus and scale to loaded model bounds on open.
+  - 3D Mesh Analyzer / Cleaned up legacy WPF material allocations and streamlined topological overlay rendering.
