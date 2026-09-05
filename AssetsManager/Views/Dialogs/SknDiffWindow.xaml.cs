@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using System.Windows.Threading;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Utils;
@@ -79,56 +80,53 @@ namespace AssetsManager.Views.Dialogs
             OldViewport.Viewport3D.Camera.Changed += _oldCameraChangedHandler;
             NewViewport.Viewport3D.Camera.Changed += _newCameraChangedHandler;
 
-            // Initial focus on origin
-            Loaded += (s, e) => ResetCharacterCameras();
-
-            if (OldViewport.OpenTkControl != null)
-            {
-                OldViewport.OpenTkControl.Opacity = 0;
-            }
-            if (NewViewport.OpenTkControl != null)
-            {
-                NewViewport.OpenTkControl.Opacity = 0;
-            }
+            // Initial focus on origin and smooth loading handover
+            Loaded += SknDiffWindow_Loaded;
 
             CompositionTarget.Rendering += OnDiffRendering;
         }
 
-        private int _oldRenderedFrames = 0;
-        private int _newRenderedFrames = 0;
+        private async void SknDiffWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= SknDiffWindow_Loaded;
+            ResetCharacterCameras();
+
+            // 1. Wait for UI to process the initial rendering
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+
+            // 2. Smooth Handover: Take focus first, then close loader
+            this.Activate();
+            this.Focus();
+
+            if (LoadingWindow != null)
+            {
+                try { LoadingWindow.Close(); } catch { }
+                LoadingWindow = null;
+            }
+        }
 
         private void OnDiffRendering(object sender, EventArgs e)
         {
             if (OldViewport.OpenTkControl != null && OldViewport.OpenTkControl.IsLoaded)
             {
                 OldViewport.OpenTkControl.InvalidateVisual();
-                if (_oldRenderedFrames < 2 && OldViewport.OpenTkControl.Framebuffer > 0)
-                {
-                    _oldRenderedFrames++;
-                    if (_oldRenderedFrames >= 2)
-                    {
-                        OldViewport.OpenTkControl.Opacity = 1.0;
-                    }
-                }
             }
 
             if (NewViewport.OpenTkControl != null && NewViewport.OpenTkControl.IsLoaded)
             {
                 NewViewport.OpenTkControl.InvalidateVisual();
-                if (_newRenderedFrames < 2 && NewViewport.OpenTkControl.Framebuffer > 0)
-                {
-                    _newRenderedFrames++;
-                    if (_newRenderedFrames >= 2)
-                    {
-                        NewViewport.OpenTkControl.Opacity = 1.0;
-                    }
-                }
             }
         }
 
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
+
+            if (LoadingWindow != null)
+            {
+                try { LoadingWindow.Close(); } catch { }
+                LoadingWindow = null;
+            }
 
             CompositionTarget.Rendering -= OnDiffRendering;
 
@@ -251,7 +249,6 @@ namespace AssetsManager.Views.Dialogs
                 if (srcCam is PerspectiveCamera srcP && tgtCam is PerspectiveCamera tgtP)
                 {
                     tgtP.FieldOfView = srcP.FieldOfView;
-                    target.ViewModel.FieldOfView = srcP.FieldOfView;
                 }
                 else if (srcCam is OrthographicCamera srcO && tgtCam is OrthographicCamera tgtO)
                 {

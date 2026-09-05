@@ -331,9 +331,6 @@ namespace AssetsManager.Services.Core
             // [PROGRESS] 100% Reached before opening window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
             await Task.Delay(300);
-            
-            // Close loading window before ShowDialog to prevent it from staying open (ShowDialog is blocking)
-            loadingWindow.Close();
             sknDiffWindow.ShowDialog();
         }
 

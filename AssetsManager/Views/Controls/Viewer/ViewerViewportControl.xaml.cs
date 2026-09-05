@@ -381,7 +381,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private async void OnViewportLoaded(object sender, RoutedEventArgs e)
+        private void OnViewportLoaded(object sender, RoutedEventArgs e)
         {
             _isCleanedUp = false;
             if (AppSettings != null)
@@ -394,8 +394,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationServices.Clear();
             InitializeModelInteraction();
             _cameraController = new CustomCameraController(Viewport3D, CameraInputSurface);
-
-            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
             if (_isCleanedUp) return;
 

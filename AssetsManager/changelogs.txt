@@ -542,7 +542,7 @@ Bug Fixes
   - Fixed update checks failing with an error when release data is temporarily incomplete.
   - Fixed version verification freezing or running out of memory on corrupted manifests.
   - Fixed audio previews leaving background conversions running after switching files.
-  - Fixed 3D Mesh Analyzer displaying an uninitialized grey viewport upon opening by initializing the OpenGL surface at opacity 0 until the framebuffer is allocated and rendered.
+  - Fixed 3D Mesh Analyzer displaying empty viewports on opening with seamless Dispatcher render handover and no opacity transitions.
   - Fixed 3D Mesh Analyzer camera controls and viewport rendering freezing after the Silk.NET OpenGL migration by maintaining an active rendering loop.
   - Fixed 3D Mesh Analyzer single-model view incorrectly creating a combined scene and displaying a model badge on the empty viewport side.
   - Fixed 3D Mesh Analyzer Old Viewport badge displaying '2 models' in split mode instead of the loaded model filename.
