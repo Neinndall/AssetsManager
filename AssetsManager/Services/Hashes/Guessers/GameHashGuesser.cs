@@ -429,6 +429,21 @@ namespace AssetsManager.Services.Hashes.Guessers
                         "GAME Custom: animation actions build-list",
                         (int)Math.Min(int.MaxValue, progressOffset + count))));
                 checkedCandidates = (int)Math.Min(int.MaxValue, checkedCandidates + animationCheckedCandidates);
+                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            }
+
+            if (ShouldRun("game-custom-textures"))
+            {
+                progress?.Report(engine.CreateProgress(
+                    "GAME Custom: texture build-list", checkedCandidates));
+                int progressOffset = checkedCandidates;
+                long textureCheckedCandidates = SubstituteTextureBuildListWords(
+                    engine,
+                    cancellationToken,
+                    progress: count => progress?.Report(engine.CreateProgress(
+                        "GAME Custom: texture build-list",
+                        (int)Math.Min(int.MaxValue, progressOffset + count))));
+                checkedCandidates = (int)Math.Min(int.MaxValue, checkedCandidates + textureCheckedCandidates);
             }
 
             return checkedCandidates;
@@ -1625,7 +1640,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
                 var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (Match match in Regex.Matches(text, @"(?:ASSETS|DATA|Characters|Shaders|Maps|Gameplay|ClientStates|Patching|Loadouts)/"))
+                foreach (Match match in Regex.Matches(text, @"(?:ASSETS|DATA|Characters|Shaders|Maps|Gameplay|ClientStates|Patching|Loadouts)/", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     int offset = match.Index;
@@ -2952,6 +2967,22 @@ namespace AssetsManager.Services.Hashes.Guessers
                 while (length > 0 && char.IsDigit(head[length - 1])) length--;
                 return length == 0 ? string.Empty : head[..length].ToString().ToLowerInvariant();
             }
+        }
+
+        /// <summary>
+        /// Executes the learned skin texture build-list attack across all champion skin families
+        /// to discover unresolved material masks, flowmaps, and texture links.
+        /// </summary>
+        internal long SubstituteTextureBuildListWords(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            long candidateBudget = long.MaxValue,
+            Action<long> progress = null)
+        {
+            if (engine.RemainingUnknownCount == 0 || candidateBudget <= 0) return 0;
+
+            var familyIndex = Corpus.GetOrCreate("skin-texture-families", paths => new GameTextureFamilyIndex(paths, cancellationToken));
+            return familyIndex.RunBuildList(engine, cancellationToken, candidateBudget, progress);
         }
 
         private IReadOnlyDictionary<string, IReadOnlyList<string>> GetChampionSkinMap(CancellationToken cancellationToken)

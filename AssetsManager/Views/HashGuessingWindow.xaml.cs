@@ -170,6 +170,7 @@ namespace AssetsManager.Views
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-swordlist", Name = "SubstituteSwordlistBasenameWords", Description = "Full corpus basename words substitution matrix", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-shaders", Name = "SubstituteShaderVocabWords", Description = "Custom shader vocabulary and compound names", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-animations", Name = "SubstituteAnimationBuildListWords", Description = "Animation actions build-list (loop_in, tokens) across skins", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-textures", Name = "SubstituteTextureBuildListWords", Description = "Texture families build-list (masks, flowmaps, states) across skins", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             _allMethods.Add(gameCustom);
 
             // LCU (Domain 1)

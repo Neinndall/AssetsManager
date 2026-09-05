@@ -497,10 +497,12 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             AssertResolved(engine, expected);
         }
 
-        [Fact]
-        public void GameBinGrepExpandsCharacterAndLuaPaths()
+        [Theory]
+        [InlineData("Characters/Ahri/Spells/Test.lua")]
+        [InlineData("characters/ahri/spells/test.lua")]
+        [InlineData("cHaRaCtErS/Ahri/Spells/Test.lua")]
+        public void GameBinGrepExpandsCharacterAndLuaPaths(string source)
         {
-            const string source = "Characters/Ahri/Spells/Test.lua";
             const string expected = "assets/characters/ahri/spells/test.lua";
             byte[] path = Encoding.ASCII.GetBytes(source);
             byte[] data = new byte[path.Length + 2];

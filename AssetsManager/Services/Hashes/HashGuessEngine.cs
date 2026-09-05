@@ -57,6 +57,41 @@ namespace AssetsManager.Services.Hashes
             return true;
         }
 
+        /// <summary>
+        /// Evaluates a candidate formed by prefix and suffix spans with zero heap allocations on misses,
+        /// using a stack buffer for XXH64 hashing and materializing a string only upon a confirmed match.
+        /// </summary>
+        public bool CheckPrefixSuffix(
+            ReadOnlySpan<char> prefix,
+            ReadOnlySpan<char> suffix,
+            HashGuessStrategy strategy,
+            string source = "Generated",
+            ulong sourceChunkHash = 0)
+        {
+            CheckedCandidates++;
+            int totalLength = prefix.Length + suffix.Length;
+            if (totalLength == 0)
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            Span<char> buffer = totalLength <= 256 ? stackalloc char[totalLength] : new char[totalLength];
+            prefix.CopyTo(buffer);
+            suffix.CopyTo(buffer[prefix.Length..]);
+
+            ulong hash = XxHash64Ext.Hash(buffer);
+            if (!_unknownHashes.Contains(hash))
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            string path = buffer.ToString();
+            _AddKnown(hash, path, strategy, source, sourceChunkHash);
+            return true;
+        }
+
         internal bool CheckCombined(
             string directory,
             string relativePath,
