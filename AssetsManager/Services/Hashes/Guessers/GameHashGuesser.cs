@@ -2115,6 +2115,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 for (int i = 0; i < knownPaths.Count; i++)
                 {
                     string p = knownPaths[i];
+                    if (p.StartsWith("assets/loadouts/summoneremotes/", StringComparison.OrdinalIgnoreCase))
+                        candidates.Add(Regex.Replace(p, @"_(?:inventory|glow)\.(?:tex|dds)$", "_selector.tex", RegexOptions.IgnoreCase));
                     if (p.Contains("loadouts/regalia", StringComparison.OrdinalIgnoreCase))
                     {
                         Match match = regaliaRegex.Match(p);
@@ -2380,6 +2382,16 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
             }
 
+            string ResolveMeshPath(BinTreeProperty property)
+            {
+                if (property is BinTreeString text) return text.Value;
+                if (property is not BinTreeWadChunkLink link || link.Value == 0) return null;
+                if (engine.Matches.TryGetValue(link.Value, out var match)) return match.Path;
+                // Hashed mesh references still provide naming context when their paths are known.
+                var knownPaths = Corpus.GetOrCreate("known-hashes-dict", _ => HashFile.Load());
+                return knownPaths.TryGetValue(link.Value, out string path) ? path : null;
+            }
+
             var submeshesBySkin = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var skinObjects = new List<(BinTreeObject Obj, string SimpleSkin, string Skeleton, HashSet<ulong> Links)>();
             var materialObjects = new List<(string Champ, string Skin, string RawMat, HashSet<ulong> Links, HashSet<string> Descriptors)>();
@@ -2399,15 +2411,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                         meshProp is BinTreeStruct meshStruct)
                     {
                         CollectChunkLinks(meshStruct, targetTexHashes);
-                        if (meshStruct.Properties.TryGetValue(0xd6a00df6, out BinTreeProperty skinProp) &&
-                            skinProp is BinTreeString skinStr)
+                        if (meshStruct.Properties.TryGetValue(0xd6a00df6, out BinTreeProperty skinProp))
                         {
-                            simpleSkin = skinStr.Value;
+                            simpleSkin = ResolveMeshPath(skinProp);
                         }
-                        if (meshStruct.Properties.TryGetValue(0xb14c976e, out BinTreeProperty skelProp) &&
-                            skelProp is BinTreeString skelStr)
+                        if (meshStruct.Properties.TryGetValue(0xb14c976e, out BinTreeProperty skelProp))
                         {
-                            skeleton = skelStr.Value;
+                            skeleton = ResolveMeshPath(skelProp);
                         }
 
                         string refSkin = !string.IsNullOrEmpty(simpleSkin) ? simpleSkin : skeleton;
@@ -3026,8 +3036,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         }
 
         /// <summary>
-        /// Executes the learned skin texture build-list attack across all champion skin families
-        /// to discover unresolved material masks, flowmaps, and texture links.
+        /// Combines learned texture suffixes across skins, companion themes and map kitpieces.
         /// </summary>
         internal long SubstituteTextureBuildListWords(
             HashGuessEngine engine,
@@ -3426,11 +3435,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                          includeCommonPadding: false))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                string name = GetBasename(candidate.Path);
-                if (!attemptedNames.Add(name)) continue;
-                foreach (string path in MatchAnimationVariants(name, character, skin, remaining, DefaultPrefixModifiers, DefaultSuffixModifiers, includeThemeLayout))
-                    yield return path;
-                if (remaining.Count == 0) yield break;
+                foreach (string name in ExpandNumberedAnimationNames(GetBasename(candidate.Path)))
+                {
+                    if (!attemptedNames.Add(name)) continue;
+                    foreach (string path in MatchAnimationVariants(name, character, skin, remaining, DefaultPrefixModifiers, DefaultSuffixModifiers, includeThemeLayout))
+                        yield return path;
+                    if (remaining.Count == 0) yield break;
+                }
             }
         }
 
@@ -3520,7 +3531,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var knownAnimationPathRegex = new Regex(
-                @"^(?:assets|data)/characters/(?<character>[^/]+)/skins/(?<skin>[^/]+)/animations/[^/]+\.anm$",
+                @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:skins|themes)/(?<skin>[^/]+)/animations/[^/]+\.anm$",
                 RegexOptions.IgnoreCase);
             for (int pathIndex = 0; pathIndex < knownPaths.Count; pathIndex++)
             {
@@ -3641,6 +3652,17 @@ namespace AssetsManager.Services.Hashes.Guessers
                     }
                 }
             }
+        }
+
+        private static IEnumerable<string> ExpandNumberedAnimationNames(string name)
+        {
+            yield return name;
+            Match match = Regex.Match(name, @"^(?<stem>.*?)(?:_)?(?<number>\d+)\.anm$", RegexOptions.CultureInvariant);
+            if (!match.Success || !int.TryParse(match.Groups["number"].Value, out int number) || number > 99) yield break;
+            string stem = match.Groups["stem"].Value + number.ToString("D2", CultureInfo.InvariantCulture);
+            yield return stem + ".anm";
+            yield return stem + "a.anm";
+            yield return stem + "b.anm";
         }
 
         private static IEnumerable<string> ExpandAnimationStemVariants(string stem)

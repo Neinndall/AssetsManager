@@ -14,7 +14,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 {
     internal sealed class GameTextureFamilyIndex
     {
-        private const int MaximumSuffixes = 8192;
+        private const int MaximumSuffixes = 11_000;
         private const int DirectoryCandidateBudget = 2_000_000;
         private readonly Dictionary<string, List<string>> _paths = new(StringComparer.Ordinal);
         private readonly Dictionary<ulong, string> _directories = new();
@@ -25,11 +25,14 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal GameTextureFamilyIndex(IEnumerable<string> paths, CancellationToken cancellationToken)
         {
             var frequencies = new Dictionary<string, int>(StringComparer.Ordinal);
+            var additionalFrequencies = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (string value in paths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string path = PathUtils.NormalizePath(value);
-                if (!TryGetSkinTextureDirectory(path, out string directory)) continue;
+                bool isSkin = TryGetSkinTextureDirectory(path, out string directory);
+                if (!isSkin && !TryGetAdditionalTextureDirectory(path, out directory)) continue;
+                var suffixFrequencies = isSkin ? frequencies : additionalFrequencies;
                 if (!_paths.TryGetValue(directory, out var family))
                     _paths[directory] = family = new List<string>();
                 family.Add(path);
@@ -43,13 +46,19 @@ namespace AssetsManager.Services.Hashes.Guessers
                     int separator = name.LastIndexOf('_', end - 1);
                     if (separator <= 0) break;
                     string suffix = name[(separator + 1)..];
-                    frequencies[suffix] = frequencies.GetValueOrDefault(suffix) + 1;
+                    suffixFrequencies[suffix] = suffixFrequencies.GetValueOrDefault(suffix) + 1;
                     end = separator;
                 }
             }
             _suffixes = frequencies.Where(pair => pair.Value >= 2)
                 .OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal)
-                .Take(MaximumSuffixes).Select(pair => pair.Key).ToArray();
+                .Take(MaximumSuffixes).Select(pair => pair.Key)
+                .Concat(additionalFrequencies.Where(pair => pair.Value >= 2)
+                    .OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Take(MaximumSuffixes).Select(pair => pair.Key))
+                .Distinct(StringComparer.Ordinal)
+                .OrderByDescending(suffix => frequencies.GetValueOrDefault(suffix) + additionalFrequencies.GetValueOrDefault(suffix))
+                .ThenBy(suffix => suffix, StringComparer.Ordinal).ToArray();
 
             var allPrefixes = new HashSet<string>(StringComparer.Ordinal);
             foreach (var family in _paths.Values)
@@ -169,7 +178,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         }
 
         /// <summary>
-        /// Runs the learned texture build-list across all skin prefixes in frequency-ordered batches (round-robin),
+        /// Runs the learned texture build-list across texture families in frequency-ordered batches (round-robin),
         /// prioritizing high-probability suffixes across all champions before exhausting the candidate budget.
         /// </summary>
         internal long RunBuildList(
@@ -227,6 +236,23 @@ namespace AssetsManager.Services.Hashes.Guessers
             int skinEnd = path.IndexOf('/', characterEnd + "/skins/".Length);
             if (skinEnd < 0 || path.IndexOf('/', skinEnd + 1) >= 0) return false;
             directory = path[..skinEnd];
+            return true;
+        }
+
+        private static bool TryGetAdditionalTextureDirectory(string path, out string directory)
+        {
+            directory = null;
+            if (!(path.EndsWith(".tex", StringComparison.Ordinal) || path.EndsWith(".dds", StringComparison.Ordinal))) return false;
+            int separator = path.LastIndexOf('/');
+            if (path.StartsWith("assets/maps/kitpieces/", StringComparison.Ordinal) && path.Contains("/textures/", StringComparison.Ordinal))
+            {
+                directory = path[..separator];
+                return true;
+            }
+            if (!path.StartsWith("assets/characters/", StringComparison.Ordinal)) return false;
+            int themes = path.IndexOf("/themes/", "assets/characters/".Length, StringComparison.Ordinal);
+            if (themes < 0 || path.IndexOf('/', themes + "/themes/".Length) != separator) return false;
+            directory = path[..separator];
             return true;
         }
 

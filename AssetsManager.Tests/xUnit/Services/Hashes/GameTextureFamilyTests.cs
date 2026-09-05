@@ -113,6 +113,24 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(engine.CheckedCandidates, attempts);
             Assert.Equal(attempts, reported);
         }
+
+        [Theory]
+        [InlineData("assets/characters/petexample/themes/summer/petexample_summer")]
+        [InlineData("assets/maps/kitpieces/tft/set18/textures/example")]
+        public void TextureBuildListIncludesThemesAndMapKitpieces(string prefix)
+        {
+            string target = prefix + "_wall_a_tx.tex";
+            string[] paths =
+            {
+                prefix + "_floor_a_tx.tex",
+                "assets/maps/kitpieces/tft/set1/textures/teacher_wall_a_tx.tex",
+                "assets/maps/kitpieces/tft/set2/textures/teacher_wall_a_tx.tex"
+            };
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, paths));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+            guesser.SubstituteTextureBuildListWords(engine, CancellationToken.None);
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+        }
         [Fact]
         public void GameCustomAttacksResolvesTextureBuildListSubMethod()
         {

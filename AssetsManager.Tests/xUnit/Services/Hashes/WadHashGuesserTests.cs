@@ -2643,6 +2643,36 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(0, engine.RemainingUnknownCount);
         }
 
+        [Theory]
+        [InlineData("idle03a.anm")]
+        [InlineData("idle03b.anm")]
+        [InlineData("idle05.anm")]
+        public void GameAnimationBinExpandsPaddedNumberAndLetterVariants(string filename)
+        {
+            string expected = "assets/characters/example/skins/skin03/animations/" + filename;
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/example/skins/skin03/animations/idle_01.anm"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+            guesser.GrepWad(engine, CreateAnimationBin("unresolved_action", XxHash64Ext.Hash(expected)),
+                "data/characters/example/animations/skin3.bin", "example.wad.client", 123);
+            AssertResolved(engine, expected);
+        }
+
+        [Theory]
+        [InlineData("glow")]
+        [InlineData("inventory")]
+        public void GameRegaliaDerivesEmoteSelectors(string variant)
+        {
+            const string stem = "assets/loadouts/summoneremotes/events/example/123_example";
+            const string expected = stem + "_selector.tex";
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { stem + "_" + variant + ".tex" }));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+            guesser.GuessRegaliaAssets(engine, CancellationToken.None);
+            AssertResolved(engine, expected);
+        }
+
         private static byte[] CreateAnimationBin(string clipName, ulong pathHash)
         {
             var resource = new BinTreeStruct(
