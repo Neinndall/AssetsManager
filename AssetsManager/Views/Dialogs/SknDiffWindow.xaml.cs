@@ -191,34 +191,30 @@ namespace AssetsManager.Views.Dialogs
 
         private void ResetCharacterCameras()
         {
-            _isSyncing = true;
-            try
+            if (NewViewport != null && _newScene != null)
             {
-                if (NewViewport != null && _newScene != null)
+                NewViewport.ResetCamera(false);
+                if (OldViewport != null)
                 {
-                    NewViewport.ResetCamera(false);
-                    if (OldViewport != null)
+                    if (_oldScene != null)
                     {
-                        SyncCameras(NewViewport, OldViewport);
+                        OldViewport.ResetCamera(false);
                     }
-                }
-                else if (OldViewport != null && _oldScene != null)
-                {
-                    OldViewport.ResetCamera(false);
-                    if (NewViewport != null)
-                    {
-                        SyncCameras(OldViewport, NewViewport);
-                    }
-                }
-                else
-                {
-                    if (OldViewport != null) OldViewport.ResetCamera(false);
-                    if (NewViewport != null) NewViewport.ResetCamera(false);
+                    SyncCameras(NewViewport, OldViewport);
                 }
             }
-            finally
+            else if (OldViewport != null && _oldScene != null)
             {
-                _isSyncing = false;
+                OldViewport.ResetCamera(false);
+                if (NewViewport != null)
+                {
+                    SyncCameras(OldViewport, NewViewport);
+                }
+            }
+            else
+            {
+                if (OldViewport != null) OldViewport.ResetCamera(false);
+                if (NewViewport != null) NewViewport.ResetCamera(false);
             }
         }
 
@@ -253,9 +249,14 @@ namespace AssetsManager.Views.Dialogs
                 tgtCam.UpDirection = srcCam.UpDirection;
                 
                 if (srcCam is PerspectiveCamera srcP && tgtCam is PerspectiveCamera tgtP)
+                {
                     tgtP.FieldOfView = srcP.FieldOfView;
+                    target.ViewModel.FieldOfView = srcP.FieldOfView;
+                }
                 else if (srcCam is OrthographicCamera srcO && tgtCam is OrthographicCamera tgtO)
+                {
                     tgtO.Width = srcO.Width;
+                }
             }
             finally
             {
