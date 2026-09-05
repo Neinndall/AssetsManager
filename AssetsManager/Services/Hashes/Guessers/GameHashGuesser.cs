@@ -62,9 +62,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             "_tx_cm.dds", "_tx.dds", ".dds"
         };
 
-        private static readonly string[] MaterialRoleDescriptors =
+        private static readonly string[] CanonicalMaterialRoles =
         {
-            "", "_mask", "_scroll", "_scrollmask", "_flowmap", "_matcap", "_pattern", "_additivescroll"
+            "", "_mask", "_scroll", "_scrollmask", "_flowmap", "_matcap"
         };
 
 
@@ -2295,6 +2295,30 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
+        private static void HarvestRoleTokens(string text, HashSet<string> descriptors)
+        {
+            if (string.IsNullOrWhiteSpace(text) || text.Contains('/')) return;
+            string low = text.ToLowerInvariant().Replace("_texture", "").Replace("_tex", "");
+            if (low.Length >= 3)
+            {
+                descriptors.Add("_" + low);
+                string[] parts = low.Split('_', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 1)
+                {
+                    descriptors.Add("_" + string.Join("", parts));
+                    foreach (string part in parts)
+                    {
+                        if (part.Length >= 3 && part != "texture")
+                        {
+                            descriptors.Add("_" + part);
+                            if (part.EndsWith("scroll", StringComparison.Ordinal))
+                                descriptors.Add("_scrollmask");
+                        }
+                    }
+                }
+            }
+        }
+
         private void GuessSkinCharacterBinChunkLinks(
             HashGuessEngine engine,
             ArraySegment<byte> data,
@@ -2355,7 +2379,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             var submeshesBySkin = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var skinObjects = new List<(BinTreeObject Obj, string SimpleSkin, string Skeleton, HashSet<ulong> Links)>();
-            var materialObjects = new List<(string Champ, string Skin, string RawMat, HashSet<ulong> Links)>();
+            var materialObjects = new List<(string Champ, string Skin, string RawMat, HashSet<ulong> Links, HashSet<string> Descriptors)>();
             int totalUnresolved = 0;
 
             // Phase 1: Fast single-pass metadata harvest across all BIN objects
@@ -2453,7 +2477,26 @@ namespace AssetsManager.Services.Hashes.Guessers
                                 else if (rawMat.StartsWith(mChamp + "_", StringComparison.OrdinalIgnoreCase))
                                     rawMat = rawMat[(mChamp.Length + 1)..];
 
-                                materialObjects.Add((mChamp, mSkin, rawMat, matLinks));
+                                var descriptors = new HashSet<string>(CanonicalMaterialRoles, StringComparer.OrdinalIgnoreCase);
+                                foreach (BinTreeProperty p in obj.Properties.Values)
+                                {
+                                    if (p is BinTreeContainer container)
+                                    {
+                                        foreach (BinTreeProperty elem in container.Elements)
+                                        {
+                                            if (elem is BinTreeStruct samplerStruct)
+                                            {
+                                                foreach (BinTreeProperty sp in samplerStruct.Properties.Values)
+                                                {
+                                                    if (sp is BinTreeString sVal)
+                                                        HarvestRoleTokens(sVal.Value, descriptors);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                materialObjects.Add((mChamp, mSkin, rawMat, matLinks, descriptors));
                                 totalUnresolved += matLinks.Count;
                             }
                         }
@@ -2464,66 +2507,35 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (totalUnresolved == 0 || engine.RemainingUnknownCount == 0) return;
 
             // Phase 2: Resolve Modern Skin Materials (StaticMaterialDef)
-            foreach (var (mChamp, mSkin, rawMat, matLinks) in materialObjects)
+            foreach (var (mChamp, mSkin, rawMat, matLinks, matDescriptors) in materialObjects)
             {
                 if (engine.RemainingUnknownCount == 0) break;
 
-                var stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rawMat };
-                int under = rawMat.IndexOf('_');
-                if (under > 0) stems.Add(rawMat[..under]);
-
-                foreach (string tok in rawMat.Split('_', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                var baseStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rawMat };
+                if (rawMat.Contains('_'))
                 {
-                    if (tok.Length >= 3 && tok != "matcap" && tok != "inst" && tok != "mat")
-                    {
-                        stems.Add(tok);
-                        stems.Add(tok + "_mask");
-                        if (tok == "holographic" || tok == "holo")
-                        {
-                            stems.Add("holo");
-                            stems.Add("hologram");
-                            stems.Add("holomask");
-                            stems.Add("holoscroll");
-                        }
-                        else if (tok == "iridescent")
-                        {
-                            stems.Add("iridescentgradient");
-                            stems.Add("iridescenttex");
-                        }
-                    }
+                    foreach (string tok in rawMat.Split('_', StringSplitOptions.RemoveEmptyEntries))
+                        if (tok.Length >= 3 && tok != "matcap" && tok != "inst" && tok != "mat")
+                            baseStems.Add(tok);
                 }
 
                 if (submeshesBySkin.TryGetValue(mSkin, out var smList))
-                {
-                    foreach (string sm in smList) stems.Add(sm);
-                }
+                    baseStems.UnionWith(smList);
 
-                var expStems = stems.ToList();
-                foreach (string st in expStems)
+                var stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string baseSt in baseStems)
                 {
-                    if (st.EndsWith("_f1", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string pfx = st[..^3];
-                        stems.Add(pfx + "_f2");
-                        stems.Add(pfx + "_f3");
-                        stems.Add(pfx + "_f4");
-                        stems.Add(pfx + "_f2_f3");
-                        stems.Add(pfx + "_f1_f2");
-                        stems.Add(pfx + "_empowered");
-                        stems.Add(pfx + "_reset");
-                        stems.Add("empowered_" + pfx);
-                    }
-                    else
-                    {
-                        stems.Add(st + "_empowered");
-                        stems.Add(st + "_reset");
-                        stems.Add(st + "_f1");
-                        stems.Add(st + "_f2");
-                        stems.Add(st + "_f3");
-                        stems.Add(st + "_f2_f3");
-                        stems.Add(st + "_f1_f2");
-                        stems.Add("empowered_" + st);
-                    }
+                    string root = baseSt.EndsWith("_f1", StringComparison.OrdinalIgnoreCase) ? baseSt[..^3] : baseSt;
+                    stems.Add(root);
+                    stems.Add(root + "_f1");
+                    stems.Add(root + "_f2");
+                    stems.Add(root + "_f3");
+                    stems.Add(root + "_f4");
+                    stems.Add(root + "_f1_f2");
+                    stems.Add(root + "_f2_f3");
+                    stems.Add(root + "_empowered");
+                    stems.Add(root + "_reset");
+                    stems.Add("empowered_" + root);
                 }
 
                 string baseDir = $"assets/characters/{mChamp}/skins/{mSkin}/";
@@ -2535,12 +2547,11 @@ namespace AssetsManager.Services.Hashes.Guessers
                     Check(engine, $"{baseDir}{mChamp}_{mSkin}_tx_cm.tex", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
                     Check(engine, $"{baseDir}{mChamp}_{mSkin}_mask_tx_cm.tex", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
                     Check(engine, $"{baseDir}{mChamp}_{mSkin}_matcap.tex", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                    Check(engine, $"{baseDir}matcap_iridescent.tex", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
 
                     foreach (string st in stems)
                     {
                         if (!engine.UnknownHashes.Contains(unk)) break;
-                        foreach (string desc in MaterialRoleDescriptors)
+                        foreach (string desc in matDescriptors)
                         {
                             if (!engine.UnknownHashes.Contains(unk)) break;
                             foreach (string suf in MaterialTextureSuffixes)
