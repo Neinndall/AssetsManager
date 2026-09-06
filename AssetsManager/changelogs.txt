@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Guessing Lab / Accelerated basename word substitution across GAME and LCU with zero-allocation span hashing.
   - Hash Guessing Lab / Reduced shader vocabulary setup work while preserving the selected shader paths.
   - Hash Guessing Lab / GAME WAD Grep reuses Regalia hash lookups and animation path prefixes to reduce repeated work and temporary strings.
   - Hash Guessing Lab / Reduced temporary allocations in GAME Animation Build List while preserving its candidate coverage and limits.

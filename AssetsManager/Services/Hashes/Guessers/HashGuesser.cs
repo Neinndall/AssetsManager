@@ -605,31 +605,78 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
             if (candidateBudget == 0) return 0;
 
+            IReadOnlyList<string> wordsList = words.ToList();
+            if (wordsList.Count == 0) return 0;
+
+            if (newWordCount == 1)
+            {
+                var formats1 = BuildBasenameWordFormats(paths, oldWordCount, 1)
+                    .Select(f => (
+                        Prefix: PathUtils.NormalizePath(f.Prefix),
+                        Suffix: PathUtils.NormalizePath(f.Suffix),
+                        Key: f.Prefix + "%s" + f.Suffix))
+                    .OrderBy(f => f.Key, StringComparer.Ordinal)
+                    .ToList();
+
+                if (formats1.Count == 0) return 0;
+
+                IReadOnlyList<string> normalizedWords = wordsList
+                    .Select(PathUtils.NormalizePath)
+                    .ToList();
+
+                long checkedCount = 0;
+                foreach (var format in ProgressIterator(formats1, f => f.Key, cancellationToken))
+                {
+                    int remaining = candidateBudget == int.MaxValue
+                        ? int.MaxValue
+                        : (int)Math.Max(0, candidateBudget - checkedCount);
+                    if (remaining <= 0) return (int)Math.Min(int.MaxValue, checkedCount);
+
+                    int wordsToTake = Math.Min(remaining, normalizedWords.Count);
+                    for (int i = 0; i < wordsToTake; i++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        engine.CheckNormalizedParts(format.Prefix, normalizedWords[i], format.Suffix, strategy, source);
+                        checkedCount++;
+                        if (engine.RemainingUnknownCount == 0)
+                        {
+                            int earlyReported = (int)Math.Min(int.MaxValue, checkedCount);
+                            progress?.Invoke(earlyReported);
+                            return earlyReported;
+                        }
+                    }
+
+                    int reportedCount = (int)Math.Min(int.MaxValue, checkedCount);
+                    progress?.Invoke(reportedCount);
+                    if (engine.RemainingUnknownCount == 0) return reportedCount;
+                }
+                return (int)Math.Min(int.MaxValue, checkedCount);
+            }
+
             IReadOnlyList<string> formats = BuildBasenameWordFormats(paths, oldWordCount, newWordCount)
                 .SelectMany(format => (newWordCount == 1 ? new[] { string.Empty } : new[] { "-", "_" })
                     .Select(separator => BuildBasenameWordFormat(format.Prefix, format.Suffix, separator, newWordCount)))
                 .OrderBy(format => format, StringComparer.Ordinal)
                 .ToList();
-            IReadOnlyList<string> wordsList = words.ToList();
-            if (formats.Count == 0 || wordsList.Count == 0) return 0;
+            if (formats.Count == 0) return 0;
 
-            long checkedCount = 0;
+            long checkedCountMulti = 0;
             foreach (string format in ProgressIterator(formats, format => format, cancellationToken))
             {
                 int remaining = candidateBudget == int.MaxValue
                     ? int.MaxValue
-                    : (int)Math.Max(0, candidateBudget - checkedCount);
-                if (remaining <= 0) return (int)Math.Min(int.MaxValue, checkedCount);
+                    : (int)Math.Max(0, candidateBudget - checkedCountMulti);
+                if (remaining <= 0) return (int)Math.Min(int.MaxValue, checkedCountMulti);
 
                 IEnumerable<string> candidates = EnumerateBasenameWordCandidates(format, wordsList, newWordCount, cancellationToken);
                 if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
 
-                checkedCount += CheckIter(engine, candidates, strategy, source);
-                int reportedCount = (int)Math.Min(int.MaxValue, checkedCount);
+                checkedCountMulti += CheckIter(engine, candidates, strategy, source);
+                int reportedCount = (int)Math.Min(int.MaxValue, checkedCountMulti);
                 progress?.Invoke(reportedCount);
                 if (engine.RemainingUnknownCount == 0) return reportedCount;
             }
-            return (int)Math.Min(int.MaxValue, checkedCount);
+            return (int)Math.Min(int.MaxValue, checkedCountMulti);
         }
 
         internal static IReadOnlyList<string> BuildWordAdditionFormats(IEnumerable<string> paths)

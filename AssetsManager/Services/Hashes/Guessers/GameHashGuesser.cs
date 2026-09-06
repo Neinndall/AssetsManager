@@ -189,13 +189,16 @@ namespace AssetsManager.Services.Hashes.Guessers
             IReadOnlyList<string> binPaths = GetCustomBinPaths(dataOnly: false);
             IReadOnlyList<string> binWordlist = GetCustomUnifiedBinWords();
 
-            return SubstituteBasenameWordlist(
+            return _SubstituteBasenameWords(
                 engine,
                 binPaths,
                 binWordlist,
+                oldWordCount: 1,
+                newWordCount: 1,
                 cancellationToken,
+                candidateBudget: int.MaxValue,
                 source: "GAME Custom: BIN basename wordlist",
-                progress);
+                progress: progress);
         }
 
         internal int SubstituteDataBinBasenameWords(
@@ -216,13 +219,16 @@ namespace AssetsManager.Services.Hashes.Guessers
             string[] remainingWords = dataWordlist.ToArray();
             if (remainingWords.Length == 0) return 0;
 
-            return SubstituteBasenameWordlist(
+            return _SubstituteBasenameWords(
                 engine,
                 dataPaths,
                 remainingWords,
+                oldWordCount: 1,
+                newWordCount: 1,
                 cancellationToken,
+                candidateBudget: int.MaxValue,
                 source: "GAME Custom: data BIN basename wordlist",
-                progress);
+                progress: progress);
         }
 
         private IReadOnlyList<string> GetCustomBinPaths(bool dataOnly) =>
@@ -245,42 +251,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                     .Distinct(StringComparer.Ordinal)
                     .ToList();
             });
-
-        private int SubstituteBasenameWordlist(
-            HashGuessEngine engine,
-            IReadOnlyList<string> paths,
-            IReadOnlyList<string> wordList,
-            CancellationToken cancellationToken,
-            string source,
-            Action<int> progress = null)
-        {
-            if (engine.RemainingUnknownCount == 0 || paths.Count == 0 || wordList.Count == 0) return 0;
-
-            IReadOnlyList<(string Prefix, string Suffix)> formats = Corpus.GetOrCreate(
-                $"basename-word-formats/{paths.Count}/{paths.FirstOrDefault()}",
-                _ => BuildBasenameWordFormats(paths, oldWordCount: 1, newWordCount: 1));
-
-            long checkedCount = 0;
-            int progressInterval = 0;
-            foreach ((string prefix, string suffix) in formats)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                foreach (string word in wordList)
-                {
-                    engine.CheckNormalizedParts(prefix, word, suffix,
-                        HashGuessStrategy.WordlistVariant, source);
-                    checkedCount++;
-                    if (engine.RemainingUnknownCount == 0) break;
-                }
-
-                if ((++progressInterval & 0x7f) == 0)
-                    progress?.Invoke((int)Math.Min(int.MaxValue, checkedCount));
-                if (engine.RemainingUnknownCount == 0) break;
-            }
-
-            progress?.Invoke((int)Math.Min(int.MaxValue, checkedCount));
-            return (int)Math.Min(int.MaxValue, checkedCount);
-        }
 
         internal int SubstituteCharacterDdsBasenameWords(
             HashGuessEngine engine,
@@ -324,7 +294,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 cancellationToken,
                 candidateBudget: int.MaxValue,
                 source: $"GAME Custom: character {extension.ToUpperInvariant()} basename wordlist",
-                progress);
+                progress: progress);
         }
 
         internal int SubstituteSwordlistBasenameWords(
@@ -342,7 +312,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 cancellationToken,
                 candidateBudget: int.MaxValue,
                 source: "GAME Custom: SwordList basename substitution",
-                progress);
+                progress: progress);
         }
 
         internal int SubstituteWordlistBasenameWords(
@@ -360,7 +330,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 cancellationToken,
                 candidateBudget: int.MaxValue,
                 source: "GAME Custom: WordList basename substitution",
-                progress);
+                progress: progress);
         }
 
         internal int RunCustomAttacks(
