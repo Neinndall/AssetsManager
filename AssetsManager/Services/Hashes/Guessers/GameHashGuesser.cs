@@ -24,7 +24,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 {
     internal sealed class GameHashGuesser : HashGuesser
     {
-        private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs" };
+        private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs", ".cs" };
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
         private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scannedWadCharacters = new();
         private const int MaxCustomBuildListWords = 50_000;
@@ -461,11 +461,13 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             if (engine.RemainingUnknownCount == 0) return 0;
 
-            var shaderPattern = new Regex(@"\.[pv]s(?:_[23]_0|(?=$|[.-]))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            var shaderPattern = new Regex(@"\.(?:[pv]s(?:_[23]_0)?|cs)(?=$|[.-])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
             IReadOnlyList<string> shaderPaths = Corpus.GetOrCreate(
                 "custom-shader-paths",
                 paths => paths
-                    .Where(path => path.StartsWith("assets/shaders/", StringComparison.OrdinalIgnoreCase) || shaderPattern.IsMatch(path))
+                    .Where(path => path.StartsWith("assets/shaders/", StringComparison.OrdinalIgnoreCase) ||
+                                   path.StartsWith("data/shaders/", StringComparison.OrdinalIgnoreCase) ||
+                                   shaderPattern.IsMatch(path))
                     .ToList());
 
             IReadOnlyList<string> shaderNames = Corpus.GetOrCreate(
@@ -1093,7 +1095,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
             if (candidateBudget == 0) return 0;
 
-            var shaderPattern = new Regex(@".*\.[pv]s(?:_[23]_0|(?=$|[.-]))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            var shaderPattern = new Regex(@".*\.(?:[pv]s(?:_[23]_0)?|cs)(?=$|[.-])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
             var shaderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string path in KnownPaths)
             {
@@ -1793,7 +1795,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 return;
             }
 
-            if (extension is "hls" or "ps_2_0" or "ps_3_0" or "vs_2_0" or "vs_3_0")
+            if (extension is "hls" or "hlsl" or "ps_2_0" or "ps_3_0" or "vs_2_0" or "vs_3_0" or "ps" or "vs" or "cs")
             {
                 string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
                 string directory = PathUtils.NormalizeSeparators(Path.GetDirectoryName(sourcePath));

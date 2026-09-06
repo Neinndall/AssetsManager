@@ -245,7 +245,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains(engine.Matches.Values, match => match.Path == lowVariantEnd);
             Assert.DoesNotContain(engine.Matches.Values, match => match.Path == numberedShader);
             Assert.Equal(1, engine.RemainingUnknownCount);
-            Assert.Equal(4_176, engine.CheckedCandidates);
+            Assert.Equal(4_872, engine.CheckedCandidates);
         }
 
         [Fact]
