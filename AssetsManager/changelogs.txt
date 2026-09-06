@@ -6,6 +6,9 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Guessing Lab / Running BIN and Data BIN together now skips overlapping searches while preserving Data BIN's independent vocabulary.
+  - Hash Guessing Lab / Texture Build List now checks particle texture and mask variants before its broader family search.
+  - Hash Guessing Lab / Clarified the complementary coverage of character DDS/TEX word searches and Texture Build List.
   - Hash Guessing Lab / Added texture families build-list attack in GAME Custom Guess to recover skin texture patterns and material masks.
   - Hash Guessing Lab / Enabled BIN domain selection while keeping RST hidden.
   - Hash Guessing Lab / GAME animation BIN links now recognize companion theme layouts and prioritize nearby cross-skin targets from corpus evidence.

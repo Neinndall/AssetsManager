@@ -16,20 +16,31 @@ namespace AssetsManager.Services.Hashes.Guessers
     {
         private const int MaximumSuffixes = 11_000;
         private const int DirectoryCandidateBudget = 2_000_000;
+        private static readonly string[] ParticleRoles = { "tx", "d", "m", "m2", "mask" };
         private readonly Dictionary<string, List<string>> _paths = new(StringComparer.Ordinal);
         private readonly Dictionary<ulong, string> _directories = new();
         private readonly string[] _suffixes;
         private readonly string[] _allPrefixes;
+        private readonly (string Prefix, string Extension)[] _particleTemplates;
         private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scanned = new();
 
         internal GameTextureFamilyIndex(IEnumerable<string> paths, CancellationToken cancellationToken)
         {
             var frequencies = new Dictionary<string, int>(StringComparer.Ordinal);
             var additionalFrequencies = new Dictionary<string, int>(StringComparer.Ordinal);
+            var particleTemplates = new HashSet<(string Prefix, string Extension)>();
             foreach (string value in paths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string path = PathUtils.NormalizePath(value);
+                if ((path.StartsWith("assets/characters/", StringComparison.Ordinal) && path.Contains("/particles/", StringComparison.Ordinal) ||
+                     path.StartsWith("assets/maps/particles/", StringComparison.Ordinal)) &&
+                    (path.EndsWith(".tex", StringComparison.Ordinal) || path.EndsWith(".dds", StringComparison.Ordinal)))
+                {
+                    int separator = path.LastIndexOf('_');
+                    if (separator > path.LastIndexOf('/') && ParticleRoles.Contains(path[(separator + 1)..^4], StringComparer.Ordinal))
+                        particleTemplates.Add((path[..(separator + 1)], path[^4..]));
+                }
                 bool isSkin = TryGetSkinTextureDirectory(path, out string directory);
                 if (!isSkin && !TryGetAdditionalTextureDirectory(path, out directory)) continue;
                 var suffixFrequencies = isSkin ? frequencies : additionalFrequencies;
@@ -78,6 +89,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
             }
             _allPrefixes = allPrefixes.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            _particleTemplates = particleTemplates.OrderBy(value => value.Prefix, StringComparer.Ordinal)
+                .ThenBy(value => value.Extension, StringComparer.Ordinal).ToArray();
         }
 
         internal static bool HasUnresolvedContext(HashGuessEngine engine, BinTree tree, CancellationToken cancellationToken)
@@ -187,11 +200,27 @@ namespace AssetsManager.Services.Hashes.Guessers
             long candidateBudget = long.MaxValue,
             Action<long> progress = null)
         {
-            if (_suffixes.Length == 0 || _allPrefixes.Length == 0 || candidateBudget <= 0 || engine.RemainingUnknownCount == 0)
+            if (candidateBudget <= 0 || engine.RemainingUnknownCount == 0)
                 return 0;
 
             const int suffixBatchSize = 64;
             long checkedCandidates = 0;
+
+            // Test small particle role families before the wider learned suffix combinations.
+            foreach (var template in _particleTemplates)
+            foreach (string role in ParticleRoles)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget)
+                {
+                    progress?.Invoke(checkedCandidates);
+                    return checkedCandidates;
+                }
+                engine.CheckPrefixSuffix(template.Prefix, role + template.Extension,
+                    HashGuessStrategy.WordlistVariant, "GAME Custom: texture build-list");
+                checkedCandidates++;
+                if ((checkedCandidates & 0x3fff) == 0) progress?.Invoke(checkedCandidates);
+            }
 
             for (int suffixOffset = 0; suffixOffset < _suffixes.Length; suffixOffset += suffixBatchSize)
             {

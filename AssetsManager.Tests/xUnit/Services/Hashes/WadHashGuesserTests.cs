@@ -2497,6 +2497,49 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GameCustomDataBinSkipsOnlyCompletedGeneralVocabulary()
+        {
+            var paths = Enumerable.Range(0, 20000).Select(i => $"assets/words/w{i:D5}.bin")
+                .Concat(new[] { "data/example/alpha.bin", "data/teacher/zzzz.bin" });
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, paths));
+            const string expected = "data/example/zzzz.bin";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.SubstituteDataBinBasenameWords(engine, CancellationToken.None,
+                excludeCompletedBinVocabulary: true);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void GameCustomBinAndDataBinDoNotRepeatCoveredCandidates()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "data/example/alpha.bin", "data/teacher/beta.bin", "assets/example/gamma.bin"
+            }));
+            var first = CreateEngine(HashGuessDomain.Game, "unreachable.bin");
+            var second = CreateEngine(HashGuessDomain.Game, "unreachable.bin");
+            int generalOnly = game.RunCustomAttacks(first, null, CancellationToken.None,
+                new HashSet<string> { "game-custom-bin" });
+            int combined = game.RunCustomAttacks(second, null, CancellationToken.None,
+                new HashSet<string> { "game-custom-bin", "game-custom-databin" });
+
+            Assert.True(generalOnly > 0);
+            Assert.Equal(generalOnly, combined);
+        }
+
+        [Fact]
+        public void GameCustomDataBinHonorsCancellationBeforeSkippingVocabulary()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game,
+                new[] { "data/example/alpha.bin" }));
+            var engine = CreateEngine(HashGuessDomain.Game, "unreachable.bin");
+            Assert.Throws<OperationCanceledException>(() => game.SubstituteDataBinBasenameWords(
+                engine, new CancellationToken(true), excludeCompletedBinVocabulary: true));
+        }
+
+        [Fact]
         public void GameCustomCharacterDdsWordlistAttackUsesOnlyCharacterDdsPaths()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]

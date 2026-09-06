@@ -165,12 +165,12 @@ namespace AssetsManager.Views
             };
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-bin", Name = "SubstituteBinBasenameWords", Description = "All BIN basename word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-databin", Name = "SubstituteDataBinBasenameWords", Description = "All data/*.bin basename word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-dds", Name = "SubstituteCharacterDdsBasenameWords", Description = "All character .dds texture word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-tex", Name = "SubstituteCharacterTexBasenameWords", Description = "All character .tex texture word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-dds", Name = "SubstituteCharacterDdsBasenameWords", Description = "Word replacement in character DDS names, including particles and HUD", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-tex", Name = "SubstituteCharacterTexBasenameWords", Description = "Word replacement in character TEX names, including particles and HUD", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-swordlist", Name = "SubstituteSwordlistBasenameWords", Description = "Full corpus basename words substitution matrix", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-shaders", Name = "SubstituteShaderVocabWords", Description = "Custom shader vocabulary and compound names", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-animations", Name = "SubstituteAnimationBuildListWords", Description = "Animation actions build-list (loop_in, tokens) across skins", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-textures", Name = "SubstituteTextureBuildListWords", Description = "Texture families build-list across skins, companion themes and map kitpieces", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-textures", Name = "SubstituteTextureBuildListWords", Description = "Texture families across skins, companion themes and maps, plus particle role variants", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             _allMethods.Add(gameCustom);
 
             // LCU (Domain 1)

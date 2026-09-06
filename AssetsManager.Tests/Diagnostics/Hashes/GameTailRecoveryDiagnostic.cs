@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -36,6 +37,16 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 .Where(line => !string.IsNullOrWhiteSpace(line))
                 .Select(line => ulong.Parse(line.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture)).ToHashSet();
             var guesser = new GameHashGuesser(hashFile);
+            if (args.Contains("--compare-bins", StringComparer.Ordinal))
+            {
+                CompareBins(hashFile, unknown);
+                return;
+            }
+            if (args.Contains("--compare-textures", StringComparer.Ordinal))
+            {
+                CompareTextures(hashFile, unknown);
+                return;
+            }
             if (args.Contains("--verify-patterns", StringComparer.Ordinal))
             {
                 VerifyPatterns(root, known, unknown, guesser);
@@ -102,6 +113,69 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 }
             }
             Console.WriteLine($"Attempts: {attempts}; printable preimages: {emitted.Count}; attested-word candidates: {plausible}. Nothing persisted.");
+        }
+
+        private static void CompareBins(HashFile hashFile, HashSet<ulong> unknown)
+        {
+            string[] allPaths = hashFile.LoadPaths().Where(path => path.EndsWith(".bin", StringComparison.Ordinal)).ToArray();
+            string[] dataPaths = allPaths.Where(path => path.StartsWith("data/", StringComparison.Ordinal)).ToArray();
+            var allWords = HashGuessEngine.BuildWordlist(allPaths.Select(Path.GetFileName)).Take(20_000).ToHashSet(StringComparer.Ordinal);
+            var dataWords = HashGuessEngine.BuildWordlist(dataPaths.Select(Path.GetFileName)).Take(20_000).ToHashSet(StringComparer.Ordinal);
+            var allFormats = HashGuesser.BuildBasenameWordFormats(allPaths, 1, 1).ToHashSet();
+            var dataFormats = HashGuesser.BuildBasenameWordFormats(dataPaths, 1, 1).ToHashSet();
+            Console.WriteLine($"BIN paths={allPaths.Length}, selected words={allWords.Count}, templates={allFormats.Count}; combinations={(long)allWords.Count * allFormats.Count:N0}");
+            Console.WriteLine($"Data BIN paths={dataPaths.Length}, selected words={dataWords.Count}, templates={dataFormats.Count}; combinations={(long)dataWords.Count * dataFormats.Count:N0}");
+            Console.WriteLine($"Data templates absent from BIN={dataFormats.Count(format => !allFormats.Contains(format))}; Data words absent from BIN={dataWords.Count(word => !allWords.Contains(word))}");
+            Console.WriteLine("Data-only selected words: " + string.Join(", ", dataWords.Except(allWords).Take(30)));
+            foreach (bool dataOnly in new[] { false, true })
+            {
+                string name = dataOnly ? "Data BIN" : "BIN";
+                var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
+                    match => Console.WriteLine($"MATCH {name}: {match.Hash:x16} {match.Path}"));
+                var guesser = new GameHashGuesser(hashFile);
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var timer = Stopwatch.StartNew();
+                bool completed = true;
+                try
+                {
+                    if (dataOnly) guesser.SubstituteDataBinBasenameWords(engine, cancellation.Token);
+                    else guesser.SubstituteBinBasenameWords(engine, cancellation.Token);
+                }
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { completed = false; }
+                Console.WriteLine($"{name}: {engine.CheckedCandidates:N0} candidates, {engine.Matches.Count} matches, {timer.Elapsed.TotalSeconds:F1}s; {(completed ? "complete" : "time-limited, NOT exhaustive")}");
+            }
+            Console.WriteLine("Nothing persisted. Template-word combinations are not unique candidate counts.");
+        }
+
+        private static void CompareTextures(HashFile hashFile, HashSet<ulong> unknown)
+        {
+            Console.WriteLine($"Texture comparison: {unknown.Count} real unknowns; independent engines; 30 seconds per method including index preparation.");
+            var results = new List<(string Name, HashSet<ulong> Matches)>();
+            foreach (string name in new[] { "DDS basename", "TEX basename", "Texture build-list" })
+            {
+                var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
+                    match => Console.WriteLine($"MATCH {name}: {match.Hash:x16} {match.Path}"));
+                var guesser = new GameHashGuesser(hashFile);
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var timer = Stopwatch.StartNew();
+                bool completed = true;
+                try
+                {
+                    if (name == "DDS basename") guesser.SubstituteCharacterDdsBasenameWords(engine, cancellation.Token);
+                    else if (name == "TEX basename") guesser.SubstituteCharacterTexBasenameWords(engine, cancellation.Token);
+                    else guesser.SubstituteTextureBuildListWords(engine, cancellation.Token);
+                }
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { completed = false; }
+                timer.Stop();
+                Console.WriteLine($"{name}: {engine.CheckedCandidates:N0} candidates, {engine.Matches.Count} matches, {timer.Elapsed.TotalSeconds:F1}s; {(completed ? "complete" : "time-limited, NOT exhaustive")}");
+                results.Add((name, engine.Matches.Keys.ToHashSet()));
+            }
+            foreach (var result in results)
+            {
+                var otherMatches = results.Where(other => other.Name != result.Name).SelectMany(other => other.Matches).ToHashSet();
+                Console.WriteLine($"{result.Name}: {result.Matches.Count(hash => !otherMatches.Contains(hash))} exclusive matches in these measured passes");
+            }
+            Console.WriteLine("Nothing persisted. A time-limited zero does not establish that a method has no exclusive coverage.");
         }
 
         private static void VerifyPatterns(string root, IReadOnlyDictionary<ulong, string> known,

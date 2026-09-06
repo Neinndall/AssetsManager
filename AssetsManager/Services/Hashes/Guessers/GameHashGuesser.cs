@@ -186,15 +186,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             CancellationToken cancellationToken,
             Action<int> progress = null)
         {
-            IReadOnlyList<string> binPaths = Corpus.GetOrCreate(
-                "custom-bin-paths",
-                paths => paths.Where(path => path.EndsWith(".bin", StringComparison.Ordinal)).ToList());
-            IReadOnlyList<string> binNames = Corpus.GetOrCreate(
-                "custom-bin-names",
-                _ => binPaths.Select(GetBasename).ToList());
-            IReadOnlyList<string> binWordlist = Corpus.GetOrCreate(
-                "custom-bin-wordlist",
-                _ => HashGuessEngine.BuildWordlist(binNames));
+            IReadOnlyList<string> binPaths = GetCustomBinPaths(dataOnly: false);
+            IReadOnlyList<string> binWordlist = GetCustomBinWords(dataOnly: false);
 
             return _SubstituteBasenameWords(
                 engine,
@@ -211,25 +204,25 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal int SubstituteDataBinBasenameWords(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
-            Action<int> progress = null)
+            Action<int> progress = null,
+            bool excludeCompletedBinVocabulary = false)
         {
-            IReadOnlyList<string> dataPaths = Corpus.GetOrCreate(
-                "custom-data-bin-paths",
-                paths => paths
-                    .Where(path => path.StartsWith("data/", StringComparison.Ordinal)
-                        && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
-                    .ToList());
-            IReadOnlyList<string> dataNames = Corpus.GetOrCreate(
-                "custom-data-bin-names",
-                _ => dataPaths.Select(GetBasename).ToList());
-            IReadOnlyList<string> dataWordlist = Corpus.GetOrCreate(
-                "custom-data-bin-wordlist",
-                _ => HashGuessEngine.BuildWordlist(dataNames));
+            cancellationToken.ThrowIfCancellationRequested();
+            IReadOnlyList<string> dataPaths = GetCustomBinPaths(dataOnly: true);
+            IEnumerable<string> dataWordlist = GetCustomBinWords(dataOnly: true).Take(MaxCustomDataBinWords);
+            if (excludeCompletedBinVocabulary)
+            {
+                // The full BIN pass includes every data template, but its word limit can exclude data-specific vocabulary.
+                var completedWords = GetCustomBinWords(dataOnly: false).Take(MaxCustomBinWords).ToHashSet(StringComparer.Ordinal);
+                dataWordlist = dataWordlist.Where(word => !completedWords.Contains(word));
+            }
+            string[] remainingWords = dataWordlist.ToArray();
+            if (remainingWords.Length == 0) return 0;
 
             return _SubstituteBasenameWords(
                 engine,
                 dataPaths,
-                dataWordlist.Take(MaxCustomDataBinWords),
+                remainingWords,
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
@@ -238,63 +231,57 @@ namespace AssetsManager.Services.Hashes.Guessers
                 progress);
         }
 
+        private IReadOnlyList<string> GetCustomBinPaths(bool dataOnly) =>
+            Corpus.GetOrCreate(dataOnly ? "custom-data-bin-paths" : "custom-bin-paths",
+                paths => paths.Where(path => path.EndsWith(".bin", StringComparison.Ordinal) &&
+                    (!dataOnly || path.StartsWith("data/", StringComparison.Ordinal))).ToList());
+
+        private IReadOnlyList<string> GetCustomBinWords(bool dataOnly) =>
+            Corpus.GetOrCreate(dataOnly ? "custom-data-bin-wordlist" : "custom-bin-wordlist",
+                _ => HashGuessEngine.BuildWordlist(GetCustomBinPaths(dataOnly).Select(GetBasename)));
+
         internal int SubstituteCharacterDdsBasenameWords(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
-            Action<int> progress = null)
-        {
-            IReadOnlyList<string> characterDdsPaths = Corpus.GetOrCreate(
-                "custom-character-dds-paths",
-                paths => paths
-                    .Where(path => path.StartsWith("assets/characters/", StringComparison.Ordinal)
-                        && path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
-                    .ToList());
-            IReadOnlyList<string> characterDdsNames = Corpus.GetOrCreate(
-                "custom-character-dds-names",
-                _ => characterDdsPaths.Select(GetBasename).ToList());
-            IReadOnlyList<string> characterDdsWordlist = Corpus.GetOrCreate(
-                "custom-character-dds-wordlist",
-                _ => HashGuessEngine.BuildWordlist(characterDdsNames));
-
-            return _SubstituteBasenameWords(
-                engine,
-                characterDdsPaths,
-                characterDdsWordlist.Take(MaxCustomDdsWords),
-                oldWordCount: 1,
-                newWordCount: 1,
-                cancellationToken,
-                candidateBudget: int.MaxValue,
-                source: "GAME Custom: character DDS basename wordlist",
-                progress);
-        }
+            Action<int> progress = null) =>
+            SubstituteCharacterTextureBasenameWords(engine, "dds", MaxCustomDdsWords, cancellationToken, progress);
 
         internal int SubstituteCharacterTexBasenameWords(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
-            Action<int> progress = null)
+            Action<int> progress = null) =>
+            SubstituteCharacterTextureBasenameWords(engine, "tex", MaxCustomTexWords, cancellationToken, progress);
+
+        private int SubstituteCharacterTextureBasenameWords(
+            HashGuessEngine engine,
+            string extension,
+            int maximumWords,
+            CancellationToken cancellationToken,
+            Action<int> progress)
         {
-            IReadOnlyList<string> characterTexPaths = Corpus.GetOrCreate(
-                "custom-character-tex-paths",
+            string dottedExtension = "." + extension;
+            IReadOnlyList<string> texturePaths = Corpus.GetOrCreate(
+                $"custom-character-{extension}-paths",
                 paths => paths
                     .Where(path => path.StartsWith("assets/characters/", StringComparison.Ordinal)
-                        && path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                        && path.EndsWith(dottedExtension, StringComparison.OrdinalIgnoreCase))
                     .ToList());
-            IReadOnlyList<string> characterTexNames = Corpus.GetOrCreate(
-                "custom-character-tex-names",
-                _ => characterTexPaths.Select(GetBasename).ToList());
-            IReadOnlyList<string> characterTexWordlist = Corpus.GetOrCreate(
-                "custom-character-tex-wordlist",
-                _ => HashGuessEngine.BuildWordlist(characterTexNames));
+            IReadOnlyList<string> textureNames = Corpus.GetOrCreate(
+                $"custom-character-{extension}-names",
+                _ => texturePaths.Select(GetBasename).ToList());
+            IReadOnlyList<string> textureWordlist = Corpus.GetOrCreate(
+                $"custom-character-{extension}-wordlist",
+                _ => HashGuessEngine.BuildWordlist(textureNames));
 
             return _SubstituteBasenameWords(
                 engine,
-                characterTexPaths,
-                characterTexWordlist.Take(MaxCustomTexWords),
+                texturePaths,
+                textureWordlist.Take(maximumWords),
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
                 candidateBudget: int.MaxValue,
-                source: "GAME Custom: character TEX basename wordlist",
+                source: $"GAME Custom: character {extension.ToUpperInvariant()} basename wordlist",
                 progress);
         }
 
@@ -366,7 +353,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     engine,
                     cancellationToken,
                     count => progress?.Report(engine.CreateProgress(
-                        "GAME Custom: data BIN basename wordlist", progressOffset + count)));
+                        "GAME Custom: data BIN basename wordlist", progressOffset + count)),
+                    excludeCompletedBinVocabulary: ShouldRun("game-custom-bin"));
                 if (engine.RemainingUnknownCount == 0) return checkedCandidates;
             }
 

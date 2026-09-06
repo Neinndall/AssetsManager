@@ -143,5 +143,54 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 new HashSet<string> { "game-custom-textures" });
             Assert.Equal(Target, Assert.Single(engine.Matches).Value.Path);
         }
+
+        [Theory]
+        [InlineData("assets/maps/particles/tft/example/rocket", ".tex")]
+        [InlineData("assets/characters/example/skins/skin1/particles/rocket", ".dds")]
+        public void TextureBuildListChecksSmallParticleRoleFamilies(string stem, string extension)
+        {
+            string target = stem + "_m2" + extension;
+            var index = new GameTextureFamilyIndex(new[] { stem + "_tx" + extension }, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+            long attempts = index.RunBuildList(engine, CancellationToken.None);
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+            Assert.InRange(attempts, 1, 5);
+        }
+
+        [Fact]
+        public void ParticleRolePassPreservesBudgetAccountingAndCancellation()
+        {
+            var index = new GameTextureFamilyIndex(new[] { "assets/maps/particles/example_tx.tex" }, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { 42 });
+            long reported = -1;
+            Assert.Equal(2, index.RunBuildList(engine, CancellationToken.None, 2, count => reported = count));
+            Assert.Equal(2, reported);
+            Assert.Equal(2, engine.CheckedCandidates);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+            Assert.Throws<OperationCanceledException>(() => index.RunBuildList(engine, cancellation.Token));
+            Assert.Equal(2, engine.CheckedCandidates);
+        }
+
+        [Theory]
+        [InlineData("dds")]
+        [InlineData("tex")]
+        public void CharacterWordSubstitutionRetainsExclusiveParticleCoverage(string extension)
+        {
+            string target = $"assets/characters/example/skins/skin1/particles/smoke_blue.{extension}";
+            string[] paths =
+            {
+                $"assets/characters/example/skins/skin1/particles/smoke_red.{extension}",
+                $"assets/characters/teacher/skins/skin1/particles/fire_blue.{extension}"
+            };
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, paths));
+            var words = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+            var families = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+            if (extension == "dds") game.SubstituteCharacterDdsBasenameWords(words, CancellationToken.None);
+            else game.SubstituteCharacterTexBasenameWords(words, CancellationToken.None);
+            game.SubstituteTextureBuildListWords(families, CancellationToken.None);
+            Assert.Equal(target, Assert.Single(words.Matches).Value.Path);
+            Assert.Empty(families.Matches);
+        }
     }
 }
