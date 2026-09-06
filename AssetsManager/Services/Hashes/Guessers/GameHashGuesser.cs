@@ -234,8 +234,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private IReadOnlyList<string> GetCustomBinPaths(bool dataOnly) =>
             Corpus.GetOrCreate(dataOnly ? "custom-data-bin-paths" : "custom-bin-paths",
                 paths => paths.Where(path => path.EndsWith(".bin", StringComparison.Ordinal) &&
-                    (dataOnly ? path.StartsWith("data/", StringComparison.Ordinal)
-                              : (path.StartsWith("data/", StringComparison.Ordinal) || path.StartsWith("assets/", StringComparison.Ordinal)))).ToList());
+                    (!dataOnly || path.StartsWith("data/", StringComparison.Ordinal))).ToList());
 
         private IReadOnlyList<string> GetCustomBinWords(bool dataOnly) =>
             Corpus.GetOrCreate(dataOnly ? "custom-data-bin-wordlist" : "custom-bin-wordlist",
@@ -303,6 +302,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             Action<int> progress = null,
             bool excludeCompletedBinPaths = false)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            string[] words = BuildSwordlist().Take(MaxCustomSwordlistWords).ToArray();
+            // BIN paths can only be skipped when the completed pass also covered every selected word.
+            if (excludeCompletedBinPaths)
+                excludeCompletedBinPaths = GetCustomUnifiedBinWords().ToHashSet(StringComparer.Ordinal).IsSupersetOf(words);
             IReadOnlyList<string> paths = Corpus.GetOrCreate(
                 excludeCompletedBinPaths ? "custom-focused-swordlist-paths-nobin" : "custom-focused-wordlist-paths",
                 values => excludeCompletedBinPaths
@@ -311,7 +315,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             return _SubstituteBasenameWords(
                 engine,
                 paths,
-                BuildSwordlist().Take(MaxCustomSwordlistWords),
+                words,
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,

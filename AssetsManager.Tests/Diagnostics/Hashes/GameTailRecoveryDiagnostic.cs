@@ -37,6 +37,29 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 .Where(line => !string.IsNullOrWhiteSpace(line))
                 .Select(line => ulong.Parse(line.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture)).ToHashSet();
             var guesser = new GameHashGuesser(hashFile);
+            if (args.Contains("--verify-number-screenshot", StringComparer.Ordinal))
+            {
+                string[] targets = new[] { "assets/characters/jade_galio/skins/base/particles/galio_armor_05.tex" }
+                    .Concat(new[] { 2, 3, 4, 5, 7 }.Select(i => $"assets/characters/petdoughcat/themes/sushi/petdoughcat_sushi_sushi_face{i:D2}_tx_cm.tex"))
+                    .Concat(Enumerable.Range(2, 6).Select(i => $"assets/characters/petstyletwoleblanc/skins/skin2/particles/petstyletwoleblanc_skin2_emote_wtrail{i:D2}.tex")).ToArray();
+                string[] seeds = known.Values.Where(path => path.StartsWith("assets/characters/jade_galio/skins/base/particles/galio_armor_", StringComparison.Ordinal) ||
+                    path.StartsWith("assets/characters/petdoughcat/themes/sushi/petdoughcat_sushi_sushi_face", StringComparison.Ordinal) ||
+                    path.StartsWith("assets/characters/petstyletwoleblanc/skins/skin2/particles/petstyletwoleblanc_skin2_emote_wtrail", StringComparison.Ordinal)).ToArray();
+                foreach (string seed in seeds) Console.WriteLine($"SEED {seed}");
+                foreach (string target in targets)
+                {
+                    ulong hash = XxHash64Ext.Hash(target);
+                    Console.WriteLine($"TARGET {hash:x16} known={known.ContainsKey(hash)} currentUnknown={unknown.Contains(hash)} {target}");
+                }
+                var focused = new GameHashGuesser(new HashFile(HashGuessDomain.Game, seeds));
+                var engine = new HashGuessEngine(HashGuessDomain.Game, targets.Select(path => XxHash64Ext.Hash(path)).ToHashSet(),
+                    match => Console.WriteLine($"MATCH {match.Hash:x16} {match.Strategy} {match.Path}"));
+                focused.SubstituteNumbers(engine, CancellationToken.None, maximum: 200);
+                Console.WriteLine($"Unpadded matches: {engine.Matches.Count}");
+                focused.SubstituteNumbers(engine, CancellationToken.None, maximum: 200, digits: 2);
+                Console.WriteLine($"Combined matches: {engine.Matches.Count}/{targets.Length}; candidates={engine.CheckedCandidates}. Focused production passes with real catalog seeds; nothing persisted.");
+                return;
+            }
             if (args.Contains("--compare-shader-filters", StringComparer.Ordinal))
             {
                 string[] original = null;
