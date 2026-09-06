@@ -67,9 +67,19 @@ namespace AssetsManager.Services.Hashes
             HashGuessStrategy strategy,
             string source = "Generated",
             ulong sourceChunkHash = 0)
+            => CheckNormalizedParts(prefix, ReadOnlySpan<char>.Empty, suffix, strategy, source, sourceChunkHash);
+
+        // Callers must provide normalized path parts, as with CheckPrefixSuffix.
+        internal bool CheckNormalizedParts(
+            ReadOnlySpan<char> prefix,
+            ReadOnlySpan<char> word,
+            ReadOnlySpan<char> suffix,
+            HashGuessStrategy strategy,
+            string source,
+            ulong sourceChunkHash = 0)
         {
             CheckedCandidates++;
-            int totalLength = prefix.Length + suffix.Length;
+            int totalLength = prefix.Length + word.Length + suffix.Length;
             if (totalLength == 0)
             {
                 DiscardedCandidates++;
@@ -78,7 +88,8 @@ namespace AssetsManager.Services.Hashes
 
             Span<char> buffer = totalLength <= 256 ? stackalloc char[totalLength] : new char[totalLength];
             prefix.CopyTo(buffer);
-            suffix.CopyTo(buffer[prefix.Length..]);
+            word.CopyTo(buffer[prefix.Length..]);
+            suffix.CopyTo(buffer[(prefix.Length + word.Length)..]);
 
             ulong hash = XxHash64Ext.Hash(buffer);
             if (!_unknownHashes.Contains(hash))

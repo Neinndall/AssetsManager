@@ -6,6 +6,9 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Guessing Lab / Reduced shader vocabulary setup work while preserving the selected shader paths.
+  - Hash Guessing Lab / GAME WAD Grep reuses Regalia hash lookups and animation path prefixes to reduce repeated work and temporary strings.
+  - Hash Guessing Lab / Reduced temporary allocations in GAME Animation Build List while preserving its candidate coverage and limits.
   - Hash Guessing Lab / Running BIN and Data BIN together now skips overlapping searches while preserving Data BIN's independent vocabulary.
   - Hash Guessing Lab / Texture Build List now checks particle texture and mask variants before its broader family search.
   - Hash Guessing Lab / Clarified the complementary coverage of character DDS/TEX word searches and Texture Build List.

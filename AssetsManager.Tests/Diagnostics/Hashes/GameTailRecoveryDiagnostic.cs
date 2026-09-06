@@ -37,6 +37,41 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 .Where(line => !string.IsNullOrWhiteSpace(line))
                 .Select(line => ulong.Parse(line.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture)).ToHashSet();
             var guesser = new GameHashGuesser(hashFile);
+            if (args.Contains("--compare-shader-filters", StringComparer.Ordinal))
+            {
+                string[] original = null;
+                foreach (string pattern in new[] { @".*\.[pv]s(?:_[23]_0|(?=$|[.-]))", @"\.[pv]s(?:_[23]_0|(?=$|[.-]))" })
+                {
+                    var regex = new System.Text.RegularExpressions.Regex(pattern,
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+                    var timer = Stopwatch.StartNew();
+                    string[] selected = known.Values.Where(path => path.StartsWith("assets/shaders/", StringComparison.OrdinalIgnoreCase) || regex.IsMatch(path)).ToArray();
+                    Console.WriteLine($"Filter {pattern}: {selected.Length:N0} paths; {timer.Elapsed.TotalSeconds:F3}s");
+                    if (original != null && !original.SequenceEqual(selected)) throw new InvalidOperationException("Shader filter coverage changed");
+                    original = selected;
+                }
+                Console.WriteLine("Identical shader paths and ordering. No guessing run or persistence.");
+                return;
+            }
+            if (args.Contains("--compare-animations", StringComparer.Ordinal))
+            {
+                var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
+                    match => Console.WriteLine($"MATCH animation: {match.Hash:x16} {match.Path}"));
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var timer = Stopwatch.StartNew();
+                long allocated = GC.GetAllocatedBytesForCurrentThread();
+                bool complete = true;
+                try { guesser.SubstituteAnimationBuildListWords(engine, cancellation.Token); }
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { complete = false; }
+                Console.WriteLine($"Animation: {unknown.Count} unknowns; {engine.CheckedCandidates:N0} candidates; {engine.Matches.Count} matches; {timer.Elapsed.TotalSeconds:F1}s; {(GC.GetAllocatedBytesForCurrentThread() - allocated) / 1_000_000:N0} MB allocated; complete={complete}");
+                Console.WriteLine("Nothing persisted. A partial run does not establish exhaustive coverage.");
+                return;
+            }
+            if (args.Contains("--probe-animation-directions", StringComparer.Ordinal) || args.Contains("--probe-animation-basenames", StringComparer.Ordinal))
+            {
+                ProbeAnimationNames(root, known, unknown, guesser, args.Contains("--probe-animation-basenames", StringComparer.Ordinal));
+                return;
+            }
             if (args.Contains("--compare-bins", StringComparer.Ordinal))
             {
                 CompareBins(hashFile, unknown);
@@ -113,6 +148,51 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 }
             }
             Console.WriteLine($"Attempts: {attempts}; printable preimages: {emitted.Count}; attested-word candidates: {plausible}. Nothing persisted.");
+        }
+
+        private static void ProbeAnimationNames(string root, IReadOnlyDictionary<ulong, string> known,
+            HashSet<ulong> unknown, GameHashGuesser guesser, bool fullBasenames)
+        {
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
+                match => Console.WriteLine($"MATCH animation probe: {match.Hash:x16} {match.Path}"));
+            var templates = new HashSet<string>(StringComparer.Ordinal);
+            string[] basenames = known.Values.Where(path => path.EndsWith(".anm", StringComparison.Ordinal))
+                .Select(Path.GetFileName).Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            var regex = new System.Text.RegularExpressions.Regex(@"(?:_?-?\d+[ab]?)?\.anm$");
+            foreach (string wadPath in guesser.FindWads(root))
+            {
+                using var wad = new WadFile(wadPath);
+                bool hasAnimation = false;
+                foreach (var pair in wad.Chunks)
+                {
+                    if (!unknown.Contains(pair.Key) || pair.Value.Compression == WadChunkCompression.Satellite) continue;
+                    using var owner = wad.LoadChunkDecompressed(pair.Value);
+                    if (HashGuessingService.InferChunkExtension(owner.DangerousGetArray(), detectJson: false) == "anm")
+                        hasAnimation = true;
+                }
+                if (!hasAnimation) continue;
+                foreach (ulong hash in wad.Chunks.Keys)
+                {
+                    if (!known.TryGetValue(hash, out string path) || !path.EndsWith(".anm", StringComparison.Ordinal)) continue;
+                    if (fullBasenames)
+                    {
+                        string directory = path[..(path.LastIndexOf('/') + 1)];
+                        if (!templates.Add(directory)) continue;
+                        foreach (string basename in basenames)
+                            engine.CheckPrefixSuffix(directory, basename, HashGuessStrategy.WordlistVariant, "Animation basename probe");
+                        continue;
+                    }
+                    string prefix = regex.Replace(path, "");
+                    if (!templates.Add(prefix)) continue;
+                    foreach (int number in new[] { -180, -135, -90, -45, 0, 45, 90, 135, 180 })
+                    foreach (string separator in new[] { "", "_" })
+                    foreach (string digits in new[] { number.ToString(CultureInfo.InvariantCulture), number.ToString("D2", CultureInfo.InvariantCulture) }.Distinct())
+                    foreach (string letter in new[] { "", "a", "b" })
+                        engine.CheckPrefixSuffix(prefix, separator + digits + letter + ".anm",
+                            HashGuessStrategy.WordlistVariant, "Animation direction probe");
+                }
+            }
+            Console.WriteLine($"Animation {(fullBasenames ? "basename" : "direction")} probe: {templates.Count:N0} templates; {engine.CheckedCandidates:N0} candidates; {engine.Matches.Count} matches. Nothing persisted.");
         }
 
         private static void CompareBins(HashFile hashFile, HashSet<ulong> unknown)

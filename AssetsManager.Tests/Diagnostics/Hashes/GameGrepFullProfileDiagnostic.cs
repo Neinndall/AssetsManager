@@ -33,7 +33,8 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 .Where(line => ulong.TryParse(line, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _))
                 .Select(line => ulong.Parse(line, NumberStyles.HexNumber, CultureInfo.InvariantCulture))
                 .ToHashSet();
-            var engine = new HashGuessEngine(HashGuessDomain.Game, unknowns);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, unknowns,
+                match => Console.WriteLine($"\nMATCH {match.Hash:x16} {match.Path}"));
             var guesser = new GameHashGuesser(hashFile);
             string[] wads = guesser.FindWads(root);
             if (!string.IsNullOrWhiteSpace(wadFilter))
@@ -43,6 +44,8 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             var slowest = new List<ChunkStat>();
             var total = Stopwatch.StartNew();
             long chunkCount = 0;
+            long allocated = GC.GetAllocatedBytesForCurrentThread();
+            long skippedMedia = 0;
 
             for (int wadIndex = 0; wadIndex < wads.Length && engine.RemainingUnknownCount > 0; wadIndex++)
             {
@@ -57,10 +60,16 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                     foreach ((ulong hash, WadChunk chunk) in wad.Chunks)
                     {
                         if (chunk.Compression == WadChunkCompression.Satellite) continue;
-                        using var owner = wad.LoadChunkDecompressed(chunk);
-                        ArraySegment<byte> data = owner.DangerousGetArray();
                         string sourcePath = knownPaths.TryGetValue(hash, out string path) ? path : hash.ToString("x16");
                         string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
+                        // Match production's pre-decompression filter for known media.
+                        if (path != null && extension.Length > 0 && !guesser.ShouldGrepExtension(extension))
+                        {
+                            skippedMedia++;
+                            continue;
+                        }
+                        using var owner = wad.LoadChunkDecompressed(chunk);
+                        ArraySegment<byte> data = owner.DangerousGetArray();
                         if (extension.Length == 0)
                         {
                             extension = HashGuessingService.InferChunkExtension(data, detectJson: false);
@@ -88,7 +97,8 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 wadTimer.Stop();
                 wadStats.Add(new Aggregate(Path.GetFileName(wadPath), wadTimer.Elapsed, wadChunks,
                     engine.CheckedCandidates - wadCandidates, engine.Matches.Count - wadMatches));
-                Console.Write($"\r{wadIndex + 1:N0}/{wads.Length:N0} WADs | {chunkCount:N0} chunks | {engine.Matches.Count:N0} matches | {total.Elapsed:hh\\:mm\\:ss}");
+                if ((wadIndex + 1) % 25 == 0 || wadIndex + 1 == wads.Length)
+                    Console.WriteLine($"{wadIndex + 1:N0}/{wads.Length:N0} WADs | {chunkCount:N0} chunks | {engine.Matches.Count:N0} matches | {total.Elapsed:hh\\:mm\\:ss}");
             }
             total.Stop();
             Console.WriteLine();
@@ -101,6 +111,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             foreach (ChunkStat stat in slowest.OrderByDescending(value => value.Elapsed))
                 Console.WriteLine($"{stat.Elapsed,12:hh\\:mm\\:ss\\.fff} | {stat.Candidates,12:N0} | {stat.Matches,4:N0} | {stat.Wad} | {stat.Path}");
             Console.WriteLine($"\nTotal: {total.Elapsed:hh\\:mm\\:ss\\.fff} | Chunks: {chunkCount:N0} | Matches: {engine.Matches.Count:N0} | Remaining: {engine.RemainingUnknownCount:N0}");
+            Console.WriteLine($"Allocated: {(GC.GetAllocatedBytesForCurrentThread() - allocated) / 1_000_000:N0} MB cumulative; skipped known media: {skippedMedia:N0}");
         }
 
         private static void AddAggregate(Dictionary<string, Aggregate> values, string name, TimeSpan elapsed, long candidates, int matches, long calls)
