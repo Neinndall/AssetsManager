@@ -300,9 +300,14 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal int SubstituteSwordlistBasenameWords(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
-            Action<int> progress = null)
+            Action<int> progress = null,
+            bool excludeCompletedBinPaths = false)
         {
-            IReadOnlyList<string> paths = Corpus.GetOrCreate("custom-focused-wordlist-paths", values => values.ToList());
+            IReadOnlyList<string> paths = Corpus.GetOrCreate(
+                excludeCompletedBinPaths ? "custom-focused-swordlist-paths-nobin" : "custom-focused-wordlist-paths",
+                values => excludeCompletedBinPaths
+                    ? values.Where(path => !path.EndsWith(".bin", StringComparison.Ordinal)).ToList()
+                    : values.ToList());
             return _SubstituteBasenameWords(
                 engine,
                 paths,
@@ -405,7 +410,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     engine,
                     cancellationToken,
                     count => progress?.Report(engine.CreateProgress(
-                        "GAME Custom: SwordList basename substitution", progressOffset + count)));
+                        "GAME Custom: SwordList basename substitution", progressOffset + count)),
+                    excludeCompletedBinPaths: ShouldRun("game-custom-bin"));
                 if (engine.RemainingUnknownCount == 0) return checkedCandidates;
             }
 

@@ -82,6 +82,11 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 CompareTextures(hashFile, unknown);
                 return;
             }
+            if (args.Contains("--compare-swordlist", StringComparer.Ordinal))
+            {
+                CompareSwordlist(hashFile, unknown);
+                return;
+            }
             if (args.Contains("--verify-patterns", StringComparer.Ordinal))
             {
                 VerifyPatterns(root, known, unknown, guesser);
@@ -256,6 +261,38 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 Console.WriteLine($"{result.Name}: {result.Matches.Count(hash => !otherMatches.Contains(hash))} exclusive matches in these measured passes");
             }
             Console.WriteLine("Nothing persisted. A time-limited zero does not establish that a method has no exclusive coverage.");
+        }
+
+        private static void CompareSwordlist(HashFile hashFile, HashSet<ulong> unknown)
+        {
+            Console.WriteLine($"Swordlist comparison: {unknown.Count} real unknowns; measuring coverage, overlap, and computational cost.");
+            var guesser = new GameHashGuesser(hashFile);
+            var knownPaths = hashFile.LoadPaths().ToList();
+            var swordlist = guesser.BuildSwordlist();
+            var binPaths = knownPaths.Where(p => p.EndsWith(".bin", StringComparison.Ordinal)).ToList();
+            var nonBinPaths = knownPaths.Where(p => !p.EndsWith(".bin", StringComparison.Ordinal)).ToList();
+
+            Console.WriteLine($"Corpus total paths: {knownPaths.Count:N0} (BIN: {binPaths.Count:N0}, non-BIN: {nonBinPaths.Count:N0})");
+            Console.WriteLine($"Swordlist vocabulary: {swordlist.Count:N0} words extracted from .bin basenames.");
+
+            foreach (bool excludeBin in new[] { false, true })
+            {
+                string label = excludeBin ? "Swordlist (non-BIN cross-domain, coordinated)" : "Swordlist (standalone full corpus)";
+                var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
+                    match => Console.WriteLine($"MATCH {label}: {match.Hash:x16} {match.Path}"));
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var timer = Stopwatch.StartNew();
+                long allocated = GC.GetAllocatedBytesForCurrentThread();
+                bool complete = true;
+                try
+                {
+                    guesser.SubstituteSwordlistBasenameWords(engine, cancellation.Token, excludeCompletedBinPaths: excludeBin);
+                }
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { complete = false; }
+                long bytes = GC.GetAllocatedBytesForCurrentThread() - allocated;
+                Console.WriteLine($"{label}: {engine.CheckedCandidates:N0} candidates, {engine.Matches.Count} matches, {timer.Elapsed.TotalSeconds:F1}s, {bytes / 1_000_000:N0} MB allocated; {(complete ? "complete" : "time-limited, NOT exhaustive")}");
+            }
+            Console.WriteLine("Nothing persisted. A time-limited run does not establish exhaustive coverage.");
         }
 
         private static void VerifyPatterns(string root, IReadOnlyDictionary<ulong, string> known,

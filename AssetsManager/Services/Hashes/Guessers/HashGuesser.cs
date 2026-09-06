@@ -568,23 +568,25 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             if (oldWordCount < 1) throw new ArgumentOutOfRangeException(nameof(oldWordCount));
             if (newWordCount < 1) throw new ArgumentOutOfRangeException(nameof(newWordCount));
-            var counts = new Dictionary<(string Prefix, string Suffix), int>();
+            var uniqueFormats = new HashSet<(string Prefix, string Suffix)>();
             var regex = new Regex($@"([^/_.-]+)(?=((?:[-_][^/_.-]+){{{oldWordCount - 1}}})[^/]*\.[^/]+$)", RegexOptions.Compiled);
             foreach (string path in paths)
             {
-                foreach (Match match in regex.Matches(path))
+                string normalizedPath = PathUtils.NormalizePath(path);
+                foreach (Match match in regex.Matches(normalizedPath))
                 {
                     int matchedLength = match.Groups[1].Length + match.Groups[2].Length;
-                    var format = (path[..match.Index], path[(match.Index + matchedLength)..]);
-                    counts.TryGetValue(format, out int support);
-                    counts[format] = support + 1;
+                    var format = (normalizedPath[..match.Index], normalizedPath[(match.Index + matchedLength)..]);
+                    uniqueFormats.Add(format);
                 }
             }
-            return counts.OrderByDescending(pair => pair.Value)
-                .ThenBy(pair => pair.Key.Prefix, StringComparer.Ordinal)
-                .ThenBy(pair => pair.Key.Suffix, StringComparer.Ordinal)
-                .Select(pair => pair.Key)
-                .ToList();
+            var formats = new List<(string Prefix, string Suffix)>(uniqueFormats);
+            formats.Sort((a, b) =>
+            {
+                int cmp = string.CompareOrdinal(a.Prefix, b.Prefix);
+                return cmp != 0 ? cmp : string.CompareOrdinal(a.Suffix, b.Suffix);
+            });
+            return formats;
         }
 
         protected internal int _SubstituteBasenameWords(
@@ -610,14 +612,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             if (newWordCount == 1)
             {
-                var formats1 = BuildBasenameWordFormats(paths, oldWordCount, 1)
-                    .Select(f => (
-                        Prefix: PathUtils.NormalizePath(f.Prefix),
-                        Suffix: PathUtils.NormalizePath(f.Suffix),
-                        Key: f.Prefix + "%s" + f.Suffix))
-                    .OrderBy(f => f.Key, StringComparer.Ordinal)
-                    .ToList();
-
+                var formats1 = BuildBasenameWordFormats(paths, oldWordCount, 1);
                 if (formats1.Count == 0) return 0;
 
                 IReadOnlyList<string> normalizedWords = wordsList
@@ -625,7 +620,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     .ToList();
 
                 long checkedCount = 0;
-                foreach (var format in ProgressIterator(formats1, f => f.Key, cancellationToken))
+                foreach (var format in ProgressIterator(formats1, f => f.Prefix + "%s" + f.Suffix, cancellationToken))
                 {
                     int remaining = candidateBudget == int.MaxValue
                         ? int.MaxValue
