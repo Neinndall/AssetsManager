@@ -163,8 +163,7 @@ namespace AssetsManager.Views
                 BadgeBrush = accentOrange,
                 EstimatedTime = "Variable"
             };
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-bin", Name = "SubstituteBinBasenameWords", Description = "All BIN basename word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-databin", Name = "SubstituteDataBinBasenameWords", Description = "All data/*.bin basename word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-bin", Name = "SubstituteBinBasenameWords", Description = "All data/ and assets/ BIN basename word substitutions", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-dds", Name = "SubstituteCharacterDdsBasenameWords", Description = "Word replacement in character DDS names, including particles and HUD", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-tex", Name = "SubstituteCharacterTexBasenameWords", Description = "Word replacement in character TEX names, including particles and HUD", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-swordlist", Name = "SubstituteSwordlistBasenameWords", Description = "Full corpus basename words substitution matrix", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });

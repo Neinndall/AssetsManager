@@ -187,16 +187,13 @@ namespace AssetsManager.Services.Hashes.Guessers
             Action<int> progress = null)
         {
             IReadOnlyList<string> binPaths = GetCustomBinPaths(dataOnly: false);
-            IReadOnlyList<string> binWordlist = GetCustomBinWords(dataOnly: false);
+            IReadOnlyList<string> binWordlist = GetCustomUnifiedBinWords();
 
-            return _SubstituteBasenameWords(
+            return SubstituteBasenameWordlist(
                 engine,
                 binPaths,
-                binWordlist.Take(MaxCustomBinWords),
-                oldWordCount: 1,
-                newWordCount: 1,
+                binWordlist,
                 cancellationToken,
-                candidateBudget: int.MaxValue,
                 source: "GAME Custom: BIN basename wordlist",
                 progress);
         }
@@ -219,14 +216,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             string[] remainingWords = dataWordlist.ToArray();
             if (remainingWords.Length == 0) return 0;
 
-            return _SubstituteBasenameWords(
+            return SubstituteBasenameWordlist(
                 engine,
                 dataPaths,
                 remainingWords,
-                oldWordCount: 1,
-                newWordCount: 1,
                 cancellationToken,
-                candidateBudget: int.MaxValue,
                 source: "GAME Custom: data BIN basename wordlist",
                 progress);
         }
@@ -234,11 +228,59 @@ namespace AssetsManager.Services.Hashes.Guessers
         private IReadOnlyList<string> GetCustomBinPaths(bool dataOnly) =>
             Corpus.GetOrCreate(dataOnly ? "custom-data-bin-paths" : "custom-bin-paths",
                 paths => paths.Where(path => path.EndsWith(".bin", StringComparison.Ordinal) &&
-                    (!dataOnly || path.StartsWith("data/", StringComparison.Ordinal))).ToList());
+                    (dataOnly ? path.StartsWith("data/", StringComparison.Ordinal)
+                              : (path.StartsWith("data/", StringComparison.Ordinal) || path.StartsWith("assets/", StringComparison.Ordinal)))).ToList());
 
         private IReadOnlyList<string> GetCustomBinWords(bool dataOnly) =>
             Corpus.GetOrCreate(dataOnly ? "custom-data-bin-wordlist" : "custom-bin-wordlist",
                 _ => HashGuessEngine.BuildWordlist(GetCustomBinPaths(dataOnly).Select(GetBasename)));
+
+        private IReadOnlyList<string> GetCustomUnifiedBinWords() =>
+            Corpus.GetOrCreate("custom-unified-bin-wordlist", _ =>
+            {
+                IReadOnlyList<string> globalWords = GetCustomBinWords(dataOnly: false);
+                IReadOnlyList<string> dataWords = GetCustomBinWords(dataOnly: true);
+                return globalWords.Take(MaxCustomBinWords)
+                    .Concat(dataWords.Take(MaxCustomDataBinWords))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+            });
+
+        private int SubstituteBasenameWordlist(
+            HashGuessEngine engine,
+            IReadOnlyList<string> paths,
+            IReadOnlyList<string> wordList,
+            CancellationToken cancellationToken,
+            string source,
+            Action<int> progress = null)
+        {
+            if (engine.RemainingUnknownCount == 0 || paths.Count == 0 || wordList.Count == 0) return 0;
+
+            IReadOnlyList<(string Prefix, string Suffix)> formats = Corpus.GetOrCreate(
+                $"basename-word-formats/{paths.Count}/{paths.FirstOrDefault()}",
+                _ => BuildBasenameWordFormats(paths, oldWordCount: 1, newWordCount: 1));
+
+            long checkedCount = 0;
+            int progressInterval = 0;
+            foreach ((string prefix, string suffix) in formats)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (string word in wordList)
+                {
+                    engine.CheckNormalizedParts(prefix, word, suffix,
+                        HashGuessStrategy.WordlistVariant, source);
+                    checkedCount++;
+                    if (engine.RemainingUnknownCount == 0) break;
+                }
+
+                if ((++progressInterval & 0x7f) == 0)
+                    progress?.Invoke((int)Math.Min(int.MaxValue, checkedCount));
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+
+            progress?.Invoke((int)Math.Min(int.MaxValue, checkedCount));
+            return (int)Math.Min(int.MaxValue, checkedCount);
+        }
 
         internal int SubstituteCharacterDdsBasenameWords(
             HashGuessEngine engine,
@@ -344,7 +386,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (engine.RemainingUnknownCount == 0) return checkedCandidates;
             }
 
-            if (ShouldRun("game-custom-databin"))
+            else if (ShouldRun("game-custom-databin"))
             {
                 progress?.Report(engine.CreateProgress(
                     "GAME Custom: data BIN basename wordlist", checkedCandidates));
