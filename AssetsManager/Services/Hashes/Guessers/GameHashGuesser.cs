@@ -27,6 +27,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs", ".cs" };
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
         private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scannedWadCharacters = new();
+
         private const int MaxCustomBuildListWords = 50_000;
         private const int MaxCustomBinWords = 20_000;
         private const int MaxCustomDataBinWords = 20_000;
@@ -143,27 +144,33 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
             if (candidateBudget == 0) return 0;
 
-            string[] values = (prefixes ?? new[] { "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_", "tft_", "common_", "base_", "sru_", "icon_" }).ToArray();
-            var candidates = new HashSet<string>(StringComparer.Ordinal);
+            string[] values = (prefixes ?? new[] { "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_", "tft_", "common_", "base_", "sru_", "icon_" })
+                .Select(prefix => prefix ?? string.Empty)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+            int checkedCount = 0;
             foreach (string path in KnownPaths)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 int separator = path.LastIndexOf('/');
-                string directory = separator >= 0 ? path[..(separator + 1)] : string.Empty;
-                string basename = separator >= 0 ? path[(separator + 1)..] : path;
+                ReadOnlySpan<char> directory = separator >= 0 ? path.AsSpan(0, separator + 1) : ReadOnlySpan<char>.Empty;
+                ReadOnlySpan<char> basename = separator >= 0 ? path.AsSpan(separator + 1) : path.AsSpan();
+
                 foreach (string prefix in values)
-                    candidates.Add(directory + prefix + basename);
+                {
+                    engine.CheckNormalizedParts(
+                        directory,
+                        prefix.AsSpan(),
+                        basename,
+                        HashGuessStrategy.PrefixVariant,
+                        "GAME basename prefixes");
+                    checkedCount++;
+                    if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
+                }
             }
 
-            IEnumerable<HashGuessCandidate> orderedCandidates = candidates
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .Select(path => new HashGuessCandidate(path, HashGuessStrategy.PrefixVariant));
-            if (candidateBudget != int.MaxValue) orderedCandidates = orderedCandidates.Take(candidateBudget);
-            int checkedCount = CheckIter(
-                engine,
-                orderedCandidates,
-                "GAME basename prefixes",
-                cancellationToken,
-                progress);
             return checkedCount;
         }
 

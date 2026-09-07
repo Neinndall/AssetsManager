@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Guessing Lab / Basename prefix guessing now runs with far lower memory use and faster bounded scans while preserving candidate coverage.
   - Hash Guessing Lab / Running BIN before Swordlist now preserves words unique to Swordlist.
   - Hash Guessing Lab / Restored Custom BIN searches and vocabulary for loadouts, characters and root-level paths.
   - Hash Guessing Lab / Expanded shader guessing and WAD scanning to cover compute shaders (.cs) and modern shader includes.

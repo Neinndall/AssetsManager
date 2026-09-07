@@ -1765,6 +1765,47 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GameBasenamePrefixesPreserveCoverageAcrossPrefixCollisions()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/ui/icon.png",
+                "assets/ui/sd_icon.png"
+            }));
+
+            const string expected = "assets/ui/2x_sd_sd_icon.png";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+            int checkedCandidates = game.CheckBasenamePrefixes(
+                engine,
+                CancellationToken.None,
+                new[] { "2x_", "2x_sd_" });
+
+            AssertResolved(engine, expected);
+            Assert.Equal(4, checkedCandidates);
+        }
+
+        [Fact]
+        public void GameBasenamePrefixesHonorBudgetAfterOrdinalDeduplication()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/ui/icon.png",
+                "assets/ui/sd_icon.png"
+            }));
+
+            const string expected = "assets/ui/2x_sd_icon.png";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+            int checkedCandidates = game.CheckBasenamePrefixes(
+                engine,
+                CancellationToken.None,
+                new[] { "2x_", "2x_sd_" },
+                candidateBudget: 2);
+
+            AssertResolved(engine, expected);
+            Assert.Equal(2, checkedCandidates);
+        }
+
+        [Fact]
         public void LcuBuildWordlistUsesFullFilteredPaths()
         {
             var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]

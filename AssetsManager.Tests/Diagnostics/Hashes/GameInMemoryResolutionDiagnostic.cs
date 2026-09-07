@@ -906,6 +906,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
         {
             long candidatesBefore = engine.CheckedCandidates;
             int matchesBefore = engine.Matches.Count;
+            long allocatedBefore = GC.GetTotalAllocatedBytes(precise: false);
             var stopwatch = Stopwatch.StartNew();
             string error = null;
             try
@@ -918,11 +919,13 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 Console.WriteLine($"  [warn] Basic stage '{name}' failed: {exception.Message}");
             }
             stopwatch.Stop();
+            long allocatedAfter = GC.GetTotalAllocatedBytes(precise: false);
             stages.Add(new BasicStageResult(
                 name,
                 engine.CheckedCandidates - candidatesBefore,
                 engine.Matches.Count - matchesBefore,
                 stopwatch.Elapsed,
+                allocatedAfter - allocatedBefore,
                 engine.RemainingUnknownCount,
                 error is null,
                 error ?? string.Empty));
@@ -953,12 +956,12 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             Console.WriteLine($"  allocated managed bytes: {FormatBytes(result.AllocatedBytes)}");
             Console.WriteLine("  stage budget: capped stages use the configured budget; regalia and locale APIs are measured uncapped.");
             Console.WriteLine("  stage metrics:");
-            Console.WriteLine($"    {"Stage",-34} {"Candidates",12} {"Resolved",10} {"Elapsed",10} {"Remaining",10} {"Status",10}");
+            Console.WriteLine($"    {"Stage",-34} {"Candidates",12} {"Resolved",10} {"Elapsed",10} {"Allocated",12} {"Remaining",10} {"Status",10}");
             foreach (BasicStageResult stage in result.Stages)
             {
                 Console.WriteLine($"    {stage.Name,-34} {stage.Candidates,12:N0} {stage.Resolved,10:N0} " +
-                                  $"{stage.Elapsed.ToString("hh\\:mm\\:ss"),10} {stage.Remaining,10:N0} " +
-                                  $"{(stage.Succeeded ? "OK" : "FAILED"),10}");
+                                  $"{stage.Elapsed.ToString("hh\\:mm\\:ss"),10} {FormatBytes(stage.AllocatedBytes),12} " +
+                                  $"{stage.Remaining,10:N0} {(stage.Succeeded ? "OK" : "FAILED"),10}");
             }
 
             if (result.Matches.Count > 0)
@@ -1154,6 +1157,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             long Candidates,
             int Resolved,
             TimeSpan Elapsed,
+            long AllocatedBytes,
             int Remaining,
             bool Succeeded,
             string Error);
