@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
+using AssetsManager.Services.Hashes.Guessers.Game;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Hashing;
 using Xunit;

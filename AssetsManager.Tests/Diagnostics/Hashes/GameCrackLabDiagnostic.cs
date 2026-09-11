@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.IO.Hashing;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
+using AssetsManager.Services.Hashes.Guessers.Game;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;

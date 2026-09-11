@@ -12,7 +12,7 @@ using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Hashing;
 
-namespace AssetsManager.Services.Hashes.Guessers
+namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed partial class GameHashGuesser
     {

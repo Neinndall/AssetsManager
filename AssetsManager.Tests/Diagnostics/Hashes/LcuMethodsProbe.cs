@@ -12,6 +12,7 @@ using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
+using AssetsManager.Services.Hashes.Guessers.Game;
 
 namespace AssetsManager.Tests.Diagnostics.Hashes
 {

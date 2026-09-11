@@ -9,7 +9,7 @@ using System.Threading;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Hashes;
 
-namespace AssetsManager.Services.Hashes.Guessers
+namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed partial class GameHashGuesser
     {

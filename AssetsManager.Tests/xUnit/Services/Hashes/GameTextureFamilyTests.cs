@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
+using AssetsManager.Services.Hashes.Guessers.Game;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
