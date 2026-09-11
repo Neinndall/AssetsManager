@@ -100,6 +100,16 @@ namespace AssetsManager.Tests.Diagnostics
                 await BinDumpDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "unknown-skin-context", StringComparison.OrdinalIgnoreCase))
+            {
+                UnknownSkinContextDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "skin-asset-crack", StringComparison.OrdinalIgnoreCase))
+            {
+                SkinAssetCrackDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "quick-hash-check", StringComparison.OrdinalIgnoreCase))
             {
                 QuickHashCheck.Run(args.Skip(1).ToArray());
