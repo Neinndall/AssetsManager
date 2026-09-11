@@ -479,21 +479,23 @@ namespace AssetsManager.Services.Viewer.Resolvers
             bool usesLocalizedAlpha = material.HasSwitch(
                 "ALPHA_BLEND_ON",
                 "USE_FRESNEL_ALPHA");
+            // Generic Mask holds authored coverage when no dedicated iridescence mask exists.
+            string iridescenceMask = FindSamplerKey(
+                material,
+                textureKeys,
+                "Iridescence_Mask",
+                "Iridescent_Mask",
+                "AdditiveScroll_Mask",
+                "Scroll_Tex_Mask",
+                "Scroll_Texture_Mask",
+                "Scroll_Mask",
+                "Pattern_Mask") ?? FindMaterialMask(material, textureKeys);
             return effect with
             {
                 Kind = effect.Kind | ModelMaterialEffectKind.Iridescence,
                 Iridescence = new ModelIridescenceDefinition(
                     iridescenceTexture,
-                    FindSamplerKey(
-                        material,
-                        textureKeys,
-                        "Iridescence_Mask",
-                        "Iridescent_Mask",
-                        "AdditiveScroll_Mask",
-                        "Scroll_Tex_Mask",
-                        "Scroll_Texture_Mask",
-                        "Scroll_Mask",
-                        "Pattern_Mask"),
+                    iridescenceMask,
                     control,
                     ReadVector2(
                         material.Parameters,
