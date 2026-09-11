@@ -399,11 +399,10 @@ namespace AssetsManager.Services.Viewer.Resolvers
             if (candidateRoot != null && relativePath != null)
             {
                 string candidate = Path.GetFullPath(Path.Combine(candidateRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-                string extension = Path.GetExtension(candidate);
                 string rootedPrefix = Path.GetFullPath(candidateRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
                 if (candidate.StartsWith(rootedPrefix, StringComparison.OrdinalIgnoreCase) &&
-                    extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) &&
+                    candidate.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) &&
                     File.Exists(candidate))
                 {
                     return candidate;
@@ -413,35 +412,34 @@ namespace AssetsManager.Services.Viewer.Resolvers
             string fileName = Path.GetFileName(assetPath);
             if (!string.IsNullOrEmpty(fileName))
             {
-                var searchDirs = new List<string>(3);
+                string targetFile = fileName.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)
+                    ? fileName
+                    : fileName + ".tex";
+
                 string skinDir = Path.GetDirectoryName(Path.GetFullPath(sknPath));
                 if (!string.IsNullOrEmpty(skinDir))
                 {
-                    searchDirs.Add(skinDir);
+                    string candidate = Path.Combine(skinDir, targetFile);
+                    if (File.Exists(candidate))
+                    {
+                        return candidate;
+                    }
                 }
-                searchDirs.Add(characterRoot.FullName);
+
+                string characterCandidate = Path.Combine(characterRoot.FullName, targetFile);
+                if (File.Exists(characterCandidate))
+                {
+                    return characterCandidate;
+                }
 
                 if (characterRoot.Parent?.Parent is DirectoryInfo assetsDir &&
                     assetsDir.Name.Equals("assets", StringComparison.OrdinalIgnoreCase) &&
                     assetsDir.Parent != null)
                 {
-                    searchDirs.Add(assetsDir.Parent.FullName);
-                }
-
-                foreach (string dir in searchDirs)
-                {
-                    string candidate = Path.Combine(dir, fileName);
-                    string ext = Path.GetExtension(candidate);
-                    if (ext.Equals(".tex", StringComparison.OrdinalIgnoreCase) &&
-                        File.Exists(candidate))
+                    string wadRootCandidate = Path.Combine(assetsDir.Parent.FullName, targetFile);
+                    if (File.Exists(wadRootCandidate))
                     {
-                        return candidate;
-                    }
-
-                    string texCandidate = Path.Combine(dir, fileName + ".tex");
-                    if (File.Exists(texCandidate))
-                    {
-                        return texCandidate;
+                        return wadRootCandidate;
                     }
                 }
             }
