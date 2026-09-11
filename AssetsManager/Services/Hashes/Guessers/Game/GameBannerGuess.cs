@@ -10,6 +10,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed partial class GameHashGuesser
     {
+        private const int EsportsBannerSingleCandidateBudget = 2_000_000;
+        private const int EsportsBannerCompoundCandidateBudget = 10_000_000;
+        private const int EsportsBannerDoubleCandidateBudget = 2_000_000;
+        private const int EsportsBannerInsertionCandidateBudget = 750_000;
+        private const int EsportsBannerDoubleWordLimit = 96;
 
         internal int GuessEsportsBanners(
             HashGuessEngine engine,

@@ -19,6 +19,38 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed partial class GameHashGuesser
     {
+        private static IEnumerable<IReadOnlyList<T>> GetCombinations<T>(IReadOnlyList<T> values, int length)
+        {
+            if (length <= 0 || values.Count < length) yield break;
+            if (length == 1)
+            {
+                for (int i = 0; i < values.Count; i++)
+                    yield return new[] { values[i] };
+                yield break;
+            }
+
+            int[] indices = new int[length];
+            for (int i = 0; i < length; i++)
+                indices[i] = i;
+
+            while (true)
+            {
+                T[] result = new T[length];
+                for (int i = 0; i < length; i++)
+                    result[i] = values[indices[i]];
+                yield return result;
+
+                int pos = length - 1;
+                while (pos >= 0 && indices[pos] == values.Count - length + pos)
+                    pos--;
+
+                if (pos < 0) break;
+
+                indices[pos]++;
+                for (int i = pos + 1; i < length; i++)
+                    indices[i] = indices[i - 1] + 1;
+            }
+        }
 
         internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
         {

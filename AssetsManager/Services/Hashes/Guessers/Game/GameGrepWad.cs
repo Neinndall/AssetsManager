@@ -333,6 +333,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             }
         }
 
+        private const int AnimationBinFallbackCandidateBudget = 100_000;
+        private static readonly Regex AnimationBinPathRegex = new(
+            @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?|themes/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.(?:bin|inibin)$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private readonly record struct AnimationFileLink(uint NameHash, ulong PathHash, string Path);
+
         private void GuessAnimationBinPaths(
             HashGuessEngine engine,
             ArraySegment<byte> data,

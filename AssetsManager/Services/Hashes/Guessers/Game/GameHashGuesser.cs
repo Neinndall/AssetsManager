@@ -34,16 +34,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private const int MaxCustomSwordlistWords = 20_000;
         private const int MaxCustomDdsWords = 20_000;
         private const int MaxCustomTexWords = 20_000;
-        private const int EsportsBannerSingleCandidateBudget = 2_000_000;
-        private const int EsportsBannerCompoundCandidateBudget = 10_000_000;
-        private const int EsportsBannerDoubleCandidateBudget = 2_000_000;
-        private const int EsportsBannerInsertionCandidateBudget = 750_000;
-        private const int EsportsBannerDoubleWordLimit = 96;
-        private const int AnimationBinFallbackCandidateBudget = 100_000;
-        private static readonly Regex AnimationBinPathRegex = new(
-            @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?|themes/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.(?:bin|inibin)$",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private readonly record struct AnimationFileLink(uint NameHash, ulong PathHash, string Path);
+
         private readonly LogService _logService;
         private readonly Func<uint, string> _resolveBinHash;
 
@@ -335,45 +326,5 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             return true;
         }
 
-        private static IEnumerable<IReadOnlyList<T>> GetCombinations<T>(IReadOnlyList<T> values, int length)
-        {
-            if (length <= 0 || values.Count < length) yield break;
-            if (length == 1)
-            {
-                for (int i = 0; i < values.Count; i++)
-                    yield return new[] { values[i] };
-                yield break;
-            }
-
-            int[] indices = new int[length];
-            for (int i = 0; i < length; i++)
-                indices[i] = i;
-
-            while (true)
-            {
-                T[] result = new T[length];
-                for (int i = 0; i < length; i++)
-                    result[i] = values[indices[i]];
-                yield return result;
-
-                int pos = length - 1;
-                while (pos >= 0 && indices[pos] == values.Count - length + pos)
-                    pos--;
-
-                if (pos < 0) break;
-
-                indices[pos]++;
-                for (int i = pos + 1; i < length; i++)
-                    indices[i] = indices[i - 1] + 1;
-            }
-        }
-
-        private static IEnumerable<IEnumerable<T>> GetPermutations<T>(IReadOnlyList<T> values, int length)
-        {
-            if (length == 1) return values.Select(value => new[] { value }.AsEnumerable());
-            return values.SelectMany(
-                (value, index) => GetPermutations(values.Where((_, candidateIndex) => candidateIndex != index).ToList(), length - 1),
-                (value, tail) => new[] { value }.Concat(tail));
-        }
     }
 }
