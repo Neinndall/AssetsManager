@@ -33,6 +33,7 @@ namespace AssetsManager.Utils
         private static readonly byte[] BIN_IMAA_SIGNATURE = { 0x49, 0x4D, 0x41, 0x41 }; // "IMAA"
         private static readonly byte[] ICO_SIGNATURE = { 0x00, 0x00, 0x01, 0x00 };
         private static readonly byte[] TEX_SIGNATURE = { 0x54, 0x45, 0x58, 0x00 }; // "TEX\0"
+        private static readonly byte[] TOC3_SIGNATURE = { 0x06, 0x00, 0x00, 0x00, 0x54, 0x4F, 0x43, 0x33, 0x2E, 0x30 }; // "\x06\x00\x00\x00TOC3.0"
         private static readonly byte[] ENCRYPTED_RIOT_TEX_SIGNATURE = { 0xC9, 0xE3, 0x44, 0x26 };
         private static readonly byte[] WASM_SIGNATURE = { 0x00, 0x61, 0x73, 0x6d }; // "\0asm"
 
@@ -47,6 +48,7 @@ namespace AssetsManager.Utils
 
             if (StartsWith(data, DDS_SIGNATURE)) return "dds";
             if (StartsWith(data, TEX_SIGNATURE) || StartsWith(data, ENCRYPTED_RIOT_TEX_SIGNATURE)) return "tex";
+            if (StartsWith(data, TOC3_SIGNATURE)) return "toc";
             if (StartsWith(data, WASM_SIGNATURE)) return "wasm";
             if (StartsWith(data, UNITYFS_SIGNATURE) || StartsWith(data, UNITYWEB_SIGNATURE) || StartsWith(data, UNITYRAW_SIGNATURE)) return "assetbundle";
             if (StartsWith(data, PNG_SIGNATURE)) return "png";
