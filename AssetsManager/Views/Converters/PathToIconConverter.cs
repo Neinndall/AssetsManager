@@ -45,6 +45,7 @@ namespace AssetsManager.Views.Converters
             { ".bin", MaterialIconKind.FileCodeOutline },
             { ".troybin", MaterialIconKind.StarFourPoints },
             { ".preload", MaterialIconKind.FormatListBulleted },
+            { ".toc", MaterialIconKind.TableOfContents },
             { ".skl", MaterialIconKind.SitemapOutline }, 
             { ".skn", MaterialIconKind.CubeOutline },
             { ".sco", MaterialIconKind.CubeOutline },
