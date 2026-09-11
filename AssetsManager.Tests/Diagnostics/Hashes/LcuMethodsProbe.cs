@@ -222,7 +222,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
 
         private static object CreateLcuGuesser(IReadOnlyList<string> paths)
         {
-            Type type = GetType("AssetsManager.Services.Hashes.Guessers.LcuHashGuesser");
+            Type type = GetType("AssetsManager.Services.Hashes.Guessers.Lcu.LcuHashGuesser");
             object hashFile = CreateHashFile(HashGuessDomain.Lcu, paths);
             Type hashFileType = hashFile.GetType();
             ConstructorInfo ctor = type.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
@@ -236,7 +236,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
 
         private static object CreateGameGuesser(IReadOnlyList<string> paths)
         {
-            Type type = GetType("AssetsManager.Services.Hashes.Guessers.GameHashGuesser");
+            Type type = GetType("AssetsManager.Services.Hashes.Guessers.Game.GameHashGuesser");
             object hashFile = CreateHashFile(HashGuessDomain.Game, paths);
             Type hashFileType = hashFile.GetType();
             ConstructorInfo ctor = type.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)

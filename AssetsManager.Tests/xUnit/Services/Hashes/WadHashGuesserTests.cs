@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
 using AssetsManager.Services.Hashes.Guessers.Game;
+using AssetsManager.Services.Hashes.Guessers.Lcu;
 using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
