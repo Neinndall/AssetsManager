@@ -16,6 +16,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed partial class GameHashGuesser
     {
+        private const int MaxCustomBuildListWords = 50_000;
+        private const int MaxCustomBinWords = 20_000;
+        private const int MaxCustomDataBinWords = 20_000;
+        private const int MaxCustomSwordlistWords = 20_000;
+        private const int MaxCustomDdsWords = 20_000;
+        private const int MaxCustomTexWords = 20_000;
 
         internal int SubstituteBasenameWords(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
         {

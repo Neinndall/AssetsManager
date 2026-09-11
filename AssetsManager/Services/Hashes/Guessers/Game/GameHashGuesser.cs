@@ -28,13 +28,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
         private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scannedWadCharacters = new();
 
-        private const int MaxCustomBuildListWords = 50_000;
-        private const int MaxCustomBinWords = 20_000;
-        private const int MaxCustomDataBinWords = 20_000;
-        private const int MaxCustomSwordlistWords = 20_000;
-        private const int MaxCustomDdsWords = 20_000;
-        private const int MaxCustomTexWords = 20_000;
-
         private readonly LogService _logService;
         private readonly Func<uint, string> _resolveBinHash;
 
