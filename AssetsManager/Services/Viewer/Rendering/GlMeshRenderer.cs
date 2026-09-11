@@ -341,7 +341,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gl.ActiveTexture(TextureUnit.Texture6);
                     _gl.BindTexture(TextureTarget.Texture2D, resources.IridescenceTexture != 0 ? resources.IridescenceTexture : _resources.WhiteTexture);
                     _gl.ActiveTexture(TextureUnit.Texture7);
-                    _gl.BindTexture(TextureTarget.Texture2D, resources.IridescenceMaskTexture != 0 ? resources.IridescenceMaskTexture : _resources.WhiteTexture);
+                    uint iridescenceMaskTex = resources.IridescenceMaskTexture != 0
+                        ? resources.IridescenceMaskTexture
+                        : (iridescence?.MaskTextureName != null ? _resources.BlackTexture : _resources.WhiteTexture);
+                    _gl.BindTexture(TextureTarget.Texture2D, iridescenceMaskTex);
                 }
 
                 // --- Material Effects parameters ---

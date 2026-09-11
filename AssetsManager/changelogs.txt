@@ -568,4 +568,4 @@ Bug Fixes
   - 3D Mesh Analyzer / Synchronized camera framing to automatically focus and scale to loaded model bounds on open.
   - 3D Mesh Analyzer / Cleaned up legacy WPF material allocations and streamlined topological overlay rendering.
   - Fixed 3D Mesh Analyzer camera reset leaving the Old Version viewport unsynchronized after switching camera views.
-  - Viewer / Fixed greenish-blue edges on champion skins so models show their authored colors.
+  - Viewer / Fixed greenish-blue silhouette edges on champion skins by resolving extracted WAD mask textures and honoring authored coverage.

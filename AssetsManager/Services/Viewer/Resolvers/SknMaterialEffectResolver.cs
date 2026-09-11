@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Hashing;
 
@@ -30,6 +31,16 @@ namespace AssetsManager.Services.Viewer.Resolvers
             "Scroll_Tex_Mask",
             "Scroll_Texture_Mask",
             "Scroll_Mask"
+        };
+        private static readonly string[] IridescenceMaskSamplerNames =
+        {
+            "Iridescence_Mask",
+            "Iridescent_Mask",
+            "AdditiveScroll_Mask",
+            "Scroll_Tex_Mask",
+            "Scroll_Texture_Mask",
+            "Scroll_Mask",
+            "Pattern_Mask"
         };
 
         internal static ModelMaterialEffectDefinition Resolve(
@@ -483,13 +494,16 @@ namespace AssetsManager.Services.Viewer.Resolvers
             string iridescenceMask = FindSamplerKey(
                 material,
                 textureKeys,
-                "Iridescence_Mask",
-                "Iridescent_Mask",
-                "AdditiveScroll_Mask",
-                "Scroll_Tex_Mask",
-                "Scroll_Texture_Mask",
-                "Scroll_Mask",
-                "Pattern_Mask") ?? FindMaterialMask(material, textureKeys);
+                IridescenceMaskSamplerNames) ?? FindMaterialMask(material, textureKeys);
+            if (iridescenceMask == null)
+            {
+                if (HasAuthoredBlackMaterialMask(material))
+                {
+                    return effect;
+                }
+
+                iridescenceMask = FindAuthoredMaskName(material);
+            }
             return effect with
             {
                 Kind = effect.Kind | ModelMaterialEffectKind.Iridescence,
@@ -728,6 +742,23 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 material,
                 textureKeys,
                 MaterialMaskSamplerNames);
+
+        private static string FindAuthoredMaskName(SknMaterialDefinition material)
+        {
+            foreach (string samplerName in IridescenceMaskSamplerNames.Concat(MaterialMaskSamplerNames))
+            {
+                string expected = SknMaterialTextureResolver.NormalizeToken(samplerName);
+                SknMaterialSampler sampler = material.FindSampler(expected);
+                if (sampler != null && !string.IsNullOrWhiteSpace(sampler.TexturePath) &&
+                    !SknMaterialTextureResolver.IsNeutralTexturePath(sampler.TexturePath))
+                {
+                    return PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(
+                        sampler.TexturePath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar)));
+                }
+            }
+
+            return null;
+        }
 
         private static bool HasAuthoredBlackMaterialMask(SknMaterialDefinition material) =>
             material.Samplers.Any(sampler =>

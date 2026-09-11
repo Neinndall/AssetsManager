@@ -396,20 +396,63 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 relativePath = assetPath["assets/".Length..];
             }
 
-            if (candidateRoot == null || relativePath == null)
+            if (candidateRoot != null && relativePath != null)
             {
-                return null;
+                string candidate = Path.GetFullPath(Path.Combine(candidateRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+                string extension = Path.GetExtension(candidate);
+                string rootedPrefix = Path.GetFullPath(candidateRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+                if (candidate.StartsWith(rootedPrefix, StringComparison.OrdinalIgnoreCase) &&
+                    (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) || extension.Equals(".dds", StringComparison.OrdinalIgnoreCase)) &&
+                    File.Exists(candidate))
+                {
+                    return candidate;
+                }
             }
 
-            string candidate = Path.GetFullPath(Path.Combine(candidateRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-            string extension = Path.GetExtension(candidate);
-            string rootedPrefix = Path.GetFullPath(candidateRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            string fileName = Path.GetFileName(assetPath);
+            if (!string.IsNullOrEmpty(fileName))
+            {
+                var searchDirs = new List<string>(3);
+                string skinDir = Path.GetDirectoryName(Path.GetFullPath(sknPath));
+                if (!string.IsNullOrEmpty(skinDir))
+                {
+                    searchDirs.Add(skinDir);
+                }
+                searchDirs.Add(characterRoot.FullName);
 
-            return candidate.StartsWith(rootedPrefix, StringComparison.OrdinalIgnoreCase) &&
-                   (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) || extension.Equals(".dds", StringComparison.OrdinalIgnoreCase)) &&
-                   File.Exists(candidate)
-                ? candidate
-                : null;
+                if (characterRoot.Parent?.Parent is DirectoryInfo assetsDir &&
+                    assetsDir.Name.Equals("assets", StringComparison.OrdinalIgnoreCase) &&
+                    assetsDir.Parent != null)
+                {
+                    searchDirs.Add(assetsDir.Parent.FullName);
+                }
+
+                foreach (string dir in searchDirs)
+                {
+                    string candidate = Path.Combine(dir, fileName);
+                    string ext = Path.GetExtension(candidate);
+                    if ((ext.Equals(".tex", StringComparison.OrdinalIgnoreCase) || ext.Equals(".dds", StringComparison.OrdinalIgnoreCase)) &&
+                        File.Exists(candidate))
+                    {
+                        return candidate;
+                    }
+
+                    string texCandidate = Path.Combine(dir, fileName + ".tex");
+                    if (File.Exists(texCandidate))
+                    {
+                        return texCandidate;
+                    }
+
+                    string ddsCandidate = Path.Combine(dir, fileName + ".dds");
+                    if (File.Exists(ddsCandidate))
+                    {
+                        return ddsCandidate;
+                    }
+                }
+            }
+
+            return null;
         }
 
         private static DirectoryInfo FindCharacterRoot(string sknPath)

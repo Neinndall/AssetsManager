@@ -78,9 +78,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         {
             _gl = gl;
             WhiteTexture = CreateWhiteTexture();
+            BlackTexture = CreateBlackTexture();
         }
 
         internal uint WhiteTexture { get; }
+        internal uint BlackTexture { get; }
 
         internal PartResources Ensure(SceneModel model, ModelPart part)
         {
@@ -574,6 +576,27 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             return texture;
         }
 
+        private uint CreateBlackTexture()
+        {
+            uint texture = _gl.GenTexture();
+            _gl.BindTexture(TextureTarget.Texture2D, texture);
+            byte[] black = { 0, 0, 0, 255 };
+            _gl.TexImage2D(
+                TextureTarget.Texture2D,
+                0,
+                InternalFormat.Rgba8,
+                1,
+                1,
+                0,
+                Silk.NET.OpenGL.PixelFormat.Rgba,
+                PixelType.UnsignedByte,
+                new ReadOnlySpan<byte>(black));
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
+            return texture;
+        }
+
         private uint UploadTexture(
             BitmapSource bitmap,
             bool premultiplyAlpha = true,
@@ -656,6 +679,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
                 if (WhiteTexture != 0)
                     _gl.DeleteTexture(WhiteTexture);
+                if (BlackTexture != 0)
+                    _gl.DeleteTexture(BlackTexture);
             }
             catch (Silk.NET.Core.Loader.SymbolLoadingException)
             {

@@ -559,6 +559,30 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Null(effect.Iridescence.MaskTextureName);
         }
 
+        [Fact]
+        public void Resolve_PreservesAuthoredMaskForIridescenceWhenTextureUnresolved()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler(
+                        "iridescentTex",
+                        "ASSETS/Shared/Materials/default_gradient.tex"),
+                    new SknMaterialSampler(
+                        "Mask",
+                        "cd174f650ce9caee")
+                },
+                new Dictionary<string, Vector4>());
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "default_gradient" },
+                new[] { "Body" });
+
+            Assert.Equal("cd174f650ce9caee", effect.Iridescence.MaskTextureName);
+        }
+
         [Theory]
         [InlineData("black", false)]
         [InlineData("white", true)]
@@ -1522,6 +1546,42 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     SknMaterialTextureResolver.TryResolveTexturePath(
                         sknPath,
                         "ASSETS/Shared/Materials/flowmap.tex"),
+                    ignoreCase: true);
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Fact]
+        public void TryResolveTexturePath_FindsUnhashedChunkAtWadRoot()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-wad-root-{Guid.NewGuid():N}");
+            string sknPath = Path.Combine(
+                root,
+                "assets",
+                "characters",
+                "janna",
+                "skins",
+                "skin67",
+                "janna_skin67.skn");
+            string chunkTexturePath = Path.Combine(root, "cd174f650ce9caee.tex");
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(sknPath)!);
+                File.WriteAllBytes(sknPath, Array.Empty<byte>());
+                File.WriteAllBytes(chunkTexturePath, Array.Empty<byte>());
+
+                Assert.Equal(
+                    chunkTexturePath,
+                    SknMaterialTextureResolver.TryResolveTexturePath(
+                        sknPath,
+                        "cd174f650ce9caee"),
                     ignoreCase: true);
             }
             finally
