@@ -1593,6 +1593,36 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             }
         }
 
+        [Fact]
+        public void Resolve_ResolvesProceduralGlassMaterialWithoutSamplers()
+        {
+            const string materialPath = "Characters/Janna/Skins/Skin67/Materials/Eyes_mat";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Janna/Skins/Skin67/Janna_Skin67_TX_CM.tex",
+                CreateOverride(
+                    "Glass",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    Array.Empty<BinTreeEmbedded>(),
+                    CreateParameter("Glass_Color1", new Vector4(0.31f, 0.15f, 0.31f, 0f)),
+                    CreateParameter("Glass_Color2", new Vector4(1f, 0.2f, 0.33f, 0f)),
+                    CreateParameter("Alpha_Bias", new Vector4(0.055f, 0f, 0f, 0f)),
+                    CreateParameter("Fresnel_Size_Inner", new Vector4(64f, 0f, 0f, 0f)),
+                    CreateParameter("Fresnel_Size_Outer", new Vector4(1.13f, 0f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "janna_skin67_tx_cm" });
+
+            Assert.True(resolution.MaterialOverrideKeys.Contains("glass"));
+            ModelMaterialEffectDefinition effect = resolution.ResolveEffect("glass");
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
+            Assert.True(effect.MaterialTint.W < 0.1f);
+            Assert.Equal(0.31f, effect.MaterialTint.X, 2);
+            Assert.Equal(1f, effect.FresnelColor.X, 2);
+        }
+
         private static BinTree CreateSeraphineIridescentBodyTree(
             bool includeAdditiveTint,
             bool includeZeroAdditiveSpeed = false,

@@ -212,7 +212,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                                 candidates.Add(materialTexturePath);
                             }
 
-                            if (materialDefinition.Samplers.Count > 0)
+                            if (materialDefinition.Samplers.Count > 0 ||
+                                materialDefinition.Parameters.Count > 0 ||
+                                materialDefinition.Switches.Count > 0)
                             {
                                 overrideMaterials[normalizedSubmesh] = materialDefinition;
                             }

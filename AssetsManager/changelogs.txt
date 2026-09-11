@@ -569,3 +569,4 @@ Bug Fixes
   - 3D Mesh Analyzer / Cleaned up legacy WPF material allocations and streamlined topological overlay rendering.
   - Fixed 3D Mesh Analyzer camera reset leaving the Old Version viewport unsynchronized after switching camera views.
   - Viewer / Fixed greenish-blue silhouette edges on champion skins by resolving extracted WAD mask textures and honoring authored coverage.
+  - Viewer / Supported procedural glass materials with transparency and fresnel highlights, preventing opaque white surfaces on untextured glass submeshes.

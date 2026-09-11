@@ -69,16 +69,46 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         private static ModelMaterialEffectDefinition ApplyMaterialTint(
             ModelMaterialEffectDefinition effect,
-            SknMaterialDefinition material) =>
-            effect with
+            SknMaterialDefinition material)
+        {
+            Vector4 tint = ReadVector4(
+                material.Parameters,
+                Vector4.One,
+                "TintColor",
+                "MaterialTint",
+                "ColorTint");
+
+            if (tint == Vector4.One &&
+                (material.Parameters.ContainsKey("Alpha_Bias") ||
+                 material.Parameters.ContainsKey("AlphaBias") ||
+                 material.Parameters.ContainsKey("Glass_Color1") ||
+                 material.Parameters.ContainsKey("GlassColor1")))
             {
-                MaterialTint = ReadVector4(
+                Vector4 glassColor = ReadVector4(
                     material.Parameters,
                     Vector4.One,
-                    "TintColor",
-                    "MaterialTint",
-                    "ColorTint")
-            };
+                    "Glass_Color1",
+                    "GlassColor1",
+                    "Glass_Color",
+                    "GlassColor");
+
+                float alpha = ReadFloat(
+                    material.Parameters,
+                    1f,
+                    "Alpha_Bias",
+                    "AlphaBias",
+                    "Glass_Alpha",
+                    "Transparency");
+
+                float finalAlpha = material.Parameters.ContainsKey("Alpha_Bias") || material.Parameters.ContainsKey("AlphaBias")
+                    ? Math.Clamp(alpha, 0.01f, 0.95f)
+                    : (glassColor.W > 0f && glassColor.W < 1f ? glassColor.W : 1f);
+
+                tint = new Vector4(glassColor.X, glassColor.Y, glassColor.Z, finalAlpha);
+            }
+
+            return effect with { MaterialTint = tint };
+        }
 
         private static ModelMaterialEffectDefinition ResolveOverlay(
             SknMaterialDefinition material,
@@ -418,7 +448,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "FresnelIntensity",
                 "Fresnel_Strength",
                 "Fresnel",
-                "Fresnel_Color_Intensity");
+                "Fresnel_Color_Intensity",
+                "Fresnel_Size_Outer");
             if (strength <= Epsilon)
             {
                 return effect;
@@ -441,13 +472,16 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     Vector4.One,
                     "Fresnel_Color",
                     "FresnelColor",
-                    "Fresnel_ColorTint"),
+                    "Fresnel_ColorTint",
+                    "Glass_Color2",
+                    "GlassColor2"),
                 FresnelPower = ReadFloat(
                     material.Parameters,
                     2f,
                     "FresnelPower",
                     "Fresnel_Power",
-                    "FresnelExponent"),
+                    "FresnelExponent",
+                    "Fresnel_Size_Inner"),
                 FresnelStrength = strength
             };
 
