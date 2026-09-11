@@ -403,7 +403,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 string rootedPrefix = Path.GetFullPath(candidateRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
                 if (candidate.StartsWith(rootedPrefix, StringComparison.OrdinalIgnoreCase) &&
-                    (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) || extension.Equals(".dds", StringComparison.OrdinalIgnoreCase)) &&
+                    extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) &&
                     File.Exists(candidate))
                 {
                     return candidate;
@@ -432,7 +432,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 {
                     string candidate = Path.Combine(dir, fileName);
                     string ext = Path.GetExtension(candidate);
-                    if ((ext.Equals(".tex", StringComparison.OrdinalIgnoreCase) || ext.Equals(".dds", StringComparison.OrdinalIgnoreCase)) &&
+                    if (ext.Equals(".tex", StringComparison.OrdinalIgnoreCase) &&
                         File.Exists(candidate))
                     {
                         return candidate;
@@ -442,12 +442,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     if (File.Exists(texCandidate))
                     {
                         return texCandidate;
-                    }
-
-                    string ddsCandidate = Path.Combine(dir, fileName + ".dds");
-                    if (File.Exists(ddsCandidate))
-                    {
-                        return ddsCandidate;
                     }
                 }
             }
