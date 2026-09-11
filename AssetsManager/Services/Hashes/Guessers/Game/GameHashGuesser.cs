@@ -26,8 +26,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
     {
         private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs", ".cs" };
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
-        private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scannedWadCharacters = new();
-
         private readonly LogService _logService;
         private readonly Func<uint, string> _resolveBinHash;
 

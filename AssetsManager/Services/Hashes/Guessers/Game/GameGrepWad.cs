@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Hashing;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -22,6 +23,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed partial class GameHashGuesser
     {
+        private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scannedWadCharacters = new();
 
         internal override bool ShouldGrepExtension(string extension) =>
             extension is not ("dds" or "jpg" or "png" or "tga" or "ttf" or "otf" or "ogg" or "webm" or
