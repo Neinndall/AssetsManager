@@ -3893,7 +3893,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                      container.Length > 4 && container.Skip(4).All(char.IsDigit));
         }
 
-        private static IEnumerable<string> OrderAnimationContainers(string sourceContainer, IEnumerable<string> containers)
+        internal static IEnumerable<string> OrderAnimationContainers(string sourceContainer, IEnumerable<string> containers)
         {
             int sourceNumber = -1;
             Match sourceMatch = Regex.Match(sourceContainer ?? string.Empty, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
@@ -3906,6 +3906,9 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             int AnimationContainerDistance(string container)
             {
+                // The shared base container holds the fallback actions, so it goes
+                // right after the source skin instead of starving behind the budget.
+                if (container.Equals("base", StringComparison.OrdinalIgnoreCase)) return -1;
                 if (sourceNumber < 0) return int.MaxValue;
                 Match match = Regex.Match(container, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
                 return match.Success && int.TryParse(match.Groups[1].Value, out int number)

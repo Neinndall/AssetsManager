@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
 using AssetsManager.Views.Models.Hashes;
@@ -46,6 +47,11 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
 
         private sealed record OverrideRef(string SkinBin, string Submesh);
 
+        private static readonly uint AnimationFileHash = Fnv1a.HashLower("mAnimationFilePath");
+        private static readonly Regex SkinNumberRegex = new(@"skin(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private sealed record AnimBin(string Bin, List<string> KnownAnims, List<ulong> UnknownAnims);
+
         public static void Run(string[] args)
         {
             string pbeRoot = args.FirstOrDefault(arg => !arg.StartsWith("--", StringComparison.Ordinal))
@@ -81,6 +87,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 // Phase 1: collect (unknown texture -> skin BINs + submeshes) via material overrides.
                 var textureRefs = new Dictionary<ulong, List<OverrideRef>>();
                 var skinBins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var animBins = new List<AnimBin>();
                 foreach (string wadPath in wadPaths)
                 {
                     WadFile wad;
@@ -126,6 +133,9 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                             {
                                 continue;
                             }
+
+                            if (logical.Contains("/animations/", StringComparison.OrdinalIgnoreCase))
+                                CollectAnimLinks(logical, tree, gamePaths, unknowns, animBins);
 
                             var materials = new Dictionary<uint, List<ulong>>();
                             foreach (BinTreeObject material in tree.Objects.Values)
@@ -190,6 +200,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 Console.WriteLine($"SKIN ASSET CRACK PROBE ({unknowns.Count} unknowns)");
                 Console.WriteLine($"  skin BINs with overrides: {skinBins.Count}");
                 Console.WriteLine($"  unknown textures referenced: {textureRefs.Count}");
+                Console.WriteLine($"  animation BINs with siblings: {animBins.Count}");
 
                 // Phase 2: learn file stems per skin folder from known textures, then try candidates.
                 var stems = LearnStems(gamePaths);
@@ -229,11 +240,225 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 Console.WriteLine($"  HITS: {hits}");
                 foreach (string sample in hitSamples)
                     Console.WriteLine($"    {sample}");
+
+                // Phase 2b: sibling skin-swap for unknown animations.
+                int animHits = 0;
+                int animTried = 0;
+                var animSamples = new List<string>();
+                foreach (AnimBin animBin in animBins)
+                {
+                    string file = Path.GetFileNameWithoutExtension(animBin.Bin);
+                    Match skinMatch = SkinNumberRegex.Match(file);
+                    string skinNum = skinMatch.Success ? skinMatch.Groups[1].Value : null;
+                    foreach (ulong target in animBin.UnknownAnims)
+                    {
+                        foreach (string sibling in animBin.KnownAnims)
+                        {
+                            foreach (string candidate in BuildAnimCandidates(sibling, skinNum))
+                            {
+                                animTried++;
+                                if (XxHash64Ext.Hash(candidate) == target)
+                                {
+                                    animHits++;
+                                    if (animSamples.Count < 40)
+                                        animSamples.Add($"{target:x16} = {candidate}");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Console.WriteLine($"  anim candidates tried: {animTried}");
+                Console.WriteLine($"  ANIM HITS: {animHits}");
+                foreach (string sample in animSamples)
+                    Console.WriteLine($"    {sample}");
+
+                // Phase 2c: sibling action transfer for unknown animations.
+                int actionHits = 0;
+                int actionTried = 0;
+                var actionSamples = new List<string>();
+                var actionIndex = BuildActionIndex(animBins, gamePaths);
+                foreach (AnimBin animBin in animBins)
+                {
+                    foreach (ulong target in animBin.UnknownAnims)
+                    {
+                        foreach (string candidate in BuildActionCandidates(animBin, target, actionIndex))
+                        {
+                            actionTried++;
+                            if (XxHash64Ext.Hash(candidate) == target)
+                            {
+                                actionHits++;
+                                if (actionSamples.Count < 40)
+                                    actionSamples.Add($"{target:x16} = {candidate}");
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                Console.WriteLine($"  action candidates tried: {actionTried}");
+                Console.WriteLine($"  ACTION HITS: {actionHits}");
+                foreach (string sample in actionSamples)
+                    Console.WriteLine($"    {sample}");
             }
             finally
             {
                 foreach (WadFile wad in wadIndex.Values)
                     wad.Dispose();
+            }
+        }
+
+        private static void CollectAnimLinks(
+            string logical,
+            BinTree tree,
+            IReadOnlyDictionary<ulong, string> gamePaths,
+            HashSet<ulong> unknowns,
+            List<AnimBin> animBins)
+        {
+            var known = new List<string>();
+            var unknown = new List<ulong>();
+            foreach (BinTreeObject obj in tree.Objects.Values)
+            foreach (BinTreeProperty property in Enumerate(obj.Properties.Values))
+            {
+                if (property.NameHash != AnimationFileHash ||
+                    property is not BinTreeWadChunkLink link ||
+                    link.Value == 0)
+                    continue;
+                if (unknowns.Contains(link.Value))
+                {
+                    if (!unknown.Contains(link.Value))
+                        unknown.Add(link.Value);
+                }
+                else if (gamePaths.TryGetValue(link.Value, out string animPath) &&
+                         animPath.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) &&
+                         !known.Contains(animPath, StringComparer.OrdinalIgnoreCase))
+                    known.Add(animPath);
+            }
+
+            if (unknown.Count > 0 && known.Count > 0)
+                animBins.Add(new AnimBin(logical, known, unknown));
+        }
+
+        private static IEnumerable<string> BuildAnimCandidates(string sibling, string skinNum)
+        {
+            if (skinNum == null || !SkinNumberRegex.IsMatch(sibling))
+                yield break;
+            if (int.TryParse(skinNum, out int number))
+            {
+                string plain = SkinNumberRegex.Replace(sibling, "skin" + number);
+                if (!plain.Equals(sibling, StringComparison.OrdinalIgnoreCase))
+                    yield return plain;
+                string padded = SkinNumberRegex.Replace(sibling, "skin" + number.ToString("D2", CultureInfo.InvariantCulture));
+                if (!padded.Equals(sibling, StringComparison.OrdinalIgnoreCase) &&
+                    !padded.Equals(plain, StringComparison.OrdinalIgnoreCase))
+                    yield return padded;
+            }
+        }
+
+        private static IEnumerable<BinTreeProperty> Enumerate(IEnumerable<BinTreeProperty> properties)
+        {
+            foreach (BinTreeProperty property in properties)
+            {
+                if (property is null)
+                    continue;
+                yield return property;
+                IEnumerable<BinTreeProperty> children = property switch
+                {
+                    BinTreeStruct structure => structure.Properties.Values,
+                    BinTreeOptional optional when optional.Value is not null => new[] { optional.Value },
+                    BinTreeContainer container => container.Elements,
+                    BinTreeMap map => map.SelectMany(pair => new[] { pair.Key, pair.Value }),
+                    _ => Array.Empty<BinTreeProperty>()
+                };
+                foreach (BinTreeProperty child in children)
+                foreach (BinTreeProperty nested in Enumerate(new[] { child }))
+                    yield return nested;
+            }
+        }
+
+        private sealed record ActionIndex(
+            Dictionary<string, HashSet<string>> DirStems,
+            Dictionary<string, HashSet<string>> ChampActions);
+
+        private static ActionIndex BuildActionIndex(
+            List<AnimBin> animBins,
+            IReadOnlyDictionary<ulong, string> gamePaths)
+        {
+            var dirStems = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var champActions = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var seenDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (AnimBin animBin in animBins)
+            foreach (string sibling in animBin.KnownAnims)
+            {
+                string dir = sibling[..(sibling.LastIndexOf('/') + 1)];
+                string baseName = sibling[(sibling.LastIndexOf('/') + 1)..^".anm".Length];
+                if (!seenDirs.Add(dir))
+                    continue;
+                if (!dirStems.TryGetValue(dir, out HashSet<string> stems))
+                    dirStems[dir] = stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                int prefixCut = baseName.LastIndexOf('_');
+                if (prefixCut > 0)
+                    stems.Add(baseName[..prefixCut]);
+            }
+
+            foreach (string path in gamePaths.Values)
+            {
+                if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string[] parts = path.Replace('\\', '/').Split('/');
+                int charIndex = Array.FindIndex(parts, p => p.Equals("characters", StringComparison.OrdinalIgnoreCase));
+                if (charIndex < 0 || charIndex + 1 >= parts.Length)
+                    continue;
+                string champ = parts[charIndex + 1].ToLowerInvariant();
+                string baseName = parts[^1][..^".anm".Length];
+                if (!champActions.TryGetValue(champ, out HashSet<string> actions))
+                    champActions[champ] = actions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                actions.Add(baseName);
+                string stripped = StripChampSkinPrefix(baseName, champ);
+                if (!stripped.Equals(baseName, StringComparison.OrdinalIgnoreCase))
+                    actions.Add(stripped);
+            }
+
+            return new ActionIndex(dirStems, champActions);
+        }
+
+        private static string StripChampSkinPrefix(string baseName, string champ)
+        {
+            string work = baseName;
+            if (work.StartsWith(champ + "_", StringComparison.OrdinalIgnoreCase))
+                work = work[(champ.Length + 1)..];
+            work = SkinNumberRegex.Replace(work, "").Trim('_');
+            return work.Length == 0 ? baseName : work;
+        }
+
+        private static IEnumerable<string> BuildActionCandidates(
+            AnimBin animBin,
+            ulong target,
+            ActionIndex index)
+        {
+            string[] parts = animBin.Bin.Replace('\\', '/').Split('/');
+            int charIndex = Array.FindIndex(parts, p => p.Equals("characters", StringComparison.OrdinalIgnoreCase));
+            string champ = charIndex >= 0 && charIndex + 1 < parts.Length
+                ? parts[charIndex + 1].ToLowerInvariant()
+                : null;
+            var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string sibling in animBin.KnownAnims)
+                dirs.Add(sibling[..(sibling.LastIndexOf('/') + 1)]);
+            if (!index.ChampActions.TryGetValue(champ ?? string.Empty, out HashSet<string> actions))
+                actions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string dir in dirs)
+            {
+                index.DirStems.TryGetValue(dir, out HashSet<string> stems);
+                foreach (string action in actions)
+                {
+                    yield return $"{dir}{action}.anm";
+                    if (stems == null)
+                        continue;
+                    foreach (string stem in stems)
+                        yield return $"{dir}{stem}_{action}.anm";
+                }
             }
         }
 

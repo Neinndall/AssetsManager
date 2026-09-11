@@ -911,6 +911,27 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void AnimationContainersPrioritizeBaseRightAfterSource()
+        {
+            string[] ordered = GameHashGuesser
+                .OrderAnimationContainers("skin0", new[] { "skin24", "base", "skin01", "skin58", "themes" })
+                .ToArray();
+
+            Assert.Equal("base", ordered[0]);
+            Assert.Equal(new[] { "base", "skin01", "skin24", "skin58", "themes" }, ordered);
+        }
+
+        [Fact]
+        public void AnimationContainersKeepNumericProximityWithoutSourceNumber()
+        {
+            string[] ordered = GameHashGuesser
+                .OrderAnimationContainers("starnemesis", new[] { "skin24", "base", "skin01" })
+                .ToArray();
+
+            Assert.Equal("base", ordered[0]);
+        }
+
+        [Fact]
         public void NormalizationPreservesLongRiotCandidates()
         {
             string candidate = "assets/" + new string('a', 600) + ".bin";
