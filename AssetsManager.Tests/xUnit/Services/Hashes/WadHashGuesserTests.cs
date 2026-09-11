@@ -2207,6 +2207,48 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GameRecallTextureLinesWalkForwardAndBackward()
+        {
+            var game = new GameHashGuesser(new HashFile(
+                HashGuessDomain.Game,
+                new[]
+                {
+                    "assets/characters/tristana/skins/skin09/tristana_skin06_rc03_tx_cm.tex"
+                }));
+            string[] expected =
+            {
+                "assets/characters/tristana/skins/skin10/tristana_skin06_rc04_tx_cm.tex",
+                "assets/characters/tristana/skins/skin08/tristana_skin06_rc02_tx_gm.dds"
+            };
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GuessCharactersFiles(engine, CancellationToken.None, new[] { "tristana" });
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.All(expected, path =>
+                Assert.Contains(engine.Matches.Values, match => match.Path == path));
+        }
+
+        [Fact]
+        public void GameThemeRecallsSweepDarkSkinFolders()
+        {
+            var game = new GameHashGuesser(new HashFile(
+                HashGuessDomain.Game,
+                new[]
+                {
+                    "assets/characters/jade_nami/skins/skin01/animations/jade_nami_koi_attack1.anm",
+                    "assets/characters/jade_nami/skins/skin05/chromapreview.tex"
+                }));
+            const string expected = "assets/characters/jade_nami/skins/skin05/jade_nami_koi_rc02_tx_cm.tex";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GuessCharactersFiles(engine, CancellationToken.None, new[] { "jade_nami" });
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expected);
+        }
+
+        [Fact]
         public void GameSharedIconBasenamesTransferAcrossChampionFolders()
         {
             var game = new GameHashGuesser(new HashFile(
@@ -2872,6 +2914,45 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         public void GameMaterialGlossMapTwinMatchesColorMap()
         {
             const string expected = "assets/characters/test/skins/skin1/test_skin1_lower_tx_gm.tex";
+            var sampler = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("textureName"), "Diffuse_Texture"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), XxHash64Ext.Hash(expected))
+                });
+            var material = new BinTreeObject(
+                "Characters/Test/Skins/Skin1/Materials/Test_Skin1_Lower",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(0x8d39bde6, "Characters/Test/Skins/Skin1/Materials/Test_Skin1_Lower"),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new[] { sampler })
+                });
+            var tree = new BinTree(new[] { material }, Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(stream.ToArray()),
+                "data/characters/test/skins/skin1.bin",
+                "Test.wad.client",
+                1);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void GameMaterialMultiplierMapTwinMatchesColorMap()
+        {
+            const string expected = "assets/characters/test/skins/skin1/test_skin1_lower_mult.tex";
             var sampler = new BinTreeEmbedded(
                 0,
                 Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),

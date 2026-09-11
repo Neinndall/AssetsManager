@@ -110,6 +110,17 @@ namespace AssetsManager.Tests.Diagnostics
                 SkinAssetCrackDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "game-string-search", StringComparison.OrdinalIgnoreCase))
+            {
+                GameStringSearchDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "hash-path", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (string path in args.Skip(1))
+                    Console.WriteLine($"{XxHash64Ext.Hash(path):x16}  {path}");
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "anim-bin-probe", StringComparison.OrdinalIgnoreCase))
             {
                 AnimBinProbeDiagnostic.Run(args.Skip(1).ToArray());

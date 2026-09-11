@@ -87,6 +87,53 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GuessSkinRoleTextures_ResolvesBareRoleDds()
+        {
+            const string target = "assets/characters/jade_nami/skins/skin02/jade_nami_skin02_cubemap.dds";
+            ulong targetHash = XxHash64Ext.Hash(target);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()), null, _ => string.Empty);
+            var matches = new List<HashGuessMatch>();
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { targetHash }, m => matches.Add(m));
+
+            guesser.GuessSkinRoleTextures(
+                engine,
+                new ArraySegment<byte>(new byte[4]),
+                "data/characters/jade_nami/skins/skin02.bin",
+                "Nami.wad.client",
+                5UL,
+                System.Threading.CancellationToken.None,
+                () => CreateSkinTree("Characters/Jade_Nami/Skins/Skin02/Materials/Jade_Nami_Skin02_Mat", "cubemap", targetHash));
+
+            Assert.Single(matches);
+            Assert.Equal(target, matches[0].Path);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
+
+        [Theory]
+        [InlineData("skin58", "weapon_light", "assets/characters/jade_nami/skins/skin58/jade_nami_skin58_weapon_light_tx_cm.tex")]
+        [InlineData("skin24", "mask", "assets/characters/jade_nami/skins/skin24/jade_nami_skin24_mask_tx.tex")]
+        public void GuessSkinRoleTextures_KeepsUnderscoresAndShortEndings(string skin, string submesh, string target)
+        {
+            ulong targetHash = XxHash64Ext.Hash(target);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()), null, _ => string.Empty);
+            var matches = new List<HashGuessMatch>();
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { targetHash }, m => matches.Add(m));
+
+            guesser.GuessSkinRoleTextures(
+                engine,
+                new ArraySegment<byte>(new byte[4]),
+                $"data/characters/jade_nami/skins/{skin}.bin",
+                "Nami.wad.client",
+                6UL,
+                System.Threading.CancellationToken.None,
+                () => CreateSkinTree($"Characters/Jade_Nami/Skins/{skin}/Materials/Jade_Nami_Mat", submesh, targetHash));
+
+            Assert.Single(matches);
+            Assert.Equal(target, matches[0].Path);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
+
+        [Fact]
         public void GuessSkinRoleTextures_IgnoresMaterialsWithoutUnknownTargets()
         {
             var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()), null, _ => string.Empty);

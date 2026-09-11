@@ -241,40 +241,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 foreach (string sample in hitSamples)
                     Console.WriteLine($"    {sample}");
 
-                // Phase 2b: sibling skin-swap for unknown animations.
-                int animHits = 0;
-                int animTried = 0;
-                var animSamples = new List<string>();
-                foreach (AnimBin animBin in animBins)
-                {
-                    string file = Path.GetFileNameWithoutExtension(animBin.Bin);
-                    Match skinMatch = SkinNumberRegex.Match(file);
-                    string skinNum = skinMatch.Success ? skinMatch.Groups[1].Value : null;
-                    foreach (ulong target in animBin.UnknownAnims)
-                    {
-                        foreach (string sibling in animBin.KnownAnims)
-                        {
-                            foreach (string candidate in BuildAnimCandidates(sibling, skinNum))
-                            {
-                                animTried++;
-                                if (XxHash64Ext.Hash(candidate) == target)
-                                {
-                                    animHits++;
-                                    if (animSamples.Count < 40)
-                                        animSamples.Add($"{target:x16} = {candidate}");
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Console.WriteLine($"  anim candidates tried: {animTried}");
-                Console.WriteLine($"  ANIM HITS: {animHits}");
-                foreach (string sample in animSamples)
-                    Console.WriteLine($"    {sample}");
-
-                // Phase 2c: sibling action transfer for unknown animations.
+                // Phase 2b: sibling action transfer for unknown animations.
                 int actionHits = 0;
                 int actionTried = 0;
                 var actionSamples = new List<string>();
@@ -428,22 +395,6 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
 
             if (unknown.Count > 0 && known.Count > 0)
                 animBins.Add(new AnimBin(logical, known, unknown));
-        }
-
-        private static IEnumerable<string> BuildAnimCandidates(string sibling, string skinNum)
-        {
-            if (skinNum == null || !SkinNumberRegex.IsMatch(sibling))
-                yield break;
-            if (int.TryParse(skinNum, out int number))
-            {
-                string plain = SkinNumberRegex.Replace(sibling, "skin" + number);
-                if (!plain.Equals(sibling, StringComparison.OrdinalIgnoreCase))
-                    yield return plain;
-                string padded = SkinNumberRegex.Replace(sibling, "skin" + number.ToString("D2", CultureInfo.InvariantCulture));
-                if (!padded.Equals(sibling, StringComparison.OrdinalIgnoreCase) &&
-                    !padded.Equals(plain, StringComparison.OrdinalIgnoreCase))
-                    yield return padded;
-            }
         }
 
         private static IEnumerable<BinTreeProperty> Enumerate(IEnumerable<BinTreeProperty> properties)

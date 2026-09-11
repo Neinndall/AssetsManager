@@ -663,6 +663,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             IReadOnlyDictionary<string, List<string>> HudChampStemFiles = Corpus.GetOrCreate(
                 "hud-champ-stem-files",
                 knownPaths => BuildHudChampStemFiles(knownPaths));
+            IReadOnlyDictionary<string, RecallContext> RecallContexts = Corpus.GetOrCreate(
+                "recall-contexts",
+                BuildRecallContexts);
 
             int checkedCount = 0;
             var emittedCharacterPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -753,6 +756,23 @@ namespace AssetsManager.Services.Hashes.Guessers
                             return $"assets/characters/jade_{character}{knownPath[(marker + hudMarker.Length - 1)..]}";
                         }));
                 }
+                // Recall textures: walk anchored lines both directions, and sweep dark skin
+                // folders with theme words for anchor-less lines (koi_rc01 with no precedent).
+                if (RecallContexts.TryGetValue(character, out RecallContext recallContext))
+                {
+                    checkedCount += CheckCharacterPaths(
+                        recallContext.Lines.SelectMany(WalkRecallTextureLine));
+                    if (recallContext.DarkFolders.Count > 0 && recallContext.Themes.Count > 0)
+                    {
+                        checkedCount += CheckCharacterPaths(
+                            from folder in recallContext.DarkFolders
+                            from theme in recallContext.Themes
+                            from number in Enumerable.Range(1, 5)
+                            from candidate in RecallFileCandidates(folder, $"{character}_{theme}", number)
+                            select candidate);
+                    }
+                }
+
                 checkedCount += CheckCharacterPaths(
                     Enumerable.Range(0, nskins).Select(skin =>
                         $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}.tex"));
@@ -2393,8 +2413,8 @@ namespace AssetsManager.Services.Hashes.Guessers
         // only cost hash comparisons and can catch future variants with zero false positives.
         private static readonly string[] TextureMapKinds =
         {
-            "_cm", "_tx_cm", "_tx", "_base_tx_cm", "_tx_gm", "_cm_tx", "_d", "_tx_cm2",
-            "_diffuse", "_base_cm_tx", "_base_tx", ""
+            "_cm", "_tx_cm", "_tx", "_base_tx_cm", "_tx_gm", "_tx_rm", "_cm_tx", "_d", "_tx_cm2",
+            "_diffuse", "_mult", "_base_cm_tx", "_base_tx", ""
         };
         private static readonly string[] TextureMapVariants = { "", ".project_jade" };
         private static readonly string[] TextureMapExtensions = { ".tex", ".dds" };
@@ -3046,6 +3066,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_cm.dds", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_gm.tex", HashGuessStrategy.CharacterTemplate));
+                    candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx.tex", HashGuessStrategy.CharacterTemplate));
+                    candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}.dds", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/2x_{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/4x_{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                 }
@@ -3084,6 +3106,148 @@ namespace AssetsManager.Services.Hashes.Guessers
             return result;
         }
 
+        private sealed record RecallTextureLine(string Folder, string Stem, int SkinNumber, int RecallNumber, int SkinWidth);
+
+        private sealed record RecallContext(List<RecallTextureLine> Lines, List<string> DarkFolders, List<string> Themes);
+
+        private static Dictionary<string, RecallContext> BuildRecallContexts(IReadOnlyList<string> knownPaths)
+        {
+            var linePattern = new Regex(
+                @"^assets/characters/(?<champ>[^/]+)/skins/(?<folder>skin(?<folderNum>\d+))/(?:(?<hd>2x_|4x_))?(?<stem>.+)_rc(?<recallNum>\d+)_tx_(?<map>cm|gm|rm)\.(?<ext>tex|dds)$",
+                RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            var lines = new Dictionary<string, List<RecallTextureLine>>(StringComparer.OrdinalIgnoreCase);
+            var folderCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var folderChamp = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var champThemes = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in knownPaths)
+            {
+                string normalized = path.Replace('\\', '/');
+                Match lineMatch = normalized.Contains("_rc", StringComparison.OrdinalIgnoreCase)
+                    ? linePattern.Match(normalized)
+                    : Match.Empty;
+                if (lineMatch.Success &&
+                    int.TryParse(lineMatch.Groups["folderNum"].Value, out int folderNum) &&
+                    int.TryParse(lineMatch.Groups["recallNum"].Value, out int recallNum))
+                {
+                    string lineChamp = lineMatch.Groups["champ"].Value.ToLowerInvariant();
+                    if (!lines.TryGetValue(lineChamp, out List<RecallTextureLine> champLines))
+                        lines[lineChamp] = champLines = new List<RecallTextureLine>();
+                    string lineFolder = $"assets/characters/{lineMatch.Groups["champ"].Value}/skins/{lineMatch.Groups["folder"].Value}/";
+                    string stem = lineMatch.Groups["stem"].Value;
+                    if (!champLines.Any(line => line.Folder.Equals(lineFolder, StringComparison.OrdinalIgnoreCase) &&
+                                                line.Stem.Equals(stem, StringComparison.OrdinalIgnoreCase)))
+                        champLines.Add(new RecallTextureLine(
+                            lineFolder,
+                            stem,
+                            folderNum,
+                            recallNum,
+                            lineMatch.Groups["folder"].Value.Length - "skin".Length));
+                }
+
+                if (!normalized.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string[] parts = normalized.Split('/');
+                if (parts.Length < 5 || !parts[3].Equals("skins", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string champ = parts[2].ToLowerInvariant();
+                string folder = string.Join('/', parts[..5]) + "/";
+                folderCounts[folder] = folderCounts.TryGetValue(folder, out int count) ? count + 1 : 1;
+                folderChamp.TryAdd(folder, champ);
+
+                if (parts.Length >= 7 && parts[5].Equals("animations", StringComparison.OrdinalIgnoreCase) &&
+                    parts[^1].EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Theme words sit between the champion stem and the trailing action
+                    // (jade_nami_koi_attack1 -> koi); the action itself is never a theme.
+                    string[] tokens = parts[^1][..^4].ToLowerInvariant()
+                        .Split('_', StringSplitOptions.RemoveEmptyEntries);
+                    if (tokens.Length < 3)
+                        continue;
+                    if (!champThemes.TryGetValue(champ, out HashSet<string> themes))
+                        champThemes[champ] = themes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (string token in tokens[1..^1])
+                    {
+                        if (token.Length < 3 || token.StartsWith("skin", StringComparison.OrdinalIgnoreCase) ||
+                            token == "jade" || champ.Contains(token, StringComparison.OrdinalIgnoreCase))
+                            continue;
+                        themes.Add(token);
+                    }
+                }
+            }
+
+            foreach (HashSet<string> themes in champThemes.Values)
+            {
+                themes.RemoveWhere(token =>
+                    BaseAnimationActions.Contains(token, StringComparer.OrdinalIgnoreCase) ||
+                    (token.Length == 2 && token.All(char.IsDigit)));
+            }
+
+            var darkFolders = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            var orderedThemes = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach ((string champ, HashSet<string> themes) in champThemes)
+            {
+                if (themes.Count == 0)
+                    continue;
+                orderedThemes[champ] = themes.OrderBy(t => t, StringComparer.Ordinal).Take(12).ToList();
+            }
+
+            foreach ((string folder, int count) in folderCounts)
+            {
+                if (count > 2 || !folderChamp.TryGetValue(folder, out string champ))
+                    continue;
+                if (!orderedThemes.ContainsKey(champ))
+                    continue;
+                if (!darkFolders.TryGetValue(champ, out List<string> folders))
+                    darkFolders[champ] = folders = new List<string>();
+                if (folders.Count < 12)
+                    folders.Add(folder);
+            }
+
+            var result = new Dictionary<string, RecallContext>(StringComparer.OrdinalIgnoreCase);
+            foreach (string champ in lines.Keys
+                         .Concat(darkFolders.Keys)
+                         .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                lines.TryGetValue(champ, out List<RecallTextureLine> champLines);
+                darkFolders.TryGetValue(champ, out List<string> champFolders);
+                orderedThemes.TryGetValue(champ, out List<string> themes);
+                result[champ] = new RecallContext(
+                    champLines ?? new List<RecallTextureLine>(),
+                    champFolders ?? new List<string>(),
+                    themes ?? new List<string>());
+            }
+
+            return result;
+        }
+
+        private static IEnumerable<string> RecallFileCandidates(string folder, string stem, int recallNumber)
+        {
+            string recall = recallNumber.ToString("D2", CultureInfo.InvariantCulture);
+            foreach (string map in new[] { "cm", "gm", "rm" })
+            foreach (string extension in new[] { "tex", "dds" })
+            foreach (string hd in new[] { "", "2x_", "4x_" })
+                yield return $"{folder}{hd}{stem}_rc{recall}_tx_{map}.{extension}";
+        }
+
+        private static IEnumerable<string> WalkRecallTextureLine(RecallTextureLine line)
+        {
+            foreach (int step in new[] { 1, 2, 3, -1, -2 })
+            {
+                int folderNum = line.SkinNumber + step;
+                int recallNum = line.RecallNumber + step;
+                if (folderNum < 0 || recallNum < 1 || recallNum > 30)
+                    continue;
+                string folderSkin = "skin" + folderNum.ToString().PadLeft(line.SkinWidth, '0');
+                string folder = Regex.Replace(
+                    line.Folder,
+                    @"/skins/skin\d+/",
+                    $"/skins/{folderSkin}/",
+                    RegexOptions.IgnoreCase);
+                foreach (string candidate in RecallFileCandidates(folder, line.Stem, recallNum))
+                    yield return candidate;
+            }
+        }
+
         private IReadOnlyDictionary<string, HashSet<string>> SkinFolderStems =>
             Corpus.GetOrCreate("skin-folder-txcm-stems", BuildSkinFolderStems);
 
@@ -3118,9 +3282,9 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             var builder = new StringBuilder(submesh.Length);
             foreach (char c in submesh.TrimEnd('\0'))
-                if (char.IsLetterOrDigit(c))
+                if (char.IsLetterOrDigit(c) || c == '_')
                     builder.Append(char.ToLowerInvariant(c));
-            return builder.ToString();
+            return builder.ToString().Trim('_');
         }
 
         private void GuessChampionSpecialBins(
