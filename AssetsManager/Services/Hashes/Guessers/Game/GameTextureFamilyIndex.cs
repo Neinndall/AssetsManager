@@ -10,7 +10,7 @@ using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 
-namespace AssetsManager.Services.Hashes.Guessers
+namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed class GameTextureFamilyIndex
     {
