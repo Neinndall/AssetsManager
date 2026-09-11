@@ -9,6 +9,8 @@ namespace AssetsManager.Utils
         private readonly long _minimumIntervalTicks;
         private readonly object _sync = new();
         private long _lastUpdateTimestamp;
+        private T _pending;
+        private bool _hasPending;
 
         public ProgressUpdateLimiter(IProgress<T> target, TimeSpan minimumInterval)
         {
@@ -25,12 +27,35 @@ namespace AssetsManager.Utils
             {
                 long now = Stopwatch.GetTimestamp();
                 if (_lastUpdateTimestamp != 0 && now - _lastUpdateTimestamp < _minimumIntervalTicks)
+                {
+                    _pending = value;
+                    _hasPending = true;
                     return;
+                }
 
                 _lastUpdateTimestamp = now;
+                _hasPending = false;
             }
 
             _target.Report(value);
+        }
+
+        // Flushes the last throttled value so the UI reaches its final state before completion.
+        public void Flush()
+        {
+            T pending;
+            lock (_sync)
+            {
+                if (!_hasPending)
+                    return;
+
+                pending = _pending;
+                _hasPending = false;
+                _pending = default;
+                _lastUpdateTimestamp = Stopwatch.GetTimestamp();
+            }
+
+            _target.Report(pending);
         }
     }
 }

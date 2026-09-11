@@ -826,9 +826,10 @@ namespace AssetsManager.Views
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, 0, 0, $"{stageName} · {foundMatches:N0} found", customProgressText);
                     }
                 });
-                IProgress<HashGuessProgress> progress = new ProgressUpdateLimiter<HashGuessProgress>(
+                var progressLimiter = new ProgressUpdateLimiter<HashGuessProgress>(
                     uiProgress,
                     HashLabProgressUpdateInterval);
+                IProgress<HashGuessProgress> progress = progressLimiter;
                 var matchProgress = new Progress<HashGuessMatch>(match =>
                 {
                     if (displayedMatchHashes.Add(match.Hash))
@@ -857,6 +858,8 @@ namespace AssetsManager.Views
                     HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, effectiveToken, matchProgress),
                     _ => throw new ArgumentOutOfRangeException(nameof(mode))
                 };
+                progressLimiter.Flush();
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                 stopwatch.Stop();
                 string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                 _viewModel.Matches.AddRange(result.Matches.Where(match => displayedMatchHashes.Add(match.Hash)));
@@ -1003,9 +1006,10 @@ namespace AssetsManager.Views
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, 0, 0, $"{stageName} · {p.FoundMatches:N0} found", customProgressText);
                     }
                 });
-                IProgress<InternalHashProgress> progress = new ProgressUpdateLimiter<InternalHashProgress>(
+                var internalProgressLimiter = new ProgressUpdateLimiter<InternalHashProgress>(
                     uiProgress,
                     HashLabProgressUpdateInterval);
+                IProgress<InternalHashProgress> progress = internalProgressLimiter;
 
                 InternalHashRunResult result = action switch
                 {
@@ -1013,6 +1017,8 @@ namespace AssetsManager.Views
                     InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods),
                     _ => throw new ArgumentOutOfRangeException(nameof(action))
                 };
+                internalProgressLimiter.Flush();
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
 
                 stopwatch.Stop();
                 string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
@@ -1114,10 +1120,13 @@ namespace AssetsManager.Views
                             _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
                         }
                     });
-                    IProgress<HashGuessProgress> progress = new ProgressUpdateLimiter<HashGuessProgress>(
+                    var scanProgressLimiter = new ProgressUpdateLimiter<HashGuessProgress>(
                         uiProgress,
                         HashLabProgressUpdateInterval);
+                    IProgress<HashGuessProgress> progress = scanProgressLimiter;
                     var summary = await _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, progress, effectiveToken);
+                    scanProgressLimiter.Flush();
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     stopwatch.Stop();
                     string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.ProgressValue = 100;
@@ -1143,10 +1152,13 @@ namespace AssetsManager.Views
                             _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
                         }
                     });
-                    IProgress<InternalHashProgress> progress = new ProgressUpdateLimiter<InternalHashProgress>(
+                    var inventoryProgressLimiter = new ProgressUpdateLimiter<InternalHashProgress>(
                         uiProgress,
                         HashLabProgressUpdateInterval);
+                    IProgress<InternalHashProgress> progress = inventoryProgressLimiter;
                     await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, effectiveToken);
+                    inventoryProgressLimiter.Flush();
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     var summary = await _binRstHashGuessingService.GetSummaryAsync(effectiveToken);
                     stopwatch.Stop();
                     string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
