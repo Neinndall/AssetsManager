@@ -64,6 +64,29 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GuessSkinRoleTextures_ResolvesGlossMapTwin()
+        {
+            const string target = "assets/characters/urgot/skins/skin42/urgot_skin42_lower_tx_gm.tex";
+            ulong targetHash = XxHash64Ext.Hash(target);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()), null, _ => string.Empty);
+            var matches = new List<HashGuessMatch>();
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { targetHash }, m => matches.Add(m));
+
+            guesser.GuessSkinRoleTextures(
+                engine,
+                new ArraySegment<byte>(new byte[4]),
+                "data/characters/urgot/skins/skin42.bin",
+                "Urgot.wad.client",
+                4UL,
+                System.Threading.CancellationToken.None,
+                () => CreateSkinTree("Characters/Urgot/Skins/Skin42/Materials/Urgot_Skin42_Mat", "lower", targetHash));
+
+            Assert.Single(matches);
+            Assert.Equal(target, matches[0].Path);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
+
+        [Fact]
         public void GuessSkinRoleTextures_IgnoresMaterialsWithoutUnknownTargets()
         {
             var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()), null, _ => string.Empty);

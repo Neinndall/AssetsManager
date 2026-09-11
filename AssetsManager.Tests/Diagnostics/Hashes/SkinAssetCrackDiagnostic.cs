@@ -301,6 +301,96 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 Console.WriteLine($"  ACTION HITS: {actionHits}");
                 foreach (string sample in actionSamples)
                     Console.WriteLine($"    {sample}");
+
+                // Phase 3: icon basename transfer across champion folders (incl. jade_ aliases).
+                var iconFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var iconBases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string path in gamePaths.Values)
+                {
+                    int marker = path.IndexOf("/hud/icons2d/", StringComparison.OrdinalIgnoreCase);
+                    if (marker < 0)
+                        continue;
+                    iconFolders.Add(path[..(marker + "/hud/icons2d/".Length)]);
+                    iconBases.Add(path[(marker + "/hud/icons2d/".Length)..]);
+                }
+
+                foreach (string folder in iconFolders.ToList())
+                {
+                    const string marker = "assets/characters/";
+                    if (folder.StartsWith(marker, StringComparison.OrdinalIgnoreCase))
+                    {
+                        string rest = folder[marker.Length..];
+                        int slash = rest.IndexOf('/');
+                        if (slash > 0)
+                        {
+                            string champ = rest[..slash];
+                            if (!champ.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+                                iconFolders.Add($"{marker}jade_{champ}/hud/icons2d/");
+                        }
+                    }
+                }
+
+                int iconHits = 0;
+                int iconTried = 0;
+                var iconSamples = new List<string>();
+                var remainingTargets = new HashSet<ulong>(unknowns);
+                foreach (string folder in iconFolders)
+                foreach (string baseName in iconBases)
+                {
+                    iconTried++;
+                    if (XxHash64Ext.Hash(folder + baseName) is ulong hash && remainingTargets.Remove(hash))
+                    {
+                        iconHits++;
+                        if (iconSamples.Count < 40)
+                            iconSamples.Add($"{hash:x16} = {folder + baseName}");
+                    }
+                }
+
+                Console.WriteLine($"  icon folders: {iconFolders.Count}, icon basenames: {iconBases.Count}, tried: {iconTried}");
+                Console.WriteLine($"  ICON HITS: {iconHits}");
+                foreach (string sample in iconSamples)
+                    Console.WriteLine($"    {sample}");
+
+                // Phase 4: champion-stem swap to jade twins for HUD files (mirrors production).
+                int stemHits = 0;
+                int stemTried = 0;
+                var stemSamples = new List<string>();
+                var stemTargets = new HashSet<ulong>(unknowns);
+                const string assetMarker = "assets/characters/";
+                foreach (string path in gamePaths.Values)
+                {
+                    if (!path.StartsWith(assetMarker, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    string rest = path[assetMarker.Length..];
+                    int slash = rest.IndexOf('/');
+                    if (slash <= 0)
+                        continue;
+                    string champ = rest[..slash];
+                    if (champ.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ||
+                        champ.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    int hud = rest.IndexOf("/hud/", StringComparison.OrdinalIgnoreCase);
+                    if (hud < 0)
+                        continue;
+                    string file = rest[(rest.LastIndexOf('/') + 1)..];
+                    if (!file.StartsWith(champ, StringComparison.OrdinalIgnoreCase) || !file.Contains('.'))
+                        continue;
+                    string remainder = rest[(hud + "/hud/".Length - 1)..];
+                    stemTried++;
+                    string candidate = $"{assetMarker}jade_{champ}{remainder}";
+                    ulong hash = XxHash64Ext.Hash(candidate);
+                    if (stemTargets.Remove(hash))
+                    {
+                        stemHits++;
+                        if (stemSamples.Count < 40)
+                            stemSamples.Add($"{hash:x16} = {candidate}");
+                    }
+                }
+
+                Console.WriteLine($"  stem candidates tried: {stemTried}");
+                Console.WriteLine($"  STEM HITS: {stemHits}");
+                foreach (string sample in stemSamples)
+                    Console.WriteLine($"    {sample}");
             }
             finally
             {

@@ -47,33 +47,11 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly Regex SkinPathRegex = new(
             @"characters/(?<champ>[^/]+)/skins/(?<skin>base|skin0*(?<num>\d+))",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly Regex SkinBinFileRegex = new(
-            @"^(?:assets|data)/characters/(?<champ>[^/]+)/skins/(?<skin>skin\d+|base)\.bin$",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly uint SkinPropertiesClassHash = Fnv1a.HashLower("SkinCharacterDataProperties");
-        private static readonly uint StaticMaterialClassHash = Fnv1a.HashLower("StaticMaterialDef");
-        private static readonly uint SkinMeshPropertiesHash = Fnv1a.HashLower("skinMeshProperties");
-        private static readonly uint MaterialOverrideHash = Fnv1a.HashLower("materialOverride");
-        private static readonly uint MaterialLinkHash = Fnv1a.HashLower("Material");
-        private static readonly uint DirectTextureHash = Fnv1a.HashLower("texture");
-        private static readonly uint SubmeshNameHash = Fnv1a.HashLower("submesh");
-        private static readonly uint SamplerValuesHash = Fnv1a.HashLower("samplerValues");
-        private static readonly uint TexturePathHash = Fnv1a.HashLower("texturePath");
         private static readonly Regex MaterialPathRegex = new(
             @"characters/(?<champ>[^/]+)/skins/(?<skin>[^/]+)/materials/(?<mat>[^/]+)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly string[] SkinTextureSuffixes =
-        {
-            "_tx.tex", "_tx_cm.tex", "_cm_tx.tex", "_tx_cm2.tex", "_cm.tex", ".tex", "_d.tex",
-            "_base_tx.tex", "_base_tx_cm.tex", "_base_cm_tx.tex", "_diffuse.tex",
-            "_tx.dds", "_tx_cm.dds", "_cm_tx.dds", "_tx_cm2.dds", "_cm.dds", ".dds",
-            "_tx_cm.project_jade.tex", "_tx_cm2.project_jade.tex", "_tx.project_jade.tex", ".project_jade.tex"
-        };
-        private static readonly string[] MaterialTextureSuffixes =
-        {
-            "_tx_cm.tex", "_tx.tex", ".tex",
-            "_tx_cm.dds", "_tx.dds", ".dds"
-        };
+						
+
 
         private static readonly string[] CanonicalMaterialRoles =
         {
@@ -673,6 +651,19 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
             }
 
+            IReadOnlyList<string> HudIcons2dBasenames = Corpus.GetOrCreate(
+                "hud-icons2d-basenames",
+                knownPaths => knownPaths
+                    .Where(path => path.Contains("/hud/icons2d/", StringComparison.OrdinalIgnoreCase))
+                    .Select(path => path[(path.LastIndexOf('/') + 1)..])
+                    .Where(baseName => baseName.Contains('.'))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(value => value, StringComparer.Ordinal)
+                    .ToList());
+            IReadOnlyDictionary<string, List<string>> HudChampStemFiles = Corpus.GetOrCreate(
+                "hud-champ-stem-files",
+                knownPaths => BuildHudChampStemFiles(knownPaths));
+
             int checkedCount = 0;
             var emittedCharacterPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -713,6 +704,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     $"assets/characters/{character}/hud/{character}_square.tex",
                     $"assets/characters/{character}/hud/{character}_square_301.tex",
                     $"assets/characters/{character}/skins/base/{character}_base_tx_cm.tex",
+                    $"assets/characters/{character}/skins/base/{character}_base_tx_gm.tex",
                     $"assets/characters/{character}/skins/base/{character}loadscreen.tex",
                     $"assets/characters/{character}/skins/base/{character}_loadscreen.tex",
                     $"characters/{character}"
@@ -742,6 +734,25 @@ namespace AssetsManager.Services.Hashes.Guessers
                     from number in new[] { "", "1", "2", "3", "4" }
                     from suffix in new[] { "", "_passive" }
                     select $"assets/characters/{character}/hud/icons2d/{character}_{ability}{number}{suffix}.dds");
+                // Shared icon basenames travel across champion folders (e.g. poro icons
+                // attested for fizz reappear for jade_fizz), so replay them per character.
+                checkedCount += CheckCharacterPaths(
+                    HudIcons2dBasenames.Select(baseName =>
+                        $"assets/characters/{character}/hud/icons2d/{baseName}"));
+                // Champion stems travel to jade twins attached or underscore-joined
+                // (gravespshell1 -> jade_gravespshell1, graves_circle_tobacco ->
+                // jade_graves_circle_tobacco), so replay known HUD files per character.
+                if (!character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) &&
+                    HudChampStemFiles.TryGetValue(character, out List<string> hudStemFiles))
+                {
+                    const string hudMarker = "/hud/";
+                    checkedCount += CheckCharacterPaths(
+                        hudStemFiles.Select(knownPath =>
+                        {
+                            int marker = knownPath.IndexOf(hudMarker, StringComparison.OrdinalIgnoreCase);
+                            return $"assets/characters/jade_{character}{knownPath[(marker + hudMarker.Length - 1)..]}";
+                        }));
+                }
                 checkedCount += CheckCharacterPaths(
                     Enumerable.Range(0, nskins).Select(skin =>
                         $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}.tex"));
@@ -971,6 +982,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                     string basename = GetBasename(path);
                     string stem = basename.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? basename[..^4] : basename;
                     if (stem.Length == 0 || stem.Length > 50) continue;
+
+                    // Versioned variants (attack1.pie_c_11_15) only bloat the list and starve
+                    // later skins under the fallback budget; the clean action covers them and
+                    // structural generators rebuild versioned names, mirroring the global list.
+                    int dotIndex = stem.IndexOf('.');
+                    if (dotIndex > 0) stem = stem[..dotIndex];
+                    if (stem.Length == 0) continue;
 
                     actions.Add(stem);
 
@@ -2076,23 +2094,31 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             IEnumerable<string> EnumerateAnimationSkins(string animationCharacter)
             {
-                if (!string.IsNullOrEmpty(sourceSkin) &&
+                IReadOnlyList<string> knownSkins = GetChampionSkinNames(animationCharacter, cancellationToken);
+                bool hasSource = !string.IsNullOrEmpty(sourceSkin) &&
                     !sourceSkin.Equals("root", StringComparison.OrdinalIgnoreCase) &&
-                    !sourceSkin.Equals("shared", StringComparison.OrdinalIgnoreCase))
-                {
+                    !sourceSkin.Equals("shared", StringComparison.OrdinalIgnoreCase);
+                // Shared base container first: highest hit density per candidate, so it
+                // survives the fallback budget even when the source skin overflows it.
+                if (knownSkins.Contains("base", StringComparer.OrdinalIgnoreCase) &&
+                    (!hasSource || !sourceSkin.Equals("base", StringComparison.OrdinalIgnoreCase)))
+                    yield return "base";
+                if (hasSource)
                     yield return sourceSkin;
-                }
 
-                IEnumerable<string> knownSkins = GetChampionSkinNames(animationCharacter, cancellationToken);
                 foreach (string candidate in OrderAnimationContainers(sourceSkin, knownSkins))
-                    if (!candidate.Equals(sourceSkin, StringComparison.OrdinalIgnoreCase)) yield return candidate;
+                    if (!candidate.Equals(sourceSkin, StringComparison.OrdinalIgnoreCase) &&
+                        !candidate.Equals("base", StringComparison.OrdinalIgnoreCase)) yield return candidate;
             }
 
             IEnumerable<string> EnumerateActionsForSkin(string animChar, string sk)
             {
                 bool isTargetSkin = !string.IsNullOrEmpty(sourceSkin) &&
                                     sk.Equals(sourceSkin, StringComparison.OrdinalIgnoreCase);
-                if (isTargetSkin || string.IsNullOrEmpty(sourceSkin))
+                // The shared base container only gets thin per-character actions, so pooled
+                // actions never reach it before the budget dies; give it the full fallback.
+                if (isTargetSkin || string.IsNullOrEmpty(sourceSkin) ||
+                    sk.Equals("base", StringComparison.OrdinalIgnoreCase))
                 {
                     return EnumerateFallbackActions(animChar);
                 }
@@ -2362,6 +2388,24 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
+        // Built compositionally (map kind x variant x extension) instead of hardcoding every
+        // ending; both consumers below are per-unknown gated loops, so extra combinations
+        // only cost hash comparisons and can catch future variants with zero false positives.
+        private static readonly string[] TextureMapKinds =
+        {
+            "_cm", "_tx_cm", "_tx", "_base_tx_cm", "_tx_gm", "_cm_tx", "_d", "_tx_cm2",
+            "_diffuse", "_base_cm_tx", "_base_tx", ""
+        };
+        private static readonly string[] TextureMapVariants = { "", ".project_jade" };
+        private static readonly string[] TextureMapExtensions = { ".tex", ".dds" };
+        private static readonly string[] TextureMapSuffixes = BuildTextureMapSuffixes();
+
+        private static string[] BuildTextureMapSuffixes() =>
+            (from kind in TextureMapKinds
+             from variant in TextureMapVariants
+             from extension in TextureMapExtensions
+             select kind + variant + extension).ToArray();
+
         private void GuessSkinCharacterBinChunkLinks(
             HashGuessEngine engine,
             ArraySegment<byte> data,
@@ -2605,7 +2649,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         foreach (string desc in matDescriptors)
                         {
                             if (!engine.UnknownHashes.Contains(unk)) break;
-                            foreach (string suf in MaterialTextureSuffixes)
+                            foreach (string suf in TextureMapSuffixes)
                             {
                                 string c1 = $"{baseDir}{mChamp}_{mSkin}_{st}{desc}{suf}";
                                 if (XxHash64Ext.Hash(c1) == unk)
@@ -2795,7 +2839,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     foreach (string cStem in candidateStems)
                     {
                         if (targetTexHashes.Count == 0 || engine.RemainingUnknownCount == 0) break;
-                        foreach (string suf in SkinTextureSuffixes)
+                        foreach (string suf in TextureMapSuffixes)
                         {
                             string candidatePath = cDir + cStem + suf;
                             ulong hash = XxHash64Ext.Hash(candidatePath);
@@ -2878,6 +2922,19 @@ namespace AssetsManager.Services.Hashes.Guessers
                 return result;
             });
         }
+
+        private static readonly Regex SkinBinFileRegex = new(
+            @"^(?:assets|data)/characters/(?<champ>[^/]+)/skins/(?<skin>skin\d+|base)\.bin$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly uint SkinPropertiesClassHash = Fnv1a.HashLower("SkinCharacterDataProperties");
+        private static readonly uint StaticMaterialClassHash = Fnv1a.HashLower("StaticMaterialDef");
+        private static readonly uint SkinMeshPropertiesHash = Fnv1a.HashLower("skinMeshProperties");
+        private static readonly uint MaterialOverrideHash = Fnv1a.HashLower("materialOverride");
+        private static readonly uint MaterialLinkHash = Fnv1a.HashLower("Material");
+        private static readonly uint DirectTextureHash = Fnv1a.HashLower("texture");
+        private static readonly uint SubmeshNameHash = Fnv1a.HashLower("submesh");
+        private static readonly uint SamplerValuesHash = Fnv1a.HashLower("samplerValues");
+        private static readonly uint TexturePathHash = Fnv1a.HashLower("texturePath");
 
         /// <summary>
         /// Resolves skin textures from their material context. When a skin BIN links a
@@ -2983,16 +3040,48 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (string stem in stems)
             {
                 candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
+                candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_tx_gm.tex", HashGuessStrategy.CharacterTemplate));
                 foreach (string role in roles)
                 {
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_cm.dds", HashGuessStrategy.CharacterTemplate));
+                    candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_gm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/2x_{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/4x_{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                 }
             }
 
             CheckIter(engine, candidates, sourceWadPath, cancellationToken, sourceChunkHash: sourceChunkHash);
+        }
+
+        private static Dictionary<string, List<string>> BuildHudChampStemFiles(IReadOnlyList<string> knownPaths)
+        {
+            var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in knownPaths)
+            {
+                const string marker = "assets/characters/";
+                if (!path.StartsWith(marker, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string rest = path[marker.Length..];
+                int slash = rest.IndexOf('/');
+                if (slash <= 0)
+                    continue;
+                string champ = rest[..slash];
+                if (champ.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ||
+                    champ.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                int hud = rest.IndexOf("/hud/", StringComparison.OrdinalIgnoreCase);
+                if (hud < 0)
+                    continue;
+                string file = rest[(rest.LastIndexOf('/') + 1)..];
+                if (!file.StartsWith(champ, StringComparison.OrdinalIgnoreCase) || !file.Contains('.'))
+                    continue;
+                if (!result.TryGetValue(champ, out List<string> files))
+                    result[champ] = files = new List<string>();
+                files.Add(path);
+            }
+
+            return result;
         }
 
         private IReadOnlyDictionary<string, HashSet<string>> SkinFolderStems =>
@@ -3906,8 +3995,8 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             int AnimationContainerDistance(string container)
             {
-                // The shared base container holds the fallback actions, so it goes
-                // right after the source skin instead of starving behind the budget.
+                // The shared base container holds the fallback actions, so it stays
+                // ahead of numbered skins (the caller also tries it before the source).
                 if (container.Equals("base", StringComparison.OrdinalIgnoreCase)) return -1;
                 if (sourceNumber < 0) return int.MaxValue;
                 Match match = Regex.Match(container, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);

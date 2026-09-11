@@ -110,6 +110,11 @@ namespace AssetsManager.Tests.Diagnostics
                 SkinAssetCrackDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "anim-bin-probe", StringComparison.OrdinalIgnoreCase))
+            {
+                AnimBinProbeDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "quick-hash-check", StringComparison.OrdinalIgnoreCase))
             {
                 QuickHashCheck.Run(args.Skip(1).ToArray());
