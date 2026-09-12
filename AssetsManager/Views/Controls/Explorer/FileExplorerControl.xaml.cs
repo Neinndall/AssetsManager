@@ -471,15 +471,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 var newNodes = await buildFunc(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (_viewModel.RootNodes != null && _viewModel.RootNodes.Count > 0)
-                {
-                    WadSearchBoxService?.InvalidateIndex(_viewModel.RootNodes);
-                    for (int i = 0; i < _viewModel.RootNodes.Count; i++)
-                    {
-                        _viewModel.RootNodes[i]?.Dispose();
-                    }
-                }
-
                 _viewModel.RootNodes.ReplaceRange(newNodes);
                 WadSearchBoxService.RebuildIndex(_viewModel.RootNodes);
 
