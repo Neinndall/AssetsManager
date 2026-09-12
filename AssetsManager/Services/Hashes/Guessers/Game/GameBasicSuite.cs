@@ -111,25 +111,34 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             };
             var langsRegex = new Regex($"({string.Join("|", langs)})", RegexOptions.Compiled);
 
-            IReadOnlyList<string> formats = KnownPaths
+            IReadOnlyList<string> formats = Corpus.GetOrCreate("game-locale-formats", known => known
                 .Where(path => langsRegex.IsMatch(path))
                 .Select(path => langsRegex.Replace(path, "{}"))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(path => path, StringComparer.Ordinal)
-                .ToList();
+                .ToList());
 
             int checkedCount = 0;
             foreach (string format in ProgressIterator(formats, value => value, cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                checkedCount += CheckIter(
-                    engine,
-                    langs.Select(lang => new HashGuessCandidate(
-                        format.Replace("{}", lang, StringComparison.Ordinal),
-                        HashGuessStrategy.LanguageVariant)),
-                    source,
-                    cancellationToken);
-                progress?.Invoke(checkedCount);
+                int marker = format.IndexOf("{}", StringComparison.Ordinal);
+                if (marker < 0) continue;
+                ReadOnlySpan<char> formatPrefix = format.AsSpan(0, marker);
+                ReadOnlySpan<char> formatSuffix = format.AsSpan(marker + 2);
+
+                foreach (string lang in langs)
+                {
+                    engine.CheckNormalizedParts(
+                        formatPrefix,
+                        lang.AsSpan(),
+                        formatSuffix,
+                        HashGuessStrategy.LanguageVariant,
+                        source);
+                    checkedCount++;
+                }
+
+                if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
                 if (engine.RemainingUnknownCount == 0) break;
             }
 
@@ -223,7 +232,21 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 BuildRecallContexts);
 
             int checkedCount = 0;
+            const string source = "GAME character files";
+            const HashGuessStrategy strategy = HashGuessStrategy.CharacterTemplate;
+            Span<char> pathBuf = stackalloc char[384];
+            int w = 0;
             var emittedCharacterPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            bool CheckSpan(ReadOnlySpan<char> path)
+            {
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return false;
+                cancellationToken.ThrowIfCancellationRequested();
+                engine.CheckNormalizedPath(path, strategy, source);
+                checkedCount++;
+                if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
+                return true;
+            }
 
             int CheckCharacterPaths(IEnumerable<string> paths)
             {
@@ -233,15 +256,23 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     path => new HashGuessCandidate(path, HashGuessStrategy.CharacterTemplate))
                     .Where(candidate => !string.IsNullOrWhiteSpace(candidate.Path) && emittedCharacterPaths.Add(candidate.Path));
                 if (remaining != int.MaxValue) candidatesToCheck = candidatesToCheck.Take(remaining);
-                int checkedPaths = CheckIter(engine, candidatesToCheck, "GAME character files", cancellationToken);
+                int checkedPaths = CheckIter(engine, candidatesToCheck, source, cancellationToken);
                 progress?.Invoke(checkedCount + checkedPaths);
                 return checkedPaths;
             }
 
+            ReadOnlySpan<string> abilities = ["", "p", "q", "w", "e", "r"];
+            ReadOnlySpan<string> numbers = ["", "1", "2", "3", "4"];
+            ReadOnlySpan<string> suffixes = ["", "_passive"];
+            ReadOnlySpan<string> tiers = ["starter", "signature", "premium", "base"];
+            const int nskins = 400;
+
             foreach (string character in ProgressIterator(characterList, value => value, cancellationToken))
             {
-                checkedCount += CheckCharacterPaths(new[]
-                {
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
+
+                // Root and base files
+                ReadOnlySpan<string> fixedPatterns = [
                     $"data/characters/{character}/skins/root.bin",
                     $"data/characters/{character}/skins/base/{character}.skl",
                     $"data/characters/{character}/skins/base/{character}.skn",
@@ -266,53 +297,79 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     $"assets/characters/{character}/skins/base/{character}loadscreen.tex",
                     $"assets/characters/{character}/skins/base/{character}_loadscreen.tex",
                     $"characters/{character}"
-                });
+                ];
+                foreach (string fixedPath in fixedPatterns)
+                {
+                    if (!CheckSpan(fixedPath.AsSpan())) goto ChampionDone;
+                }
 
-                const int nskins = 400;
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"data/characters/{character}/skins/skin{skin}.bin"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(1, 9).Select(skin =>
-                        $"data/characters/{character}/skins/skin{skin:D2}.bin"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"data/characters/{character}/animations/skin{skin}.bin"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(1, 9).Select(skin =>
-                        $"data/characters/{character}/animations/skin{skin:D2}.bin"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/hud/{character}_circle_{skin}.tex"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/hud/{character}_square_{skin}.tex"));
-                checkedCount += CheckCharacterPaths(
-                    from ability in new[] { "", "p", "q", "w", "e", "r" }
-                    from number in new[] { "", "1", "2", "3", "4" }
-                    from suffix in new[] { "", "_passive" }
-                    select $"assets/characters/{character}/hud/icons2d/{character}_{ability}{number}{suffix}.dds");
-                // Shared icon basenames travel across champion folders (e.g. poro icons
-                // attested for fizz reappear for jade_fizz), so replay them per character.
-                checkedCount += CheckCharacterPaths(
-                    HudIcons2dBasenames.Select(baseName =>
-                        $"assets/characters/{character}/hud/icons2d/{baseName}"));
-                // Champion stems travel to jade twins attached or underscore-joined
-                // (gravespshell1 -> jade_gravespshell1, graves_circle_tobacco ->
-                // jade_graves_circle_tobacco), so replay known HUD files per character.
+                // Skins, animations, HUD icons, loadscreens and textures
+                for (int skin = 0; skin < nskins; skin++)
+                {
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"data/characters/{character}/skins/skin{skin}.bin", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"data/characters/{character}/animations/skin{skin}.bin", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/hud/{character}_circle_{skin}.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/hud/{character}_square_{skin}.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_loadscreen_{skin}.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}_le.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_loadscreen_{skin}_le.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_tx_cm.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+
+                    foreach (string tier in tiers)
+                    {
+                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/ui/{character}_skin{skin:D2}_loadscreen_augments_border_{tier}.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    }
+
+                    if (skin is >= 1 and <= 9)
+                    {
+                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"data/characters/{character}/skins/skin{skin:D2}.bin", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"data/characters/{character}/animations/skin{skin:D2}.bin", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                        foreach (string tier in tiers)
+                        {
+                            if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin}/ui/{character}_skin{skin}_loadscreen_augments_border_{tier}.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                        }
+                    }
+                }
+
+                // Ability icons
+                foreach (string ability in abilities)
+                {
+                    foreach (string number in numbers)
+                    {
+                        foreach (string suffix in suffixes)
+                        {
+                            if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/hud/icons2d/{character}_{ability}{number}{suffix}.dds", out w))
+                                if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+                        }
+                    }
+                }
+
+                // Shared HUD icons
+                foreach (string baseName in HudIcons2dBasenames)
+                {
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/hud/icons2d/{baseName}", out w))
+                        if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+                }
+
+                // Jade HUD files
                 if (!character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) &&
                     HudChampStemFiles.TryGetValue(character, out List<string> hudStemFiles))
                 {
                     const string hudMarker = "/hud/";
-                    checkedCount += CheckCharacterPaths(
-                        hudStemFiles.Select(knownPath =>
+                    foreach (string knownPath in hudStemFiles)
+                    {
+                        int marker = knownPath.IndexOf(hudMarker, StringComparison.OrdinalIgnoreCase);
+                        if (marker >= 0)
                         {
-                            int marker = knownPath.IndexOf(hudMarker, StringComparison.OrdinalIgnoreCase);
-                            return $"assets/characters/jade_{character}{knownPath[(marker + hudMarker.Length - 1)..]}";
-                        }));
+                            ReadOnlySpan<char> suffix = knownPath.AsSpan(marker + hudMarker.Length - 1);
+                            if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/jade_{character}{suffix}", out w))
+                                if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+                        }
+                    }
                 }
-                // Recall textures: walk anchored lines both directions, and sweep dark skin
-                // folders with theme words for anchor-less lines (koi_rc01 with no precedent).
+
+                // Recall textures
                 if (RecallContexts.TryGetValue(character, out RecallContext recallContext))
                 {
                     checkedCount += CheckCharacterPaths(
@@ -326,56 +383,44 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                             from candidate in RecallFileCandidates(folder, $"{character}_{theme}", number)
                             select candidate);
                     }
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
                 }
 
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}.tex"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}_loadscreen_{skin}.tex"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}_le.tex"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}_loadscreen_{skin}_le.tex"));
-                checkedCount += CheckCharacterPaths(
-                    Enumerable.Range(0, nskins).Select(skin =>
-                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_tx_cm.tex"));
-                checkedCount += CheckCharacterPaths(
-                    from skin in Enumerable.Range(0, nskins)
-                    from tier in new[] { "starter", "signature", "premium", "base" }
-                    select $"assets/characters/{character}/skins/skin{skin:D2}/ui/{character}_skin{skin:D2}_loadscreen_augments_border_{tier}.tex");
-                checkedCount += CheckCharacterPaths(
-                    from skin in Enumerable.Range(1, 9)
-                    from tier in new[] { "starter", "signature", "premium", "base" }
-                    select $"assets/characters/{character}/skins/skin{skin}/ui/{character}_skin{skin}_loadscreen_augments_border_{tier}.tex");
+                // Pet tiers and themes
                 if (character.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
                 {
-                    checkedCount += CheckCharacterPaths(
-                        Enumerable.Range(0, 10).Select(tier =>
-                            $"data/characters/{character}/tiers/tier{tier}.bin"));
+                    for (int tier = 0; tier < 10; tier++)
+                    {
+                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"data/characters/{character}/tiers/tier{tier}.bin", out w))
+                            if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    }
 
                     IReadOnlyDictionary<string, IReadOnlyList<string>> themesByPet =
                         GetDynamicPetThemeNames(cancellationToken);
-                    IReadOnlyList<string> themes = themesByPet.TryGetValue(
+                    IReadOnlyList<string> petThemes = themesByPet.TryGetValue(
                         character,
                         out IReadOnlyList<string> observedThemes)
                         ? observedThemes
                         : new[] { "base" };
-                    checkedCount += CheckCharacterPaths(
-                        themes.SelectMany(theme =>
-                            new[]
-                            {
-                                $"data/characters/{character}/themes/{theme}/root.bin"
-                            }.Concat(Enumerable.Range(1, 3).Select(tier =>
-                                $"data/characters/{character}/themes/{theme}/tier{tier}.bin"))));
+
+                    foreach (string theme in petThemes)
+                    {
+                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"data/characters/{character}/themes/{theme}/root.bin", out w))
+                            if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+
+                        for (int tier = 1; tier <= 3; tier++)
+                        {
+                            if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"data/characters/{character}/themes/{theme}/tier{tier}.bin", out w))
+                                if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+                        }
+                    }
                 }
 
+            ChampionDone:
                 if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
             }
 
+            progress?.Invoke(checkedCount);
             return checkedCount;
         }
 
@@ -499,8 +544,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     : $"assets/shaders/hlsl/{path}");
             }
         }
-
-
 
         private static bool IsShaderPathByte(byte value) =>
             value is >= (byte)'0' and <= (byte)'9' or
