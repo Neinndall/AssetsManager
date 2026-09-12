@@ -647,6 +647,54 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     }
                 }
 
+                var tftLoadoutStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < knownPaths.Count; i++)
+                {
+                    string p = knownPaths[i];
+                    if (p.Contains("tftdamageskins", StringComparison.OrdinalIgnoreCase) ||
+                        p.Contains("tftzoomskins", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int lastSlash = p.LastIndexOf('/');
+                        if (lastSlash < 0) continue;
+                        string filename = p[(lastSlash + 1)..];
+                        int dot = filename.IndexOf('.');
+                        string stem = dot > 0 ? filename[..dot] : filename;
+                        stem = stem.Replace("_tier1", "", StringComparison.OrdinalIgnoreCase)
+                                   .Replace("_tier2", "", StringComparison.OrdinalIgnoreCase)
+                                   .Replace("_tier3", "", StringComparison.OrdinalIgnoreCase)
+                                   .Replace("_small", "", StringComparison.OrdinalIgnoreCase)
+                                   .Replace("boom_", "", StringComparison.OrdinalIgnoreCase);
+                        if (stem.Length > 0 && !stem.All(char.IsDigit))
+                            tftLoadoutStems.Add(stem.ToLowerInvariant());
+                    }
+                }
+
+                string[] tftRootDirs = { "loadouts/", "global/loadouts/", "data/loadouts/", "assets/loadouts/" };
+                string[] tftTemplates =
+                {
+                    "{0}.vfxdefinition.bin",
+                    "{0}.resourcebin.bin",
+                    "{0}_tier1.resourcebin.bin",
+                    "{0}_tier2.resourcebin.bin",
+                    "{0}_tier3.resourcebin.bin",
+                    "{0}_tier1.cutscene.bin",
+                    "{0}_tier2.cutscene.bin",
+                    "{0}_tier3.cutscene.bin",
+                    "{0}.cutscene.bin"
+                };
+
+                foreach (string stem in tftLoadoutStems)
+                {
+                    foreach (string root in tftRootDirs)
+                    {
+                        foreach (string tpl in tftTemplates)
+                        {
+                            candidates.Add($"{root}tftdamageskins/{string.Format(CultureInfo.InvariantCulture, tpl, stem)}");
+                            candidates.Add($"{root}tftzoomskins/{string.Format(CultureInfo.InvariantCulture, tpl, stem)}");
+                        }
+                    }
+                }
+
                 foreach (string dir in directories)
                 foreach (string queue in queueTokens)
                 foreach (string tier in tierTokens)

@@ -160,25 +160,35 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (candidateBudget == 0) return 0;
 
             const string source = "GAME from LCU hashes";
-            var regex = new Regex(
-                @"^plugins/rcp-be-lol-game-data/global/default/((?:assets|data)/.*)\.(png|jpg|json)$",
-                RegexOptions.Compiled);
+            const string pluginPrefix = "plugins/rcp-be-lol-game-data/global/default/";
             int checkedCount = 0;
             foreach (string lcuPath in lcuGuesser.KnownPaths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
 
-                Match match = regex.Match(lcuPath);
-                if (!match.Success) continue;
-                string path = match.Groups[1].Value;
-                string extension = match.Groups[2].Value;
-                string candidatePath = extension is "png" or "jpg"
-                    ? $"{path}.dds"
-                    : $"{path}.{extension}";
+                if (!lcuPath.StartsWith(pluginPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+                ReadOnlySpan<char> rel = lcuPath.AsSpan(pluginPrefix.Length);
+                if (!rel.StartsWith("assets/", StringComparison.OrdinalIgnoreCase) &&
+                    !rel.StartsWith("data/", StringComparison.OrdinalIgnoreCase)) continue;
 
-                Check(engine, candidatePath, HashGuessStrategy.CrossDomainGame, source);
-                checkedCount++;
+                int dot = rel.LastIndexOf('.');
+                if (dot <= 0) continue;
+
+                ReadOnlySpan<char> stem = rel[..dot];
+                ReadOnlySpan<char> ext = rel[(dot + 1)..];
+
+                if (ext.Equals("png", StringComparison.OrdinalIgnoreCase) || ext.Equals("jpg", StringComparison.OrdinalIgnoreCase))
+                {
+                    engine.CheckNormalizedParts(stem, ReadOnlySpan<char>.Empty, ".dds".AsSpan(), HashGuessStrategy.CrossDomainGame, source);
+                    checkedCount++;
+                }
+                else if (ext.Equals("json", StringComparison.OrdinalIgnoreCase))
+                {
+                    engine.CheckNormalizedParts(stem, ReadOnlySpan<char>.Empty, ".json".AsSpan(), HashGuessStrategy.CrossDomainGame, source);
+                    checkedCount++;
+                }
+
                 if ((checkedCount & 0x1fff) == 0)
                 {
                     progress?.Invoke(checkedCount);
@@ -265,6 +275,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             ReadOnlySpan<string> numbers = ["", "1", "2", "3", "4"];
             ReadOnlySpan<string> suffixes = ["", "_passive"];
             ReadOnlySpan<string> tiers = ["starter", "signature", "premium", "base"];
+            ReadOnlySpan<string> skinSubmeshRoles = [
+                "body", "weapon", "weapon_light", "props", "hands", "coin", 
+                "iridescent", "bodymask", "angelteemo", "recall", "head", "hair", 
+                "tails", "cloth", "wings", "eyes", "mask"
+            ];
             const int nskins = 400;
 
             foreach (string character in ProgressIterator(characterList, value => value, cancellationToken))
@@ -303,6 +318,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     if (!CheckSpan(fixedPath.AsSpan())) goto ChampionDone;
                 }
 
+                if (character.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
+                {
+                    ReadOnlySpan<string> petParts = ["arms", "face", "flower", "piano", "props", "body", "head", "tail", "wings", "hair", "weapon"];
+                    foreach (string part in petParts)
+                    {
+                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/themes/base/{character}_base_{part}_tx_cm.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/themes/bloodmoon/{character}_bloodmoon_{part}_tx_cm.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    }
+                }
+
                 // Skins, animations, HUD icons, loadscreens and textures
                 for (int skin = 0; skin < nskins; skin++)
                 {
@@ -315,6 +340,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}_le.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
                     if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_loadscreen_{skin}_le.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
                     if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_tx_cm.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+
+                    foreach (string role in skinSubmeshRoles)
+                    {
+                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_{role}_tx_cm.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    }
 
                     foreach (string tier in tiers)
                     {
