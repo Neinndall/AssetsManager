@@ -275,11 +275,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             ReadOnlySpan<string> numbers = ["", "1", "2", "3", "4"];
             ReadOnlySpan<string> suffixes = ["", "_passive"];
             ReadOnlySpan<string> tiers = ["starter", "signature", "premium", "base"];
-            ReadOnlySpan<string> skinSubmeshRoles = [
-                "body", "weapon", "weapon_light", "props", "hands", "coin", 
-                "iridescent", "bodymask", "angelteemo", "recall", "head", "hair", 
-                "tails", "cloth", "wings", "eyes", "mask"
-            ];
             const int nskins = 400;
 
             foreach (string character in ProgressIterator(characterList, value => value, cancellationToken))
@@ -318,16 +313,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     if (!CheckSpan(fixedPath.AsSpan())) goto ChampionDone;
                 }
 
-                if (character.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
-                {
-                    ReadOnlySpan<string> petParts = ["arms", "face", "flower", "piano", "props", "body", "head", "tail", "wings", "hair", "weapon"];
-                    foreach (string part in petParts)
-                    {
-                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/themes/base/{character}_base_{part}_tx_cm.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
-                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/themes/bloodmoon/{character}_bloodmoon_{part}_tx_cm.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
-                    }
-                }
-
                 // Skins, animations, HUD icons, loadscreens and textures
                 for (int skin = 0; skin < nskins; skin++)
                 {
@@ -340,11 +325,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}_le.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
                     if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_loadscreen_{skin}_le.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
                     if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_tx_cm.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
-
-                    foreach (string role in skinSubmeshRoles)
-                    {
-                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_{role}_tx_cm.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
-                    }
 
                     foreach (string tier in tiers)
                     {
