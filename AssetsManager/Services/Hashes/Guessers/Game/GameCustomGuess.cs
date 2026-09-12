@@ -185,7 +185,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             CancellationToken cancellationToken,
             Action<int> progress = null)
         {
-            IReadOnlyList<string> paths = Corpus.GetOrCreate("custom-focused-wordlist-paths", values => values.ToList());
+            IReadOnlyList<string> paths = KnownPaths;
             return _SubstituteBasenameWords(
                 engine,
                 paths,

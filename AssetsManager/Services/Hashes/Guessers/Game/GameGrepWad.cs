@@ -905,7 +905,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 if (property is not BinTreeWadChunkLink link || link.Value == 0) return null;
                 if (engine.Matches.TryGetValue(link.Value, out var match)) return match.Path;
                 // Hashed mesh references still provide naming context when their paths are known.
-                var knownPaths = Corpus.GetOrCreate("known-hashes-dict", _ => HashFile.Load());
+                var knownPaths = HashFile.Load();
                 return knownPaths.TryGetValue(link.Value, out string path) ? path : null;
             }
 
@@ -1945,7 +1945,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (!ImageAutoAtlas.IsAtlas(data.AsSpan()) || !ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out ImageAutoAtlas atlas))
                 return;
 
-            IReadOnlyDictionary<ulong, string> knownDict = Corpus.GetOrCreate("known-hashes-dict", _ => HashFile.Load());
+            IReadOnlyDictionary<ulong, string> knownDict = HashFile.Load();
 
             // Ensure any sprite hash not in HashFile is marked unknown in engine
             bool hasUnresolvedSprites = false;

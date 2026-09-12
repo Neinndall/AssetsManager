@@ -311,6 +311,23 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (string path in knownPaths)
             {
                 if (!IncludeNumberPath(path)) continue;
+
+                if (AnchorNumberMatchesToFileName)
+                {
+                    int lastSlash = path.LastIndexOf('/');
+                    ReadOnlySpan<char> fileName = lastSlash >= 0 ? path.AsSpan(lastSlash + 1) : path.AsSpan();
+                    bool hasDigit = false;
+                    foreach (char c in fileName)
+                    {
+                        if (char.IsAsciiDigit(c))
+                        {
+                            hasDigit = true;
+                            break;
+                        }
+                    }
+                    if (!hasDigit) continue;
+                }
+
                 foreach (Match match in Regex.Matches(path, numberPattern))
                     formats.Add(path[..match.Index] + "{number}" + path[(match.Index + match.Length)..]);
             }
@@ -353,41 +370,44 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
             if (candidateBudget == 0) return 0;
 
-            (IReadOnlyList<string> orderedPrefixes, IReadOnlyList<string> orderedExtensions) =
-                Corpus.GetOrCreate("extension-substitution-data", paths =>
+            IReadOnlyList<string> orderedExtensions =
+                Corpus.GetOrCreate("known-extensions", paths =>
                 {
-                    var prefixes = new HashSet<string>(StringComparer.Ordinal);
                     var extensions = new HashSet<string>(StringComparer.Ordinal);
                     foreach (string path in paths)
                     {
                         int dot = path.LastIndexOf('.');
                         if (dot > path.LastIndexOf('/'))
                         {
-                            prefixes.Add(path[..dot]);
                             string ext = path[dot..];
                             if (!ext.EndsWith("00", StringComparison.Ordinal))
                                 extensions.Add(ext);
                         }
-                        else
-                        {
-                            prefixes.Add(path);
-                        }
                     }
-                    return (
-                        (IReadOnlyList<string>)prefixes.OrderBy(v => v, StringComparer.Ordinal).ToList(),
-                        (IReadOnlyList<string>)extensions.OrderBy(v => v, StringComparer.Ordinal).ToList()
-                    );
+                    return (IReadOnlyList<string>)extensions.OrderBy(v => v, StringComparer.Ordinal).ToList();
                 });
 
             int checkedCount = 0;
-            foreach (string prefix in ProgressIterator(orderedPrefixes, value => value, cancellationToken))
+            var seenStems = new HashSet<ulong>();
+
+            foreach (string path in ProgressIterator(KnownPaths, value => value, cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                ReadOnlySpan<char> prefixSpan = prefix.AsSpan();
+
+                int slash = path.LastIndexOf('/');
+                int dot = path.LastIndexOf('.');
+                ReadOnlySpan<char> prefixSpan = dot > slash ? path.AsSpan(0, dot) : path.AsSpan();
+                ReadOnlySpan<char> currentExt = dot > slash ? path.AsSpan(dot) : ReadOnlySpan<char>.Empty;
+
+                ulong stemHash = XxHash64Ext.Hash(prefixSpan);
+                if (!seenStems.Add(stemHash)) continue;
 
                 foreach (string extension in orderedExtensions)
                 {
                     if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
+
+                    if (currentExt.Equals(extension.AsSpan(), StringComparison.OrdinalIgnoreCase))
+                        continue;
 
                     engine.CheckNormalizedParts(
                         prefixSpan,
@@ -490,6 +510,16 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (engine.RemainingUnknownCount == 0) break;
             }
             return checkedCount;
+        }
+
+        internal static IEnumerable<T> ProgressIterator<T>(
+            IReadOnlyList<T> sequence,
+            Func<T, string> formatter = null,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(sequence);
+            if (Console.IsErrorRedirected) return sequence;
+            return ProgressIterate(sequence, formatter, cancellationToken);
         }
 
         internal static IEnumerable<T> ProgressIterator<T>(
