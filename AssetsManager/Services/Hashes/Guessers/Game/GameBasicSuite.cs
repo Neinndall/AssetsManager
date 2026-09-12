@@ -234,9 +234,9 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(value => value, StringComparer.Ordinal)
                     .ToList());
-            IReadOnlyDictionary<string, List<string>> HudChampStemFiles = Corpus.GetOrCreate(
-                "hud-champ-stem-files",
-                knownPaths => BuildHudChampStemFiles(knownPaths));
+            IReadOnlyDictionary<string, List<string>> JadeChampFiles = Corpus.GetOrCreate(
+                "jade-champ-files",
+                knownPaths => BuildJadeChampFiles(knownPaths));
             IReadOnlyDictionary<string, RecallContext> RecallContexts = Corpus.GetOrCreate(
                 "recall-contexts",
                 BuildRecallContexts);
@@ -306,6 +306,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     $"assets/characters/{character}/skins/base/{character}_base_tx_gm.tex",
                     $"assets/characters/{character}/skins/base/{character}loadscreen.tex",
                     $"assets/characters/{character}/skins/base/{character}_loadscreen.tex",
+                    $"assets/characters/{character}/hud/{character}_circle_tobacco.tex",
+                    $"assets/characters/{character}/hud/{character}_square_tobacco.tex",
+                    $"assets/characters/{character}/skins/base/{character}loadscreen_tobacco.tex",
+                    $"assets/characters/{character}/skins/base/{character}_loadscreen_tobacco.tex",
+                    $"assets/characters/{character}/skins/base/{character}_base_cubemap.dds",
                     $"characters/{character}"
                 ];
                 foreach (string fixedPath in fixedPatterns)
@@ -362,19 +367,32 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
                 }
 
-                // Jade HUD files
+                // Jade character files projection
                 if (!character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) &&
-                    HudChampStemFiles.TryGetValue(character, out List<string> hudStemFiles))
+                    JadeChampFiles.TryGetValue(character, out List<string> champFiles))
                 {
-                    const string hudMarker = "/hud/";
-                    foreach (string knownPath in hudStemFiles)
+                    foreach (string knownPath in champFiles)
                     {
-                        int marker = knownPath.IndexOf(hudMarker, StringComparison.OrdinalIgnoreCase);
-                        if (marker >= 0)
+                        const string assetsMarker = "assets/characters/";
+                        const string dataMarker = "data/characters/";
+                        string marker = knownPath.StartsWith(assetsMarker, StringComparison.OrdinalIgnoreCase) ? assetsMarker : dataMarker;
+                        string subpath = knownPath[(marker.Length + character.Length)..];
+
+                        // Candidate 1: same subpath under jade_{character}
+                        if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"{marker}jade_{character}{subpath}", out w))
+                            if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+
+                        // Candidate 2: if file stem starts with character, prefix with jade_
+                        int lastSlash = subpath.LastIndexOf('/');
+                        if (lastSlash >= 0)
                         {
-                            ReadOnlySpan<char> suffix = knownPath.AsSpan(marker + hudMarker.Length - 1);
-                            if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/jade_{character}{suffix}", out w))
-                                if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+                            string folder = subpath[..(lastSlash + 1)];
+                            string filename = subpath[(lastSlash + 1)..];
+                            if (filename.StartsWith(character, StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"{marker}jade_{character}{folder}jade_{filename}", out w))
+                                    if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+                            }
                         }
                     }
                 }
@@ -629,28 +647,29 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             });
         }
 
-        private static Dictionary<string, List<string>> BuildHudChampStemFiles(IReadOnlyList<string> knownPaths)
+        private static Dictionary<string, List<string>> BuildJadeChampFiles(IReadOnlyList<string> knownPaths)
         {
             var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (string path in knownPaths)
             {
-                const string marker = "assets/characters/";
-                if (!path.StartsWith(marker, StringComparison.OrdinalIgnoreCase))
+                const string assetsMarker = "assets/characters/";
+                const string dataMarker = "data/characters/";
+                string marker = path.StartsWith(assetsMarker, StringComparison.OrdinalIgnoreCase) ? assetsMarker
+                    : path.StartsWith(dataMarker, StringComparison.OrdinalIgnoreCase) ? dataMarker
+                    : null;
+                if (marker == null)
                     continue;
+
                 string rest = path[marker.Length..];
                 int slash = rest.IndexOf('/');
                 if (slash <= 0)
                     continue;
+
                 string champ = rest[..slash];
                 if (champ.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ||
                     champ.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
                     continue;
-                int hud = rest.IndexOf("/hud/", StringComparison.OrdinalIgnoreCase);
-                if (hud < 0)
-                    continue;
-                string file = rest[(rest.LastIndexOf('/') + 1)..];
-                if (!file.StartsWith(champ, StringComparison.OrdinalIgnoreCase) || !file.Contains('.'))
-                    continue;
+
                 if (!result.TryGetValue(champ, out List<string> files))
                     result[champ] = files = new List<string>();
                 files.Add(path);

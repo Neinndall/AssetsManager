@@ -2276,6 +2276,37 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 Assert.Contains(engine.Matches.Values, match => match.Path == path));
         }
 
+        [Fact]
+        public void GameJadeProjectionResolvesFullChampionHierarchyAndTobacco()
+        {
+            var game = new GameHashGuesser(new HashFile(
+                HashGuessDomain.Game,
+                new[]
+                {
+                    "assets/characters/fizz/skins/skin16/fizz_skin16_angelteemo_tx_cm.tex",
+                    "assets/characters/nautilus/hud/icons2d/nautilus_staggeringblow.dds",
+                    "assets/characters/nami/skins/skin02/particles/common_smoke_clouds_2x2.tex"
+                }));
+            string[] expected =
+            {
+                "assets/characters/jade_fizz/skins/skin16/jade_fizz_skin16_angelteemo_tx_cm.tex",
+                "assets/characters/jade_nautilus/hud/icons2d/jade_nautilus_staggeringblow.dds",
+                "assets/characters/jade_nami/skins/skin02/particles/common_smoke_clouds_2x2.tex",
+                "assets/characters/jade_graves/hud/jade_graves_circle_tobacco.tex",
+                "assets/characters/jade_graves/skins/base/jade_gravesloadscreen_tobacco.tex",
+                "assets/characters/jade_nami/skins/base/jade_nami_base_cubemap.dds"
+            };
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                expected.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+
+            game.GuessCharactersFiles(engine, CancellationToken.None, new[] { "fizz", "nautilus", "nami", "graves" });
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.All(expected, path =>
+                Assert.Contains(engine.Matches.Values, match => match.Path == path));
+        }
+
         [Theory]
         [InlineData("assets/shaders/generated/shaders/test.ps_2_0-dx11")]
         [InlineData("assets/shaders/generated/shaders/test.ps_2_0-dx11_0")]
@@ -2988,6 +3019,73 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 1);
 
             AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void GameDynamicBinSamplerAndMaterialExtractionResolvesModernRoles()
+        {
+            const string iridescentPath = "assets/characters/janna/skins/skin70/janna_skin70_iridescent_tx_cm.tex";
+            const string bodymaskPath = "assets/characters/janna/skins/skin69/janna_skin69_bodymask_tx_cm.tex";
+
+            var sampler1 = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("textureName"), "iridescentTex"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), XxHash64Ext.Hash(iridescentPath))
+                });
+            var material1 = new BinTreeObject(
+                "Characters/Janna/Skins/Skin70/Materials/Wings",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(0x8d39bde6, "Characters/Janna/Skins/Skin70/Materials/Wings"),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new[] { sampler1 })
+                });
+
+            var sampler2 = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("textureName"), "Mask"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), XxHash64Ext.Hash(bodymaskPath))
+                });
+            var material2 = new BinTreeObject(
+                "Characters/Janna/Skins/Skin69/Materials/Specular_Body_Fresnel_Masked_inst",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(0x8d39bde6, "Characters/Janna/Skins/Skin69/Materials/Specular_Body_Fresnel_Masked_inst"),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new[] { sampler2 })
+                });
+
+            var tree = new BinTree(new[] { material1, material2 }, Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                new HashSet<ulong> { XxHash64Ext.Hash(iridescentPath), XxHash64Ext.Hash(bodymaskPath) });
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(stream.ToArray()),
+                "data/characters/janna/skins/skin70.bin",
+                "Janna.wad.client",
+                1);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Contains(engine.Matches.Values, match => match.Path == iridescentPath);
+            Assert.Contains(engine.Matches.Values, match => match.Path == bodymaskPath);
         }
 
         [Fact]
