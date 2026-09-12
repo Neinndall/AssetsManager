@@ -746,20 +746,55 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             foreach (string sm in text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 string smLow = sm.ToLowerInvariant();
-                if (smLow.Length >= 3)
+                if (smLow.Length >= 1)
                 {
                     smSet.Add(smLow);
                     string[] parts = smLow.Split('_', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length > 1)
                     {
                         for (int i = 1; i < parts.Length; i++)
+                        {
                             smSet.Add(string.Join('_', parts.Take(i)));
+                            smSet.Add(string.Join('_', parts.Skip(i)));
+                        }
                         foreach (string part in parts)
                         {
-                            if (part.Length >= 3 && part != "top" && part != "low" && part != "bot")
+                            if (part != "top" && part != "low" && part != "bot")
                                 smSet.Add(part);
                         }
                     }
+                }
+            }
+        }
+
+        private static readonly string[] StandardSkinRoles =
+        {
+            "r", "recall", "weapon", "weapons", "wings", "wing", "body", "hair",
+            "props", "prop", "tail", "horns", "owl", "ult", "pet", "familiar",
+            "shadow", "clone", "mask", "extra", "cape", "eyes"
+        };
+
+        private static void HarvestSubmeshRoleTokens(string submeshName, HashSet<string> roles)
+        {
+            if (string.IsNullOrWhiteSpace(submeshName)) return;
+            string clean = CleanRoleName(submeshName);
+            if (string.IsNullOrEmpty(clean)) return;
+
+            roles.Add(clean);
+
+            string[] parts = clean.Split('_', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 1)
+            {
+                foreach (string part in parts)
+                {
+                    if (!string.IsNullOrWhiteSpace(part))
+                        roles.Add(part);
+                }
+
+                for (int i = 1; i < parts.Length; i++)
+                {
+                    roles.Add(string.Join('_', parts.Skip(i)));
+                    roles.Add(string.Join('_', parts.Take(i)));
                 }
             }
         }
@@ -1200,7 +1235,13 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 string sKey = champMatch.Success ? champMatch.Groups["skin"].Value.ToLowerInvariant() : "";
                 if (!string.IsNullOrEmpty(sKey) && submeshesBySkin.TryGetValue(sKey, out var smList))
                 {
-                    foreach (string sm in smList) candidateStems.Add(sm);
+                    foreach (string sm in smList)
+                    {
+                        candidateStems.Add(sm);
+                        candidateStems.Add($"{fileStem}_{sm}");
+                        if (!string.IsNullOrEmpty(cleanChamp))
+                            candidateStems.Add($"{cleanChamp}_{sm}");
+                    }
                 }
 
                 var allStems = candidateStems.ToList();
@@ -1326,9 +1367,9 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 }
             }
 
-            if (materialTargets.Count == 0) return;
-
+            var directTargets = new HashSet<ulong>();
             var roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (BinTreeObject obj in tree.Objects.Values)
             {
                 if (obj.ClassHash != SkinPropertiesClassHash ||
@@ -1349,17 +1390,28 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     if (entry.Properties.TryGetValue(MaterialLinkHash, out BinTreeProperty materialProperty) &&
                         materialProperty is BinTreeObjectLink materialLink &&
                         materialTargets.ContainsKey(materialLink.Value))
+                    {
                         hitsUnknown = true;
+                    }
                     else if (entry.Properties.TryGetValue(DirectTextureHash, out BinTreeProperty textureProperty) &&
                              textureProperty is BinTreeWadChunkLink directLink &&
                              directLink.Value != 0 && engine.UnknownHashes.Contains(directLink.Value))
+                    {
                         hitsUnknown = true;
+                        directTargets.Add(directLink.Value);
+                    }
 
                     if (hitsUnknown)
-                        roles.Add(CleanRoleName(submesh.Value));
+                    {
+                        HarvestSubmeshRoleTokens(submesh.Value, roles);
+                    }
                 }
             }
 
+            if (materialTargets.Count == 0 && directTargets.Count == 0) return;
+
+            // When unknown material or direct texture targets exist, also test standard canonical skin roles
+            roles.UnionWith(StandardSkinRoles);
             roles.RemoveWhere(string.IsNullOrWhiteSpace);
             if (roles.Count == 0) return;
 
@@ -1372,6 +1424,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             {
                 candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                 candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_tx_gm.tex", HashGuessStrategy.CharacterTemplate));
+                candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_mask_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
+                candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_goldfresnelmasks.tex", HashGuessStrategy.CharacterTemplate));
                 foreach (string role in roles)
                 {
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
@@ -1379,6 +1433,9 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_gm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}.dds", HashGuessStrategy.CharacterTemplate));
+                    candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_mask.tex", HashGuessStrategy.CharacterTemplate));
+                    candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_mask_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
+                    candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_goldfresnelmasks.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/2x_{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/4x_{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                 }

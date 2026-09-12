@@ -153,6 +153,57 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(1, engine.RemainingUnknownCount);
         }
 
+        [Fact]
+        public void GuessSkinRoleTextures_ResolvesDirectTextureSubmeshWithPrefix()
+        {
+            const string target = "assets/characters/janna/skins/skin67/janna_skin67_r_tx_cm.tex";
+            ulong targetHash = XxHash64Ext.Hash(target);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()), null, _ => string.Empty);
+            var matches = new List<HashGuessMatch>();
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { targetHash }, m => matches.Add(m));
+
+            guesser.GuessSkinRoleTextures(
+                engine,
+                new ArraySegment<byte>(new byte[4]),
+                "data/characters/janna/skins/skin67.bin",
+                "Janna.wad.client",
+                1UL,
+                System.Threading.CancellationToken.None,
+                () => CreateSkinTreeWithDirectTexture("R_Wing", targetHash));
+
+            Assert.Single(matches);
+            Assert.Equal(target, matches[0].Path);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
+
+
+        private static BinTree CreateSkinTreeWithDirectTexture(string submesh, ulong textureHash)
+        {
+            var skinOverride = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("submesh"), submesh),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), textureHash)
+                });
+            var mesh = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("materialOverride"),
+                        BinPropertyType.Embedded,
+                        new[] { skinOverride })
+                });
+            var skin = new BinTreeObject(
+                "Characters/Janna/Skins/Skin67",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[] { mesh });
+            return new BinTree(new[] { skin }, Array.Empty<string>());
+        }
+
         private static BinTree CreateSkinTree(string materialPath, string submesh, ulong textureHash)
         {
             var sampler = new BinTreeEmbedded(
