@@ -59,6 +59,7 @@ namespace AssetsManager.Views
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private ComparatorWindow _comparatorWindow;
         private HashGuessingWindow _hashGuessingWindow;
+        private ExplorerWindow _explorerWindow;
         private bool _isUpdatePromptOpen;
 
         // New fields to manage the state of the extraction after comparison
@@ -463,11 +464,7 @@ namespace AssetsManager.Views
             // Dialogs (Settings, Help) do not replace the main content, so no cleanup is needed.
             if (viewTag != "Settings" && viewTag != "Help")
             {
-                if (MainContentArea.Content is ExplorerWindow explorerWindow)
-                {
-                    explorerWindow.CleanupResources();
-                }
-                else if (MainContentArea.Content is ViewerWindow viewerWindow)
+                if (MainContentArea.Content is ViewerWindow viewerWindow)
                 {
                     viewerWindow.CleanupResources();
                 }
@@ -492,9 +489,9 @@ namespace AssetsManager.Views
 
         private async Task LoadExplorerWithModeAsync(string mode)
         {
-            var explorerWindow = _serviceProvider.GetRequiredService<ExplorerWindow>();
-            MainContentArea.Content = explorerWindow;
-            await explorerWindow.InitializeWithMode(mode);
+            _explorerWindow ??= _serviceProvider.GetRequiredService<ExplorerWindow>();
+            MainContentArea.Content = _explorerWindow;
+            await _explorerWindow.InitializeWithMode(mode);
         }
 
         private void LoadHomeWindow()
@@ -504,7 +501,11 @@ namespace AssetsManager.Views
             MainContentArea.Content = homeWindow;
         }
 
-        private void LoadExplorerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ExplorerWindow>();
+        private void LoadExplorerWindow()
+        {
+            _explorerWindow ??= _serviceProvider.GetRequiredService<ExplorerWindow>();
+            MainContentArea.Content = _explorerWindow;
+        }
         private void LoadComparatorWindow()
         {
             _comparatorWindow ??= _serviceProvider.GetRequiredService<ComparatorWindow>();
@@ -542,6 +543,10 @@ namespace AssetsManager.Views
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
+            _explorerWindow?.CleanupResources();
+            _explorerWindow = null;
+            _hashGuessingWindow?.CleanupResources();
+            _hashGuessingWindow = null;
             _updateCheckService.Stop();
             StateChanged -= MainWindow_StateChanged;
             TrayIcon?.Dispose();

@@ -51,6 +51,15 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal IReadOnlyList<string> KnownPaths => Corpus.Paths;
 
+        internal virtual void ReleaseMemory()
+        {
+            HashFile.Invalidate();
+            lock (_corpusSync)
+            {
+                _corpus = null;
+            }
+        }
+
 
         internal static HashSet<ulong> UnknownFromExport(string directory) =>
             HashFile.LoadUnknownFromExport(directory);

@@ -149,5 +149,15 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
         {
             _logService?.LogDebug($"Hash Lab skipped invalid {kind} JSON '{sourcePath}': {exception.Message}");
         }
+
+        internal override void ReleaseMemory()
+        {
+            base.ReleaseMemory();
+            lock (_directorySync)
+            {
+                _knownDirectories = null;
+                _knownDirectoryRevision = -1;
+            }
+        }
     }
 }

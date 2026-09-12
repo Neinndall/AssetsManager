@@ -223,11 +223,17 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
+        public void ReleaseMemory()
+        {
+            _gameGuesser?.ReleaseMemory();
+            _lcuGuesser?.ReleaseMemory();
+            _binEntriesHashFile?.Invalidate();
+        }
+
         public async Task SaveMatchesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken)
         {
             await _persistence.PromotePathMatchesAsync(matches, cancellationToken);
-            _gameHashFile.Invalidate();
-            _lcuHashFile.Invalidate();
+            ReleaseMemory();
             await _hashResolverService.ForceReloadHashesAsync();
         }
 

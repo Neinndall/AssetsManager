@@ -177,33 +177,60 @@ namespace AssetsManager.Views.Controls.Explorer
             _treeBuildCts?.Dispose();
             _treeBuildCts = null;
 
-            // 2. Stop search timer (Unloaded also does this, but we ensure it here too)
+            // 2. Stop search timer and detach handler
             if (_searchTimer != null)
             {
                 _searchTimer.Stop();
+                _searchTimer.Tick -= SearchTimer_Tick;
             }
 
-            // 3. Clear the TreeView binding and events
+            // 3. Clear settings & favorites singleton subscriptions
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+
+            if (FavoritesManager != null)
+            {
+                FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
+            }
+
+            // 4. Invalidate search box index BEFORE clearing RootNodes
+            if (WadSearchBoxService != null && _viewModel.RootNodes != null)
+            {
+                WadSearchBoxService.InvalidateIndex(_viewModel.RootNodes);
+            }
+
+            // 5. Cleanup toolbar global window listeners
+            Toolbar?.Cleanup();
+
+            if (_viewModel.Toolbar != null)
+            {
+                _viewModel.Toolbar.PropertyChanged -= Toolbar_PropertyChanged;
+                _viewModel.Toolbar.ParentExplorer = null;
+            }
+
+            // 6. Clear the TreeView binding and events
             if (FileTreeView != null)
             {
                 FileTreeView.SelectedItemChanged -= FileTreeView_SelectedItemChanged;
                 FileTreeView.ItemsSource = null; 
             }
 
-            // 4. DEEP CLEANUP: Dispose all nodes recursively to release megabytes of RAM
+            // 7. DEEP CLEANUP: Dispose all nodes recursively without allocating temporary lists
             if (_viewModel.RootNodes != null)
             {
-                foreach (var rootNode in _viewModel.RootNodes.ToList())
+                for (int i = 0; i < _viewModel.RootNodes.Count; i++)
                 {
-                    rootNode.Dispose(); 
+                    _viewModel.RootNodes[i]?.Dispose(); 
                 }
                 _viewModel.RootNodes.Clear();
             }
 
-            // 5. Break peer connections
+            // 8. Break peer connections
             FilePreviewer = null; 
 
-            // 6. Reset internal state
+            // 9. Reset internal state
             _currentRootPath = null;
             _isExternalInitRequested = false;
         }
@@ -467,6 +494,15 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 var newNodes = await buildFunc(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (_viewModel.RootNodes != null && _viewModel.RootNodes.Count > 0)
+                {
+                    WadSearchBoxService?.InvalidateIndex(_viewModel.RootNodes);
+                    for (int i = 0; i < _viewModel.RootNodes.Count; i++)
+                    {
+                        _viewModel.RootNodes[i]?.Dispose();
+                    }
+                }
 
                 _viewModel.RootNodes.ReplaceRange(newNodes);
                 WadSearchBoxService.RebuildIndex(_viewModel.RootNodes);

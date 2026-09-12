@@ -245,30 +245,41 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             finally
             {
-                try
+                CleanupResources();
+            }
+        }
+
+        public void CleanupResources()
+        {
+            try
+            {
+                CancelGridPreviewLoading();
+                ExplorerPreviewService?.ReleaseResources();
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error releasing Explorer preview resources");
+            }
+
+            try
+            {
+                if (ViewModel?.PinnedFilesManager != null)
                 {
-                    ExplorerPreviewService?.ReleaseResources();
-                }
-                catch (Exception ex)
-                {
-                    LogService.LogError(ex, "Error releasing Explorer preview resources");
+                    ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
+                    ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
+                    ViewModel.PinnedFilesManager.PinnedFiles.Clear();
                 }
 
-                try
-                {
-                    if (ViewModel.PinnedFilesManager != null)
-                    {
-                        ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
-                        ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
-                    }
+                // Clear sub-controls peer connection
+                if (FileGridControl != null) FileGridControl.ParentPreviewer = null;
 
-                    // Clear sub-controls peer connection
-                    if (FileGridControl != null) FileGridControl.ParentPreviewer = null;
-                }
-                catch (Exception ex)
-                {
-                    LogService.LogError(ex, "Error detaching FilePreviewerControl subscriptions");
-                }
+                _currentNode = null;
+                _currentFolderNode = null;
+                _rootNodes = null;
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error detaching FilePreviewerControl subscriptions");
             }
         }
 

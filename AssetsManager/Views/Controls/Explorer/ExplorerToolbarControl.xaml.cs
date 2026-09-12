@@ -27,15 +27,19 @@ namespace AssetsManager.Views.Controls.Explorer
             Unloaded += ExplorerToolbarControl_Unloaded;
         }
 
+        private Window _parentWindow;
+
         // ── Lifecycle: attach/detach global click listener ──
 
         private void ExplorerToolbarControl_Loaded(object sender, RoutedEventArgs e)
         {
-            var window = Window.GetWindow(this);
-            if (window != null)
+            _parentWindow = Window.GetWindow(this);
+            if (_parentWindow != null)
             {
-                window.PreviewMouseDown += Window_PreviewMouseDown;
-                window.LocationChanged += Window_LocationChanged;
+                _parentWindow.PreviewMouseDown -= Window_PreviewMouseDown;
+                _parentWindow.PreviewMouseDown += Window_PreviewMouseDown;
+                _parentWindow.LocationChanged -= Window_LocationChanged;
+                _parentWindow.LocationChanged += Window_LocationChanged;
             }
 
             LoadHistory();
@@ -43,11 +47,16 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void ExplorerToolbarControl_Unloaded(object sender, RoutedEventArgs e)
         {
-            var window = Window.GetWindow(this);
-            if (window != null)
+            Cleanup();
+        }
+
+        public void Cleanup()
+        {
+            if (_parentWindow != null)
             {
-                window.PreviewMouseDown -= Window_PreviewMouseDown;
-                window.LocationChanged -= Window_LocationChanged;
+                _parentWindow.PreviewMouseDown -= Window_PreviewMouseDown;
+                _parentWindow.LocationChanged -= Window_LocationChanged;
+                _parentWindow = null;
             }
         }
 

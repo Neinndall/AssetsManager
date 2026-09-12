@@ -89,6 +89,7 @@ namespace AssetsManager.Views
         public void CleanupResources()
         {
             FileExplorer?.CleanupResources();
+            FilePreviewer?.CleanupResources();
 
             if (FileExplorer != null)
             {

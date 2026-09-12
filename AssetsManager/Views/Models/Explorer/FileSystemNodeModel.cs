@@ -373,15 +373,21 @@ namespace AssetsManager.Views.Models.Explorer
 
         public void Dispose()
         {
-            // Limpiar hijos recursivamente
+            if (_visibleChildren != null && !ReferenceEquals(_visibleChildren, _children))
+            {
+                _visibleChildren.Clear();
+                _visibleChildren = null;
+            }
+
+            // Limpiar hijos recursivamente sin copias intermedias
             if (_children != null)
             {
-                var childrenCopy = _children.ToList();
-                foreach (var child in childrenCopy)
+                for (int i = 0; i < _children.Count; i++)
                 {
-                    child.Dispose();
+                    _children[i]?.Dispose();
                 }
                 _children.Clear();
+                _children = null;
             }
 
             // Limpiar referencias

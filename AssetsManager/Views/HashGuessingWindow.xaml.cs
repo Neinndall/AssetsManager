@@ -689,9 +689,18 @@ namespace AssetsManager.Views
             _cancellationTokenSource?.Cancel();
         }
 
+        public void CleanupResources()
+        {
+            if (!_viewModel.IsRunning)
+            {
+                _hashGuessingService?.ReleaseMemory();
+            }
+        }
+
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            // Do not cancel background task on view unload
+            // Release memory if operation is not running
+            CleanupResources();
         }
 
         private async Task RunAsync(HashGuessMode mode)
@@ -920,6 +929,7 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
+                _hashGuessingService?.ReleaseMemory();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();
@@ -1193,6 +1203,7 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
+                _hashGuessingService?.ReleaseMemory();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();
