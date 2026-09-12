@@ -19,6 +19,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed partial class GameHashGuesser
     {
+        private const int DefaultExtendedCandidateBudget = 15_000_000;
+
         private static IEnumerable<IReadOnlyList<T>> GetCombinations<T>(IReadOnlyList<T> values, int length)
         {
             if (length <= 0 || values.Count < length) yield break;
@@ -52,7 +54,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             }
         }
 
-        internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
+        internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = DefaultExtendedCandidateBudget)
         {
             var paths = Corpus.GetOrCreate("word-addition-paths", values => values.Where(path =>
                 !path.Contains("assets/characters/", StringComparison.OrdinalIgnoreCase) &&
@@ -69,9 +71,9 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 source: "GAME basename word addition");
         }
 
-        internal IEnumerable<HashGuessCandidate> SubstituteCharacter(int candidateBudget = int.MaxValue) => GenerateCharacterSubstitutionCandidates(candidateBudget);
-        internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers(int candidateBudget = int.MaxValue) => GenerateSkinNumberCandidates(candidateBudget);
-        internal IEnumerable<HashGuessCandidate> SubstituteSuffixes(int candidateBudget = int.MaxValue) => GenerateSuffixCandidates(candidateBudget);
+        internal IEnumerable<HashGuessCandidate> SubstituteCharacter(int candidateBudget = DefaultExtendedCandidateBudget) => GenerateCharacterSubstitutionCandidates(candidateBudget);
+        internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers(int candidateBudget = DefaultExtendedCandidateBudget) => GenerateSkinNumberCandidates(candidateBudget);
+        internal IEnumerable<HashGuessCandidate> SubstituteSuffixes(int candidateBudget = DefaultExtendedCandidateBudget) => GenerateSuffixCandidates(candidateBudget);
 
         internal IEnumerable<HashGuessCandidate> GenerateCharacterSubstitutionCandidates(int candidateBudget)
         {
@@ -180,15 +182,15 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             bool ShouldRun(string subId) => selectedSubMethods == null || selectedSubMethods.Contains(subId);
 
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-skingroups"))
-                checkedCandidates += await GuessSkinGroupsBin(engine, cancellationToken, progress, checkedCandidates);
+                checkedCandidates += await GuessSkinGroupsBin(engine, cancellationToken, progress, checkedCandidates, DefaultExtendedCandidateBudget);
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-chromas"))
                 checkedCandidates += await GuessSkinGroupsBinUsingChromas(engine, rootDirectory, cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-suffixes"))
-                checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
+                checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(DefaultExtendedCandidateBudget), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-skinnumbers"))
                 checkedCandidates += CheckCandidates(
                     engine,
-                    SubstituteSkinNumbers(),
+                    SubstituteSkinNumbers(DefaultExtendedCandidateBudget),
                     "GAME skin number combinations",
                     cancellationToken,
                     progress,
@@ -196,7 +198,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-characters"))
                 checkedCandidates += CheckCandidates(
                     engine,
-                    SubstituteCharacter(),
+                    SubstituteCharacter(DefaultExtendedCandidateBudget),
                     "GAME character substitution",
                     cancellationToken,
                     progress,
@@ -207,7 +209,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 checkedCandidates += AddBasenameWord(
                     engine,
                     cancellationToken,
-                    candidateBudget: int.MaxValue);
+                    candidateBudget: DefaultExtendedCandidateBudget);
                 progress?.Report(engine.CreateProgress("GAME basename word addition", checkedCandidates));
             }
 
@@ -354,7 +356,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             HashGuessEngine engine,
             CancellationToken cancellationToken,
             IProgress<HashGuessProgress> progress = null,
-            int progressOffset = 0)
+            int progressOffset = 0,
+            int candidateBudget = DefaultExtendedCandidateBudget)
         {
             return Task.Run(() =>
             {
@@ -376,24 +379,84 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 const string stageName = "GAME Extended: local skin groups";
                 progress?.Report(engine.CreateProgress(stageName, progressOffset));
 
-                foreach (var pair in characters.OrderBy(pair => pair.Value.Count))
+                var sortedCharacters = characters
+                    .Select(pair => (Character: pair.Key, Skins: pair.Value.OrderBy(v => v).Select(v => $"_skins_skin{v}").ToList()))
+                    .OrderBy(c => c.Skins.Count)
+                    .ToList();
+
+                int maxSkinsCount = sortedCharacters.Count > 0 ? sortedCharacters.Max(c => c.Skins.Count) : 0;
+
+                // Level-by-level breadth-first combination generation across ALL champions:
+                // Level 1: Single skins for every champion
+                // Level 2: Pairs for every champion
+                // Level 3: Triplets for every champion
+                // etc.
+                for (int length = 1; length <= maxSkinsCount; length++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var skins = pair.Value.Select(value => $"_skins_skin{value}").OrderBy(value => value, StringComparer.Ordinal).ToList();
-                    for (int length = 1; length <= skins.Count; length++)
+                    if (engine.RemainingUnknownCount == 0 || generated >= candidateBudget) break;
+
+                    foreach (var (character, skins) in sortedCharacters)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (engine.RemainingUnknownCount == 0 || generated >= candidateBudget) break;
+                        if (length > skins.Count) continue;
+
+                        // For higher lengths (> 3), skip combinatorial explosion on champions with many skins,
+                        // testing contiguous sliding windows instead (representing realistic chroma batches)
+                        if (length > 3 && skins.Count > 25)
+                        {
+                            for (int start = 0; start <= skins.Count - length; start++)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                string rangeSuffix = string.Concat(skins.Skip(start).Take(length));
+                                Check(engine, $"data/{character}{rangeSuffix}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
+                                generated++;
+                                Check(engine, $"data/{character}_skins_root{rangeSuffix}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
+                                generated++;
+
+                                if ((generated % 5000) == 0)
+                                    progress?.Report(engine.CreateProgress(stageName, progressOffset + generated));
+                                if (engine.RemainingUnknownCount == 0 || generated >= candidateBudget) return generated;
+                            }
+                            continue;
+                        }
+
                         foreach (var combination in GetCombinations(skins, length))
                         {
-                            Check(engine, $"data/{pair.Key}{string.Concat(combination)}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
-                            if (generated < int.MaxValue) generated++;
+                            cancellationToken.ThrowIfCancellationRequested();
+                            string suffix = string.Concat(combination);
+                            Check(engine, $"data/{character}{suffix}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
+                            generated++;
+                            if (length <= 2)
+                            {
+                                Check(engine, $"data/{character}_skins_root{suffix}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
+                                generated++;
+                            }
+
                             if ((generated % 5000) == 0)
                             {
                                 progress?.Report(engine.CreateProgress(stageName, progressOffset + generated));
                             }
-                            if (engine.RemainingUnknownCount == 0) return generated;
+                            if (engine.RemainingUnknownCount == 0 || generated >= candidateBudget) return generated;
                         }
                     }
                 }
+
+                // Also check full skin sets with _skins_root for each champion
+                foreach (var (character, skins) in sortedCharacters)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (engine.RemainingUnknownCount == 0 || generated >= candidateBudget) break;
+                    if (skins.Count <= 1) continue;
+
+                    string allSkins = string.Concat(skins);
+                    Check(engine, $"data/{character}_skins_root{allSkins}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
+                    generated++;
+                    Check(engine, $"data/{character}{allSkins}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
+                    generated++;
+                }
+
                 progress?.Report(engine.CreateProgress(stageName, progressOffset + generated));
                 return generated;
             }, cancellationToken);
@@ -403,7 +466,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             HashGuessEngine engine,
             CancellationToken cancellationToken,
             IProgress<HashGuessProgress> progress = null,
-            int progressOffset = 0) =>
-            GuessSkinGroupsBinLocalAsync(engine, cancellationToken, progress, progressOffset);
+            int progressOffset = 0,
+            int candidateBudget = DefaultExtendedCandidateBudget) =>
+            GuessSkinGroupsBinLocalAsync(engine, cancellationToken, progress, progressOffset, candidateBudget);
     }
 }
