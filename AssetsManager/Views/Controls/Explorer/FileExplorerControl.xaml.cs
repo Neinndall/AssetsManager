@@ -177,47 +177,23 @@ namespace AssetsManager.Views.Controls.Explorer
             _treeBuildCts?.Dispose();
             _treeBuildCts = null;
 
-            // 2. Stop search timer and detach handler
-            if (_searchTimer != null)
-            {
-                _searchTimer.Stop();
-                _searchTimer.Tick -= SearchTimer_Tick;
-            }
+            // 2. Stop search timer
+            _searchTimer?.Stop();
 
-            // 3. Clear settings & favorites singleton subscriptions
-            if (AppSettings != null)
-            {
-                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
-            }
-
-            if (FavoritesManager != null)
-            {
-                FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
-            }
-
-            // 4. Invalidate search box index BEFORE clearing RootNodes
+            // 3. Clear search box index BEFORE clearing RootNodes
             if (WadSearchBoxService != null && _viewModel.RootNodes != null)
             {
                 WadSearchBoxService.InvalidateIndex(_viewModel.RootNodes);
             }
 
-            // 5. Cleanup toolbar global window listeners
-            Toolbar?.Cleanup();
-
-            if (_viewModel.Toolbar != null)
-            {
-                _viewModel.Toolbar.PropertyChanged -= Toolbar_PropertyChanged;
-                _viewModel.Toolbar.ParentExplorer = null;
-            }
-
-            // 6. Clear the TreeView binding and events
+            // 4. Clear the TreeView binding and events
             if (FileTreeView != null)
             {
                 FileTreeView.SelectedItemChanged -= FileTreeView_SelectedItemChanged;
                 FileTreeView.ItemsSource = null; 
             }
 
-            // 7. DEEP CLEANUP: Dispose all nodes recursively without allocating temporary lists
+            // 5. DEEP CLEANUP: Dispose all nodes recursively without allocating temporary lists
             if (_viewModel.RootNodes != null)
             {
                 for (int i = 0; i < _viewModel.RootNodes.Count; i++)
@@ -227,10 +203,10 @@ namespace AssetsManager.Views.Controls.Explorer
                 _viewModel.RootNodes.Clear();
             }
 
-            // 8. Break peer connections
+            // 6. Break peer connections
             FilePreviewer = null; 
 
-            // 9. Reset internal state
+            // 7. Reset internal state
             _currentRootPath = null;
             _isExternalInitRequested = false;
         }
