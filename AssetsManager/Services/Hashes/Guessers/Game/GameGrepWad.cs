@@ -711,10 +711,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         }
 
         private static readonly Regex SkinPathRegex = new(
-            @"characters/(?<champ>[^/]+)/skins/(?<skin>base|skin0*(?<num>\d+))",
+            @"characters/(?<champ>[^/]+)/(?:skins|themes)/(?<skin>base|(?:skin|theme)0*(?<num>\d+))",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex MaterialPathRegex = new(
-            @"characters/(?<champ>[^/]+)/skins/(?<skin>[^/]+)/materials/(?<mat>[^/]+)",
+            @"characters/(?<champ>[^/]+)/(?<folder>skins|themes)/(?<skin>[^/]+)/materials/(?<mat>[^/]+)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 						
 
@@ -970,7 +970,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             var submeshesBySkin = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var skinObjects = new List<(BinTreeObject Obj, string SimpleSkin, string Skeleton, HashSet<ulong> Links)>();
-            var materialObjects = new List<(string Champ, string Skin, string RawMat, HashSet<ulong> Links, HashSet<string> Descriptors, HashSet<string> SamplerStems)>();
+            var materialObjects = new List<(string Champ, string Folder, string Skin, string RawMat, HashSet<ulong> Links, HashSet<string> Descriptors, HashSet<string> SamplerStems)>();
             int totalUnresolved = 0;
 
             // Phase 1: Fast single-pass metadata harvest across all BIN objects
@@ -1057,6 +1057,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                             if (matLinks.Count > 0)
                             {
                                 string mChamp = matMatch.Groups["champ"].Value.ToLowerInvariant();
+                                string mFolder = matMatch.Groups["folder"].Value.ToLowerInvariant();
                                 string mSkin = matMatch.Groups["skin"].Value.ToLowerInvariant();
                                 string rawMat = matMatch.Groups["mat"].Value.ToLowerInvariant();
                                 if (rawMat.EndsWith("_inst", StringComparison.OrdinalIgnoreCase)) rawMat = rawMat[..^5];
@@ -1086,7 +1087,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                                     }
                                 }
 
-                                materialObjects.Add((mChamp, mSkin, rawMat, matLinks, descriptors, samplerStems));
+                                materialObjects.Add((mChamp, mFolder, mSkin, rawMat, matLinks, descriptors, samplerStems));
                                 totalUnresolved += matLinks.Count;
                             }
                         }
@@ -1097,7 +1098,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (totalUnresolved == 0 || engine.RemainingUnknownCount == 0) return;
 
             // Phase 2: Resolve Modern Skin Materials (StaticMaterialDef)
-            foreach (var (mChamp, mSkin, rawMat, matLinks, matDescriptors, samplerStems) in materialObjects)
+            foreach (var (mChamp, mFolder, mSkin, rawMat, matLinks, matDescriptors, samplerStems) in materialObjects)
             {
                 if (engine.RemainingUnknownCount == 0) break;
 
@@ -1148,7 +1149,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     stems.Add("empowered_" + root);
                 }
 
-                string baseDir = $"assets/characters/{mChamp}/skins/{mSkin}/";
+                string baseDir = $"assets/characters/{mChamp}/{mFolder}/{mSkin}/";
                 foreach (ulong unk in matLinks)
                 {
                     if (engine.RemainingUnknownCount == 0) break;
@@ -1376,7 +1377,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         }
 
         private static readonly Regex SkinBinFileRegex = new(
-            @"^(?:assets|data)/characters/(?<champ>[^/]+)/skins/(?<skin>skin\d+|base)\.bin$",
+            @"^(?:assets|data)/characters/(?<champ>[^/]+)/(?<folder>skins|themes)/(?<skin>(?:skin|theme)\d+|base)\.bin$",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly uint SkinPropertiesClassHash = Fnv1a.HashLower("SkinCharacterDataProperties");
         private static readonly uint StaticMaterialClassHash = Fnv1a.HashLower("StaticMaterialDef");
@@ -1409,8 +1410,9 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (!skin.Success) return;
 
             string champ = skin.Groups["champ"].Value.ToLowerInvariant();
+            string folder = skin.Groups["folder"].Value.ToLowerInvariant();
             string skinFile = skin.Groups["skin"].Value.ToLowerInvariant();
-            string assetFolder = $"assets/characters/{champ}/skins/{skinFile}";
+            string assetFolder = $"assets/characters/{champ}/{folder}/{skinFile}";
 
             BinTree tree;
             try
@@ -1505,6 +1507,15 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_goldfresnelmasks.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/2x_{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/4x_{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
+
+                    if (role.Contains('_'))
+                    {
+                        int lastSep = role.LastIndexOf('_');
+                        string rolePrefix = role[..lastSep];
+                        string roleSuffix = role[(lastSep + 1)..];
+                        candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{rolePrefix}_tx_cm_{roleSuffix}.tex", HashGuessStrategy.CharacterTemplate));
+                        candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{rolePrefix}_tx_gm_{roleSuffix}.tex", HashGuessStrategy.CharacterTemplate));
+                    }
                 }
             }
 
@@ -1521,7 +1532,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             {
                 if (!path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase)) continue;
                 string[] parts = path.Replace('\\', '/').Split('/');
-                if (parts.Length < 6 || !parts[3].Equals("skins", StringComparison.OrdinalIgnoreCase)) continue;
+                if (parts.Length < 6 || (!parts[3].Equals("skins", StringComparison.OrdinalIgnoreCase) && !parts[3].Equals("themes", StringComparison.OrdinalIgnoreCase))) continue;
                 string file = parts[^1];
                 string baseName = file.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
                                   file.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)

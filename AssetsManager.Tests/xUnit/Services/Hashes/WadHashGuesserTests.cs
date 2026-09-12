@@ -3089,6 +3089,128 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GameGrepWadResolvesThemeSubmeshTexturesAndPropsUlt()
+        {
+            const string themeTexture = "assets/characters/petchibijhin/themes/theme1/petchibijhin_theme1_piano_tx_cm.tex";
+            const string propsUltTexture = "assets/characters/jade_nautilus/skins/skin09/jade_nautilus_skin09_props_tx_cm_ult.tex";
+            ulong themeHash = XxHash64Ext.Hash(themeTexture);
+            ulong propsUltHash = XxHash64Ext.Hash(propsUltTexture);
+
+            // 1. PetChibiJhin in theme1.bin with submesh "piano"
+            var petSampler = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("textureName"), "Diffuse_Texture"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), themeHash)
+                });
+            var petMaterial = new BinTreeObject(
+                "Characters/PetChibiJhin/Themes/Theme1/Materials/PetChibiJhin_Theme1_Piano",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new[] { petSampler })
+                });
+            var petOverride = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("submesh"), "piano"),
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower("Characters/PetChibiJhin/Themes/Theme1/Materials/PetChibiJhin_Theme1_Piano"))
+                });
+            var petMesh = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("materialOverride"),
+                        BinPropertyType.Embedded,
+                        new[] { petOverride })
+                });
+            var petSkin = new BinTreeObject(
+                "Characters/PetChibiJhin/Themes/Theme1",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[] { petMesh });
+            var petTree = new BinTree(new[] { petSkin, petMaterial }, Array.Empty<string>());
+            using var petStream = new MemoryStream();
+            petTree.Write(petStream);
+
+            // 2. Jade Nautilus in skin09.bin with submesh "props_ult"
+            var nautSampler = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("textureName"), "Diffuse_Texture"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), propsUltHash)
+                });
+            var nautMaterial = new BinTreeObject(
+                "Characters/Jade_Nautilus/Skins/Skin09/Materials/Jade_Nautilus_Skin09_Props",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new[] { nautSampler })
+                });
+            var nautOverride = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("submesh"), "props_ult"),
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower("Characters/Jade_Nautilus/Skins/Skin09/Materials/Jade_Nautilus_Skin09_Props"))
+                });
+            var nautMesh = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("materialOverride"),
+                        BinPropertyType.Embedded,
+                        new[] { nautOverride })
+                });
+            var nautSkin = new BinTreeObject(
+                "Characters/Jade_Nautilus/Skins/Skin09",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[] { nautMesh });
+            var nautTree = new BinTree(new[] { nautSkin, nautMaterial }, Array.Empty<string>());
+            using var nautStream = new MemoryStream();
+            nautTree.Write(nautStream);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                new HashSet<ulong> { themeHash, propsUltHash });
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(petStream.ToArray()),
+                "data/characters/petchibijhin/themes/theme1.bin",
+                "Companions.wad.client",
+                1);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(nautStream.ToArray()),
+                "data/characters/jade_nautilus/skins/skin09.bin",
+                "Nautilus.wad.client",
+                2);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Contains(engine.Matches.Values, match => match.Path == themeTexture);
+            Assert.Contains(engine.Matches.Values, match => match.Path == propsUltTexture);
+        }
+
+        [Fact]
         public void GameNumberSubstitutionOnlyChangesNumbersInFileNames()
         {
             string knownPath = "assets/maps/map11/scene.dds";
