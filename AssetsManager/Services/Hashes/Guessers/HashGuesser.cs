@@ -230,15 +230,37 @@ namespace AssetsManager.Services.Hashes.Guessers
             int checkedCount = 0;
 
             IReadOnlyList<string> formats = BuildNumberFormats(paths, effectiveDigits);
+            string formatSpecifier = effectiveDigits.HasValue ? $"D{effectiveDigits.Value}" : null;
+            Span<char> numSpan = stackalloc char[16];
+
             foreach (string format in ProgressIterator(formats, value => value, cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                checkedCount += CheckIter(
-                    engine,
-                    GenerateNumberCandidatesForFormat(format, numberLimit, effectiveDigits, includeCommonPadding: false),
-                    source,
-                    cancellationToken);
-                progress?.Invoke(checkedCount);
+                int marker = format.IndexOf("{number}", StringComparison.Ordinal);
+                if (marker < 0) continue;
+
+                ReadOnlySpan<char> formatPrefix = format.AsSpan(0, marker);
+                ReadOnlySpan<char> formatSuffix = format.AsSpan(marker + 8);
+
+                for (int value = 0; value < numberLimit; value++)
+                {
+                    bool formatted = formatSpecifier != null
+                        ? value.TryFormat(numSpan, out int charsWritten, formatSpecifier, CultureInfo.InvariantCulture)
+                        : value.TryFormat(numSpan, out charsWritten, default, CultureInfo.InvariantCulture);
+
+                    if (!formatted) continue;
+
+                    engine.CheckNormalizedParts(
+                        formatPrefix,
+                        numSpan[..charsWritten],
+                        formatSuffix,
+                        HashGuessStrategy.NumberVariant,
+                        source);
+
+                    checkedCount++;
+                }
+
+                if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
                 if (engine.RemainingUnknownCount == 0) break;
             }
 
@@ -269,6 +291,17 @@ namespace AssetsManager.Services.Hashes.Guessers
         }
 
         private IReadOnlyList<string> BuildNumberFormats(IEnumerable<string> knownPaths, int? effectiveDigits)
+        {
+            if (ReferenceEquals(knownPaths, KnownPaths))
+            {
+                string cacheKey = $"number-formats-{AnchorNumberMatchesToFileName}-{effectiveDigits}";
+                return Corpus.GetOrCreate(cacheKey, paths => ExtractNumberFormats(paths, effectiveDigits));
+            }
+
+            return ExtractNumberFormats(knownPaths, effectiveDigits);
+        }
+
+        private IReadOnlyList<string> ExtractNumberFormats(IEnumerable<string> knownPaths, int? effectiveDigits)
         {
             string digitExpression = effectiveDigits.HasValue ? $"[0-9]{{{effectiveDigits.Value}}}" : "[0-9]+";
             string numberPattern = AnchorNumberMatchesToFileName
@@ -320,32 +353,53 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
             if (candidateBudget == 0) return 0;
 
-            var prefixes = new HashSet<string>(StringComparer.Ordinal);
-            var extensions = new HashSet<string>(StringComparer.Ordinal);
-            foreach (string path in KnownPaths)
-            {
-                string extension = Path.GetExtension(path);
-                string prefix = extension.Length == 0 ? path : path[..^extension.Length];
-                prefixes.Add(prefix);
-                if (!extension.EndsWith("00", StringComparison.Ordinal))
-                    extensions.Add(extension);
-            }
+            (IReadOnlyList<string> orderedPrefixes, IReadOnlyList<string> orderedExtensions) =
+                Corpus.GetOrCreate("extension-substitution-data", paths =>
+                {
+                    var prefixes = new HashSet<string>(StringComparer.Ordinal);
+                    var extensions = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (string path in paths)
+                    {
+                        int dot = path.LastIndexOf('.');
+                        if (dot > path.LastIndexOf('/'))
+                        {
+                            prefixes.Add(path[..dot]);
+                            string ext = path[dot..];
+                            if (!ext.EndsWith("00", StringComparison.Ordinal))
+                                extensions.Add(ext);
+                        }
+                        else
+                        {
+                            prefixes.Add(path);
+                        }
+                    }
+                    return (
+                        (IReadOnlyList<string>)prefixes.OrderBy(v => v, StringComparer.Ordinal).ToList(),
+                        (IReadOnlyList<string>)extensions.OrderBy(v => v, StringComparer.Ordinal).ToList()
+                    );
+                });
 
             int checkedCount = 0;
-            IReadOnlyList<string> orderedExtensions = extensions.OrderBy(value => value, StringComparer.Ordinal).ToList();
-            IEnumerable<string> orderedPrefixes = prefixes.OrderBy(value => value, StringComparer.Ordinal);
             foreach (string prefix in ProgressIterator(orderedPrefixes, value => value, cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                int remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
-                if (remaining <= 0) break;
+                ReadOnlySpan<char> prefixSpan = prefix.AsSpan();
 
-                IEnumerable<HashGuessCandidate> candidates = orderedExtensions
-                    .Select(extension => new HashGuessCandidate(prefix + extension, HashGuessStrategy.ExtensionVariant));
-                if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
+                foreach (string extension in orderedExtensions)
+                {
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
 
-                checkedCount += CheckIter(engine, candidates, source, cancellationToken);
-                progress?.Invoke(checkedCount);
+                    engine.CheckNormalizedParts(
+                        prefixSpan,
+                        ReadOnlySpan<char>.Empty,
+                        extension.AsSpan(),
+                        HashGuessStrategy.ExtensionVariant,
+                        source);
+
+                    checkedCount++;
+                }
+
+                if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
                 if (engine.RemainingUnknownCount == 0) break;
             }
 

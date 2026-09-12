@@ -69,6 +69,35 @@ namespace AssetsManager.Services.Hashes
             ulong sourceChunkHash = 0)
             => CheckNormalizedParts(prefix, ReadOnlySpan<char>.Empty, suffix, strategy, source, sourceChunkHash);
 
+        /// <summary>
+        /// Evaluates a pre-normalized candidate path span directly without heap allocation on misses.
+        /// Materializes a string only upon a confirmed match.
+        /// </summary>
+        public bool CheckNormalizedPath(
+            ReadOnlySpan<char> normalizedPath,
+            HashGuessStrategy strategy,
+            string source = "Generated",
+            ulong sourceChunkHash = 0)
+        {
+            CheckedCandidates++;
+            if (normalizedPath.Length == 0)
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            ulong hash = XxHash64Ext.Hash(normalizedPath);
+            if (!_unknownHashes.Contains(hash))
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            string path = normalizedPath.ToString();
+            _AddKnown(hash, path, strategy, source, sourceChunkHash);
+            return true;
+        }
+
         // Callers must provide normalized path parts, as with CheckPrefixSuffix.
         internal bool CheckNormalizedParts(
             ReadOnlySpan<char> prefix,
