@@ -714,7 +714,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             @"characters/(?<champ>[^/]+)/(?:skins|themes)/(?<skin>base|(?:skin|theme)0*(?<num>\d+))",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex MaterialPathRegex = new(
-            @"characters/(?<champ>[^/]+)/(?<folder>skins|themes)/(?<skin>[^/]+)/materials/(?<mat>[^/]+)",
+            @"characters/(?<champ>[^/]+)/(?<folder>skins|themes)/(?<skin>[^/]+)(?:/materials)?/(?<mat>[^/]+)$",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 						
 
@@ -791,12 +791,14 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private static void HarvestSubmeshTokens(string text, HashSet<string> smSet)
         {
             if (string.IsNullOrWhiteSpace(text)) return;
-            foreach (string sm in text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            foreach (string sm in text.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 string smLow = sm.ToLowerInvariant();
                 if (smLow.Length >= 1)
                 {
                     smSet.Add(smLow);
+                    if (smLow.Contains("angle")) smSet.Add(smLow.Replace("angle", "angel"));
+                    if (smLow.Contains("angel")) smSet.Add(smLow.Replace("angel", "angle"));
                     string[] parts = smLow.Split('_', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length > 1)
                     {
@@ -823,6 +825,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (string.IsNullOrEmpty(clean)) return;
 
             roles.Add(clean);
+            if (clean.Contains("angle")) roles.Add(clean.Replace("angle", "angel"));
+            if (clean.Contains("angel")) roles.Add(clean.Replace("angel", "angle"));
 
             string[] parts = clean.Split('_', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length > 1)
@@ -830,7 +834,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 foreach (string part in parts)
                 {
                     if (!string.IsNullOrWhiteSpace(part))
+                    {
                         roles.Add(part);
+                        if (part.Contains("angle")) roles.Add(part.Replace("angle", "angel"));
+                        if (part.Contains("angel")) roles.Add(part.Replace("angel", "angle"));
+                    }
                 }
 
                 for (int i = 1; i < parts.Length; i++)
@@ -888,7 +896,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         {
             "_cm", "_tx_cm", "_tx", "_base_tx_cm", "_tx_gm", "_tx_rm", "_cm_tx", "_d", "_tx_cm2",
             "_tx_cm_2", "_flowmap", "_tx_flowmap", "_cubemap", "_base_cubemap", "_noise",
-            "_diffuse", "_mult", "_base_cm_tx", "_base_tx", ""
+            "_diffuse", "_mult", "_base_cm_tx", "_base_tx", "_tx_cm_ult", "_cm_ult", "_tx_ult", ""
         };
         private static readonly string[] TextureMapVariants = { "", ".project_jade" };
         private static readonly string[] TextureMapExtensions = { ".tex", ".dds" };
@@ -1128,7 +1136,25 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 }
 
                 if (samplerStems != null && samplerStems.Count > 0)
+                {
                     baseStems.UnionWith(samplerStems);
+                    foreach (string sStem in samplerStems)
+                    {
+                        baseStems.Add(rawMat + sStem);
+                        baseStems.Add(rawMat + "_" + sStem);
+                        if (rawMat.Contains('_'))
+                        {
+                            foreach (string part in rawMat.Split('_', StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                if (part.Length >= 3 && part != "matcap" && part != "inst" && part != "mat")
+                                {
+                                    baseStems.Add(part + sStem);
+                                    baseStems.Add(part + "_" + sStem);
+                                }
+                            }
+                        }
+                    }
+                }
 
                 if (submeshesBySkin.TryGetValue(mSkin, out var smList))
                     baseStems.UnionWith(smList);
@@ -1245,10 +1271,85 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 else
                     candidateStems.Add("jade_" + fileStem);
 
+                Match sourceSkinMatch = SkinBinFileRegex.Match(PathUtils.NormalizePath(sourcePath));
+                if (sourceSkinMatch.Success)
+                {
+                    string binChamp = sourceSkinMatch.Groups["champ"].Value.ToLowerInvariant();
+                    string binSkin = sourceSkinMatch.Groups["skin"].Value.ToLowerInvariant();
+                    candidateDirs.Add($"assets/characters/{binChamp}/skins/{binSkin}/");
+                    candidateDirs.Add($"data/characters/{binChamp}/skins/{binSkin}/");
+                    if (binSkin.Equals("skin0", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidateDirs.Add($"assets/characters/{binChamp}/skins/base/");
+                        candidateDirs.Add($"data/characters/{binChamp}/skins/base/");
+                    }
+
+                    candidateStems.Add($"{binChamp}_{binSkin}");
+                    candidateStems.Add($"{binChamp}_{binSkin}_body");
+                    if (binSkin.Equals("skin0", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidateStems.Add($"{binChamp}_base");
+                        candidateStems.Add($"{binChamp}_base_body");
+                    }
+
+                    if (binChamp.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string unjaded = binChamp[5..];
+                        candidateDirs.Add($"assets/characters/{unjaded}/skins/{binSkin}/");
+                        candidateDirs.Add($"data/characters/{unjaded}/skins/{binSkin}/");
+                        if (binSkin.Equals("skin0", StringComparison.OrdinalIgnoreCase))
+                        {
+                            candidateDirs.Add($"assets/characters/{unjaded}/skins/base/");
+                            candidateDirs.Add($"data/characters/{unjaded}/skins/base/");
+                        }
+                        candidateStems.Add($"{unjaded}_{binSkin}");
+                        candidateStems.Add($"{unjaded}_{binSkin}_body");
+                        if (binSkin.Equals("skin0", StringComparison.OrdinalIgnoreCase))
+                        {
+                            candidateStems.Add($"{unjaded}_base");
+                            candidateStems.Add($"{unjaded}_base_body");
+                        }
+                    }
+
+                    if (binChamp.EndsWith("shark", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string sharkSeparated = binChamp.Replace("shark", "_shark");
+                        candidateStems.Add($"{sharkSeparated}_{binSkin}");
+                        candidateStems.Add($"{sharkSeparated}_{binSkin}_body");
+                        if (binSkin.Equals("skin0", StringComparison.OrdinalIgnoreCase))
+                        {
+                            candidateStems.Add($"{sharkSeparated}_base");
+                            candidateStems.Add($"{sharkSeparated}_base_body");
+                        }
+                        if (sharkSeparated.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string unjadedShark = sharkSeparated[5..];
+                            candidateStems.Add($"{unjadedShark}_{binSkin}");
+                            candidateStems.Add($"{unjadedShark}_{binSkin}_body");
+                            if (binSkin.Equals("skin0", StringComparison.OrdinalIgnoreCase))
+                            {
+                                candidateStems.Add($"{unjadedShark}_base");
+                                candidateStems.Add($"{unjadedShark}_base_body");
+                            }
+                        }
+                    }
+
+                    if (submeshesBySkin.TryGetValue(binSkin, out var binSmList))
+                    {
+                        foreach (string sm in binSmList)
+                        {
+                            candidateStems.Add($"{binChamp}_{binSkin}_{sm}");
+                            candidateStems.Add($"{binChamp}_{sm}");
+                        }
+                    }
+                }
+
                 var champAliases = new List<string>();
                 if (!string.IsNullOrEmpty(cleanChamp))
                 {
                     champAliases.Add(cleanChamp);
+                    if (cleanChamp.EndsWith("shark", StringComparison.OrdinalIgnoreCase))
+                        champAliases.Add(cleanChamp.Replace("shark", "_shark"));
                     if (cleanChamp == "xinzhao")
                     {
                         champAliases.Add("xenzhao");
@@ -2480,6 +2581,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private static IEnumerable<string> ExpandAnimationStemVariants(string stem)
         {
             yield return stem;
+            if (stem.StartsWith("crit", StringComparison.OrdinalIgnoreCase))
+                yield return "attack_" + stem;
             if (stem.Contains("variant", StringComparison.OrdinalIgnoreCase))
                 yield return stem.Replace("variant", "varient", StringComparison.OrdinalIgnoreCase);
             if (stem.Contains("spawn", StringComparison.OrdinalIgnoreCase))

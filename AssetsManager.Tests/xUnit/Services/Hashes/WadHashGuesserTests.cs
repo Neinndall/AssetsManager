@@ -3211,6 +3211,162 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GameGrepWadResolvesModernSkinMaterialWithoutMaterialsSubfolderAndCompoundMask()
+        {
+            const string eyesTexture = "assets/characters/urgot/skins/skin41/urgot_skin41_eyeseffect_tx_cm.tex";
+            const string bodyMaskTexture = "assets/characters/urgot/skins/skin41/urgot_skin41_bodymask_tx_cm.tex";
+            ulong eyesHash = XxHash64Ext.Hash(eyesTexture);
+            ulong bodyMaskHash = XxHash64Ext.Hash(bodyMaskTexture);
+
+            var eyesSampler = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("textureName"), "Diffuse_Texture"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), eyesHash)
+                });
+            var eyesMaterial = new BinTreeObject(
+                "Characters/Urgot/Skins/Skin41/Urgot_Skin41_EyesEffect",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(0x8d39bde6, "Characters/Urgot/Skins/Skin41/Urgot_Skin41_EyesEffect"),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new[] { eyesSampler })
+                });
+
+            var bodySampler = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("textureName"), "Mask"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), bodyMaskHash)
+                });
+            var bodyMaterial = new BinTreeObject(
+                "Characters/Urgot/Skins/Skin41/Urgot_Skin41_Body",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(0x8d39bde6, "Characters/Urgot/Skins/Skin41/Urgot_Skin41_Body"),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new[] { bodySampler })
+                });
+
+            var tree = new BinTree(new[] { eyesMaterial, bodyMaterial }, Array.Empty<string>());
+            using var ms = new MemoryStream();
+            tree.Write(ms);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                new HashSet<ulong> { eyesHash, bodyMaskHash });
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(ms.ToArray()),
+                "data/characters/urgot/skins/skin41.bin",
+                "DATA/FINAL/Champions/Urgot.wad.client",
+                1);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Contains(engine.Matches.Values, match => match.Path == eyesTexture);
+            Assert.Contains(engine.Matches.Values, match => match.Path == bodyMaskTexture);
+        }
+
+        [Fact]
+        public void GameGrepWadResolvesSubmeshTypoAngelTeemoAndChromaBody()
+        {
+            const string angelTexture = "assets/characters/jade_fizz/skins/skin23/jade_fizz_skin23_angelteemo_tx_cm.tex";
+            const string sharkBodyTexture = "assets/characters/jade_fizzshark/skins/skin20/jade_fizzshark_skin20_body_tx_cm.tex";
+            ulong angelHash = XxHash64Ext.Hash(angelTexture);
+            ulong sharkBodyHash = XxHash64Ext.Hash(sharkBodyTexture);
+
+            // Jade Fizz skin23 with "AngleTeemo" typo in submesh override
+            var angelOverride = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("submesh"), "AngleTeemo"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), angelHash)
+                });
+            var fizzMesh = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("skeleton"), "ASSETS/Characters/Jade_Fizz/Skins/Skin16/Jade_Fizz_Skin16.skl"),
+                    new BinTreeString(Fnv1a.HashLower("simpleSkin"), "ASSETS/Characters/Jade_Fizz/Skins/Skin16/Jade_Fizz_Skin16.skn"),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("materialOverride"),
+                        BinPropertyType.Embedded,
+                        new[] { angelOverride })
+                });
+            var fizzSkin = new BinTreeObject(
+                "Characters/Jade_Fizz/Skins/Skin23",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "Jade_FizzSkin23"),
+                    fizzMesh
+                });
+            var fizzTree = new BinTree(new[] { fizzSkin }, Array.Empty<string>());
+            using var fizzMs = new MemoryStream();
+            fizzTree.Write(fizzMs);
+
+            // Jade FizzShark skin20 referencing skin16 mesh but target texture is skin20 body
+            var sharkMesh = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("skeleton"), "ASSETS/Characters/Jade_FizzShark/skins/Skin16/Jade_FizzShark_Skin16.skl"),
+                    new BinTreeString(Fnv1a.HashLower("simpleSkin"), "ASSETS/Characters/Jade_FizzShark/skins/Skin16/Jade_FizzShark_Skin16.skn"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), sharkBodyHash)
+                });
+            var sharkSkin = new BinTreeObject(
+                "Characters/Jade_FizzShark/Skins/Skin20",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "Jade_FizzSharkSkin20"),
+                    sharkMesh
+                });
+            var sharkTree = new BinTree(new[] { sharkSkin }, Array.Empty<string>());
+            using var sharkMs = new MemoryStream();
+            sharkTree.Write(sharkMs);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                new HashSet<ulong> { angelHash, sharkBodyHash });
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(fizzMs.ToArray()),
+                "data/characters/jade_fizz/skins/skin23.bin",
+                "DATA/FINAL/Champions/Fizz.wad.client",
+                1);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(sharkMs.ToArray()),
+                "data/characters/jade_fizzshark/skins/skin20.bin",
+                "DATA/FINAL/Champions/Fizz.wad.client",
+                2);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Contains(engine.Matches.Values, match => match.Path == angelTexture);
+            Assert.Contains(engine.Matches.Values, match => match.Path == sharkBodyTexture);
+        }
+
+        [Fact]
         public void GameNumberSubstitutionOnlyChangesNumbersInFileNames()
         {
             string knownPath = "assets/maps/map11/scene.dds";
