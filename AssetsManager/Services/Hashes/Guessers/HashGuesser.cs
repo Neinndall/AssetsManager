@@ -513,23 +513,14 @@ namespace AssetsManager.Services.Hashes.Guessers
         }
 
         internal static IEnumerable<T> ProgressIterator<T>(
-            IReadOnlyList<T> sequence,
-            Func<T, string> formatter = null,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(sequence);
-            if (Console.IsErrorRedirected) return sequence;
-            return ProgressIterate(sequence, formatter, cancellationToken);
-        }
-
-        internal static IEnumerable<T> ProgressIterator<T>(
             IEnumerable<T> sequence,
             Func<T, string> formatter = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(sequence);
             if (Console.IsErrorRedirected) return sequence;
-            return ProgressIterate(sequence.ToList(), formatter, cancellationToken);
+            IReadOnlyList<T> list = sequence as IReadOnlyList<T> ?? sequence.ToList();
+            return ProgressIterate(list, formatter, cancellationToken);
         }
 
         internal static IEnumerable<T> ProgressIterate<T>(
