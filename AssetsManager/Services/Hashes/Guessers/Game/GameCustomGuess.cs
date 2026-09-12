@@ -163,11 +163,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             // BIN paths can only be skipped when the completed pass also covered every selected word.
             if (excludeCompletedBinPaths)
                 excludeCompletedBinPaths = GetCustomUnifiedBinWords().ToHashSet(StringComparer.Ordinal).IsSupersetOf(words);
-            IReadOnlyList<string> paths = Corpus.GetOrCreate(
-                excludeCompletedBinPaths ? "custom-focused-swordlist-paths-nobin" : "custom-focused-wordlist-paths",
-                values => excludeCompletedBinPaths
-                    ? values.Where(path => !path.EndsWith(".bin", StringComparison.Ordinal)).ToList()
-                    : values.ToList());
+            IReadOnlyList<string> paths = excludeCompletedBinPaths
+                ? Corpus.GetOrCreate("custom-focused-swordlist-paths-nobin",
+                    values => values.Where(path => !path.EndsWith(".bin", StringComparison.Ordinal)).ToList())
+                : KnownPaths;
             return _SubstituteBasenameWords(
                 engine,
                 paths,
