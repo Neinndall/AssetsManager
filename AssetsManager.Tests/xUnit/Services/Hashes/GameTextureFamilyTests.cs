@@ -172,26 +172,5 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Throws<OperationCanceledException>(() => index.RunBuildList(engine, cancellation.Token));
             Assert.Equal(2, engine.CheckedCandidates);
         }
-
-        [Theory]
-        [InlineData("dds")]
-        [InlineData("tex")]
-        public void CharacterWordSubstitutionRetainsExclusiveParticleCoverage(string extension)
-        {
-            string target = $"assets/characters/example/skins/skin1/particles/smoke_blue.{extension}";
-            string[] paths =
-            {
-                $"assets/characters/example/skins/skin1/particles/smoke_red.{extension}",
-                $"assets/characters/teacher/skins/skin1/particles/fire_blue.{extension}"
-            };
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, paths));
-            var words = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
-            var families = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
-            if (extension == "dds") game.SubstituteCharacterDdsBasenameWords(words, CancellationToken.None);
-            else game.SubstituteCharacterTexBasenameWords(words, CancellationToken.None);
-            game.SubstituteTextureBuildListWords(families, CancellationToken.None);
-            Assert.Equal(target, Assert.Single(words.Matches).Value.Path);
-            Assert.Empty(families.Matches);
-        }
     }
 }

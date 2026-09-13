@@ -2718,63 +2718,6 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
-        public void GameCustomCharacterDdsWordlistAttackUsesOnlyCharacterDdsPaths()
-        {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/ahri/ahri.dds",
-                "assets/characters/lux/lux.dds",
-                "assets/characters/ahri/ahri.bin",
-                "assets/maps/ahri/ahri.dds"
-            }));
-            const string expected = "assets/characters/ahri/lux.dds";
-            var engine = CreateEngine(HashGuessDomain.Game, expected);
-
-            int checkedCandidates = game.SubstituteCharacterDdsBasenameWords(engine, CancellationToken.None);
-
-            AssertResolved(engine, expected);
-            Assert.True(checkedCandidates > 0);
-        }
-
-        [Fact]
-        public void GameCustomCharacterTexWordlistAttackUsesOnlyCharacterTexPaths()
-        {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/ahri/ahri.tex",
-                "assets/characters/lux/lux.tex",
-                "assets/characters/ahri/ahri.dds",
-                "assets/maps/ahri/ahri.tex"
-            }));
-            const string expected = "assets/characters/ahri/lux.tex";
-            var engine = CreateEngine(HashGuessDomain.Game, expected);
-
-            int checkedCandidates = game.SubstituteCharacterTexBasenameWords(engine, CancellationToken.None);
-
-            AssertResolved(engine, expected);
-            Assert.True(checkedCandidates > 0);
-        }
-
-        [Fact]
-        public void GameCustomCharacterTexWordlistAttackReachesPathsBeyondFormerSampleLimit()
-        {
-            var paths = Enumerable.Range(0, 20_001)
-                .Select(index => $"assets/characters/champ{index:D5}/skins/base/idle.tex")
-                .Concat(new[]
-                {
-                    "assets/characters/ahri/skins/base/run.tex",
-                    "assets/characters/zyra/skins/base/idle.tex"
-                });
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, paths));
-            const string expected = "assets/characters/zyra/skins/base/run.tex";
-            var engine = CreateEngine(HashGuessDomain.Game, expected);
-
-            game.SubstituteCharacterTexBasenameWords(engine, CancellationToken.None);
-
-            AssertResolved(engine, expected);
-        }
-
-        [Fact]
         public void GameWordAdditionUsesDeterministicGameLists()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]

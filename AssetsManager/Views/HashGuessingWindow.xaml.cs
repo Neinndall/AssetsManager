@@ -164,8 +164,6 @@ namespace AssetsManager.Views
                 EstimatedTime = "Variable"
             };
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-bin", Name = "SubstituteBinBasenameWords", Description = "All BIN basename word substitutions, including loadouts and root paths", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-dds", Name = "SubstituteCharacterDdsBasenameWords", Description = "Word replacement in character DDS names, including particles and HUD", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-tex", Name = "SubstituteCharacterTexBasenameWords", Description = "Word replacement in character TEX names, including particles and HUD", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-swordlist", Name = "SubstituteSwordlistBasenameWords", Description = "Full corpus basename words substitution matrix", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-shaders", Name = "SubstituteShaderVocabWords", Description = "Custom shader vocabulary and compound names", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-animations", Name = "SubstituteAnimationBuildListWords", Description = "Animation actions build-list (loop_in, tokens) across skins", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });

@@ -260,7 +260,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
         {
             Console.WriteLine($"Texture comparison: {unknown.Count} real unknowns; independent engines; 30 seconds per method including index preparation.");
             var results = new List<(string Name, HashSet<ulong> Matches)>();
-            foreach (string name in new[] { "DDS basename", "TEX basename", "Texture build-list" })
+            foreach (string name in new[] { "Texture build-list" })
             {
                 var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
                     match => Console.WriteLine($"MATCH {name}: {match.Hash:x16} {match.Path}"));
@@ -270,9 +270,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 bool completed = true;
                 try
                 {
-                    if (name == "DDS basename") guesser.SubstituteCharacterDdsBasenameWords(engine, cancellation.Token);
-                    else if (name == "TEX basename") guesser.SubstituteCharacterTexBasenameWords(engine, cancellation.Token);
-                    else guesser.SubstituteTextureBuildListWords(engine, cancellation.Token);
+                    guesser.SubstituteTextureBuildListWords(engine, cancellation.Token);
                 }
                 catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { completed = false; }
                 timer.Stop();

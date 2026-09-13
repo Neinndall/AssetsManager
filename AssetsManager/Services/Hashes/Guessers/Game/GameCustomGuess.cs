@@ -20,8 +20,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private const int MaxCustomBinWords = 15_000;
         private const int MaxCustomDataBinWords = 15_000;
         private const int MaxCustomSwordlistWords = 15_000;
-        private const int MaxCustomDdsWords = 15_000;
-        private const int MaxCustomTexWords = 15_000;
 
         internal int SubstituteBasenameWords(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
         {
@@ -107,51 +105,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     .ToList();
             });
 
-        internal int SubstituteCharacterDdsBasenameWords(
-            HashGuessEngine engine,
-            CancellationToken cancellationToken,
-            Action<int> progress = null) =>
-            SubstituteCharacterTextureBasenameWords(engine, "dds", MaxCustomDdsWords, cancellationToken, progress);
-
-        internal int SubstituteCharacterTexBasenameWords(
-            HashGuessEngine engine,
-            CancellationToken cancellationToken,
-            Action<int> progress = null) =>
-            SubstituteCharacterTextureBasenameWords(engine, "tex", MaxCustomTexWords, cancellationToken, progress);
-
-        private int SubstituteCharacterTextureBasenameWords(
-            HashGuessEngine engine,
-            string extension,
-            int maximumWords,
-            CancellationToken cancellationToken,
-            Action<int> progress)
-        {
-            string dottedExtension = "." + extension;
-            IReadOnlyList<string> texturePaths = Corpus.GetOrCreate(
-                $"custom-character-{extension}-paths",
-                paths => paths
-                    .Where(path => path.StartsWith("assets/characters/", StringComparison.Ordinal)
-                        && path.EndsWith(dottedExtension, StringComparison.OrdinalIgnoreCase))
-                    .ToList());
-            IReadOnlyList<string> textureNames = Corpus.GetOrCreate(
-                $"custom-character-{extension}-names",
-                _ => texturePaths.Select(GetBasename).ToList());
-            IReadOnlyList<string> textureWordlist = Corpus.GetOrCreate(
-                $"custom-character-{extension}-wordlist",
-                _ => HashGuessEngine.BuildWordlist(textureNames));
-
-            return _SubstituteBasenameWords(
-                engine,
-                texturePaths,
-                textureWordlist.Take(maximumWords),
-                oldWordCount: 1,
-                newWordCount: 1,
-                cancellationToken,
-                candidateBudget: int.MaxValue,
-                source: $"GAME Custom: character {extension.ToUpperInvariant()} basename wordlist",
-                progress: progress);
-        }
-
         internal int SubstituteSwordlistBasenameWords(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
@@ -231,32 +184,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     count => progress?.Report(engine.CreateProgress(
                         "GAME Custom: data BIN basename wordlist", progressOffset + count)),
                     excludeCompletedBinVocabulary: ShouldRun("game-custom-bin"));
-                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
-            }
-
-            if (ShouldRun("game-custom-dds"))
-            {
-                progress?.Report(engine.CreateProgress(
-                    "GAME Custom: character DDS basename wordlist", checkedCandidates));
-                int progressOffset = checkedCandidates;
-                checkedCandidates += SubstituteCharacterDdsBasenameWords(
-                    engine,
-                    cancellationToken,
-                    count => progress?.Report(engine.CreateProgress(
-                        "GAME Custom: character DDS basename wordlist", progressOffset + count)));
-                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
-            }
-
-            if (ShouldRun("game-custom-tex"))
-            {
-                progress?.Report(engine.CreateProgress(
-                    "GAME Custom: character TEX basename wordlist", checkedCandidates));
-                int progressOffset = checkedCandidates;
-                checkedCandidates += SubstituteCharacterTexBasenameWords(
-                    engine,
-                    cancellationToken,
-                    count => progress?.Report(engine.CreateProgress(
-                        "GAME Custom: character TEX basename wordlist", progressOffset + count)));
                 if (engine.RemainingUnknownCount == 0) return checkedCandidates;
             }
 
