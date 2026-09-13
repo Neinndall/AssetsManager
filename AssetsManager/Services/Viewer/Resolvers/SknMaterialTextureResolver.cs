@@ -237,8 +237,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 }
             }
 
-            AssociateUnboundMaterials(materialDefinitions, overrideMaterials, overrideTexturePaths);
-
             return new SknMaterialTextureMetadata(
                 defaultTexturePath,
                 defaultMaterial,
@@ -891,62 +889,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             result = null;
             return false;
-        }
-
-        private static void AssociateUnboundMaterials(
-            Dictionary<uint, SknMaterialDefinition> materialDefinitions,
-            Dictionary<string, SknMaterialDefinition> overrideMaterials,
-            Dictionary<string, IReadOnlyList<string>> overrideTexturePaths)
-        {
-            if (materialDefinitions == null || materialDefinitions.Count == 0)
-            {
-                return;
-            }
-
-            var usedMaterials = new HashSet<SknMaterialDefinition>(overrideMaterials.Values);
-            foreach (SknMaterialDefinition material in materialDefinitions.Values)
-            {
-                if (usedMaterials.Contains(material))
-                {
-                    continue;
-                }
-
-                string inferredCategory = null;
-                foreach (SknMaterialSampler sampler in material.Samplers)
-                {
-                    string normName = NormalizeToken(sampler.TextureName);
-                    if (normName.Contains("hair"))
-                    {
-                        inferredCategory = "hair";
-                        break;
-                    }
-                    if (normName.Contains("face"))
-                    {
-                        inferredCategory = "face";
-                        break;
-                    }
-                    if (normName.Contains("tool") || normName.Contains("yoyo") || normName.Contains("rope"))
-                    {
-                        inferredCategory = "tool";
-                        break;
-                    }
-                    if (normName.Contains("speedline"))
-                    {
-                        inferredCategory = "speedline";
-                        break;
-                    }
-                }
-
-                if (inferredCategory != null && !overrideMaterials.ContainsKey(inferredCategory))
-                {
-                    overrideMaterials[inferredCategory] = material;
-                    string colPath = SelectColorTexturePath(material.Samplers);
-                    if (!string.IsNullOrWhiteSpace(colPath) && !overrideTexturePaths.ContainsKey(inferredCategory))
-                    {
-                        overrideTexturePaths[inferredCategory] = new[] { colPath };
-                    }
-                }
-            }
         }
 
         internal static string MatchTextureKey(string texturePath, IReadOnlyList<string> availableKeys)
