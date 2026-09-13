@@ -339,20 +339,18 @@ namespace AssetsManager.Services.Downloads
 
             try
             {
-                int processedCount = 0;
-                foreach (var node in nodes)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    await _assetExportService.ExportSmartAsync(node, destinationPath, rootNodes, currentRootPath, cancellationToken,
-                        (path) =>
-                        {
-                            processedCount++;
-                            string fileName = Path.GetFileName(path);
-                            SavingProgressChanged?.Invoke(processedCount, totalFiles, fileName);
-                            onFileSavedCallback?.Invoke(path);
-                        }, ExportFormats.ExplorerSmart(_appSettings.AudioExportFormat));
-                }
+                await _assetExportService.ExportSmartNodesAsync(
+                    nodes,
+                    destinationPath,
+                    rootNodes,
+                    currentRootPath,
+                    cancellationToken,
+                    (processed, total, currentFile) =>
+                    {
+                        SavingProgressChanged?.Invoke(processed, total, currentFile);
+                    },
+                    onFileSavedCallback,
+                    ExportFormats.ExplorerSmart(_appSettings.AudioExportFormat));
             }
             catch (OperationCanceledException)
             {
@@ -368,6 +366,12 @@ namespace AssetsManager.Services.Downloads
                 await NotifySavingCompletedAsync();
             }
         }
+
+        public string GetNodeTargetPath(FileSystemNodeModel node, string baseDestinationPath) =>
+            _assetExportService.GetNodeTargetPath(node, baseDestinationPath);
+
+        public (string WadContainerName, string RelativePathInWad)? GetWadHierarchy(FileSystemNodeModel node) =>
+            _assetExportService.GetWadHierarchy(node);
 
         private async Task NotifyExtractionCompletedAsync()
         {

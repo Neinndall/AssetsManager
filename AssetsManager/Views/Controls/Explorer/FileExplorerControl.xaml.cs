@@ -632,19 +632,24 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         var node = selectedNodes[0];
                         string logName = PathUtils.GetLogName(node.Name);
-                        string logPath = destinationPath;
-
-                        if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
-                        {
-                            string cleanName = PathUtils.GetLogName(node.Name);
-                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
-                        }
+                        string logPath = ExtractionService.GetNodeTargetPath(node, destinationPath);
 
                         LogService.LogInteractiveSuccess($"Successfully extracted {logName}", logPath, logName);
                     }
                     else
                     {
-                        LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items", destinationPath, "Extracted Assets");
+                        string logPath = destinationPath;
+                        var firstWad = ExtractionService.GetWadHierarchy(selectedNodes[0]);
+                        if (firstWad.HasValue && selectedNodes.All(n => ExtractionService.GetWadHierarchy(n)?.WadContainerName == firstWad.Value.WadContainerName))
+                        {
+                            string candidate = Path.Combine(destinationPath, firstWad.Value.WadContainerName);
+                            if (Directory.Exists(candidate))
+                            {
+                                logPath = candidate;
+                            }
+                        }
+
+                        LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items", logPath, "Extracted Assets");
                     }
                 }
                 catch (OperationCanceledException)
@@ -715,21 +720,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     if (selectedNodes.Count == 1)
                     {
                         var node = selectedNodes[0];
-                        string logPath = destinationPath;
-                        string logName = node.Name;
-
-                        if (node.Type == NodeType.SoundBank)
-                        {
-                            string cleanName = PathUtils.GetLogName(node.Name);
-                            logPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(cleanName));
-                            logName = PathUtils.GetLogName(node.Name);
-                        }
-                        else if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
-                        {
-                            string cleanName = PathUtils.GetLogName(node.Name);
-                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
-                            logName = PathUtils.GetLogName(node.Name);
-                        }
+                        string logName = PathUtils.GetLogName(node.Name);
+                        string logPath = ExtractionService.GetNodeTargetPath(node, destinationPath);
 
                         if (allSavedFiles.Count == 1)
                         {
@@ -741,7 +733,18 @@ namespace AssetsManager.Views.Controls.Explorer
                     }
                     else
                     {
-                        LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items", destinationPath, "Saved Assets");
+                        string logPath = destinationPath;
+                        var firstWad = ExtractionService.GetWadHierarchy(selectedNodes[0]);
+                        if (firstWad.HasValue && selectedNodes.All(n => ExtractionService.GetWadHierarchy(n)?.WadContainerName == firstWad.Value.WadContainerName))
+                        {
+                            string candidate = Path.Combine(destinationPath, firstWad.Value.WadContainerName);
+                            if (Directory.Exists(candidate))
+                            {
+                                logPath = candidate;
+                            }
+                        }
+
+                        LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items", logPath, "Saved Assets");
                     }
                 }
                 catch (OperationCanceledException)

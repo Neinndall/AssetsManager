@@ -127,7 +127,9 @@ namespace AssetsManager.Services.Formatting
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                await ExportAsync(node, destinationPath, cancellationToken,
+                string nodeDestination = ResolveNodeDestinationDirectory(node, destinationPath);
+
+                await ExportAsync(node, nodeDestination, cancellationToken,
                     (path) =>
                     {
                         processedCount++;
@@ -284,6 +286,46 @@ namespace AssetsManager.Services.Formatting
                 else if (node.Children != null) count += CountSoundsInAudioTree(node.Children);
             }
             return count;
+        }
+
+        public async Task<int> ExportSmartNodesAsync(
+            List<FileSystemNodeModel> nodes,
+            string destinationPath,
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes,
+            string currentRootPath,
+            CancellationToken cancellationToken,
+            Action<int, int, string> onProgress = null,
+            Action<string> onFileSaved = null,
+            ExportFormats? formats = null)
+        {
+            var exportFormats = formats ?? ExportFormats.ExplorerSmart(AudioExportFormat.Ogg);
+            int totalFiles = await CalculateTotalSmartAsync(nodes, rootNodes, currentRootPath, cancellationToken);
+            onProgress?.Invoke(0, totalFiles, null);
+
+            int processedCount = 0;
+            foreach (var node in nodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                string nodeDestination = ResolveNodeDestinationDirectory(node, destinationPath);
+
+                await ExportSmartAsync(
+                    node,
+                    nodeDestination,
+                    rootNodes,
+                    currentRootPath,
+                    cancellationToken,
+                    (path) =>
+                    {
+                        processedCount++;
+                        string fileName = Path.GetFileName(path);
+                        onProgress?.Invoke(processedCount, totalFiles, fileName);
+                        onFileSaved?.Invoke(path);
+                    },
+                    exportFormats);
+            }
+
+            return processedCount;
         }
 
         /// <summary>
@@ -619,6 +661,139 @@ namespace AssetsManager.Services.Formatting
                     }
                 }
             }
+        }
+
+        #endregion
+
+        #region Hierarchy and Destination Resolution
+
+        /// <summary>
+        /// Detects whether the node belongs to a WAD container and returns the container WAD name
+        /// and the relative path of the node within the WAD (omitting UI grouping folders).
+        /// </summary>
+        public (string WadContainerName, string RelativePathInWad)? GetWadHierarchy(FileSystemNodeModel node)
+        {
+            if (node == null) return null;
+
+            if (node.Type == NodeType.WadFile)
+            {
+                string wadName = PathUtils.SanitizeName(PathUtils.GetLogName(node.Name));
+                return (wadName, string.Empty);
+            }
+
+            FileSystemNodeModel wadAncestor = null;
+            var segments = new List<string>();
+
+            for (var cur = node; cur != null; cur = cur.Parent)
+            {
+                if (cur.Type == NodeType.WadFile)
+                {
+                    wadAncestor = cur;
+                    break;
+                }
+
+                if (!cur.IsGroupingFolder)
+                {
+                    segments.Add(cur.Name);
+                }
+            }
+
+            string containerWadName = null;
+            if (wadAncestor != null)
+            {
+                containerWadName = PathUtils.SanitizeName(PathUtils.GetLogName(wadAncestor.Name));
+            }
+            else if (!string.IsNullOrEmpty(node.SourceWadPath))
+            {
+                containerWadName = PathUtils.SanitizeName(PathUtils.GetLogName(Path.GetFileName(node.SourceWadPath)));
+            }
+
+            if (string.IsNullOrEmpty(containerWadName))
+            {
+                return null;
+            }
+
+            string relPath;
+            if (wadAncestor != null && segments.Count > 0)
+            {
+                segments.Reverse();
+                relPath = string.Join("/", segments);
+            }
+            else if (!string.IsNullOrEmpty(node.VirtualPath))
+            {
+                relPath = node.VirtualPath.Replace('\\', '/').TrimStart('/');
+                int firstSlash = relPath.IndexOf('/');
+                if (firstSlash > 0)
+                {
+                    string firstPart = relPath.Substring(0, firstSlash);
+                    if (firstPart is "New" or "Modified" or "Renamed" or "Removed" or "Dependency")
+                    {
+                        relPath = relPath.Substring(firstSlash + 1);
+                    }
+                }
+            }
+            else
+            {
+                relPath = node.Name;
+            }
+
+            return (containerWadName, relPath);
+        }
+
+        /// <summary>
+        /// Resolves the parent destination directory where this node should be exported or saved,
+        /// ensuring that WAD containers and their virtual relative paths are preserved on disk.
+        /// </summary>
+        public string ResolveNodeDestinationDirectory(FileSystemNodeModel node, string baseDestinationPath)
+        {
+            var wadInfo = GetWadHierarchy(node);
+            if (wadInfo == null)
+            {
+                return baseDestinationPath;
+            }
+
+            var (wadContainerName, relPath) = wadInfo.Value;
+            if (string.IsNullOrEmpty(relPath))
+            {
+                return baseDestinationPath;
+            }
+
+            string normalizedRelPath = relPath.Replace('/', Path.DirectorySeparatorChar);
+            string parentRelPath = Path.GetDirectoryName(normalizedRelPath);
+            string resolvedDir;
+            if (string.IsNullOrEmpty(parentRelPath))
+            {
+                resolvedDir = Path.Combine(baseDestinationPath, wadContainerName);
+            }
+            else
+            {
+                resolvedDir = Path.Combine(baseDestinationPath, wadContainerName, parentRelPath);
+            }
+
+            _directoriesCreator.CreateDirectory(resolvedDir);
+            return resolvedDir;
+        }
+
+        /// <summary>
+        /// Gets the expected on-disk target path for a node after extraction/save, useful for logging
+        /// and opening the folder directly in the system file explorer.
+        /// </summary>
+        public string GetNodeTargetPath(FileSystemNodeModel node, string baseDestinationPath)
+        {
+            var wadInfo = GetWadHierarchy(node);
+            if (wadInfo == null)
+            {
+                string cleanName = PathUtils.GetLogName(node.Name);
+                return Path.Combine(baseDestinationPath, PathUtils.SanitizeName(cleanName));
+            }
+
+            var (wadContainerName, relPath) = wadInfo.Value;
+            if (string.IsNullOrEmpty(relPath))
+            {
+                return Path.Combine(baseDestinationPath, wadContainerName);
+            }
+
+            return Path.Combine(baseDestinationPath, wadContainerName, relPath.Replace('/', Path.DirectorySeparatorChar));
         }
 
         #endregion
