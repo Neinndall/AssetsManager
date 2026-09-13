@@ -902,6 +902,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return true;
             }
 
+            if (property is BinTreeString text && !string.IsNullOrWhiteSpace(text.Value))
+            {
+                result = PathUtils.ToVirtualPath(text.Value);
+                return true;
+            }
+
             result = null;
             return false;
         }
