@@ -896,7 +896,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         {
             "_cm", "_tx_cm", "_tx", "_base_tx_cm", "_tx_gm", "_tx_rm", "_cm_tx", "_d", "_tx_cm2",
             "_tx_cm_2", "_flowmap", "_tx_flowmap", "_cubemap", "_base_cubemap", "_noise",
-            "_diffuse", "_mult", "_base_cm_tx", "_base_tx", "_tx_cm_ult", "_cm_ult", "_tx_ult", ""
+            "_diffuse", "_mult", "_base_cm_tx", "_base_tx", ""
         };
         private static readonly string[] TextureMapVariants = { "", ".project_jade" };
         private static readonly string[] TextureMapExtensions = { ".tex", ".dds" };
