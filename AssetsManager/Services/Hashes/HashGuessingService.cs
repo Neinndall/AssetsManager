@@ -925,12 +925,12 @@ namespace AssetsManager.Services.Hashes
             {
                 Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
                 engine = new HashGuessEngine(HashGuessDomain.Game, unknown, reportMatch);
-                progress?.Report(engine.CreateProgress("GAME Prefixes: basename prefixes (tft_, 2x_, sd_, pie_)", 0));
+                progress?.Report(engine.CreateProgress("GAME Prefixes: basename prefixes", 0));
                 int checkedCandidates = _gameGuesser.CheckBasenamePrefixes(
                     engine,
                     cancellationToken,
                     progress: count => progress?.Report(
-                        engine.CreateProgress("GAME Prefixes: basename prefixes (tft_, 2x_, sd_, pie_)", count)));
+                        engine.CreateProgress("GAME Prefixes: basename prefixes", count)));
                 progress?.Report(engine.CreateProgress("GAME Prefixes: basename prefixes", checkedCandidates));
 
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
