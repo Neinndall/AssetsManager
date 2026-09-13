@@ -797,8 +797,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 if (smLow.Length >= 1)
                 {
                     smSet.Add(smLow);
-                    if (smLow.Contains("angle")) smSet.Add(smLow.Replace("angle", "angel"));
-                    if (smLow.Contains("angel")) smSet.Add(smLow.Replace("angel", "angle"));
                     string[] parts = smLow.Split('_', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length > 1)
                     {
@@ -825,8 +823,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (string.IsNullOrEmpty(clean)) return;
 
             roles.Add(clean);
-            if (clean.Contains("angle")) roles.Add(clean.Replace("angle", "angel"));
-            if (clean.Contains("angel")) roles.Add(clean.Replace("angel", "angle"));
 
             string[] parts = clean.Split('_', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length > 1)
@@ -836,8 +832,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     if (!string.IsNullOrWhiteSpace(part))
                     {
                         roles.Add(part);
-                        if (part.Contains("angle")) roles.Add(part.Replace("angle", "angel"));
-                        if (part.Contains("angel")) roles.Add(part.Replace("angel", "angle"));
                     }
                 }
 
@@ -946,6 +940,42 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             }
 
             return suffixes.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private IReadOnlyDictionary<string, IReadOnlyList<string>> ChampionSubmeshTokens =>
+            Corpus.GetOrCreate("champion-submesh-tokens", BuildChampionSubmeshTokens);
+
+        private static readonly Regex CharacterTextureTokenRegex = new(
+            @"assets/characters/(?<champ>[^/]+)/skins/[^/]+/(?:[0-9]x_)?(?:jade_)?(?:[a-z0-9]+_)*(?:skin\d+|base)_(?<token>[a-z0-9]+(?:_[a-z0-9]+)*?)_(?:tx|cm|base|flowmap|cubemap|noise|mask|matcap|diffuse|mult)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static IReadOnlyDictionary<string, IReadOnlyList<string>> BuildChampionSubmeshTokens(IReadOnlyList<string> knownPaths)
+        {
+            var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < knownPaths.Count; i++)
+            {
+                string path = knownPaths[i];
+                if (!path.Contains("/skins/", StringComparison.OrdinalIgnoreCase)) continue;
+                Match m = CharacterTextureTokenRegex.Match(path);
+                if (m.Success)
+                {
+                    string champ = m.Groups["champ"].Value.ToLowerInvariant();
+                    if (champ.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+                        champ = champ[5..];
+                    string tok = m.Groups["token"].Value.ToLowerInvariant();
+                    if (tok.Length <= 24 && tok != "body" && tok != "tx")
+                    {
+                        if (!result.TryGetValue(champ, out var set))
+                            result[champ] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        set.Add(tok);
+                    }
+                }
+            }
+
+            return result.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlyList<string>)kvp.Value.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList(),
+                StringComparer.OrdinalIgnoreCase);
         }
 
         private void GuessSkinCharacterBinChunkLinks(
@@ -1463,6 +1493,24 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         candidateStems.Add($"{fileStem}_{sm}");
                         if (!string.IsNullOrEmpty(cleanChamp))
                             candidateStems.Add($"{cleanChamp}_{sm}");
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(cleanChamp) && ChampionSubmeshTokens.TryGetValue(cleanChamp, out var champTokens))
+                {
+                    foreach (string ct in champTokens)
+                    {
+                        candidateStems.Add(ct);
+                        candidateStems.Add($"{fileStem}_{ct}");
+                        candidateStems.Add($"{cleanChamp}_{ct}");
+                        if (!string.IsNullOrEmpty(sKey))
+                            candidateStems.Add($"{cleanChamp}_{sKey}_{ct}");
+                        if (sourceSkinMatch.Success)
+                        {
+                            string binChamp = sourceSkinMatch.Groups["champ"].Value.ToLowerInvariant();
+                            string binSkin = sourceSkinMatch.Groups["skin"].Value.ToLowerInvariant();
+                            candidateStems.Add($"{binChamp}_{binSkin}_{ct}");
+                        }
                     }
                 }
 

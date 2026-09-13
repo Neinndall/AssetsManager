@@ -3342,7 +3342,10 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             using var sharkMs = new MemoryStream();
             sharkTree.Write(sharkMs);
 
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/fizz/skins/skin16/fizz_skin16_angelteemo_tx_cm.tex"
+            }));
             var engine = new HashGuessEngine(
                 HashGuessDomain.Game,
                 new HashSet<ulong> { angelHash, sharkBodyHash });
