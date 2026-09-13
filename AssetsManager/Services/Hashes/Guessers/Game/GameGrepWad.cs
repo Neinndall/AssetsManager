@@ -908,6 +908,46 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
              from extension in TextureMapExtensions
              select kind + variant + extension).ToArray();
 
+        private IReadOnlyList<string> DynamicTextureMapSuffixes =>
+            Corpus.GetOrCreate("dynamic-texture-map-suffixes", BuildDynamicTextureMapSuffixes);
+
+        private static readonly Regex CharacterTextureSuffixRegex = new(
+            @"/(?:skins|themes)/[^/]+/.*?(_(?:tx|cm|base|flowmap|cubemap|noise|mask|matcap|goldfresnel|ult|prop|diffuse|mult)[a-z0-9_]*?\.(?:tex|dds)(?:\.project_jade)?)$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static IReadOnlyList<string> BuildDynamicTextureMapSuffixes(IReadOnlyList<string> knownPaths)
+        {
+            var suffixes = new HashSet<string>(TextureMapSuffixes, StringComparer.OrdinalIgnoreCase);
+            var suffixCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < knownPaths.Count; i++)
+            {
+                string path = knownPaths[i];
+                if (!path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) &&
+                    !path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) &&
+                    !path.EndsWith(".project_jade", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (!path.Contains("characters/", StringComparison.OrdinalIgnoreCase)) continue;
+
+                Match m = CharacterTextureSuffixRegex.Match(path);
+                if (m.Success)
+                {
+                    string suf = m.Groups[1].Value.ToLowerInvariant();
+                    if (suf.Length <= 28)
+                        suffixCounts[suf] = suffixCounts.GetValueOrDefault(suf) + 1;
+                }
+            }
+
+            foreach (var (suf, count) in suffixCounts)
+            {
+                if (count >= 20)
+                    suffixes.Add(suf);
+            }
+
+            return suffixes.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
         private void GuessSkinCharacterBinChunkLinks(
             HashGuessEngine engine,
             ArraySegment<byte> data,
@@ -1191,7 +1231,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         foreach (string desc in matDescriptors)
                         {
                             if (!engine.UnknownHashes.Contains(unk)) break;
-                            foreach (string suf in TextureMapSuffixes)
+                            foreach (string suf in DynamicTextureMapSuffixes)
                             {
                                 string c1 = $"{baseDir}{mChamp}_{mSkin}_{st}{desc}{suf}";
                                 if (XxHash64Ext.Hash(c1) == unk)
@@ -1462,7 +1502,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     foreach (string cStem in candidateStems)
                     {
                         if (targetTexHashes.Count == 0 || engine.RemainingUnknownCount == 0) break;
-                        foreach (string suf in TextureMapSuffixes)
+                        foreach (string suf in DynamicTextureMapSuffixes)
                         {
                             string candidatePath = cDir + cStem + suf;
                             ulong hash = XxHash64Ext.Hash(candidatePath);
