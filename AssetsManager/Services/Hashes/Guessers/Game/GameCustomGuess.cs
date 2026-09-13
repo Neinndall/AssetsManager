@@ -32,24 +32,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 "GAME basename word substitution");
         }
 
-        internal int SubstituteWordlistBasenameWords(
-            HashGuessEngine engine,
-            CancellationToken cancellationToken,
-            Action<int> progress = null)
-        {
-            IReadOnlyList<string> paths = KnownPaths;
-            return _SubstituteBasenameWords(
-                engine,
-                paths,
-                BuildWordlist().Take(MaxCustomBuildListWords),
-                oldWordCount: 1,
-                newWordCount: 1,
-                cancellationToken,
-                candidateBudget: int.MaxValue,
-                source: "GAME Custom: WordList basename substitution",
-                progress: progress);
-        }
-
         internal int RunCustomAttacks(
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,

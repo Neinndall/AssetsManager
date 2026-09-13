@@ -98,24 +98,6 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Same(game.KnownPaths, game.KnownPaths);
             Assert.Same(game.DirectoryList(), game.DirectoryList());
             Assert.Same(game.BuildWordlist(), game.BuildWordlist());
-            Assert.Same(game.BuildSwordlist(), game.BuildSwordlist());
-        }
-
-        [Fact]
-        public void SwordlistUsesBasenamesFromPathsContainingBin()
-        {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/ahri/ahri.bin",
-                "assets/characters/lux/lux.bin.meta",
-                "assets/characters/zed/zed.dds"
-            }));
-
-            IReadOnlyList<string> swordlist = game.BuildSwordlist();
-
-            Assert.Contains("ahri", swordlist);
-            Assert.Contains("lux", swordlist);
-            Assert.DoesNotContain("zed", swordlist);
         }
 
         [Fact]
@@ -2654,22 +2636,6 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.True(checkedCandidates > 0);
         }
 
-        [Fact]
-        public void GameCustomWordlistSubstitutionUsesTheGeneralGameWords()
-        {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/ahri/ahri.dds",
-                "assets/characters/lux/lux.dds"
-            }));
-            const string expected = "assets/characters/ahri/lux.dds";
-            var engine = CreateEngine(HashGuessDomain.Game, expected);
-
-            int checkedCandidates = game.SubstituteWordlistBasenameWords(engine, CancellationToken.None);
-
-            AssertResolved(engine, expected);
-            Assert.True(checkedCandidates > 0);
-        }
 
         [Fact]
         public void HashFileLoadsUnknownExportsWithoutOwningPersistence()

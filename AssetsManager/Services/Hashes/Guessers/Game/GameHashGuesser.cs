@@ -42,13 +42,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         internal override IReadOnlyList<string> BuildWordlist() =>
             Corpus.GetOrCreate("wordlist", HashGuessEngine.BuildWordlist);
 
-        internal IReadOnlyList<string> BuildSwordlist() =>
-            Corpus.GetOrCreate(
-                "swordlist",
-                values => HashGuessEngine.BuildWordlist(
-                    values
-                        .Where(path => path.Contains(".bin", StringComparison.Ordinal))
-                        .Select(GetBasename)));
 
         internal IEnumerable<HashGuessCandidate> GuessFromBinEntryBasenames(IEnumerable<string> binEntryPaths)
         {
