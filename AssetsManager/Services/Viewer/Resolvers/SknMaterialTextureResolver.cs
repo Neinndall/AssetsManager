@@ -628,29 +628,44 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 if (obj.ClassHash != SkinPropertiesClass ||
                     !obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
                     meshProperty is not BinTreeStruct meshProperties ||
-                    !meshProperties.Properties.TryGetValue(SimpleSkin, out BinTreeProperty simpleSkinProperty) ||
-                    simpleSkinProperty is not BinTreeString simpleSkin)
+                    !meshProperties.Properties.TryGetValue(SimpleSkin, out BinTreeProperty simpleSkinProperty))
                 {
                     continue;
                 }
 
-                string declaredSkin = simpleSkin.Value;
-                if (string.IsNullOrWhiteSpace(declaredSkin))
+                if (simpleSkinProperty is BinTreeString simpleSkin)
                 {
-                    continue;
-                }
+                    string declaredSkin = simpleSkin.Value;
+                    if (string.IsNullOrWhiteSpace(declaredSkin))
+                    {
+                        continue;
+                    }
 
-                if (Path.GetFileName(declaredSkin).Equals(sknFileName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
+                    if (Path.GetFileName(declaredSkin).Equals(sknFileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
 
-                string normalizedDeclared = NormalizeAssetPath(declaredSkin);
-                if (normalizedDeclared.Equals(normalizedSkn, StringComparison.OrdinalIgnoreCase) ||
-                    normalizedSkn.EndsWith(normalizedDeclared, StringComparison.OrdinalIgnoreCase) ||
-                    normalizedDeclared.EndsWith(normalizedSkn, StringComparison.OrdinalIgnoreCase))
+                    string normalizedDeclared = NormalizeAssetPath(declaredSkin);
+                    if (normalizedDeclared.Equals(normalizedSkn, StringComparison.OrdinalIgnoreCase) ||
+                        normalizedSkn.EndsWith(normalizedDeclared, StringComparison.OrdinalIgnoreCase) ||
+                        normalizedDeclared.EndsWith(normalizedSkn, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+                else if (simpleSkinProperty is BinTreeWadChunkLink chunkLink)
                 {
-                    return true;
+                    if (XxHash64Ext.Hash(normalizedSkn) == chunkLink.Value)
+                    {
+                        return true;
+                    }
+
+                    int assetsIdx = normalizedSkn.IndexOf("assets/", StringComparison.OrdinalIgnoreCase);
+                    if (assetsIdx >= 0 && XxHash64Ext.Hash(normalizedSkn.AsSpan(assetsIdx)) == chunkLink.Value)
+                    {
+                        return true;
+                    }
                 }
             }
 

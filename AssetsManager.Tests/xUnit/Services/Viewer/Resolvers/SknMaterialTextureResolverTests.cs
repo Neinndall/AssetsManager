@@ -1450,6 +1450,48 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void TryResolveBinPath_UsesCompanionSkinBinReferencingWadChunkLinkModel()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-companion-link-{Guid.NewGuid():N}");
+            string characterRoot = Path.Combine(root, "assets", "characters", "petstyletwoaphelios");
+            string sknPath = Path.Combine(
+                characterRoot,
+                "themes",
+                "spiritblossomsprings",
+                "tier1",
+                "petstyletwoaphelios_spiritblossomsprings_tier1.skn");
+            string skinBinPath = Path.Combine(characterRoot, "skins", "skin2.bin");
+            string virtualSknPath =
+                "assets/characters/petstyletwoaphelios/themes/spiritblossomsprings/tier1/" +
+                "petstyletwoaphelios_spiritblossomsprings_tier1.skn";
+            ulong sknHash = XxHash64Ext.Hash(virtualSknPath);
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(sknPath)!);
+                Directory.CreateDirectory(Path.GetDirectoryName(skinBinPath)!);
+                File.WriteAllBytes(sknPath, Array.Empty<byte>());
+
+                BinTree tree = CreateSkinTree(
+                    "assets/characters/petstyletwoaphelios/themes/spiritblossomsprings/tier1/petstyletwoaphelios_spiritblossomsprings_tier1_tx_cm.tex",
+                    simpleSkinProperty: new BinTreeWadChunkLink(Fnv1a.HashLower("simpleSkin"), sknHash));
+                using (var stream = File.Create(skinBinPath))
+                {
+                    tree.Write(stream);
+                }
+
+                Assert.Equal(skinBinPath, SknMaterialTextureResolver.TryResolveBinPath(sknPath));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Fact]
         public void MatchTextureKey_ResolvesWadChunkHashAgainstAvailableKeys()
         {
             var availableKeys = new[]
@@ -1754,13 +1796,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             string simpleSkinPath = null,
             BinTreeEmbedded materialOverride2 = null,
             string defaultMaterialPath = null,
-            BinTreeProperty defaultTextureProperty = null)
+            BinTreeProperty defaultTextureProperty = null,
+            BinTreeProperty simpleSkinProperty = null)
         {
             var meshPropertyList = new System.Collections.Generic.List<BinTreeProperty>
             {
                 defaultTextureProperty ?? CreateTextureLink("texture", defaultTexturePath)
             };
-            if (!string.IsNullOrWhiteSpace(simpleSkinPath))
+            if (simpleSkinProperty != null)
+            {
+                meshPropertyList.Add(simpleSkinProperty);
+            }
+            else if (!string.IsNullOrWhiteSpace(simpleSkinPath))
             {
                 meshPropertyList.Add(new BinTreeString(Fnv1a.HashLower("simpleSkin"), simpleSkinPath));
             }
