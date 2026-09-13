@@ -176,8 +176,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
                     GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
-                    GuessSkinCharacterBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessSkinRoleTextures(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
+                    GuessSkinCharacterBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                 }
 
                 GuessChampionSpecialBins(engine, sourceWadPath, cancellationToken);
@@ -974,7 +974,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             var submeshesBySkin = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var skinObjects = new List<(BinTreeObject Obj, string SimpleSkin, string Skeleton, HashSet<ulong> Links)>();
-            var materialObjects = new List<(string Champ, string Folder, string Skin, string RawMat, HashSet<ulong> Links, HashSet<string> Descriptors, HashSet<string> SamplerStems)>();
+            var materialObjects = new List<(string Champ, string Folder, string Skin, string RawMat, List<(ulong Hash, HashSet<string> Descriptors, HashSet<string> Stems)> Targets)>();
             int totalUnresolved = 0;
 
             // Phase 1: Fast single-pass metadata harvest across all BIN objects
@@ -1039,6 +1039,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     foreach (BinTreeProperty p in obj.Properties.Values)
                         CollectChunkLinks(p, targetTexHashes);
 
+                    targetTexHashes.RemoveWhere(hash => !engine.UnknownHashes.Contains(hash));
+
                     if (targetTexHashes.Count > 0)
                     {
                         skinObjects.Add((obj, simpleSkin, skeleton, targetTexHashes));
@@ -1055,10 +1057,36 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         if (matMatch.Success)
                         {
                             var matLinks = new HashSet<ulong>();
-                            foreach (BinTreeProperty p in obj.Properties.Values)
-                                CollectChunkLinks(p, matLinks);
+                            foreach (BinTreeProperty property in obj.Properties.Values)
+                                CollectChunkLinks(property, matLinks);
+                            matLinks.RemoveWhere(hash => !engine.UnknownHashes.Contains(hash));
 
-                            if (matLinks.Count > 0)
+                            var descriptors = new HashSet<string>(CanonicalMaterialRoles, StringComparer.OrdinalIgnoreCase);
+                            var stemsByTarget = new Dictionary<ulong, HashSet<string>>();
+                            foreach (BinTreeContainer container in obj.Properties.Values.OfType<BinTreeContainer>())
+                            foreach (BinTreeStruct sampler in container.Elements.OfType<BinTreeStruct>())
+                            {
+                                var samplerStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                                foreach (BinTreeString value in sampler.Properties.Values.OfType<BinTreeString>())
+                                    HarvestRoleTokens(value.Value, descriptors, samplerStems);
+
+                                if (sampler.Properties.TryGetValue(TexturePathHash, out BinTreeProperty pathProperty) &&
+                                    pathProperty is BinTreeWadChunkLink link && matLinks.Contains(link.Value))
+                                {
+                                    if (!stemsByTarget.TryGetValue(link.Value, out HashSet<string> targetStems))
+                                        stemsByTarget[link.Value] = targetStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                                    targetStems.UnionWith(samplerStems);
+                                }
+                            }
+
+                            var targets = matLinks
+                                .Select(hash => (hash, descriptors,
+                                    stemsByTarget.TryGetValue(hash, out HashSet<string> stems)
+                                        ? stems
+                                        : new HashSet<string>(StringComparer.OrdinalIgnoreCase)))
+                                .ToList();
+
+                            if (targets.Count > 0)
                             {
                                 string mChamp = matMatch.Groups["champ"].Value.ToLowerInvariant();
                                 string mFolder = matMatch.Groups["folder"].Value.ToLowerInvariant();
@@ -1071,28 +1099,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                                 else if (rawMat.StartsWith(mChamp + "_", StringComparison.OrdinalIgnoreCase))
                                     rawMat = rawMat[(mChamp.Length + 1)..];
 
-                                var descriptors = new HashSet<string>(CanonicalMaterialRoles, StringComparer.OrdinalIgnoreCase);
-                                var samplerStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                                foreach (BinTreeProperty p in obj.Properties.Values)
-                                {
-                                    if (p is BinTreeContainer container)
-                                    {
-                                        foreach (BinTreeProperty elem in container.Elements)
-                                        {
-                                            if (elem is BinTreeStruct samplerStruct)
-                                            {
-                                                foreach (BinTreeProperty sp in samplerStruct.Properties.Values)
-                                                {
-                                                    if (sp is BinTreeString sVal)
-                                                        HarvestRoleTokens(sVal.Value, descriptors, samplerStems);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                materialObjects.Add((mChamp, mFolder, mSkin, rawMat, matLinks, descriptors, samplerStems));
-                                totalUnresolved += matLinks.Count;
+                                materialObjects.Add((mChamp, mFolder, mSkin, rawMat, targets));
+                                totalUnresolved += targets.Count;
                             }
                         }
                     }
@@ -1102,120 +1110,104 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (totalUnresolved == 0 || engine.RemainingUnknownCount == 0) return;
 
             // Phase 2: Resolve Modern Skin Materials (StaticMaterialDef)
-            foreach (var (mChamp, mFolder, mSkin, rawMat, matLinks, matDescriptors, samplerStems) in materialObjects)
+            foreach (var (mChamp, mFolder, mSkin, rawMat, targets) in materialObjects)
             {
                 if (engine.RemainingUnknownCount == 0) break;
 
-                var baseStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rawMat };
-                if (rawMat.Contains('_'))
-                {
-                    string[] rawParts = rawMat.Split('_', StringSplitOptions.RemoveEmptyEntries);
-                    foreach (string tok in rawParts)
-                    {
-                        if (tok.Length >= 3 && tok != "matcap" && tok != "inst" && tok != "mat" && tok != "specular" && tok != "fresnel")
-                        {
-                            baseStems.Add(tok);
-                            if (tok.EndsWith("ed", StringComparison.OrdinalIgnoreCase) && tok.Length > 4)
-                                baseStems.Add(tok[..^2]);
-                        }
-                    }
-
-                    var meaningful = rawParts
-                        .Where(p => p.Length >= 3 && p != "matcap" && p != "inst" && p != "mat" && p != "specular" && p != "fresnel")
-                        .Select(p => p.EndsWith("ed", StringComparison.OrdinalIgnoreCase) && p.Length > 4 ? p[..^2] : p)
-                        .ToArray();
-                    if (meaningful.Length > 1)
-                    {
-                        baseStems.Add(string.Join("", meaningful));
-                        baseStems.Add(string.Join('_', meaningful));
-                    }
-                }
-
-                if (samplerStems != null && samplerStems.Count > 0)
-                {
-                    baseStems.UnionWith(samplerStems);
-                    foreach (string sStem in samplerStems)
-                    {
-                        baseStems.Add(rawMat + sStem);
-                        baseStems.Add(rawMat + "_" + sStem);
-                        if (rawMat.Contains('_'))
-                        {
-                            foreach (string part in rawMat.Split('_', StringSplitOptions.RemoveEmptyEntries))
-                            {
-                                if (part.Length >= 3 && part != "matcap" && part != "inst" && part != "mat")
-                                {
-                                    baseStems.Add(part + sStem);
-                                    baseStems.Add(part + "_" + sStem);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (submeshesBySkin.TryGetValue(mSkin, out var smList))
-                    baseStems.UnionWith(smList);
-
-                var stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (string baseSt in baseStems)
-                {
-                    string root = baseSt.EndsWith("_f1", StringComparison.OrdinalIgnoreCase) ? baseSt[..^3] : baseSt;
-                    stems.Add(root);
-                    stems.Add(root + "_f1");
-                    stems.Add(root + "_f2");
-                    stems.Add(root + "_f3");
-                    stems.Add(root + "_f4");
-                    stems.Add(root + "_f1_f2");
-                    stems.Add(root + "_f2_f3");
-                    stems.Add(root + "_empowered");
-                    stems.Add(root + "_reset");
-                    stems.Add("empowered_" + root);
-                }
-
                 string baseDir = $"assets/characters/{mChamp}/{mFolder}/{mSkin}/";
-                foreach (ulong unk in matLinks)
+                Check(engine, $"{baseDir}{mChamp}_{mSkin}_tx_cm.tex", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                Check(engine, $"{baseDir}{mChamp}_{mSkin}_mask_tx_cm.tex", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                Check(engine, $"{baseDir}{mChamp}_{mSkin}_matcap.tex", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+
+                string championSkinPrefix = $"{baseDir}{mChamp}_{mSkin}_";
+                string championPrefix = $"{baseDir}{mChamp}_";
+                foreach (var (targetHash, matDescriptors, samplerStems) in targets)
                 {
-                    if (engine.RemainingUnknownCount == 0) break;
-                    if (!engine.UnknownHashes.Contains(unk)) continue;
+                    if (!engine.UnknownHashes.Contains(targetHash)) continue;
 
-                    Check(engine, $"{baseDir}{mChamp}_{mSkin}_tx_cm.tex", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                    Check(engine, $"{baseDir}{mChamp}_{mSkin}_mask_tx_cm.tex", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                    Check(engine, $"{baseDir}{mChamp}_{mSkin}_matcap.tex", HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-
-                    foreach (string st in stems)
+                    var baseStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rawMat };
+                    string[] rawParts = rawMat.Split('_', StringSplitOptions.RemoveEmptyEntries);
+                    if (rawParts.Length > 1)
                     {
-                        if (!engine.UnknownHashes.Contains(unk)) break;
-                        foreach (string desc in matDescriptors)
+                        foreach (string part in rawParts)
                         {
-                            if (!engine.UnknownHashes.Contains(unk)) break;
-                            foreach (string suf in TextureMapSuffixes)
+                            if (part.Length < 3 || part is "matcap" or "inst" or "mat" or "specular" or "fresnel") continue;
+                            baseStems.Add(part);
+                            if (part.EndsWith("ed", StringComparison.OrdinalIgnoreCase) && part.Length > 4)
+                                baseStems.Add(part[..^2]);
+                        }
+
+                        string[] meaningful = rawParts
+                            .Where(part => part.Length >= 3 && part is not ("matcap" or "inst" or "mat" or "specular" or "fresnel"))
+                            .Select(part => part.EndsWith("ed", StringComparison.OrdinalIgnoreCase) && part.Length > 4 ? part[..^2] : part)
+                            .ToArray();
+                        if (meaningful.Length > 1)
+                        {
+                            baseStems.Add(string.Join("", meaningful));
+                            baseStems.Add(string.Join('_', meaningful));
+                        }
+                    }
+
+                    baseStems.UnionWith(samplerStems);
+                    foreach (string samplerStem in samplerStems)
+                    {
+                        baseStems.Add(rawMat + samplerStem);
+                        baseStems.Add(rawMat + "_" + samplerStem);
+                        foreach (string part in rawParts)
+                        {
+                            if (part.Length < 3 || part is "matcap" or "inst" or "mat") continue;
+                            baseStems.Add(part + samplerStem);
+                            baseStems.Add(part + "_" + samplerStem);
+                        }
+                    }
+                    foreach (string baseStem in baseStems)
+                    {
+                        string root = baseStem.EndsWith("_f1", StringComparison.OrdinalIgnoreCase) ? baseStem[..^3] : baseStem;
+                        foreach (string stem in new[] { root, root + "_f1", root + "_f2", root + "_f3", root + "_f4", root + "_f1_f2", root + "_f2_f3", root + "_empowered", root + "_reset", "empowered_" + root })
+                        foreach (string descriptor in matDescriptors)
+                        foreach (string suffix in TextureMapSuffixes)
+                        {
+                            if (TryMatch(championSkinPrefix, stem, descriptor, suffix, targetHash, out string candidate) ||
+                                TryMatch(championPrefix, stem, descriptor, suffix, targetHash, out candidate) ||
+                                TryMatch(baseDir, stem, descriptor, suffix, targetHash, out candidate))
                             {
-                                string c1 = $"{baseDir}{mChamp}_{mSkin}_{st}{desc}{suf}";
-                                if (XxHash64Ext.Hash(c1) == unk)
-                                {
-                                    Check(engine, c1, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                                    break;
-                                }
-                                string c2 = $"{baseDir}{mChamp}_{st}{desc}{suf}";
-                                if (XxHash64Ext.Hash(c2) == unk)
-                                {
-                                    Check(engine, c2, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                                    break;
-                                }
-                                string c3 = $"{baseDir}{st}{desc}{suf}";
-                                if (XxHash64Ext.Hash(c3) == unk)
-                                {
-                                    Check(engine, c3, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
-                                    break;
-                                }
+                                Check(engine, candidate, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                                goto NextTarget;
                             }
                         }
                     }
+
+                    NextTarget:;
+                }
+
+                static bool TryMatch(string prefix, string stem, string descriptor, string suffix, ulong targetHash, out string match)
+                {
+                    int length = prefix.Length + stem.Length + descriptor.Length + suffix.Length;
+                    Span<char> candidate = length <= 512 ? stackalloc char[length] : new char[length];
+                    int offset = 0;
+                    prefix.AsSpan().CopyTo(candidate);
+                    offset += prefix.Length;
+                    stem.AsSpan().CopyTo(candidate[offset..]);
+                    offset += stem.Length;
+                    descriptor.AsSpan().CopyTo(candidate[offset..]);
+                    offset += descriptor.Length;
+                    suffix.AsSpan().CopyTo(candidate[offset..]);
+
+                    if (XxHash64Ext.Hash(candidate) == targetHash)
+                    {
+                        match = candidate.ToString();
+                        return true;
+                    }
+
+                    match = null;
+                    return false;
                 }
             }
 
             // Phase 3: Resolve Skin Mesh Links (SkinCharacterDataProperties)
             foreach (var (obj, simpleSkin, skeleton, targetTexHashes) in skinObjects)
             {
+                targetTexHashes.RemoveWhere(hash => !engine.UnknownHashes.Contains(hash));
                 if (engine.RemainingUnknownCount == 0 || targetTexHashes.Count == 0) break;
 
                 string refPath = !string.IsNullOrEmpty(simpleSkin) ? simpleSkin : skeleton;
