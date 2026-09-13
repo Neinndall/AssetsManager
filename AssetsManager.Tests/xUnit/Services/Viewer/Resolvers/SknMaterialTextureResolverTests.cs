@@ -1450,6 +1450,74 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void MatchTextureKey_ResolvesWadChunkHashAgainstAvailableKeys()
+        {
+            var availableKeys = new[]
+            {
+                "petchibizoe_base_tx_cm",
+                "petchibizoe_base_face_tx_cm",
+                "petchibizoe_base_hair_tx_cm",
+                "petchibizoe_base_tool_tx_cm",
+                "petchibizoe_base_speedline_tx_cm"
+            };
+
+            ulong bodyHash = XxHash64Ext.Hash("assets/characters/petchibizoe/themes/base/petchibizoe_base_tx_cm.tex");
+            ulong faceHash = XxHash64Ext.Hash("assets/characters/petchibizoe/themes/base/petchibizoe_base_face_tx_cm.tex");
+            ulong hairHash = XxHash64Ext.Hash("assets/characters/petchibizoe/themes/base/petchibizoe_base_hair_tx_cm.tex");
+
+            Assert.Equal("petchibizoe_base_tx_cm", SknResolver.MatchTextureKey($"{bodyHash:x16}", availableKeys));
+            Assert.Equal("petchibizoe_base_face_tx_cm", SknResolver.MatchTextureKey($"{faceHash:x16}", availableKeys));
+            Assert.Equal("petchibizoe_base_hair_tx_cm", SknResolver.MatchTextureKey($"{hairHash:x16}", availableKeys));
+        }
+
+        [Fact]
+        public void MatchSubmeshTexture_ResolvesChibiExpressionsHairAndProps()
+        {
+            var availableKeys = new[]
+            {
+                "petchibizoe_base_face_tx_cm",
+                "petchibizoe_base_fresnel_tx_cm",
+                "petchibizoe_base_hair_tx_cm",
+                "petchibizoe_base_mask_tx_cm",
+                "petchibizoe_base_speedline_tx_cm",
+                "petchibizoe_base_tool_tx_cm",
+                "petchibizoe_base_tx_cm"
+            };
+
+            Assert.Equal("petchibizoe_base_face_tx_cm", SknResolver.MatchSubmeshTexture("Eye_Base", availableKeys));
+            Assert.Equal("petchibizoe_base_face_tx_cm", SknResolver.MatchSubmeshTexture("Lip_Happy", availableKeys));
+            Assert.Equal("petchibizoe_base_face_tx_cm", SknResolver.MatchSubmeshTexture("Face_Lazy", availableKeys));
+            Assert.Equal("petchibizoe_base_face_tx_cm", SknResolver.MatchSubmeshTexture("Brow_Sad", availableKeys));
+
+            Assert.Equal("petchibizoe_base_hair_tx_cm", SknResolver.MatchSubmeshTexture("Hair", availableKeys));
+            Assert.Equal("petchibizoe_base_hair_tx_cm", SknResolver.MatchSubmeshTexture("Hairmetal", availableKeys));
+
+            Assert.Equal("petchibizoe_base_tool_tx_cm", SknResolver.MatchSubmeshTexture("Yoyo", availableKeys));
+            Assert.Equal("petchibizoe_base_tool_tx_cm", SknResolver.MatchSubmeshTexture("Rope", availableKeys));
+
+            Assert.Equal("petchibizoe_base_speedline_tx_cm", SknResolver.MatchSubmeshTexture("Speedline", availableKeys));
+
+            Assert.Equal("petchibizoe_base_tx_cm", SknResolver.MatchSubmeshTexture("Body", availableKeys));
+        }
+
+        [Fact]
+        public void FindBaseDiffuseTextureKey_SelectsBaseBodyTexture()
+        {
+            var availableKeys = new[]
+            {
+                "petchibizoe_base_face_tx_cm",
+                "petchibizoe_base_fresnel_tx_cm",
+                "petchibizoe_base_hair_tx_cm",
+                "petchibizoe_base_mask_tx_cm",
+                "petchibizoe_base_speedline_tx_cm",
+                "petchibizoe_base_tool_tx_cm",
+                "petchibizoe_base_tx_cm"
+            };
+
+            Assert.Equal("petchibizoe_base_tx_cm", SknResolver.FindBaseDiffuseTextureKey(availableKeys));
+        }
+
+        [Fact]
         public void ResolveTextureDirectory_UsesCompanionThemeParent()
         {
             string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-companion-textures-{Guid.NewGuid():N}");

@@ -365,6 +365,17 @@ namespace AssetsManager.Services.Viewer.Loading
                 return null;
             }
 
+            var availableKeys = loadedTextures.Keys.ToList();
+            string semanticMatch = SknMaterialTextureResolver.MatchSubmeshTexture(
+                materialName,
+                availableKeys,
+                defaultTextureKey);
+            if (!string.IsNullOrEmpty(semanticMatch) && loadedTextures.ContainsKey(semanticMatch))
+            {
+                _logService.LogDebug($"Resolved semantic texture '{semanticMatch}' for submesh '{materialName}'.");
+                return semanticMatch;
+            }
+
             if (defaultTextureKey != null)
             {
                 _logService.LogDebug($"Using skin-bin default texture '{defaultTextureKey}' for submesh '{materialName}'.");

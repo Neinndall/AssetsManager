@@ -153,86 +153,91 @@ namespace AssetsManager.Services.Viewer.Resolvers
             string defaultTexturePath = null;
             SknMaterialDefinition defaultMaterial = null;
 
-            foreach (BinTreeObject obj in primaryTree.Objects.Values)
+            foreach (BinTree tree in trees)
             {
-                if (obj.ClassHash != SkinPropertiesClass ||
-                    !obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
-                    meshProperty is not BinTreeStruct meshProperties)
+                foreach (BinTreeObject obj in tree.Objects.Values)
                 {
-                    continue;
-                }
-
-                if (defaultTexturePath == null &&
-                    TryGetTexturePath(meshProperties, Texture, wadChunkPathResolver, out string texturePath))
-                {
-                    defaultTexturePath = texturePath;
-                }
-
-                if (defaultMaterial == null &&
-                    meshProperties.Properties.TryGetValue(Material, out BinTreeProperty materialProperty) &&
-                    materialProperty is BinTreeObjectLink defaultMaterialLink &&
-                    materialDefinitions.TryGetValue(defaultMaterialLink.Value, out SknMaterialDefinition linkedMaterial))
-                {
-                    defaultMaterial = linkedMaterial;
-                }
-
-                if (!meshProperties.Properties.TryGetValue(MaterialOverride, out BinTreeProperty overrideProperty) ||
-                    overrideProperty is not BinTreeContainer materialOverrides)
-                {
-                    continue;
-                }
-
-                foreach (BinTreeProperty element in materialOverrides.Elements)
-                {
-                    if (element is not BinTreeStruct entry ||
-                        !TryGetString(entry, Submesh, out string submeshName))
+                    if (obj.ClassHash != SkinPropertiesClass ||
+                        !obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
+                        meshProperty is not BinTreeStruct meshProperties)
                     {
                         continue;
                     }
 
-                    string normalizedSubmesh = NormalizeMaterialKey(submeshName);
-                    if (string.IsNullOrEmpty(normalizedSubmesh))
+                    if (defaultTexturePath == null &&
+                        TryGetTexturePath(meshProperties, Texture, wadChunkPathResolver, out string texturePath))
+                    {
+                        defaultTexturePath = texturePath;
+                    }
+
+                    if (defaultMaterial == null &&
+                        meshProperties.Properties.TryGetValue(Material, out BinTreeProperty materialProperty) &&
+                        materialProperty is BinTreeObjectLink defaultMaterialLink &&
+                        materialDefinitions.TryGetValue(defaultMaterialLink.Value, out SknMaterialDefinition linkedMaterial))
+                    {
+                        defaultMaterial = linkedMaterial;
+                    }
+
+                    if (!meshProperties.Properties.TryGetValue(MaterialOverride, out BinTreeProperty overrideProperty) ||
+                        overrideProperty is not BinTreeContainer materialOverrides)
                     {
                         continue;
                     }
 
-                    var candidates = new List<string>(2);
-                    bool hasAuthoredOverride = false;
-                    if (entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
-                        linkProperty is BinTreeObjectLink materialLink)
+                    foreach (BinTreeProperty element in materialOverrides.Elements)
                     {
-                        hasAuthoredOverride = true;
-                        if (materialDefinitions.TryGetValue(
-                                materialLink.Value,
-                                out SknMaterialDefinition materialDefinition))
+                        if (element is not BinTreeStruct entry ||
+                            !TryGetString(entry, Submesh, out string submeshName))
                         {
-                            string materialTexturePath = SelectColorTexturePath(materialDefinition.Samplers);
-                            if (!string.IsNullOrWhiteSpace(materialTexturePath))
-                            {
-                                candidates.Add(materialTexturePath);
-                            }
+                            continue;
+                        }
 
-                            if (materialDefinition.Samplers.Count > 0 ||
-                                materialDefinition.Parameters.Count > 0 ||
-                                materialDefinition.Switches.Count > 0)
+                        string normalizedSubmesh = NormalizeMaterialKey(submeshName);
+                        if (string.IsNullOrEmpty(normalizedSubmesh))
+                        {
+                            continue;
+                        }
+
+                        var candidates = new List<string>(2);
+                        bool hasAuthoredOverride = false;
+                        if (entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
+                            linkProperty is BinTreeObjectLink materialLink)
+                        {
+                            hasAuthoredOverride = true;
+                            if (materialDefinitions.TryGetValue(
+                                    materialLink.Value,
+                                    out SknMaterialDefinition materialDefinition))
                             {
-                                overrideMaterials[normalizedSubmesh] = materialDefinition;
+                                string materialTexturePath = SelectColorTexturePath(materialDefinition.Samplers);
+                                if (!string.IsNullOrWhiteSpace(materialTexturePath))
+                                {
+                                    candidates.Add(materialTexturePath);
+                                }
+
+                                if (materialDefinition.Samplers.Count > 0 ||
+                                    materialDefinition.Parameters.Count > 0 ||
+                                    materialDefinition.Switches.Count > 0)
+                                {
+                                    overrideMaterials[normalizedSubmesh] = materialDefinition;
+                                }
                             }
                         }
-                    }
 
-                    if (TryGetTexturePath(entry, Texture, wadChunkPathResolver, out string directTexturePath))
-                    {
-                        hasAuthoredOverride = true;
-                        candidates.Add(directTexturePath);
-                    }
+                        if (TryGetTexturePath(entry, Texture, wadChunkPathResolver, out string directTexturePath))
+                        {
+                            hasAuthoredOverride = true;
+                            candidates.Add(directTexturePath);
+                        }
 
-                    if (hasAuthoredOverride)
-                    {
-                        overrideTexturePaths[normalizedSubmesh] = candidates;
+                        if (hasAuthoredOverride && !overrideTexturePaths.ContainsKey(normalizedSubmesh))
+                        {
+                            overrideTexturePaths[normalizedSubmesh] = candidates;
+                        }
                     }
                 }
             }
+
+            AssociateUnboundMaterials(materialDefinitions, overrideMaterials, overrideTexturePaths);
 
             return new SknMaterialTextureMetadata(
                 defaultTexturePath,
@@ -285,7 +290,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 MatchTextureKey(
                     SelectColorTexturePath(metadata.DefaultMaterial?.Samplers),
                     textureKeys) ??
-                MatchTextureKey(metadata.DefaultTexturePath, textureKeys),
+                MatchTextureKey(metadata.DefaultTexturePath, textureKeys) ??
+                FindBaseDiffuseTextureKey(textureKeys),
                 overrides,
                 effects,
                 metadata.OverrideTexturePaths.Keys
@@ -347,28 +353,64 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
             string dataMarker = $"{Path.DirectorySeparatorChar}data{Path.DirectorySeparatorChar}";
             int dataIndex = normalizedBinPath.IndexOf(dataMarker, StringComparison.OrdinalIgnoreCase);
-            if (dataIndex < 0)
+            if (dataIndex >= 0)
             {
-                return null;
+                string virtualPath = PathUtils.NormalizeSeparators(dependencyPath)
+                    .TrimStart('/')
+                    .ToLowerInvariant();
+                if (virtualPath.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
+                {
+                    string rootPath = normalizedBinPath[..dataIndex];
+                    string namedPath = Path.Combine(rootPath, virtualPath.Replace('/', Path.DirectorySeparatorChar));
+                    if (File.Exists(namedPath))
+                    {
+                        return namedPath;
+                    }
+
+                    string hashedPath = Path.Combine(rootPath, $"{XxHash64Ext.Hash(virtualPath):x16}.bin");
+                    if (File.Exists(hashedPath))
+                    {
+                        return hashedPath;
+                    }
+                }
             }
 
-            string virtualPath = PathUtils.NormalizeSeparators(dependencyPath)
-                .TrimStart('/')
-                .ToLowerInvariant();
-            if (!virtualPath.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
+            // Fallback for extracted folders without \data\ directory structure
+            string cleanDep = PathUtils.NormalizeSeparators(dependencyPath).TrimStart('/');
+            if (cleanDep.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
             {
-                return null;
+                cleanDep = cleanDep["data/".Length..];
+            }
+            if (!cleanDep.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+            {
+                cleanDep += ".bin";
             }
 
-            string rootPath = normalizedBinPath[..dataIndex];
-            string namedPath = Path.Combine(rootPath, virtualPath.Replace('/', Path.DirectorySeparatorChar));
-            if (File.Exists(namedPath))
+            string depFileName = Path.GetFileName(cleanDep);
+            for (DirectoryInfo dir = Directory.GetParent(normalizedBinPath);
+                 dir != null;
+                 dir = dir.Parent)
             {
-                return namedPath;
+                string candidate = Path.Combine(dir.FullName, cleanDep.Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+
+                string fileCandidate = Path.Combine(dir.FullName, depFileName);
+                if (File.Exists(fileCandidate))
+                {
+                    return fileCandidate;
+                }
+
+                string animCandidate = Path.Combine(dir.FullName, "animations", depFileName);
+                if (File.Exists(animCandidate))
+                {
+                    return animCandidate;
+                }
             }
 
-            string hashedPath = Path.Combine(rootPath, $"{XxHash64Ext.Hash(virtualPath):x16}.bin");
-            return File.Exists(hashedPath) ? hashedPath : null;
+            return null;
         }
 
         internal static string TryResolveTexturePath(string sknPath, string assetTexturePath)
@@ -474,43 +516,115 @@ namespace AssetsManager.Services.Viewer.Resolvers
         {
             string themesMarker = $"{Path.DirectorySeparatorChar}themes{Path.DirectorySeparatorChar}";
             int themesIndex = normalizedSknPath.IndexOf(themesMarker, StringComparison.OrdinalIgnoreCase);
-            if (themesIndex < 0)
-            {
-                return null;
-            }
 
-            string characterRoot = normalizedSknPath[..themesIndex];
-            string characterName = Path.GetFileName(characterRoot);
-            string skinsDirectory = Path.Combine(characterRoot, "skins");
-            if (string.IsNullOrWhiteSpace(characterName) || !Directory.Exists(skinsDirectory))
+            string themeName = null;
+            string tierName = null;
+            if (themesIndex >= 0)
             {
-                return null;
-            }
-
-            string relativeModelPath = Path.GetRelativePath(characterRoot, normalizedSknPath)
-                .Replace(Path.DirectorySeparatorChar, '/');
-            string virtualModelPath = $"assets/characters/{characterName}/{relativeModelPath}";
-
-            foreach (string binPath in Directory.EnumerateFiles(
-                         skinsDirectory,
-                         "skin*.bin",
-                         SearchOption.TopDirectoryOnly)
-                     .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
-            {
-                using var stream = File.OpenRead(binPath);
-                var binTree = new BinTree(stream);
-                if (ReferencesModel(binTree, virtualModelPath))
+                string afterThemes = normalizedSknPath[(themesIndex + themesMarker.Length)..];
+                string[] themeParts = afterThemes.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+                if (themeParts.Length >= 1)
                 {
-                    return binPath;
+                    themeName = themeParts[0];
+                }
+                if (themeParts.Length >= 2)
+                {
+                    tierName = themeParts[1];
                 }
             }
 
-            return null;
+            var candidateRoots = new List<string>();
+            if (themesIndex >= 0)
+            {
+                string charRoot = normalizedSknPath[..themesIndex];
+                candidateRoots.Add(charRoot);
+                string dataRoot = charRoot.Replace(
+                    $"{Path.DirectorySeparatorChar}assets{Path.DirectorySeparatorChar}",
+                    $"{Path.DirectorySeparatorChar}data{Path.DirectorySeparatorChar}",
+                    StringComparison.OrdinalIgnoreCase);
+                if (!dataRoot.Equals(charRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    candidateRoots.Add(dataRoot);
+                }
+            }
+
+            string fallbackThemeBin = null;
+
+            foreach (string root in candidateRoots.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (!Directory.Exists(root))
+                {
+                    continue;
+                }
+
+                string skinsDirectory = Path.Combine(root, "skins");
+                if (Directory.Exists(skinsDirectory))
+                {
+                    foreach (string binPath in Directory.EnumerateFiles(
+                                 skinsDirectory,
+                                 "skin*.bin",
+                                 SearchOption.TopDirectoryOnly)
+                             .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
+                    {
+                        try
+                        {
+                            using var stream = File.OpenRead(binPath);
+                            var binTree = new BinTree(stream);
+                            if (ReferencesModel(binTree, normalizedSknPath))
+                            {
+                                return binPath;
+                            }
+                        }
+                        catch
+                        {
+                            // Ignore corrupted bin candidate
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(themeName))
+                {
+                    string themeDir = Path.Combine(root, "themes", themeName);
+                    if (Directory.Exists(themeDir))
+                    {
+                        var candidateBins = new List<string>();
+                        if (!string.IsNullOrEmpty(tierName))
+                        {
+                            candidateBins.Add(Path.Combine(themeDir, $"{tierName}.bin"));
+                        }
+                        candidateBins.Add(Path.Combine(themeDir, "root.bin"));
+
+                        foreach (string binPath in candidateBins)
+                        {
+                            if (File.Exists(binPath))
+                            {
+                                try
+                                {
+                                    using var stream = File.OpenRead(binPath);
+                                    var binTree = new BinTree(stream);
+                                    if (ReferencesModel(binTree, normalizedSknPath))
+                                    {
+                                        fallbackThemeBin ??= binPath;
+                                    }
+                                }
+                                catch
+                                {
+                                    // Ignore
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return fallbackThemeBin;
         }
 
-        private static bool ReferencesModel(BinTree binTree, string virtualModelPath)
+        private static bool ReferencesModel(BinTree binTree, string sknPath)
         {
-            string expectedPath = NormalizeAssetPath(virtualModelPath);
+            string sknFileName = Path.GetFileName(sknPath);
+            string normalizedSkn = NormalizeAssetPath(sknPath);
+
             foreach (BinTreeObject obj in binTree.Objects.Values)
             {
                 if (obj.ClassHash != SkinPropertiesClass ||
@@ -522,9 +636,21 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     continue;
                 }
 
-                if (NormalizeAssetPath(simpleSkin.Value).Equals(
-                        expectedPath,
-                        StringComparison.OrdinalIgnoreCase))
+                string declaredSkin = simpleSkin.Value;
+                if (string.IsNullOrWhiteSpace(declaredSkin))
+                {
+                    continue;
+                }
+
+                if (Path.GetFileName(declaredSkin).Equals(sknFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                string normalizedDeclared = NormalizeAssetPath(declaredSkin);
+                if (normalizedDeclared.Equals(normalizedSkn, StringComparison.OrdinalIgnoreCase) ||
+                    normalizedSkn.EndsWith(normalizedDeclared, StringComparison.OrdinalIgnoreCase) ||
+                    normalizedDeclared.EndsWith(normalizedSkn, StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }
@@ -767,18 +893,256 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return false;
         }
 
+        private static void AssociateUnboundMaterials(
+            Dictionary<uint, SknMaterialDefinition> materialDefinitions,
+            Dictionary<string, SknMaterialDefinition> overrideMaterials,
+            Dictionary<string, IReadOnlyList<string>> overrideTexturePaths)
+        {
+            if (materialDefinitions == null || materialDefinitions.Count == 0)
+            {
+                return;
+            }
+
+            var usedMaterials = new HashSet<SknMaterialDefinition>(overrideMaterials.Values);
+            foreach (SknMaterialDefinition material in materialDefinitions.Values)
+            {
+                if (usedMaterials.Contains(material))
+                {
+                    continue;
+                }
+
+                string inferredCategory = null;
+                foreach (SknMaterialSampler sampler in material.Samplers)
+                {
+                    string normName = NormalizeToken(sampler.TextureName);
+                    if (normName.Contains("hair"))
+                    {
+                        inferredCategory = "hair";
+                        break;
+                    }
+                    if (normName.Contains("face"))
+                    {
+                        inferredCategory = "face";
+                        break;
+                    }
+                    if (normName.Contains("tool") || normName.Contains("yoyo") || normName.Contains("rope"))
+                    {
+                        inferredCategory = "tool";
+                        break;
+                    }
+                    if (normName.Contains("speedline"))
+                    {
+                        inferredCategory = "speedline";
+                        break;
+                    }
+                }
+
+                if (inferredCategory != null && !overrideMaterials.ContainsKey(inferredCategory))
+                {
+                    overrideMaterials[inferredCategory] = material;
+                    string colPath = SelectColorTexturePath(material.Samplers);
+                    if (!string.IsNullOrWhiteSpace(colPath) && !overrideTexturePaths.ContainsKey(inferredCategory))
+                    {
+                        overrideTexturePaths[inferredCategory] = new[] { colPath };
+                    }
+                }
+            }
+        }
+
         internal static string MatchTextureKey(string texturePath, IReadOnlyList<string> availableKeys)
         {
-            if (string.IsNullOrWhiteSpace(texturePath))
+            if (string.IsNullOrWhiteSpace(texturePath) || availableKeys == null || availableKeys.Count == 0)
             {
                 return null;
             }
 
             string fileName = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(
                 texturePath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar)));
-            return availableKeys.FirstOrDefault(key =>
+
+            string directMatch = availableKeys.FirstOrDefault(key =>
                 key.Equals(fileName, StringComparison.OrdinalIgnoreCase));
+            if (directMatch != null)
+            {
+                return directMatch;
+            }
+
+            // If texturePath is a 16-character hex hash from WadChunkLink
+            if (fileName.Length == 16 &&
+                ulong.TryParse(fileName, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out ulong hashValue))
+            {
+                string hashMatch = MatchTextureHash(hashValue, availableKeys);
+                if (hashMatch != null)
+                {
+                    return hashMatch;
+                }
+            }
+
+            return null;
         }
+
+        private static string MatchTextureHash(ulong hashValue, IReadOnlyList<string> availableKeys)
+        {
+            foreach (string key in availableKeys)
+            {
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                string[] parts = key.Split('_');
+                var candidates = new List<string>(8);
+                if (parts.Length >= 2)
+                {
+                    candidates.Add($"assets/characters/{parts[0]}/themes/{parts[1]}/{key}.tex");
+                    candidates.Add($"assets/characters/{parts[0]}/themes/{parts[1]}/{key}.dds");
+                    candidates.Add($"assets/characters/{parts[0]}/skins/{parts[1]}/{key}.tex");
+                    candidates.Add($"assets/characters/{parts[0]}/skins/{parts[1]}/{key}.dds");
+                    candidates.Add($"assets/characters/{parts[0]}/{key}.tex");
+                    candidates.Add($"assets/characters/{parts[0]}/{key}.dds");
+                }
+                candidates.Add($"assets/{key}.tex");
+                candidates.Add($"assets/{key}.dds");
+
+                foreach (string candidate in candidates)
+                {
+                    if (XxHash64Ext.Hash(candidate.ToLowerInvariant()) == hashValue)
+                    {
+                        return key;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        internal static string MatchSubmeshTexture(
+            string submeshName,
+            IReadOnlyList<string> availableKeys,
+            string defaultTextureKey = null)
+        {
+            if (availableKeys == null || availableKeys.Count == 0)
+            {
+                return defaultTextureKey;
+            }
+
+            string token = NormalizeToken(submeshName);
+            if (string.IsNullOrEmpty(token))
+            {
+                return defaultTextureKey ?? FindBaseDiffuseTextureKey(availableKeys);
+            }
+
+            // 1. Face and Expressions: eyes, eyebrows, lips, blush, lazy face, etc.
+            if (token.Contains("face") || token.Contains("eye") || token.Contains("brow") ||
+                token.Contains("lip") || token.Contains("mouth") || token.Contains("blush") ||
+                token.Contains("expr"))
+            {
+                string faceKey = availableKeys.FirstOrDefault(k =>
+                {
+                    string nt = NormalizeToken(k);
+                    return nt.Contains("facetxcm") || (nt.Contains("face") && !nt.Contains("mask"));
+                });
+                if (faceKey != null) return faceKey;
+            }
+
+            // 2. Hair: hair, hairmetal, braids, etc.
+            if (token.Contains("hair"))
+            {
+                string hairKey = availableKeys.FirstOrDefault(k =>
+                {
+                    string nt = NormalizeToken(k);
+                    return nt.Contains("hairtxcm") || (nt.Contains("hair") && !nt.Contains("mask") && !nt.Contains("discolor") && !nt.Contains("fresnel"));
+                });
+                if (hairKey != null) return hairKey;
+            }
+
+            // 3. Speedline / VFX meshes
+            if (token.Contains("speedline") || token.Contains("speed"))
+            {
+                string speedKey = availableKeys.FirstOrDefault(k =>
+                {
+                    string nt = NormalizeToken(k);
+                    return nt.Contains("speedline") || nt.Contains("speed");
+                });
+                if (speedKey != null) return speedKey;
+            }
+
+            // 4. Tools, weapons, ropes, props (e.g. yoyo, umbrella, rope)
+            if (token.Contains("tool") || token.Contains("weapon") || token.Contains("rope") ||
+                token.Contains("yoyo") || token.Contains("umbrella"))
+            {
+                string toolKey = availableKeys.FirstOrDefault(k =>
+                {
+                    string nt = NormalizeToken(k);
+                    return nt.Contains("tooltxcm") || nt.Contains("tool") || nt.Contains("weapon");
+                });
+                if (toolKey != null) return toolKey;
+            }
+
+            // 5. Prop / companion-specific tokens (e.g. rabbit, octopus, arma, tibbers)
+            foreach (string candidateKey in availableKeys)
+            {
+                string normKey = NormalizeToken(candidateKey);
+                if (IsNonColorTextureToken(normKey)) continue;
+
+                string[] keyParts = candidateKey.Split('_');
+                foreach (string part in keyParts)
+                {
+                    string normPart = NormalizeToken(part);
+                    if (normPart.Length >= 4 &&
+                        !normPart.Equals("tx", StringComparison.OrdinalIgnoreCase) &&
+                        !normPart.Equals("cm", StringComparison.OrdinalIgnoreCase) &&
+                        !normPart.Equals("base", StringComparison.OrdinalIgnoreCase) &&
+                        token.Contains(normPart))
+                    {
+                        return candidateKey;
+                    }
+                }
+            }
+
+            // 6. Body / Costume / Clothes
+            if (token.Contains("body") || token.Contains("cloth") || token.Contains("dress") || token.Contains("costume"))
+            {
+                string bodyKey = FindBaseDiffuseTextureKey(availableKeys);
+                if (bodyKey != null) return bodyKey;
+            }
+
+            return defaultTextureKey ?? FindBaseDiffuseTextureKey(availableKeys);
+        }
+
+        internal static string FindBaseDiffuseTextureKey(IReadOnlyList<string> availableKeys)
+        {
+            if (availableKeys == null || availableKeys.Count == 0) return null;
+
+            var filtered = availableKeys
+                .Where(k => !IsPresentationTexture(k))
+                .Where(k =>
+                {
+                    string nt = NormalizeToken(k);
+                    return !IsNonColorTextureToken(nt) &&
+                           !nt.Contains("face") &&
+                           !nt.Contains("hair") &&
+                           !nt.Contains("tool") &&
+                           !nt.Contains("speedline");
+                })
+                .ToList();
+
+            if (filtered.Count > 0)
+            {
+                return filtered.FirstOrDefault(k => NormalizeToken(k).EndsWith("txcm")) ?? filtered[0];
+            }
+
+            return availableKeys.FirstOrDefault(k => !IsPresentationTexture(k) && !IsNonColorTextureToken(NormalizeToken(k)));
+        }
+
+        private static bool IsNonColorTextureToken(string normalizedToken) =>
+            normalizedToken.Contains("mask") ||
+            normalizedToken.Contains("fresnel") ||
+            normalizedToken.Contains("noise") ||
+            normalizedToken.Contains("normal") ||
+            normalizedToken.Contains("discolor") ||
+            normalizedToken.Contains("rough") ||
+            normalizedToken.Contains("metal") ||
+            normalizedToken.Contains("matcap");
 
         private static string GetSkinBinName(string skinFolder)
         {
