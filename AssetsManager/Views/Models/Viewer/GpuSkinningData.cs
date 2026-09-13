@@ -13,7 +13,7 @@ namespace AssetsManager.Views.Models.Viewer
     /// </summary>
     internal sealed class GpuSkinningData
     {
-        internal const int MaxBones = 256;
+        internal const int MaxBones = 512;
 
         internal sealed class PartData
         {
@@ -153,7 +153,7 @@ namespace AssetsManager.Views.Models.Viewer
             }
 
             short resolvedJoint = skeleton.Influences[influenceIndex];
-            if (resolvedJoint < 0 || resolvedJoint >= skeleton.Joints.Count)
+            if (resolvedJoint < 0 || resolvedJoint >= skeleton.Joints.Count || resolvedJoint >= MaxBones)
             {
                 jointIndex = 0;
                 return false;

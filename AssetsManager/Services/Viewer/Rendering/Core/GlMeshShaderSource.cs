@@ -20,7 +20,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					uniform float uWaveSpeed;
 					uniform float uWaveFrequency;
 					uniform float uWaveIntensity;
-					const int MAX_BONES = 256;
+					const int MAX_BONES = 512;
 					layout(std140) uniform BoneTransforms {
 						mat4 uBoneTransforms[MAX_BONES];
 					};
