@@ -302,6 +302,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     $"assets/characters/{character}/hud/{character}_square.dds",
                     $"assets/characters/{character}/hud/{character}_square.tex",
                     $"assets/characters/{character}/hud/{character}_square_301.tex",
+                    $"assets/characters/{character}/skins/base/{character}.skn",
+                    $"assets/characters/{character}/skins/base/{character}.skl",
                     $"assets/characters/{character}/skins/base/{character}_base_tx_cm.tex",
                     $"assets/characters/{character}/skins/base/{character}_base_tx_gm.tex",
                     $"assets/characters/{character}/skins/base/{character}loadscreen.tex",
@@ -329,7 +331,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_loadscreen_{skin}.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
                     if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}_le.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
                     if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_loadscreen_{skin}_le.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}.skn", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}.skl", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
                     if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_tx_cm.tex", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
+                    if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_tx_cm.dds", out w) && !CheckSpan(pathBuf[..w])) goto ChampionDone;
 
                     foreach (string tier in tiers)
                     {

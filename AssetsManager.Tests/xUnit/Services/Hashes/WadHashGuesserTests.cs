@@ -3280,45 +3280,10 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
-        public void GameGrepWadResolvesSubmeshTypoAngelTeemoAndChromaBody()
+        public void GameGrepWadResolvesChromaBodyMeshLinks()
         {
-            const string angelTexture = "assets/characters/jade_fizz/skins/skin23/jade_fizz_skin23_angelteemo_tx_cm.tex";
             const string sharkBodyTexture = "assets/characters/jade_fizzshark/skins/skin20/jade_fizzshark_skin20_body_tx_cm.tex";
-            ulong angelHash = XxHash64Ext.Hash(angelTexture);
             ulong sharkBodyHash = XxHash64Ext.Hash(sharkBodyTexture);
-
-            // Jade Fizz skin23 with "AngleTeemo" typo in submesh override
-            var angelOverride = new BinTreeEmbedded(
-                0,
-                Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"),
-                new BinTreeProperty[]
-                {
-                    new BinTreeString(Fnv1a.HashLower("submesh"), "AngleTeemo"),
-                    new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), angelHash)
-                });
-            var fizzMesh = new BinTreeStruct(
-                Fnv1a.HashLower("skinMeshProperties"),
-                Fnv1a.HashLower("SkinMeshDataProperties"),
-                new BinTreeProperty[]
-                {
-                    new BinTreeString(Fnv1a.HashLower("skeleton"), "ASSETS/Characters/Jade_Fizz/Skins/Skin16/Jade_Fizz_Skin16.skl"),
-                    new BinTreeString(Fnv1a.HashLower("simpleSkin"), "ASSETS/Characters/Jade_Fizz/Skins/Skin16/Jade_Fizz_Skin16.skn"),
-                    new BinTreeUnorderedContainer(
-                        Fnv1a.HashLower("materialOverride"),
-                        BinPropertyType.Embedded,
-                        new[] { angelOverride })
-                });
-            var fizzSkin = new BinTreeObject(
-                "Characters/Jade_Fizz/Skins/Skin23",
-                "SkinCharacterDataProperties",
-                new BinTreeProperty[]
-                {
-                    new BinTreeString(Fnv1a.HashLower("name"), "Jade_FizzSkin23"),
-                    fizzMesh
-                });
-            var fizzTree = new BinTree(new[] { fizzSkin }, Array.Empty<string>());
-            using var fizzMs = new MemoryStream();
-            fizzTree.Write(fizzMs);
 
             // Jade FizzShark skin20 referencing skin16 mesh but target texture is skin20 body
             var sharkMesh = new BinTreeStruct(
@@ -3342,20 +3307,10 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             using var sharkMs = new MemoryStream();
             sharkTree.Write(sharkMs);
 
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/fizz/skins/skin16/fizz_skin16_angelteemo_tx_cm.tex"
-            }));
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
             var engine = new HashGuessEngine(
                 HashGuessDomain.Game,
-                new HashSet<ulong> { angelHash, sharkBodyHash });
-
-            game.GrepWad(
-                engine,
-                new ArraySegment<byte>(fizzMs.ToArray()),
-                "data/characters/jade_fizz/skins/skin23.bin",
-                "DATA/FINAL/Champions/Fizz.wad.client",
-                1);
+                new HashSet<ulong> { sharkBodyHash });
 
             game.GrepWad(
                 engine,
@@ -3365,8 +3320,29 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 2);
 
             Assert.Equal(0, engine.RemainingUnknownCount);
-            Assert.Contains(engine.Matches.Values, match => match.Path == angelTexture);
             Assert.Contains(engine.Matches.Values, match => match.Path == sharkBodyTexture);
+        }
+
+        [Fact]
+        public void GameTextureBuildListResolvesCrossSkinVariantTexture()
+        {
+            const string angelTexture = "assets/characters/jade_fizz/skins/skin23/jade_fizz_skin23_angelteemo_tx_cm.tex";
+            ulong angelHash = XxHash64Ext.Hash(angelTexture);
+
+            var knownPaths = new[]
+            {
+                "assets/characters/fizz/skins/skin16/fizz_skin16_angelteemo_tx_cm.tex",
+                "assets/characters/fizz/skins/skin17/fizz_skin17_angelteemo_tx_cm.tex",
+                "assets/characters/jade_fizz/skins/skin23/jade_fizz_skin23_tx_cm.tex"
+            };
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, knownPaths));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { angelHash });
+
+            game.SubstituteTextureBuildListWords(engine, CancellationToken.None);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Contains(engine.Matches.Values, match => match.Path == angelTexture);
         }
 
         [Fact]

@@ -896,86 +896,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private static readonly string[] TextureMapExtensions = { ".tex", ".dds" };
         private static readonly string[] TextureMapSuffixes = BuildTextureMapSuffixes();
 
-        private static string[] BuildTextureMapSuffixes() =>
-            (from kind in TextureMapKinds
-             from variant in TextureMapVariants
-             from extension in TextureMapExtensions
-             select kind + variant + extension).ToArray();
-
-        private IReadOnlyList<string> DynamicTextureMapSuffixes =>
-            Corpus.GetOrCreate("dynamic-texture-map-suffixes", BuildDynamicTextureMapSuffixes);
-
-        private static readonly Regex CharacterTextureSuffixRegex = new(
-            @"/(?:skins|themes)/[^/]+/.*?(_(?:tx|cm|base|flowmap|cubemap|noise|mask|matcap|goldfresnel|ult|prop|diffuse|mult)[a-z0-9_]*?\.(?:tex|dds)(?:\.project_jade)?)$",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-        private static IReadOnlyList<string> BuildDynamicTextureMapSuffixes(IReadOnlyList<string> knownPaths)
+        private static string[] BuildTextureMapSuffixes()
         {
-            var suffixes = new HashSet<string>(TextureMapSuffixes, StringComparer.OrdinalIgnoreCase);
-            var suffixCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-            for (int i = 0; i < knownPaths.Count; i++)
-            {
-                string path = knownPaths[i];
-                if (!path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) &&
-                    !path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) &&
-                    !path.EndsWith(".project_jade", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                if (!path.Contains("characters/", StringComparison.OrdinalIgnoreCase)) continue;
-
-                Match m = CharacterTextureSuffixRegex.Match(path);
-                if (m.Success)
-                {
-                    string suf = m.Groups[1].Value.ToLowerInvariant();
-                    if (suf.Length <= 28)
-                        suffixCounts[suf] = suffixCounts.GetValueOrDefault(suf) + 1;
-                }
-            }
-
-            foreach (var (suf, count) in suffixCounts)
-            {
-                if (count >= 20)
-                    suffixes.Add(suf);
-            }
-
-            return suffixes.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
-        }
-
-        private IReadOnlyDictionary<string, IReadOnlyList<string>> ChampionSubmeshTokens =>
-            Corpus.GetOrCreate("champion-submesh-tokens", BuildChampionSubmeshTokens);
-
-        private static readonly Regex CharacterTextureTokenRegex = new(
-            @"assets/characters/(?<champ>[^/]+)/skins/[^/]+/(?:[0-9]x_)?(?:jade_)?(?:[a-z0-9]+_)*(?:skin\d+|base)_(?<token>[a-z0-9]+(?:_[a-z0-9]+)*?)_(?:tx|cm|base|flowmap|cubemap|noise|mask|matcap|diffuse|mult)",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-        private static IReadOnlyDictionary<string, IReadOnlyList<string>> BuildChampionSubmeshTokens(IReadOnlyList<string> knownPaths)
-        {
-            var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < knownPaths.Count; i++)
-            {
-                string path = knownPaths[i];
-                if (!path.Contains("/skins/", StringComparison.OrdinalIgnoreCase)) continue;
-                Match m = CharacterTextureTokenRegex.Match(path);
-                if (m.Success)
-                {
-                    string champ = m.Groups["champ"].Value.ToLowerInvariant();
-                    if (champ.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
-                        champ = champ[5..];
-                    string tok = m.Groups["token"].Value.ToLowerInvariant();
-                    if (tok.Length <= 24 && tok != "body" && tok != "tx")
-                    {
-                        if (!result.TryGetValue(champ, out var set))
-                            result[champ] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                        set.Add(tok);
-                    }
-                }
-            }
-
-            return result.ToDictionary(
-                kvp => kvp.Key,
-                kvp => (IReadOnlyList<string>)kvp.Value.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList(),
-                StringComparer.OrdinalIgnoreCase);
+            return (from kind in TextureMapKinds
+                    from variant in TextureMapVariants
+                    from extension in TextureMapExtensions
+                    select kind + variant + extension).ToArray();
         }
 
         private void GuessSkinCharacterBinChunkLinks(
@@ -1261,7 +1187,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         foreach (string desc in matDescriptors)
                         {
                             if (!engine.UnknownHashes.Contains(unk)) break;
-                            foreach (string suf in DynamicTextureMapSuffixes)
+                            foreach (string suf in TextureMapSuffixes)
                             {
                                 string c1 = $"{baseDir}{mChamp}_{mSkin}_{st}{desc}{suf}";
                                 if (XxHash64Ext.Hash(c1) == unk)
@@ -1496,24 +1422,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     }
                 }
 
-                if (!string.IsNullOrEmpty(cleanChamp) && ChampionSubmeshTokens.TryGetValue(cleanChamp, out var champTokens))
-                {
-                    foreach (string ct in champTokens)
-                    {
-                        candidateStems.Add(ct);
-                        candidateStems.Add($"{fileStem}_{ct}");
-                        candidateStems.Add($"{cleanChamp}_{ct}");
-                        if (!string.IsNullOrEmpty(sKey))
-                            candidateStems.Add($"{cleanChamp}_{sKey}_{ct}");
-                        if (sourceSkinMatch.Success)
-                        {
-                            string binChamp = sourceSkinMatch.Groups["champ"].Value.ToLowerInvariant();
-                            string binSkin = sourceSkinMatch.Groups["skin"].Value.ToLowerInvariant();
-                            candidateStems.Add($"{binChamp}_{binSkin}_{ct}");
-                        }
-                    }
-                }
-
                 var allStems = candidateStems.ToList();
                 foreach (string s in allStems)
                 {
@@ -1550,7 +1458,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     foreach (string cStem in candidateStems)
                     {
                         if (targetTexHashes.Count == 0 || engine.RemainingUnknownCount == 0) break;
-                        foreach (string suf in DynamicTextureMapSuffixes)
+                        foreach (string suf in TextureMapSuffixes)
                         {
                             string candidatePath = cDir + cStem + suf;
                             ulong hash = XxHash64Ext.Hash(candidatePath);

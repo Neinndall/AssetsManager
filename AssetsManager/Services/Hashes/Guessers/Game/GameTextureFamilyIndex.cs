@@ -14,7 +14,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed class GameTextureFamilyIndex
     {
-        private const int MaximumSuffixes = 11_000;
+        private const int MaximumSuffixes = 25_000;
         private const int DirectoryCandidateBudget = 2_000_000;
         private static readonly string[] ParticleRoles = { "tx", "d", "m", "m2", "mask" };
         private readonly Dictionary<string, List<string>> _paths = new(StringComparer.Ordinal);
@@ -62,14 +62,14 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 }
             }
             _suffixes = frequencies.Where(pair => pair.Value >= 2)
-                .OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal)
-                .Take(MaximumSuffixes).Select(pair => pair.Key)
-                .Concat(additionalFrequencies.Where(pair => pair.Value >= 2)
-                    .OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal)
-                    .Take(MaximumSuffixes).Select(pair => pair.Key))
-                .Distinct(StringComparer.Ordinal)
-                .OrderByDescending(suffix => frequencies.GetValueOrDefault(suffix) + additionalFrequencies.GetValueOrDefault(suffix))
-                .ThenBy(suffix => suffix, StringComparer.Ordinal).ToArray();
+                .Concat(additionalFrequencies.Where(pair => pair.Value >= 2))
+                .GroupBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(g => new KeyValuePair<string, int>(g.Key, g.Sum(x => x.Value)))
+                .OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                .Take(MaximumSuffixes)
+                .Select(pair => pair.Key)
+                .ToArray();
 
             var allPrefixes = new HashSet<string>(StringComparer.Ordinal);
             foreach (var family in _paths.Values)
@@ -77,8 +77,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 family.Sort(StringComparer.Ordinal);
                 foreach (string path in family)
                 {
-                    int end = path.Length;
                     int dirLen = path.LastIndexOf('/');
+                    string filename = path[(dirLen + 1)..];
+                    if (filename.StartsWith("2x_") || filename.StartsWith("4x_")) continue;
+
+                    int end = path.Length;
                     for (int count = 0; count < 4; count++)
                     {
                         int separator = path.LastIndexOf('_', end - 1);
