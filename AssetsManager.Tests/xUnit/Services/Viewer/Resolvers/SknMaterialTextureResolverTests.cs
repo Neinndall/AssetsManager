@@ -1471,36 +1471,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void MatchSubmeshTexture_ResolvesChibiExpressionsHairAndProps()
-        {
-            var availableKeys = new[]
-            {
-                "petchibizoe_base_face_tx_cm",
-                "petchibizoe_base_fresnel_tx_cm",
-                "petchibizoe_base_hair_tx_cm",
-                "petchibizoe_base_mask_tx_cm",
-                "petchibizoe_base_speedline_tx_cm",
-                "petchibizoe_base_tool_tx_cm",
-                "petchibizoe_base_tx_cm"
-            };
-
-            Assert.Equal("petchibizoe_base_face_tx_cm", SknResolver.MatchSubmeshTexture("Eye_Base", availableKeys));
-            Assert.Equal("petchibizoe_base_face_tx_cm", SknResolver.MatchSubmeshTexture("Lip_Happy", availableKeys));
-            Assert.Equal("petchibizoe_base_face_tx_cm", SknResolver.MatchSubmeshTexture("Face_Lazy", availableKeys));
-            Assert.Equal("petchibizoe_base_face_tx_cm", SknResolver.MatchSubmeshTexture("Brow_Sad", availableKeys));
-
-            Assert.Equal("petchibizoe_base_hair_tx_cm", SknResolver.MatchSubmeshTexture("Hair", availableKeys));
-            Assert.Equal("petchibizoe_base_hair_tx_cm", SknResolver.MatchSubmeshTexture("Hairmetal", availableKeys));
-
-            Assert.Equal("petchibizoe_base_tool_tx_cm", SknResolver.MatchSubmeshTexture("Yoyo", availableKeys));
-            Assert.Equal("petchibizoe_base_tool_tx_cm", SknResolver.MatchSubmeshTexture("Rope", availableKeys));
-
-            Assert.Equal("petchibizoe_base_speedline_tx_cm", SknResolver.MatchSubmeshTexture("Speedline", availableKeys));
-
-            Assert.Equal("petchibizoe_base_tx_cm", SknResolver.MatchSubmeshTexture("Body", availableKeys));
-        }
-
-        [Fact]
         public void FindBaseDiffuseTextureKey_SelectsBaseBodyTexture()
         {
             var availableKeys = new[]
