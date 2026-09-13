@@ -17,9 +17,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
     internal sealed partial class GameHashGuesser
     {
         private const int MaxCustomBuildListWords = 20_000;
-        private const int MaxCustomBinWords = 15_000;
-        private const int MaxCustomDataBinWords = 15_000;
-        private const int MaxCustomSwordlistWords = 15_000;
 
         internal int SubstituteBasenameWords(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
         {
@@ -33,103 +30,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 cancellationToken,
                 candidateBudget,
                 "GAME basename word substitution");
-        }
-
-        internal int SubstituteBinBasenameWords(
-            HashGuessEngine engine,
-            CancellationToken cancellationToken,
-            Action<int> progress = null)
-        {
-            IReadOnlyList<string> binPaths = GetCustomBinPaths(dataOnly: false);
-            IReadOnlyList<string> binWordlist = GetCustomUnifiedBinWords();
-
-            return _SubstituteBasenameWords(
-                engine,
-                binPaths,
-                binWordlist,
-                oldWordCount: 1,
-                newWordCount: 1,
-                cancellationToken,
-                candidateBudget: int.MaxValue,
-                source: "GAME Custom: BIN basename wordlist",
-                progress: progress);
-        }
-
-        internal int SubstituteDataBinBasenameWords(
-            HashGuessEngine engine,
-            CancellationToken cancellationToken,
-            Action<int> progress = null,
-            bool excludeCompletedBinVocabulary = false)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            IReadOnlyList<string> dataPaths = GetCustomBinPaths(dataOnly: true);
-            IEnumerable<string> dataWordlist = GetCustomBinWords(dataOnly: true).Take(MaxCustomDataBinWords);
-            if (excludeCompletedBinVocabulary)
-            {
-                // The full BIN pass includes every data template, but its word limit can exclude data-specific vocabulary.
-                var completedWords = GetCustomBinWords(dataOnly: false).Take(MaxCustomBinWords).ToHashSet(StringComparer.Ordinal);
-                dataWordlist = dataWordlist.Where(word => !completedWords.Contains(word));
-            }
-            string[] remainingWords = dataWordlist.ToArray();
-            if (remainingWords.Length == 0) return 0;
-
-            return _SubstituteBasenameWords(
-                engine,
-                dataPaths,
-                remainingWords,
-                oldWordCount: 1,
-                newWordCount: 1,
-                cancellationToken,
-                candidateBudget: int.MaxValue,
-                source: "GAME Custom: data BIN basename wordlist",
-                progress: progress);
-        }
-
-        private IReadOnlyList<string> GetCustomBinPaths(bool dataOnly) =>
-            Corpus.GetOrCreate(dataOnly ? "custom-data-bin-paths" : "custom-bin-paths",
-                paths => paths.Where(path => path.EndsWith(".bin", StringComparison.Ordinal) &&
-                    (!dataOnly || path.StartsWith("data/", StringComparison.Ordinal))).ToList());
-
-        private IReadOnlyList<string> GetCustomBinWords(bool dataOnly) =>
-            Corpus.GetOrCreate(dataOnly ? "custom-data-bin-wordlist" : "custom-bin-wordlist",
-                _ => HashGuessEngine.BuildWordlist(GetCustomBinPaths(dataOnly).Select(GetBasename)));
-
-        private IReadOnlyList<string> GetCustomUnifiedBinWords() =>
-            Corpus.GetOrCreate("custom-unified-bin-wordlist", _ =>
-            {
-                IReadOnlyList<string> globalWords = GetCustomBinWords(dataOnly: false);
-                IReadOnlyList<string> dataWords = GetCustomBinWords(dataOnly: true);
-                return globalWords.Take(MaxCustomBinWords)
-                    .Concat(dataWords.Take(MaxCustomDataBinWords))
-                    .Distinct(StringComparer.Ordinal)
-                    .ToList();
-            });
-
-        internal int SubstituteSwordlistBasenameWords(
-            HashGuessEngine engine,
-            CancellationToken cancellationToken,
-            Action<int> progress = null,
-            bool excludeCompletedBinPaths = false)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            string[] words = BuildSwordlist().Take(MaxCustomSwordlistWords).ToArray();
-            // BIN paths can only be skipped when the completed pass also covered every selected word.
-            if (excludeCompletedBinPaths)
-                excludeCompletedBinPaths = GetCustomUnifiedBinWords().ToHashSet(StringComparer.Ordinal).IsSupersetOf(words);
-            IReadOnlyList<string> paths = excludeCompletedBinPaths
-                ? Corpus.GetOrCreate("custom-focused-swordlist-paths-nobin",
-                    values => values.Where(path => !path.EndsWith(".bin", StringComparison.Ordinal)).ToList())
-                : KnownPaths;
-            return _SubstituteBasenameWords(
-                engine,
-                paths,
-                words,
-                oldWordCount: 1,
-                newWordCount: 1,
-                cancellationToken,
-                candidateBudget: int.MaxValue,
-                source: "GAME Custom: SwordList basename substitution",
-                progress: progress);
         }
 
         internal int SubstituteWordlistBasenameWords(
@@ -160,46 +60,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (engine.RemainingUnknownCount == 0) return checkedCandidates;
 
             bool ShouldRun(string subId) => selectedSubMethods == null || selectedSubMethods.Contains(subId);
-
-            if (ShouldRun("game-custom-bin"))
-            {
-                progress?.Report(engine.CreateProgress("GAME Custom: BIN basename wordlist", checkedCandidates));
-                int progressOffset = checkedCandidates;
-                checkedCandidates += SubstituteBinBasenameWords(
-                    engine,
-                    cancellationToken,
-                    count => progress?.Report(engine.CreateProgress(
-                        "GAME Custom: BIN basename wordlist", progressOffset + count)));
-                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
-            }
-
-            else if (ShouldRun("game-custom-databin"))
-            {
-                progress?.Report(engine.CreateProgress(
-                    "GAME Custom: data BIN basename wordlist", checkedCandidates));
-                int progressOffset = checkedCandidates;
-                checkedCandidates += SubstituteDataBinBasenameWords(
-                    engine,
-                    cancellationToken,
-                    count => progress?.Report(engine.CreateProgress(
-                        "GAME Custom: data BIN basename wordlist", progressOffset + count)),
-                    excludeCompletedBinVocabulary: ShouldRun("game-custom-bin"));
-                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
-            }
-
-            if (ShouldRun("game-custom-swordlist"))
-            {
-                progress?.Report(engine.CreateProgress(
-                    "GAME Custom: SwordList basename substitution", checkedCandidates));
-                int progressOffset = checkedCandidates;
-                checkedCandidates += SubstituteSwordlistBasenameWords(
-                    engine,
-                    cancellationToken,
-                    count => progress?.Report(engine.CreateProgress(
-                        "GAME Custom: SwordList basename substitution", progressOffset + count)),
-                    excludeCompletedBinPaths: ShouldRun("game-custom-bin"));
-                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
-            }
 
             if (ShouldRun("game-custom-shaders"))
             {

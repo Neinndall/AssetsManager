@@ -226,34 +226,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
 
         private static void CompareBins(HashFile hashFile, HashSet<ulong> unknown)
         {
-            string[] allPaths = hashFile.LoadPaths().Where(path => path.EndsWith(".bin", StringComparison.Ordinal)).ToArray();
-            string[] dataPaths = allPaths.Where(path => path.StartsWith("data/", StringComparison.Ordinal)).ToArray();
-            var allWords = HashGuessEngine.BuildWordlist(allPaths.Select(Path.GetFileName)).Take(20_000).ToHashSet(StringComparer.Ordinal);
-            var dataWords = HashGuessEngine.BuildWordlist(dataPaths.Select(Path.GetFileName)).Take(20_000).ToHashSet(StringComparer.Ordinal);
-            var allFormats = HashGuesser.BuildBasenameWordFormats(allPaths, 1, 1).ToHashSet();
-            var dataFormats = HashGuesser.BuildBasenameWordFormats(dataPaths, 1, 1).ToHashSet();
-            Console.WriteLine($"BIN paths={allPaths.Length}, selected words={allWords.Count}, templates={allFormats.Count}; combinations={(long)allWords.Count * allFormats.Count:N0}");
-            Console.WriteLine($"Data BIN paths={dataPaths.Length}, selected words={dataWords.Count}, templates={dataFormats.Count}; combinations={(long)dataWords.Count * dataFormats.Count:N0}");
-            Console.WriteLine($"Data templates absent from BIN={dataFormats.Count(format => !allFormats.Contains(format))}; Data words absent from BIN={dataWords.Count(word => !allWords.Contains(word))}");
-            Console.WriteLine("Data-only selected words: " + string.Join(", ", dataWords.Except(allWords).Take(30)));
-            foreach (bool dataOnly in new[] { false, true })
-            {
-                string name = dataOnly ? "Data BIN" : "BIN";
-                var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
-                    match => Console.WriteLine($"MATCH {name}: {match.Hash:x16} {match.Path}"));
-                var guesser = new GameHashGuesser(hashFile);
-                using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                var timer = Stopwatch.StartNew();
-                bool completed = true;
-                try
-                {
-                    if (dataOnly) guesser.SubstituteDataBinBasenameWords(engine, cancellation.Token);
-                    else guesser.SubstituteBinBasenameWords(engine, cancellation.Token);
-                }
-                catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { completed = false; }
-                Console.WriteLine($"{name}: {engine.CheckedCandidates:N0} candidates, {engine.Matches.Count} matches, {timer.Elapsed.TotalSeconds:F1}s; {(completed ? "complete" : "time-limited, NOT exhaustive")}");
-            }
-            Console.WriteLine("Nothing persisted. Template-word combinations are not unique candidate counts.");
+            Console.WriteLine("CompareBins: Obsolete - SubstituteBinBasenameWords has been removed.");
         }
 
         private static void CompareTextures(HashFile hashFile, HashSet<ulong> unknown)
@@ -287,34 +260,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
 
         private static void CompareSwordlist(HashFile hashFile, HashSet<ulong> unknown)
         {
-            Console.WriteLine($"Swordlist comparison: {unknown.Count} real unknowns; measuring coverage, overlap, and computational cost.");
-            var guesser = new GameHashGuesser(hashFile);
-            var knownPaths = hashFile.LoadPaths().ToList();
-            var swordlist = guesser.BuildSwordlist();
-            var binPaths = knownPaths.Where(p => p.EndsWith(".bin", StringComparison.Ordinal)).ToList();
-            var nonBinPaths = knownPaths.Where(p => !p.EndsWith(".bin", StringComparison.Ordinal)).ToList();
-
-            Console.WriteLine($"Corpus total paths: {knownPaths.Count:N0} (BIN: {binPaths.Count:N0}, non-BIN: {nonBinPaths.Count:N0})");
-            Console.WriteLine($"Swordlist vocabulary: {swordlist.Count:N0} words extracted from .bin basenames.");
-
-            foreach (bool excludeBin in new[] { false, true })
-            {
-                string label = excludeBin ? "Swordlist (non-BIN cross-domain, coordinated)" : "Swordlist (standalone full corpus)";
-                var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
-                    match => Console.WriteLine($"MATCH {label}: {match.Hash:x16} {match.Path}"));
-                using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                var timer = Stopwatch.StartNew();
-                long allocated = GC.GetAllocatedBytesForCurrentThread();
-                bool complete = true;
-                try
-                {
-                    guesser.SubstituteSwordlistBasenameWords(engine, cancellation.Token, excludeCompletedBinPaths: excludeBin);
-                }
-                catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { complete = false; }
-                long bytes = GC.GetAllocatedBytesForCurrentThread() - allocated;
-                Console.WriteLine($"{label}: {engine.CheckedCandidates:N0} candidates, {engine.Matches.Count} matches, {timer.Elapsed.TotalSeconds:F1}s, {bytes / 1_000_000:N0} MB allocated; {(complete ? "complete" : "time-limited, NOT exhaustive")}");
-            }
-            Console.WriteLine("Nothing persisted. A time-limited run does not establish exhaustive coverage.");
+            Console.WriteLine("CompareSwordlist: Obsolete - SubstituteSwordlistBasenameWords has been removed.");
         }
 
         private static void VerifyPatterns(string root, IReadOnlyDictionary<ulong, string> known,

@@ -2638,86 +2638,6 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
-        public void GameCustomBinWordlistAttackUsesBinPathsAndBasenames()
-        {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/ahri/ahri.bin",
-                "assets/characters/lux/lux.bin",
-                "assets/characters/ahri/ahri.dds"
-            }));
-            const string expected = "assets/characters/ahri/lux.bin";
-            var engine = CreateEngine(HashGuessDomain.Game, expected);
-
-            int checkedCandidates = game.SubstituteBinBasenameWords(engine, CancellationToken.None);
-
-            AssertResolved(engine, expected);
-            Assert.True(checkedCandidates > 0);
-        }
-
-        [Fact]
-        public void GameCustomDataBinWordlistAttackUsesOnlyDataBinPaths()
-        {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "data/characters/ahri/ahri.bin",
-                "data/characters/lux/lux.bin",
-                "assets/characters/ahri/ahri.bin",
-                "data/characters/ahri/ahri.dds"
-            }));
-            const string expected = "data/characters/ahri/lux.bin";
-            var engine = CreateEngine(HashGuessDomain.Game, expected);
-
-            int checkedCandidates = game.SubstituteDataBinBasenameWords(engine, CancellationToken.None);
-
-            AssertResolved(engine, expected);
-            Assert.True(checkedCandidates > 0);
-        }
-
-        [Fact]
-        public void GameCustomDataBinSkipsOnlyCompletedGeneralVocabulary()
-        {
-            var paths = Enumerable.Range(0, 20000).Select(i => $"assets/words/w{i:D5}.bin")
-                .Concat(new[] { "data/example/alpha.bin", "data/teacher/zzzz.bin" });
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, paths));
-            const string expected = "data/example/zzzz.bin";
-            var engine = CreateEngine(HashGuessDomain.Game, expected);
-
-            game.SubstituteDataBinBasenameWords(engine, CancellationToken.None,
-                excludeCompletedBinVocabulary: true);
-
-            AssertResolved(engine, expected);
-        }
-
-        [Fact]
-        public void GameCustomBinAndDataBinDoNotRepeatCoveredCandidates()
-        {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "data/example/alpha.bin", "data/teacher/beta.bin", "assets/example/gamma.bin"
-            }));
-            var first = CreateEngine(HashGuessDomain.Game, "unreachable.bin");
-            var second = CreateEngine(HashGuessDomain.Game, "unreachable.bin");
-            int generalOnly = game.RunCustomAttacks(first, null, CancellationToken.None,
-                new HashSet<string> { "game-custom-bin" });
-            int combined = game.RunCustomAttacks(second, null, CancellationToken.None,
-                new HashSet<string> { "game-custom-bin", "game-custom-databin" });
-
-            Assert.True(generalOnly > 0);
-            Assert.Equal(generalOnly, combined);
-        }
-
-        [Fact]
-        public void GameCustomDataBinHonorsCancellationBeforeSkippingVocabulary()
-        {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game,
-                new[] { "data/example/alpha.bin" }));
-            var engine = CreateEngine(HashGuessDomain.Game, "unreachable.bin");
-            Assert.Throws<OperationCanceledException>(() => game.SubstituteDataBinBasenameWords(
-                engine, new CancellationToken(true), excludeCompletedBinVocabulary: true));
-        }
-
-        [Fact]
         public void GameWordAdditionUsesDeterministicGameLists()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
@@ -2729,24 +2649,6 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             var engine = CreateEngine(HashGuessDomain.Game, expected);
 
             int checkedCandidates = game.AddBasenameWord(engine, CancellationToken.None);
-
-            AssertResolved(engine, expected);
-            Assert.True(checkedCandidates > 0);
-        }
-
-        [Fact]
-        public void GameCustomSwordlistSubstitutionUsesTheSpecializedBinWords()
-        {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/ahri/ahri.dds",
-                "assets/characters/lux/lux.bin",
-                "assets/characters/zed/zed.bin"
-            }));
-            const string expected = "assets/characters/ahri/lux.dds";
-            var engine = CreateEngine(HashGuessDomain.Game, expected);
-
-            int checkedCandidates = game.SubstituteSwordlistBasenameWords(engine, CancellationToken.None);
 
             AssertResolved(engine, expected);
             Assert.True(checkedCandidates > 0);
