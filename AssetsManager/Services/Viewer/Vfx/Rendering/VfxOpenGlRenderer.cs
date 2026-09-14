@@ -15,7 +15,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     public sealed class VfxOpenGlRenderer : IDisposable
     {
         private GL _gl = null!;
-        private uint _program, _vao, _quadVbo, _instVbo;
+        private uint _program, _vao, _quadVbo, _instVbo, _trailVao, _trailVbo;
+        private readonly VfxTrailGeometry _trailGeometry = new();
         private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uHasTex, _uEmitterUvOffset;
         private int _uTexMult, _uHasTexMult, _uTexDivMult, _uTexSizeMult, _uUvScrollRateMult, _uFlipUMult, _uFlipVMult;
         private int _uUvTransformCenter, _uUvTransformCenterMult, _uAddressMode, _uAddressModeMult, _uClampUvMult;
@@ -169,6 +170,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
 
             _textures = new VfxTextureResourceCache(gl);
+            _trailVao = gl.GenVertexArray();
+            _trailVbo = gl.GenBuffer();
+            gl.BindVertexArray(_trailVao);
+            gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
+            int[] sizes = { 2, 3, 2, 4, 2, 4, 3, 2, 2, 1, 1, 4, 2, 2, 1, 2 };
+            int[] offsets = { 0, 2, 5, 7, 11, 13, 17, 21, 23, 25, 26, 27, 31, 33, 35, 36 };
+            for (uint attribute = 0; attribute < sizes.Length; attribute++)
+            {
+                gl.EnableVertexAttribArray(attribute);
+                gl.VertexAttribPointer(attribute, sizes[attribute], VertexAttribPointerType.Float, false,
+                    VfxTrailGeometry.VertexStride * sizeof(float), new IntPtr(offsets[attribute] * sizeof(float)));
+            }
+            gl.BindVertexArray(0);
             _capture = new VfxSceneCapture(gl);
             _meshResources = new VfxMeshResourceCache(gl);
             _ready = true;
@@ -180,7 +194,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         public void CaptureScene(uint width, uint height, bool captureColor, bool captureDepth)
             => _capture.Capture(width, height, captureColor, captureDepth);
 
-        public void Render(IReadOnlyList<VfxRenderQueueEntry> renderQueue, Matrix4x4 viewProj, Matrix4x4 view)
+        public void Render(IReadOnlyList<VfxRenderQueueEntry> renderQueue, Matrix4x4 viewProj, Matrix4x4 view,
+            IReadOnlyList<VfxRenderQueueEntry> stencilQueue = null)
         {
             if (!_ready || renderQueue is null || renderQueue.Count == 0) return;
 
@@ -230,7 +245,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
             try
             {
-            IReadOnlyDictionary<uint, byte> stencilReferences = BuildStencilReferenceMap(renderQueue);
+            IReadOnlyDictionary<uint, byte> stencilReferences = BuildStencilReferenceMap(stencilQueue ?? renderQueue);
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
             _gl.Uniform3(_uCamRight, camRight.X, camRight.Y, camRight.Z);
@@ -244,7 +259,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_uErosionTex, 4);
             _gl.Uniform1(_uReflectionTex, 5);
             _gl.Uniform1(_uSceneDepthTex, 6);
-            _gl.Uniform2(_uViewportSize, _capture.Width, _capture.Height);
+            _gl.Uniform2(_uViewportSize, (float)_capture.Width, (float)_capture.Height);
 
             _gl.BindVertexArray(_vao);
             _gl.ActiveTexture(TextureUnit.Texture0);
@@ -271,7 +286,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
                 int floats = es.InstanceCount * Stride;
                 ReadOnlySpan<float> instancesSpan;
-                if (!VfxBlendModes.IsAdditive(es.Def.BlendMode) && es.InstanceCount > 1)
+                if (es.Def.PrimitiveKind is not (VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail) &&
+                    VfxBlendModes.ShouldSortBackToFront(es.Def.BlendMode) && es.InstanceCount > 1)
                 {
                     EnsureInstanceSortCapacity(es.InstanceCount, floats);
                     VfxRenderQueue.CopyInstancesBackToFront(
@@ -291,8 +307,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
-                    ApplyEmitterDepthState(es.Def, isDistortion: false);
-                    ApplyBlendMode(es.Def.BlendMode, distortion: false);
+                    ApplyEmitterDepthState(es.Def, isDistortion: es.Def.Distortion != null);
+                    ApplyBlendMode(es.Def.BlendMode, distortion: es.Def.Distortion != null);
                     RenderMeshEmitter(es, viewProj, instancesSpan);
                     continue;
                 }
@@ -310,8 +326,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, instancesSpan);
                 }
-
-                ApplyBlendMode(es.Def.BlendMode, isDistortion);
 
                 _gl.Uniform2(_uTexDiv, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
                 _gl.Uniform2(_uTexSize, Math.Max(1f, es.TextureWidth), Math.Max(1f, es.TextureHeight));
@@ -465,16 +479,30 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.BindTexture(TextureTarget.Texture2D, es.ColorGradientTexture != 0
                     ? es.ColorGradientTexture
                     : _textures.FallbackTransparentTexture);
-                ApplyAddressMode(1);
+                ApplyAddressMode(2);
                 ApplyTextureSampling(false);
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + 8));
                 _gl.BindTexture(TextureTarget.Texture2D, es.PaletteTexture != 0
                     ? es.PaletteTexture
                     : _textures.FallbackTransparentTexture);
-                ApplyAddressMode(1);
+                ApplyAddressMode(2);
                 ApplyTextureSampling(false);
                 _gl.ActiveTexture(TextureUnit.Texture0);
-                _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)es.InstanceCount);
+                if (es.Def.PrimitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail)
+                {
+                    int vertices = _trailGeometry.Build(es, Vector3.Normalize(Vector3.Cross(camRight, camUp)));
+                    if (vertices > 0)
+                    {
+                        _gl.BindVertexArray(_trailVao);
+                        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
+                        _gl.BufferData(BufferTargetARB.ArrayBuffer,
+                            new ReadOnlySpan<float>(_trailGeometry.Vertices, 0, vertices * VfxTrailGeometry.VertexStride), BufferUsageARB.DynamicDraw);
+                        _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
+                        _gl.BindVertexArray(_vao);
+                    }
+                }
+                else
+                    _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)es.InstanceCount);
             }
 
             }
@@ -536,8 +564,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             var wrap = addressMode switch
             {
-                1 => TextureWrapMode.ClampToEdge,
-                2 => TextureWrapMode.MirroredRepeat,
+                1 => TextureWrapMode.MirroredRepeat,
+                2 => TextureWrapMode.ClampToEdge,
                 3 => TextureWrapMode.ClampToBorder,
                 _ => TextureWrapMode.Repeat,
             };
@@ -552,6 +580,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 definition.BlendMode,
                 renderState.AlphaReference);
             _gl.DepthMask(writeDepth);
+            if (VfxBlendModes.ShouldTestDepth(definition.MiscRenderFlags)) _gl.Enable(EnableCap.DepthTest);
+            else _gl.Disable(EnableCap.DepthTest);
 
             if (definition.DepthBiasFactors is { } bias)
             {
@@ -588,8 +618,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private void ApplyBlendMode(int blendMode, bool distortion = false)
         {
-            VfxBlendModeDescriptor descriptor = VfxBlendModes.GetDescriptor(
-                distortion ? VfxAuthoredDefaults.BlendMode : blendMode);
+            VfxBlendModeDescriptor descriptor = VfxBlendModes.GetDrawDescriptor(blendMode, distortion);
             if (descriptor.Kind == VfxBlendModeKind.Opaque)
             {
                 _gl.Disable(EnableCap.Blend);
@@ -704,6 +733,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             if (!_ready) return;
             _textures.Dispose();
+            _gl.DeleteBuffer(_trailVbo);
+            _gl.DeleteVertexArray(_trailVao);
             _gl.DeleteBuffer(_quadVbo);
             _gl.DeleteBuffer(_instVbo);
             _gl.DeleteVertexArray(_vao);
@@ -717,6 +748,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private uint _meshProgram;
         private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
+        private int _muIsDistortion, _muDistortionTex, _muSceneTex, _muDistortionStrength;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
         private int _muTextureMultFrame, _muEmitterUvOffsetMult, _muFlipUMult, _muFlipVMult;
@@ -742,6 +774,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muTex = _gl.GetUniformLocation(_meshProgram, "uTex");
                 _muHasTex = _gl.GetUniformLocation(_meshProgram, "uHasTex");
                 _muEmitterUvOffset = _gl.GetUniformLocation(_meshProgram, "uEmitterUvOffset");
+                _muIsDistortion = _gl.GetUniformLocation(_meshProgram, "uIsDistortion");
+                _muDistortionTex = _gl.GetUniformLocation(_meshProgram, "uDistortionTex");
+                _muSceneTex = _gl.GetUniformLocation(_meshProgram, "uSceneTex");
+                _muDistortionStrength = _gl.GetUniformLocation(_meshProgram, "uDistortionStrength");
                 _muTexDiv = _gl.GetUniformLocation(_meshProgram, "uTexDiv");
                 _muTexSize = _gl.GetUniformLocation(_meshProgram, "uTexSize");
                 _muFrame = _gl.GetUniformLocation(_meshProgram, "uFrame");
@@ -832,6 +868,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             ReadOnlySpan<float> instances)
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
+            bool isDistortion = es.Def.Distortion != null;
+            if (isDistortion && (es.DistortionTexture == 0 || _capture.ColorTexture == 0)) return;
             if (es.MeshAnimation != null)
                 UpdateEmitterMeshPositions(es, es.MeshAnimation.Evaluate(es.EmitterAge));
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
@@ -895,6 +933,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 meshModulationFactor.Y,
                 meshModulationFactor.Z,
                 meshModulationFactor.W);
+            _gl.Uniform1(_muIsDistortion, isDistortion ? 1 : 0);
+            _gl.Uniform1(_muDistortionStrength, es.Def.Distortion?.Strength ?? 0f);
+            _gl.Uniform1(_muDistortionTex, 2);
+            _gl.Uniform1(_muSceneTex, 3);
+            if (isDistortion)
+            {
+                _gl.ActiveTexture(TextureUnit.Texture2);
+                _gl.BindTexture(TextureTarget.Texture2D, es.DistortionTexture);
+                ApplyAddressMode(renderState.TextureAddressMode);
+                _gl.ActiveTexture(TextureUnit.Texture3);
+                _gl.BindTexture(TextureTarget.Texture2D, _capture.ColorTexture);
+                _gl.ActiveTexture(TextureUnit.Texture0);
+            }
             _gl.Uniform1(_muHasColor, es.ColorGradientTexture != 0 ? 1 : 0);
             _gl.Uniform1(
                 _muColorRenderFlags,
@@ -961,7 +1012,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 soft?.DeltaIn ?? 0f,
                 soft?.BeginOut ?? 0f,
                 soft?.DeltaOut ?? 0f);
-            _gl.Uniform2(_muViewportSize, _capture.Width, _capture.Height);
+            _gl.Uniform2(_muViewportSize, (float)_capture.Width, (float)_capture.Height);
             if (_capture.DepthTexture != 0)
             {
                 _gl.ActiveTexture(TextureUnit.Texture6);
@@ -972,19 +1023,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.BindTexture(TextureTarget.Texture2D, es.ColorGradientTexture != 0
                 ? es.ColorGradientTexture
                 : _textures.FallbackTransparentTexture);
-            ApplyAddressMode(1);
+            ApplyAddressMode(2);
             ApplyTextureSampling(false);
             _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + 8));
             _gl.BindTexture(TextureTarget.Texture2D, es.PaletteTexture != 0
                 ? es.PaletteTexture
                 : _textures.FallbackTransparentTexture);
-            ApplyAddressMode(1);
+            ApplyAddressMode(2);
             ApplyTextureSampling(false);
             _gl.ActiveTexture(TextureUnit.Texture0);
             // VFX meshes can be thin or single-sided. Attached owner submeshes also use
             // authored particle material state here, so culling would hide valid surfaces.
             _gl.Disable(EnableCap.CullFace);
-            ApplyBlendMode(es.Def.BlendMode);
+            ApplyBlendMode(es.Def.BlendMode, isDistortion);
 
             Vector2 emitterUvOffset = es.Def.EmitterUvScrollRate * es.EmitterAge;
             _gl.Uniform2(_muEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);

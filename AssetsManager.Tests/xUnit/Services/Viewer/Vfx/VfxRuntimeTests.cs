@@ -256,7 +256,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void CameraTrailUsesBirthScaleForWidthAndSegmentDistanceForLength()
+        public void CameraTrailPreservesPointWidthsAndBuildsConnectedGeometry()
         {
             var emitter = CreateEmitter(new Vector3(2f, 9f, 1f), VfxEmitterRenderState.Default) with
             {
@@ -278,11 +278,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             simulator.Update(0.1f);
 
             var state = Assert.Single(simulator.Emitters);
-            Assert.Equal(1, state.InstanceCount);
-            Assert.Equal(2f, state.Instances[3], 3);
-            Assert.Equal(1f, state.Instances[4], 3);
-            Assert.Equal(-0.5f, state.Instances[21], 3);
-            Assert.Equal(-0.25f, state.Instances[19], 3);
+            Assert.Equal(2, state.InstanceCount);
+            var geometry = new VfxTrailGeometry();
+            Assert.Equal(6, geometry.Build(state, Vector3.UnitZ));
+            int stride = VfxTrailGeometry.VertexStride;
+            // Birth X is a half-width, and both triangles reuse exactly the same joint.
+            Assert.Equal(4f, MathF.Abs(geometry.Vertices[3] - geometry.Vertices[4 * stride + 3]), 3);
+            Assert.Equal(geometry.Vertices[0], geometry.Vertices[3 * stride]);
+            Assert.Equal(0.5f, MathF.Abs(geometry.Vertices[0] - geometry.Vertices[2 * stride]), 3);
         }
 
         [Fact]
@@ -301,7 +304,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             simulator.Update(0.1f);
 
-            Assert.Equal(0, Assert.Single(simulator.Emitters).InstanceCount);
+            Assert.Equal(0, new VfxTrailGeometry().Build(Assert.Single(simulator.Emitters), Vector3.UnitZ));
         }
 
         [Fact]
@@ -346,7 +349,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             VfxPlaybackRuntime.EmitterState state = Assert.Single(simulator.Emitters);
             Assert.Equal(2, state.Particles.Count);
-            Assert.Equal(0, state.InstanceCount);
+            Assert.Equal(0, new VfxTrailGeometry().Build(state, Vector3.UnitZ));
         }
 
         [Fact]
@@ -370,7 +373,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             simulator.Update(0.1f);
             simulator.Update(0.1f);
 
-            Assert.Equal(0, Assert.Single(simulator.Emitters).InstanceCount);
+            Assert.Equal(0, new VfxTrailGeometry().Build(Assert.Single(simulator.Emitters), Vector3.UnitZ));
         }
 
         [Fact]
@@ -1274,6 +1277,75 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(7, (int)VfxPrimitiveKind.Ray);
             Assert.Equal(8, (int)VfxPrimitiveKind.Beam);
             Assert.Equal(9, (int)VfxPrimitiveKind.PlanarProjection);
+        }
+
+        [Fact]
+        public void TrailCutoffLimitsAccumulatedLengthAndPreservesJointAttributes()
+        {
+            var state = TrailState(cutoff: 2.5f);
+            var geometry = new VfxTrailGeometry();
+            Assert.Equal(12, geometry.Build(state, Vector3.UnitZ));
+            int stride = VfxTrailGeometry.VertexStride;
+            // The shared corner is byte-identical across adjacent segments, including colour and UV.
+            for (int component = 0; component < stride; component++)
+                Assert.Equal(geometry.Vertices[component], geometry.Vertices[8 * stride + component]);
+            Assert.NotEqual(geometry.Vertices[7], geometry.Vertices[2 * stride + 7]);
+        }
+
+        [Fact]
+        public void WakeUvStaysAttachedToBirthDistanceWhenOlderParticlesDisappear()
+        {
+            var state = TrailState(cutoff: 0f);
+            var geometry = new VfxTrailGeometry();
+            Assert.Equal(18, geometry.Build(state, Vector3.UnitZ));
+            float newestU = geometry.Vertices[2 * VfxTrailGeometry.VertexStride];
+            state.Particles.RemoveAt(0);
+            Array.Copy(state.Instances, VfxPlaybackRuntime.InstanceStride, state.Instances, 0, 3 * VfxPlaybackRuntime.InstanceStride);
+            state.InstanceCount--;
+            Assert.Equal(12, geometry.Build(state, Vector3.UnitZ));
+            Assert.Equal(newestU, geometry.Vertices[2 * VfxTrailGeometry.VertexStride]);
+        }
+
+        [Fact]
+        public void ArbitraryTrailUsesParticleSideInsteadOfFacingCamera()
+        {
+            var original = TrailState(0f);
+            var state = new VfxPlaybackRuntime.EmitterState
+            {
+                Def = original.Def with { PrimitiveKind = VfxPrimitiveKind.ArbitraryTrail },
+                Instances = original.Instances, InstanceCount = original.InstanceCount,
+                PlacementRight = Vector3.UnitX, PlacementUp = Vector3.UnitY, PlacementForward = Vector3.UnitZ
+            };
+            state.Particles.AddRange(original.Particles);
+            var geometry = new VfxTrailGeometry();
+            Assert.Equal(18, geometry.Build(state, Vector3.UnitZ));
+            float[] first = (float[])geometry.Vertices.Clone();
+            geometry.Build(state, Vector3.UnitY);
+            Assert.Equal(first, geometry.Vertices);
+        }
+
+        private static VfxPlaybackRuntime.EmitterState TrailState(float cutoff)
+        {
+            var state = new VfxPlaybackRuntime.EmitterState
+            {
+                Def = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+                {
+                    IsMeshPrimitive = false, PrimitiveKind = VfxPrimitiveKind.CameraTrail,
+                    Trail = new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 1, 30, cutoff)
+                },
+                Instances = new float[4 * VfxPlaybackRuntime.InstanceStride], InstanceCount = 4,
+                PlacementRight = Vector3.UnitX, PlacementUp = Vector3.UnitY, PlacementForward = Vector3.UnitZ
+            };
+            for (int i = 0; i < 4; i++)
+            {
+                int at = i * VfxPlaybackRuntime.InstanceStride;
+                state.Instances[at] = i;
+                state.Instances[at + 3] = i + 1;
+                state.Instances[at + 5] = i * 0.25f;
+                state.Instances[at + 21] = state.Instances[at + 22] = 1f;
+                state.Particles.Add(new VfxPlaybackRuntime.Particle { TrailTiling = Vector3.One, TrailBirthDistance = i });
+            }
+            return state;
         }
 
         private static VfxEmitterDefinition CreateEmitter(Vector3 birthScale, VfxEmitterRenderState renderState)

@@ -36,7 +36,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxBlendModeDescriptor alpha = VfxBlendModes.GetDescriptor(1);
             Assert.Equal(VfxBlendFactor.SourceAlpha, alpha.SourceRgb);
             Assert.Equal(VfxBlendFactor.OneMinusSourceAlpha, alpha.DestinationRgb);
-            Assert.Equal(VfxBlendFactor.One, alpha.SourceAlpha);
+            Assert.Equal(VfxBlendFactor.SourceAlpha, alpha.SourceAlpha);
             Assert.Equal(VfxBlendFactor.OneMinusSourceAlpha, alpha.DestinationAlpha);
 
             VfxBlendModeDescriptor subtract = VfxBlendModes.GetDescriptor(2);
@@ -78,7 +78,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [InlineData(3, 5, true)]
         [InlineData(4, 0, false)]
         [InlineData(4, 255, true)]
-        [InlineData(8, 5, false)]
+        [InlineData(6, 5, true)]
+        [InlineData(7, 5, true)]
+        [InlineData(8, 5, true)]
         [InlineData(255, 5, true)]
         public void EvaluatesAlphaTestAgainstAlphaReference(int rawMode, int alphaReference, bool expected)
         {
@@ -97,14 +99,57 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Theory]
-        [InlineData(1, 1, false, true)]
-        [InlineData(3, 1, false, true)]
-        [InlineData(0, 1, false, false)]
-        [InlineData(1, 0, false, false)]
-        [InlineData(1, 1, true, false)]
-        public void ResolvesMiscRenderFaceInversion(int flags, int rawMode, bool disableCull, bool expected)
+        [InlineData(0, true)]
+        [InlineData(1, false)]
+        [InlineData(2, true)]
+        [InlineData(5, false)]
+        public void AuthoredDisableZBufferControlsDepthTest(int flags, bool expected)
+            => Assert.Equal(expected, VfxBlendModes.ShouldTestDepth(flags));
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(2)]
+        [InlineData(3)]
+        [InlineData(8)]
+        public void DistortionAlwaysCompositesWithAlphaBlend(int authoredMode)
         {
-            Assert.Equal(expected, VfxBlendModes.ShouldFlipFaces(flags, rawMode, disableCull));
+            var draw = VfxBlendModes.GetDrawDescriptor(authoredMode, true);
+            Assert.Equal(1, draw.RawMode);
+            Assert.Equal(VfxBlendFactor.SourceAlpha, draw.SourceRgb);
+            Assert.Equal(VfxBlendFactor.OneMinusSourceAlpha, draw.DestinationRgb);
+            Assert.False(draw.AllowsDepthWrite);
+        }
+
+        [Theory]
+        [InlineData(0, 0.7f, 0.85f)]
+        [InlineData(1, 0.425f, 0.5125f)]
+        [InlineData(2, 0.4f, 0.45f)]
+        [InlineData(3, 0.2f, 0.25f)]
+        [InlineData(4, 0.55f, 0.6625f)]
+        [InlineData(5, 0.575f, 0.7f)]
+        [InlineData(6, 0.2f, 0.25f)]
+        [InlineData(7, 0.5f, 0.6f)]
+        [InlineData(8, 0.38f, 0.85f)]
+        public void AuthoredBlendEquationsMatchLtkColorAndCoverage(int mode, float red, float alpha)
+        {
+            var d = VfxBlendModes.GetDescriptor(mode);
+            Assert.Equal(red, Compose(0.2f, 0.5f, d.SourceRgb, d.DestinationRgb, d.RgbEquation), 5);
+            Assert.Equal(alpha, Compose(0.25f, 0.6f, d.SourceAlpha, d.DestinationAlpha, d.AlphaEquation), 5);
+        }
+
+        private static float Compose(float source, float destination, VfxBlendFactor sf, VfxBlendFactor df, VfxBlendEquationKind equation)
+        {
+            if (equation == VfxBlendEquationKind.Min) return System.MathF.Min(source, destination);
+            if (equation == VfxBlendEquationKind.Max) return System.MathF.Max(source, destination);
+            float Factor(VfxBlendFactor f) => f switch
+            {
+                VfxBlendFactor.Zero => 0f, VfxBlendFactor.One => 1f,
+                VfxBlendFactor.SourceAlpha => 0.25f, VfxBlendFactor.OneMinusSourceAlpha => 0.75f,
+                VfxBlendFactor.DestinationAlpha => 0.6f, VfxBlendFactor.OneMinusDestinationAlpha => 0.4f,
+                VfxBlendFactor.OneMinusSourceColor => 1f - source,
+                _ => throw new System.InvalidOperationException()
+            };
+            return source * Factor(sf) + destination * Factor(df);
         }
 
         [Fact]

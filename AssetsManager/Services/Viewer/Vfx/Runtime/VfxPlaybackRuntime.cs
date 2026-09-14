@@ -55,6 +55,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             /// erosion state, and the authored palette selector.</summary>
             public float[] Instances = System.Array.Empty<float>();
             public int InstanceCount;
+            internal float TrailDistance;
 
             // Mesh-primitive emitters (0 = billboard)
             public uint MeshVao, MeshVbo, MeshEbo;
@@ -69,6 +70,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public Vector3 Pos, Vel, BirthAccel, BirthOrbitalVelocity, BirthDrag;
             public Quaternion SpawnRotation;
             public float Age, Life;
+            public Vector3 TrailTiling;
+            public float TrailBirthDistance;
             public Vector3 BirthSize;
             public Vector4 BirthColor;
             public Vector3 BirthRotation;
@@ -127,7 +130,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     }
                 }
                 Matrix4x4 placement = EmitterTransform(es.Def, worldTransform);
-                es.BasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(EmitterTime(es)), placement);
+                Vector3 nextBasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(EmitterTime(es)), placement);
+                es.TrailDistance += Vector3.Distance(es.BasePos, nextBasePos);
+                es.BasePos = nextBasePos;
                 es.PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, placement), Vector3.UnitX);
                 es.PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, placement), Vector3.UnitY);
                 es.PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, placement), Vector3.UnitZ);
@@ -239,6 +244,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             foreach (var s in _emitters)
             {
                 s.Particles.Clear();
+                s.TrailDistance = 0f;
+                s.BasePos = Vector3.Transform(s.Def.EmitterPosition.Sample(0f), EmitterTransform(s.Def, _worldTransform));
                 s.EmittedThrough = s.Def.TimeBeforeFirstEmission;
                 s.Age = 0;
                 s.BurstDone = false;
@@ -343,6 +350,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             Matrix4x4 placement = EmitterTransform(d, _worldTransform);
             s.BasePos = Vector3.Transform(d.EmitterPosition.Sample(emitterT), placement);
             Vector3 emitterDelta = s.BasePos - previousBasePos;
+            s.TrailDistance += emitterDelta.Length();
             if (d.IsEmitterSpace && s.Particles.Count > 0)
             {
                 if (emitterDelta.LengthSquared() > 1e-12f)
@@ -493,6 +501,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 SpawnRotation = Quaternion.CreateFromRotationMatrix(spawnRotation),
                 Age = 0f,
                 Life = life,
+                TrailTiling = d.Trail?.BirthTilingSize.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero,
+                TrailBirthDistance = s.TrailDistance,
                 BirthSize = finalBirthSize,
                 BirthColor = VfxColorSemantics.ResolveBirth(d.BirthColor, emitterT, _rng, sharedRoll),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
@@ -524,26 +534,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             var d = s.Def;
             int n = s.Particles.Count;
-            bool isTrail = d.PrimitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail;
-            int instanceCount = isTrail ? Math.Max(0, n - 1) : n;
+            int instanceCount = n;
             if (s.Instances.Length < instanceCount * InstanceStride)
                 s.Instances = new float[Math.Max(instanceCount * InstanceStride, InstanceStride * 4)];
             var buf = s.Instances;
             int k = 0;
-            float trailDistance = 0f;
-            for (int i = isTrail ? 1 : 0; i < n; i++)
+            for (int i = 0; i < n; i++)
             {
                 var p = s.Particles[i];
-                Vector3 trailSegment = Vector3.Zero;
-                float trailLength = 0f;
-                if (isTrail)
-                {
-                    trailSegment = p.Pos - s.Particles[i - 1].Pos;
-                    trailLength = trailSegment.Length();
-                    float cutoff = d.Trail?.Cutoff ?? 0f;
-                    if (trailLength <= 1e-5f || (cutoff > 0f && trailLength > cutoff))
-                        continue;
-                }
                 float t = float.IsPositiveInfinity(p.Life) ? 0f : Math.Clamp(p.Age / p.Life, 0f, 1f);
                 var scaleMul = d.ScaleOverLife?.Sample(t) ?? Vector3.One;
                 if (d.IsUniformScale)
@@ -572,13 +570,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     direction += Vector3.Cross(p.BirthOrbitalVelocity, p.Pos - s.BasePos);
                 if (d.PrimitiveKind == VfxPrimitiveKind.Ray && d.RayTargetOffset is { } targetOffset)
                     direction = Vector3.TransformNormal(targetOffset, _worldTransform);
-                if (isTrail)
-                {
-                    Vector3 start = s.Particles[i - 1].Pos;
-                    position = (start + p.Pos) * 0.5f;
-                    direction = trailSegment;
-                    sizeY = trailLength;
-                }
+
                 if (d.UseTextureAspect) sizeX *= s.SpriteAspect;
                 buf[k++] = position.X; buf[k++] = position.Y; buf[k++] = position.Z;
                 buf[k++] = sizeX;
@@ -619,13 +611,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector2 uvOffset = p.BirthUvOffset + p.BirthUvScrollRate * p.Age
                     + SampleIntegrated(d.ParticleUvScrollRate, t, p.Age, p.Life);
                 Vector2 uvScale = d.UvScale?.Sample(t) ?? Vector2.One;
-                Vector3 trailTiling = d.Trail?.BirthTilingSize.Sample(t) ?? Vector3.Zero;
-                if (isTrail && trailTiling.X > 1e-5f)
-                {
-                    float longitudinalScale = -trailLength / trailTiling.X;
-                    uvScale.X *= longitudinalScale;
-                    uvOffset.X += trailDistance / trailTiling.X - 0.5f - 0.5f * uvScale.X;
-                }
                 float uvRotationDegrees = (d.UvRotation?.Sample(t) ?? 0f) + p.BirthUvRotateRate * p.Age
                     + SampleIntegrated(d.ParticleUvRotateRate, t, p.Age, p.Life);
                 float uvRotation = uvRotationDegrees * (MathF.PI / 180f);
@@ -640,11 +625,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     + p.TextureMultBirthUvScrollRate * p.Age
                     + SampleIntegrated(d.TextureMultParticleUvScroll, t, p.Age, p.Life);
                 Vector2 textureMultUvScale = d.TextureMultUvScale?.Sample(t) ?? Vector2.One;
-                if (isTrail && trailTiling.X > 1e-5f)
-                {
-                    textureMultUvScale.X *= -trailLength / trailTiling.X;
-                    textureMultUvOffset.X += trailDistance / trailTiling.X - 0.5f - 0.5f * textureMultUvScale.X;
-                }
+
                 float textureMultUvRotationDegrees = (d.TextureMultUvRotation?.Sample(t) ?? 0f)
                     + p.TextureMultBirthUvRotateRate * p.Age
                     + SampleIntegrated(d.TextureMultParticleUvRotate, t, p.Age, p.Life);
@@ -653,7 +634,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 buf[k++] = textureMultUvRotationDegrees * (MathF.PI / 180f);
                 buf[k++] = p.TextureMultFrame;
                 buf[k++] = d.PaletteDefinition?.PaletteSelector.Sample(t).X ?? 0f;
-                if (isTrail) trailDistance += trailLength;
             }
             s.InstanceCount = k / InstanceStride;
         }

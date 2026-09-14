@@ -39,22 +39,13 @@ uniform int uClampUvMult;
 uniform vec2 uBirthUvOffset;
 uniform vec2 uUvScale;
 uniform float uUvRotation;
-out vec2 vUv;
-out vec2 vUvMult;
+out vec2 vCell;
+out vec2 vCellMult;
 out vec2 vLocalUv;
 out vec2 vLocalUvMult;
 out vec4 vMeshColor;
 out vec3 vColorDynamics;
-vec2 addressUv(vec2 uv, int mode){
-    if (mode == 1 || mode == 3) return clamp(uv, vec2(0.0), vec2(1.0));
-    if (mode == 2) {
-        vec2 mirrored = mod(uv, vec2(2.0));
-        return vec2(1.0) - abs(mirrored - vec2(1.0));
-    }
-    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
-        return fract(uv);
-    return clamp(uv, vec2(0.0), vec2(1.0));
-}
+
 void main(){
     vec3 scaled = aPos * uScale;
     float sz = sin(uRotation.z); float cz = cos(uRotation.z);
@@ -74,17 +65,12 @@ void main(){
     if (uFlipU != 0) baseUv.x = 1.0 - baseUv.x;
     if (uFlipV != 0) baseUv.y = 1.0 - baseUv.y;
     vec2 mainScroll = uEmitterUvOffset;
-    if (uClampUv != 0) mainScroll = clamp(mainScroll, -baseUv, vec2(1.0) - baseUv);
     vLocalUv = baseUv + mainScroll;
-    baseUv = addressUv(vLocalUv, uAddressMode);
     vec2 mainDiv = max(uTexDiv, vec2(1.0));
     float mainCols = mainDiv.x;
     float frame = floor(uFrame + 0.0001);
     vec2 mainCell = vec2(mod(frame, mainCols), floor(frame / mainCols));
-    vec2 halfTexel = 0.5 / max(uTexSize, vec2(1.0));
-    vec2 cellMin = mainCell / mainDiv + halfTexel;
-    vec2 cellMax = (mainCell + vec2(1.0)) / mainDiv - halfTexel;
-    vUv = clamp((mainCell + baseUv) / mainDiv, cellMin, cellMax);
+    vCell = mainCell;
     vec2 multUv = aUv;
     vec2 centeredMultUv = (multUv - uUvTransformCenterMult) * uUvScaleMult;
     float multSin = sin(uUvRotationMult); float multCos = cos(uUvRotationMult);
@@ -94,17 +80,12 @@ void main(){
     if (uFlipUMult != 0) multUv.x = 1.0 - multUv.x;
     if (uFlipVMult != 0) multUv.y = 1.0 - multUv.y;
     vec2 multScroll = uEmitterUvOffsetMult;
-    if (uClampUvMult != 0) multScroll = clamp(multScroll, -multUv, vec2(1.0) - multUv);
     vLocalUvMult = multUv + multScroll;
-    multUv = addressUv(vLocalUvMult, uAddressModeMult);
     vec2 multDiv = max(uTexDivMult, vec2(1.0));
     float multCols = multDiv.x;
     float multFrame = floor(uTextureMultFrame + 0.0001);
     vec2 multCell = vec2(mod(multFrame, multCols), floor(multFrame / multCols));
-    vec2 multHalfTexel = 0.5 / max(uTexSizeMult, vec2(1.0));
-    vec2 multCellMin = multCell / multDiv + multHalfTexel;
-    vec2 multCellMax = (multCell + vec2(1.0)) / multDiv - multHalfTexel;
-    vUvMult = clamp((multCell + multUv) / multDiv, multCellMin, multCellMax);
+    vCellMult = multCell;
     vMeshColor = aColor;
     vColorDynamics = vec3(1.0, 0.0, 0.0);
 }";
@@ -152,8 +133,8 @@ uniform vec2 uUvTransformCenterMult;
 uniform vec3 uPlacementRight;
 uniform vec3 uPlacementUp;
 uniform vec3 uPlacementForward;
-out vec2 vUv;
-out vec2 vUvMult;
+out vec2 vCell;
+out vec2 vCellMult;
 out vec4 vColor;
 out float vErosionDrive;
 out vec4 vErosionMixer;
@@ -169,16 +150,7 @@ vec3 rotateEuler(vec3 p, vec3 r){
     float sy = sin(r.y); float cy = cos(r.y);
     return vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
 }
-vec2 addressUv(vec2 uv, int mode){
-    if (mode == 1 || mode == 3) return clamp(uv, vec2(0.0), vec2(1.0));
-    if (mode == 2) {
-        vec2 mirrored = mod(uv, vec2(2.0));
-        return vec2(1.0) - abs(mirrored - vec2(1.0));
-    }
-    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
-        return fract(uv);
-    return clamp(uv, vec2(0.0), vec2(1.0));
-}
+
 void main(){
     bool rayPrimitive = uPrimitiveKind == 7 || uPrimitiveKind == 8;
     bool trailPrimitive = uPrimitiveKind == 5 || uPrimitiveKind == 6;
@@ -234,7 +206,7 @@ void main(){
         }
         world = aCenter + up * (alongRay * rayLength) + right * (rc.x * aSize.x);
     } else if (trailPrimitive) {
-        world = aCenter + up * (rc.y * aSize.y) + right * (rc.x * aSize.x);
+        world = aCenter;
     } else if (uIsGroundLayer != 0 || uPrimitiveKind == 9) {
         vec3 groundForward = uArbitraryQuad != 0 ? (uPlacementRight * localUp.x + uPlacementUp * localUp.y + uPlacementForward * localUp.z) : vec3(0.0, 0.0, 1.0);
         vec3 groundRight = uArbitraryQuad != 0 ? placedRight : vec3(1.0, 0.0, 0.0);
@@ -255,7 +227,7 @@ void main(){
     float fx = mod(frame, cols);
     float fy = floor(frame / cols);
     vec2 localUv = trailPrimitive
-        ? vec2(1.0 - cell.y, cell.x)
+        ? aCorner
         : vec2(cell.x, 1.0 - cell.y);
     vec2 centeredUv = (localUv - uUvTransformCenter) * aUvScale;
     float uvSin = sin(aUvRotation); float uvCos = cos(aUvRotation);
@@ -265,17 +237,10 @@ void main(){
     if (uFlipU != 0) localUv.x = 1.0 - localUv.x;
     if (uFlipV != 0) localUv.y = 1.0 - localUv.y;
     vec2 scroll = uEmitterUvOffset;
-    if (uClampUv != 0) scroll = clamp(scroll, -localUv, vec2(1.0) - localUv);
     vLocalUv = localUv + scroll;
-    localUv = addressUv(vLocalUv, uAddressMode);
-    vec2 halfTexel = 0.5 / max(uTexSize, vec2(1.0));
-    vec2 atlasUv = (vec2(fx, fy) + localUv) / vec2(cols, rows);
-    vec2 cellMin = vec2(fx, fy) / vec2(cols, rows) + halfTexel;
-    vec2 cellMax = vec2(fx + 1.0, fy + 1.0) / vec2(cols, rows) - halfTexel;
-    atlasUv = clamp(atlasUv, cellMin, cellMax);
-    vUv = atlasUv;
+    vCell = vec2(fx, fy);
     vec2 multUv = trailPrimitive
-        ? vec2(1.0 - cell.y, cell.x)
+        ? aCorner
         : vec2(cell.x, 1.0 - cell.y);
     vec2 centeredMultUv = (multUv - uUvTransformCenterMult) * aUvScaleMult;
     float multSin = sin(aUvRotationMult); float multCos = cos(aUvRotationMult);
@@ -285,17 +250,12 @@ void main(){
     if (uFlipUMult != 0) multUv.x = 1.0 - multUv.x;
     if (uFlipVMult != 0) multUv.y = 1.0 - multUv.y;
     vec2 multScroll = uUvScrollRateMult;
-    if (uClampUvMult != 0) multScroll = clamp(multScroll, -multUv, vec2(1.0) - multUv);
     vLocalUvMult = multUv + multScroll;
-    multUv = addressUv(vLocalUvMult, uAddressModeMult);
     vec2 multDiv = max(uTexDivMult, vec2(1.0));
     float multCols = multDiv.x;
     float multFrame = floor(aTextureMultFramePalette.x + 0.0001);
     vec2 multCell = vec2(mod(multFrame, multCols), floor(multFrame / multCols));
-    vec2 multHalfTexel = 0.5 / max(uTexSizeMult, vec2(1.0));
-    vec2 multCellMin = multCell / multDiv + multHalfTexel;
-    vec2 multCellMax = (multCell + vec2(1.0)) / multDiv - multHalfTexel;
-    vUvMult = clamp((multCell + multUv) / multDiv, multCellMin, multCellMax);
+    vCellMult = multCell;
     vColor = aColor;
     vPaletteSelector = aTextureMultFramePalette.y;
     vErosionDrive = aErosionDrive;
@@ -303,13 +263,35 @@ void main(){
     vColorDynamics = vec3(aAgeVelX.x, length(aAgeVelX.yzw), aRotFrame.y);
 }";
 
-        internal const string MeshFragment = @"
-in vec2 vUv;
-in vec2 vUvMult;
+
+        private const string TextureSampling = @"
+uniform int uClampUv;
+uniform int uClampUvMult;
+uniform vec2 uTexDiv;
+uniform vec2 uTexSize;
+uniform vec2 uTexDivMult;
+uniform vec2 uTexSizeMult;
+vec2 atlasUv(vec2 local, vec2 cell, vec2 divisions, vec2 size, int mode){
+    vec2 held = mode >= 2 ? clamp(local, vec2(0.0), vec2(1.0))
+        : mode == 1 ? vec2(1.0) - abs(mod(local, vec2(2.0)) - vec2(1.0))
+        : fract(local);
+    vec2 div = max(divisions, vec2(1.0));
+    vec2 inset = min(0.5 / max(size, vec2(1.0)), 0.5 / div);
+    return clamp((cell + held) / div, cell / div + inset, (cell + vec2(1.0)) / div - inset);
+}
+";
+
+        internal const string MeshFragment = TextureSampling + @"
+in vec2 vCell;
+in vec2 vCellMult;
 in vec2 vLocalUv;
 in vec2 vLocalUvMult;
 in vec4 vMeshColor;
 in vec3 vColorDynamics;
+uniform int uIsDistortion;
+uniform sampler2D uDistortionTex;
+uniform sampler2D uSceneTex;
+uniform float uDistortionStrength;
 uniform sampler2D uTex;
 uniform int uHasTex;
 uniform sampler2D uTexMult;
@@ -385,6 +367,8 @@ vec4 applyParticleColor(vec4 texel){
     return texel;
 }
 void main(){
+    vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uClampUv != 0 ? 2 : uAddressMode);
+    vec2 vUvMult = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uClampUvMult != 0 ? 2 : uAddressModeMult);
     vec4 texel = (uHasTex != 0)
         ? texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode)
         : vec4(0.0);
@@ -439,16 +423,26 @@ void main(){
     }
     vec4 authoredColor = uColor * vMeshColor * uModulationFactor;
     float effectiveAlpha = texel.a * authoredColor.a;
-    if (effectiveAlpha <= 0.0001 || (uAlphaTest != 0 && effectiveAlpha <= uAlphaCutoff)) discard;
+    if (uAlphaTest != 0 && effectiveAlpha < uAlphaCutoff) discard;
+    if (uIsDistortion != 0) {
+        vec4 normalSample = texture(uDistortionTex, vUv);
+        float mask = normalSample.a * effectiveAlpha;
+        vec2 normalOffset = normalSample.rg * 2.0 - vec2(1.0);
+        vec2 sceneUv = gl_FragCoord.xy / max(uViewportSize, vec2(1.0));
+        sceneUv = clamp(sceneUv + normalOffset * uDistortionStrength * mask * vec2(uViewportSize.y / max(uViewportSize.x, 1.0), 1.0), vec2(0.0), vec2(1.0));
+        vec4 refracted = texture(uSceneTex, sceneUv);
+        fragColor = vec4(refracted.rgb, mask);
+        return;
+    }
     fragColor = texel * authoredColor;
     if (uIsAdditive == 1 || uIsMultiply != 0)
         fragColor.rgb *= authoredColor.a;
     fragColor.rgb *= uEmissiveStrength;
 }";
 
-        internal const string ParticleFragment = @"
-in vec2 vUv;
-in vec2 vUvMult;
+        internal const string ParticleFragment = TextureSampling + @"
+in vec2 vCell;
+in vec2 vCellMult;
 in vec4 vColor;
 in float vErosionDrive;
 in vec4 vErosionMixer;
@@ -531,6 +525,8 @@ vec4 applyParticleColor(vec4 tex){
     return tex;
 }
 void main(){
+    vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uClampUv != 0 ? 2 : uAddressMode);
+    vec2 vUvMult = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uClampUvMult != 0 ? 2 : uAddressModeMult);
     vec4 t = (uHasTex != 0)
         ? texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode)
         : vec4(0.0);
@@ -585,13 +581,13 @@ void main(){
     }
     vec4 authoredColor = vColor * uModulationFactor;
     float effectiveAlpha = t.a * authoredColor.a;
-    if (effectiveAlpha <= 0.0001 || (uAlphaTest != 0 && effectiveAlpha <= uAlphaCutoff)) discard;
+    if (uAlphaTest != 0 && effectiveAlpha < uAlphaCutoff) discard;
     if (uIsDistortion != 0) {
         vec4 normalSample = texture(uDistortionTex, vUv);
         float mask = normalSample.a * effectiveAlpha;
         vec2 normalOffset = normalSample.rg * 2.0 - vec2(1.0);
         vec2 sceneUv = gl_FragCoord.xy / max(uViewportSize, vec2(1.0));
-        sceneUv = clamp(sceneUv + normalOffset * uDistortionStrength * mask, vec2(0.0), vec2(1.0));
+        sceneUv = clamp(sceneUv + normalOffset * uDistortionStrength * mask * vec2(uViewportSize.y / max(uViewportSize.x, 1.0), 1.0), vec2(0.0), vec2(1.0));
         vec4 refracted = texture(uSceneTex, sceneUv);
         fragColor = vec4(refracted.rgb, mask);
         return;

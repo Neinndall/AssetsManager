@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Viewer / Browse VFX systems and animations in a skin and BIN tree with on-demand loading.
   - Viewer / Resolved companion and chibi model textures and materials by resolving companion BIN paths, matching WadChunkLink texture hashes, and applying semantic submesh token matching.
   - Explorer / EXTRACT and SAVE now preserve the WAD container folder name and relative virtual path hierarchy for selected subtrees and files, maintaining root archive alignment across assets and data.
   - Hash Guessing Lab / Basename prefix guessing now runs with far lower memory use and faster bounded scans while preserving candidate coverage.
@@ -373,6 +374,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Corrected VFX texture wrapping, trails, blending and distortion to improve effect previews.
   - Diff Viewer / Fixed severe 10-minute freeze and horizontal line blowout when viewing minified JavaScript files (e.g. rcp-fe-lol-navigation.js). Replaced quadratic Jsbeautifier and broken fallback with a high-performance linear JavaScript tokenizer/beautifier featuring regex-literal aware string tokenization, bounded line wrapping, and clamped indentation.
   - Hash Guessing Lab / Wired task cancellation into the centralized progress manager, displaying 'Cancelling Task...' with the orange status glow before returning cleanly to Ready.
   - Status Bar / Synchronized live percentage calculations across all progress views using uniform rounding.

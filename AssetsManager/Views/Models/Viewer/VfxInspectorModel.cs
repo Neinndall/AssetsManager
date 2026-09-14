@@ -444,6 +444,22 @@ namespace AssetsManager.Views.Models.Viewer
     /// </summary>
     public class VfxSkinItem : INotifyPropertyChanged
     {
+        public VfxSkinItem()
+        {
+            Sections.Add(new VfxBrowserSection(this, "Systems", false));
+            Sections.Add(new VfxBrowserSection(this, "Animations", true));
+        }
+
+        public ObservableCollection<VfxBrowserSection> Sections { get; } = new();
+        public string Title => SkinIndex == int.MaxValue
+            ? System.IO.Path.GetFileName(BinPath) : $"Skin {SkinIndex}";
+        private bool _isExpanded;
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set { if (_isExpanded == value) return; _isExpanded = value; OnPropertyChanged(); }
+        }
+
         private string _displayName;
         private string _binPath;
         private int _skinIndex;

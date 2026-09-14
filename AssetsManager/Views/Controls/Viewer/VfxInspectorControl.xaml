@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:models="clr-namespace:AssetsManager.Views.Models.Viewer"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:glWpfControl="clr-namespace:OpenTK.Wpf;assembly=GLWpfControl"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
@@ -11,111 +12,43 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
-        <!-- Segmented Tab Style (using HoverColor from Colors.xaml) -->
-        <Style x:Key="LtkSegmentedTabStyle" TargetType="RadioButton">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="TabBorder" Background="Transparent" CornerRadius="6" Padding="8,5" Margin="1">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                <Setter Property="Foreground" Value="#FFFFFF"/>
-                                <Setter Property="FontWeight" Value="SemiBold"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <Style x:Key="VfxBrowserItemStyle" TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
+            <Setter Property="IsExpanded" Value="False"/>
+            <EventSetter Event="Expanded" Handler="BrowserItem_Expanded"/>
         </Style>
-
-        <!-- List Item Container: Animations (HoverColor on hover & selection) -->
-        <Style x:Key="LtkAnimationItemStyle" TargetType="ListViewItem">
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Margin" Value="0,0,0,3"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListViewItem">
-                        <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="6" Padding="10,8">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <materialIcons:MaterialIcon x:Name="ItemIcon" Grid.Column="0" Kind="MotionPlayOutline" Width="17" Height="17" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock x:Name="ItemTitle" Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding Duration, StringFormat='{}{0:F2}s'}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
-                                </StackPanel>
-                                <Border Grid.Column="2" VerticalAlignment="Center" Margin="6,0,0,0" Padding="6,2" CornerRadius="4"
-                                        Background="#26F59E0B"
-                                        Visibility="{Binding HasVfx, Converter={StaticResource BoolToVis}}">
-                                    <TextBlock Text="{Binding VfxSummary}" FontSize="9" FontWeight="Bold" Foreground="#FFFBBF24"/>
-                                </Border>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <Style x:Key="VfxBrowserBranchStyle" TargetType="TreeViewItem" BasedOn="{StaticResource VfxBrowserItemStyle}">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
         </Style>
-
-        <!-- List Item Container: VFX Systems (HoverColor on hover & selection) -->
-        <Style x:Key="LtkSystemItemStyle" TargetType="ListViewItem">
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Margin" Value="0,0,0,3"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListViewItem">
-                        <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="6" Padding="10,8">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <materialIcons:MaterialIcon x:Name="ItemIcon" Grid.Column="0" Kind="ApplicationCogOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock x:Name="ItemTitle" Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                        <TextBlock Text="{Binding EmitterCount, StringFormat='{}Emitters: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0"/>
-                                        <TextBlock Text="{Binding TextureCount, StringFormat='{}Tex: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <HierarchicalDataTemplate DataType="{x:Type models:VfxSkinItem}" ItemsSource="{Binding Sections}" ItemContainerStyle="{StaticResource VfxBrowserBranchStyle}">
+            <Grid Margin="2,5" ToolTip="{Binding DisplayName}">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <materialIcons:MaterialIcon Kind="PaletteOutline" Width="18" Height="18" Foreground="{StaticResource AccentOrange}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" MaxWidth="260">
+                    <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="{Binding DisplayName}" FontSize="10" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Grid>
+        </HierarchicalDataTemplate>
+        <HierarchicalDataTemplate DataType="{x:Type models:VfxBrowserSection}" ItemsSource="{Binding Items}" ItemContainerStyle="{StaticResource VfxBrowserItemStyle}">
+            <StackPanel Orientation="Horizontal" Margin="2,5">
+                <materialIcons:MaterialIcon Kind="FolderOutline" Width="15" Height="15" Foreground="{StaticResource AccentBrush}" Margin="0,0,7,0"/>
+                <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding Items.Count, StringFormat='{}{0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="8,1,0,0"/>
+            </StackPanel>
+        </HierarchicalDataTemplate>
+        <DataTemplate DataType="{x:Type models:VfxSystemDiagnosticItem}">
+            <StackPanel Orientation="Horizontal" Margin="2,4" ToolTip="{Binding Name}">
+                <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="14" Height="14" Foreground="#10B981" Margin="0,0,7,0"/>
+                <TextBlock Text="{Binding Name}" FontSize="11" MaxWidth="235" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type models:VfxAnimationItem}">
+            <StackPanel Orientation="Horizontal" Margin="2,4" ToolTip="{Binding VfxSummary}">
+                <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,7,0"/>
+                <TextBlock Text="{Binding DisplayName}" FontSize="11" MaxWidth="195" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding Duration, StringFormat='{}{0:F2}s'}" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="8,1,0,0"/>
+            </StackPanel>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid Background="{StaticResource SidebarBackground}">
@@ -124,7 +57,7 @@
             <RowDefinition Height="*"/>    <!-- 1: Main Management Area -->
         </Grid.RowDefinitions>
 
-        <!-- 0. TOP TOOLBAR: Unified Capsule with ROOT & BIN selection -->
+        <!-- 0. TOP TOOLBAR: Extracted asset folder -->
         <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="20,9">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -134,11 +67,11 @@
 
                 <!-- Left: Title & Subtitle -->
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="VFX MANAGEMENT" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
-                    <TextBlock Text="Champion VFX &amp; Emitter Control Deck" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
+                    <TextBlock Text="VFX STUDIO" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
+                    <TextBlock Text="Browse skins, effects and animations" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
                 </StackPanel>
 
-                <!-- Right: Path & BIN Selection Tools Capsule (wraps instead of clipping on narrow widths) -->
+                <!-- Right: Asset folder selection -->
                 <Border Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
                         Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,4"
                         BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
@@ -146,7 +79,7 @@
                         <!-- ROOT Path Group -->
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="FolderSearchOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="ROOT Path:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Folder:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <TextBox x:Name="RootPathTextBox" Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}" Height="32" Padding="10,0" VerticalContentAlignment="Center" FontSize="11" Width="220"
                                      VerticalAlignment="Center" KeyDown="RootPathTextBox_KeyDown"/>
@@ -156,26 +89,6 @@
                             </Button>
                         </StackPanel>
 
-                        <!-- SEPARATOR -->
-                        <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center" Opacity="0.8"/>
-
-                        <!-- Skin Selector Group -->
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="PaletteOutline" Width="18" Height="18" Foreground="{StaticResource AccentOrange}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="Skin:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <ComboBox x:Name="BinComboBox" ItemsSource="{Binding DetectedSkins}" SelectedItem="{Binding SelectedSkin, Mode=TwoWay}"
-                                      SelectionChanged="BinSelector_SelectionChanged" Style="{StaticResource ModernComboBox}"
-                                      Width="170" Height="32" FontSize="11" VerticalAlignment="Center">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" Margin="2,0">
-                                            <materialIcons:MaterialIcon Kind="Palette" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                        </StackPanel>
                     </WrapPanel>
                 </Border>
             </Grid>
@@ -199,59 +112,28 @@
                         <RowDefinition Height="*"/>    <!-- Systems ListView -->
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                        <!-- Mode Switch Capsule: ANIMATIONS vs SYSTEMS (.BIN) in LTK Slate Style -->
-                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="2" Margin="0,0,0,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                            <UniformGrid Columns="2" Height="30">
-                                <RadioButton Content="ANIMACIONES"
-                                             IsChecked="{Binding IsAnimationMode, Mode=TwoWay}"
-                                             Style="{StaticResource LtkSegmentedTabStyle}"
-                                             FontSize="10.5" FontWeight="Bold"/>
-                                <RadioButton Content="SISTEMAS (.BIN)"
-                                             IsChecked="{Binding IsRawSystemsMode, Mode=TwoWay}"
-                                             Style="{StaticResource LtkSegmentedTabStyle}"
-                                             FontSize="10.5" FontWeight="Bold"/>
-                            </UniformGrid>
-                        </Border>
-
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsAnimationMode, Converter={StaticResource BoolToVis}}">
-                            <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="18" Height="18" Foreground="#3B82F6" Margin="0,0,8,0"/>
-                            <TextBlock Text="CLIPS &amp; ANIMATIONS" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsRawSystemsMode, Converter={StaticResource BoolToVis}}">
-                            <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="18" Height="18" Foreground="#10B981" Margin="0,0,8,0"/>
-                            <TextBlock Text="VFX SYSTEMS (.BIN)" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                        </StackPanel>
-                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                    <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                        <DockPanel>
+                            <TextBlock Text="ASSETS" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="{Binding DetectedSkins.Count, StringFormat='{}{0} BINs'}" HorizontalAlignment="Right" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                        </DockPanel>
+                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}"/>
                     </StackPanel>
 
                     <!-- Search Filter (visible for both modes) -->
                     <TextBox Grid.Row="1"
                              Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource StandardSearchBoxStyle}"
-                             Tag="Search animations, clips or VFX..."
+                             Tag="Search effects or animations in this BIN..."
                              Height="34"
                              Margin="0,0,0,10"
                              TextChanged="SearchQuery_TextChanged"/>
 
-                    <!-- Content Lists Container -->
-                    <Grid Grid.Row="2">
-                        <!-- 1. ANIMATIONS LIST (Champion Viewport / Skin Viewport mode) -->
-                        <ListView ItemsSource="{Binding DetectedAnimations}"
-                                  SelectedItem="{Binding SelectedAnimation, Mode=TwoWay}"
-                                  ItemContainerStyle="{StaticResource LtkAnimationItemStyle}"
-                                  Visibility="{Binding IsAnimationMode, Converter={StaticResource BoolToVis}}"
-                                  Background="Transparent" BorderThickness="0"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
-
-                        <!-- 2. RAW SYSTEMS LIST (VFX Diagnostic Inspector mode) -->
-                        <ListView ItemsSource="{Binding Systems}"
-                                  SelectedItem="{Binding SelectedSystem, Mode=TwoWay}"
-                                  ItemContainerStyle="{StaticResource LtkSystemItemStyle}"
-                                  Visibility="{Binding IsRawSystemsMode, Converter={StaticResource BoolToVis}}"
-                                  Background="Transparent" BorderThickness="0"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
-                    </Grid>
+                    <TreeView x:Name="VfxBrowser" Grid.Row="2" ItemsSource="{Binding DetectedSkins}"
+                              Style="{StaticResource ModernTreeView}" ItemContainerStyle="{StaticResource VfxBrowserBranchStyle}"
+                              SelectedItemChanged="VfxBrowser_SelectedItemChanged" BorderThickness="0" Background="Transparent"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"/>
                 </Grid>
             </Border>
 

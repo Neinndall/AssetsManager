@@ -52,7 +52,7 @@ namespace AssetsManager.Views.Models.Viewer
             new(0, "Add", VfxBlendModeKind.Additive, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
 
             // 1: ALPHA -> SrcAlpha, OneMinusSrcAlpha, Add
-            new(1, "Alpha Blend", VfxBlendModeKind.Alpha, VfxBlendFactor.SourceAlpha, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendFactor.One, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+            new(1, "Alpha Blend", VfxBlendModeKind.Alpha, VfxBlendFactor.SourceAlpha, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendFactor.SourceAlpha, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
 
             // 2: SUBTRACT -> Zero, OneMinusSrcColor (Color), Zero, OneMinusSrcAlpha (Alpha) (Dest darken)
             new(2, "Subtract", VfxBlendModeKind.Multiply, VfxBlendFactor.Zero, VfxBlendFactor.OneMinusSourceColor, VfxBlendFactor.Zero, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: true),
@@ -61,19 +61,19 @@ namespace AssetsManager.Views.Models.Viewer
             new(3, "None (Opaque)", VfxBlendModeKind.Opaque, VfxBlendFactor.One, VfxBlendFactor.Zero, VfxBlendFactor.One, VfxBlendFactor.Zero, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: true, NeutralizeTransparentRgb: false),
 
             // 4: ALPHA_ADD -> SrcAlpha, One, Add (Alpha-modulated additive)
-            new(4, "Alpha Add", VfxBlendModeKind.Additive, VfxBlendFactor.SourceAlpha, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+            new(4, "Alpha Add", VfxBlendModeKind.Additive, VfxBlendFactor.SourceAlpha, VfxBlendFactor.One, VfxBlendFactor.SourceAlpha, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
 
             // 5: PREMULTIPLIED_ALPHA -> One, OneMinusSrcAlpha, Add
             new(5, "Premultiplied Alpha", VfxBlendModeKind.Alpha, VfxBlendFactor.One, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendFactor.One, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
 
             // 6: MIN -> One, One, Min
-            new(6, "Min", VfxBlendModeKind.Additive, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Min, VfxBlendEquationKind.Min, AllowsAlphaTest: false, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+            new(6, "Min", VfxBlendModeKind.Additive, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Min, VfxBlendEquationKind.Min, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
 
             // 7: MAX -> One, One, Max
-            new(7, "Max", VfxBlendModeKind.Additive, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Max, VfxBlendEquationKind.Max, AllowsAlphaTest: false, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+            new(7, "Max", VfxBlendModeKind.Additive, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Max, VfxBlendEquationKind.Max, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
 
             // 8: TARGET_ALPHA -> OneMinusDstAlpha, DstAlpha
-            new(8, "Target Alpha", VfxBlendModeKind.Alpha, VfxBlendFactor.OneMinusDestinationAlpha, VfxBlendFactor.DestinationAlpha, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: false, AllowsDepthWrite: false, NeutralizeTransparentRgb: false)
+            new(8, "Target Alpha", VfxBlendModeKind.Alpha, VfxBlendFactor.OneMinusDestinationAlpha, VfxBlendFactor.DestinationAlpha, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false)
         };
 
         private static readonly VfxBlendModeDescriptor SafeAlphaFallback = new(
@@ -95,6 +95,13 @@ namespace AssetsManager.Views.Models.Viewer
         public static VfxBlendModeDescriptor GetDescriptor(int rawMode)
             => IsKnown(rawMode) ? AuthoredModes[rawMode] : SafeAlphaFallback;
 
+        public static VfxBlendModeDescriptor GetDrawDescriptor(int rawMode, bool distortion)
+            => GetDescriptor(distortion ? 1 : rawMode);
+
+        public static bool ShouldTestDepth(int miscRenderFlags) => (miscRenderFlags & 1) == 0;
+
+        public static bool ShouldSortBackToFront(int rawMode) => rawMode is 1 or 2 or 5 or 8;
+
         public static bool IsAdditive(int rawMode) => GetDescriptor(rawMode).Kind == VfxBlendModeKind.Additive;
 
         public static bool IsMultiply(int rawMode) => GetDescriptor(rawMode).Kind == VfxBlendModeKind.Multiply;
@@ -105,13 +112,10 @@ namespace AssetsManager.Views.Models.Viewer
             => GetDescriptor(rawMode).AllowsAlphaTest && alphaReference > 0;
 
         public static bool ShouldWriteDepth(int rawMode, int alphaReference)
-            => GetDescriptor(rawMode).AllowsDepthWrite || (GetDescriptor(rawMode).AllowsAlphaTest && alphaReference > 0 && rawMode == 3);
+            => GetDescriptor(rawMode).AllowsDepthWrite;
 
         public static int ResolveColorRenderFlags(int rawFlags, bool hasParticleColorTexture)
             => hasParticleColorTexture ? rawFlags | 1 : rawFlags;
-
-        public static bool ShouldFlipFaces(int miscRenderFlags, int rawMode, bool disableBackfaceCull)
-            => (miscRenderFlags & 1) != 0 && !disableBackfaceCull && rawMode is 1 or 3;
 
         public static VfxBlendModeKind Resolve(int rawMode)
             => GetDescriptor(rawMode).Kind;

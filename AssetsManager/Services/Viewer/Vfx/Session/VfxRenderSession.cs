@@ -575,12 +575,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _renderer.CaptureScene(
                 _viewportWidth,
                 _viewportHeight,
-                emitters.Any(emitter => emitter.Def.Distortion != null),
+                false,
                 emitters.Any(emitter => VfxOpenGlRenderer.ShouldUseSoftParticles(emitter.Def, true)));
             IReadOnlyList<VfxRenderQueueEntry> renderQueue = VfxRenderQueue.Build(
                 _graphs.SelectMany(graph => graph.Runtimes).Select(runtime => runtime.Emitters),
                 view);
-            _renderer.Render(renderQueue, viewProjection, view);
+            _renderer.Render(renderQueue.Where(entry => entry.Emitter.Def.Distortion == null).ToArray(), viewProjection, view, renderQueue);
+            var distortionQueue = renderQueue.Where(entry => entry.Emitter.Def.Distortion != null).ToArray();
+            if (distortionQueue.Length > 0)
+            {
+                _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
+                _renderer.Render(distortionQueue, viewProjection, view, renderQueue);
+            }
         }
 
         private void UploadPendingResources()

@@ -89,9 +89,15 @@ namespace AssetsManager.Views.Controls.Viewer
             Unloaded += OnControlUnloaded;
         }
 
+        private VfxSkinItem _browserSkin;
+
         private void OnModelPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(VfxInspectorModel.SelectedSystem))
+            if (e.PropertyName == nameof(VfxInspectorModel.SelectedSkin))
+            {
+                BindBrowserSkin();
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedSystem))
             {
                 RequestSystemInspection(_model.SelectedSystem);
             }
@@ -610,11 +616,49 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void BinSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void BindBrowserSkin()
         {
-            if (_model.SelectedSkin != null)
+            if (_browserSkin != null)
             {
-                LoadBinFile(_model.SelectedSkin.BinPath);
+                _browserSkin.IsExpanded = false;
+                foreach (var section in _browserSkin.Sections)
+                    section.Items = new ListCollectionView(Array.Empty<object>());
+            }
+            _browserSkin = _model.SelectedSkin;
+            if (_browserSkin == null) return;
+            _browserSkin.Sections[0].Items = CollectionViewSource.GetDefaultView(_model.Systems);
+            _browserSkin.Sections[1].Items = CollectionViewSource.GetDefaultView(_model.DetectedAnimations);
+            _model.IsRawSystemsMode = true;
+            _browserSkin.IsExpanded = true;
+            LoadBinFile(_browserSkin.BinPath);
+        }
+
+        private void BrowserItem_Expanded(object sender, RoutedEventArgs e)
+        {
+            if (e.OriginalSource is TreeViewItem { DataContext: VfxSkinItem skin } &&
+                !ReferenceEquals(_model.SelectedSkin, skin))
+                _model.SelectedSkin = skin;
+        }
+
+        private void VfxBrowser_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            switch (e.NewValue)
+            {
+                case VfxSkinItem skin when !ReferenceEquals(_model.SelectedSkin, skin):
+                    _model.SelectedSkin = skin;
+                    break;
+                case VfxBrowserSection section:
+                    if (!ReferenceEquals(_model.SelectedSkin, section.Owner)) _model.SelectedSkin = section.Owner;
+                    _model.IsAnimationMode = section.IsAnimation;
+                    break;
+                case VfxSystemDiagnosticItem system:
+                    _model.IsRawSystemsMode = true;
+                    _model.SelectedSystem = system;
+                    break;
+                case VfxAnimationItem animation:
+                    _model.IsAnimationMode = true;
+                    _model.SelectedAnimation = animation;
+                    break;
             }
         }
 
@@ -697,6 +741,8 @@ namespace AssetsManager.Views.Controls.Viewer
             catch (Exception ex)
             {
                 _abilityCompositions = Array.Empty<VfxAbilityComposition>();
+                LogService?.LogError(ex, "Failed to load VFX BIN.");
+                _model.StatusText = "Unable to load this BIN.";
                 _model.LogMessages.Add($"[ERROR] Failed to load BIN: {ex.Message}");
             }
             finally
