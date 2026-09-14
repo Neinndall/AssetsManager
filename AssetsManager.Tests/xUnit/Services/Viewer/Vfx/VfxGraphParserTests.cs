@@ -136,7 +136,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(VfxAuthoredDefaults.ColorLookUpTypeX, parsed.ColorLookUpTypeX);
             Assert.Equal(0, parsed.ColorLookUpTypeY);
             Assert.False(parsed.TextureMultFlipV);
-            Assert.False(parsed.TextureMultRandomStartFrame);
             Assert.Equal(3, parsed.Importance);
             Assert.Equal(2, parsed.BlendMode);
             Assert.Equal(1, parsed.ColorRenderFlags);

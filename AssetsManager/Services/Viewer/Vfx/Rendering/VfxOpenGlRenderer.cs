@@ -818,7 +818,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _muIsDistortion, _muDistortionTex, _muSceneTex, _muDistortionStrength;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
-        private int _muTextureMultFrame, _muEmitterUvOffsetMult, _muFlipUMult, _muFlipVMult;
+        private int _muEmitterUvOffsetMult, _muFlipUMult, _muFlipVMult;
         private int _muAddressModeMult, _muClampUvMult, _muUvTransformCenterMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
         private int _muAlphaCutoff, _muAlphaTest, _muEmissiveStrength, _muIsMultiply, _muColorMap, _muHasColor, _muRampAtMult, _muUvMode, _muColorRenderFlags, _muIsAdditive, _muModulationFactor, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
@@ -859,7 +859,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muUvOffsetMult = _gl.GetUniformLocation(_meshProgram, "uUvOffsetMult");
                 _muUvScaleMult = _gl.GetUniformLocation(_meshProgram, "uUvScaleMult");
                 _muUvRotationMult = _gl.GetUniformLocation(_meshProgram, "uUvRotationMult");
-                _muTextureMultFrame = _gl.GetUniformLocation(_meshProgram, "uTextureMultFrame");
                 _muEmitterUvOffsetMult = _gl.GetUniformLocation(_meshProgram, "uEmitterUvOffsetMult");
                 _muFlipUMult = _gl.GetUniformLocation(_meshProgram, "uFlipUMult");
                 _muFlipVMult = _gl.GetUniformLocation(_meshProgram, "uFlipVMult");
@@ -1162,7 +1161,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform2(_muUvScaleMult, instances[o + 31], instances[o + 32]);
                 _gl.Uniform1(_muUvRotationMult, instances[o + 33]);
                 _gl.Uniform1(_muFrame, instances[o + 10]);
-                _gl.Uniform1(_muTextureMultFrame, instances[o + 34]);
                 _gl.Uniform1(_muPaletteSelector, instances[o + 35]);
 
                 if (es.MeshIndexCount > 0)

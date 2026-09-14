@@ -92,7 +92,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public float TextureMultBirthUvRotateRate, IntegratedTextureMultUvRotation;
             public float LingerFrom;
             public float Rot, RotVel;
-            public float StartFrame, FrameRate, TextureMultFrame;
+            public float StartFrame, FrameRate;
         }
 
         public IReadOnlyList<EmitterState> Emitters => _emitters;
@@ -861,7 +861,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 StartFrame = d.RandomStartFrame && d.NumFrames > 1 ? roll * d.NumFrames : 0f,
                 FrameRate = (d.FrameRate ?? 0f) *
                     (d.BirthFrameRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? 1f),
-                TextureMultFrame = 0f,
                 BirthUvOffset = birthUvOffset,
                 BirthUvScrollRate = birthUvScrollRate,
                 BirthUvRotateRate = birthUvRotateRate,

@@ -458,27 +458,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void MultiplierAtlasFrameIsDeterministicAndPackedPerParticle()
+        public void BirthRandomIsDeterministicAndPackedForColorLookup()
         {
-            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
-            {
-                TextureMultPath = "mult.tex",
-                TextureMultTexDiv = new Vector2(4f, 2f),
-                TextureMultRandomStartFrame = true
-            };
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
             var first = new VfxPlaybackRuntime(37);
             var second = new VfxPlaybackRuntime(37);
-            var system = new VfxSystemDefinition(1, "mult-atlas", "mult-atlas", new[] { emitter });
+            var system = new VfxSystemDefinition(1, "birth-random", "birth-random", new[] { emitter });
             first.SetSystem(system, Vector3.Zero);
             second.SetSystem(system, Vector3.Zero);
 
             first.Update(0.02f);
             second.Update(0.02f);
 
-            float firstFrame = Assert.Single(first.Emitters).Instances[34];
-            float secondFrame = Assert.Single(second.Emitters).Instances[34];
-            Assert.Equal(firstFrame, secondFrame);
-            Assert.InRange(firstFrame, 0f, 7f);
+            VfxPlaybackRuntime.EmitterState firstState = Assert.Single(first.Emitters);
+            VfxPlaybackRuntime.EmitterState secondState = Assert.Single(second.Emitters);
+            float firstRoll = firstState.Instances[34];
+            float secondRoll = secondState.Instances[34];
+            Assert.Equal(firstRoll, secondRoll);
+            Assert.Equal(firstState.Particles[0].RangeRandom, firstRoll);
+            Assert.InRange(firstRoll, 0f, 1f);
             Assert.Equal(45, VfxPlaybackRuntime.InstanceStride);
         }
 

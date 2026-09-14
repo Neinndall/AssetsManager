@@ -17,6 +17,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void TextureMultiplierSharesTheBaseFlipbookFrame()
+        {
+            Assert.DoesNotContain("uTextureMultFrame", VfxShaderSource.MeshVertex);
+            Assert.Contains("float multFrame = floor(uFrame + 0.0001);", VfxShaderSource.MeshVertex);
+            Assert.Contains("float multFrame = floor(aRotFrame.y + 0.0001);", VfxShaderSource.ParticleVertex);
+        }
+
+        [Fact]
         public void PaletteColoringPreservesAuthoredTextureCoverage()
         {
             Assert.Contains("float paletteCoverage = t.a;", VfxShaderSource.ParticleFragment);
