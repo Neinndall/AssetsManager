@@ -46,10 +46,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
             return new VfxAbilityComposition(
                 sequence.OwnerPathHash,
                 sequence.OwnerClassHash,
-                sequence.TickDuration,
+                sequence.TickDuration > 0 ? sequence.TickDuration : 1f / 30f,
                 sequence.StartFrame,
                 sequence.EndFrame,
-                compositionEvents)
+                compositionEvents,
+                sequence.ClipName,
+                sequence.AnimationFilePath,
+                sequence.GraphPathHash,
+                sequence.ChildClipHashes)
             {
                 ResolvedCount = resolvedCount
             };

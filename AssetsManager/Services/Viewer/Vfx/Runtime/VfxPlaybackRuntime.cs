@@ -24,7 +24,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public Vector3 PlacementRight, PlacementUp, PlacementForward;
             public uint Texture;                    // GL handle for this emitter's sprite (0 = not uploaded/skip)
             public int TextureWidth, TextureHeight;
-            public bool DeriveAlphaFromRgb;
             public uint TextureMult;                // optional Riot multiplier/noise texture stage
             public int TextureMultWidth, TextureMultHeight;
             public uint DistortionTexture;          // normal map for screen-space heat haze/refraction
@@ -44,7 +43,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public uint ColorGradientTexture;
             public object PendingColorGradient;
             public float SpriteAspect = 1f;         // legacy scalar quads preserve one atlas cell's width/height
-            internal float SpawnAccum;
+            internal float SharedRandom;
+            internal bool SharedRandomRolled;
+            internal float EmittedThrough;
             internal float Age;                     // emitter age (seconds)
             internal bool BurstDone;                // for isSingleParticle
             internal bool InitialEmissionDone;
@@ -71,7 +72,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public Vector3 BirthSize;
             public Vector4 BirthColor;
             public Vector3 BirthRotation;
-            public Vector3 RotationalVelocity;
+            public Vector3 RotationalVelocity, RotationalAcceleration;
             public float RangeRandom;
             public Vector2 BirthUvOffset, BirthUvScrollRate;
             public Vector2 TextureMultBirthUvOffset, TextureMultBirthUvScrollRate;
@@ -83,11 +84,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         public IReadOnlyList<EmitterState> Emitters => _emitters;
         private readonly List<EmitterState> _emitters = new();
         private readonly int _seed;
-        private Random _rng;
+        private VfxXorShift64Random _rng;
+        public float CurrentTime { get; private set; }
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private Matrix4x4 _inverseWorldTransform = Matrix4x4.Identity;
         private Vector3 _worldScale = Vector3.One;
         private bool _isKilled;
+        public bool IsStopped { get; set; }
         public int LiveParticleCount { get; private set; }
         public object UserTag { get; set; }
         /// <summary>
@@ -123,17 +126,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         es.Particles[particleIndex] = particle;
                     }
                 }
-                es.BasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(EmitterTime(es)), worldTransform);
-                es.PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX);
-                es.PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY);
-                es.PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ);
+                Matrix4x4 placement = EmitterTransform(es.Def, worldTransform);
+                es.BasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(EmitterTime(es)), placement);
+                es.PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, placement), Vector3.UnitX);
+                es.PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, placement), Vector3.UnitY);
+                es.PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, placement), Vector3.UnitZ);
             }
         }
 
         public VfxPlaybackRuntime(int seed = 1234)
         {
             _seed = seed;
-            _rng = new Random(seed);
+            _rng = new VfxXorShift64Random(seed);
         }
 
         /// <summary>Configure from a system placed at worldPos.</summary>
@@ -156,13 +160,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 {
                     Def = e,
                     SourceOrder = emitterIndex,
-                    BasePos = Vector3.Transform(e.EmitterPosition.Sample(0f), worldTransform),
+                    BasePos = Vector3.Transform(e.EmitterPosition.Sample(0f), EmitterTransform(e, worldTransform)),
                     PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX),
                     PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY),
                     PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ),
                 });
             }
             Reset();
+            SetTransform(worldTransform);
         }
 
         public bool SetEmitterVisibility(int sourceOrder, bool isVisible)
@@ -211,17 +216,55 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             VfxEmitterDefinition definition = state.Def;
             return definition.EmitterLifetime is > 0f
-                ? Math.Clamp((state.Age - definition.TimeBeforeFirstEmission) / definition.EmitterLifetime.Value, 0f, 1f)
+                ? Math.Clamp(state.Age / definition.EmitterLifetime.Value, 0f, 1f)
                 : 0f;
+        }
+
+        private static Matrix4x4 EmitterTransform(VfxEmitterDefinition definition, Matrix4x4 world)
+        {
+            Vector3 rotation = definition.RotationOverride.GetValueOrDefault() * (MathF.PI / 180f);
+            return Matrix4x4.CreateScale(definition.ScaleOverride ?? Vector3.One) *
+                Matrix4x4.CreateRotationZ(rotation.Z) * Matrix4x4.CreateRotationX(rotation.X) *
+                Matrix4x4.CreateRotationY(rotation.Y) *
+                Matrix4x4.CreateTranslation(definition.TranslationOverride.GetValueOrDefault()) * world;
         }
 
         public void Reset()
         {
-            _rng = new Random(_seed);
+            _rng = new VfxXorShift64Random(_seed);
             _isKilled = false;
+            IsStopped = false;
+            CurrentTime = 0f;
             _startDelay = _configuredStartDelay;
-            foreach (var s in _emitters) { s.Particles.Clear(); s.SpawnAccum = 0; s.Age = 0; s.BurstDone = false; s.InitialEmissionDone = false; s.InstanceCount = 0; }
+            foreach (var s in _emitters)
+            {
+                s.Particles.Clear();
+                s.EmittedThrough = s.Def.TimeBeforeFirstEmission;
+                s.Age = 0;
+                s.BurstDone = false;
+                s.InitialEmissionDone = false;
+                s.SharedRandomRolled = false;
+                s.InstanceCount = 0;
+            }
             LiveParticleCount = 0;
+        }
+
+        /// <summary>
+        /// Seeks deterministically to an exact target time in seconds.
+        /// If seeking backward or to zero, resets and fast-forwards deterministically.
+        /// </summary>
+        public void Seek(float targetTime)
+        {
+            targetTime = MathF.Max(0f, targetTime);
+            if (targetTime < CurrentTime)
+            {
+                Reset();
+            }
+            float dt = targetTime - CurrentTime;
+            if (dt > 0f)
+            {
+                Update(dt);
+            }
         }
 
         private float _configuredStartDelay;
@@ -237,7 +280,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         public bool IsComplete
             => _isKilled || _emitters.Count == 0 || _emitters.TrueForAll(state =>
-                (state.BurstDone || (state.Def.EmitterLifetime is { } lifetime && state.Age > state.Def.TimeBeforeFirstEmission + lifetime)) &&
+                (IsStopped || state.BurstDone || (!state.Def.IsLoop && state.Def.EmitterLifetime is { } lifetime && state.Age > lifetime)) &&
                 state.Particles.Count == 0);
 
         public void Update(float dt)
@@ -272,6 +315,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 _startDelay = 0f;
                 if (dt <= 0f) return;
             }
+            CurrentTime += dt;
             int live = 0;
             foreach (var s in _emitters)
             {
@@ -286,19 +330,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             var d = s.Def;
             s.Age += dt;
 
-            if (d.IsLoop && d.EmitterLifetime is { } loopLife && s.Age > d.TimeBeforeFirstEmission + loopLife)
+            if (d.IsLoop && d.EmitterLifetime is { } loopLife && loopLife > 0f && s.Age > loopLife)
             {
-                s.Age = d.TimeBeforeFirstEmission;
+                s.Age %= loopLife;
                 s.BurstDone = false;
                 s.InitialEmissionDone = false;
+                s.EmittedThrough = d.TimeBeforeFirstEmission;
             }
 
             float emitterT = EmitterTime(s);
             Vector3 previousBasePos = s.BasePos;
-            s.BasePos = Vector3.Transform(d.EmitterPosition.Sample(emitterT), _worldTransform);
+            Matrix4x4 placement = EmitterTransform(d, _worldTransform);
+            s.BasePos = Vector3.Transform(d.EmitterPosition.Sample(emitterT), placement);
+            Vector3 emitterDelta = s.BasePos - previousBasePos;
             if (d.IsEmitterSpace && s.Particles.Count > 0)
             {
-                Vector3 emitterDelta = s.BasePos - previousBasePos;
                 if (emitterDelta.LengthSquared() > 1e-12f)
                 {
                     for (int particleIndex = 0; particleIndex < s.Particles.Count; particleIndex++)
@@ -310,39 +356,26 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 }
             }
 
-            bool emitting = s.Age >= d.TimeBeforeFirstEmission
-                            && (d.EmitterLifetime is not { } life || s.Age <= d.TimeBeforeFirstEmission + life);
-            if (emitting)
+            bool emitting = !IsStopped
+                            && s.Age >= d.TimeBeforeFirstEmission
+                            && (d.EmitterLifetime is not { } life || s.Age <= life);
+            if (emitting && !(d.IsSingleParticle && s.BurstDone))
             {
-                if (d.IsSingleParticle)
+                float rawRate = MathF.Max(0f, d.Rate.Sample(emitterT));
+                float rate = d.RateIsPeriod ? (rawRate > 0.001f ? 1f / rawRate : 0f) : rawRate;
+                if (!float.IsFinite(rate)) rate = 0f;
+                int count = (int)MathF.Min(MaxParticlesPerEmitter,
+                    MathF.Min(MathF.Truncate(MathF.Max(0f, s.Age - s.EmittedThrough) * rate + 0.00001f), MathF.Truncate(rate * 0.33f) + 1f));
+                if (!s.InitialEmissionDone)
+                    count = d.IsSingleParticle ? Math.Max(1, (int)MathF.Min(rate, ushort.MaxValue)) : Math.Max(1, count);
+                if (d.Trail?.MaxAddedPerFrame is > 0) count = Math.Min(count, d.Trail.MaxAddedPerFrame);
+                count = Math.Min(count, MaxParticlesPerEmitter - s.Particles.Count);
+                for (int born = 0; born < count; born++) Spawn(s, emitterT);
+                if (count > 0)
                 {
-                    if (!s.BurstDone) { Spawn(s, emitterT); s.BurstDone = true; }
-                }
-                else
-                {
-                    float rawRate = MathF.Max(0f, d.Rate.Sample(emitterT));
-                    float rate = d.RateIsPeriod ? (rawRate > 0.001f ? 1f / rawRate : 0f) : rawRate;
-                    s.SpawnAccum += rate * dt;
-                    int addedThisStep = 0;
-                    int maxAdded = d.Trail?.MaxAddedPerFrame is > 0
-                        ? d.Trail.MaxAddedPerFrame
-                        : int.MaxValue;
-                    if (!s.InitialEmissionDone && rate > 0f && maxAdded > 0)
-                    {
-                        Spawn(s, emitterT);
-                        s.InitialEmissionDone = true;
-                        addedThisStep++;
-                    }
-                    while (s.SpawnAccum >= 1f &&
-                           s.Particles.Count < MaxParticlesPerEmitter &&
-                           addedThisStep < maxAdded)
-                    {
-                        Spawn(s, emitterT);
-                        s.SpawnAccum -= 1f;
-                        addedThisStep++;
-                    }
-                    if (addedThisStep >= maxAdded) s.SpawnAccum = MathF.Min(s.SpawnAccum, 1f);
-                    if (s.Particles.Count >= MaxParticlesPerEmitter) s.SpawnAccum = 0f;
+                    s.InitialEmissionDone = true;
+                    s.BurstDone = d.IsSingleParticle;
+                    s.EmittedThrough = rate > 0f ? s.EmittedThrough + count / rate : s.Age;
                 }
             }
 
@@ -357,8 +390,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     continue;
                 }
                 float particleT = float.IsPositiveInfinity(p.Life) ? 0f : Math.Clamp(p.Age / p.Life, 0f, 1f);
-                var worldAccel = d.Acceleration?.Sample(particleT) ?? Vector3.Zero;
-                worldAccel = Vector3.TransformNormal(worldAccel, _worldTransform);
+                if (!d.IsEmitterSpace && d.BindWeight is { } bindWeight && emitterDelta.LengthSquared() > 1e-12f)
+                {
+                    float bind = Math.Clamp(bindWeight.Sample(particleT), 0f, 1f);
+                    if (bind > 0f)
+                    {
+                        p.Pos += emitterDelta * bind;
+                    }
+                }
+                var worldAccel = d.AccelerationOverLife?.Sample(emitterT) ?? Vector3.Zero;
+                worldAccel = Vector3.TransformNormal(worldAccel, placement);
+                worldAccel += d.Acceleration?.Sample(emitterT) ?? Vector3.Zero;
                 Vector3 fieldDrag = Vector3.Zero;
                 ApplyFields(d.Fields, particleT, p.Age, p.Pos, ref worldAccel, ref fieldDrag);
                 p.Vel += (p.BirthAccel + worldAccel) * dt;
@@ -379,57 +421,67 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 }
                 if (d.IsRotationEnabled)
                 {
+                    p.RotationalVelocity += p.RotationalAcceleration * dt;
+                    p.RotVel = p.RotationalVelocity.X;
                     p.Rot += p.RotVel * dt;
                     p.BirthRotation += p.RotationalVelocity * dt;
                 }
                 s.Particles[i] = p;
             }
 
-            if (d.IsSingleParticle && s.BurstDone && s.Particles.Count == 0 && d.EmitterLifetime is null)
-                s.BurstDone = false;
         }
 
         private void Spawn(EmitterState s, float emitterT)
         {
             var d = s.Def;
-            float sampledLife = d.ParticleLifetime.SampleBirth(emitterT, _rng);
+            if (d.ParticlesShareRandomValue && !s.SharedRandomRolled)
+            {
+                s.SharedRandom = _rng.NextUnitFloat();
+                s.SharedRandomRolled = true;
+            }
+            float roll = _rng.NextUnitFloat();
+            float? sharedRoll = d.ParticlesShareRandomValue ? s.SharedRandom : _rng.NextUnitFloat();
+
+            float sampledLife = d.ParticleLifetime.SampleBirth(emitterT, _rng, sharedRoll);
             float life = sampledLife < 0f ? float.PositiveInfinity : MathF.Max(0.05f, sampledLife);
             bool hasRange = d.BirthScale1 is { } || d.Rotation1 is { };
-            var rangeRandom = hasRange ? (float)_rng.NextDouble() : 0f;
-            var birthScale = d.BirthScale.SampleBirth(emitterT, _rng);
+            var rangeRandom = hasRange ? roll : 0f;
+            var birthScale = d.BirthScale.SampleBirth(emitterT, _rng, sharedRoll);
             if (d.BirthScale1 is { } birthScale1)
-                birthScale = Vector3.Lerp(birthScale, birthScale1.SampleBirth(emitterT, _rng), rangeRandom);
+                birthScale = Vector3.Lerp(birthScale, birthScale1.SampleBirth(emitterT, _rng, sharedRoll), rangeRandom);
             // Mesh emitters with the authored uniform flag use X as their scalar;
             // billboard primitives retain their authored width/height vector.
             if (d.IsMeshPrimitive && d.IsUniformScale)
                 birthScale = new Vector3(birthScale.X);
             birthScale *= ResolveFlexMultiplier(d.FlexShape?.ScaleBirthScaleByBoundObjectSize);
-            var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
-            var birthAccel = d.BirthAcceleration?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
-            var birthOrbitalVelocity = d.BirthOrbitalVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
-            var birthDrag = d.BirthDrag?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
-            var birthRotation = d.BirthRotation?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
-            var rotVel = d.BirthRotationalVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
-            Vector2 birthUvOffset = d.BirthUvOffset?.SampleBirth(emitterT, _rng) ?? Vector2.Zero;
-            Vector2 birthUvScrollRate = d.BirthUvScrollRateCurve?.SampleBirth(emitterT, _rng) ?? d.UvScrollRate;
-            float birthUvRotateRate = d.BirthUvRotateRate?.SampleBirth(emitterT, _rng) ?? 0f;
-            Vector2 textureMultBirthUvOffset = d.TextureMultBirthUvOffset?.SampleBirth(emitterT, _rng) ?? Vector2.Zero;
-            Vector2 textureMultBirthUvScrollRate = d.TextureMultBirthUvScrollRate?.SampleBirth(emitterT, _rng)
+            var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
+            var birthAccel = d.BirthAcceleration?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
+            var birthOrbitalVelocity = d.BirthOrbitalVelocity?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
+            var birthDrag = d.BirthDrag?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
+            var birthRotation = d.BirthRotation?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
+            var rotVel = d.BirthRotationalVelocity?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
+            var rotationalAcceleration = d.BirthRotationalAcceleration?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
+            Vector2 birthUvOffset = d.BirthUvOffset?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector2.Zero;
+            Vector2 birthUvScrollRate = d.BirthUvScrollRateCurve?.SampleBirth(emitterT, _rng, sharedRoll) ?? d.UvScrollRate;
+            float birthUvRotateRate = d.BirthUvRotateRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? 0f;
+            Vector2 textureMultBirthUvOffset = d.TextureMultBirthUvOffset?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector2.Zero;
+            Vector2 textureMultBirthUvScrollRate = d.TextureMultBirthUvScrollRate?.SampleBirth(emitterT, _rng, sharedRoll)
                 ?? d.TextureMultUvScrollRate;
-            float textureMultBirthUvRotateRate = d.TextureMultBirthUvRotateRate?.SampleBirth(emitterT, _rng) ?? 0f;
+            float textureMultBirthUvRotateRate = d.TextureMultBirthUvRotateRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? 0f;
 
             Matrix4x4 spawnRotation = Matrix4x4.Identity;
             var localOffset = d.SpawnShape is { } shape
                 ? shape.SampleOffset(_rng, emitterT, out spawnRotation)
                 : Vector3.Zero;
             localOffset *= ResolveFlexMultiplier(d.FlexShape?.ScaleEmitOffsetByBoundObjectSize);
-            var worldOffset = Vector3.Transform(localOffset, _worldTransform) - Vector3.Transform(Vector3.Zero, _worldTransform);
+            Matrix4x4 placement = EmitterTransform(d, _worldTransform);
+            var worldOffset = Vector3.TransformNormal(localOffset, placement);
             vel = Vector3.TransformNormal(vel, spawnRotation);
             birthAccel = Vector3.TransformNormal(birthAccel, spawnRotation);
             birthOrbitalVelocity = Vector3.TransformNormal(birthOrbitalVelocity, spawnRotation);
-            vel = Vector3.TransformNormal(vel, _worldTransform);
-            birthAccel = Vector3.TransformNormal(birthAccel, _worldTransform);
-            Vector3 finalBirthSize = birthScale * _worldScale;
+            vel = Vector3.TransformNormal(vel, placement);
+            birthAccel = Vector3.TransformNormal(birthAccel, placement);
+            Vector3 finalBirthSize = birthScale * ExtractScale(placement);
 
             s.Particles.Add(new Particle
             {
@@ -442,16 +494,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Age = 0f,
                 Life = life,
                 BirthSize = finalBirthSize,
-                BirthColor = VfxColorSemantics.ResolveBirth(d.BirthColor, emitterT, _rng),
+                BirthColor = VfxColorSemantics.ResolveBirth(d.BirthColor, emitterT, _rng, sharedRoll),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
                 RotationalVelocity = d.IsRotationEnabled ? rotVel * (MathF.PI / 180f) : Vector3.Zero,
+                RotationalAcceleration = d.IsRotationEnabled ? rotationalAcceleration * (MathF.PI / 180f) : Vector3.Zero,
                 Rot = d.IsMeshPrimitive ? 0f : birthRotation.X * (MathF.PI / 180f),
                 RotVel = d.IsRotationEnabled ? rotVel.X * (MathF.PI / 180f) : 0f,
                 RangeRandom = rangeRandom,
                 StartFrame = d.RandomStartFrame && d.NumFrames > 1
                     ? _rng.Next(d.NumFrames)
                     : Math.Clamp(d.StartFrame, 0f, Math.Max(0, d.NumFrames - 1)),
-                FrameRate = d.BirthFrameRate?.SampleBirth(emitterT, _rng) ?? d.FrameRate ?? 0f,
+                FrameRate = d.BirthFrameRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? d.FrameRate ?? 0f,
                 TextureMultFrame = d.TextureMultRandomStartFrame
                     ? _rng.Next(Math.Max(1,
                         (int)MathF.Max(1f, d.TextureMultTexDiv.X) *
@@ -532,7 +585,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 buf[k++] = col.X; buf[k++] = col.Y; buf[k++] = col.Z; buf[k++] = col.W;
                 buf[k++] = p.Rot;
                 buf[k++] = frame;
-                buf[k++] = p.Age;
+                buf[k++] = t;
                 buf[k++] = direction.X; buf[k++] = direction.Y; buf[k++] = direction.Z;
                 Vector3 lifeRotation = Vector3.Zero;
                 if (d.IsRotationEnabled && d.RotationOverLife is { } rotationCurve)

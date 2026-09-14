@@ -9,13 +9,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
     public sealed class VfxColorSemanticsTests
     {
         [Fact]
-        public void NormalizesByteEncodedValueColor()
+        public void PreservesHdrColorWithoutTreatingFloatsAsBytes()
         {
-            Vector4 normalized = VfxColorSemantics.Normalize(new Vector4(216f, 216f, 216f, 255f));
+            Vector4 normalized = VfxColorSemantics.Normalize(new Vector4(2f, 4f, 8f, 1f));
 
-            Assert.Equal(216f / 255f, normalized.X, 4);
-            Assert.Equal(216f / 255f, normalized.Y, 4);
-            Assert.Equal(216f / 255f, normalized.Z, 4);
+            Assert.Equal(2f, normalized.X);
+            Assert.Equal(4f, normalized.Y);
+            Assert.Equal(8f, normalized.Z);
             Assert.Equal(1f, normalized.W);
         }
 
@@ -39,14 +39,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void ResolvesByteEncodedAnimatedColorAtParticleAge()
+        public void ResolvesLinearAnimatedColorAtParticleAge()
         {
             var curve = new VfxCurve4(
                 Vector4.One,
                 new[] { 0f, 1f },
                 new[]
                 {
-                    new Vector4(255f, 128f, 0f, 255f),
+                    new Vector4(1f, 128f / 255f, 0f, 1f),
                     new Vector4(0f, 0f, 0f, 0f)
                 });
 

@@ -16,7 +16,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     {
         private GL _gl = null!;
         private uint _program, _vao, _quadVbo, _instVbo;
-        private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uEmitterUvOffset;
+        private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uHasTex, _uEmitterUvOffset;
         private int _uTexMult, _uHasTexMult, _uTexDivMult, _uTexSizeMult, _uUvScrollRateMult, _uFlipUMult, _uFlipVMult;
         private int _uUvTransformCenter, _uUvTransformCenterMult, _uAddressMode, _uAddressModeMult, _uClampUvMult;
         private int _uIsDistortion, _uDistortionTex, _uSceneTex, _uViewportSize, _uDistortionStrength;
@@ -24,7 +24,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _uReflectionTex, _uHasReflection, _uReflectionOpacity, _uReflectionColor;
         private int _uDirectionOriented, _uArbitraryQuad;
         private int _uPrimitiveKind;
-        private int _uAlphaCutoff, _uAlphaTest, _uDeriveAlphaFromRgb, _uEmissiveStrength, _uIsMultiply, _uFlipU, _uFlipV, _uClampUv;
+        private int _uAlphaCutoff, _uAlphaTest, _uEmissiveStrength, _uIsMultiply, _uFlipU, _uFlipV, _uClampUv;
         private int _uColorMap, _uHasColor, _uColorRenderFlags, _uIsAdditive, _uModulationFactor;
         private int _uPaletteMap, _uHasPalette, _uPaletteCount, _uPaletteMixMask;
         private int _uColorLookUpTypeX, _uColorLookUpTypeY, _uColorLookUpScales, _uColorLookUpOffsets;
@@ -61,6 +61,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uTexDiv = gl.GetUniformLocation(_program, "uTexDiv");
             _uTexSize = gl.GetUniformLocation(_program, "uTexSize");
             _uTex = gl.GetUniformLocation(_program, "uTex");
+            _uHasTex = gl.GetUniformLocation(_program, "uHasTex");
             _uTexMult = gl.GetUniformLocation(_program, "uTexMult");
             _uHasTexMult = gl.GetUniformLocation(_program, "uHasTexMult");
             _uTexDivMult = gl.GetUniformLocation(_program, "uTexDivMult");
@@ -91,7 +92,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uPrimitiveKind = gl.GetUniformLocation(_program, "uPrimitiveKind");
             _uAlphaCutoff = gl.GetUniformLocation(_program, "uAlphaCutoff");
             _uAlphaTest = gl.GetUniformLocation(_program, "uAlphaTest");
-            _uDeriveAlphaFromRgb = gl.GetUniformLocation(_program, "uDeriveAlphaFromRgb");
             _uEmissiveStrength = gl.GetUniformLocation(_program, "uEmissiveStrength");
             _uIsMultiply = gl.GetUniformLocation(_program, "uIsMultiply");
             _uColorMap = gl.GetUniformLocation(_program, "uColorMap");
@@ -266,7 +266,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 ApplyEmitterStencilState(emitterRenderState, stencilReferences);
                 // Never synthesize an AttachedMesh proxy. Render only geometry that was
                 // resolved from the real owner scene and filtered by authored submesh masks.
-                if (es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh && es.MeshVao == 0)
+                if (es.Def.IsMeshPrimitive && es.MeshVao == 0)
                     continue;
 
                 int floats = es.InstanceCount * Stride;
@@ -292,6 +292,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
                     ApplyEmitterDepthState(es.Def, isDistortion: false);
+                    ApplyBlendMode(es.Def.BlendMode, distortion: false);
                     RenderMeshEmitter(es, viewProj, instancesSpan);
                     continue;
                 }
@@ -346,11 +347,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform1(_uPrimitiveKind, (int)es.Def.PrimitiveKind);
                 var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 ApplyEmitterDepthState(es.Def, isDistortion);
+                ApplyBlendMode(es.Def.BlendMode, isDistortion);
                 _gl.Uniform1(_uAlphaCutoff, renderState.AlphaCutoff);
                 _gl.Uniform1(
                     _uAlphaTest,
                     VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0);
-                _gl.Uniform1(_uDeriveAlphaFromRgb, es.DeriveAlphaFromRgb ? 1 : 0);
                 _gl.Uniform1(_uEmissiveStrength, VfxBlendModes.ResolveEmissiveStrength(es.Def.BlendMode));
                 _gl.Uniform1(
                     _uIsMultiply,
@@ -373,7 +374,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform1(_uPaletteCount, Math.Max(1, palette?.PaletteCount ?? 1));
                 Vector4 paletteMask = palette?.PaletteSourceMixColor ?? Vector4.UnitX;
                 _gl.Uniform4(_uPaletteMixMask, paletteMask.X, paletteMask.Y, paletteMask.Z, paletteMask.W);
-                _gl.Uniform1(_uIsAdditive, VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 1 : 0);
+                _gl.Uniform1(_uIsAdditive, es.Def.BlendMode == 0 ? 1 : VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 2 : 0);
                 _gl.Uniform1(_uColorLookUpTypeX, es.Def.ColorLookUpTypeX ?? 0);
                 _gl.Uniform1(_uColorLookUpTypeY, es.Def.ColorLookUpTypeY ?? 0);
                 Vector2 colorLookUpScales = es.Def.ColorLookUpScales == Vector2.Zero
@@ -417,6 +418,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform3(_uPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
+                _gl.Uniform1(_uHasTex, es.Texture != 0 ? 1 : 0);
                 ApplyAddressMode(renderState.TextureAddressMode);
                 ApplyTextureSampling(es.Def.IsTexturePixelated);
                 if (es.TextureMult != 0)
@@ -588,6 +590,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             VfxBlendModeDescriptor descriptor = VfxBlendModes.GetDescriptor(
                 distortion ? VfxAuthoredDefaults.BlendMode : blendMode);
+            if (descriptor.Kind == VfxBlendModeKind.Opaque)
+            {
+                _gl.Disable(EnableCap.Blend);
+                return;
+            }
+
+            _gl.Enable(EnableCap.Blend);
             _gl.BlendEquationSeparate(
                 ToOpenGl(descriptor.RgbEquation),
                 ToOpenGl(descriptor.AlphaEquation));
@@ -667,12 +676,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             VfxBlendFactor.SourceAlpha => BlendingFactor.SrcAlpha,
             VfxBlendFactor.OneMinusSourceAlpha => BlendingFactor.OneMinusSrcAlpha,
             VfxBlendFactor.DestinationColor => BlendingFactor.DstColor,
+            VfxBlendFactor.OneMinusSourceColor => BlendingFactor.OneMinusSrcColor,
+            VfxBlendFactor.DestinationAlpha => BlendingFactor.DstAlpha,
+            VfxBlendFactor.OneMinusDestinationAlpha => BlendingFactor.OneMinusDstAlpha,
             _ => throw new ArgumentOutOfRangeException(nameof(factor), factor, null)
         };
 
         private static GLEnum ToOpenGl(VfxBlendEquationKind equation) => equation switch
         {
             VfxBlendEquationKind.Add => GLEnum.FuncAdd,
+            VfxBlendEquationKind.Min => GLEnum.Min,
+            VfxBlendEquationKind.Max => GLEnum.Max,
             _ => throw new ArgumentOutOfRangeException(nameof(equation), equation, null)
         };
 
@@ -702,13 +716,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         }
 
         private uint _meshProgram;
-        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muColor, _muTex, _muEmitterUvOffset;
+        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
         private int _muTextureMultFrame, _muEmitterUvOffsetMult, _muFlipUMult, _muFlipVMult;
         private int _muAddressModeMult, _muClampUvMult, _muUvTransformCenterMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
-        private int _muAlphaCutoff, _muAlphaTest, _muDeriveAlphaFromRgb, _muEmissiveStrength, _muIsMultiply, _muColorMap, _muHasColor, _muColorRenderFlags, _muIsAdditive, _muModulationFactor, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
+        private int _muAlphaCutoff, _muAlphaTest, _muEmissiveStrength, _muIsMultiply, _muColorMap, _muHasColor, _muColorRenderFlags, _muIsAdditive, _muModulationFactor, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
         private int _muPaletteMap, _muHasPalette, _muPaletteCount, _muPaletteSelector, _muPaletteMixMask;
         private int _muBirthUvOffset, _muUvScale, _muUvRotation;
         private int _muErosionTex, _muHasErosion, _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionMixer;
@@ -726,6 +740,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muRotation = _gl.GetUniformLocation(_meshProgram, "uRotation");
                 _muColor = _gl.GetUniformLocation(_meshProgram, "uColor");
                 _muTex = _gl.GetUniformLocation(_meshProgram, "uTex");
+                _muHasTex = _gl.GetUniformLocation(_meshProgram, "uHasTex");
                 _muEmitterUvOffset = _gl.GetUniformLocation(_meshProgram, "uEmitterUvOffset");
                 _muTexDiv = _gl.GetUniformLocation(_meshProgram, "uTexDiv");
                 _muTexSize = _gl.GetUniformLocation(_meshProgram, "uTexSize");
@@ -752,7 +767,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muPlacementForward = _gl.GetUniformLocation(_meshProgram, "uPlacementForward");
                 _muAlphaCutoff = _gl.GetUniformLocation(_meshProgram, "uAlphaCutoff");
                 _muAlphaTest = _gl.GetUniformLocation(_meshProgram, "uAlphaTest");
-                _muDeriveAlphaFromRgb = _gl.GetUniformLocation(_meshProgram, "uDeriveAlphaFromRgb");
                 _muEmissiveStrength = _gl.GetUniformLocation(_meshProgram, "uEmissiveStrength");
                 _muIsMultiply = _gl.GetUniformLocation(_meshProgram, "uIsMultiply");
                 _muColorMap = _gl.GetUniformLocation(_meshProgram, "uColorMap");
@@ -863,13 +877,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform3(_muPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
+            _gl.Uniform1(_muHasTex, es.Texture != 0 ? 1 : 0);
             var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
             ApplyAddressMode(renderState.TextureAddressMode);
             _gl.Uniform1(_muAlphaCutoff, renderState.AlphaCutoff);
             _gl.Uniform1(
                 _muAlphaTest,
                 VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0);
-            _gl.Uniform1(_muDeriveAlphaFromRgb, es.DeriveAlphaFromRgb ? 1 : 0);
             _gl.Uniform1(_muEmissiveStrength, VfxBlendModes.ResolveEmissiveStrength(es.Def.BlendMode));
             _gl.Uniform1(
                 _muIsMultiply,
@@ -892,7 +906,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_muPaletteCount, Math.Max(1, meshPalette?.PaletteCount ?? 1));
             Vector4 meshPaletteMask = meshPalette?.PaletteSourceMixColor ?? Vector4.UnitX;
             _gl.Uniform4(_muPaletteMixMask, meshPaletteMask.X, meshPaletteMask.Y, meshPaletteMask.Z, meshPaletteMask.W);
-            _gl.Uniform1(_muIsAdditive, VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 1 : 0);
+            _gl.Uniform1(_muIsAdditive, es.Def.BlendMode == 0 ? 1 : VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 2 : 0);
             _gl.Uniform1(_muColorLookUpTypeX, es.Def.ColorLookUpTypeX ?? 0);
             _gl.Uniform1(_muColorLookUpTypeY, es.Def.ColorLookUpTypeY ?? 0);
             Vector2 meshColorLookUpScales = es.Def.ColorLookUpScales == Vector2.Zero

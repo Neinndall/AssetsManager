@@ -13,8 +13,306 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
     /// Parses VfxSystemDefinitionData objects out of a companion .bin and exposes
     /// them keyed by object path-hash.
     /// </summary>
-    public static partial class VfxGraphParser
+    public static class VfxGraphParser
     {
+        private static class HashAlgorithms
+        {
+            public static uint Fnv1a(string text) =>
+                text == null ? 0 : LeagueToolkit.Hashing.Fnv1a.HashLower(text);
+        }
+
+        // class hashes
+        private static readonly uint SystemClass  = HashAlgorithms.Fnv1a("VfxSystemDefinitionData");
+        private static readonly uint EmitterClass = HashAlgorithms.Fnv1a("VfxEmitterDefinitionData");
+
+        // system fields
+        private static readonly uint F_particleName = HashAlgorithms.Fnv1a("particleName");
+        private static readonly uint F_particlePath = HashAlgorithms.Fnv1a("particlePath");
+        private static readonly uint F_visibilityRadius = HashAlgorithms.Fnv1a("visibilityRadius");
+        private static readonly uint F_transform = HashAlgorithms.Fnv1a("transform");
+        private static readonly uint[] EmitterLists =
+        {
+            HashAlgorithms.Fnv1a("complexEmitterDefinitionData"),
+            HashAlgorithms.Fnv1a("simpleEmitterDefinitionData")
+        };
+        private static readonly uint F_materialOverrideDefinitions = HashAlgorithms.Fnv1a("materialOverrideDefinitions");
+        private static readonly uint F_assetRemappingTable = HashAlgorithms.Fnv1a("assetRemappingTable");
+
+        // emitter fields
+        private static readonly uint F_emitterName   = HashAlgorithms.Fnv1a("emitterName");
+        private static readonly uint F_rate          = HashAlgorithms.Fnv1a("rate");
+        private static readonly uint F_particleLife  = HashAlgorithms.Fnv1a("particleLifetime");
+        private static readonly uint F_lifetime      = HashAlgorithms.Fnv1a("lifetime");
+        private static readonly uint F_particleLinger= HashAlgorithms.Fnv1a("particleLinger");
+        private static readonly uint F_particleLingerType = HashAlgorithms.Fnv1a("particleLingerType");
+        private static readonly uint F_emitterLinger = HashAlgorithms.Fnv1a("emitterLinger");
+        private static readonly uint F_timeBefore    = HashAlgorithms.Fnv1a("timeBeforeFirstEmission");
+        private static readonly uint F_isSingle      = HashAlgorithms.Fnv1a("isSingleParticle");
+        private static readonly uint F_disabled      = HashAlgorithms.Fnv1a("disabled");
+        private static readonly uint F_importance    = HashAlgorithms.Fnv1a("importance");
+        private static readonly uint F_miscRenderFlags = HashAlgorithms.Fnv1a("miscRenderFlags");
+        private static readonly uint F_meshRenderFlags = HashAlgorithms.Fnv1a("meshRenderFlags");
+        private static readonly uint F_useNavmeshMask = HashAlgorithms.Fnv1a("useNavmeshMask");
+        private static readonly uint F_depthBiasFactors = HashAlgorithms.Fnv1a("depthBiasFactors");
+        private static readonly uint F_isRotationEnabled = HashAlgorithms.Fnv1a("isRotationEnabled");
+        private static readonly uint F_rateIsPeriod  = HashAlgorithms.Fnv1a("rateIsPeriod");
+        private static readonly uint F_birthTimePeriod = HashAlgorithms.Fnv1a("birthTimePeriod");
+        private static readonly uint F_isLoop        = HashAlgorithms.Fnv1a("isLoop");
+        private static readonly uint F_blendMode     = HashAlgorithms.Fnv1a("blendMode");
+        private static readonly uint F_renderPass    = HashAlgorithms.Fnv1a("pass");
+        private static readonly uint F_alphaRef      = HashAlgorithms.Fnv1a("alphaRef");
+        private static readonly uint F_texAddress    = HashAlgorithms.Fnv1a("texAddressModeBase");
+        private static readonly uint F_uvScrollClamp = HashAlgorithms.Fnv1a("uvScrollClamp");
+        private static readonly uint F_textureFlipU  = HashAlgorithms.Fnv1a("TextureFlipU");
+        private static readonly uint F_textureFlipV  = HashAlgorithms.Fnv1a("TextureFlipV");
+        private static readonly uint F_disableCull   = HashAlgorithms.Fnv1a("disableBackfaceCull");
+        private static readonly uint F_birthScale0   = HashAlgorithms.Fnv1a("birthScale0");
+        private static readonly uint F_birthScale1   = HashAlgorithms.Fnv1a("birthScale1");
+        private static readonly uint F_scale0        = HashAlgorithms.Fnv1a("scale0");
+        private static readonly uint F_birthColor    = HashAlgorithms.Fnv1a("birthColor");
+        private static readonly uint F_color         = HashAlgorithms.Fnv1a("color");
+        private static readonly uint F_modulationFactor = HashAlgorithms.Fnv1a("modulationFactor");
+        private static readonly uint F_particleColorTex = HashAlgorithms.Fnv1a("particleColorTexture");
+        private static readonly uint F_colorLookUpX  = HashAlgorithms.Fnv1a("colorLookUpTypeX");
+        private static readonly uint F_colorLookUpY  = HashAlgorithms.Fnv1a("colorLookUpTypeY");
+        private static readonly uint F_colorLookUpOffsets = HashAlgorithms.Fnv1a("colorLookUpOffsets");
+        private static readonly uint F_colorLookUpScales = HashAlgorithms.Fnv1a("colorLookUpScales");
+        private static readonly uint F_colorRenderFlags = HashAlgorithms.Fnv1a("colorRenderFlags");
+        private static readonly uint F_isTexturePixelated = HashAlgorithms.Fnv1a("isTexturePixelated");
+        private static readonly uint F_birthVelocity = HashAlgorithms.Fnv1a("birthVelocity");
+        private static readonly uint F_velocity      = HashAlgorithms.Fnv1a("velocity");
+        private static readonly uint F_birthAccel    = HashAlgorithms.Fnv1a("birthAcceleration");
+        private static readonly uint F_accel         = HashAlgorithms.Fnv1a("acceleration");
+        private static readonly uint F_birthOrbital  = HashAlgorithms.Fnv1a("birthOrbitalVelocity");
+        private static readonly uint F_worldAccel    = HashAlgorithms.Fnv1a("worldAcceleration");
+        private static readonly uint F_birthDrag     = HashAlgorithms.Fnv1a("birthDrag");
+        private static readonly uint F_drag          = HashAlgorithms.Fnv1a("drag");
+        private static readonly uint F_birthRotation = HashAlgorithms.Fnv1a("birthRotation0");
+        private static readonly uint F_rotation      = HashAlgorithms.Fnv1a("rotation0");
+        private static readonly uint F_rotation1     = HashAlgorithms.Fnv1a("rotation1");
+        private static readonly uint F_birthRotVel0  = HashAlgorithms.Fnv1a("birthRotationalVelocity0");
+        private static readonly uint F_birthRotAccel = HashAlgorithms.Fnv1a("birthRotationalAcceleration");
+        private static readonly uint F_emitterPos    = HashAlgorithms.Fnv1a("emitterPosition");
+        private static readonly uint F_isEmitterSpace = HashAlgorithms.Fnv1a("IsEmitterSpace");
+        private static readonly uint F_isLocalOrientation = HashAlgorithms.Fnv1a("isLocalOrientation");
+        private static readonly uint F_particleIsLocalOrientation = HashAlgorithms.Fnv1a("particleIsLocalOrientation");
+        private static readonly uint F_isFollowingTerrain = HashAlgorithms.Fnv1a("isFollowingTerrain");
+        private static readonly uint F_isGroundLayer = HashAlgorithms.Fnv1a("isGroundLayer");
+        private static readonly uint F_isUniformScale = HashAlgorithms.Fnv1a("isUniformScale");
+        private static readonly uint F_uvMode        = HashAlgorithms.Fnv1a("uvMode");
+        private static readonly uint F_bindWeight    = HashAlgorithms.Fnv1a("bindWeight");
+        private static readonly uint F_flexShapeDefinition = HashAlgorithms.Fnv1a("FlexShapeDefinition");
+        private static readonly uint F_scaleBirthScaleByBoundObjectSize =
+            HashAlgorithms.Fnv1a("scaleBirthScaleByBoundObjectSize");
+        private static readonly uint F_scaleEmitOffsetByBoundObjectSize =
+            HashAlgorithms.Fnv1a("scaleEmitOffsetByBoundObjectSize");
+        private static readonly uint F_directionVelocityScale = HashAlgorithms.Fnv1a("directionVelocityScale");
+        private static readonly uint F_rateByVelocityFunction = HashAlgorithms.Fnv1a("rateByVelocityFunction");
+        private static readonly uint F_paletteDefinition = HashAlgorithms.Fnv1a("paletteDefinition");
+        private static readonly uint F_paletteCount = HashAlgorithms.Fnv1a("paletteCount");
+        private static readonly uint F_paletteSelector = HashAlgorithms.Fnv1a("paletteSelector");
+        private static readonly uint F_paletteTexture = HashAlgorithms.Fnv1a("paletteTexture");
+        private static readonly uint F_paletteSourceMixColor = HashAlgorithms.Fnv1a("paletteSrcMixColor");
+        private static readonly uint F_palleteSourceMixColor = HashAlgorithms.Fnv1a("palleteSrcMixColor");
+        private static readonly uint F_audio = HashAlgorithms.Fnv1a("Audio");
+        private static readonly uint F_soundOnCreate = HashAlgorithms.Fnv1a("SoundOnCreate");
+        private static readonly uint F_hasPostRotateOrientation = HashAlgorithms.Fnv1a("hasPostRotateOrientation");
+        private static readonly uint F_particlesShareRandomValue = HashAlgorithms.Fnv1a("ParticlesShareRandomValue");
+        private static readonly uint F_falloffTexture = HashAlgorithms.Fnv1a("falloffTexture");
+        private static readonly uint F_filtering = HashAlgorithms.Fnv1a("Filtering");
+        private static readonly uint F_keywordsExcluded = HashAlgorithms.Fnv1a("keywordsExcluded");
+        private static readonly uint F_customMaterial = HashAlgorithms.Fnv1a("CustomMaterial");
+        private static readonly uint F_stencilMode = HashAlgorithms.Fnv1a("stencilMode");
+        private static readonly uint F_stencilRef = HashAlgorithms.Fnv1a("stencilRef");
+        private static readonly uint F_stencilReferenceId = HashAlgorithms.Fnv1a("StencilReferenceId");
+        private static readonly uint F_writeAlphaOnly = HashAlgorithms.Fnv1a("WriteAlphaOnly");
+        private static readonly uint F_renderPhaseOverride = HashAlgorithms.Fnv1a("renderPhaseOverride");
+        private static readonly uint F_sortEmittersByPos = HashAlgorithms.Fnv1a("SortEmittersByPos");
+        private static readonly uint F_emissionMeshName = HashAlgorithms.Fnv1a("emissionMeshName");
+        private static readonly uint F_emissionSurfaceDefinition = HashAlgorithms.Fnv1a("emissionSurfaceDefinition");
+        private static readonly uint F_useEmissionMeshNormal = HashAlgorithms.Fnv1a("useEmissionMeshNormalForBirth");
+        private static readonly uint F_translationOverride = HashAlgorithms.Fnv1a("translationOverride");
+        private static readonly uint F_rotationOverride = HashAlgorithms.Fnv1a("rotationOverride");
+        private static readonly uint F_scaleOverride = HashAlgorithms.Fnv1a("scaleOverride");
+        private static readonly uint F_postRotateOrientationAxis = HashAlgorithms.Fnv1a("postRotateOrientationAxis");
+        private static readonly uint F_period = HashAlgorithms.Fnv1a("period");
+        private static readonly uint F_timeActiveDuringPeriod = HashAlgorithms.Fnv1a("timeActiveDuringPeriod");
+        private const uint F_spawnShape              = 0x3bf0b4ed; // SpawnShape
+        private static readonly uint F_emitOffset    = HashAlgorithms.Fnv1a("emitOffset");
+        private static readonly uint F_emitRotAxes   = HashAlgorithms.Fnv1a("emitRotationAxes");
+        private static readonly uint F_emitRotAngles = HashAlgorithms.Fnv1a("emitRotationAngles");
+        private static readonly uint F_shapeSize      = HashAlgorithms.Fnv1a("Size");
+        private static readonly uint F_shapeRadius    = HashAlgorithms.Fnv1a("radius");
+        private static readonly uint F_shapeHeight    = HashAlgorithms.Fnv1a("height");
+        private static readonly uint F_shapeFlags     = HashAlgorithms.Fnv1a("flags");
+        private static readonly uint F_direction     = HashAlgorithms.Fnv1a("isDirectionOriented");
+        private static readonly uint F_texture       = HashAlgorithms.Fnv1a("texture");
+        private static readonly uint F_textureMult   = HashAlgorithms.Fnv1a("textureMult");
+        private static readonly uint F_emitterUvScroll = HashAlgorithms.Fnv1a("emitterUvScrollRate");
+        private static readonly uint F_texDiv        = HashAlgorithms.Fnv1a("texDiv");
+        private static readonly uint F_texDivMult    = HashAlgorithms.Fnv1a("texDivMult");
+        private static readonly uint F_numFrames     = HashAlgorithms.Fnv1a("numFrames");
+        private static readonly uint F_randomStart   = HashAlgorithms.Fnv1a("isRandomStartFrame");
+        private static readonly uint F_birthFrameRate= HashAlgorithms.Fnv1a("birthFrameRate");
+        private static readonly uint F_frameRate     = HashAlgorithms.Fnv1a("frameRate");
+        private static readonly uint F_birthUvScrollMult = HashAlgorithms.Fnv1a("birthUvScrollRateMult");
+        private static readonly uint F_birthUvOffsetMult = HashAlgorithms.Fnv1a("birthUVOffsetMult");
+        private static readonly uint F_particleUvScroll = HashAlgorithms.Fnv1a("particleUVScrollRate");
+        private static readonly uint F_particleUvRotate = HashAlgorithms.Fnv1a("particleUVRotateRate");
+        private static readonly uint F_birthUvRotate = HashAlgorithms.Fnv1a("birthUvRotateRate");
+        private static readonly uint F_particleUvScrollMult = HashAlgorithms.Fnv1a("ParticleIntegratedUvScrollMult");
+        private static readonly uint F_particleUvRotateMult = HashAlgorithms.Fnv1a("ParticleIntegratedUvRotateMult");
+        private static readonly uint F_birthUvRotateMult = HashAlgorithms.Fnv1a("birthUvRotateRateMult");
+        private static readonly uint F_uvScaleMult = HashAlgorithms.Fnv1a("uvScaleMult");
+        private static readonly uint F_uvRotationMult = HashAlgorithms.Fnv1a("UvRotationMult");
+        private static readonly uint F_texAddressMult = HashAlgorithms.Fnv1a("texAddressModeMult");
+        private static readonly uint F_textureMultFlipV = HashAlgorithms.Fnv1a("TextureMultFilpV");
+        private static readonly uint F_textureMultFlipU = HashAlgorithms.Fnv1a("TextureMultFilpU");
+        private static readonly uint F_textureMultRandomStart = HashAlgorithms.Fnv1a("isRandomStartFrameMult");
+        private static readonly uint F_textureMultTransformCenter = HashAlgorithms.Fnv1a("uvTransformCenterMult");
+        private static readonly uint F_textureMultClampUv = HashAlgorithms.Fnv1a("uvScrollClampMult");
+        private static readonly uint F_textureMultEmitterUvScroll = HashAlgorithms.Fnv1a("emitterUvScrollRateMult");
+        private static readonly uint F_textureMultScrollAlpha = HashAlgorithms.Fnv1a("uvScrollAlphaMult");
+        private static readonly uint F_birthUvOffset = HashAlgorithms.Fnv1a("birthUVOffset");
+        private static readonly uint F_uvScale       = HashAlgorithms.Fnv1a("uvScale");
+        private static readonly uint F_uvRotation    = HashAlgorithms.Fnv1a("uvRotation");
+        private static readonly uint F_uvTransformCenter = HashAlgorithms.Fnv1a("uvTransformCenter");
+        private static readonly uint F_primitive     = HashAlgorithms.Fnv1a("primitive");
+        private static readonly uint F_startFrame    = HashAlgorithms.Fnv1a("startFrame");
+        private static readonly uint F_legacySimple  = HashAlgorithms.Fnv1a("LegacySimple");
+        private static readonly uint F_legacyBirthScale = HashAlgorithms.Fnv1a("birthScale");
+        private static readonly uint F_legacyScale = HashAlgorithms.Fnv1a("scale");
+        private static readonly uint F_legacyBirthRotation = HashAlgorithms.Fnv1a("birthRotation");
+        private static readonly uint F_legacyBirthRotVel = HashAlgorithms.Fnv1a("birthRotationalVelocity");
+        private static readonly uint F_shape = HashAlgorithms.Fnv1a("shape");
+        private static readonly uint F_distortionDefinition = HashAlgorithms.Fnv1a("distortionDefinition");
+        private static readonly uint F_distortion = HashAlgorithms.Fnv1a("distortion");
+        private static readonly uint F_distortionMode = HashAlgorithms.Fnv1a("distortionMode");
+        private static readonly uint F_normalMapTexture = HashAlgorithms.Fnv1a("normalMapTexture");
+        private static readonly uint F_alphaErosionDefinition = HashAlgorithms.Fnv1a("alphaErosionDefinition");
+        private static readonly uint F_erosionMapName = HashAlgorithms.Fnv1a("erosionMapName");
+        private static readonly uint F_erosionDriveCurve = HashAlgorithms.Fnv1a("erosionDriveCurve");
+        private static readonly uint F_erosionFeatherIn = HashAlgorithms.Fnv1a("erosionFeatherIn");
+        private static readonly uint F_erosionFeatherOut = HashAlgorithms.Fnv1a("erosionFeatherOut");
+        private static readonly uint F_erosionMapAddressMode = HashAlgorithms.Fnv1a("erosionMapAddressMode");
+        private static readonly uint F_erosionMapChannelMixer = HashAlgorithms.Fnv1a("erosionMapChannelMixer");
+        private static readonly uint F_softParticleParams = HashAlgorithms.Fnv1a("softParticleParams");
+        private static readonly uint F_softBeginIn = HashAlgorithms.Fnv1a("beginIn");
+        private static readonly uint F_softDeltaIn = HashAlgorithms.Fnv1a("deltaIn");
+        private static readonly uint F_softBeginOut = HashAlgorithms.Fnv1a("beginOut");
+        private static readonly uint F_softDeltaOut = HashAlgorithms.Fnv1a("deltaOut");
+        private static readonly uint F_reflectionDefinition = HashAlgorithms.Fnv1a("reflectionDefinition");
+        private static readonly uint F_reflectionOpacityDirect = HashAlgorithms.Fnv1a("reflectionOpacityDirect");
+        private static readonly uint F_reflectionOpacityGlancing = HashAlgorithms.Fnv1a("reflectionOpacityGlancing");
+        private static readonly uint F_reflectionFresnel = HashAlgorithms.Fnv1a("reflectionFresnel");
+        private static readonly uint F_fresnel = HashAlgorithms.Fnv1a("fresnel");
+        private static readonly uint F_fresnelColor = HashAlgorithms.Fnv1a("fresnelColor");
+        private static readonly uint F_reflectionFresnelColor = HashAlgorithms.Fnv1a("reflectionFresnelColor");
+        private static readonly uint F_reflectionMapTexture = HashAlgorithms.Fnv1a("reflectionMapTexture");
+        private static readonly uint F_childParticleSet = HashAlgorithms.Fnv1a("childParticleSetDefinition");
+        private static readonly uint F_childrenIdentifiers = HashAlgorithms.Fnv1a("childrenIdentifiers");
+        private static readonly uint F_childEmitOnDeath = HashAlgorithms.Fnv1a("childEmitOnDeath");
+        private static readonly uint F_childrenProbability = HashAlgorithms.Fnv1a("childrenProbability");
+        private static readonly uint F_parentInheritance = HashAlgorithms.Fnv1a("ParentInheritanceDefinition");
+        private static readonly uint F_relativeOffset = HashAlgorithms.Fnv1a("RelativeOffset");
+        private static readonly uint F_inheritanceMode = HashAlgorithms.Fnv1a("Mode");
+        private static readonly uint F_effectName = HashAlgorithms.Fnv1a("effectName");
+        private static readonly uint F_effect = HashAlgorithms.Fnv1a("effect");
+        private static readonly uint F_effectKey = HashAlgorithms.Fnv1a("effectKey");
+        private static readonly uint F_fieldCollection = HashAlgorithms.Fnv1a("fieldCollectionDefinition");
+        private static readonly uint F_fieldAccelerationDefinitions = HashAlgorithms.Fnv1a("fieldAccelerationDefinitions");
+        private static readonly uint F_fieldAttractionDefinitions = HashAlgorithms.Fnv1a("fieldAttractionDefinitions");
+        private static readonly uint F_fieldDragDefinitions = HashAlgorithms.Fnv1a("fieldDragDefinitions");
+        private static readonly uint F_fieldOrbitalDefinitions = HashAlgorithms.Fnv1a("fieldOrbitalDefinitions");
+        private static readonly uint F_fieldNoiseDefinitions = HashAlgorithms.Fnv1a("fieldNoiseDefinitions");
+        private static readonly uint F_isLocalSpace = HashAlgorithms.Fnv1a("isLocalSpace");
+        private static readonly uint F_position = HashAlgorithms.Fnv1a("position");
+        private static readonly uint F_radius = HashAlgorithms.Fnv1a("radius");
+        private static readonly uint F_strength = HashAlgorithms.Fnv1a("strength");
+        private static readonly uint F_directionField = HashAlgorithms.Fnv1a("direction");
+        private static readonly uint F_frequency = HashAlgorithms.Fnv1a("frequency");
+        private static readonly uint F_velocityDelta = HashAlgorithms.Fnv1a("velocityDelta");
+        private static readonly uint F_axisFraction = HashAlgorithms.Fnv1a("axisFraction");
+
+        // Value* / dynamics inner fields
+        private static readonly uint F_constantValue = HashAlgorithms.Fnv1a("constantValue");
+        private static readonly uint F_dynamics      = HashAlgorithms.Fnv1a("dynamics");
+        private static readonly uint F_times         = HashAlgorithms.Fnv1a("times");
+        private static readonly uint F_values        = HashAlgorithms.Fnv1a("values");
+        private static readonly uint F_probTables    = HashAlgorithms.Fnv1a("probabilityTables");
+        private static readonly uint F_keyTimes      = HashAlgorithms.Fnv1a("keyTimes");
+        private static readonly uint F_keyValues     = HashAlgorithms.Fnv1a("keyValues");
+        private static readonly uint F_meshDef       = 0x0d89732d; // VfxPrimitiveMesh's VfxMeshDefinitionData field
+        private static readonly uint F_simpleMesh    = HashAlgorithms.Fnv1a("mSimpleMeshName");
+        private static readonly uint F_meshName      = HashAlgorithms.Fnv1a("mMeshName");
+        private static readonly uint F_submeshesToDrawAlways = HashAlgorithms.Fnv1a("mSubmeshesToDrawAlways");
+        private static readonly uint F_submeshesToDraw = HashAlgorithms.Fnv1a("mSubmeshesToDraw");
+        private static readonly uint F_birthUvScroll = HashAlgorithms.Fnv1a("birthUvScrollRate");
+        private static readonly uint F_meshSkeleton  = 0x90595a15; // VfxMeshDefinitionData skeleton field
+        private static readonly uint F_meshAnim      = HashAlgorithms.Fnv1a("mAnimationName");
+        private static readonly uint F_trailDefinition = HashAlgorithms.Fnv1a("mTrail");
+        private static readonly uint F_trailBirthTilingSize = HashAlgorithms.Fnv1a("mBirthTilingSize");
+        private static readonly uint F_trailSmoothingMode = HashAlgorithms.Fnv1a("mSmoothingMode");
+        private static readonly uint F_trailMode = HashAlgorithms.Fnv1a("mMode");
+        private static readonly uint F_trailMaxAddedPerFrame = HashAlgorithms.Fnv1a("mMaxAddedPerFrame");
+        private static readonly uint F_trailCutoff = HashAlgorithms.Fnv1a("mCutoff");
+
+        // primitive class hashes we treat as "mesh"
+        private static readonly uint PrimMesh = HashAlgorithms.Fnv1a("VfxPrimitiveMesh");
+        private static readonly uint PrimAttachedMesh = HashAlgorithms.Fnv1a("VfxPrimitiveAttachedMesh");
+        private static readonly uint PrimArbitraryQuad = HashAlgorithms.Fnv1a("VfxPrimitiveArbitraryQuad");
+        private static readonly uint PrimCameraQuad = HashAlgorithms.Fnv1a("VfxPrimitiveCameraQuad");
+        private static readonly uint PrimCameraUnitQuad = HashAlgorithms.Fnv1a("VfxPrimitiveCameraUnitQuad");
+        private static readonly uint PrimCameraTrail = HashAlgorithms.Fnv1a("VfxPrimitiveCameraTrail");
+        private static readonly uint PrimArbitraryTrail = HashAlgorithms.Fnv1a("VfxPrimitiveArbitraryTrail");
+        private static readonly uint PrimRay = HashAlgorithms.Fnv1a("VfxPrimitiveRay");
+        private static readonly uint PrimBeam = HashAlgorithms.Fnv1a("VfxPrimitiveBeam");
+        private static readonly uint PrimCameraSegmentBeam = HashAlgorithms.Fnv1a("VfxPrimitiveCameraSegmentBeam");
+        private static readonly uint PrimPlanarProjection = HashAlgorithms.Fnv1a("VfxPrimitivePlanarProjection");
+        private static readonly uint ShapeLegacy = HashAlgorithms.Fnv1a("VfxShapeLegacy");
+        private static readonly uint ShapeBox = HashAlgorithms.Fnv1a("VfxShapeBox");
+        private static readonly uint ShapeSphere = HashAlgorithms.Fnv1a("VfxShapeSphere");
+        private static readonly uint ShapeCylinder = HashAlgorithms.Fnv1a("VfxShapeCylinder");
+
+        private static readonly uint ResolverClass = HashAlgorithms.Fnv1a("ResourceResolver");
+        private static readonly uint F_resourceMap = HashAlgorithms.Fnv1a("resourceMap");
+        private static readonly uint F_mResourceMap = HashAlgorithms.Fnv1a("mResourceMap");
+
+        // animation particle event fields
+        private static readonly uint ParticleEventClass = HashAlgorithms.Fnv1a("ParticleEventData");
+        private static readonly uint F_eventDataMap = HashAlgorithms.Fnv1a("mEventDataMap");
+        private static readonly uint F_clipDataMap = HashAlgorithms.Fnv1a("mClipDataMap");
+        private static readonly uint F_clipTickDuration = HashAlgorithms.Fnv1a("mTickDuration");
+        private static readonly uint F_clipStartFrame = HashAlgorithms.Fnv1a("startFrame");
+        private static readonly uint F_clipEndFrame = HashAlgorithms.Fnv1a("EndFrame");
+        private static readonly uint SkinCharacterDataPropertiesClass = HashAlgorithms.Fnv1a("SkinCharacterDataProperties");
+        private static readonly uint F_skinMeshProperties = HashAlgorithms.Fnv1a("skinMeshProperties");
+        private static readonly uint F_simpleSkin = HashAlgorithms.Fnv1a("simpleSkin");
+        private static readonly uint F_ownerSkeleton = HashAlgorithms.Fnv1a("skeleton");
+        private static readonly uint F_skinScale = HashAlgorithms.Fnv1a("skinScale");
+        private static readonly uint F_eventName = HashAlgorithms.Fnv1a("mName");
+        private static readonly uint F_eventStartFrame = HashAlgorithms.Fnv1a("mStartFrame");
+        private static readonly uint F_eventEndFrame = HashAlgorithms.Fnv1a("mEndFrame");
+        private static readonly uint F_eventIsSelfOnly = HashAlgorithms.Fnv1a("mIsSelfOnly");
+        private static readonly uint F_eventFireIfAnimationEndsEarly = HashAlgorithms.Fnv1a("mFireIfAnimationEndsEarly");
+        private static readonly uint F_eventEffectKey = HashAlgorithms.Fnv1a("mEffectKey");
+        private static readonly uint F_eventEnemyEffectKey = HashAlgorithms.Fnv1a("mEnemyEffectKey");
+        private static readonly uint F_eventEffectName = HashAlgorithms.Fnv1a("mEffectName");
+        private static readonly uint F_eventIsLoop = HashAlgorithms.Fnv1a("mIsLoop");
+        private static readonly uint F_eventIsKill = HashAlgorithms.Fnv1a("mIsKillEvent");
+        private static readonly uint F_eventIsDetachable = HashAlgorithms.Fnv1a("mIsDetachable");
+        private static readonly uint F_eventSkipIfPastEndFrame = HashAlgorithms.Fnv1a("SkipIfPastEndFrame");
+        private static readonly uint F_eventScalePlaySpeed = HashAlgorithms.Fnv1a("mScalePlaySpeedWithAnimation");
+        private static readonly uint F_eventScale = HashAlgorithms.Fnv1a("scale");
+        private static readonly uint F_eventPairList = HashAlgorithms.Fnv1a("mParticleEventDataPairList");
+        private static readonly uint F_eventSourceBone = HashAlgorithms.Fnv1a("mBoneName");
+        private static readonly uint F_eventTargetBone = HashAlgorithms.Fnv1a("mTargetBoneName");
+        private static readonly uint F_idleParticlesEffects = 0x84186f3c;
+        private static readonly uint F_idlePosition = 0x934f4e0a;
+        private static readonly uint F_animationResourceData = 0xb49f754e;
+        private static readonly uint F_animationFilePath = 0x0329f1d7;
+        private static readonly uint F_clipName = HashAlgorithms.Fnv1a("mClipName");
+        private static readonly uint F_trackDataName = HashAlgorithms.Fnv1a("mTrackDataName");
         private static BinTree ParseTree(byte[] data)
         {
             ArgumentNullException.ThrowIfNull(data);
@@ -31,7 +329,39 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 ExtractResourceMap(tree),
                 tree.Dependencies.ToArray(),
                 ExtractEventSequences(tree),
-                ExtractOwnerSceneContext(tree));
+                ExtractOwnerSceneContext(tree),
+                ExtractIdleEffects(tree));
+        }
+
+        private static IReadOnlyList<VfxIdleEffectDefinition> ExtractIdleEffects(BinTree tree)
+        {
+            var idleEffects = new List<VfxIdleEffectDefinition>();
+            foreach (BinTreeObject owner in tree.Objects.Values)
+            {
+                if (owner.ClassHash != SkinCharacterDataPropertiesClass) continue;
+                var prop = Get(owner.Properties, F_idleParticlesEffects);
+                if (prop is not BinTreeContainer container) continue;
+                foreach (var elem in container.Elements.OfType<BinTreeStruct>())
+                {
+                    uint effectKey = AsU32(Get(elem.Properties, F_eventEffectKey)) ?? 0u;
+                    string effectName = GetString(elem.Properties, F_eventEffectName) ?? string.Empty;
+                    string boneName = GetString(elem.Properties, F_eventSourceBone) ?? string.Empty;
+                    uint boneNameHash = AsU32(Get(elem.Properties, F_eventSourceBone)) ?? (string.IsNullOrEmpty(boneName) ? 0u : HashAlgorithms.Fnv1a(boneName));
+                    string targetBoneName = GetString(elem.Properties, F_eventTargetBone) ?? string.Empty;
+                    uint targetBoneNameHash = AsU32(Get(elem.Properties, F_eventTargetBone)) ?? (string.IsNullOrEmpty(targetBoneName) ? 0u : HashAlgorithms.Fnv1a(targetBoneName));
+                    Vector3 position = AsVec3(Get(elem.Properties, F_idlePosition)) ?? Vector3.Zero;
+
+                    idleEffects.Add(new VfxIdleEffectDefinition(
+                        effectKey,
+                        effectName,
+                        boneName,
+                        boneNameHash,
+                        targetBoneName,
+                        targetBoneNameHash,
+                        position));
+                }
+            }
+            return idleEffects;
         }
 
         private static VfxOwnerSceneContext ExtractOwnerSceneContext(BinTree tree)
@@ -44,11 +374,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     continue;
                 }
 
-                string meshPath = GetString(meshProperties.Properties, F_simpleSkin);
+                string meshPath = ReadAsset(meshProperties.Properties, F_simpleSkin, ".skn");
                 if (string.IsNullOrWhiteSpace(meshPath)) continue;
                 return new VfxOwnerSceneContext(
                     meshPath,
-                    GetString(meshProperties.Properties, F_ownerSkeleton) ?? string.Empty,
+                    ReadAsset(meshProperties.Properties, F_ownerSkeleton, ".skl") ?? string.Empty,
                     Math.Max(0.01f, GetF32(meshProperties.Properties, F_skinScale) ?? 1f));
             }
             return null;
@@ -64,11 +394,29 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 foreach (var clipPair in clipMap)
                 {
                     if (clipPair.Value is not BinTreeStruct clip) continue;
+
+                    string clipName = clipPair.Key switch
+                    {
+                        BinTreeString s => s.Value,
+                        _ => GetString(clip.Properties, F_clipName)
+                    };
+
+                    string animFilePath = null;
+                    if (Get(clip.Properties, F_animationResourceData) is BinTreeStruct animResource)
+                    {
+                        animFilePath = ReadAsset(animResource.Properties, F_animationFilePath, ".anm");
+                    }
+
                     AddEventSequence(
                         sequences,
-                        AsU32(clipPair.Key) ?? owner.PathHash,
+                        AsU32(clipPair.Key) ?? 0u,
                         clip.ClassHash,
-                        clip.Properties);
+                        clip.Properties,
+                        clipName,
+                        animFilePath,
+                        owner.PathHash,
+                        ReadClipChildren(clip.Properties),
+                        includeEmpty: true);
                 }
             }
             return sequences;
@@ -78,24 +426,61 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             ICollection<VfxEventSequenceDefinition> sequences,
             uint ownerPathHash,
             uint ownerClassHash,
-            IReadOnlyDictionary<uint, BinTreeProperty> properties)
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            string clipName = null,
+            string animationFilePath = null,
+            uint graphPathHash = 0,
+            IReadOnlyList<uint> childClipHashes = null,
+            bool includeEmpty = false)
         {
-            if (Get(properties, F_eventDataMap) is not BinTreeMap eventMap) return;
             var events = new List<VfxParticleEventDefinition>();
-            foreach (var pair in eventMap)
+            if (Get(properties, F_eventDataMap) is BinTreeMap eventMap)
             {
-                if (pair.Value is not BinTreeStruct eventData || eventData.ClassHash != ParticleEventClass)
-                    continue;
-                events.Add(ParseParticleEvent(AsU32(pair.Key) ?? 0u, eventData));
+                foreach (var pair in eventMap)
+                {
+                    if (pair.Value is not BinTreeStruct eventData || eventData.ClassHash != ParticleEventClass)
+                        continue;
+                    events.Add(ParseParticleEvent(AsU32(pair.Key) ?? 0u, eventData));
+                }
             }
-            if (events.Count == 0) return;
+            if (events.Count == 0 && !includeEmpty) return;
             sequences.Add(new VfxEventSequenceDefinition(
                 ownerPathHash,
                 ownerClassHash,
-                Math.Max(0.0001f, GetF32(properties, F_clipTickDuration) ?? (1f / 30f)),
+                GetF32(properties, F_clipTickDuration) is { } tick && float.IsFinite(tick) && tick > 0 ? tick : 0,
                 GetF32(properties, F_clipStartFrame) ?? 0f,
                 GetF32(properties, F_clipEndFrame) ?? -1f,
-                events));
+                events,
+                clipName,
+                animationFilePath,
+                graphPathHash,
+                childClipHashes));
+        }
+
+        private static IReadOnlyList<uint> ReadClipChildren(IReadOnlyDictionary<uint, BinTreeProperty> properties)
+        {
+            var children = new List<uint>();
+            void Add(BinTreeProperty property)
+            {
+                if (AsU32(property) is uint hash && hash != 0u) children.Add(hash);
+            }
+            foreach (var (field, itemField) in new (uint, uint)[]
+            {
+                (0x2ec3ba66, 0xca2b847d), (0x512c9525, 0xca2b847d),
+                (0x4d7a54c0, 0), (0x24af5ac1, 0), (0x2329eec5, 0xca2b847d),
+                (0x078cafd9, 0), (0xd188b400, 0x68c14f60), (0x9a7f92cb, 0),
+                (0x8e5e6618, 0), (0x21328a43, 0xc6f291ed), (0x778d6dee, 0x68c14f60)
+            })
+            {
+                BinTreeProperty value = Get(properties, field);
+                if (value is BinTreeContainer container)
+                {
+                    foreach (BinTreeProperty item in container.Elements)
+                        Add(itemField != 0 && item is BinTreeStruct pair ? Get(pair.Properties, itemField) : item);
+                }
+                else Add(value);
+            }
+            return children;
         }
 
         private static VfxParticleEventDefinition ParseParticleEvent(uint eventHash, BinTreeStruct eventData)
@@ -120,8 +505,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 AsU32(Get(properties, F_eventEffectKey)) ?? 0u,
                 AsU32(Get(properties, F_eventEnemyEffectKey)) ?? 0u,
                 GetString(properties, F_eventEffectName) ?? string.Empty,
-                GetBool(properties, F_eventIsLoop, defaultValue: true),
-                GetBool(properties, F_eventIsKill, defaultValue: true),
+                GetBool(properties, F_eventIsLoop),
+                GetBool(properties, F_eventIsKill),
                 GetBool(properties, F_eventIsDetachable),
                 GetBool(properties, F_eventIsSelfOnly),
                 GetBool(properties, F_eventFireIfAnimationEndsEarly),
@@ -139,15 +524,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 if (o.ClassHash != ResolverClass) continue;
                 if (!o.Properties.TryGetValue(F_resourceMap, out var prop)
                     && !o.Properties.TryGetValue(F_mResourceMap, out prop)) continue;
-                if (prop is not System.Collections.IEnumerable entries || prop is BinTreeString) continue;
+                if (prop is not BinTreeMap entries) continue;
                 foreach (var kv in entries)
                 {
-                    var kvType = kv.GetType();
-                    var key = kvType.GetProperty("Key")?.GetValue(kv);
-                    var val = kvType.GetProperty("Value")?.GetValue(kv);
-                    uint kh = key switch { BinTreeHash h => h.Value, BinTreeU32 u => u.Value, _ => 0u };
-                    uint vh = val switch { BinTreeObjectLink ol => ol.Value, BinTreeHash h => h.Value, BinTreeU32 u => u.Value, _ => 0u };
-                    if (kh != 0 && vh != 0) map[kh] = vh;
+                    uint key = AsU32(kv.Key) ?? 0u;
+                    uint value = AsU32(kv.Value) ?? 0u;
+                    if (key != 0 && value != 0) map.TryAdd(key, value);
                 }
             }
             return map;
@@ -173,9 +555,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             string path = GetString(o.Properties, F_particlePath) ?? "";
 
             var emitters = new List<VfxEmitterDefinition>();
-            foreach (var (_, prop) in o.Properties)
+            foreach (uint listHash in EmitterLists)
             {
-                if (prop is not BinTreeContainer c) continue;
+                if (Get(o.Properties, listHash) is not BinTreeContainer c) continue;
                 foreach (var el in c.Elements)
                     if (el is BinTreeStruct s && s.ClassHash == EmitterClass)
                         emitters.Add(ParseEmitter(s));
@@ -235,9 +617,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             VfxTrailDefinition trail = null;
             if (isMesh && prim is BinTreeStruct ps2 && Get(ps2.Properties, F_meshDef) is BinTreeStruct md)
             {
-                meshPath = GetString(md.Properties, F_simpleMesh) ?? GetString(md.Properties, F_meshName);
-                meshSkl = GetString(md.Properties, F_meshSkeleton);
-                meshAnm = GetString(md.Properties, F_meshAnim);
+                meshPath = ReadAsset(md.Properties, F_simpleMesh, ".scb") ?? ReadAsset(md.Properties, F_meshName, ".scb");
+                meshSkl = ReadAsset(md.Properties, F_meshSkeleton, ".skl");
+                meshAnm = ReadAsset(md.Properties, F_meshAnim, ".anm");
                 attachedSubmeshHashes = ReadHashContainer(Get(md.Properties, F_submeshesToDrawAlways))
                     .Concat(ReadHashContainer(Get(md.Properties, F_submeshesToDraw)))
                     .Distinct()
@@ -274,7 +656,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             Vector2 textureMultEmitterUvScroll = Vector2.Zero;
             if (Get(p, F_textureMult) is BinTreeStruct textureMult)
             {
-                textureMultPath = GetString(textureMult.Properties, F_textureMult);
+                textureMultPath = ReadAsset(textureMult.Properties, F_textureMult, ".tex");
                 textureMultTexDiv = ReadValueVec2(Get(textureMult.Properties, F_texDivMult)) ?? Vector2.One;
                 textureMultBirthUvScroll = ReadCurve2(textureMult.Properties, F_birthUvScrollMult);
                 textureMultUvScroll = textureMultBirthUvScroll?.Constant ?? Vector2.Zero;
@@ -305,7 +687,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 distortion = new VfxDistortionDefinition(
                     GetF32(dp, F_distortion) ?? 0f,
                     GetU8(dp, F_distortionMode) ?? 0,
-                    GetString(dp, F_normalMapTexture));
+                    ReadAsset(dp, F_normalMapTexture, ".tex"));
             }
 
             VfxAlphaErosionDefinition alphaErosion = null;
@@ -313,7 +695,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             {
                 var ep = erosionData.Properties;
                 alphaErosion = new VfxAlphaErosionDefinition(
-                    GetString(ep, F_erosionMapName),
+                    ReadAsset(ep, F_erosionMapName, ".tex"),
                     ReadCurveF(ep, F_erosionDriveCurve) ?? VfxCurveF.Const(1f),
                     GetF32(ep, F_erosionFeatherIn) ?? 0.1f,
                     GetF32(ep, F_erosionFeatherOut) ?? 0.1f,
@@ -343,7 +725,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     GetF32(rp, F_fresnel) ?? 1f,
                     GetVec4(rp, F_fresnelColor) ?? Vector4.Zero,
                     GetVec4(rp, F_reflectionFresnelColor) ?? Vector4.One,
-                    GetString(rp, F_reflectionMapTexture));
+                    ReadAsset(rp, F_reflectionMapTexture, ".tex"));
             }
 
             bool isSingle = GetBool(p, F_isSingle);
@@ -368,7 +750,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 Acceleration: ReadCurve3(p, F_worldAccel),
                 BirthRotationalVelocity: birthRotationalVelocity,
                 EmitterPosition: ReadCurve3(p, F_emitterPos) ?? VfxCurve3.Const(Vector3.Zero),
-                TexturePath: GetString(p, F_texture),
+                TexturePath: ReadAsset(p, F_texture, ".tex"),
                 TexDiv: GetVec2(p, F_texDiv) ?? Vector2.One,
                 NumFrames: GetU16(p, F_numFrames) ?? 1,
                 RandomStartFrame: GetBool(p, F_randomStart),
@@ -378,7 +760,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 MeshSkeletonPath: meshSkl,
                 MeshAnimationPath: meshAnm,
                 SpawnShape: ReadSpawnShape(p),
-                BirthAcceleration: ReadCurve3(p, F_birthAccel) ?? ReadCurve3(p, F_accel),
+                BirthAcceleration: ReadCurve3(p, F_birthAccel),
+                AccelerationOverLife: ReadCurve3(p, F_accel),
+                BirthRotationalAcceleration: ReadCurve3(p, F_birthRotAccel),
+                TranslationOverride: AsVec3(Get(p, F_translationOverride)),
+                RotationOverride: AsVec3(Get(p, F_rotationOverride)),
+                ScaleOverride: AsVec3(Get(p, F_scaleOverride)),
                 BirthOrbitalVelocity: ReadCurve3(p, F_birthOrbital),
                 BirthDrag: ReadCurve3(p, F_birthDrag),
                 DragOverLife: ReadCurve3(p, F_drag),
@@ -393,7 +780,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 StartFrame: GetU16(p, F_startFrame) ?? 0,
                 UseTextureAspect: legacy is not null,
                 Distortion: distortion,
-                ParticleColorTexturePath: GetString(p, F_particleColorTex),
+                ParticleColorTexturePath: ReadAsset(p, F_particleColorTex, ".tex"),
                 ColorLookUpTypeX: GetU8(p, F_colorLookUpX) ?? VfxAuthoredDefaults.ColorLookUpTypeX,
                 ColorLookUpTypeY: GetU8(p, F_colorLookUpY) ?? VfxAuthoredDefaults.ColorLookUpTypeY,
                 RenderState: new VfxEmitterRenderState(
@@ -472,7 +859,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 RateByVelocityFunction: ReadCurve2(p, F_rateByVelocityFunction),
                 HasPostRotateOrientation: GetBool(p, F_hasPostRotateOrientation),
                 ParticlesShareRandomValue: GetBool(p, F_particlesShareRandomValue),
-                FalloffTexturePath: GetString(p, F_falloffTexture),
+                FalloffTexturePath: ReadAsset(p, F_falloffTexture, ".tex"),
                 AudioSoundOnCreate: audioSoundOnCreate,
                 FilteringKeywordsExcluded: filteringKeywords,
                 AttachedSubmeshHashes: attachedSubmeshHashes,
@@ -529,7 +916,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return new VfxPaletteDefinition(
                 Math.Max(1, GetI32(palette.Properties, F_paletteCount) ?? 1),
                 ReadCurve3(palette.Properties, F_paletteSelector) ?? VfxCurve3.Const(Vector3.Zero),
-                GetString(palette.Properties, F_paletteTexture),
+                ReadAsset(palette.Properties, F_paletteTexture, ".tex"),
                 sourceMixColor?.Constant ?? Vector4.UnitX);
         }
 
@@ -814,6 +1201,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static string GetString(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
             => Get(p, hash) is BinTreeString s ? s.Value : null;
 
+        private static string ReadAsset(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash, string extension)
+            => Get(p, hash) switch
+            {
+                BinTreeString text => text.Value,
+                BinTreeWadChunkLink link => $"{link.Value:x16}{extension}",
+                _ => null
+            };
+
         private static float? GetF32(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash) => AsF32(Get(p, hash));
 
         private static float? GetOptionalF32(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
@@ -884,6 +1279,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             BinTreeU32 u => u.Value,
             BinTreeHash h => h.Value,
             BinTreeObjectLink ol => ol.Value,
+            BinTreeString text => HashAlgorithms.Fnv1a(text.Value),
             _ => null
         };
 

@@ -24,7 +24,8 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyDictionary<uint, uint> ResourceMap,
         IReadOnlyList<string> Dependencies,
         IReadOnlyList<VfxEventSequenceDefinition> EventSequences,
-        VfxOwnerSceneContext OwnerSceneContext);
+        VfxOwnerSceneContext OwnerSceneContext,
+        IReadOnlyList<VfxIdleEffectDefinition> IdleEffects = null);
 
     /// <summary>
     /// Domain graph for a League VFX system and its emitter nodes.
@@ -46,7 +47,7 @@ namespace AssetsManager.Views.Models.Viewer
         float? EmitterLifetime,         // emitter runtime; null = infinite (loops)
         float ParticleLinger,           // retention window used while an emitter shuts down
         float TimeBeforeFirstEmission,
-        bool IsSingleParticle,          // burst of exactly one particle
+        bool IsSingleParticle,          // one burst; rate determines its particle count
         bool Disabled,
         int BlendMode,                  // raw authored BIN value; VfxBlendModes owns its rendering semantics
         VfxCurve3 BirthScale,           // ABSOLUTE size at birth (birthScale0), world units
@@ -156,7 +157,12 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<string> FilteringKeywordsExcluded = null,
         Vector4? ModulationFactor = null,
         IReadOnlyList<uint> AttachedSubmeshHashes = null,
-        VfxEmitterAuthoredFeatures AuthoredFeatures = null)
+        VfxEmitterAuthoredFeatures AuthoredFeatures = null,
+        Vector3? TranslationOverride = null,
+        Vector3? RotationOverride = null,
+        Vector3? ScaleOverride = null,
+        VfxCurve3? AccelerationOverLife = null,
+        VfxCurve3? BirthRotationalAcceleration = null)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && PrimitiveKind != VfxPrimitiveKind.AttachedMesh && (!string.IsNullOrEmpty(TexturePath) ||
@@ -304,14 +310,12 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector3 SampleOffset(Random rng, float t, out Matrix4x4 rotation)
         {
             rotation = Matrix4x4.Identity;
+            bool volume = (Flags & 1) == 0;
             var offset = (Kind switch
             {
-                VfxSpawnShapeKind.Box => new Vector3(
-                    SignedUnit(rng) * Size.X * 0.5f,
-                    SignedUnit(rng) * Size.Y * 0.5f,
-                    SignedUnit(rng) * Size.Z * 0.5f),
-                VfxSpawnShapeKind.Sphere => SampleSphere(rng, Radius),
-                VfxSpawnShapeKind.Cylinder => SampleCylinder(rng, Radius, Height),
+                VfxSpawnShapeKind.Box => SampleBox(rng, Size, volume),
+                VfxSpawnShapeKind.Sphere => SampleSphere(rng, Radius, volume),
+                VfxSpawnShapeKind.Cylinder => SampleCylinder(rng, Radius, Height, volume),
                 _ => Vector3.Zero
             }) + EmitOffset.SampleBirth(t, rng);
             int count = Math.Min(RotationAxes.Count, RotationAngles.Count);
@@ -329,23 +333,30 @@ namespace AssetsManager.Views.Models.Viewer
 
         private static float SignedUnit(Random rng) => (float)(rng.NextDouble() * 2d - 1d);
 
-        private static Vector3 SampleSphere(Random rng, float radius)
+        private static Vector3 SampleBox(Random rng, Vector3 size, bool volume)
         {
-            float z = SignedUnit(rng);
-            float angle = (float)(rng.NextDouble() * Math.Tau);
-            float radial = MathF.Sqrt(MathF.Max(0f, 1f - z * z));
-            float distance = radius * MathF.Cbrt((float)rng.NextDouble());
-            return new Vector3(radial * MathF.Cos(angle), z, radial * MathF.Sin(angle)) * distance;
+            float x = SignedUnit(rng) * size.X * 0.5f;
+            float y = SignedUnit(rng) * size.Y * 0.5f;
+            float z = (volume ? SignedUnit(rng) : 1f) * size.Z * 0.5f;
+            return new Vector3(x, y, z);
         }
 
-        private static Vector3 SampleCylinder(Random rng, float radius, float height)
+        private static Vector3 SampleSphere(Random rng, float radius, bool volume)
         {
-            float angle = (float)(rng.NextDouble() * Math.Tau);
-            float distance = radius * MathF.Sqrt((float)rng.NextDouble());
-            return new Vector3(
-                MathF.Cos(angle) * distance,
-                SignedUnit(rng) * height * 0.5f,
-                MathF.Sin(angle) * distance);
+            float r = (volume ? (float)rng.NextDouble() : 1f) * radius;
+            float angleY = (float)(rng.NextDouble() * Math.Tau);
+            float angleZ = (float)(rng.NextDouble() * Math.Tau);
+            Matrix4x4 rot = Matrix4x4.CreateRotationY(angleY) * Matrix4x4.CreateRotationZ(angleZ);
+            return Vector3.Transform(new Vector3(r, 0, 0), rot);
+        }
+
+        private static Vector3 SampleCylinder(Random rng, float radius, float height, bool volume)
+        {
+            float r = (volume ? SignedUnit(rng) : 1f) * radius;
+            float h = (float)rng.NextDouble() * height; // Upwards 0..height (Riot / LTK spawnShape.ts)
+            float angleY = (float)(rng.NextDouble() * Math.Tau);
+            Matrix4x4 rot = Matrix4x4.CreateRotationY(angleY);
+            return Vector3.Transform(new Vector3(r, h, 0), rot);
         }
     }
 
@@ -368,12 +379,12 @@ namespace AssetsManager.Views.Models.Viewer
         public float SampleBirth(Random rng)
             => SampleBirth(0f, rng);
 
-        public float SampleBirth(float t, Random rng)
+        public float SampleBirth(float t, Random rng, float? sharedRoll = null)
         {
             float value = Sample(t);
-            return Prob is { Length: > 0 } && !Prob[0].IsEmpty
-                ? value * Prob[0].Sample((float)rng.NextDouble())
-                : value;
+            if (Prob is not { Length: > 0 } || Prob[0].IsEmpty) return value;
+            float roll = sharedRoll ?? (float)rng.NextDouble();
+            return value * Prob[0].Sample(roll);
         }
         public static readonly VfxCurveF Zero = new(0f, null, null);
         public static VfxCurveF Const(float v) => new(v, null, null);
@@ -390,13 +401,15 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector2 SampleBirth(Random rng)
             => SampleBirth(0f, rng);
 
-        public Vector2 SampleBirth(float t, Random rng)
+        public Vector2 SampleBirth(float t, Random rng, float? sharedRoll = null)
         {
             var value = Sample(t);
             if (Prob is not { Length: > 0 }) return value;
+            float roll0 = sharedRoll ?? (float)rng.NextDouble();
+            float roll1 = sharedRoll ?? (float)rng.NextDouble();
             return new Vector2(
-                Prob.Length > 0 && !Prob[0].IsEmpty ? value.X * Prob[0].Sample((float)rng.NextDouble()) : value.X,
-                Prob.Length > 1 && !Prob[1].IsEmpty ? value.Y * Prob[1].Sample((float)rng.NextDouble()) : value.Y);
+                Prob.Length > 0 && !Prob[0].IsEmpty ? value.X * Prob[0].Sample(roll0) : value.X,
+                Prob.Length > 1 && !Prob[1].IsEmpty ? value.Y * Prob[1].Sample(roll1) : value.Y);
         }
 
         public static VfxCurve2 Const(Vector2 value) => new(value, null, null);
@@ -414,14 +427,17 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector3 SampleBirth(Random rng)
             => SampleBirth(0f, rng);
 
-        public Vector3 SampleBirth(float t, Random rng)
+        public Vector3 SampleBirth(float t, Random rng, float? sharedRoll = null)
         {
             var v = Sample(t);
             if (Prob is not { Length: > 0 }) return v;
+            float roll0 = sharedRoll ?? (float)rng.NextDouble();
+            float roll1 = sharedRoll ?? (float)rng.NextDouble();
+            float roll2 = sharedRoll ?? (float)rng.NextDouble();
             return new Vector3(
-                Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample((float)rng.NextDouble()) : v.X,
-                Prob.Length > 1 && !Prob[1].IsEmpty ? v.Y * Prob[1].Sample((float)rng.NextDouble()) : v.Y,
-                Prob.Length > 2 && !Prob[2].IsEmpty ? v.Z * Prob[2].Sample((float)rng.NextDouble()) : v.Z);
+                Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample(roll0) : v.X,
+                Prob.Length > 1 && !Prob[1].IsEmpty ? v.Y * Prob[1].Sample(roll1) : v.Y,
+                Prob.Length > 2 && !Prob[2].IsEmpty ? v.Z * Prob[2].Sample(roll2) : v.Z);
         }
         public bool HasProb => Prob is { Length: > 0 } && Prob.Any(static p => !p.IsEmpty);
         public static VfxCurve3 Const(Vector3 v) => new(v, null, null);
@@ -438,15 +454,19 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector4 SampleBirth(Random rng)
             => SampleBirth(0f, rng);
 
-        public Vector4 SampleBirth(float t, Random rng)
+        public Vector4 SampleBirth(float t, Random rng, float? sharedRoll = null)
         {
             var v = Sample(t);
             if (Prob is not { Length: > 0 }) return v;
+            float roll0 = sharedRoll ?? (float)rng.NextDouble();
+            float roll1 = sharedRoll ?? (float)rng.NextDouble();
+            float roll2 = sharedRoll ?? (float)rng.NextDouble();
+            float roll3 = sharedRoll ?? (float)rng.NextDouble();
             return new Vector4(
-                Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample((float)rng.NextDouble()) : v.X,
-                Prob.Length > 1 && !Prob[1].IsEmpty ? v.Y * Prob[1].Sample((float)rng.NextDouble()) : v.Y,
-                Prob.Length > 2 && !Prob[2].IsEmpty ? v.Z * Prob[2].Sample((float)rng.NextDouble()) : v.Z,
-                Prob.Length > 3 && !Prob[3].IsEmpty ? v.W * Prob[3].Sample((float)rng.NextDouble()) : v.W);
+                Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample(roll0) : v.X,
+                Prob.Length > 1 && !Prob[1].IsEmpty ? v.Y * Prob[1].Sample(roll1) : v.Y,
+                Prob.Length > 2 && !Prob[2].IsEmpty ? v.Z * Prob[2].Sample(roll2) : v.Z,
+                Prob.Length > 3 && !Prob[3].IsEmpty ? v.W * Prob[3].Sample(roll3) : v.W);
         }
         public static VfxCurve4 Const(Vector4 v) => new(v, null, null);
     }
@@ -471,5 +491,27 @@ namespace AssetsManager.Views.Models.Viewer
             }
             return values[n - 1];
         }
+    }
+
+    public sealed record VfxOwnerSceneContext(
+        string MeshPath,
+        string SkeletonPath,
+        float SkinScale);
+
+    /// <summary>
+    /// Authored defaults from League's VfxEmitterDefinitionData schema. BIN omits
+    /// fields whose value equals these defaults, so parsing must not invent preview values.
+    /// </summary>
+    public static class VfxAuthoredDefaults
+    {
+        public const int BlendMode = 0;
+        public const byte AlphaReference = 5;
+        public const byte ColorLookUpTypeX = 1;
+        public const byte ColorLookUpTypeY = 0;
+        public const byte MeshRenderFlags = 1;
+        public const byte Importance = 1;
+        public const byte RenderPhaseOverride = 7;
+        public const byte StencilMode = 0;
+        public const byte StencilReference = 0;
     }
 }

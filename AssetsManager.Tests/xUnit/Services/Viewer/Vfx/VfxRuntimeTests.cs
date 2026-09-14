@@ -250,7 +250,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             for (int i = 0; i < 5; i++) simulator.Update(0.1f);
 
             var state = Assert.Single(simulator.Emitters);
-            Assert.Equal(6, state.InstanceCount);
+            Assert.Equal(5, state.InstanceCount);
             int last = (state.InstanceCount - 1) * VfxPlaybackRuntime.InstanceStride;
             Assert.InRange(state.Instances[last + 8], 0.499f, 0.501f);
         }
@@ -948,7 +948,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 EnemyEffectKey: 0,
                 EffectName: string.Empty,
                 IsLoop: false,
-                IsKillEvent: true,
+                IsKillEvent: false,
                 IsDetachable: false,
                 IsSelfOnly: false,
                 FireIfAnimationEndsEarly: false,

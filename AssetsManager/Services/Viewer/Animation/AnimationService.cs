@@ -20,6 +20,10 @@ namespace AssetsManager.Services.Viewer.Animation
         private Matrix4x4[] _finalBoneTransforms;
         private uint[] _jointHashes;
         private GpuSkinningData _gpuSkinningData;
+        private IAnimationAsset _lastAnimation;
+        private IAnimationAsset _evaluatedAnimation;
+        private RigResource _evaluatedSkeleton;
+        private float _evaluatedTime = float.NaN;
 
         // Cached model-specific data
         private string _lastModelName;
@@ -48,6 +52,9 @@ namespace AssetsManager.Services.Viewer.Animation
             _lastSkeleton = null;
             _lastSkin = null;
             _lastModelParts = null;
+            _lastAnimation = null;
+            _evaluatedAnimation = null;
+            _evaluatedSkeleton = null;
             _gpuSkinningData = null;
             _currentPose.Clear();
         }
@@ -114,12 +121,51 @@ namespace AssetsManager.Services.Viewer.Animation
 
             // 1. Ensure buffers are ready (only allocates when model data changes)
             EnsureBuffers(skeleton, skin, modelParts, modelName);
+            _lastAnimation = animation;
 
+            EvaluatePose(totalSeconds, animation, skeleton);
+
+            // Final Skinning Matrices for GPU vertex shader
+            for (int i = 0; i < skeleton.Joints.Count; i++)
+            {
+                _finalBoneTransforms[i] = skeleton.Joints[i].InverseBindTransform * _boneTransforms[i];
+            }
+        }
+
+        /// <summary>
+        /// Evaluates the cached animation at an arbitrary clip time and returns a bone's
+        /// world-space transform. Seeking needs this path because the runtime replays VFX
+        /// events at many intermediate times rather than only at the final pose.
+        /// </summary>
+        public bool TrySampleBoneTransform(
+            float totalSeconds,
+            string boneName,
+            uint boneHash,
+            out Matrix4x4 transform)
+        {
+            transform = Matrix4x4.Identity;
+            if (_isDisposed || _lastAnimation == null || _lastSkeleton == null || _boneTransforms == null)
+                return false;
+
+            EvaluatePose(totalSeconds, _lastAnimation, _lastSkeleton);
+            return TryGetBoneTransform(boneName, boneHash, out transform);
+        }
+
+        private void EvaluatePose(float totalSeconds, IAnimationAsset animation, RigResource skeleton)
+        {
+            if (ReferenceEquals(animation, _evaluatedAnimation) && ReferenceEquals(skeleton, _evaluatedSkeleton) && totalSeconds == _evaluatedTime)
+                return;
+            _evaluatedAnimation = animation;
+            _evaluatedSkeleton = skeleton;
+            _evaluatedTime = totalSeconds;
             _currentPose.Clear();
-            var currentTime = animation.Duration > 0f ? totalSeconds % animation.Duration : 0f;
+            float currentTime = animation.Duration > 0f
+                ? Math.Clamp(totalSeconds, 0f, animation.Duration)
+                : 0f;
             animation.Evaluate(currentTime, _currentPose);
 
-            // 2. Calculate Bone Matrices (Hierarchical)
+            // Calculate bone matrices hierarchically so attachment consumers receive the
+            // same transforms as GPU skinning, including joints omitted by the animation.
             for (int i = 0; i < skeleton.Joints.Count; i++)
             {
                 var joint = skeleton.Joints[i];
@@ -133,21 +179,70 @@ namespace AssetsManager.Services.Viewer.Animation
                                      Matrix4x4.CreateTranslation(pose.Translation);
                 }
 
-                if (joint.ParentId > -1)
+                _boneTransforms[i] = joint.ParentId > -1
+                    ? localTransform * _boneTransforms[joint.ParentId]
+                    : localTransform;
+            }
+        }
+
+        private bool TryGetBoneTransform(string boneName, uint boneHash, out Matrix4x4 transform)
+        {
+            if (!string.IsNullOrWhiteSpace(boneName) && TryGetBoneTransform(boneName, out transform))
+                return true;
+            return TryGetBoneTransform(boneHash, out transform);
+        }
+
+        public bool TryGetBoneTransform(string boneName, out Matrix4x4 transform)
+        {
+            transform = Matrix4x4.Identity;
+            if (_lastSkeleton == null || _boneTransforms == null || string.IsNullOrWhiteSpace(boneName))
+                return false;
+
+            for (int i = 0; i < _lastSkeleton.Joints.Count; i++)
+            {
+                if (string.Equals(_lastSkeleton.Joints[i].Name, boneName, StringComparison.OrdinalIgnoreCase))
                 {
-                    _boneTransforms[i] = localTransform * _boneTransforms[joint.ParentId];
-                }
-                else
-                {
-                    _boneTransforms[i] = localTransform;
+                    if (i < _boneTransforms.Length)
+                    {
+                        transform = _boneTransforms[i];
+                        return true;
+                    }
                 }
             }
 
-            // 3. Final Skinning Matrices for GPU vertex shader
-            for (int i = 0; i < skeleton.Joints.Count; i++)
+            uint elf = Elf.HashLower(boneName);
+            uint fnv = Fnv1a.HashLower(boneName);
+            return TryGetBoneTransform(elf, out transform) || TryGetBoneTransform(fnv, out transform);
+        }
+
+        public bool TryGetBoneTransform(uint boneHash, out Matrix4x4 transform)
+        {
+            transform = Matrix4x4.Identity;
+            if (_lastSkeleton == null || _boneTransforms == null || boneHash == 0)
+                return false;
+
+            for (int i = 0; i < _lastSkeleton.Joints.Count; i++)
             {
-                _finalBoneTransforms[i] = skeleton.Joints[i].InverseBindTransform * _boneTransforms[i];
+                if (_jointHashes != null && i < _jointHashes.Length && _jointHashes[i] == boneHash)
+                {
+                    if (i < _boneTransforms.Length)
+                    {
+                        transform = _boneTransforms[i];
+                        return true;
+                    }
+                }
+
+                if (Fnv1a.HashLower(_lastSkeleton.Joints[i].Name) == boneHash)
+                {
+                    if (i < _boneTransforms.Length)
+                    {
+                        transform = _boneTransforms[i];
+                        return true;
+                    }
+                }
             }
+
+            return false;
         }
 
         public void Dispose()

@@ -8,11 +8,120 @@
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Background="{StaticResource SidebarBackground}">
 
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <!-- LTK Professional Segmented Tab Style (Slate / Dark Zinc, No AccentBrush / HoverColor) -->
+        <Style x:Key="LtkSegmentedTabStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#94A3B8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="TabBorder" Background="Transparent" CornerRadius="6" Padding="8,5" Margin="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="#171C26"/>
+                                <Setter Property="Foreground" Value="#E2E8F0"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="#222938"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- List Item Container: Animations (HoverColor on hover & selection) -->
+        <Style x:Key="LtkAnimationItemStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="6" Padding="10,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon x:Name="ItemIcon" Grid.Column="0" Kind="MotionPlayOutline" Width="17" Height="17" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ItemTitle" Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Duration, StringFormat='{}{0:F2}s'}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <Border Grid.Column="2" VerticalAlignment="Center" Margin="6,0,0,0" Padding="6,2" CornerRadius="4"
+                                        Background="#26F59E0B"
+                                        Visibility="{Binding HasVfx, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding VfxSummary}" FontSize="9" FontWeight="Bold" Foreground="#FFFBBF24"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- List Item Container: VFX Systems (HoverColor on hover & selection) -->
+        <Style x:Key="LtkSystemItemStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="6" Padding="10,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon x:Name="ItemIcon" Grid.Column="0" Kind="ApplicationCogOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ItemTitle" Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                        <TextBlock Text="{Binding EmitterCount, StringFormat='{}Emitters: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0"/>
+                                        <TextBlock Text="{Binding TextureCount, StringFormat='{}Tex: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid Background="{StaticResource SidebarBackground}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 0: Top Toolbar / ROOT Selector -->
             <RowDefinition Height="*"/>    <!-- 1: Main Management Area -->
-            <RowDefinition Height="Auto"/> <!-- 2: Bottom Status Bar -->
         </Grid.RowDefinitions>
 
         <!-- 0. TOP TOOLBAR: Unified Capsule with ROOT & BIN selection -->
@@ -67,14 +176,6 @@
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
                         </StackPanel>
-
-                        <!-- Scan & Load Button -->
-                        <Button Click="ReloadRoot_Click" Style="{StaticResource PrimaryButton}" Padding="12,5" Margin="12,0,0,0" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal">
-                                <materialIcons:MaterialIcon Kind="Refresh" Width="15" Height="15" Foreground="White" Margin="0,0,6,0"/>
-                                <TextBlock Text="Scan &amp; Load" FontWeight="SemiBold" FontSize="11"/>
-                            </StackPanel>
-                        </Button>
                     </WrapPanel>
                 </Border>
             </Grid>
@@ -99,59 +200,58 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                        <StackPanel Orientation="Horizontal">
-                            <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
-                            <TextBlock Text="VFX SYSTEMS" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        <!-- Mode Switch Capsule: ANIMATIONS vs SYSTEMS (.BIN) in LTK Slate Style -->
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="2" Margin="0,0,0,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                            <UniformGrid Columns="2" Height="30">
+                                <RadioButton Content="ANIMACIONES"
+                                             IsChecked="{Binding IsAnimationMode, Mode=TwoWay}"
+                                             Style="{StaticResource LtkSegmentedTabStyle}"
+                                             FontSize="10.5" FontWeight="Bold"/>
+                                <RadioButton Content="SISTEMAS (.BIN)"
+                                             IsChecked="{Binding IsRawSystemsMode, Mode=TwoWay}"
+                                             Style="{StaticResource LtkSegmentedTabStyle}"
+                                             FontSize="10.5" FontWeight="Bold"/>
+                            </UniformGrid>
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsAnimationMode, Converter={StaticResource BoolToVis}}">
+                            <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="18" Height="18" Foreground="#3B82F6" Margin="0,0,8,0"/>
+                            <TextBlock Text="CLIPS &amp; ANIMATIONS" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                         </StackPanel>
-                        <TextBlock Text="Select a system definition to load" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsRawSystemsMode, Converter={StaticResource BoolToVis}}">
+                            <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="18" Height="18" Foreground="#10B981" Margin="0,0,8,0"/>
+                            <TextBlock Text="VFX SYSTEMS (.BIN)" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
 
-                    <!-- Search Filter -->
+                    <!-- Search Filter (visible for both modes) -->
                     <TextBox Grid.Row="1"
                              Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource StandardSearchBoxStyle}"
-                             Tag="Search VFX systems..."
+                             Tag="Search animations, clips or VFX..."
                              Height="34"
                              Margin="0,0,0,10"
                              TextChanged="SearchQuery_TextChanged"/>
 
-                    <!-- Systems List -->
-                    <ListView Grid.Row="2" ItemsSource="{Binding Systems}" SelectedItem="{Binding SelectedSystem, Mode=TwoWay}"
-                              Background="Transparent" BorderThickness="0"
-                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                        <ListView.ItemContainerStyle>
-                            <Style TargetType="ListViewItem">
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListViewItem">
-                                            <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="6" Padding="10,8" Margin="0,0,0,4">
-                                                 <Grid>
-                                                     <Grid.ColumnDefinitions>
-                                                         <ColumnDefinition Width="*"/>
-                                                     </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0">
-                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                            <TextBlock Text="{Binding EmitterCount, StringFormat='{}Emitters: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0"/>
-                                                            <TextBlock Text="{Binding TextureCount, StringFormat='{}Tex: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                 </Grid>
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#1AFFFFFF"/>
-                                                </Trigger>
-                                                <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource AccentBrush}"/>
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListView.ItemContainerStyle>
-                    </ListView>
+                    <!-- Content Lists Container -->
+                    <Grid Grid.Row="2">
+                        <!-- 1. ANIMATIONS LIST (Champion Viewport / Skin Viewport mode) -->
+                        <ListView ItemsSource="{Binding DetectedAnimations}"
+                                  SelectedItem="{Binding SelectedAnimation, Mode=TwoWay}"
+                                  ItemContainerStyle="{StaticResource LtkAnimationItemStyle}"
+                                  Visibility="{Binding IsAnimationMode, Converter={StaticResource BoolToVis}}"
+                                  Background="Transparent" BorderThickness="0"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+
+                        <!-- 2. RAW SYSTEMS LIST (VFX Diagnostic Inspector mode) -->
+                        <ListView ItemsSource="{Binding Systems}"
+                                  SelectedItem="{Binding SelectedSystem, Mode=TwoWay}"
+                                  ItemContainerStyle="{StaticResource LtkSystemItemStyle}"
+                                  Visibility="{Binding IsRawSystemsMode, Converter={StaticResource BoolToVis}}"
+                                  Background="Transparent" BorderThickness="0"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+                    </Grid>
                 </Grid>
             </Border>
 
@@ -166,28 +266,28 @@
                         <RowDefinition Height="*"/>    <!-- Active Content Panel -->
                     </Grid.RowDefinitions>
 
-                    <!-- Segmented Tab Capsule Bar (Matching Hash Lab / Control Deck Style) -->
+                    <!-- Segmented Tab Capsule Bar (LTK Professional Slate Design) -->
                     <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="9" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,10">
                         <UniformGrid Columns="4" Height="36">
-                            <RadioButton x:Name="TabViewport" IsChecked="True" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="3D Live Viewport">
+                            <RadioButton x:Name="TabViewport" IsChecked="True" GroupName="VfxWorkspaceTabs" Style="{StaticResource LtkSegmentedTabStyle}" ToolTip="3D Live Viewport">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <materialIcons:MaterialIcon Kind="CubeOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="3D LIVE VIEWPORT" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </RadioButton>
-                            <RadioButton x:Name="TabEmitters" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Emitters Breakdown">
+                            <RadioButton x:Name="TabEmitters" GroupName="VfxWorkspaceTabs" Style="{StaticResource LtkSegmentedTabStyle}" ToolTip="Emitters Breakdown">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="EMITTERS BREAKDOWN" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </RadioButton>
-                            <RadioButton x:Name="TabTextures" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Textures Audit">
+                            <RadioButton x:Name="TabTextures" GroupName="VfxWorkspaceTabs" Style="{StaticResource LtkSegmentedTabStyle}" ToolTip="Textures Audit">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <materialIcons:MaterialIcon Kind="TextureBox" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="TEXTURES" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </RadioButton>
-                            <RadioButton x:Name="TabMeshes" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Meshes Audit">
+                            <RadioButton x:Name="TabMeshes" GroupName="VfxWorkspaceTabs" Style="{StaticResource LtkSegmentedTabStyle}" ToolTip="Meshes Audit">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <materialIcons:MaterialIcon Kind="VectorTriangle" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="MESHES (.scb/.sco)" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -213,19 +313,79 @@
                                                          Ready="OpenTkControl_Ready" 
                                                          Render="OpenTkControl_Render"/>
 
-                                    <!-- HUD Overlay in Viewport -->
+                                    <!-- HUD Overlay in Viewport (Top-Left: System & Live Particles) -->
                                     <Border VerticalAlignment="Top" HorizontalAlignment="Left" Margin="12" 
-                                            Background="#CC12131A" CornerRadius="6" Padding="10,6" IsHitTestVisible="False">
+                                            Background="#CC12131A" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                            CornerRadius="6" Padding="10,6" IsHitTestVisible="False">
                                         <StackPanel Orientation="Horizontal">
-                                            <materialIcons:MaterialIcon Kind="EyeOutline" Width="16" Height="16" Foreground="{StaticResource AccentGreen}" Margin="0,0,6,0"/>
-                                            <TextBlock Text="{Binding SelectedSystem.Name, FallbackValue='No system selected'}" FontWeight="Bold" FontSize="12" Foreground="White"/>
-                                            <TextBlock Text="{Binding LiveParticleCount, StringFormat='{} | Particles: {0}'}" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0"/>
+                                            <materialIcons:MaterialIcon Kind="AutoAwesome" Width="15" Height="15" Foreground="{StaticResource AccentGreen}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding SelectedSystem.Name, FallbackValue='No system selected'}" FontWeight="Bold" FontSize="11.5" Foreground="White" VerticalAlignment="Center"/>
+                                            <Border Width="1" Height="14" Background="{StaticResource BorderColor}" Margin="8,0" VerticalAlignment="Center"/>
+                                            <materialIcons:MaterialIcon Kind="Grain" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding LiveParticleCount, StringFormat='{}Particles: {0}'}" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                         </StackPanel>
-                                     </Border>
+                                    </Border>
+
+                                    <!-- Viewport Quick Toolbar (Top-Right: Champion Mesh Toggle & Reset Camera) -->
+                                    <Border VerticalAlignment="Top" HorizontalAlignment="Right" Margin="12"
+                                            Background="#CC12131A" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                            CornerRadius="6" Padding="4,3">
+                                        <StackPanel Orientation="Horizontal">
+                                            <!-- Simulation Rig Motion Preset (LTK-Manager style: Still, Burst, Missile, Trail) -->
+                                            <Button Click="RigPreset_Click" Style="{StaticResource TransparentIconButton}"
+                                                    Height="26" Padding="6,0" Margin="0,0,4,0"
+                                                    ToolTip="VFX Simulation Rig Motion (Still / Burst / Missile / Trail)">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <materialIcons:MaterialIcon Kind="{Binding RigPresetIcon}" Width="13" Height="13" Foreground="{StaticResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding RigPresetText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                                    <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <Button.ContextMenu>
+                                                    <ContextMenu Background="#FF161822" BorderBrush="{StaticResource BorderColor}" Foreground="White">
+                                                        <MenuItem Header="Still (Stationary single run)" Tag="Still" Click="SetRigPreset_Click">
+                                                            <MenuItem.Icon>
+                                                                <materialIcons:MaterialIcon Kind="CrosshairsGps" Width="14" Height="14" Foreground="{StaticResource TextSecondary}"/>
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                        <MenuItem Header="Burst (Stationary loop)" Tag="Burst" Click="SetRigPreset_Click">
+                                                            <MenuItem.Icon>
+                                                                <materialIcons:MaterialIcon Kind="Sparkles" Width="14" Height="14" Foreground="{StaticResource AccentGreen}"/>
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                        <MenuItem Header="Missile (Flight projectile path)" Tag="Missile" Click="SetRigPreset_Click">
+                                                            <MenuItem.Icon>
+                                                                <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}"/>
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                        <MenuItem Header="Trail (Orbit circuit path)" Tag="Trail" Click="SetRigPreset_Click">
+                                                            <MenuItem.Icon>
+                                                                <materialIcons:MaterialIcon Kind="RotateRight" Width="14" Height="14" Foreground="{StaticResource AccentPurple}"/>
+                                                            </MenuItem.Icon>
+                                                        </MenuItem>
+                                                    </ContextMenu>
+                                                </Button.ContextMenu>
+                                            </Button>
+
+                                            <!-- Champion Mesh Toggle -->
+                                            <ToggleButton IsChecked="{Binding ShowChampionMesh, Mode=TwoWay}"
+                                                          Style="{StaticResource TransparentIconToggleButton}"
+                                                          Width="28" Height="26" Margin="0,0,4,0"
+                                                          ToolTip="Toggle Champion 3D Model Mesh (when available)"
+                                                          Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <materialIcons:MaterialIcon Kind="AccountBoxOutline" Width="15" Height="15"/>
+                                            </ToggleButton>
+
+                                            <!-- Reset Camera / Focus (F) -->
+                                            <Button Click="ResetCamera_Click" Style="{StaticResource TransparentIconButton}"
+                                                    Width="28" Height="26" ToolTip="Reset Camera View (F)">
+                                                <materialIcons:MaterialIcon Kind="CameraRetakeOutline" Width="15" Height="15" Foreground="{StaticResource TextSecondary}"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
                                 </Grid>
                             </Border>
 
-                            <!-- Unified Bottom Timeline & Control Deck (Matching ej.png) -->
+                            <!-- Unified Bottom Timeline & Control Deck (Professional DAW / LTK-Manager Style) -->
                             <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="10" 
                                     BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,8,0,0" Padding="14,12">
                                 <Grid>
@@ -238,14 +398,46 @@
                                     <!-- 1. TIME RULER HEADER (Top of timeline) -->
                                     <Grid Grid.Row="0" Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200"/> <!-- Name Column Header -->
+                                            <ColumnDefinition Width="260"/> <!-- Name & Solo/Mute Header Column -->
                                             <ColumnDefinition Width="*"/>   <!-- Time Ruler Ticks -->
                                         </Grid.ColumnDefinitions>
 
-                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <materialIcons:MaterialIcon Kind="LayersOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"/>
-                                            <TextBlock Text="EMITTERS / LAYERS" FontSize="10.5" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
-                                        </StackPanel>
+                                        <Grid Grid.Column="0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="24"/> <!-- Mute All -->
+                                                <ColumnDefinition Width="24"/> <!-- Clear Solos -->
+                                                <ColumnDefinition Width="*"/>  <!-- Label -->
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Mute All Toggle -->
+                                            <Button Grid.Column="0" Click="ToggleMuteAll_Click" Style="{StaticResource TransparentIconButton}"
+                                                    Width="20" Height="20" Padding="0" ToolTip="Mute / Unmute All Emitters">
+                                                <materialIcons:MaterialIcon Kind="EyeOutline" Width="13" Height="13" Foreground="{StaticResource TextMuted}"/>
+                                            </Button>
+
+                                            <!-- Clear Solos Button -->
+                                            <Button Grid.Column="1" Click="ClearAllSolos_Click" Style="{StaticResource TransparentIconButton}"
+                                                    Width="20" Height="20" Padding="0" ToolTip="Clear All Solos"
+                                                    IsEnabled="{Binding HasAnySolo}">
+                                                <TextBlock Text="S" FontSize="10" FontWeight="Black">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasAnySolo}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#FFD700"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Button>
+
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                                                <materialIcons:MaterialIcon Kind="LayersOutline" Width="13" Height="13" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0"/>
+                                                <TextBlock Text="EMITTERS &amp; LANES" FontSize="9.5" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
+                                            </StackPanel>
+                                        </Grid>
 
                                         <Grid Grid.Column="1" Margin="8,0,0,0">
                                             <Grid.ColumnDefinitions>
@@ -261,20 +453,20 @@
                                         </Grid>
                                     </Grid>
 
-                                    <!-- 2. TIMELINE TRACKS (Master System + Emitters - Clean layout without black container) -->
-                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="180" Margin="0,0,0,10">
+                                    <!-- 2. TIMELINE TRACKS (Master System + Emitters Lanes) -->
+                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="200" Margin="0,0,0,10">
                                         <Grid x:Name="TimelineInteractiveGrid" Background="Transparent"
                                               PreviewMouseDown="TimelineGrid_PreviewMouseDown"
                                               PreviewMouseMove="TimelineGrid_PreviewMouseMove"
                                               PreviewMouseUp="TimelineGrid_PreviewMouseUp">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="200"/> <!-- Names & Toggles Column -->
+                                                <ColumnDefinition Width="260"/> <!-- Names, Toggles & Live Badges Column -->
                                                 <ColumnDefinition Width="*"/>   <!-- Tracks Canvas Column -->
                                             </Grid.ColumnDefinitions>
 
-                                            <!-- Left Column: Master System Name + Emitters List -->
+                                            <!-- Left Column: Master System Row + Emitters List -->
                                             <StackPanel Grid.Column="0">
-                                                <!-- Row #0: Master VFX System Name (Green Accent) -->
+                                                <!-- Row #0: Master VFX System Name -->
                                                 <Grid Height="26" Margin="0,2">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="20"/>
@@ -288,15 +480,84 @@
                                                 <ItemsControl ItemsSource="{Binding Emitters}">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Grid Height="24" Margin="0,2">
+                                                            <Grid Height="26" Margin="0,2">
                                                                 <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="28"/>
-                                                                    <ColumnDefinition Width="18"/>
-                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="22"/> <!-- Mute (Eye) -->
+                                                                    <ColumnDefinition Width="22"/> <!-- Solo ('S') -->
+                                                                    <ColumnDefinition Width="22"/> <!-- Index [1] -->
+                                                                    <ColumnDefinition Width="48"/> <!-- Primitive Badge -->
+                                                                    <ColumnDefinition Width="*"/>  <!-- Emitter Name -->
+                                                                    <ColumnDefinition Width="34"/> <!-- Live Particle Count Badge -->
                                                                 </Grid.ColumnDefinitions>
-                                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" Margin="0" Width="26" Height="16" HorizontalAlignment="Left" VerticalAlignment="Center" ToolTip="Show or hide this emitter in the viewport without stopping its simulation."/>
-                                                                <TextBlock Grid.Column="1" Text="{Binding IndexNumber}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                                                <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+
+                                                                <!-- Mute Button -->
+                                                                <Button Grid.Column="0" Click="EmitterMute_Click" Style="{StaticResource TransparentIconButton}"
+                                                                        Width="20" Height="20" Padding="0" ToolTip="Mute (Hide) this emitter">
+                                                                    <materialIcons:MaterialIcon Width="13" Height="13">
+                                                                        <materialIcons:MaterialIcon.Style>
+                                                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                                                <Setter Property="Kind" Value="EyeOutline"/>
+                                                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                                                                        <Setter Property="Kind" Value="EyeOffOutline"/>
+                                                                                        <Setter Property="Foreground" Value="#EF4444"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </materialIcons:MaterialIcon.Style>
+                                                                    </materialIcons:MaterialIcon>
+                                                                </Button>
+
+                                                                <!-- Solo Button -->
+                                                                <Button Grid.Column="1" Click="EmitterSolo_Click" Width="20" Height="20" Padding="0" ToolTip="Solo this emitter">
+                                                                    <Button.Style>
+                                                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                                                            <Setter Property="Background" Value="Transparent"/>
+                                                                            <Setter Property="BorderThickness" Value="1"/>
+                                                                            <Setter Property="BorderBrush" Value="Transparent"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsSolo}" Value="True">
+                                                                                    <Setter Property="Background" Value="#33FFD700"/>
+                                                                                    <Setter Property="BorderBrush" Value="#FFD700"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Button.Style>
+                                                                    <TextBlock Text="S" FontSize="10" FontWeight="Black">
+                                                                        <TextBlock.Style>
+                                                                            <Style TargetType="TextBlock">
+                                                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsSolo}" Value="True">
+                                                                                        <Setter Property="Foreground" Value="#FFD700"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBlock.Style>
+                                                                    </TextBlock>
+                                                                </Button>
+
+                                                                <!-- Index Number -->
+                                                                <TextBlock Grid.Column="2" Text="{Binding IndexNumber, StringFormat='[{0}]'}" FontSize="9.5" FontFamily="Consolas"
+                                                                           FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+
+                                                                <!-- Primitive Kind Pill -->
+                                                                <Border Grid.Column="3" Background="#14FFFFFF" CornerRadius="3" Padding="4,1" Margin="2,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                                                    <TextBlock Text="{Binding PrimitiveKindName}" FontSize="8" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
+                                                                </Border>
+
+                                                                <!-- Emitter Name -->
+                                                                <TextBlock Grid.Column="4" Text="{Binding Name}" FontSize="10.5" FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                                           ToolTip="{Binding Name}" Margin="2,0"/>
+
+                                                                <!-- Live Active Particle Badge -->
+                                                                <Border Grid.Column="5" Background="#14000000" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                                                        CornerRadius="3" Padding="3,1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,2,0">
+                                                                    <TextBlock Text="{Binding ActiveParticleCount}" FontSize="9" FontFamily="Consolas" FontWeight="Bold"
+                                                                               Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center"/>
+                                                                </Border>
                                                             </Grid>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
@@ -317,84 +578,88 @@
                                                     <ItemsControl ItemsSource="{Binding Emitters}">
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate>
-                                                                 <Grid Height="24" Margin="0,2">
-                                                                     <!-- Authored emitter interval: starts at its emission trigger and includes residual particle lifetime. -->
-                                                                     <Border Background="{Binding TrackBrush}" CornerRadius="4" Height="14" VerticalAlignment="Center"
-                                                                             Margin="{Binding TrackMargin}" HorizontalAlignment="Left" Width="{Binding TrackWidth}">
-                                                                         <Border.Effect>
-                                                                             <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.35"/>
-                                                                         </Border.Effect>
-                                                                     </Border>
+                                                                <Grid Height="26" Margin="0,2">
+                                                                    <!-- Authored emitter interval -->
+                                                                    <Border Background="{Binding TrackBrush}" CornerRadius="4" Height="14" VerticalAlignment="Center"
+                                                                            Margin="{Binding TrackMargin}" HorizontalAlignment="Left" Width="{Binding TrackWidth}">
+                                                                        <Border.Effect>
+                                                                            <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.35"/>
+                                                                        </Border.Effect>
+                                                                    </Border>
 
-                                                                     <!-- Emission trigger marker, centered on the real start of the emitter bar. -->
-                                                                     <Ellipse Width="8" Height="8" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1"
-                                                                              HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                                              Margin="{Binding DelayMarkerMargin}"
-                                                                              Visibility="{Binding HasDelay, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                                              ToolTip="{Binding DelayTime, StringFormat='Emission Trigger: {0:F2}s'}"/>
-                                                                 </Grid>
+                                                                    <!-- Emission trigger marker -->
+                                                                    <Ellipse Width="8" Height="8" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1"
+                                                                             HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                                             Margin="{Binding DelayMarkerMargin}"
+                                                                             Visibility="{Binding HasDelay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                                             ToolTip="{Binding DelayTime, StringFormat='Emission Trigger: {0:F2}s'}"/>
+                                                                </Grid>
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
                                                 </StackPanel>
 
-                                                 <!-- Playhead Needle Overlay Canvas -->
-                                                 <Canvas x:Name="PlayheadCanvas" IsHitTestVisible="False" Panel.ZIndex="10">
-                                                     <!-- Vertical Red Line sweeping across timeline -->
-                                                     <Line x:Name="PlayheadLine" X1="0" Y1="0" X2="0" Y2="400"
-                                                           Stroke="#FF4D4D" StrokeThickness="2"/>
-                                                     <!-- Red Playhead Top Circle Indicator -->
-                                                     <Ellipse x:Name="PlayheadHandle" Canvas.Left="-4" Canvas.Top="0"
-                                                              Width="8" Height="8" Fill="#FF4D4D" Stroke="#18181B" StrokeThickness="1"/>
-                                                 </Canvas>
+                                                <!-- Playhead Needle Overlay Canvas -->
+                                                <Canvas x:Name="PlayheadCanvas" IsHitTestVisible="False" Panel.ZIndex="10">
+                                                    <Line x:Name="PlayheadLine" X1="0" Y1="0" X2="0" Y2="400"
+                                                          Stroke="#FF4D4D" StrokeThickness="2"/>
+                                                    <Ellipse x:Name="PlayheadHandle" Canvas.Left="-4" Canvas.Top="0"
+                                                             Width="8" Height="8" Fill="#FF4D4D" Stroke="#18181B" StrokeThickness="1"/>
+                                                </Canvas>
 
-                                                 <!-- Active System Loop Boundary Needle Overlay Canvas (Placed ON TOP of Playhead for easy grabbing!) -->
-                                                 <Canvas x:Name="LoopBoundaryCanvas" Panel.ZIndex="100">
-                                                      <Canvas.Style>
-                                                          <Style TargetType="Canvas">
-                                                              <Setter Property="Visibility" Value="Visible"/>
-                                                              <Style.Triggers>
-                                                                  <DataTrigger Binding="{Binding IsPreviewLoopEnabled}" Value="False">
-                                                                      <Setter Property="Visibility" Value="Collapsed"/>
-                                                                  </DataTrigger>
-                                                              </Style.Triggers>
-                                                          </Style>
-                                                     </Canvas.Style>
-                                                     <!-- Vertical Golden Amber Line marking system loop boundary -->
-                                                     <Line x:Name="LoopBoundaryLine" X1="0" Y1="0" X2="0" Y2="400"
-                                                           Stroke="#FFD700" StrokeThickness="2" IsHitTestVisible="False"/>
-                                                     <!-- Top Golden Handle Circle with Amber Glow - Drag to adjust custom loop boundary! -->
-                                                     <Ellipse x:Name="LoopBoundaryHandle" Canvas.Left="-7" Canvas.Top="1" Cursor="SizeWE"
-                                                              Width="14" Height="14" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1.5"
-                                                              PreviewMouseDown="LoopBoundaryHandle_PreviewMouseDown"
-                                                              PreviewMouseMove="LoopBoundaryHandle_PreviewMouseMove"
-                                                              PreviewMouseUp="LoopBoundaryHandle_PreviewMouseUp"
-                                                              ToolTip="Drag to adjust the optional preview loop. Authored emitter lifetimes are not changed.">
-                                                         <Ellipse.Effect>
-                                                             <DropShadowEffect Color="#FFD700" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/>
-                                                         </Ellipse.Effect>
-                                                     </Ellipse>
-                                                 </Canvas>
+                                                <!-- Active System Loop Boundary Needle Overlay Canvas -->
+                                                <Canvas x:Name="LoopBoundaryCanvas" Panel.ZIndex="100">
+                                                    <Canvas.Style>
+                                                        <Style TargetType="Canvas">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsPreviewLoopEnabled}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Canvas.Style>
+                                                    <Line x:Name="LoopBoundaryLine" X1="0" Y1="0" X2="0" Y2="400"
+                                                          Stroke="#FFD700" StrokeThickness="2" IsHitTestVisible="False"/>
+                                                    <Ellipse x:Name="LoopBoundaryHandle" Canvas.Left="-7" Canvas.Top="1" Cursor="SizeWE"
+                                                             Width="14" Height="14" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1.5"
+                                                             PreviewMouseDown="LoopBoundaryHandle_PreviewMouseDown"
+                                                             PreviewMouseMove="LoopBoundaryHandle_PreviewMouseMove"
+                                                             PreviewMouseUp="LoopBoundaryHandle_PreviewMouseUp"
+                                                             ToolTip="Drag to adjust preview loop boundary">
+                                                        <Ellipse.Effect>
+                                                            <DropShadowEffect Color="#FFD700" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/>
+                                                        </Ellipse.Effect>
+                                                    </Ellipse>
+                                                </Canvas>
                                             </Grid>
                                         </Grid>
                                     </ScrollViewer>
 
-                                    <!-- 3. BOTTOM TRANSPORT CONTROLS BAR (Play, Stop/Resume, Slider, Speed, BG) -->
+                                    <!-- 3. BOTTOM TRANSPORT CONTROLS BAR (Play, Replay, Stop/Pause, Slider, Speed, BG) -->
                                     <Border Grid.Row="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,4,0,0">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/> <!-- Play & Stop/Resume Buttons -->
+                                                <ColumnDefinition Width="Auto"/> <!-- Replay, Play & Pause/Stop Buttons -->
                                                 <ColumnDefinition Width="*"/>    <!-- Main Time Slider & Readout -->
                                                 <ColumnDefinition Width="Auto"/> <!-- Speed Selector -->
                                                 <ColumnDefinition Width="Auto"/> <!-- Background Selector -->
                                             </Grid.ColumnDefinitions>
 
-                                            <!-- Transport Action Buttons -->
+                                            <!-- Transport Action Buttons (Replay, Play, Pause/Stop) -->
                                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                                <Button Click="Play_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,5" ToolTip="Play / Restart">
+                                                <!-- Replay Button -->
+                                                <Button Click="Replay_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,5" ToolTip="Replay / Restart from 0.00s">
+                                                    <materialIcons:MaterialIcon Kind="Replay" Width="15" Height="15" Foreground="{StaticResource AccentBrush}"/>
+                                                </Button>
+
+                                                <!-- Play Button -->
+                                                <Button Click="Play_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,5" ToolTip="Play">
                                                     <materialIcons:MaterialIcon Kind="Play" Width="15" Height="15" Foreground="{StaticResource AccentGreen}"/>
                                                 </Button>
-                                                <Button Click="StopResume_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,0,0" Padding="8,5" ToolTip="Stop / Resume">
+
+                                                <!-- Pause / Stop Button -->
+                                                <Button Click="StopResume_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,0,0" Padding="8,5" ToolTip="Pause / Resume">
                                                     <materialIcons:MaterialIcon Width="15" Height="15">
                                                         <materialIcons:MaterialIcon.Style>
                                                             <Style TargetType="materialIcons:MaterialIcon">
@@ -402,8 +667,8 @@
                                                                 <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsPlaying}" Value="True">
-                                                                        <Setter Property="Kind" Value="Stop"/>
-                                                                        <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                                        <Setter Property="Kind" Value="Pause"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
@@ -432,17 +697,18 @@
                                                 </TextBlock>
                                             </Grid>
 
-                                            <!-- Speed Selector -->
+                                            <!-- Speed Selector & Loop Toggle -->
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                                                 <ToggleButton IsChecked="{Binding IsPreviewLoopEnabled, Mode=TwoWay}"
                                                               Style="{StaticResource TransparentIconToggleButton}"
                                                               Width="28" Height="26" Margin="0,0,10,0"
-                                                              ToolTip="Loop">
+                                                              ToolTip="Toggle Timeline Loop">
                                                     <materialIcons:MaterialIcon Kind="Autorenew" Width="15" Height="15"/>
                                                 </ToggleButton>
                                                 <TextBlock Text="Speed:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                                <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="88" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="1">
+                                                <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="88" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="2">
                                                     <ComboBoxItem Content="0.25x" Tag="0.25"/>
+                                                    <ComboBoxItem Content="0.5x" Tag="0.5"/>
                                                     <ComboBoxItem Content="1.0x" Tag="1.0"/>
                                                     <ComboBoxItem Content="1.5x" Tag="1.5"/>
                                                     <ComboBoxItem Content="2.0x" Tag="2.0"/>
@@ -469,17 +735,93 @@
                             <ListView x:Name="EmittersListView" ItemsSource="{Binding Emitters}" Style="{StaticResource ModernTableListView}" Loaded="TableListView_Loaded" SizeChanged="TableListView_SizeChanged" IsVisibleChanged="TableListView_IsVisibleChanged">
                                 <ListView.View>
                                     <GridView AllowsColumnReorder="False">
-                                        <GridViewColumn Width="50">
+                                        <!-- Mute Column -->
+                                        <GridViewColumn Width="46">
                                             <GridViewColumn.HeaderContainerStyle>
                                                 <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
                                                     <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
                                                     <Setter Property="HorizontalContentAlignment" Value="Center"/>
                                                 </Style>
                                             </GridViewColumn.HeaderContainerStyle>
-                                            <GridViewColumnHeader Content="Active"/>
+                                            <GridViewColumnHeader Content="Mute"/>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" HorizontalAlignment="Center" ToolTip="Show or hide this emitter in the viewport without stopping its simulation."/>
+                                                    <Button Click="EmitterMute_Click" Style="{StaticResource TransparentIconButton}"
+                                                            Width="22" Height="22" Padding="0" HorizontalAlignment="Center" ToolTip="Mute Emitter">
+                                                        <materialIcons:MaterialIcon Width="14" Height="14">
+                                                            <materialIcons:MaterialIcon.Style>
+                                                                <Style TargetType="materialIcons:MaterialIcon">
+                                                                    <Setter Property="Kind" Value="EyeOutline"/>
+                                                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                                                            <Setter Property="Kind" Value="EyeOffOutline"/>
+                                                                            <Setter Property="Foreground" Value="#EF4444"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </materialIcons:MaterialIcon.Style>
+                                                        </materialIcons:MaterialIcon>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <!-- Solo Column -->
+                                        <GridViewColumn Width="46">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumnHeader Content="Solo"/>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Click="EmitterSolo_Click" Width="22" Height="22" Padding="0" HorizontalAlignment="Center" ToolTip="Solo Emitter">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                                                <Setter Property="Background" Value="Transparent"/>
+                                                                <Setter Property="BorderThickness" Value="1"/>
+                                                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsSolo}" Value="True">
+                                                                        <Setter Property="Background" Value="#33FFD700"/>
+                                                                        <Setter Property="BorderBrush" Value="#FFD700"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                        <TextBlock Text="S" FontSize="10" FontWeight="Black">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsSolo}" Value="True">
+                                                                            <Setter Property="Foreground" Value="#FFD700"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <!-- Primitive Kind Column -->
+                                        <GridViewColumn Header="Kind" Width="68">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="#14FFFFFF" CornerRadius="4" Padding="5,2" HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding PrimitiveKindName}" FontWeight="Bold" FontSize="9.5" Foreground="{StaticResource TextSecondary}"/>
+                                                    </Border>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
@@ -567,8 +909,8 @@
                                             </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
-                                                        <TextBlock Text="{Binding BlendMode}" FontWeight="Bold" FontSize="10" Foreground="{StaticResource AccentBrush}"/>
+                                                    <Border Background="#141720" BorderBrush="#202533" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding BlendMode}" FontWeight="Bold" FontSize="10" Foreground="#60A5FA"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
@@ -583,7 +925,7 @@
                                             </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
+                                                    <Border Background="#141720" BorderBrush="#202533" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
                                                         <TextBlock Text="{Binding TexDiv}" FontFamily="Consolas" FontSize="10.5" Foreground="{StaticResource TextMuted}"/>
                                                     </Border>
                                                 </DataTemplate>
@@ -638,7 +980,7 @@
                                             </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="5" Padding="8,2" HorizontalAlignment="Center">
+                                                    <Border Background="#141720" BorderBrush="#202533" BorderThickness="1" CornerRadius="5" Padding="8,2" HorizontalAlignment="Center">
                                                         <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontWeight="Bold" FontSize="10.5"/>
                                                     </Border>
                                                 </DataTemplate>
@@ -654,7 +996,7 @@
                                             </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
+                                                    <Border Background="#141720" BorderBrush="#202533" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
                                                         <TextBlock FontFamily="Consolas" FontSize="10.5" Foreground="{StaticResource TextPrimary}">
                                                             <Run Text="{Binding Width, Mode=OneWay}"/><Run Text=" × "/><Run Text="{Binding Height, Mode=OneWay}"/>
                                                         </TextBlock>
@@ -672,7 +1014,7 @@
                                             </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
+                                                    <Border Background="#141720" BorderBrush="#202533" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
                                                         <TextBlock Text="{Binding TexDiv}" FontFamily="Consolas" FontSize="10.5" Foreground="{StaticResource TextMuted}"/>
                                                     </Border>
                                                 </DataTemplate>
@@ -711,7 +1053,7 @@
                                             </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
+                                                    <Border Background="#141720" BorderBrush="#202533" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
                                                         <TextBlock Text="{Binding Format}" FontWeight="Bold" FontSize="10" Foreground="{StaticResource AccentOrange}"/>
                                                     </Border>
                                                 </DataTemplate>
@@ -741,7 +1083,7 @@
                                             </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="5" Padding="8,2" HorizontalAlignment="Center">
+                                                    <Border Background="#141720" BorderBrush="#202533" BorderThickness="1" CornerRadius="5" Padding="8,2" HorizontalAlignment="Center">
                                                         <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontWeight="Bold" FontSize="10.5"/>
                                                     </Border>
                                                 </DataTemplate>
@@ -798,10 +1140,5 @@
                 </Grid>
             </Border>
         </Grid>
-
-        <!-- 2. BOTTOM STATUS BAR -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" Padding="20,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" ClipToBounds="True">
-            <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
-        </Border>
     </Grid>
 </UserControl>

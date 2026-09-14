@@ -30,6 +30,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             public Dictionary<uint, uint> ResourceMap { get; } = new();
             public Dictionary<uint, string> SystemSources { get; } = new();
             public Dictionary<uint, VfxEventSequenceDefinition> EventSequences { get; } = new();
+            public List<VfxEventSequenceDefinition> Clips { get; } = new();
+            public List<VfxIdleEffectDefinition> IdleEffects { get; } = new();
             public VfxOwnerSceneContext OwnerSceneContext { get; set; }
             public List<string> LoadedBins { get; } = new();
             public List<string> MissingDependencies { get; } = new();
@@ -38,14 +40,33 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
 
         public Bundle Load(string skinBinPath, LogService log)
         {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
             _catalogGate.Wait();
             try
             {
+                ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
                 return LoadCore(skinBinPath, log, CancellationToken.None);
             }
             finally
             {
                 _catalogGate.Release();
+                TryDisposeResources();
+            }
+        }
+
+        public async Task<Bundle> LoadAsync(string skinBinPath, LogService log, CancellationToken cancellationToken)
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
+            await _catalogGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
+                return await Task.Run(() => LoadCore(skinBinPath, log, cancellationToken), cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _catalogGate.Release();
+                TryDisposeResources();
             }
         }
 
@@ -63,6 +84,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 if (!string.IsNullOrEmpty(wadRoot)) searchFolder = wadRoot;
 
                 var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var clipKeys = new HashSet<(uint Graph, uint Clip)>();
                 var queue = new Queue<string>();
 
                 void Enqueue(string p)
@@ -94,7 +116,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         foreach (var kv in document.ResourceMap)
                             bundle.ResourceMap.TryAdd(kv.Key, kv.Value);
                         foreach (VfxEventSequenceDefinition sequence in document.EventSequences)
+                        {
                             bundle.EventSequences.TryAdd(sequence.OwnerPathHash, sequence);
+                            if (clipKeys.Add((sequence.GraphPathHash, sequence.OwnerPathHash)))
+                                bundle.Clips.Add(sequence);
+                        }
+                        if (document.IdleEffects != null &&
+                            string.Equals(Path.GetFullPath(currentBinPath), Path.GetFullPath(skinBinPath), StringComparison.OrdinalIgnoreCase))
+                        {
+                            foreach (VfxIdleEffectDefinition idle in document.IdleEffects)
+                                bundle.IdleEffects.Add(idle);
+                        }
                         bundle.OwnerSceneContext ??= document.OwnerSceneContext;
 
                         foreach (var dep in document.Dependencies)
@@ -153,7 +185,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             ArgumentNullException.ThrowIfNull(definition);
             var runtime = new VfxPlaybackRuntime(seed);
             runtime.SetSystem(definition, definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * transform);
-            var alphaSemantics = new Dictionary<BitmapSource, bool>(ReferenceEqualityComparer.Instance);
 
             foreach (var emitter in runtime.Emitters)
             {
@@ -161,15 +192,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 if (texture != null)
                 {
                     emitter.PendingTexture = texture;
-                    if (!alphaSemantics.TryGetValue(texture, out bool isLegacyOpaqueRgbMask))
-                    {
-                        isLegacyOpaqueRgbMask = VfxTextureAlphaSemantics.IsLegacyOpaqueRgbMask(texture);
-                        alphaSemantics[texture] = isLegacyOpaqueRgbMask;
-                    }
-                    emitter.DeriveAlphaFromRgb = VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
-                        isLegacyOpaqueRgbMask,
-                        emitter.Def.BlendMode,
-                        emitter.Def.PrimitiveKind);
                     if (emitter.Def.UseTextureAspect)
                     {
                         float cellWidth = texture.PixelWidth / Math.Max(1f, emitter.Def.TexDiv.X);
@@ -259,6 +281,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         internal BitmapSource ResolveTexture(string authoredPath, string searchDirectory)
             => _resources.ResolveTexture(authoredPath, searchDirectory);
 
+        internal string ResolveAssetPath(string authoredPath, string searchDirectory, string extension)
+            => _resources.ResolvePath(authoredPath, searchDirectory, new[] { extension });
+
         internal (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? ResolveMesh(
             string authoredPath,
             string searchDirectory)
@@ -266,15 +291,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
 
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _disposeState, 1) != 0) return;
+            if (Interlocked.CompareExchange(ref _disposeState, 1, 0) != 0) return;
+            TryDisposeResources();
+        }
 
+        private void TryDisposeResources()
+        {
+            if (Volatile.Read(ref _disposeState) != 1 || !_catalogGate.Wait(0)) return;
             try
             {
-                _resources.Dispose();
+                if (Interlocked.CompareExchange(ref _disposeState, 2, 1) == 1)
+                    _resources.Dispose();
             }
             finally
             {
-                _catalogGate.Dispose();
+                // Pending loads must be able to acquire, reject disposal, and release safely.
+                _catalogGate.Release();
             }
         }
 

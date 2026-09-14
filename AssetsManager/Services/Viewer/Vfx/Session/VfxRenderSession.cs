@@ -27,16 +27,37 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private readonly Dictionary<BitmapSource, uint> _textureCache = new();
         private VfxOpenGlRenderer _renderer;
         private VfxPlaybackGraphRuntime _graph;
+        private sealed class GraphAttachmentInfo
+        {
+            public string BoneName { get; set; }
+            public uint BoneHash { get; set; }
+            public uint TargetBoneHash { get; set; }
+            public Vector3 LocalOffset { get; set; }
+            public Matrix4x4 BaseTransform { get; set; } = Matrix4x4.Identity;
+            public Matrix4x4 BoneTransform { get; set; } = Matrix4x4.Identity;
+            public bool HasBoneTransform { get; set; }
+            public uint EffectKey { get; set; }
+            public double StartTime { get; set; }
+            public bool IsDetachable { get; set; }
+            public bool IsIdleEffect { get; set; }
+        }
+
         private readonly List<VfxPlaybackGraphRuntime> _graphs = new();
         private readonly Dictionary<VfxPlaybackGraphRuntime, Matrix4x4> _graphPlacements = new();
-        private readonly Dictionary<VfxPlaybackGraphRuntime, double> _graphKillTimes = new();
+        private readonly List<(double Time, uint EffectKey)> _scheduledEffectKills = new();
+        private readonly Dictionary<VfxPlaybackGraphRuntime, double> _graphStopTimes = new();
+        private readonly Dictionary<VfxPlaybackGraphRuntime, GraphAttachmentInfo> _graphAttachments = new();
         private VfxSystemModel _activeSystem;
+        private VfxRigPreset _rigPreset = VfxRigPreset.Still;
+        private Vector3? _lastRigOrigin;
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private bool _isPlaying;
         private bool _ready;
         private bool _disposed;
         private uint _viewportWidth;
         private uint _viewportHeight;
+        private Func<string, uint, Matrix4x4?> _boneTransformProvider;
+        private Func<double, string, uint, Matrix4x4?> _boneTransformSampler;
 
         public VfxRenderSession(
             LogService logService = null,
@@ -62,6 +83,38 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         public VfxSystemModel ActiveSystem => _activeSystem;
+        public IReadOnlyList<VfxPlaybackGraphRuntime> Graphs => _graphs;
+
+        public VfxRigPreset RigPreset
+        {
+            get => _rigPreset;
+            set
+            {
+                _rigPreset = value;
+                _lastRigOrigin = null;
+                ApplyRigTransform();
+            }
+        }
+
+        public void ApplyRigTransform()
+        {
+            if (_graphs.Count == 0 || _graphAttachments.Count > 0 || _activeSystem == null) return;
+
+            var step = VfxRigMotion.Evaluate(
+                _rigPreset,
+                _activeSystem.CurrentTime,
+                _activeSystem.TotalDuration,
+                _lastRigOrigin);
+
+            _lastRigOrigin = step.Origin;
+
+            foreach (var graph in _graphs)
+            {
+                _graphPlacements[graph] = step.Transform;
+                graph.SetTransform(step.Transform * _worldTransform);
+                graph.IsStopped = step.IsStopped;
+            }
+        }
 
         public void Initialize(GL gl)
         {
@@ -70,15 +123,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _ready = true;
         }
 
-        public void SetVfxSystem(VfxSystemModel system)
+        public void SetVfxSystem(VfxSystemModel system) => SetSystem(system);
+        public void SetSystem(VfxSystemModel system)
         {
             _isPlaying = false;
             _activeSystem = system;
             _graph = null;
             _graphs.Clear();
             _graphPlacements.Clear();
-            _graphKillTimes.Clear();
-            if (system != null) system.CurrentTime = 0;
+            _scheduledEffectKills.Clear();
+            _graphStopTimes.Clear();
+            _graphAttachments.Clear();
+            _lastRigOrigin = null;
+            _boneTransformProvider = null;
+            _boneTransformSampler = null;
+            if (system != null)
+            {
+                system.CurrentTime = 0;
+            }
 
             if (_ready)
             {
@@ -99,6 +161,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     system.OwnerSceneContext);
                 _graphs.Add(_graph);
                 _graphPlacements[_graph] = Matrix4x4.Identity;
+                ApplyRigTransform();
             }
         }
 
@@ -109,15 +172,35 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             string searchDirectory,
             int seed,
             VfxOwnerSceneContext ownerSceneContext = null)
+            => SetAnimationSession(
+                composition,
+                null,
+                systems,
+                resourceMap,
+                searchDirectory,
+                seed,
+                0,
+                ownerSceneContext);
+
+        public bool SetAnimationSession(
+            VfxAbilityComposition composition,
+            IReadOnlyList<VfxIdleEffectDefinition> idleEffects,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap,
+            string searchDirectory,
+            int seed,
+            double animationDuration,
+            VfxOwnerSceneContext ownerSceneContext = null)
         {
-            ArgumentNullException.ThrowIfNull(composition);
             systems ??= new Dictionary<uint, VfxSystemDefinition>();
             resourceMap ??= new Dictionary<uint, uint>();
             _isPlaying = false;
             _graph = null;
             _graphs.Clear();
             _graphPlacements.Clear();
-            _graphKillTimes.Clear();
+            _scheduledEffectKills.Clear();
+            _graphStopTimes.Clear();
+            _graphAttachments.Clear();
 
             if (_ready)
             {
@@ -125,57 +208,145 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 _textureCache.Clear();
             }
 
-            double duration = 0;
-            int eventIndex = 0;
-            foreach (VfxCompositionEvent compositionEvent in composition.Events)
+            var systemsByName = systems
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Value.Name))
+                .GroupBy(pair => pair.Value.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First().Value, StringComparer.OrdinalIgnoreCase);
+
+            double duration = Math.Max(0.1, animationDuration);
+            int graphIndex = 0;
+
+            // 1. Instantiate Idle Effects (continuous character-anchored auras)
+            if (idleEffects != null)
             {
-                if (compositionEvent.System is null) continue;
-                float eventScale = Math.Max(0.01f, compositionEvent.Event.Scale);
-                var graph = _loadingService.PreparePlaybackGraph(
-                    compositionEvent.System,
-                    systems,
-                    resourceMap,
-                    searchDirectory,
-                    Matrix4x4.CreateScale(eventScale) * _worldTransform,
-                    HashCode.Combine(seed, eventIndex++),
-                    _logService,
-                    ownerSceneContext);
-                float startSeconds = Math.Max(
-                    0f,
-                    (compositionEvent.Event.StartFrame - composition.StartFrame) * composition.TickDuration);
-                graph.SetStartDelay(startSeconds);
-                _graphs.Add(graph);
-                _graphPlacements[graph] = Matrix4x4.CreateScale(eventScale);
-                if (compositionEvent.Event.IsKillEvent &&
-                    compositionEvent.Event.EndFrame >= compositionEvent.Event.StartFrame)
+                foreach (VfxIdleEffectDefinition idle in idleEffects)
                 {
-                    _graphKillTimes[graph] = Math.Max(
-                        startSeconds,
-                        (compositionEvent.Event.EndFrame - composition.StartFrame) * composition.TickDuration);
+                    VfxSystemDefinition idleDef = null;
+                    if (idle.EffectKey != 0 && systems.TryGetValue(idle.EffectKey, out var sys))
+                    {
+                        idleDef = sys;
+                    }
+                    else if (resourceMap.TryGetValue(idle.EffectKey, out uint mappedHash) && systems.TryGetValue(mappedHash, out sys))
+                    {
+                        idleDef = sys;
+                    }
+                    else if (!string.IsNullOrEmpty(idle.EffectName) && systemsByName.TryGetValue(idle.EffectName, out sys))
+                    {
+                        idleDef = sys;
+                    }
+
+                    if (idleDef == null) continue;
+
+                    var idleGraph = _loadingService.PreparePlaybackGraph(
+                        idleDef,
+                        systems,
+                        resourceMap,
+                        searchDirectory,
+                        _worldTransform,
+                        HashCode.Combine(seed, graphIndex++),
+                        _logService,
+                        ownerSceneContext);
+
+                    _graphs.Add(idleGraph);
+                    _graphPlacements[idleGraph] = Matrix4x4.Identity;
+                    _graphAttachments[idleGraph] = new GraphAttachmentInfo
+                    {
+                        BoneName = idle.BoneName,
+                        BoneHash = idle.BoneNameHash,
+                        TargetBoneHash = idle.TargetBoneNameHash,
+                        EffectKey = idle.EffectKey,
+                        LocalOffset = idle.Position,
+                        BaseTransform = Matrix4x4.Identity,
+                        IsIdleEffect = true
+                    };
+                    _graph ??= idleGraph;
                 }
-                _graph ??= graph;
-
-                double effectDuration = VfxDurationCalculator.Calculate(
-                    compositionEvent.System,
-                    systems,
-                    resourceMap);
-                if (double.IsFinite(effectDuration))
-                    duration = Math.Max(duration, startSeconds + effectDuration);
             }
 
-            if (composition.EndFrame > composition.StartFrame)
-                duration = Math.Max(duration, (composition.EndFrame - composition.StartFrame) * composition.TickDuration);
-            foreach (VfxCompositionEvent compositionEvent in composition.Events)
+            // 2. Instantiate Animation Composition Events (cued particle events)
+            if (composition != null)
             {
-                if (compositionEvent.Event.EndFrame >= compositionEvent.Event.StartFrame)
-                    duration = Math.Max(
-                        duration,
-                        (compositionEvent.Event.EndFrame - composition.StartFrame) * composition.TickDuration);
+                foreach (VfxCompositionEvent compositionEvent in composition.Events)
+                {
+                    var cue = compositionEvent.Event;
+                    float startSeconds = Math.Max(0f, cue.StartFrame * composition.TickDuration);
+                    uint effectKey = compositionEvent.UsesEnemyEffect ? cue.EnemyEffectKey : cue.EffectKey;
+                    if (cue.IsKillEvent)
+                    {
+                        _scheduledEffectKills.Add((startSeconds, effectKey));
+                        continue;
+                    }
+                    if (compositionEvent.System is null) continue;
+                    float eventScale = Math.Max(0.01f, compositionEvent.Event.Scale);
+                    Matrix4x4 scaleMatrix = Matrix4x4.CreateScale(eventScale);
+
+                    var attachments = cue.Attachments is { Count: > 0 }
+                        ? cue.Attachments
+                        : new[] { new VfxParticleEventAttachment(0, 0) };
+                    foreach (var pair in attachments)
+                    {
+                    var eventGraph = _loadingService.PreparePlaybackGraph(
+                        compositionEvent.System,
+                        systems,
+                        resourceMap,
+                        searchDirectory,
+                        scaleMatrix * _worldTransform,
+                        HashCode.Combine(seed, graphIndex++),
+                        _logService,
+                        ownerSceneContext);
+
+                    eventGraph.SetStartDelay(startSeconds);
+
+                    _graphs.Add(eventGraph);
+                    _graphPlacements[eventGraph] = scaleMatrix;
+
+                    _graphAttachments[eventGraph] = new GraphAttachmentInfo
+                    {
+                        BoneName = null,
+                        BoneHash = pair.SourceBoneHash,
+                        TargetBoneHash = pair.TargetBoneHash,
+                        EffectKey = effectKey,
+                        StartTime = startSeconds,
+                        IsDetachable = cue.IsDetachable,
+                        LocalOffset = Vector3.Zero,
+                        BaseTransform = scaleMatrix,
+                        IsIdleEffect = false
+                    };
+
+                    if (cue.EndFrame > cue.StartFrame)
+                    {
+                        _graphStopTimes[eventGraph] = cue.EndFrame * composition.TickDuration;
+                    }
+
+                    _graph ??= eventGraph;
+                    }
+
+                    double effectDuration = VfxDurationCalculator.Calculate(
+                        compositionEvent.System,
+                        systems,
+                        resourceMap);
+                    if (double.IsFinite(effectDuration))
+                        duration = Math.Max(duration, startSeconds + effectDuration);
+                }
+
+                if (composition.EndFrame > composition.StartFrame)
+                    duration = Math.Max(duration, (composition.EndFrame - composition.StartFrame) * composition.TickDuration);
+                foreach (VfxCompositionEvent compositionEvent in composition.Events)
+                {
+                    if (compositionEvent.Event.EndFrame >= compositionEvent.Event.StartFrame)
+                        duration = Math.Max(
+                            duration,
+                            (compositionEvent.Event.EndFrame - composition.StartFrame) * composition.TickDuration);
+                }
             }
+
+            string sequenceName = composition != null
+                ? (!string.IsNullOrEmpty(composition.ClipName) ? composition.ClipName : $"0x{composition.SequencePathHash:X8}")
+                : "Animation";
 
             _activeSystem = new VfxSystemModel
             {
-                Name = $"Ability 0x{composition.SequencePathHash:X8}",
+                Name = $"Session {sequenceName}",
                 SystemCatalog = systems,
                 ResourceMap = resourceMap,
                 SearchDirectory = searchDirectory,
@@ -184,11 +355,81 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 TotalDuration = Math.Max(0.1, duration),
                 Speed = 1.0
             };
+
             return _graphs.Count > 0;
+        }
+
+        public void UpdateBoneTransforms(Func<string, uint, Matrix4x4?> boneTransformProvider)
+        {
+            _boneTransformProvider = boneTransformProvider;
+            if (_graphs.Count == 0) return;
+
+            foreach (VfxPlaybackGraphRuntime graph in _graphs)
+            {
+                if (_graphAttachments.TryGetValue(graph, out var attachment) && boneTransformProvider != null)
+                {
+                    Matrix4x4? boneMatrix = null;
+                    if (!string.IsNullOrEmpty(attachment.BoneName))
+                    {
+                        boneMatrix = boneTransformProvider(attachment.BoneName, attachment.BoneHash);
+                    }
+                    if (!boneMatrix.HasValue && attachment.BoneHash != 0)
+                    {
+                        boneMatrix = boneTransformProvider(null, attachment.BoneHash);
+                    }
+
+                    if (boneMatrix.HasValue)
+                    {
+                        Matrix4x4 boneTransform = boneMatrix.Value;
+                        if (attachment.IsDetachable && attachment.HasBoneTransform)
+                            boneTransform = attachment.BoneTransform;
+                        else if (attachment.TargetBoneHash != 0 && boneTransformProvider(null, attachment.TargetBoneHash) is { } target)
+                        {
+                            Vector3 forward = target.Translation - boneTransform.Translation;
+                            if (forward.LengthSquared() > 1e-8f)
+                            {
+                                forward = Vector3.Normalize(forward);
+                                Vector3 up = Math.Abs(Vector3.Dot(forward, Vector3.UnitY)) > 0.999f
+                                    ? Vector3.UnitX : Vector3.UnitY;
+                                boneTransform = Matrix4x4.CreateWorld(boneTransform.Translation, -forward, up);
+                            }
+                        }
+                        if (attachment.IsDetachable && _activeSystem?.CurrentTime >= attachment.StartTime)
+                        {
+                            attachment.BoneTransform = boneTransform;
+                            attachment.HasBoneTransform = true;
+                        }
+                        if (attachment.LocalOffset != Vector3.Zero)
+                        {
+                            boneTransform = Matrix4x4.CreateTranslation(attachment.LocalOffset) * boneTransform;
+                        }
+                        graph.SetTransform(attachment.BaseTransform * boneTransform * _worldTransform);
+                        continue;
+                    }
+                }
+
+                if (_graphPlacements.TryGetValue(graph, out var basePlacement))
+                {
+                    graph.SetTransform(basePlacement * _worldTransform);
+                }
+            }
         }
 
         public bool SetEmitterVisibility(int sourceOrder, bool isVisible)
             => _graph?.Root.SetEmitterVisibility(sourceOrder, isVisible) ?? false;
+
+        public int GetEmitterLiveCount(int sourceOrder)
+        {
+            if (_graph?.Root != null)
+            {
+                foreach (var emitter in _graph.Root.Emitters)
+                {
+                    if (emitter.SourceOrder == sourceOrder)
+                        return emitter.Particles.Count;
+                }
+            }
+            return 0;
+        }
 
         public void Play()
         {
@@ -200,8 +441,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void Stop()
         {
             _isPlaying = false;
+            _lastRigOrigin = null;
             foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Reset();
-            if (_activeSystem != null) _activeSystem.CurrentTime = 0;
+            foreach (var attachment in _graphAttachments.Values) attachment.HasBoneTransform = false;
+            if (_activeSystem != null)
+            {
+                _activeSystem.CurrentTime = 0;
+                ApplyRigTransform();
+            }
         }
 
         public void SetWorldTransform(Vector3 position, float scale)
@@ -213,8 +460,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void SetWorldTransform(Matrix4x4 transform)
         {
             _worldTransform = transform;
-            foreach (VfxPlaybackGraphRuntime graph in _graphs)
-                graph.SetTransform(_graphPlacements.GetValueOrDefault(graph, Matrix4x4.Identity) * _worldTransform);
+            if (_graphAttachments.Count > 0)
+            {
+                foreach (VfxPlaybackGraphRuntime graph in _graphs)
+                {
+                    if (!_graphAttachments.ContainsKey(graph))
+                    {
+                        graph.SetTransform(_graphPlacements.GetValueOrDefault(graph, Matrix4x4.Identity) * _worldTransform);
+                    }
+                }
+            }
+            else
+            {
+                ApplyRigTransform();
+            }
         }
 
         public void SetViewportSize(double width, double height)
@@ -225,12 +484,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public void Update(float deltaTime)
         {
-            if (!_isPlaying || _graphs.Count == 0 || _activeSystem == null) return;
+            if (!_isPlaying || _activeSystem == null) return;
             float speed = (float)Math.Clamp(_activeSystem.Speed, 0.25, 2.0);
             float elapsed = deltaTime * speed;
-            foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Update(elapsed);
-            _activeSystem.CurrentTime += elapsed;
-            KillGraphsAt(_activeSystem.CurrentTime);
+
+            AdvanceTo(_activeSystem.CurrentTime + elapsed);
 
             if (ShouldFinishPlayback(
                     _activeSystem.HasFiniteDuration,
@@ -255,34 +513,56 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public void Seek(double seconds)
         {
-            if (_graphs.Count == 0 || _activeSystem == null) return;
+            if (_activeSystem == null) return;
             double maxDuration = _activeSystem.HasFiniteDuration ? _activeSystem.TotalDuration : 10.0;
             double target = Math.Clamp(seconds, 0, maxDuration);
+            _lastRigOrigin = null;
             foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Reset();
-            double simulated = 0;
-            const float step = 1f / 60f;
-            while (simulated + step < target)
+            foreach (var attachment in _graphAttachments.Values) attachment.HasBoneTransform = false;
+            _activeSystem.CurrentTime = 0;
+            ApplyRigTransform();
+            if (_boneTransformSampler != null)
+                UpdateBoneTransforms((name, hash) => _boneTransformSampler(0, name, hash));
+            AdvanceTo(target);
+        }
+
+        public void SetBoneTransformSampler(Func<double, string, uint, Matrix4x4?> sampler)
+            => _boneTransformSampler = sampler;
+
+        private void AdvanceTo(double target)
+        {
+            if (!double.IsFinite(target)) return;
+            while (_activeSystem.CurrentTime < target)
             {
-                foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Update(step);
-                simulated += step;
-                KillGraphsAt(simulated);
+                double previous = _activeSystem.CurrentTime;
+                double next = Math.Min(target, previous + 1d / 60d);
+                foreach (var kill in _scheduledEffectKills)
+                    if (kill.Time > previous && kill.Time < next) next = kill.Time;
+                foreach (double stopTime in _graphStopTimes.Values)
+                    if (stopTime > previous && stopTime < next) next = stopTime;
+                KillGraphsAt(previous);
+                _activeSystem.CurrentTime = next;
+                ApplyRigTransform();
+                if (_boneTransformSampler != null)
+                    UpdateBoneTransforms((name, hash) => _boneTransformSampler(next, name, hash));
+                else if (_boneTransformProvider != null)
+                    UpdateBoneTransforms(_boneTransformProvider);
+                foreach (var graph in _graphs) graph.Update((float)(next - previous));
+                KillGraphsAt(next);
             }
-            float remainder = (float)(target - simulated);
-            if (remainder > 0)
-            {
-                foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Update(remainder);
-                KillGraphsAt(target);
-            }
-            _activeSystem.CurrentTime = target;
         }
 
         private void KillGraphsAt(double seconds)
         {
-            foreach (var (graph, killTime) in _graphKillTimes)
+            foreach (var (graph, stopTime) in _graphStopTimes)
             {
-                if (seconds >= killTime)
-                    graph.Kill();
+                if (seconds >= stopTime) graph.IsStopped = true;
             }
+            foreach (var kill in _scheduledEffectKills)
+                if (seconds >= kill.Time)
+                    foreach (var (graph, attachment) in _graphAttachments)
+                        if (attachment.EffectKey == kill.EffectKey && attachment.StartTime <= kill.Time)
+                            graph.Kill();
         }
 
         public void Render(Matrix4x4 viewProjection, Matrix4x4 view)
@@ -391,7 +671,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _graph = null;
             _graphs.Clear();
             _graphPlacements.Clear();
-            _graphKillTimes.Clear();
+            _scheduledEffectKills.Clear();
+            _graphStopTimes.Clear();
             _activeSystem = null;
         }
     }

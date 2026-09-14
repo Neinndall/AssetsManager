@@ -13,6 +13,8 @@ using System.Windows.Media.Media3D;
 using Vector = System.Windows.Vector;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Animation;
+using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Composition;
@@ -41,6 +43,14 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isGlStarted;
         private VfxSystemDiagnosticItem _pendingSystem;
         private VfxSystemDiagnosticItem _inspectedSystem;
+        private GlMeshRenderer _championMeshRenderer;
+        private SceneModel _championModel;
+        private AnimationService _championAnimationService;
+        private VfxClipCatalog _clipCatalog;
+        private VfxLoadingService.Bundle _championBundle;
+        private int _championLoadGeneration;
+        private System.Threading.CancellationTokenSource _scanCancellation;
+        private System.Threading.CancellationTokenSource _binCancellation;
 
         /// <summary>Injected by the host (ViewerWindow) following the peer-controls pattern.</summary>
         public LogService LogService { get; set; }
@@ -84,6 +94,13 @@ namespace AssetsManager.Views.Controls.Viewer
             if (e.PropertyName == nameof(VfxInspectorModel.SelectedSystem))
             {
                 RequestSystemInspection(_model.SelectedSystem);
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedAnimation))
+            {
+                if (_model.SelectedAnimation != null)
+                {
+                    PlaySelectedAnimation(_model.SelectedAnimation);
+                }
             }
         }
 
@@ -162,7 +179,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
             Deactivate();
             _isCleanedUp = true;
+            _scanCancellation?.Cancel();
+            _binCancellation?.Cancel();
             _model.PropertyChanged -= OnModelPropertyChanged;
+            _championLoadGeneration++;
+            _clipCatalog?.Dispose();
+            _clipCatalog = null;
 
             var cameraController = _cameraController;
             _cameraController = null;
@@ -175,6 +197,18 @@ namespace AssetsManager.Views.Controls.Viewer
             var gridRenderer = _gridRenderer;
             _gridRenderer = null;
             RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
+
+            var championMeshRenderer = _championMeshRenderer;
+            _championMeshRenderer = null;
+            RunReleaseStep(nameof(GlMeshRenderer), () => championMeshRenderer?.Dispose(), gpuBound: true);
+
+            var championModel = _championModel;
+            _championModel = null;
+            RunReleaseStep("Champion SceneModel", () => championModel?.Dispose());
+
+            var championAnimationService = _championAnimationService;
+            _championAnimationService = null;
+            RunReleaseStep(nameof(AnimationService), () => championAnimationService?.Dispose());
 
             var gl = _gl;
             _gl = null;
@@ -299,6 +333,14 @@ namespace AssetsManager.Views.Controls.Viewer
                     _gridRenderer.Initialize(_gl, false);
                 }
 
+                if (_championMeshRenderer == null)
+                {
+                    _championMeshRenderer = new GlMeshRenderer();
+                    _championMeshRenderer.Initialize(_gl);
+                }
+
+                _championAnimationService ??= new AnimationService(LogService);
+
                 if (_cameraController == null)
                 {
                     _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
@@ -372,6 +414,59 @@ namespace AssetsManager.Views.Controls.Viewer
             // Render 3D Ground Grid (matching main viewer)
             _gridRenderer?.Render(viewProj);
 
+            // Update Champion Animation & Bone Transforms for attached VFX
+            if (_model.IsPlaying && !_isUserSeeking && _vfxRenderer?.ActiveSystem != null)
+            {
+                _vfxRenderer.ActiveSystem.Speed = _model.Speed;
+                _vfxRenderer.Update(dt);
+                _model.CurrentTime = _vfxRenderer.ActiveSystem.CurrentTime;
+                if (ShouldRestartPreview(_model.IsPreviewLoopEnabled, _model.CurrentTime, _model.ActiveLoopDuration))
+                {
+                    _vfxRenderer.Seek(0);
+                    _vfxRenderer.Play();
+                    _model.CurrentTime = 0;
+                }
+                else if (_model.CurrentTime >= _model.TotalDuration) _model.IsPlaying = false;
+            }
+            if (_championModel != null && _championAnimationService != null)
+            {
+                if (_championModel.CurrentAnimation != null && _championModel.Skeleton != null)
+                {
+                    _championAnimationService.Update(
+                        (float)_model.CurrentTime,
+                        _championModel.CurrentAnimation,
+                        _championModel.Skeleton,
+                        _championModel.SkinnedMesh,
+                        _championModel.Parts,
+                        _championModel.Name);
+                    _championModel.SkinningMatrices = _championAnimationService.FinalBoneTransforms;
+                    _championModel.GpuSkinningData = _championAnimationService.SkinningData;
+                }
+
+                _vfxRenderer?.UpdateBoneTransforms((boneName, boneHash) =>
+                {
+                    if (!string.IsNullOrEmpty(boneName) && _championAnimationService.TryGetBoneTransform(boneName, out var m))
+                        return m;
+                    if (boneHash != 0 && _championAnimationService.TryGetBoneTransform(boneHash, out m))
+                        return m;
+                    return null;
+                });
+            }
+
+            // Render Champion Mesh under VFX if available and enabled
+            if (_model.ShowChampionMesh && _championModel != null && _championMeshRenderer != null)
+            {
+                _championMeshRenderer.Render(
+                    _championModel,
+                    viewProj,
+                    eye,
+                    Vector3.Normalize(new Vector3(0.5f, 1f, 0.5f)),
+                    new Vector3(1f, 1f, 1f),
+                    Vector3.Normalize(new Vector3(-0.5f, 0.5f, -0.5f)),
+                    new Vector3(0.3f, 0.3f, 0.35f),
+                    new Vector3(0.4f, 0.4f, 0.45f));
+            }
+
             if (_vfxRenderer == null)
             {
                 _model.LiveParticleCount = 0;
@@ -379,26 +474,16 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
-            if (_model.IsPlaying && !_isUserSeeking)
-            {
-                _vfxRenderer.Update(dt);
-                if (_vfxRenderer.ActiveSystem != null)
-                    _model.CurrentTime = _vfxRenderer.ActiveSystem.CurrentTime;
-                if (ShouldRestartPreview(
-                    _model.IsPreviewLoopEnabled,
-                    _model.CurrentTime,
-                    _model.ActiveLoopDuration))
-                {
-                    _model.CurrentTime = 0;
-                    _vfxRenderer.Seek(0);
-                    _vfxRenderer.Play();
-                }
-                else if (_model.CurrentTime >= _model.TotalDuration)
-                    _model.IsPlaying = false;
-            }
             _vfxRenderer.Render(viewProj, view);
 
             _model.LiveParticleCount = _vfxRenderer.LiveParticleCount;
+
+            // Live active particle count per emitter lane (matches LTK Manager liveCount badge)
+            foreach (var emitter in _model.Emitters)
+            {
+                emitter.ActiveParticleCount = _vfxRenderer.GetEmitterLiveCount(emitter.SourceOrder);
+            }
+
             Dispatcher.InvokeAsync(UpdatePlayheadPosition);
         }
 
@@ -412,6 +497,39 @@ namespace AssetsManager.Views.Controls.Viewer
                 VfxCameraPosition,
                 VfxCameraTarget - VfxCameraPosition,
                 VfxCameraUpDirection);
+        }
+
+        private void RigPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.ContextMenu != null)
+            {
+                btn.ContextMenu.PlacementTarget = btn;
+                btn.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                btn.ContextMenu.IsOpen = true;
+            }
+        }
+
+        private void SetRigPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem item && item.Tag is string tagStr && Enum.TryParse<VfxRigPreset>(tagStr, out var preset))
+            {
+                _model.RigPreset = preset;
+                if (_vfxRenderer != null)
+                {
+                    _vfxRenderer.RigPreset = preset;
+                    if (preset == VfxRigPreset.Missile)
+                    {
+                        double missileDuration = (VfxRigMotion.FlightRange / VfxRigMotion.FlightSpeed) + 0.75;
+                        _model.ActiveLoopDuration = missileDuration;
+                        _model.TotalDuration = missileDuration;
+                        _model.IsPreviewLoopEnabled = true;
+                    }
+                    _vfxRenderer.Seek(0);
+                    _vfxRenderer.Play();
+                    _model.IsPlaying = true;
+                    _model.CurrentTime = 0;
+                }
+            }
         }
 
         #endregion
@@ -444,89 +562,35 @@ namespace AssetsManager.Views.Controls.Viewer
                 ScanRootDirectory(_model.RootPath);
         }
 
-        private void ScanRootDirectory(string rootFolder)
+        private async void ScanRootDirectory(string rootFolder)
         {
             if (!Directory.Exists(rootFolder)) return;
-
+            _scanCancellation?.Cancel();
+            _scanCancellation = new System.Threading.CancellationTokenSource();
+            var operation = _scanCancellation;
+            _model.IsPlaying = false;
+            _vfxRenderer?.Pause();
+            _model.StatusText = "Reading BIN catalog...";
             try
             {
+                var entries = await System.Threading.Tasks.Task.Run(
+                    () => VfxFolderCatalog.Scan(rootFolder, operation.Token, LogService), operation.Token);
+                if (operation.IsCancellationRequested || _isCleanedUp) return;
+                _model.SelectedSkin = null;
                 _model.DetectedSkins.Clear();
                 _model.Systems.Clear();
                 _abilityCompositions = Array.Empty<VfxAbilityComposition>();
-
-                var binFiles = Directory.GetFiles(rootFolder, "*.bin", SearchOption.AllDirectories);
-                
-                // Filter strictly for skin BINs named skin0.bin, skin1.bin, skin10.bin, etc. inside /skins/ folder
-                var skinBinFiles = binFiles
-                    .Where(b => b.Contains($"{Path.DirectorySeparatorChar}skins{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ||
-                                b.Contains("/skins/", StringComparison.OrdinalIgnoreCase))
-                    .Where(b => Path.GetFileNameWithoutExtension(b).StartsWith("skin", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                var skinItems = new List<VfxSkinItem>();
-
-                foreach (var binPath in skinBinFiles)
-                {
-                    string fileName = Path.GetFileNameWithoutExtension(binPath);
-                    int skinIndex = ExtractSkinIndex(fileName);
-                    string displayName = skinIndex == 0 ? "Skin Base (skin0)" : (skinIndex > 0 ? $"Skin {skinIndex} ({fileName})" : fileName);
-
-                    skinItems.Add(new VfxSkinItem
-                    {
-                        DisplayName = displayName,
-                        BinPath = binPath,
-                        SkinIndex = skinIndex < 0 ? 999 : skinIndex
-                    });
-                }
-
-                // Sort by skin index (0, 1, 2...)
-                foreach (var item in skinItems.OrderBy(s => s.SkinIndex))
-                {
-                    _model.DetectedSkins.Add(item);
-                }
-
-                // Fallback: If no skin*.bin files were found (e.g. non-standard folder), show general BIN files cleanly
-                if (_model.DetectedSkins.Count == 0)
-                {
-                    foreach (var binPath in binFiles.OrderBy(b => b))
-                    {
-                        string fileName = Path.GetFileName(binPath);
-                        _model.DetectedSkins.Add(new VfxSkinItem
-                        {
-                            DisplayName = fileName,
-                            BinPath = binPath,
-                            SkinIndex = 0
-                        });
-                    }
-                }
-
-                // Auto-select Skin Base (index 0) or first skin item
-                var preferredSkin = _model.DetectedSkins.FirstOrDefault(s => s.SkinIndex == 0) 
-                                 ?? _model.DetectedSkins.FirstOrDefault();
-
-                if (preferredSkin != null)
-                {
-                    _model.SelectedSkin = preferredSkin;
-                }
-
-                _model.StatusText = $"Scanned {_model.DetectedSkins.Count} skins in {Path.GetFileName(rootFolder)}.";
+                foreach (var entry in entries) _model.DetectedSkins.Add(entry);
+                _model.StatusText = $"Found {entries.Count} BIN entries.";
+                _model.SelectedSkin = _model.DetectedSkins.FirstOrDefault();
             }
-            catch (Exception ex)
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { LogService?.LogError(ex, "Failed to scan VFX folder."); }
+            finally
             {
-                LogService?.LogError(ex, "Failed to scan ROOT directory");
+                if (ReferenceEquals(_scanCancellation, operation)) _scanCancellation = null;
+                operation.Dispose();
             }
-        }
-
-        private static int ExtractSkinIndex(string fileName)
-        {
-            if (string.IsNullOrEmpty(fileName)) return -1;
-            if (fileName.StartsWith("skin", StringComparison.OrdinalIgnoreCase))
-            {
-                string numPart = fileName.Substring(4);
-                if (int.TryParse(numPart, out int skinId)) return skinId;
-            }
-            string digits = new string(fileName.Where(char.IsDigit).ToArray());
-            return int.TryParse(digits, out int val) ? val : -1;
         }
 
         private void BinSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -537,9 +601,27 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void LoadBinFile(string binFilePath)
+        private async void LoadBinFile(string binFilePath)
         {
             if (!File.Exists(binFilePath)) return;
+            _binCancellation?.Cancel();
+            _binCancellation = new System.Threading.CancellationTokenSource();
+            var operation = _binCancellation;
+            _model.IsPlaying = false;
+            _vfxRenderer?.Pause();
+            _pendingSystem = null;
+            _activeBundle = null;
+            _championLoadGeneration++;
+            _model.SelectedAnimation = null;
+            _model.DetectedAnimations.Clear();
+            _vfxRenderer?.SetSystem(null);
+            _championModel?.Dispose();
+            _championModel = null;
+            _championBundle = null;
+            _model.HasChampionMesh = false;
+            _championAnimationService?.ClearCache();
+            _clipCatalog?.Dispose();
+            _clipCatalog = null;
 
             try
             {
@@ -548,19 +630,15 @@ namespace AssetsManager.Views.Controls.Viewer
                 _abilityCompositions = Array.Empty<VfxAbilityComposition>();
                 _model.LogMessages.Add($"[BIN] Loading BIN definitions from: {Path.GetFileName(binFilePath)}");
 
-                _activeBundle = VfxLoadingService.Load(binFilePath, LogService);
+                var bundle = await VfxLoadingService.LoadAsync(binFilePath, LogService, operation.Token);
+                if (operation.IsCancellationRequested || _isCleanedUp) return;
+                _activeBundle = bundle;
 
                 foreach (var (hash, sysDef) in _activeBundle.Systems)
                 {
                     string name = sysDef.Name ?? $"VFX_0x{hash:X8}";
 
-                    // Filter out internal MATH, script, helper, dummy and 0-emitter non-visual systems
-                    if (name.StartsWith("MATH_", StringComparison.OrdinalIgnoreCase) ||
-                        name.StartsWith("Math_", StringComparison.OrdinalIgnoreCase) ||
-                        name.StartsWith("script_", StringComparison.OrdinalIgnoreCase) ||
-                        name.StartsWith("helper_", StringComparison.OrdinalIgnoreCase) ||
-                        name.StartsWith("dummy_", StringComparison.OrdinalIgnoreCase) ||
-                        !HasPlayableEmitters(sysDef))
+                    if (!HasPlayableEmitters(sysDef))
                     {
                         continue;
                     }
@@ -585,7 +663,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
 
                 _abilityCompositions = VfxAbilityCompositionBuilder.BuildAll(
-                    _activeBundle.EventSequences.Values,
+                    _activeBundle.Clips,
                     _activeBundle.Systems,
                     _activeBundle.ResourceMap);
 
@@ -594,14 +672,20 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (_model.Systems.Count > 0)
                 {
-                    _model.SelectedSystem = _model.Systems.FirstOrDefault(s => s.Name.Contains("Samira", StringComparison.OrdinalIgnoreCase))
-                                          ?? _model.Systems.First();
+                    _model.SelectedSystem = _model.Systems.First();
                 }
+                else TryLoadChampionModelAsync(_model.RootPath);
             }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 _abilityCompositions = Array.Empty<VfxAbilityComposition>();
                 _model.LogMessages.Add($"[ERROR] Failed to load BIN: {ex.Message}");
+            }
+            finally
+            {
+                if (ReferenceEquals(_binCancellation, operation)) _binCancellation = null;
+                operation.Dispose();
             }
         }
 
@@ -654,43 +738,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _model.CurrentTime = 0;
             string playbackContext = "standalone system";
-            IReadOnlyList<VfxAbilityComposition> linkedCompositions = VfxAbilityCompositionBuilder.FindContainingSystem(
-                systemItem.PathHash,
-                _abilityCompositions);
-            bool configuredComposition = false;
-            if (linkedCompositions.Count == 1 && _activeBundle is not null && _vfxRenderer is not null)
-            {
-                VfxAbilityComposition composition = linkedCompositions[0];
-                configuredComposition = _vfxRenderer.SetAbilityComposition(
-                    composition,
-                    _activeBundle.Systems,
-                    _activeBundle.ResourceMap,
-                    searchDir,
-                    HashCode.Combine(playbackSeed, composition.SequencePathHash),
-                    _activeBundle.OwnerSceneContext);
-                if (configuredComposition)
-                {
-                    playbackDuration = _vfxRenderer.ActiveSystem.TotalDuration;
-                    playbackContext = $"authored sequence 0x{composition.SequencePathHash:X8}";
-                    _model.LogMessages.Add(
-                        $"[COMPOSITION AUTO] {systemItem.Name} belongs to one authored sequence; " +
-                        $"playing all {composition.ResolvedCount} resolved events.");
-                }
-            }
-            else if (linkedCompositions.Count > 1)
-            {
-                _model.LogMessages.Add(
-                    $"[COMPOSITION AMBIGUOUS] {systemItem.Name} belongs to {linkedCompositions.Count} authored sequences; " +
-                    "standalone playback retained because no unique authored sequence can be selected automatically.");
-            }
-            else
-            {
-                _model.LogMessages.Add(
-                    $"[COMPOSITION STANDALONE] {systemItem.Name} has no explicit ParticleEventData composition reference.");
-            }
-
-            if (!configuredComposition)
-                _vfxRenderer?.SetVfxSystem(systemModel);
+            _vfxRenderer?.SetVfxSystem(systemModel);
+            if (_vfxRenderer != null) _model.RigPreset = _vfxRenderer.RigPreset;
 
             double timelineMax = ResolveTimelineDuration(playbackDuration);
             _model.ActiveLoopDuration = double.IsFinite(playbackDuration) && playbackDuration > 0
@@ -716,11 +765,18 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 (string textureStatus, Brush textureStatusBrush) = DescribeTextureStatus(emitter, tex);
 
+                string primKind = emitter.IsMeshPrimitive
+                    ? "MESH"
+                    : (emitter.IsGroundLayer ? "GROUND" : (emitter.Trail != null ? "TRAIL" : "QUAD"));
+
                 var emitterDiagnostic = new VfxEmitterDiagnosticItem
                 {
                     Name = emitter.Name ?? "Emitter",
                     SourceOrder = emitterIndex,
                     IsEnabled = true,
+                    IsSolo = false,
+                    IsMuted = false,
+                    PrimitiveKindName = primKind,
                     EmitterDef = emitter,
                     TexturePath = texPath ?? "N/A",
                     TextureSources = DescribeTextureSources(emitter),
@@ -740,6 +796,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     _vfxRenderer?.SetEmitterVisibility(item.SourceOrder, enabled);
                     _model.LogMessages.Add($"[EMITTER TOGGLE] {item.Name} set to {(enabled ? "ENABLED" : "DISABLED")}");
                 };
+                emitterDiagnostic.OnVisibilityStateChanged += item => UpdateEmittersVisibility();
 
                 _model.Emitters.Add(emitterDiagnostic);
 
@@ -775,11 +832,233 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             }
 
+            UpdateEmittersVisibility();
+            TryLoadChampionModelAsync(searchDir);
+
             UpdateTimelineTrackMetrics();
             UpdatePlayheadPosition();
 
             _model.StatusText = $"{systemItem.Name} · {playbackContext}.";
             _inspectedSystem = systemItem;
+        }
+
+        private async void TryLoadChampionModelAsync(string searchDir)
+        {
+            if (string.IsNullOrEmpty(searchDir)) return;
+            if (_championModel != null && ReferenceEquals(_championBundle, _activeBundle)) return;
+            int generation = ++_championLoadGeneration;
+            var bundle = _activeBundle;
+            try
+            {
+                string authored = _activeBundle?.OwnerSceneContext?.MeshPath;
+                string sknPath = ResolveSknPath(authored, searchDir);
+
+                if (!string.IsNullOrEmpty(sknPath) && File.Exists(sknPath))
+                {
+                    var sknLoader = new SknLoadingService(LogService);
+                    var loaded = await sknLoader.LoadModel(sknPath);
+                    if (generation != _championLoadGeneration || !ReferenceEquals(bundle, _activeBundle) || _isCleanedUp)
+                    {
+                        loaded?.Dispose();
+                        return;
+                    }
+                    if (loaded != null)
+                    {
+                        var oldModel = _championModel;
+                        _championModel = loaded;
+                        _championBundle = bundle;
+                        oldModel?.Dispose();
+                        _model.HasChampionMesh = true;
+
+                        // Ensure skeleton is loaded
+                        if (_championModel.Skeleton == null)
+                        {
+                            string sklPath = ResolveSklPath(_activeBundle?.OwnerSceneContext?.SkeletonPath, sknPath, searchDir);
+                            if (!string.IsNullOrEmpty(sklPath) && File.Exists(sklPath))
+                            {
+                                using var sklStream = File.OpenRead(sklPath);
+                                _championModel.Skeleton = new LeagueToolkit.Core.Animation.RigResource(sklStream);
+                            }
+                        }
+
+                        int boneCount = _championModel.Skeleton?.Joints?.Count ?? 0;
+                        _model.LogMessages.Add($"[CHAMPION MESH] Model loaded for VFX studio: {Path.GetFileName(sknPath)} (Skeleton: {(boneCount > 0 ? $"{boneCount} bones" : "None")})");
+
+                        // Scan animations and link with authored VFX cues
+                        ScanAndBindAnimations(sknPath, searchDir);
+                        return;
+                    }
+                }
+                _model.HasChampionMesh = false;
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogDebug($"Champion mesh not loaded: {ex.Message}");
+                _model.HasChampionMesh = false;
+            }
+        }
+
+        private void ScanAndBindAnimations(string sknPath, string searchDir)
+        {
+            _model.SelectedAnimation = null;
+            _model.DetectedAnimations.Clear();
+            if (_championModel != null) _championModel.CurrentAnimation = null;
+            _clipCatalog?.Dispose();
+            _clipCatalog = new VfxClipCatalog();
+            if (_activeBundle == null || VfxLoadingService == null) return;
+            foreach (var item in _clipCatalog.Build(_activeBundle,
+                path => VfxLoadingService.ResolveAssetPath(path, searchDir, ".anm"), LogService))
+                _model.DetectedAnimations.Add(item);
+            _model.LogMessages.Add($"[ANIMATIONS] Loaded {_model.DetectedAnimations.Count} authored clips.");
+            if (_model.IsAnimationMode)
+                _model.SelectedAnimation = _model.DetectedAnimations.FirstOrDefault();
+        }
+
+        private string ResolveSklPath(string authoredPath, string sknPath, string searchDir)
+        {
+            if (!string.IsNullOrEmpty(authoredPath))
+                return VfxLoadingService?.ResolveAssetPath(authoredPath, searchDir, ".skl");
+            string sameName = Path.ChangeExtension(sknPath, ".skl");
+            return File.Exists(sameName) ? sameName : null;
+        }
+
+        private void PlaySelectedAnimation(VfxAnimationItem animItem)
+        {
+            if (animItem == null || _championModel == null) return;
+
+            _championModel.CurrentAnimation = animItem.AnimationAsset;
+            _championModel.AnimationTime = 0;
+            _model.CurrentTime = 0;
+
+            double dur = animItem.Duration > 0 ? animItem.Duration : 3.0;
+            _model.TotalDuration = dur;
+            _model.ActiveLoopDuration = dur;
+            _model.IsPreviewLoopEnabled = true;
+
+            string searchDir = _model.RootPath;
+            if (!string.IsNullOrEmpty(searchDir) && File.Exists(searchDir))
+            {
+                searchDir = Path.GetDirectoryName(searchDir) ?? searchDir;
+            }
+
+            EnsureVfxRenderSession();
+            if (_vfxRenderer != null && _activeBundle != null)
+            {
+                _championAnimationService?.Update(0, animItem.AnimationAsset, _championModel.Skeleton,
+                    _championModel.SkinnedMesh, _championModel.Parts, _championModel.Name);
+                _vfxRenderer.SetBoneTransformSampler((time, name, hash) =>
+                    _championAnimationService != null &&
+                    _championAnimationService.TrySampleBoneTransform((float)time, name, hash, out var transform)
+                        ? transform : null);
+                int seed = HashCode.Combine(animItem.Name, _activeBundle.Systems.Count);
+                _vfxRenderer.SetAnimationSession(
+                    animItem.Composition,
+                    _activeBundle.IdleEffects,
+                    _activeBundle.Systems,
+                    _activeBundle.ResourceMap,
+                    searchDir,
+                    seed,
+                    dur,
+                    _activeBundle.OwnerSceneContext);
+                _vfxRenderer.Play();
+            }
+
+            _model.IsPlaying = true;
+            _model.StatusText = $"{animItem.DisplayName} ({dur:F2}s) · {(animItem.HasVfx ? animItem.VfxSummary : "Idle VFX active")}";
+            _model.LogMessages.Add($"[PLAY ANIMATION] {animItem.DisplayName} ({dur:F2}s) with {(animItem.Composition?.ResolvedCount ?? 0)} VFX events & {(_activeBundle?.IdleEffects.Count ?? 0)} idle auras.");
+            UpdateTimelineTrackMetrics();
+            UpdatePlayheadPosition();
+        }
+
+        private string ResolveSknPath(string authoredPath, string searchDir)
+            => VfxLoadingService?.ResolveAssetPath(authoredPath, searchDir, ".skn");
+
+        private void EmitterSolo_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is VfxEmitterDiagnosticItem item)
+            {
+                item.IsSolo = !item.IsSolo;
+                UpdateEmittersVisibility();
+            }
+        }
+
+        private void EmitterMute_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is VfxEmitterDiagnosticItem item)
+            {
+                item.IsMuted = !item.IsMuted;
+                UpdateEmittersVisibility();
+            }
+        }
+
+        private void ClearAllSolos_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var emitter in _model.Emitters)
+            {
+                emitter.IsSolo = false;
+            }
+            UpdateEmittersVisibility();
+        }
+
+        private void ToggleMuteAll_Click(object sender, RoutedEventArgs e)
+        {
+            bool allMuted = _model.Emitters.Count > 0 && _model.Emitters.All(em => em.IsMuted);
+            bool newMute = !allMuted;
+            foreach (var emitter in _model.Emitters)
+            {
+                emitter.IsMuted = newMute;
+            }
+            UpdateEmittersVisibility();
+        }
+
+        private void UpdateEmittersVisibility()
+        {
+            bool hasSolo = _model.Emitters.Any(em => em.IsSolo);
+            _model.HasAnySolo = hasSolo;
+
+            foreach (var emitter in _model.Emitters)
+            {
+                bool visible;
+                if (hasSolo)
+                {
+                    visible = emitter.IsSolo && !emitter.IsMuted;
+                }
+                else
+                {
+                    visible = !emitter.IsMuted;
+                }
+                emitter.IsEnabled = visible;
+                _vfxRenderer?.SetEmitterVisibility(emitter.SourceOrder, visible);
+            }
+
+            _model.IsAllMuted = _model.Emitters.Count > 0 && _model.Emitters.All(em => em.IsMuted);
+        }
+
+        private void Replay_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model.IsAnimationMode && _model.SelectedAnimation != null)
+            {
+                PlaySelectedAnimation(_model.SelectedAnimation);
+                return;
+            }
+
+            if (_vfxRenderer?.ActiveSystem != null)
+            {
+                _vfxRenderer.Stop();
+                _model.CurrentTime = 0;
+                _vfxRenderer.Seek(0);
+                _vfxRenderer.Play();
+                _model.IsPlaying = true;
+            }
+            else if (_model.SelectedSystem != null)
+            {
+                RequestSystemInspection(_model.SelectedSystem);
+            }
+        }
+
+        private void ResetCamera_Click(object sender, RoutedEventArgs e)
+        {
+            ResetCamera();
         }
 
         #region Timeline Deck Mechanics
@@ -1028,23 +1307,47 @@ namespace AssetsManager.Views.Controls.Viewer
         private void SearchQuery_TextChanged(object sender, TextChangedEventArgs e)
         {
             string query = _model.SearchQuery?.Trim() ?? "";
-            var view = CollectionViewSource.GetDefaultView(_model.Systems);
-            if (view == null) return;
 
-            if (string.IsNullOrWhiteSpace(query))
+            var animView = CollectionViewSource.GetDefaultView(_model.DetectedAnimations);
+            if (animView != null)
             {
-                view.Filter = null;
-            }
-            else
-            {
-                view.Filter = obj =>
+                if (string.IsNullOrWhiteSpace(query))
                 {
-                    if (obj is VfxSystemDiagnosticItem item)
+                    animView.Filter = null;
+                }
+                else
+                {
+                    animView.Filter = obj =>
                     {
-                        return item.Name.Contains(query, StringComparison.OrdinalIgnoreCase);
-                    }
-                    return false;
-                };
+                        if (obj is VfxAnimationItem item)
+                        {
+                            return item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
+                                || item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+                                || (!string.IsNullOrEmpty(item.VfxSummary) && item.VfxSummary.Contains(query, StringComparison.OrdinalIgnoreCase));
+                        }
+                        return false;
+                    };
+                }
+            }
+
+            var view = CollectionViewSource.GetDefaultView(_model.Systems);
+            if (view != null)
+            {
+                if (string.IsNullOrWhiteSpace(query))
+                {
+                    view.Filter = null;
+                }
+                else
+                {
+                    view.Filter = obj =>
+                    {
+                        if (obj is VfxSystemDiagnosticItem item)
+                        {
+                            return item.Name.Contains(query, StringComparison.OrdinalIgnoreCase);
+                        }
+                        return false;
+                    };
+                }
             }
         }
 
@@ -1060,6 +1363,18 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void Play_Click(object sender, RoutedEventArgs e)
         {
+            if (_model.IsAnimationMode && _model.SelectedAnimation != null)
+            {
+                if (_model.CurrentTime >= _model.TotalDuration)
+                {
+                    _model.CurrentTime = 0;
+                    _vfxRenderer?.Seek(0);
+                }
+                _model.IsPlaying = true;
+                _vfxRenderer?.Play();
+                return;
+            }
+
             if (_model.SelectedSystem != null)
             {
                 if (!HasSelectedSystemReady())
@@ -1084,6 +1399,18 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             else
             {
+                if (_model.IsAnimationMode && _model.SelectedAnimation != null)
+                {
+                    if (_model.CurrentTime >= _model.TotalDuration)
+                    {
+                        _model.CurrentTime = 0;
+                        _vfxRenderer?.Seek(0);
+                    }
+                    _model.IsPlaying = true;
+                    _vfxRenderer?.Play();
+                    return;
+                }
+
                 if (_model.SelectedSystem != null)
                 {
                     if (!HasSelectedSystemReady())
@@ -1109,10 +1436,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void TimeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (_vfxRenderer?.ActiveSystem == null) return;
             if (!_model.IsPlaying || _isUserSeeking)
             {
-                _vfxRenderer.Seek(e.NewValue);
+                _model.CurrentTime = e.NewValue;
+                _vfxRenderer?.Seek(e.NewValue);
             }
         }
 

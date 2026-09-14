@@ -17,6 +17,54 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
     public sealed class VfxLoadingServiceTests
     {
         [Fact]
+        public void ResourceIndexPreservesDataAndAssetsNamespaces()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxNamespaces", Guid.NewGuid().ToString("N"));
+            string data = Path.Combine(root, "data", "shared");
+            string assets = Path.Combine(root, "assets", "shared");
+            Directory.CreateDirectory(data);
+            Directory.CreateDirectory(assets);
+            try
+            {
+                string dataPath = Path.Combine(data, "effect.bin");
+                string assetPath = Path.Combine(assets, "effect.bin");
+                File.WriteAllBytes(dataPath, Array.Empty<byte>());
+                File.WriteAllBytes(assetPath, Array.Empty<byte>());
+                var index = VfxResourceIndex.Build(root);
+                Assert.Equal(dataPath, Assert.Single(index.ResolveLinkedAll("DATA/Shared/Effect.bin", new[] { ".bin" })));
+                Assert.Equal(assetPath, Assert.Single(index.ResolveLinkedAll("ASSETS/Shared/Effect.bin", new[] { ".bin" })));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void LoadsDependencyStoredUnderItsWadHash()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxHashed", Guid.NewGuid().ToString("N"));
+            string skins = Path.Combine(root, "data", "characters", "hero", "skins");
+            Directory.CreateDirectory(skins);
+            try
+            {
+                const string dependency = "data/characters/hero/shared.bin";
+                string hashedPath = Path.Combine(root, $"{XxHash64Ext.Hash(dependency):x16}.bin");
+                string skin = Path.Combine(skins, "skin0.bin");
+                WriteBin(hashedPath, new[] { CreateSystem("Effects/Hashed", "Hashed") }, Array.Empty<string>());
+                WriteBin(skin, Array.Empty<BinTreeObject>(), new[] { dependency.ToUpperInvariant() });
+                using var service = new VfxLoadingService();
+                var bundle = service.Load(skin, null);
+                Assert.Equal("Hashed", Assert.Single(bundle.Systems).Value.Name);
+                Assert.Empty(bundle.MissingDependencies);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void FollowsDeclaredTruncatedDependencyWithoutLoadingSimilarSkinNames()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxLoading", Guid.NewGuid().ToString("N"));

@@ -5,7 +5,8 @@ namespace AssetsManager.Views.Models.Viewer
     {
         Alpha,
         Multiply,
-        Additive
+        Additive,
+        Opaque
     }
 
     public enum VfxBlendFactor
@@ -14,12 +15,17 @@ namespace AssetsManager.Views.Models.Viewer
         One,
         SourceAlpha,
         OneMinusSourceAlpha,
-        DestinationColor
+        DestinationColor,
+        OneMinusSourceColor,
+        DestinationAlpha,
+        OneMinusDestinationAlpha
     }
 
     public enum VfxBlendEquationKind
     {
-        Add
+        Add,
+        Min,
+        Max
     }
 
     /// <summary>Complete backend-neutral render contract for one authored blendMode value.</summary>
@@ -42,27 +48,47 @@ namespace AssetsManager.Views.Models.Viewer
     {
         private static readonly VfxBlendModeDescriptor[] AuthoredModes =
         {
-            Alpha(0, "Alpha Blend"),
-            Alpha(1, "Alpha Blend"),
-            Additive(2),
-            new(
-                3,
-                "Multiply",
-                VfxBlendModeKind.Multiply,
-                VfxBlendFactor.DestinationColor,
-                VfxBlendFactor.Zero,
-                VfxBlendFactor.One,
-                VfxBlendFactor.OneMinusSourceAlpha,
-                VfxBlendEquationKind.Add,
-                VfxBlendEquationKind.Add,
-                AllowsAlphaTest: true,
-                AllowsDepthWrite: false,
-                NeutralizeTransparentRgb: true),
-            Additive(4),
-            Alpha(5, "Alpha Blend")
+            // 0: ADD -> One, One, Add (Pure additive)
+            new(0, "Add", VfxBlendModeKind.Additive, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: false, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+
+            // 1: ALPHA -> SrcAlpha, OneMinusSrcAlpha, Add
+            new(1, "Alpha Blend", VfxBlendModeKind.Alpha, VfxBlendFactor.SourceAlpha, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendFactor.One, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+
+            // 2: SUBTRACT -> Zero, OneMinusSrcColor (Color), Zero, OneMinusSrcAlpha (Alpha) (Dest darken)
+            new(2, "Subtract", VfxBlendModeKind.Multiply, VfxBlendFactor.Zero, VfxBlendFactor.OneMinusSourceColor, VfxBlendFactor.Zero, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: true),
+
+            // 3: NONE -> Opaque (depthWrite: true)
+            new(3, "None (Opaque)", VfxBlendModeKind.Opaque, VfxBlendFactor.One, VfxBlendFactor.Zero, VfxBlendFactor.One, VfxBlendFactor.Zero, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: true, NeutralizeTransparentRgb: false),
+
+            // 4: ALPHA_ADD -> SrcAlpha, One, Add (Alpha-modulated additive)
+            new(4, "Alpha Add", VfxBlendModeKind.Additive, VfxBlendFactor.SourceAlpha, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: false, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+
+            // 5: PREMULTIPLIED_ALPHA -> One, OneMinusSrcAlpha, Add
+            new(5, "Premultiplied Alpha", VfxBlendModeKind.Alpha, VfxBlendFactor.One, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendFactor.One, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+
+            // 6: MIN -> One, One, Min
+            new(6, "Min", VfxBlendModeKind.Additive, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Min, VfxBlendEquationKind.Min, AllowsAlphaTest: false, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+
+            // 7: MAX -> One, One, Max
+            new(7, "Max", VfxBlendModeKind.Additive, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Max, VfxBlendEquationKind.Max, AllowsAlphaTest: false, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+
+            // 8: TARGET_ALPHA -> OneMinusDstAlpha, DstAlpha
+            new(8, "Target Alpha", VfxBlendModeKind.Alpha, VfxBlendFactor.OneMinusDestinationAlpha, VfxBlendFactor.DestinationAlpha, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: false, AllowsDepthWrite: false, NeutralizeTransparentRgb: false)
         };
 
-        private static readonly VfxBlendModeDescriptor SafeAlphaFallback = Alpha(-1, "Safe Alpha Fallback");
+        private static readonly VfxBlendModeDescriptor SafeAlphaFallback = new(
+            -1,
+            "Safe Alpha Fallback",
+            VfxBlendModeKind.Alpha,
+            VfxBlendFactor.SourceAlpha,
+            VfxBlendFactor.OneMinusSourceAlpha,
+            VfxBlendFactor.One,
+            VfxBlendFactor.OneMinusSourceAlpha,
+            VfxBlendEquationKind.Add,
+            VfxBlendEquationKind.Add,
+            AllowsAlphaTest: true,
+            AllowsDepthWrite: false,
+            NeutralizeTransparentRgb: false);
 
         public static bool IsKnown(int rawMode) => rawMode >= 0 && rawMode < AuthoredModes.Length;
 
@@ -73,24 +99,17 @@ namespace AssetsManager.Views.Models.Viewer
 
         public static bool IsMultiply(int rawMode) => GetDescriptor(rawMode).Kind == VfxBlendModeKind.Multiply;
 
-        // Additive blending already uses the authored source alpha. Do not amplify
-        // RGB outside the BIN material, or authored highlights become overexposed.
         public static float ResolveEmissiveStrength(int rawMode) => 1f;
 
         public static bool ShouldAlphaTest(int rawMode, int alphaReference)
             => GetDescriptor(rawMode).AllowsAlphaTest && alphaReference > 0;
 
         public static bool ShouldWriteDepth(int rawMode, int alphaReference)
-            => GetDescriptor(rawMode).AllowsDepthWrite && alphaReference > 0;
+            => GetDescriptor(rawMode).AllowsDepthWrite || (GetDescriptor(rawMode).AllowsAlphaTest && alphaReference > 0 && rawMode == 3);
 
         public static int ResolveColorRenderFlags(int rawFlags, bool hasParticleColorTexture)
             => hasParticleColorTexture ? rawFlags | 1 : rawFlags;
 
-        /// <summary>
-        /// Riot's miscRenderFlags bit 0 requests inverted mesh faces for normal/multiply
-        /// materials. The renderer uses this to choose a safe double-sided fallback because
-        /// VFX mesh buffers do not carry normals.
-        /// </summary>
         public static bool ShouldFlipFaces(int miscRenderFlags, int rawMode, bool disableBackfaceCull)
             => (miscRenderFlags & 1) != 0 && !disableBackfaceCull && rawMode is 1 or 3;
 
@@ -104,33 +123,5 @@ namespace AssetsManager.Views.Models.Viewer
 
             return $"{GetDescriptor(rawMode).Name} ({rawMode})";
         }
-
-        private static VfxBlendModeDescriptor Alpha(int rawMode, string name) => new(
-            rawMode,
-            name,
-            VfxBlendModeKind.Alpha,
-            VfxBlendFactor.SourceAlpha,
-            VfxBlendFactor.OneMinusSourceAlpha,
-            VfxBlendFactor.One,
-            VfxBlendFactor.OneMinusSourceAlpha,
-            VfxBlendEquationKind.Add,
-            VfxBlendEquationKind.Add,
-            AllowsAlphaTest: true,
-            AllowsDepthWrite: false,
-            NeutralizeTransparentRgb: false);
-
-        private static VfxBlendModeDescriptor Additive(int rawMode) => new(
-            rawMode,
-            "Additive",
-            VfxBlendModeKind.Additive,
-            VfxBlendFactor.SourceAlpha,
-            VfxBlendFactor.One,
-            VfxBlendFactor.One,
-            VfxBlendFactor.One,
-            VfxBlendEquationKind.Add,
-            VfxBlendEquationKind.Add,
-            AllowsAlphaTest: false,
-            AllowsDepthWrite: false,
-            NeutralizeTransparentRgb: false);
     }
 }

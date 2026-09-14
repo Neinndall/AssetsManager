@@ -424,6 +424,8 @@
         </Setter>
     </Style>
 
+
+
     <!-- [Toolbars] Botón toggle de icono plano transparente -->
     <Style x:Key="TransparentIconToggleButton" TargetType="ToggleButton">
         <Setter Property="Background" Value="Transparent"/>

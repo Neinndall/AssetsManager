@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Numerics;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -22,13 +23,26 @@ namespace AssetsManager.Views.Models.Viewer
         float Scale,
         IReadOnlyList<VfxParticleEventAttachment> Attachments);
 
+    public sealed record VfxIdleEffectDefinition(
+        uint EffectKey,
+        string EffectName,
+        string BoneName,
+        uint BoneNameHash,
+        string TargetBoneName,
+        uint TargetBoneNameHash,
+        Vector3 Position);
+
     public sealed record VfxEventSequenceDefinition(
         uint OwnerPathHash,
         uint OwnerClassHash,
         float TickDuration,
         float StartFrame,
         float EndFrame,
-        IReadOnlyList<VfxParticleEventDefinition> Events);
+        IReadOnlyList<VfxParticleEventDefinition> Events,
+        string ClipName = null,
+        string AnimationFilePath = null,
+        uint GraphPathHash = 0,
+        IReadOnlyList<uint> ChildClipHashes = null);
 
     public sealed record VfxCompositionEvent(
         VfxParticleEventDefinition Event,
@@ -42,7 +56,11 @@ namespace AssetsManager.Views.Models.Viewer
         float TickDuration,
         float StartFrame,
         float EndFrame,
-        IReadOnlyList<VfxCompositionEvent> Events)
+        IReadOnlyList<VfxCompositionEvent> Events,
+        string ClipName = null,
+        string AnimationFilePath = null,
+        uint GraphPathHash = 0,
+        IReadOnlyList<uint> ChildClipHashes = null)
     {
         public int ResolvedCount { get; init; }
         public int UnresolvedCount => Events.Count - ResolvedCount;

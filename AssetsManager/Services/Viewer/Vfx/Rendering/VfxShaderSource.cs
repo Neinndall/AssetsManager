@@ -44,6 +44,7 @@ out vec2 vUvMult;
 out vec2 vLocalUv;
 out vec2 vLocalUvMult;
 out vec4 vMeshColor;
+out vec3 vColorDynamics;
 vec2 addressUv(vec2 uv, int mode){
     if (mode == 1 || mode == 3) return clamp(uv, vec2(0.0), vec2(1.0));
     if (mode == 2) {
@@ -105,6 +106,7 @@ void main(){
     vec2 multCellMax = (multCell + vec2(1.0)) / multDiv - multHalfTexel;
     vUvMult = clamp((multCell + multUv) / multDiv, multCellMin, multCellMax);
     vMeshColor = aColor;
+    vColorDynamics = vec3(1.0, 0.0, 0.0);
 }";
 
         internal const string ParticleVertex = @"
@@ -158,6 +160,7 @@ out vec4 vErosionMixer;
 out vec2 vLocalUv;
 out vec2 vLocalUvMult;
 out float vPaletteSelector;
+out vec3 vColorDynamics;
 vec3 rotateEuler(vec3 p, vec3 r){
     float sz = sin(r.z); float cz = cos(r.z);
     p = vec3(p.x * cz - p.y * sz, p.x * sz + p.y * cz, p.z);
@@ -219,6 +222,7 @@ void main(){
     float s = sin(rotation);
     float c = cos(rotation);
     vec2 rc = vec2(aCorner.x * c - aCorner.y * s, aCorner.x * s + aCorner.y * c);
+    if (uPrimitiveKind == 0) rc *= 2.0;
     vec3 world;
     if (rayPrimitive) {
         float alongRay = aCorner.y + 0.5;
@@ -296,6 +300,7 @@ void main(){
     vPaletteSelector = aTextureMultFramePalette.y;
     vErosionDrive = aErosionDrive;
     vErosionMixer = aErosionMixer;
+    vColorDynamics = vec3(aAgeVelX.x, length(aAgeVelX.yzw), aRotFrame.y);
 }";
 
         internal const string MeshFragment = @"
@@ -304,7 +309,9 @@ in vec2 vUvMult;
 in vec2 vLocalUv;
 in vec2 vLocalUvMult;
 in vec4 vMeshColor;
+in vec3 vColorDynamics;
 uniform sampler2D uTex;
+uniform int uHasTex;
 uniform sampler2D uTexMult;
 uniform int uHasTexMult;
 uniform int uAddressMode;
@@ -312,7 +319,6 @@ uniform int uAddressModeMult;
 uniform vec4 uColor;
 uniform float uAlphaCutoff;
 uniform int uAlphaTest;
-uniform int uDeriveAlphaFromRgb;
 uniform float uEmissiveStrength;
 uniform int uIsMultiply;
 uniform sampler2D uColorMap;
@@ -348,19 +354,18 @@ float addressMask(vec2 uv, int mode){
     if (mode != 3) return 1.0;
     return all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0))) ? 1.0 : 0.0;
 }
-float colorLookUpChannel(vec4 source, int type){
-    if (type == 1) return source.r;
-    if (type == 2) return source.g;
-    if (type == 3) return source.b;
-    if (type == 4) return source.a;
-    return 0.0;
+float colorLookUpDriver(int type){
+    if (type == 1) return vColorDynamics.x;
+    if (type == 2) return vColorDynamics.y;
+    if (type == 3) return vColorDynamics.z;
+    return 1.0;
 }
 vec4 applyParticleColor(vec4 texel){
     if (uHasColor == 0) return texel;
     if (uColorLookUpTypeX != 0 || uColorLookUpTypeY != 0) {
         vec2 colorUv = vec2(
-            colorLookUpChannel(texel, uColorLookUpTypeX) * uColorLookUpScales.x,
-            colorLookUpChannel(texel, uColorLookUpTypeY) * uColorLookUpScales.y) + uColorLookUpOffsets;
+            colorLookUpDriver(uColorLookUpTypeX) * uColorLookUpScales.x,
+            colorLookUpDriver(uColorLookUpTypeY) * uColorLookUpScales.y) + uColorLookUpOffsets;
         vec4 colorTex = texture(uColorMap, colorUv);
         texel.rgb = colorTex.rgb;
         texel.a *= colorTex.a;
@@ -380,9 +385,9 @@ vec4 applyParticleColor(vec4 texel){
     return texel;
 }
 void main(){
-    vec4 texel = texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode);
-    if (uDeriveAlphaFromRgb != 0)
-        texel.a = dot(texel.rgb, vec3(0.2126, 0.7152, 0.0722));
+    vec4 texel = (uHasTex != 0)
+        ? texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode)
+        : vec4(0.0);
     texel = applyParticleColor(texel);
     if (uHasPalette != 0) {
         float paletteCoverage = texel.a;
@@ -403,9 +408,12 @@ void main(){
         texel.a *= mult.a;
     }
     if (uHasErosion != 0) {
-        float erosion = dot(texture(uErosionTex, vUv), uErosionMixer);
-        float feather = max(0.001, mix(uErosionFeatherIn, uErosionFeatherOut, clamp(uErosionDrive, 0.0, 1.0)));
-        texel.a *= smoothstep(uErosionDrive - feather, uErosionDrive + feather, erosion);
+        float erosion = clamp(dot(texture(uErosionTex, vUv), uErosionMixer), 0.0, 1.0);
+        float featherIn = max(0.0001, uErosionFeatherIn);
+        float featherOut = max(0.0001, uErosionFeatherOut);
+        float upper = clamp((uErosionDrive - erosion + 1.0) / featherIn, 0.0, 1.0);
+        float lower = clamp((uErosionDrive - erosion) / featherOut, 0.0, 1.0);
+        texel.a *= clamp(upper - lower, 0.0, 1.0);
     }
     if (uHasSoftParticle != 0) {
         vec2 sceneUv = gl_FragCoord.xy / max(uViewportSize, vec2(1.0));
@@ -416,7 +424,12 @@ void main(){
         float fadeOut = uSoftParticleParams.w > 0.0
             ? 1.0 - smoothstep(uSoftParticleParams.z, uSoftParticleParams.z + uSoftParticleParams.w, -depthGap)
             : 1.0;
-        texel.a *= fadeIn * fadeOut;
+        float fade = fadeIn * fadeOut;
+        if (uIsAdditive != 0) {
+            texel.rgb *= fade;
+        } else {
+            texel.a *= fade;
+        }
     }
     if (uHasReflection != 0) {
         vec4 reflection = texture(uReflectionTex, vUv);
@@ -428,9 +441,9 @@ void main(){
     float effectiveAlpha = texel.a * authoredColor.a;
     if (effectiveAlpha <= 0.0001 || (uAlphaTest != 0 && effectiveAlpha <= uAlphaCutoff)) discard;
     fragColor = texel * authoredColor;
+    if (uIsAdditive == 1 || uIsMultiply != 0)
+        fragColor.rgb *= authoredColor.a;
     fragColor.rgb *= uEmissiveStrength;
-    if (uIsMultiply != 0)
-        fragColor.rgb = mix(vec3(1.0), fragColor.rgb, effectiveAlpha);
 }";
 
         internal const string ParticleFragment = @"
@@ -442,7 +455,9 @@ in vec4 vErosionMixer;
 in vec2 vLocalUv;
 in vec2 vLocalUvMult;
 in float vPaletteSelector;
+in vec3 vColorDynamics;
 uniform sampler2D uTex;
+uniform int uHasTex;
 uniform sampler2D uTexMult;
 uniform int uHasTexMult;
 uniform int uAddressMode;
@@ -454,7 +469,6 @@ uniform vec2 uViewportSize;
 uniform float uDistortionStrength;
 uniform float uAlphaCutoff;
 uniform int uAlphaTest;
-uniform int uDeriveAlphaFromRgb;
 uniform float uEmissiveStrength;
 uniform int uIsMultiply;
 uniform sampler2D uColorMap;
@@ -486,19 +500,18 @@ float addressMask(vec2 uv, int mode){
     if (mode != 3) return 1.0;
     return all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0))) ? 1.0 : 0.0;
 }
-float colorLookUpChannel(vec4 source, int type){
-    if (type == 1) return source.r;
-    if (type == 2) return source.g;
-    if (type == 3) return source.b;
-    if (type == 4) return source.a;
-    return 0.0;
+float colorLookUpDriver(int type){
+    if (type == 1) return vColorDynamics.x;
+    if (type == 2) return vColorDynamics.y;
+    if (type == 3) return vColorDynamics.z;
+    return 1.0;
 }
 vec4 applyParticleColor(vec4 tex){
     if (uHasColor == 0) return tex;
     if (uColorLookUpTypeX != 0 || uColorLookUpTypeY != 0) {
         vec2 colorUv = vec2(
-            colorLookUpChannel(tex, uColorLookUpTypeX) * uColorLookUpScales.x,
-            colorLookUpChannel(tex, uColorLookUpTypeY) * uColorLookUpScales.y) + uColorLookUpOffsets;
+            colorLookUpDriver(uColorLookUpTypeX) * uColorLookUpScales.x,
+            colorLookUpDriver(uColorLookUpTypeY) * uColorLookUpScales.y) + uColorLookUpOffsets;
         vec4 colorTex = texture(uColorMap, colorUv);
         tex.rgb = colorTex.rgb;
         tex.a *= colorTex.a;
@@ -518,9 +531,9 @@ vec4 applyParticleColor(vec4 tex){
     return tex;
 }
 void main(){
-    vec4 t = texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode);
-    if (uDeriveAlphaFromRgb != 0)
-        t.a = dot(t.rgb, vec3(0.2126, 0.7152, 0.0722));
+    vec4 t = (uHasTex != 0)
+        ? texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode)
+        : vec4(0.0);
     t = applyParticleColor(t);
     if (uHasPalette != 0) {
         float paletteCoverage = t.a;
@@ -541,9 +554,12 @@ void main(){
         t.a *= mult.a;
     }
     if (uHasErosion != 0) {
-        float erosion = dot(texture(uErosionTex, vUv), vErosionMixer);
-        float feather = max(0.001, mix(uErosionFeatherIn, uErosionFeatherOut, clamp(vErosionDrive, 0.0, 1.0)));
-        t.a *= smoothstep(vErosionDrive - feather, vErosionDrive + feather, erosion);
+        float erosion = clamp(dot(texture(uErosionTex, vUv), vErosionMixer), 0.0, 1.0);
+        float featherIn = max(0.0001, uErosionFeatherIn);
+        float featherOut = max(0.0001, uErosionFeatherOut);
+        float upper = clamp((vErosionDrive - erosion + 1.0) / featherIn, 0.0, 1.0);
+        float lower = clamp((vErosionDrive - erosion) / featherOut, 0.0, 1.0);
+        t.a *= clamp(upper - lower, 0.0, 1.0);
     }
     if (uHasSoftParticle != 0) {
         vec2 sceneUv = gl_FragCoord.xy / max(uViewportSize, vec2(1.0));
@@ -554,7 +570,12 @@ void main(){
         float fadeOut = uSoftParticleParams.w > 0.0
             ? 1.0 - smoothstep(uSoftParticleParams.z, uSoftParticleParams.z + uSoftParticleParams.w, -depthGap)
             : 1.0;
-        t.a *= fadeIn * fadeOut;
+        float fade = fadeIn * fadeOut;
+        if (uIsAdditive != 0) {
+            t.rgb *= fade;
+        } else {
+            t.a *= fade;
+        }
     }
     if (uHasReflection != 0) {
         vec4 reflection = texture(uReflectionTex, vUv);
@@ -576,9 +597,9 @@ void main(){
         return;
     }
     fragColor = vec4(t.rgb * authoredColor.rgb, effectiveAlpha);
+    if (uIsAdditive == 1 || uIsMultiply != 0)
+        fragColor.rgb *= authoredColor.a;
     fragColor.rgb *= uEmissiveStrength;
-    if (uIsMultiply != 0)
-        fragColor.rgb = mix(vec3(1.0), fragColor.rgb, effectiveAlpha);
 }        ";
     }
 }

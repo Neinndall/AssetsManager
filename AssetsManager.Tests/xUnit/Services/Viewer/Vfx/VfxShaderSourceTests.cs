@@ -6,6 +6,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
     public sealed class VfxShaderSourceTests
     {
         [Fact]
+        public void MissingTexturesRemainTransparentWithoutInventedAlpha()
+        {
+            Assert.Contains(": vec4(0.0)", VfxShaderSource.MeshFragment);
+            Assert.Contains(": vec4(0.0);", VfxShaderSource.ParticleFragment);
+            Assert.DoesNotContain("uDeriveAlphaFromRgb", VfxShaderSource.MeshFragment);
+            Assert.DoesNotContain("uDeriveAlphaFromRgb", VfxShaderSource.ParticleFragment);
+        }
+
+        [Fact]
         public void PaletteColoringPreservesAuthoredTextureCoverage()
         {
             Assert.Contains("float paletteCoverage = t.a;", VfxShaderSource.ParticleFragment);
@@ -18,15 +27,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void MultiplyNeutralizesTransparentRgbBeforeFramebufferComposition()
+        public void OnlyAddAndSubtractPremultiplyAuthoredAlpha()
         {
             const string coverageExpression =
-                "fragColor.rgb = mix(vec3(1.0), fragColor.rgb, effectiveAlpha);";
+                "if (uIsAdditive == 1 || uIsMultiply != 0)";
 
             Assert.Contains("uniform int uIsMultiply;", VfxShaderSource.ParticleFragment);
             Assert.Contains(coverageExpression, VfxShaderSource.ParticleFragment);
             Assert.Contains("uniform int uIsMultiply;", VfxShaderSource.MeshFragment);
             Assert.Contains(coverageExpression, VfxShaderSource.MeshFragment);
+            Assert.DoesNotContain("mix(vec3(1.0), fragColor.rgb", VfxShaderSource.ParticleFragment);
+            Assert.DoesNotContain("mix(vec3(1.0), fragColor.rgb", VfxShaderSource.MeshFragment);
         }
     }
 }

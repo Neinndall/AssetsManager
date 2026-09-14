@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Services.Viewer.Vfx.Session;
 namespace AssetsManager.Views.Models.Viewer
 {
     /// <summary>
@@ -67,6 +68,8 @@ namespace AssetsManager.Views.Models.Viewer
     public class VfxEmitterDiagnosticItem : INotifyPropertyChanged
     {
         private bool _isEnabled = true;
+        private bool _isSolo = false;
+        private bool _isMuted = false;
         private string _name;
         private VfxEmitterDefinition _emitterDef;
         private string _texturePath;
@@ -79,10 +82,14 @@ namespace AssetsManager.Views.Models.Viewer
         private string _blendMode;
         private string _texDiv;
         private bool _isMeshPrimitive;
+        private string _primitiveKindName = "Billboard";
         private bool _disableBackfaceCull;
         private int _activeParticleCount;
+        private double _timeStart;
+        private double _timeDuration;
 
         public event Action<VfxEmitterDiagnosticItem, bool> OnEnabledChanged;
+        public event Action<VfxEmitterDiagnosticItem> OnVisibilityStateChanged;
 
         public bool IsEnabled
         {
@@ -96,6 +103,52 @@ namespace AssetsManager.Views.Models.Viewer
                     OnEnabledChanged?.Invoke(this, value);
                 }
             }
+        }
+
+        public bool IsSolo
+        {
+            get => _isSolo;
+            set
+            {
+                if (_isSolo != value)
+                {
+                    _isSolo = value;
+                    OnPropertyChanged();
+                    OnVisibilityStateChanged?.Invoke(this);
+                }
+            }
+        }
+
+        public bool IsMuted
+        {
+            get => _isMuted;
+            set
+            {
+                if (_isMuted != value)
+                {
+                    _isMuted = value;
+                    OnPropertyChanged();
+                    OnVisibilityStateChanged?.Invoke(this);
+                }
+            }
+        }
+
+        public string PrimitiveKindName
+        {
+            get => _primitiveKindName;
+            set { _primitiveKindName = value; OnPropertyChanged(); }
+        }
+
+        public double TimeStart
+        {
+            get => _timeStart;
+            set { _timeStart = value; OnPropertyChanged(); }
+        }
+
+        public double TimeDuration
+        {
+            get => _timeDuration;
+            set { _timeDuration = value; OnPropertyChanged(); }
         }
 
         public string Name
@@ -405,6 +458,73 @@ namespace AssetsManager.Views.Models.Viewer
     }
 
     /// <summary>
+    /// Item model representing a champion animation with linked VFX cues and duration.
+    /// </summary>
+    public class VfxAnimationItem : INotifyPropertyChanged
+    {
+        private string _name;
+        private string _displayName;
+        private string _filePath;
+        private float _duration;
+        private bool _hasVfx;
+        private string _vfxSummary;
+        private VfxAbilityComposition _composition;
+
+        public string Name
+        {
+            get => _name;
+            set { _name = value; OnPropertyChanged(); }
+        }
+
+        public string DisplayName
+        {
+            get => _displayName;
+            set { _displayName = value; OnPropertyChanged(); }
+        }
+
+        public string FilePath
+        {
+            get => _filePath;
+            set { _filePath = value; OnPropertyChanged(); }
+        }
+
+        public float Duration
+        {
+            get => _duration;
+            set { _duration = value; OnPropertyChanged(); }
+        }
+
+        public bool HasVfx
+        {
+            get => _hasVfx;
+            set { _hasVfx = value; OnPropertyChanged(); }
+        }
+
+        public string VfxSummary
+        {
+            get => _vfxSummary;
+            set { _vfxSummary = value; OnPropertyChanged(); }
+        }
+
+        public VfxAbilityComposition Composition
+        {
+            get => _composition;
+            set { _composition = value; OnPropertyChanged(); }
+        }
+
+        private LeagueToolkit.Core.Animation.IAnimationAsset _animationAsset;
+        public LeagueToolkit.Core.Animation.IAnimationAsset AnimationAsset
+        {
+            get => _animationAsset;
+            set { _animationAsset = value; OnPropertyChanged(); }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string prop = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+    }
+
+    /// <summary>
     /// Primary view model for the VFX Inspector & Diagnostic Studio window.
     /// Manages root directory scanning, system selection, emitter live controls, and diagnostics.
     /// </summary>
@@ -414,6 +534,8 @@ namespace AssetsManager.Views.Models.Viewer
         private VfxSkinItem _selectedSkin;
         private string _searchQuery;
         private VfxSystemDiagnosticItem _selectedSystem;
+        private VfxAnimationItem _selectedAnimation;
+        private bool _isAnimationMode = true;
         private bool _isPlaying;
         private double _currentTime;
         private double _totalDuration = 5.0;
@@ -424,13 +546,101 @@ namespace AssetsManager.Views.Models.Viewer
         private string _bgMode = "Dark";
         private bool _isWireframe;
         private string _statusText = "Ready";
+        private bool _hasAnySolo;
+        private bool _isAllMuted;
+        private bool _showChampionMesh = true;
+        private bool _hasChampionMesh;
+        private VfxRigPreset _rigPreset = VfxRigPreset.Still;
+
+        public VfxRigPreset RigPreset
+        {
+            get => _rigPreset;
+            set
+            {
+                if (_rigPreset != value)
+                {
+                    _rigPreset = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(RigPresetText));
+                    OnPropertyChanged(nameof(RigPresetIcon));
+                    OnPropertyChanged(nameof(IsStillRig));
+                    OnPropertyChanged(nameof(IsBurstRig));
+                    OnPropertyChanged(nameof(IsMissileRig));
+                    OnPropertyChanged(nameof(IsTrailRig));
+                }
+            }
+        }
+
+        public string RigPresetText => _rigPreset switch
+        {
+            VfxRigPreset.Missile => "Missile",
+            VfxRigPreset.Trail => "Trail",
+            VfxRigPreset.Burst => "Burst",
+            _ => "Still"
+        };
+
+        public string RigPresetIcon => _rigPreset switch
+        {
+            VfxRigPreset.Missile => "RocketLaunchOutline",
+            VfxRigPreset.Trail => "RotateRight",
+            VfxRigPreset.Burst => "Sparkles",
+            _ => "CrosshairsGps"
+        };
+
+        public bool IsStillRig => _rigPreset == VfxRigPreset.Still;
+        public bool IsBurstRig => _rigPreset == VfxRigPreset.Burst;
+        public bool IsMissileRig => _rigPreset == VfxRigPreset.Missile;
+        public bool IsTrailRig => _rigPreset == VfxRigPreset.Trail;
 
         public ObservableCollection<VfxSkinItem> DetectedSkins { get; } = new();
+        public ObservableCollection<VfxAnimationItem> DetectedAnimations { get; } = new();
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxTextureDiagnosticItem> Textures { get; } = new();
         public ObservableCollection<VfxMeshDiagnosticItem> Meshes { get; } = new();
         public ObservableCollection<string> LogMessages { get; } = new();
+
+        public bool IsAnimationMode
+        {
+            get => _isAnimationMode;
+            set { _isAnimationMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsRawSystemsMode)); }
+        }
+
+        public bool IsRawSystemsMode
+        {
+            get => !_isAnimationMode;
+            set { IsAnimationMode = !value; }
+        }
+
+        public VfxAnimationItem SelectedAnimation
+        {
+            get => _selectedAnimation;
+            set { _selectedAnimation = value; OnPropertyChanged(); }
+        }
+
+        public bool HasAnySolo
+        {
+            get => _hasAnySolo;
+            set { _hasAnySolo = value; OnPropertyChanged(); }
+        }
+
+        public bool IsAllMuted
+        {
+            get => _isAllMuted;
+            set { _isAllMuted = value; OnPropertyChanged(); }
+        }
+
+        public bool ShowChampionMesh
+        {
+            get => _showChampionMesh;
+            set { _showChampionMesh = value; OnPropertyChanged(); }
+        }
+
+        public bool HasChampionMesh
+        {
+            get => _hasChampionMesh;
+            set { _hasChampionMesh = value; OnPropertyChanged(); }
+        }
 
         public double ActiveLoopDuration
         {
