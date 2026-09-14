@@ -74,6 +74,38 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void MissileRunLengthUsesAuthoredLingerInsteadOfFixedTail()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
+            {
+                EmitterLifetime = 0.5f,
+                ParticleLifetime = VfxCurveF.Const(1f),
+                EmitterLinger = 2f,
+                ParticleLinger = 1.5f
+            };
+            var system = new VfxSystemDefinition(1, "missile", "missile", new[] { emitter });
+
+            // Flight is 0.75s. At landing the emitter still owes 1.25s of wait,
+            // followed by 1.5s of particle linger: 0.75 + 1.25 + 1.5 = 3.5s.
+            Assert.Equal(3.5d, VfxRigMotion.RunLength(VfxRigPreset.Missile, system), precision: 4);
+        }
+
+        [Fact]
+        public void RigRunLengthsFollowLtkPresetLifecycle()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
+            {
+                EmitterLifetime = 0.5f,
+                ParticleLifetime = VfxCurveF.Const(0.25f)
+            };
+            var system = new VfxSystemDefinition(1, "rig", "rig", new[] { emitter });
+
+            Assert.Equal(1d, VfxRigMotion.RunLength(VfxRigPreset.Still, system), precision: 4);
+            Assert.Equal(1d, VfxRigMotion.RunLength(VfxRigPreset.Burst, system), precision: 4);
+            Assert.Equal(3d, VfxRigMotion.RunLength(VfxRigPreset.Trail, system), precision: 4);
+        }
+
+        [Fact]
         public void SystemNamesDoNotOverrideThePreviewRig()
         {
             var session = new VfxRenderSession();

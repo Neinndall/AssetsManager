@@ -365,16 +365,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 : 0f;
         }
 
-        private static bool IsLegacySimple(VfxEmitterDefinition definition)
+        internal static bool IsLegacySimple(VfxEmitterDefinition definition)
             => definition.LegacyBirthScale is not null;
 
-        private static float LingerSeconds(VfxEmitterDefinition definition)
+        internal static float LingerSeconds(VfxEmitterDefinition definition)
         {
             float lifetime = IsLegacySimple(definition) ? 0f : MathF.Max(0f, definition.ParticleLifetime.Constant);
             return MathF.Min(lifetime + 10f, MathF.Max(0f, definition.ParticleLinger));
         }
 
-        private static float StopWaitSeconds(VfxEmitterDefinition definition)
+        internal static float StopWaitSeconds(VfxEmitterDefinition definition)
         {
             float lifetime = IsLegacySimple(definition)
                 ? 0f
