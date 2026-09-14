@@ -1043,8 +1043,66 @@ namespace AssetsManager.Views.Controls.Viewer
 
         #region Timeline Deck Mechanics
 
+        private void TracksCanvasContainer_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateTimelineTrackMetrics();
+            UpdatePlayheadPosition();
+        }
+
         private void UpdateTimelineTrackMetrics()
         {
+            if (_model == null || TracksCanvasContainer == null) return;
+            double availableWidth = TracksCanvasContainer.ActualWidth;
+            if (availableWidth <= 0) return;
+
+            double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
+
+            Brush[] palette = new Brush[]
+            {
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00E676")), // Teal / Green
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00D1FF")), // Cyan
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5C85FF")), // Slate Blue
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF6B35")), // Coral / Orange
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD600")), // Amber / Gold
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A855F7")), // Purple
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EC4899"))  // Pink
+            };
+
+            int idx = 1;
+            foreach (var emitter in _model.Emitters)
+            {
+                emitter.IndexNumber = idx;
+                emitter.TrackBrush = palette[(idx - 1) % palette.Length];
+
+                double delay = emitter.EmitterDef?.TimeBeforeFirstEmission ?? 0;
+                VfxEmitterDefinition definition = emitter.EmitterDef;
+                double partLife = definition == null ? 1.5 : GetMaximumParticleLifetime(definition);
+                double duration = definition?.IsSingleParticle == true
+                    ? partLife
+                    : definition?.EmitterLifetime is { } emitterLife
+                        ? emitterLife + partLife
+                        : Math.Max(0, totalDur - delay);
+                var metrics = CalculateEmitterTrackMetrics(delay, duration, totalDur, availableWidth);
+
+                emitter.TrackMargin = new Thickness(metrics.BarLeft, 0, 0, 0);
+                emitter.TrackWidth = metrics.BarWidth;
+
+                // Yellow Keyframe Marker Dot for Emission Delay
+                if (delay > 0.05)
+                {
+                    emitter.HasDelay = true;
+                    emitter.DelayTime = delay;
+                    emitter.DelayMarkerMargin = new Thickness(metrics.MarkerLeft, 0, 0, 0);
+                }
+                else
+                {
+                    emitter.HasDelay = false;
+                    emitter.DelayTime = 0;
+                    emitter.DelayMarkerMargin = new Thickness(0);
+                }
+
+                idx++;
+            }
         }
 
         internal static (double BarLeft, double BarWidth, double MarkerLeft) CalculateEmitterTrackMetrics(
@@ -1068,6 +1126,28 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void UpdatePlayheadPosition()
         {
+            if (_model == null || TracksCanvasContainer == null || PlayheadLine == null) return;
+            double availableWidth = TracksCanvasContainer.ActualWidth;
+            if (availableWidth <= 0) return;
+
+            double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
+            double ratio = Math.Clamp(_model.CurrentTime / totalDur, 0.0, 1.0);
+            double posX = ratio * availableWidth;
+
+            PlayheadLine.X1 = posX;
+            PlayheadLine.X2 = posX;
+            Canvas.SetLeft(PlayheadHandle, posX - 4);
+
+            if (LoopBoundaryLine != null && LoopBoundaryHandle != null)
+            {
+                double loopDur = _model.ActiveLoopDuration > 0 ? _model.ActiveLoopDuration : totalDur;
+                double loopRatio = Math.Clamp(loopDur / totalDur, 0.0, 1.0);
+                double loopPosX = loopRatio * availableWidth;
+
+                LoopBoundaryLine.X1 = loopPosX;
+                LoopBoundaryLine.X2 = loopPosX;
+                Canvas.SetLeft(LoopBoundaryHandle, loopPosX - 7);
+            }
         }
 
         internal static bool ShouldRestartPreview(bool enabled, double currentTime, double boundary)
@@ -1077,6 +1157,85 @@ namespace AssetsManager.Views.Controls.Viewer
             => double.IsFinite(playbackDuration) && playbackDuration > 0
                 ? Math.Max(0.05, playbackDuration)
                 : 10.0;
+
+        private bool _isDraggingLoopBoundary;
+
+        private void LoopBoundaryHandle_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            _isDraggingLoopBoundary = true;
+            ((UIElement)sender).CaptureMouse();
+            UpdateLoopBoundaryFromMouse(e.GetPosition(TracksCanvasContainer).X);
+            e.Handled = true;
+        }
+
+        private void LoopBoundaryHandle_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDraggingLoopBoundary && e.LeftButton == MouseButtonState.Pressed)
+            {
+                UpdateLoopBoundaryFromMouse(e.GetPosition(TracksCanvasContainer).X);
+                e.Handled = true;
+            }
+        }
+
+        private void LoopBoundaryHandle_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDraggingLoopBoundary)
+            {
+                _isDraggingLoopBoundary = false;
+                ((UIElement)sender).ReleaseMouseCapture();
+                e.Handled = true;
+            }
+        }
+
+        private void UpdateLoopBoundaryFromMouse(double mouseX)
+        {
+            if (_model == null || TracksCanvasContainer == null) return;
+            double availableWidth = TracksCanvasContainer.ActualWidth;
+            if (availableWidth <= 0) return;
+
+            double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
+            double ratio = Math.Clamp(mouseX / availableWidth, 0.02, 1.0);
+            double newLoopDur = Math.Round(ratio * totalDur, 2);
+
+            _model.ActiveLoopDuration = Math.Max(0.05, newLoopDur);
+            _model.IsPreviewLoopEnabled = true;
+            UpdatePlayheadPosition();
+        }
+
+        private bool _isTimelineDragging;
+
+        private void TimelineGrid_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDraggingLoopBoundary) return;
+            if (e.OriginalSource is FrameworkElement fe && (fe == LoopBoundaryHandle || fe == LoopBoundaryCanvas || fe == LoopBoundaryLine)) return;
+            _isTimelineDragging = true;
+            UpdateSeekFromTimeline(e.GetPosition(TracksCanvasContainer).X);
+        }
+
+        private void TimelineGrid_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isTimelineDragging && e.LeftButton == MouseButtonState.Pressed)
+            {
+                UpdateSeekFromTimeline(e.GetPosition(TracksCanvasContainer).X);
+            }
+        }
+
+        private void TimelineGrid_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            _isTimelineDragging = false;
+        }
+
+        private void UpdateSeekFromTimeline(double mouseX)
+        {
+            double availableWidth = TracksCanvasContainer.ActualWidth;
+            if (availableWidth <= 0 || _model == null) return;
+
+            double ratio = Math.Clamp(mouseX / availableWidth, 0.0, 1.0);
+            double seekTime = ratio * _model.TotalDuration;
+
+            _model.CurrentTime = seekTime;
+            _vfxRenderer?.Seek(seekTime);
+        }
 
         #endregion
 
