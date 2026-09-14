@@ -17,19 +17,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private GL _gl = null!;
         private uint _program, _vao, _quadVbo, _instVbo, _trailVao, _trailVbo;
         private readonly VfxTrailGeometry _trailGeometry = new();
-        private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uHasTex, _uEmitterUvOffset;
+        private readonly VfxBeamGeometry _beamGeometry = new();
+        private int _uViewProj, _uCamRight, _uCamUp, _uCamPos, _uDepthPushPull, _uTexDiv, _uTexSize, _uTex, _uHasTex, _uEmitterUvOffset;
         private int _uTexMult, _uHasTexMult, _uTexDivMult, _uTexSizeMult, _uUvScrollRateMult, _uFlipUMult, _uFlipVMult;
         private int _uUvTransformCenter, _uUvTransformCenterMult, _uAddressMode, _uAddressModeMult, _uClampUvMult;
         private int _uIsDistortion, _uDistortionTex, _uSceneTex, _uViewportSize, _uDistortionStrength;
-        private int _uSceneDepthTex, _uHasSoftParticle, _uSoftParticleParams;
+        private int _uSceneDepthTex, _uHasSoftParticle, _uSoftParticleParams, _uSoftParticleControl, _uDepthProjection;
         private int _uReflectionTex, _uHasReflection, _uReflectionOpacity, _uReflectionColor;
-        private int _uDirectionOriented, _uArbitraryQuad;
+        private int _uDirectionOriented, _uArbitraryQuad, _uLegacyOrientation, _uPivotUp;
         private int _uPrimitiveKind;
         private int _uAlphaCutoff, _uAlphaTest, _uEmissiveStrength, _uIsMultiply, _uFlipU, _uFlipV, _uClampUv;
-        private int _uColorMap, _uHasColor, _uColorRenderFlags, _uIsAdditive, _uModulationFactor;
-        private int _uPaletteMap, _uHasPalette, _uPaletteCount, _uPaletteMixMask;
+        private int _uColorMap, _uHasColor, _uRampAtMult, _uUvMode, _uColorRenderFlags, _uIsAdditive, _uModulationFactor;
+        private int _uPaletteMap, _uHasPalette, _uPaletteCount, _uPaletteAddressMode, _uPaletteMixMask, _uPaletteScroll;
         private int _uColorLookUpTypeX, _uColorLookUpTypeY, _uColorLookUpScales, _uColorLookUpOffsets;
-        private int _uErosionTex, _uHasErosion, _uErosionFeatherIn, _uErosionFeatherOut;
+        private int _uErosionTex, _uHasErosion, _uHasErosionMap, _uErosionAddressMode, _uErosionDefault;
+        private int _uErosionFeatherIn, _uErosionFeatherOut, _uErosionSliceWidth;
         private int _uPlacementRight, _uPlacementUp, _uPlacementForward, _uIsGroundLayer;
         private int _instCapFloats;
         private bool _ready;
@@ -46,6 +48,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private DrawElementsDelegate _drawElements = null!;
         private const int Stride = VfxPlaybackRuntime.InstanceStride;
         private bool _gles;
+        private Vector2 _depthProjectionValue;
         public void Initialize(GL gl)
         {
             _gl = gl;
@@ -59,6 +62,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uViewProj = gl.GetUniformLocation(_program, "uViewProj");
             _uCamRight = gl.GetUniformLocation(_program, "uCamRight");
             _uCamUp = gl.GetUniformLocation(_program, "uCamUp");
+            _uCamPos = gl.GetUniformLocation(_program, "uCamPos");
+            _uDepthPushPull = gl.GetUniformLocation(_program, "uDepthPushPull");
             _uTexDiv = gl.GetUniformLocation(_program, "uTexDiv");
             _uTexSize = gl.GetUniformLocation(_program, "uTexSize");
             _uTex = gl.GetUniformLocation(_program, "uTex");
@@ -84,12 +89,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uSceneDepthTex = gl.GetUniformLocation(_program, "uSceneDepthTex");
             _uHasSoftParticle = gl.GetUniformLocation(_program, "uHasSoftParticle");
             _uSoftParticleParams = gl.GetUniformLocation(_program, "uSoftParticleParams");
+            _uSoftParticleControl = gl.GetUniformLocation(_program, "uSoftParticleControl");
+            _uDepthProjection = gl.GetUniformLocation(_program, "uDepthProjection");
             _uReflectionTex = gl.GetUniformLocation(_program, "uReflectionTex");
             _uHasReflection = gl.GetUniformLocation(_program, "uHasReflection");
             _uReflectionOpacity = gl.GetUniformLocation(_program, "uReflectionOpacity");
             _uReflectionColor = gl.GetUniformLocation(_program, "uReflectionColor");
             _uDirectionOriented = gl.GetUniformLocation(_program, "uDirectionOriented");
             _uArbitraryQuad = gl.GetUniformLocation(_program, "uArbitraryQuad");
+            _uLegacyOrientation = gl.GetUniformLocation(_program, "uLegacyOrientation");
+            _uPivotUp = gl.GetUniformLocation(_program, "uPivotUp");
             _uPrimitiveKind = gl.GetUniformLocation(_program, "uPrimitiveKind");
             _uAlphaCutoff = gl.GetUniformLocation(_program, "uAlphaCutoff");
             _uAlphaTest = gl.GetUniformLocation(_program, "uAlphaTest");
@@ -97,13 +106,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uIsMultiply = gl.GetUniformLocation(_program, "uIsMultiply");
             _uColorMap = gl.GetUniformLocation(_program, "uColorMap");
             _uHasColor = gl.GetUniformLocation(_program, "uHasColor");
+            _uRampAtMult = gl.GetUniformLocation(_program, "uRampAtMult");
+            _uUvMode = gl.GetUniformLocation(_program, "uUvMode");
             _uColorRenderFlags = gl.GetUniformLocation(_program, "uColorRenderFlags");
             _uIsAdditive = gl.GetUniformLocation(_program, "uIsAdditive");
             _uModulationFactor = gl.GetUniformLocation(_program, "uModulationFactor");
             _uPaletteMap = gl.GetUniformLocation(_program, "uPaletteMap");
             _uHasPalette = gl.GetUniformLocation(_program, "uHasPalette");
             _uPaletteCount = gl.GetUniformLocation(_program, "uPaletteCount");
+            _uPaletteAddressMode = gl.GetUniformLocation(_program, "uPaletteAddressMode");
             _uPaletteMixMask = gl.GetUniformLocation(_program, "uPaletteMixMask");
+            _uPaletteScroll = gl.GetUniformLocation(_program, "uPaletteScroll");
             _uColorLookUpTypeX = gl.GetUniformLocation(_program, "uColorLookUpTypeX");
             _uColorLookUpTypeY = gl.GetUniformLocation(_program, "uColorLookUpTypeY");
             _uColorLookUpScales = gl.GetUniformLocation(_program, "uColorLookUpScales");
@@ -113,8 +126,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uClampUv = gl.GetUniformLocation(_program, "uClampUv");
             _uErosionTex = gl.GetUniformLocation(_program, "uErosionTex");
             _uHasErosion = gl.GetUniformLocation(_program, "uHasErosion");
+            _uHasErosionMap = gl.GetUniformLocation(_program, "uHasErosionMap");
+            _uErosionAddressMode = gl.GetUniformLocation(_program, "uErosionAddressMode");
+            _uErosionDefault = gl.GetUniformLocation(_program, "uErosionDefault");
             _uErosionFeatherIn = gl.GetUniformLocation(_program, "uErosionFeatherIn");
             _uErosionFeatherOut = gl.GetUniformLocation(_program, "uErosionFeatherOut");
+            _uErosionSliceWidth = gl.GetUniformLocation(_program, "uErosionSliceWidth");
             _uPlacementRight = gl.GetUniformLocation(_program, "uPlacementRight");
             _uPlacementUp = gl.GetUniformLocation(_program, "uPlacementUp");
             _uPlacementForward = gl.GetUniformLocation(_program, "uPlacementForward");
@@ -139,7 +156,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             gl.EnableVertexAttribArray(3); gl.VertexAttribPointer(3, 4, VertexAttribPointerType.Float, false, bstride, new IntPtr(5 * sizeof(float)));
             gl.EnableVertexAttribArray(4); gl.VertexAttribPointer(4, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(9 * sizeof(float)));
             gl.EnableVertexAttribArray(5); gl.VertexAttribPointer(5, 4, VertexAttribPointerType.Float, false, bstride, new IntPtr(11 * sizeof(float)));
-            gl.EnableVertexAttribArray(6); gl.VertexAttribPointer(6, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(15 * sizeof(float)));
+            gl.EnableVertexAttribArray(6); gl.VertexAttribPointer(6, 4, VertexAttribPointerType.Float, false, bstride, new IntPtr(15 * sizeof(float)));
             gl.EnableVertexAttribArray(7); gl.VertexAttribPointer(7, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(19 * sizeof(float)));
             gl.EnableVertexAttribArray(8); gl.VertexAttribPointer(8, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(21 * sizeof(float)));
             gl.EnableVertexAttribArray(9); gl.VertexAttribPointer(9, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(23 * sizeof(float)));
@@ -174,7 +191,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _trailVbo = gl.GenBuffer();
             gl.BindVertexArray(_trailVao);
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
-            int[] sizes = { 2, 3, 2, 4, 2, 4, 3, 2, 2, 1, 1, 4, 2, 2, 1, 2 };
+            int[] sizes = { 2, 3, 2, 4, 2, 4, 4, 2, 2, 1, 1, 4, 2, 2, 1, 2 };
             int[] offsets = { 0, 2, 5, 7, 11, 13, 17, 21, 23, 25, 26, 27, 31, 33, 35, 36 };
             for (uint attribute = 0; attribute < sizes.Length; attribute++)
             {
@@ -202,6 +219,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Matrix4x4.Invert(view, out var inv);
             var camRight = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX, inv));
             var camUp = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitY, inv));
+            var camPos = inv.Translation;
+            Matrix4x4 projection = inv * viewProj;
+            _depthProjectionValue = new Vector2(projection.M33, projection.M43);
 
             bool depthTest = _gl.IsEnabled(EnableCap.DepthTest);
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
@@ -250,6 +270,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
             _gl.Uniform3(_uCamRight, camRight.X, camRight.Y, camRight.Z);
             _gl.Uniform3(_uCamUp, camUp.X, camUp.Y, camUp.Z);
+            _gl.Uniform3(_uCamPos, camPos.X, camPos.Y, camPos.Z);
             _gl.Uniform1(_uTex, 0);
             _gl.Uniform1(_uTexMult, 1);
             _gl.Uniform1(_uColorMap, 7);
@@ -260,6 +281,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_uReflectionTex, 5);
             _gl.Uniform1(_uSceneDepthTex, 6);
             _gl.Uniform2(_uViewportSize, (float)_capture.Width, (float)_capture.Height);
+            _gl.Uniform2(_uDepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y);
 
             _gl.BindVertexArray(_vao);
             _gl.ActiveTexture(TextureUnit.Texture0);
@@ -347,18 +369,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform1(_uFlipUMult, es.Def.TextureMultFlipU ? 1 : 0);
                 _gl.Uniform1(_uFlipVMult, es.Def.TextureMultFlipV ? 1 : 0);
                 _gl.Uniform1(_uClampUvMult, es.Def.TextureMultClampUvScroll ? 1 : 0);
-                bool directional = es.Def.IsDirectionOriented || es.Def.PrimitiveKind is
-                    VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.Ray or VfxPrimitiveKind.Beam;
-                bool arbitrary = es.Def.IsArbitraryQuad || es.Def.IsLocalOrientation || es.Def.ParticleIsLocalOrientation || es.Def.PrimitiveKind is
+                bool directional = es.Def.IsDirectionOriented || es.Def.PrimitiveKind == VfxPrimitiveKind.Ray;
+                bool arbitrary = es.Def.IsArbitraryQuad || es.Def.PrimitiveKind is
                     VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.PlanarProjection;
                 _gl.Uniform1(_uDirectionOriented, directional ? 1 : 0);
                 _gl.Uniform1(_uArbitraryQuad, arbitrary ? 1 : 0);
+                _gl.Uniform1(_uLegacyOrientation, es.Def.LegacyOrientation);
+                _gl.Uniform1(_uPivotUp, es.Def.LegacyScaleUpFromOrigin ? 1 : 0);
                 bool groundLayer = es.Def.IsGroundLayer ||
                     es.Def.IsFollowingTerrain ||
                     es.Def.PrimitiveKind == VfxPrimitiveKind.PlanarProjection ||
                     IsGroundLikeBirthRotation(es.Def.BirthRotation);
                 _gl.Uniform1(_uIsGroundLayer, groundLayer ? 1 : 0);
                 _gl.Uniform1(_uPrimitiveKind, (int)es.Def.PrimitiveKind);
+                bool ribbonPrimitive = es.Def.PrimitiveKind is VfxPrimitiveKind.CameraTrail or
+                    VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam;
+                _gl.Uniform1(_uDepthPushPull, ribbonPrimitive ? 0f : es.Def.DepthPushPull);
                 var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 ApplyEmitterDepthState(es.Def, isDistortion);
                 ApplyBlendMode(es.Def.BlendMode, isDistortion);
@@ -377,23 +403,36 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     modulationFactor.Y,
                     modulationFactor.Z,
                     modulationFactor.W);
-                _gl.Uniform1(_uHasColor, es.ColorGradientTexture != 0 ? 1 : 0);
+                bool hasMultLayer = !string.IsNullOrWhiteSpace(es.Def.TextureMultPath);
+                bool useColorRamp = es.ColorGradientTexture != 0 &&
+                    es.Def.AlphaErosion is null &&
+                    !(hasMultLayer && es.Def.UvMode == 2);
+                _gl.Uniform1(_uHasColor, useColorRamp ? 1 : 0);
+                _gl.Uniform1(_uRampAtMult, useColorRamp && hasMultLayer ? 1 : 0);
+                _gl.Uniform1(_uUvMode, es.Def.UvMode);
                 _gl.Uniform1(
                     _uColorRenderFlags,
                     VfxBlendModes.ResolveColorRenderFlags(
                         es.Def.ColorRenderFlags,
                         !string.IsNullOrWhiteSpace(es.Def.ParticleColorTexturePath)));
                 VfxPaletteDefinition palette = es.Def.PaletteDefinition;
-                _gl.Uniform1(_uHasPalette, es.PaletteTexture != 0 ? 1 : 0);
+                bool hasPalette = es.PaletteTexture != 0 && palette is { PaletteCount: > 0 };
+                _gl.Uniform1(_uHasPalette, hasPalette ? 1 : 0);
                 _gl.Uniform1(_uPaletteCount, Math.Max(1, palette?.PaletteCount ?? 1));
-                Vector4 paletteMask = palette?.PaletteSourceMixColor ?? Vector4.UnitX;
+                _gl.Uniform1(_uPaletteAddressMode, palette?.AddressMode ?? 0);
+                Vector4 paletteMask = palette?.PaletteSourceMixColor ?? Vector4.Zero;
                 _gl.Uniform4(_uPaletteMixMask, paletteMask.X, paletteMask.Y, paletteMask.Z, paletteMask.W);
+                float palettePhase = es.Def.EmitterLifetime is > 0f
+                    ? Math.Clamp(es.EmitterAge / es.Def.EmitterLifetime.Value, 0f, 1f)
+                    : 0f;
+                Vector2 paletteScroll = new(
+                    palette?.ScrollU?.Sample(palettePhase) ?? 0f,
+                    palette?.ScrollV?.Sample(palettePhase) ?? 0f);
+                _gl.Uniform2(_uPaletteScroll, paletteScroll.X, paletteScroll.Y);
                 _gl.Uniform1(_uIsAdditive, es.Def.BlendMode == 0 ? 1 : VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 2 : 0);
                 _gl.Uniform1(_uColorLookUpTypeX, es.Def.ColorLookUpTypeX ?? 0);
                 _gl.Uniform1(_uColorLookUpTypeY, es.Def.ColorLookUpTypeY ?? 0);
-                Vector2 colorLookUpScales = es.Def.ColorLookUpScales == Vector2.Zero
-                    ? Vector2.One
-                    : es.Def.ColorLookUpScales;
+                Vector2 colorLookUpScales = es.Def.ColorLookUpScales;
                 _gl.Uniform2(_uColorLookUpScales, colorLookUpScales.X, colorLookUpScales.Y);
                 _gl.Uniform2(_uColorLookUpOffsets, es.Def.ColorLookUpOffsets.X, es.Def.ColorLookUpOffsets.Y);
                 _gl.Uniform1(_uFlipU, renderState.FlipU ? 1 : 0);
@@ -403,18 +442,28 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform1(_uAddressModeMult, es.Def.TextureMultAddressMode);
                 _gl.Uniform1(_uIsDistortion, isDistortion ? 1 : 0);
                 _gl.Uniform1(_uDistortionStrength, es.Def.Distortion?.Strength ?? 0f);
-                _gl.Uniform1(_uHasErosion, es.ErosionTexture != 0 ? 1 : 0);
-                _gl.Uniform1(_uErosionFeatherIn, es.Def.AlphaErosion?.FeatherIn ?? 0f);
-                _gl.Uniform1(_uErosionFeatherOut, es.Def.AlphaErosion?.FeatherOut ?? 0f);
-                _gl.Uniform1(_uHasSoftParticle, ShouldUseSoftParticles(es.Def, _capture.DepthTexture != 0) ? 1 : 0);
-                VfxSoftParticleDefinition soft = es.Def.SoftParticle;
-                _gl.Uniform4(
-                    _uSoftParticleParams,
-                    soft?.BeginIn ?? 0f,
-                    soft?.DeltaIn ?? 0f,
-                    soft?.BeginOut ?? 0f,
-                    soft?.DeltaOut ?? 0f);
-                _gl.Uniform1(_uHasReflection, es.ReflectionTexture != 0 ? 1 : 0);
+                VfxAlphaErosionDefinition erosionDefinition = es.Def.AlphaErosion;
+                bool erosionEnabled = erosionDefinition is not null && es.Def.UvMode != 2;
+                bool hasErosionMap = erosionEnabled && es.ErosionTexture != 0;
+                Vector4 erosionDefault = erosionDefinition is not null && string.IsNullOrWhiteSpace(erosionDefinition.TexturePath)
+                    ? Vector4.One
+                    : Vector4.Zero;
+                _gl.Uniform1(_uHasErosion, erosionEnabled ? 1 : 0);
+                _gl.Uniform1(_uHasErosionMap, hasErosionMap ? 1 : 0);
+                _gl.Uniform1(_uErosionAddressMode, erosionDefinition?.AddressMode ?? 0);
+                _gl.Uniform4(_uErosionDefault, erosionDefault.X, erosionDefault.Y, erosionDefault.Z, erosionDefault.W);
+                _gl.Uniform1(_uErosionFeatherIn, erosionDefinition?.FeatherIn ?? 0f);
+                _gl.Uniform1(_uErosionFeatherOut, erosionDefinition?.FeatherOut ?? 0f);
+                _gl.Uniform1(_uErosionSliceWidth, erosionDefinition?.SliceWidth ?? 1.5f);
+                bool useSoftParticles = ShouldUseSoftParticles(es.Def, _capture.DepthTexture != 0);
+                _gl.Uniform1(_uHasSoftParticle, useSoftParticles ? 1 : 0);
+                Vector4 softParams = ResolveSoftParticleParams(es.Def.SoftParticle);
+                Vector4 softControl = ResolveSoftParticleControl(es.Def.BlendMode);
+                _gl.Uniform4(_uSoftParticleParams, softParams.X, softParams.Y, softParams.Z, softParams.W);
+                _gl.Uniform4(_uSoftParticleControl, softControl.X, softControl.Y, softControl.Z, softControl.W);
+                // LTK compiles reflection/rim only for mesh materials. Quad, trail and beam
+                // paths never sample the reflection definition.
+                _gl.Uniform1(_uHasReflection, 0);
                 VfxReflectionDefinition reflection = es.Def.Reflection;
                 _gl.Uniform2(
                     _uReflectionOpacity,
@@ -433,13 +482,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
                 _gl.Uniform1(_uHasTex, es.Texture != 0 ? 1 : 0);
-                ApplyAddressMode(renderState.TextureAddressMode);
+                ApplyAddressMode(2);
                 ApplyTextureSampling(es.Def.IsTexturePixelated);
                 if (es.TextureMult != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture1);
                     _gl.BindTexture(TextureTarget.Texture2D, es.TextureMult);
-                    ApplyAddressMode(es.Def.TextureMultAddressMode);
+                    ApplyAddressMode(2);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (_capture.ColorTexture != 0)
@@ -452,21 +501,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     _gl.ActiveTexture(TextureUnit.Texture3);
                     _gl.BindTexture(TextureTarget.Texture2D, es.DistortionTexture);
-                    ApplyAddressMode(renderState.TextureAddressMode);
+                    ApplyAddressMode(2);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (es.ErosionTexture != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture4);
                     _gl.BindTexture(TextureTarget.Texture2D, es.ErosionTexture);
-                    ApplyAddressMode(es.Def.AlphaErosion?.AddressMode ?? renderState.TextureAddressMode);
+                    ApplyAddressMode(2);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (es.ReflectionTexture != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture5);
                     _gl.BindTexture(TextureTarget.Texture2D, es.ReflectionTexture);
-                    ApplyAddressMode(renderState.TextureAddressMode);
+                    ApplyAddressMode(2);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (_capture.DepthTexture != 0)
@@ -497,6 +546,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
                         _gl.BufferData(BufferTargetARB.ArrayBuffer,
                             new ReadOnlySpan<float>(_trailGeometry.Vertices, 0, vertices * VfxTrailGeometry.VertexStride), BufferUsageARB.DynamicDraw);
+                        _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
+                        _gl.BindVertexArray(_vao);
+                    }
+                }
+                else if (es.Def.PrimitiveKind is VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam)
+                {
+                    int vertices = _beamGeometry.Build(es, camPos);
+                    if (vertices > 0)
+                    {
+                        _gl.BindVertexArray(_trailVao);
+                        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
+                        _gl.BufferData(BufferTargetARB.ArrayBuffer,
+                            new ReadOnlySpan<float>(_beamGeometry.Vertices, 0, vertices * VfxBeamGeometry.VertexStride), BufferUsageARB.DynamicDraw);
                         _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
                         _gl.BindVertexArray(_vao);
                     }
@@ -609,7 +671,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.TexParameter(
                 TextureTarget.Texture2D,
                 TextureParameterName.TextureMinFilter,
-                (int)(pixelated ? TextureMinFilter.Nearest : TextureMinFilter.LinearMipmapLinear));
+                (int)(pixelated ? TextureMinFilter.Nearest : TextureMinFilter.Linear));
             _gl.TexParameter(
                 TextureTarget.Texture2D,
                 TextureParameterName.TextureMagFilter,
@@ -719,8 +781,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _ => throw new ArgumentOutOfRangeException(nameof(equation), equation, null)
         };
 
-        private static Vector2 EffectiveCenter(Vector2 center)
-            => center == Vector2.Zero ? new Vector2(0.5f, 0.5f) : center;
+        private static Vector2 EffectiveCenter(Vector2 center) => center;
 
         public void ClearTextures()
         {
@@ -754,12 +815,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _muTextureMultFrame, _muEmitterUvOffsetMult, _muFlipUMult, _muFlipVMult;
         private int _muAddressModeMult, _muClampUvMult, _muUvTransformCenterMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
-        private int _muAlphaCutoff, _muAlphaTest, _muEmissiveStrength, _muIsMultiply, _muColorMap, _muHasColor, _muColorRenderFlags, _muIsAdditive, _muModulationFactor, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
-        private int _muPaletteMap, _muHasPalette, _muPaletteCount, _muPaletteSelector, _muPaletteMixMask;
+        private int _muAlphaCutoff, _muAlphaTest, _muEmissiveStrength, _muIsMultiply, _muColorMap, _muHasColor, _muRampAtMult, _muUvMode, _muColorRenderFlags, _muIsAdditive, _muModulationFactor, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
+        private int _muPaletteMap, _muHasPalette, _muPaletteCount, _muPaletteAddressMode, _muPaletteSelector, _muPaletteMixMask, _muPaletteScroll;
         private int _muBirthUvOffset, _muUvScale, _muUvRotation;
-        private int _muErosionTex, _muHasErosion, _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionMixer;
+        private int _muErosionTex, _muHasErosion, _muHasErosionMap, _muErosionAddressMode, _muErosionDefault;
+        private int _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionSliceWidth, _muErosionMixer;
         private int _muReflectionTex, _muHasReflection, _muReflectionOpacity, _muReflectionColor;
-        private int _muSceneDepthTex, _muHasSoftParticle, _muSoftParticleParams, _muViewportSize;
+        private int _muSceneDepthTex, _muHasSoftParticle, _muSoftParticleParams, _muSoftParticleControl, _muDepthProjection, _muViewportSize;
 
         private void EnsureMeshProgram()
         {
@@ -807,14 +869,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muIsMultiply = _gl.GetUniformLocation(_meshProgram, "uIsMultiply");
                 _muColorMap = _gl.GetUniformLocation(_meshProgram, "uColorMap");
                 _muHasColor = _gl.GetUniformLocation(_meshProgram, "uHasColor");
+                _muRampAtMult = _gl.GetUniformLocation(_meshProgram, "uRampAtMult");
+                _muUvMode = _gl.GetUniformLocation(_meshProgram, "uUvMode");
                 _muColorRenderFlags = _gl.GetUniformLocation(_meshProgram, "uColorRenderFlags");
                 _muIsAdditive = _gl.GetUniformLocation(_meshProgram, "uIsAdditive");
                 _muModulationFactor = _gl.GetUniformLocation(_meshProgram, "uModulationFactor");
                 _muPaletteMap = _gl.GetUniformLocation(_meshProgram, "uPaletteMap");
                 _muHasPalette = _gl.GetUniformLocation(_meshProgram, "uHasPalette");
                 _muPaletteCount = _gl.GetUniformLocation(_meshProgram, "uPaletteCount");
+                _muPaletteAddressMode = _gl.GetUniformLocation(_meshProgram, "uPaletteAddressMode");
                 _muPaletteSelector = _gl.GetUniformLocation(_meshProgram, "uPaletteSelector");
                 _muPaletteMixMask = _gl.GetUniformLocation(_meshProgram, "uPaletteMixMask");
+                _muPaletteScroll = _gl.GetUniformLocation(_meshProgram, "uPaletteScroll");
                 _muColorLookUpTypeX = _gl.GetUniformLocation(_meshProgram, "uColorLookUpTypeX");
                 _muColorLookUpTypeY = _gl.GetUniformLocation(_meshProgram, "uColorLookUpTypeY");
                 _muColorLookUpScales = _gl.GetUniformLocation(_meshProgram, "uColorLookUpScales");
@@ -826,9 +892,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muUvRotation = _gl.GetUniformLocation(_meshProgram, "uUvRotation");
                 _muErosionTex = _gl.GetUniformLocation(_meshProgram, "uErosionTex");
                 _muHasErosion = _gl.GetUniformLocation(_meshProgram, "uHasErosion");
+                _muHasErosionMap = _gl.GetUniformLocation(_meshProgram, "uHasErosionMap");
+                _muErosionAddressMode = _gl.GetUniformLocation(_meshProgram, "uErosionAddressMode");
+                _muErosionDefault = _gl.GetUniformLocation(_meshProgram, "uErosionDefault");
                 _muErosionDrive = _gl.GetUniformLocation(_meshProgram, "uErosionDrive");
                 _muErosionFeatherIn = _gl.GetUniformLocation(_meshProgram, "uErosionFeatherIn");
                 _muErosionFeatherOut = _gl.GetUniformLocation(_meshProgram, "uErosionFeatherOut");
+                _muErosionSliceWidth = _gl.GetUniformLocation(_meshProgram, "uErosionSliceWidth");
                 _muErosionMixer = _gl.GetUniformLocation(_meshProgram, "uErosionMixer");
                 _muReflectionTex = _gl.GetUniformLocation(_meshProgram, "uReflectionTex");
                 _muHasReflection = _gl.GetUniformLocation(_meshProgram, "uHasReflection");
@@ -837,6 +907,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muSceneDepthTex = _gl.GetUniformLocation(_meshProgram, "uSceneDepthTex");
                 _muHasSoftParticle = _gl.GetUniformLocation(_meshProgram, "uHasSoftParticle");
                 _muSoftParticleParams = _gl.GetUniformLocation(_meshProgram, "uSoftParticleParams");
+                _muSoftParticleControl = _gl.GetUniformLocation(_meshProgram, "uSoftParticleControl");
+                _muDepthProjection = _gl.GetUniformLocation(_meshProgram, "uDepthProjection");
                 _muViewportSize = _gl.GetUniformLocation(_meshProgram, "uViewportSize");
             }
         }
@@ -907,9 +979,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_muFlipVMult, es.Def.TextureMultFlipV ? 1 : 0);
             _gl.Uniform1(_muAddressModeMult, es.Def.TextureMultAddressMode);
             _gl.Uniform1(_muClampUvMult, es.Def.TextureMultClampUvScroll ? 1 : 0);
-            _gl.Uniform1(_muHasErosion, es.ErosionTexture != 0 ? 1 : 0);
-            _gl.Uniform1(_muErosionFeatherIn, es.Def.AlphaErosion?.FeatherIn ?? 0f);
-            _gl.Uniform1(_muErosionFeatherOut, es.Def.AlphaErosion?.FeatherOut ?? 0f);
+            VfxAlphaErosionDefinition meshErosion = es.Def.AlphaErosion;
+            bool meshErosionEnabled = meshErosion is not null;
+            bool meshHasErosionMap = meshErosionEnabled && es.ErosionTexture != 0;
+            Vector4 meshErosionDefault = meshErosion is not null && string.IsNullOrWhiteSpace(meshErosion.TexturePath)
+                ? Vector4.One
+                : Vector4.Zero;
+            _gl.Uniform1(_muHasErosion, meshErosionEnabled ? 1 : 0);
+            _gl.Uniform1(_muHasErosionMap, meshHasErosionMap ? 1 : 0);
+            _gl.Uniform1(_muErosionAddressMode, meshErosion?.AddressMode ?? 0);
+            _gl.Uniform4(_muErosionDefault, meshErosionDefault.X, meshErosionDefault.Y, meshErosionDefault.Z, meshErosionDefault.W);
+            _gl.Uniform1(_muErosionFeatherIn, meshErosion?.FeatherIn ?? 0f);
+            _gl.Uniform1(_muErosionFeatherOut, meshErosion?.FeatherOut ?? 0f);
+            _gl.Uniform1(_muErosionSliceWidth, meshErosion?.SliceWidth ?? 1.5f);
             _gl.Uniform3(_muPlacementRight, es.PlacementRight.X, es.PlacementRight.Y, es.PlacementRight.Z);
             _gl.Uniform3(_muPlacementUp, es.PlacementUp.X, es.PlacementUp.Y, es.PlacementUp.Z);
             _gl.Uniform3(_muPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
@@ -917,7 +999,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
             _gl.Uniform1(_muHasTex, es.Texture != 0 ? 1 : 0);
             var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
-            ApplyAddressMode(renderState.TextureAddressMode);
+            ApplyAddressMode(2);
             _gl.Uniform1(_muAlphaCutoff, renderState.AlphaCutoff);
             _gl.Uniform1(
                 _muAlphaTest,
@@ -941,28 +1023,37 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             {
                 _gl.ActiveTexture(TextureUnit.Texture2);
                 _gl.BindTexture(TextureTarget.Texture2D, es.DistortionTexture);
-                ApplyAddressMode(renderState.TextureAddressMode);
+                ApplyAddressMode(2);
                 _gl.ActiveTexture(TextureUnit.Texture3);
                 _gl.BindTexture(TextureTarget.Texture2D, _capture.ColorTexture);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
-            _gl.Uniform1(_muHasColor, es.ColorGradientTexture != 0 ? 1 : 0);
+            _gl.Uniform1(_muHasColor, 0);
+            _gl.Uniform1(_muRampAtMult, 0);
+            _gl.Uniform1(_muUvMode, es.Def.UvMode);
             _gl.Uniform1(
                 _muColorRenderFlags,
                 VfxBlendModes.ResolveColorRenderFlags(
                     es.Def.ColorRenderFlags,
                     !string.IsNullOrWhiteSpace(es.Def.ParticleColorTexturePath)));
             VfxPaletteDefinition meshPalette = es.Def.PaletteDefinition;
-            _gl.Uniform1(_muHasPalette, es.PaletteTexture != 0 ? 1 : 0);
+            bool meshHasPalette = es.PaletteTexture != 0 && meshPalette is { PaletteCount: > 0 };
+            _gl.Uniform1(_muHasPalette, meshHasPalette ? 1 : 0);
             _gl.Uniform1(_muPaletteCount, Math.Max(1, meshPalette?.PaletteCount ?? 1));
-            Vector4 meshPaletteMask = meshPalette?.PaletteSourceMixColor ?? Vector4.UnitX;
+            _gl.Uniform1(_muPaletteAddressMode, meshPalette?.AddressMode ?? 0);
+            Vector4 meshPaletteMask = meshPalette?.PaletteSourceMixColor ?? Vector4.Zero;
             _gl.Uniform4(_muPaletteMixMask, meshPaletteMask.X, meshPaletteMask.Y, meshPaletteMask.Z, meshPaletteMask.W);
+            float meshPalettePhase = es.Def.EmitterLifetime is > 0f
+                ? Math.Clamp(es.EmitterAge / es.Def.EmitterLifetime.Value, 0f, 1f)
+                : 0f;
+            Vector2 meshPaletteScroll = new(
+                meshPalette?.ScrollU?.Sample(meshPalettePhase) ?? 0f,
+                meshPalette?.ScrollV?.Sample(meshPalettePhase) ?? 0f);
+            _gl.Uniform2(_muPaletteScroll, meshPaletteScroll.X, meshPaletteScroll.Y);
             _gl.Uniform1(_muIsAdditive, es.Def.BlendMode == 0 ? 1 : VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 2 : 0);
             _gl.Uniform1(_muColorLookUpTypeX, es.Def.ColorLookUpTypeX ?? 0);
             _gl.Uniform1(_muColorLookUpTypeY, es.Def.ColorLookUpTypeY ?? 0);
-            Vector2 meshColorLookUpScales = es.Def.ColorLookUpScales == Vector2.Zero
-                ? Vector2.One
-                : es.Def.ColorLookUpScales;
+            Vector2 meshColorLookUpScales = es.Def.ColorLookUpScales;
             _gl.Uniform2(_muColorLookUpScales, meshColorLookUpScales.X, meshColorLookUpScales.Y);
             _gl.Uniform2(_muColorLookUpOffsets, es.Def.ColorLookUpOffsets.X, es.Def.ColorLookUpOffsets.Y);
             _gl.Uniform1(_muFlipU, renderState.FlipU ? 1 : 0);
@@ -974,14 +1065,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             {
                 _gl.ActiveTexture(TextureUnit.Texture1);
                 _gl.BindTexture(TextureTarget.Texture2D, es.TextureMult);
-                ApplyAddressMode(es.Def.TextureMultAddressMode);
+                ApplyAddressMode(2);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
             if (es.ErosionTexture != 0)
             {
                 _gl.ActiveTexture(TextureUnit.Texture4);
                 _gl.BindTexture(TextureTarget.Texture2D, es.ErosionTexture);
-                ApplyAddressMode(es.Def.AlphaErosion?.AddressMode ?? renderState.TextureAddressMode);
+                ApplyAddressMode(2);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
             _gl.Uniform1(_muHasReflection, es.ReflectionTexture != 0 ? 1 : 0);
@@ -1001,17 +1092,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             {
                 _gl.ActiveTexture(TextureUnit.Texture5);
                 _gl.BindTexture(TextureTarget.Texture2D, es.ReflectionTexture);
-                ApplyAddressMode(renderState.TextureAddressMode);
+                ApplyAddressMode(2);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
-            _gl.Uniform1(_muHasSoftParticle, ShouldUseSoftParticles(es.Def, _capture.DepthTexture != 0) ? 1 : 0);
-            VfxSoftParticleDefinition soft = es.Def.SoftParticle;
-            _gl.Uniform4(
-                _muSoftParticleParams,
-                soft?.BeginIn ?? 0f,
-                soft?.DeltaIn ?? 0f,
-                soft?.BeginOut ?? 0f,
-                soft?.DeltaOut ?? 0f);
+            bool meshUsesSoftParticles = ShouldUseSoftParticles(es.Def, _capture.DepthTexture != 0);
+            _gl.Uniform1(_muHasSoftParticle, meshUsesSoftParticles ? 1 : 0);
+            Vector4 meshSoftParams = ResolveSoftParticleParams(es.Def.SoftParticle);
+            Vector4 meshSoftControl = ResolveSoftParticleControl(es.Def.BlendMode);
+            _gl.Uniform4(_muSoftParticleParams, meshSoftParams.X, meshSoftParams.Y, meshSoftParams.Z, meshSoftParams.W);
+            _gl.Uniform4(_muSoftParticleControl, meshSoftControl.X, meshSoftControl.Y, meshSoftControl.Z, meshSoftControl.W);
+            _gl.Uniform2(_muDepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y);
             _gl.Uniform2(_muViewportSize, (float)_capture.Width, (float)_capture.Height);
             if (_capture.DepthTexture != 0)
             {
@@ -1088,12 +1178,34 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             => float.IsFinite(value) ? value : 1f;
 
         internal static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
-            => hasSceneDepth &&
-               definition?.SoftParticle != null &&
-               !definition.IsGroundLayer &&
-               !definition.IsFollowingTerrain &&
-               definition.PrimitiveKind != VfxPrimitiveKind.PlanarProjection &&
-               !IsGroundLikeBirthRotation(definition.BirthRotation);
+        {
+            if (!hasSceneDepth || definition?.SoftParticle is null) return false;
+            if (definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh) return false;
+
+            // LTK's fixed-alpha quad/ribbon shader compiles no SOFT_PARTICLES. Meshes keep
+            // their soft pass even when the emitter authors LOCK_ALPHA.
+            bool fixedAlphaUv = definition.UvMode == 2 && definition.PrimitiveKind != VfxPrimitiveKind.Mesh;
+            return !fixedAlphaUv;
+        }
+
+        internal static Vector4 ResolveSoftParticleParams(VfxSoftParticleDefinition soft)
+        {
+            if (soft is null) return Vector4.Zero;
+            bool fadesIn = soft.DeltaIn != 0f;
+            return new Vector4(
+                fadesIn ? soft.BeginIn : -1e9f,
+                soft.BeginIn + soft.DeltaIn + soft.BeginOut,
+                fadesIn ? 1f / soft.DeltaIn : 1f,
+                soft.DeltaOut == 0f ? 0f : 1f / soft.DeltaOut);
+        }
+
+        internal static Vector4 ResolveSoftParticleControl(int blendMode)
+            => blendMode switch
+            {
+                1 or 4 => new Vector4(1f, 0f, 0f, 1f),
+                5 => new Vector4(0f, 1f, 0f, 1f),
+                _ => new Vector4(0f, 1f, 1f, 0f)
+            };
 
         internal static bool IsGroundLikeBirthRotation(VfxCurve3? birthRotation)
         {

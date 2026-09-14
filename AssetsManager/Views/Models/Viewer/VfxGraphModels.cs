@@ -6,17 +6,24 @@ namespace AssetsManager.Views.Models.Viewer
 {
     public enum VfxPrimitiveKind
     {
-        CameraQuad,
-        CameraUnitQuad,
-        ArbitraryQuad,
-        Mesh,
-        AttachedMesh,
-        CameraTrail,
-        ArbitraryTrail,
-        Ray,
-        Beam,
-        PlanarProjection,
-        Unsupported
+        CameraQuad = 0,
+        CameraUnitQuad = 1,
+        ArbitraryQuad = 2,
+        Mesh = 3,
+        AttachedMesh = 4,
+        CameraTrail = 5,
+        ArbitraryTrail = 6,
+        Ray = 7,
+        Beam = 8,
+        PlanarProjection = 9,
+        CameraSegmentBeam = 10,
+        Unsupported = 11
+    }
+
+    public enum VfxDragMotion
+    {
+        Stepped,
+        Analytic
     }
 
     internal sealed record VfxBinDocument(
@@ -37,7 +44,9 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<VfxEmitterDefinition> Emitters,
         float VisibilityRadius = 0f,
         Matrix4x4? Transform = null,
-        VfxSystemAuthoredFeatures AuthoredFeatures = null);
+        VfxSystemAuthoredFeatures AuthoredFeatures = null,
+        VfxDragMotion DragMotion = VfxDragMotion.Stepped,
+        float BuildUpTime = 0f);
 
     /// <summary>One emitter inside a system. Curves are absolute-valued (sampled over normalised particle age 0..1).</summary>
     public sealed record VfxEmitterDefinition(
@@ -104,7 +113,7 @@ namespace AssetsManager.Views.Models.Viewer
         byte ParticleLingerType = 0,
         float EmitterLinger = 0f,
         bool IsEmitterSpace = false,
-        bool IsLocalOrientation = false,
+        bool IsLocalOrientation = true,
         bool ParticleIsLocalOrientation = false,
         bool IsFollowingTerrain = false,
         bool IsGroundLayer = false,
@@ -149,6 +158,7 @@ namespace AssetsManager.Views.Models.Viewer
         VfxFlexShapeDefinition FlexShape = null,
         VfxPaletteDefinition PaletteDefinition = null,
         float DirectionVelocityScale = 0f,
+        float DirectionVelocityMinScale = 1f,
         VfxCurve2? RateByVelocityFunction = null,
         bool HasPostRotateOrientation = false,
         bool ParticlesShareRandomValue = false,
@@ -162,7 +172,17 @@ namespace AssetsManager.Views.Models.Viewer
         Vector3? RotationOverride = null,
         Vector3? ScaleOverride = null,
         VfxCurve3? AccelerationOverLife = null,
-        VfxCurve3? BirthRotationalAcceleration = null)
+        VfxCurve3? BirthRotationalAcceleration = null,
+        VfxCurveF? LegacyBirthScale = null,
+        Vector2? LegacyScaleBias = null,
+        VfxCurveF? LegacyScale = null,
+        VfxCurveF? LegacyRotation = null,
+        byte LegacyOrientation = 0,
+        bool LegacyScaleUpFromOrigin = false,
+        bool LegacyLockedToEmitter = false,
+        float DepthPushPull = 0f,
+        VfxBeamDefinition Beam = null,
+        VfxLingerDefinition Linger = null)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && PrimitiveKind != VfxPrimitiveKind.AttachedMesh && (!string.IsNullOrEmpty(TexturePath) ||
@@ -231,7 +251,10 @@ namespace AssetsManager.Views.Models.Viewer
         int PaletteCount,
         VfxCurve3 PaletteSelector,
         string PaletteTexturePath = null,
-        Vector4? PaletteSourceMixColor = null);
+        Vector4? PaletteSourceMixColor = null,
+        VfxCurveF? ScrollU = null,
+        VfxCurveF? ScrollV = null,
+        int AddressMode = 1);
 
     public sealed record VfxSoftParticleDefinition(
         float BeginIn,
@@ -254,7 +277,28 @@ namespace AssetsManager.Views.Models.Viewer
         float FeatherIn,
         float FeatherOut,
         int AddressMode,
-        VfxCurve4? ChannelMixer = null);
+        VfxCurve4? ChannelMixer = null,
+        float SliceWidth = 1.5f,
+        VfxCurveF? LingerDrive = null,
+        float DriveSource = 0f);
+
+    public sealed record VfxLingerDefinition(
+        VfxCurve3? Rotation = null,
+        VfxCurve3? Scale = null,
+        VfxCurve4? Color = null,
+        VfxCurve3? Acceleration = null,
+        VfxCurve3? Velocity = null,
+        VfxCurve3? Drag = null);
+
+    public sealed record VfxBeamDefinition(
+        int Mode,
+        int TrailMode,
+        int Segments,
+        VfxCurve3 BirthTilingSize,
+        VfxCurve4 ColorByDistance,
+        bool ColorBoundToDistance,
+        Vector3 SourceOffset,
+        Vector3 TargetOffset);
 
     public sealed record VfxTrailDefinition(
         VfxCurve3 BirthTilingSize,
@@ -305,19 +349,31 @@ namespace AssetsManager.Views.Models.Viewer
         Vector3 Size = default,
         float Radius = 0f,
         float Height = 0f,
-        byte Flags = 0)
+        byte Flags = 0,
+        VfxCurve3? BirthTranslation = null)
     {
         public Vector3 SampleOffset(Random rng, float t, out Matrix4x4 rotation)
         {
             rotation = Matrix4x4.Identity;
-            bool volume = (Flags & 1) == 0;
-            var offset = (Kind switch
+            bool volume = (Flags & 1) != 0;
+            Vector3 offset = Kind switch
             {
                 VfxSpawnShapeKind.Box => SampleBox(rng, Size, volume),
                 VfxSpawnShapeKind.Sphere => SampleSphere(rng, Radius, volume),
                 VfxSpawnShapeKind.Cylinder => SampleCylinder(rng, Radius, Height, volume),
                 _ => Vector3.Zero
-            }) + EmitOffset.SampleBirth(t, rng);
+            };
+            if (Kind == VfxSpawnShapeKind.Box && !volume)
+            {
+                Matrix4x4 yTurn = Matrix4x4.CreateRotationY(rng.Next(4) * (MathF.PI * 0.5f));
+                Matrix4x4 zTurn = Matrix4x4.CreateRotationZ(rng.Next(2) * (MathF.PI * 0.5f));
+                offset = Vector3.Transform(Vector3.Transform(offset, yTurn), zTurn);
+                rotation *= yTurn;
+                rotation *= zTurn;
+            }
+            offset += EmitOffset.SampleBirth(t, rng);
+            if (Kind == VfxSpawnShapeKind.Legacy && BirthTranslation is { } translation)
+                offset += translation.SampleBirth(t, rng);
             int count = Math.Min(RotationAxes.Count, RotationAngles.Count);
             for (int i = 0; i < count; i++)
             {
@@ -335,9 +391,9 @@ namespace AssetsManager.Views.Models.Viewer
 
         private static Vector3 SampleBox(Random rng, Vector3 size, bool volume)
         {
-            float x = SignedUnit(rng) * size.X * 0.5f;
-            float y = SignedUnit(rng) * size.Y * 0.5f;
-            float z = (volume ? SignedUnit(rng) : 1f) * size.Z * 0.5f;
+            float x = SignedUnit(rng) * size.X;
+            float y = SignedUnit(rng) * size.Y;
+            float z = (volume ? SignedUnit(rng) : 1f) * size.Z;
             return new Vector3(x, y, z);
         }
 

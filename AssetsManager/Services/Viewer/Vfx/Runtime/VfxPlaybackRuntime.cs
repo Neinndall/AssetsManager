@@ -21,6 +21,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public int SourceOrder { get; init; }
             public bool IsVisible { get; set; } = true;
             public Vector3 BasePos;                 // world spawn origin (placement + emitterPosition)
+            public Vector3 SystemOrigin, SystemTarget;
             public Vector3 PlacementRight, PlacementUp, PlacementForward;
             public uint Texture;                    // GL handle for this emitter's sprite (0 = not uploaded/skip)
             public int TextureWidth, TextureHeight;
@@ -47,6 +48,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             internal bool SharedRandomRolled;
             internal float EmittedThrough;
             internal float Age;                     // emitter age (seconds)
+            internal float FinishedAt = -1f;
             internal bool BurstDone;                // for isSingleParticle
             internal bool InitialEmissionDone;
             internal readonly List<Particle> Particles = new();
@@ -67,7 +69,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         internal struct Particle
         {
-            public Vector3 Pos, Vel, BirthAccel, BirthOrbitalVelocity, BirthDrag;
+            public Vector3 Pos, Vel, Travel, BirthAccel, BirthOrbitalVelocity, BirthDrag;
+            public Vector3 AnalyticTerminal, AnalyticOffset;
+            public Matrix4x4 BirthFrame;
             public Quaternion SpawnRotation;
             public float Age, Life;
             public Vector3 TrailTiling;
@@ -78,8 +82,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public Vector3 RotationalVelocity, RotationalAcceleration;
             public float RangeRandom;
             public Vector2 BirthUvOffset, BirthUvScrollRate;
+            public Vector2 IntegratedUvOffset;
             public Vector2 TextureMultBirthUvOffset, TextureMultBirthUvScrollRate;
-            public float BirthUvRotateRate, TextureMultBirthUvRotateRate;
+            public Vector2 IntegratedTextureMultUvOffset;
+            public float BirthUvRotateRate, IntegratedUvRotation;
+            public float TextureMultBirthUvRotateRate, IntegratedTextureMultUvRotation;
+            public float LingerFrom;
             public float Rot, RotVel;
             public float StartFrame, FrameRate, TextureMultFrame;
         }
@@ -92,6 +100,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private Matrix4x4 _inverseWorldTransform = Matrix4x4.Identity;
         private Vector3 _worldScale = Vector3.One;
+        private Vector3 _pendingOriginDelta;
+        private VfxDragMotion _dragMotion;
+        private float _buildUpTime;
+        private bool _needsBuildUp;
         private bool _isKilled;
         public bool IsStopped { get; set; }
         public int LiveParticleCount { get; private set; }
@@ -111,6 +123,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             Matrix4x4 previousInverse = _inverseWorldTransform;
             Matrix4x4 emitterSpaceDelta = previousInverse * worldTransform;
+            Vector3 previousOrigin = new(_worldTransform.M41, _worldTransform.M42, _worldTransform.M43);
+            Vector3 nextOrigin = new(worldTransform.M41, worldTransform.M42, worldTransform.M43);
+            _pendingOriginDelta += nextOrigin - previousOrigin;
             _worldTransform = worldTransform;
             _worldScale = ExtractScale(worldTransform);
             if (!Matrix4x4.Invert(worldTransform, out _inverseWorldTransform))
@@ -133,10 +148,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector3 nextBasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(EmitterTime(es)), placement);
                 es.TrailDistance += Vector3.Distance(es.BasePos, nextBasePos);
                 es.BasePos = nextBasePos;
+                es.SystemOrigin = nextOrigin;
+                es.SystemTarget = Vector3.Transform(new Vector3(600f, 0f, 0f), worldTransform);
                 es.PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, placement), Vector3.UnitX);
                 es.PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, placement), Vector3.UnitY);
                 es.PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, placement), Vector3.UnitZ);
             }
+        }
+
+        public void SetTarget(Vector3 worldTarget)
+        {
+            foreach (EmitterState emitter in _emitters)
+                emitter.SystemTarget = worldTarget;
         }
 
         public VfxPlaybackRuntime(int seed = 1234)
@@ -153,6 +176,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         public void SetSystem(VfxSystemDefinition system, Matrix4x4 worldTransform)
         {
             _emitters.Clear();
+            _pendingOriginDelta = Vector3.Zero;
+            _dragMotion = system.DragMotion;
+            _buildUpTime = MathF.Max(0f, system.BuildUpTime);
             _worldTransform = worldTransform;
             _worldScale = ExtractScale(worldTransform);
             if (!Matrix4x4.Invert(worldTransform, out _inverseWorldTransform))
@@ -225,6 +251,30 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 : 0f;
         }
 
+        private static bool IsLegacySimple(VfxEmitterDefinition definition)
+            => definition.LegacyBirthScale is not null;
+
+        private static float LingerSeconds(VfxEmitterDefinition definition)
+        {
+            float lifetime = IsLegacySimple(definition) ? 0f : MathF.Max(0f, definition.ParticleLifetime.Constant);
+            return MathF.Min(lifetime + 10f, MathF.Max(0f, definition.ParticleLinger));
+        }
+
+        private static float StopWaitSeconds(VfxEmitterDefinition definition)
+        {
+            float lifetime = IsLegacySimple(definition)
+                ? 0f
+                : definition.EmitterLifetime ?? float.PositiveInfinity;
+            return MathF.Min(lifetime + 10f, MathF.Max(0f, definition.EmitterLinger));
+        }
+
+        private static float LingerProgress(EmitterState state)
+        {
+            if (state.FinishedAt < 0f) return 0f;
+            float seconds = LingerSeconds(state.Def);
+            return seconds > 0f ? Math.Clamp((state.Age - state.FinishedAt) / seconds, 0f, 1f) : 1f;
+        }
+
         private static Matrix4x4 EmitterTransform(VfxEmitterDefinition definition, Matrix4x4 world)
         {
             Vector3 rotation = definition.RotationOverride.GetValueOrDefault() * (MathF.PI / 180f);
@@ -240,6 +290,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _isKilled = false;
             IsStopped = false;
             CurrentTime = 0f;
+            _pendingOriginDelta = Vector3.Zero;
+            _needsBuildUp = _buildUpTime > 0f;
             _startDelay = _configuredStartDelay;
             foreach (var s in _emitters)
             {
@@ -248,6 +300,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 s.BasePos = Vector3.Transform(s.Def.EmitterPosition.Sample(0f), EmitterTransform(s.Def, _worldTransform));
                 s.EmittedThrough = s.Def.TimeBeforeFirstEmission;
                 s.Age = 0;
+                s.FinishedAt = -1f;
                 s.BurstDone = false;
                 s.InitialEmissionDone = false;
                 s.SharedRandomRolled = false;
@@ -290,9 +343,33 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 (IsStopped || state.BurstDone || (!state.Def.IsLoop && state.Def.EmitterLifetime is { } lifetime && state.Age > lifetime)) &&
                 state.Particles.Count == 0);
 
+        /// <summary>
+        /// Pre-simulates the authored build-up at 60 Hz while the rig stays at its initial
+        /// placement. The visible timeline remains at zero, matching the League/LTK contract.
+        /// </summary>
+        public void WarmUp()
+        {
+            if (!_needsBuildUp || _isKilled) return;
+            _needsBuildUp = false;
+            int steps = (int)MathF.Round(_buildUpTime * 60f);
+            const float dt = 1f / 60f;
+            for (int step = 0; step < steps; step++)
+            {
+                int live = 0;
+                foreach (EmitterState emitter in _emitters)
+                {
+                    UpdateEmitter(emitter, dt, Vector3.Zero);
+                    BuildInstances(emitter);
+                    live += emitter.InstanceCount;
+                }
+                LiveParticleCount = live;
+            }
+        }
+
         public void Update(float dt)
         {
             if (_isKilled || dt <= 0f || !float.IsFinite(dt)) return;
+            WarmUp();
             while (dt > 0f)
             {
                 float step = MathF.Min(dt, MaximumSimulationStep);
@@ -323,16 +400,42 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 if (dt <= 0f) return;
             }
             CurrentTime += dt;
+            Vector3 systemDelta = _pendingOriginDelta;
+            _pendingOriginDelta = Vector3.Zero;
             int live = 0;
             foreach (var s in _emitters)
             {
-                UpdateEmitter(s, dt);
+                UpdateEmitter(s, dt, systemDelta);
                 BuildInstances(s);
                 live += s.InstanceCount;
             }
             LiveParticleCount = live;
         }
-        private void UpdateEmitter(EmitterState s, float dt)
+        private void SettleEmitter(EmitterState state, float dt)
+        {
+            VfxEmitterDefinition definition = state.Def;
+            bool finished = IsStopped
+                ? state.Age > StopWaitSeconds(definition)
+                : definition.ParticleLingerType == 2 &&
+                  definition.EmitterLifetime is { } lifetime &&
+                  state.Age > lifetime;
+            if (!finished || state.FinishedAt >= 0f) return;
+
+            state.FinishedAt = state.Age;
+            float seconds = LingerSeconds(definition);
+            bool capped = definition.ParticleLingerType == 0;
+            for (int index = 0; index < state.Particles.Count; index++)
+            {
+                Particle particle = state.Particles[index];
+                particle.LingerFrom = particle.Age + dt;
+                particle.Life = capped
+                    ? MathF.Min(particle.Life, seconds)
+                    : particle.LingerFrom + seconds;
+                state.Particles[index] = particle;
+            }
+        }
+
+        private void UpdateEmitter(EmitterState s, float dt, Vector3 systemDelta)
         {
             var d = s.Def;
             s.Age += dt;
@@ -342,26 +445,94 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 s.Age %= loopLife;
                 s.BurstDone = false;
                 s.InitialEmissionDone = false;
+                s.FinishedAt = -1f;
                 s.EmittedThrough = d.TimeBeforeFirstEmission;
             }
 
+            SettleEmitter(s, dt);
             float emitterT = EmitterTime(s);
             Vector3 previousBasePos = s.BasePos;
             Matrix4x4 placement = EmitterTransform(d, _worldTransform);
             s.BasePos = Vector3.Transform(d.EmitterPosition.Sample(emitterT), placement);
             Vector3 emitterDelta = s.BasePos - previousBasePos;
             s.TrailDistance += emitterDelta.Length();
-            if (d.IsEmitterSpace && s.Particles.Count > 0)
+
+            // Existing particles are integrated before this step's births. Riot spawns new
+            // particles with a zero-sized birth step, so they remain exactly at their birth
+            // transform until the following simulation step.
+            for (int i = s.Particles.Count - 1; i >= 0; i--)
             {
-                if (emitterDelta.LengthSquared() > 1e-12f)
+                var p = s.Particles[i];
+                Vector3 positionBeforeStep = p.Pos;
+                if (d.IsEmitterSpace && emitterDelta.LengthSquared() > 1e-12f)
+                    p.Pos += emitterDelta;
+
+                p.Age += dt;
+                if (p.Age >= p.Life)
                 {
-                    for (int particleIndex = 0; particleIndex < s.Particles.Count; particleIndex++)
-                    {
-                        Particle particle = s.Particles[particleIndex];
-                        particle.Pos += emitterDelta;
-                        s.Particles[particleIndex] = particle;
-                    }
+                    ParticleLifecycle?.Invoke(this, d, p.Pos, true);
+                    s.Particles.RemoveAt(i);
+                    continue;
                 }
+
+                float particleT = float.IsPositiveInfinity(p.Life) ? 0f : Math.Clamp(p.Age / p.Life, 0f, 1f);
+                if (d.BindWeight is { } bindWeight && systemDelta.LengthSquared() > 1e-12f)
+                {
+                    float bind = Math.Clamp(bindWeight.Sample(emitterT), 0f, 1f);
+                    if (bind > 0f) p.Pos += systemDelta * bind;
+                }
+
+                float lingerT = LingerProgress(s);
+                Vector3 acceleration = s.FinishedAt >= 0f && d.Linger?.Acceleration is { } lingerAcceleration
+                    ? lingerAcceleration.Sample(lingerT)
+                    : d.AccelerationOverLife?.Sample(emitterT) ?? Vector3.Zero;
+                acceleration = Vector3.TransformNormal(acceleration, p.BirthFrame);
+                Vector3 fieldDrag = Vector3.Zero;
+                ApplyFields(d.Fields, particleT, p.Age, p.Pos, ref acceleration, ref fieldDrag);
+                p.Vel += (p.BirthAccel + acceleration) * dt;
+
+                Vector3 authoredVelocity = s.FinishedAt >= 0f && d.Linger?.Velocity is { } lingerVelocity
+                    ? lingerVelocity.Sample(lingerT)
+                    : d.VelocityOverLife?.Sample(emitterT) ?? Vector3.Zero;
+                authoredVelocity = Vector3.TransformNormal(authoredVelocity, p.BirthFrame);
+                Vector3 moving = p.Vel + authoredVelocity;
+                Vector3 dragOverLife = s.FinishedAt >= 0f && d.Linger?.Drag is { } lingerDrag
+                    ? lingerDrag.Sample(lingerT)
+                    : d.DragOverLife?.Sample(emitterT) ?? Vector3.Zero;
+                Vector3 drag = p.BirthDrag + dragOverLife + fieldDrag;
+                if (_dragMotion == VfxDragMotion.Analytic)
+                    ApplyAnalyticDrag(ref p, ref moving, drag, dt);
+                else
+                    ApplySteppedDrag(ref p.Vel, ref moving, drag, dt);
+                p.Pos += moving * dt;
+
+                // Birth angular velocity and acceleration always integrate. rotation0 is
+                // a separate integrated value authored per 1/60 second and is gated only
+                // by isRotationEnabled.
+                p.BirthRotation += (p.RotationalVelocity + p.RotationalAcceleration * p.Age) * dt;
+                if (d.IsRotationEnabled && d.RotationOverLife is { } rotationCurve)
+                {
+                    Vector3 rotationRate = rotationCurve.Sample(particleT);
+                    if (d.Rotation1 is { } rotationMax)
+                        rotationRate = Vector3.Lerp(rotationRate, rotationMax.Sample(particleT), p.RangeRandom);
+                    if (s.FinishedAt >= 0f && d.Linger?.Rotation is { } lingerRotation)
+                        rotationRate = lingerRotation.Sample(lingerT);
+                    p.BirthRotation += rotationRate * (60f * MathF.PI / 180f) * dt;
+                }
+
+                if (d.ParticleUvScrollRate is { } uvScroll)
+                    p.IntegratedUvOffset += uvScroll.Sample(particleT) * dt;
+                if (d.ParticleUvRotateRate is { } uvRotate)
+                    p.IntegratedUvRotation += uvRotate.Sample(particleT) * dt;
+                if (d.TextureMultParticleUvScroll is { } multScroll)
+                    p.IntegratedTextureMultUvOffset += multScroll.Sample(particleT) * dt;
+                if (d.TextureMultParticleUvRotate is { } multRotate)
+                    p.IntegratedTextureMultUvRotation += multRotate.Sample(particleT) * dt;
+
+                Vector3 displacement = p.Pos - positionBeforeStep;
+                if (d.IsEmitterSpace) displacement += systemDelta;
+                p.Travel = dt > 0f ? displacement / dt : Vector3.Zero;
+                s.Particles[i] = p;
             }
 
             bool emitting = !IsStopped
@@ -386,57 +557,91 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     s.EmittedThrough = rate > 0f ? s.EmittedThrough + count / rate : s.Age;
                 }
             }
+        }
 
-            for (int i = s.Particles.Count - 1; i >= 0; i--)
+        private static void ApplyAnalyticDrag(ref Particle particle, ref Vector3 moving, Vector3 drag, float dt)
+        {
+            for (int axis = 0; axis < 3; axis++)
             {
-                var p = s.Particles[i];
-                p.Age += dt;
-                if (p.Age >= p.Life)
+                float dragAxis = axis == 0 ? drag.X : axis == 1 ? drag.Y : drag.Z;
+                if (dragAxis <= 0f)
                 {
-                    ParticleLifecycle?.Invoke(this, d, p.Pos, true);
-                    s.Particles.RemoveAt(i);
+                    Vector3 kept = particle.Vel;
+                    ApplySteppedDragAxis(ref kept, ref moving, dragAxis, dt, axis);
+                    particle.Vel = kept;
                     continue;
                 }
-                float particleT = float.IsPositiveInfinity(p.Life) ? 0f : Math.Clamp(p.Age / p.Life, 0f, 1f);
-                if (!d.IsEmitterSpace && d.BindWeight is { } bindWeight && emitterDelta.LengthSquared() > 1e-12f)
+                if (dt <= 0f) continue;
+                float terminal = axis == 0 ? particle.AnalyticTerminal.X : axis == 1 ? particle.AnalyticTerminal.Y : particle.AnalyticTerminal.Z;
+                float previous = axis == 0 ? particle.AnalyticOffset.X : axis == 1 ? particle.AnalyticOffset.Y : particle.AnalyticOffset.Z;
+                float next = MathF.Exp(-dragAxis * particle.Age) * terminal;
+                float contribution = (previous - next) / dt;
+                if (axis == 0)
                 {
-                    float bind = Math.Clamp(bindWeight.Sample(particleT), 0f, 1f);
-                    if (bind > 0f)
-                    {
-                        p.Pos += emitterDelta * bind;
-                    }
+                    moving.X += contribution;
+                    particle.AnalyticOffset.X = next;
                 }
-                var worldAccel = d.AccelerationOverLife?.Sample(emitterT) ?? Vector3.Zero;
-                worldAccel = Vector3.TransformNormal(worldAccel, placement);
-                worldAccel += d.Acceleration?.Sample(emitterT) ?? Vector3.Zero;
-                Vector3 fieldDrag = Vector3.Zero;
-                ApplyFields(d.Fields, particleT, p.Age, p.Pos, ref worldAccel, ref fieldDrag);
-                p.Vel += (p.BirthAccel + worldAccel) * dt;
-                var dragOverLife = d.DragOverLife?.Sample(particleT) ?? Vector3.Zero;
-                var drag = Vector3.Max(Vector3.Zero, p.BirthDrag + dragOverLife + fieldDrag);
-                p.Vel *= new Vector3(MathF.Exp(-drag.X * dt), MathF.Exp(-drag.Y * dt), MathF.Exp(-drag.Z * dt));
-                var authoredVelocity = d.VelocityOverLife?.Sample(particleT) ?? Vector3.Zero;
-                authoredVelocity = Vector3.Transform(authoredVelocity, p.SpawnRotation);
-                authoredVelocity = Vector3.TransformNormal(authoredVelocity, _worldTransform);
-                p.Pos += (p.Vel + authoredVelocity) * dt;
-                if (p.BirthOrbitalVelocity.LengthSquared() > 1e-8f)
+                else if (axis == 1)
                 {
-                    var localRelative = Vector3.TransformNormal(p.Pos - s.BasePos, _inverseWorldTransform);
-                    var angularStep = p.BirthOrbitalVelocity * dt;
-                    var orbit = Quaternion.CreateFromYawPitchRoll(angularStep.Y, angularStep.X, angularStep.Z);
-                    p.Pos = s.BasePos + Vector3.TransformNormal(Vector3.Transform(localRelative, orbit), _worldTransform);
-                    p.Rot += angularStep.Y;
+                    moving.Y += contribution;
+                    particle.AnalyticOffset.Y = next;
                 }
-                if (d.IsRotationEnabled)
+                else
                 {
-                    p.RotationalVelocity += p.RotationalAcceleration * dt;
-                    p.RotVel = p.RotationalVelocity.X;
-                    p.Rot += p.RotVel * dt;
-                    p.BirthRotation += p.RotationalVelocity * dt;
+                    moving.Z += contribution;
+                    particle.AnalyticOffset.Z = next;
                 }
-                s.Particles[i] = p;
             }
+        }
 
+        private static void ApplySteppedDragAxis(ref Vector3 kept, ref Vector3 moving, float dragAxis, float dt, int axis)
+        {
+            float movingAxis = axis == 0 ? moving.X : axis == 1 ? moving.Y : moving.Z;
+            if (dragAxis == 0f || movingAxis == 0f) return;
+            float change = -dragAxis * movingAxis * dt;
+            if ((change + movingAxis) * movingAxis < 0f) change = -movingAxis;
+            if (axis == 0)
+            {
+                moving.X += change;
+                kept.X += change;
+            }
+            else if (axis == 1)
+            {
+                moving.Y += change;
+                kept.Y += change;
+            }
+            else
+            {
+                moving.Z += change;
+                kept.Z += change;
+            }
+        }
+
+        private static void ApplySteppedDrag(ref Vector3 kept, ref Vector3 moving, Vector3 drag, float dt)
+        {
+            for (int axis = 0; axis < 3; axis++)
+            {
+                float movingAxis = axis == 0 ? moving.X : axis == 1 ? moving.Y : moving.Z;
+                float dragAxis = axis == 0 ? drag.X : axis == 1 ? drag.Y : drag.Z;
+                if (dragAxis == 0f || movingAxis == 0f) continue;
+                float change = -dragAxis * movingAxis * dt;
+                if ((change + movingAxis) * movingAxis < 0f) change = -movingAxis;
+                if (axis == 0)
+                {
+                    moving.X += change;
+                    kept.X += change;
+                }
+                else if (axis == 1)
+                {
+                    moving.Y += change;
+                    kept.Y += change;
+                }
+                else
+                {
+                    moving.Z += change;
+                    kept.Z += change;
+                }
+            }
         }
 
         private void Spawn(EmitterState s, float emitterT)
@@ -450,16 +655,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             float roll = _rng.NextUnitFloat();
             float? sharedRoll = d.ParticlesShareRandomValue ? s.SharedRandom : _rng.NextUnitFloat();
 
-            float sampledLife = d.ParticleLifetime.SampleBirth(emitterT, _rng, sharedRoll);
-            float life = sampledLife < 0f ? float.PositiveInfinity : MathF.Max(0.05f, sampledLife);
-            bool hasRange = d.BirthScale1 is { } || d.Rotation1 is { };
-            var rangeRandom = hasRange ? roll : 0f;
+            float life = d.ParticleLifetime.SampleBirth(emitterT, _rng, sharedRoll);
+            var rangeRandom = roll;
             var birthScale = d.BirthScale.SampleBirth(emitterT, _rng, sharedRoll);
-            if (d.BirthScale1 is { } birthScale1)
+            if (d.LegacyBirthScale is { } legacyBirthScale)
+            {
+                float scalar = legacyBirthScale.SampleBirth(emitterT, _rng, sharedRoll);
+                Vector2 bias = d.LegacyScaleBias ?? Vector2.One;
+                birthScale = new Vector3(scalar * bias.X, scalar * bias.Y, scalar);
+            }
+            else if (d.BirthScale1 is { } birthScale1)
+            {
                 birthScale = Vector3.Lerp(birthScale, birthScale1.SampleBirth(emitterT, _rng, sharedRoll), rangeRandom);
-            // Mesh emitters with the authored uniform flag use X as their scalar;
-            // billboard primitives retain their authored width/height vector.
-            if (d.IsMeshPrimitive && d.IsUniformScale)
+            }
+            // isUniformScale promotes the first authored component to every axis for all
+            // particle kinds, not only mesh primitives.
+            if (d.IsUniformScale)
                 birthScale = new Vector3(birthScale.X);
             birthScale *= ResolveFlexMultiplier(d.FlexShape?.ScaleBirthScaleByBoundObjectSize);
             var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
@@ -486,10 +697,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             var worldOffset = Vector3.TransformNormal(localOffset, placement);
             vel = Vector3.TransformNormal(vel, spawnRotation);
             birthAccel = Vector3.TransformNormal(birthAccel, spawnRotation);
-            birthOrbitalVelocity = Vector3.TransformNormal(birthOrbitalVelocity, spawnRotation);
             vel = Vector3.TransformNormal(vel, placement);
             birthAccel = Vector3.TransformNormal(birthAccel, placement);
             Vector3 finalBirthSize = birthScale * ExtractScale(placement);
+            Vector3 analyticTerminal = Vector3.Zero;
+            Vector3 analyticOffset = Vector3.Zero;
+            if (_dragMotion == VfxDragMotion.Analytic)
+            {
+                analyticTerminal = new Vector3(
+                    birthDrag.X > 0f ? vel.X / birthDrag.X : 0f,
+                    birthDrag.Y > 0f ? vel.Y / birthDrag.Y : 0f,
+                    birthDrag.Z > 0f ? vel.Z / birthDrag.Z : 0f);
+                analyticOffset = analyticTerminal;
+                vel = Vector3.Zero;
+            }
 
             s.Particles.Add(new Particle
             {
@@ -498,34 +719,35 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 BirthAccel = birthAccel,
                 BirthOrbitalVelocity = birthOrbitalVelocity,
                 BirthDrag = birthDrag,
+                AnalyticTerminal = analyticTerminal,
+                AnalyticOffset = analyticOffset,
+                BirthFrame = placement,
                 SpawnRotation = Quaternion.CreateFromRotationMatrix(spawnRotation),
                 Age = 0f,
                 Life = life,
-                TrailTiling = d.Trail?.BirthTilingSize.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero,
+                TrailTiling = d.Trail?.BirthTilingSize.SampleBirth(emitterT, _rng, sharedRoll)
+                    ?? d.Beam?.BirthTilingSize.SampleBirth(emitterT, _rng, sharedRoll)
+                    ?? Vector3.Zero,
                 TrailBirthDistance = s.TrailDistance,
                 BirthSize = finalBirthSize,
                 BirthColor = VfxColorSemantics.ResolveBirth(d.BirthColor, emitterT, _rng, sharedRoll),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
-                RotationalVelocity = d.IsRotationEnabled ? rotVel * (MathF.PI / 180f) : Vector3.Zero,
-                RotationalAcceleration = d.IsRotationEnabled ? rotationalAcceleration * (MathF.PI / 180f) : Vector3.Zero,
-                Rot = d.IsMeshPrimitive ? 0f : birthRotation.X * (MathF.PI / 180f),
-                RotVel = d.IsRotationEnabled ? rotVel.X * (MathF.PI / 180f) : 0f,
+                RotationalVelocity = rotVel * (MathF.PI / 180f),
+                RotationalAcceleration = rotationalAcceleration * (MathF.PI / 180f),
+                Rot = birthRotation.X * (MathF.PI / 180f),
+                RotVel = rotVel.X * (MathF.PI / 180f),
                 RangeRandom = rangeRandom,
-                StartFrame = d.RandomStartFrame && d.NumFrames > 1
-                    ? _rng.Next(d.NumFrames)
-                    : Math.Clamp(d.StartFrame, 0f, Math.Max(0, d.NumFrames - 1)),
-                FrameRate = d.BirthFrameRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? d.FrameRate ?? 0f,
-                TextureMultFrame = d.TextureMultRandomStartFrame
-                    ? _rng.Next(Math.Max(1,
-                        (int)MathF.Max(1f, d.TextureMultTexDiv.X) *
-                        (int)MathF.Max(1f, d.TextureMultTexDiv.Y)))
-                    : 0f,
+                StartFrame = d.RandomStartFrame && d.NumFrames > 1 ? roll * d.NumFrames : 0f,
+                FrameRate = (d.FrameRate ?? 0f) *
+                    (d.BirthFrameRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? 1f),
+                TextureMultFrame = 0f,
                 BirthUvOffset = birthUvOffset,
                 BirthUvScrollRate = birthUvScrollRate,
                 BirthUvRotateRate = birthUvRotateRate,
                 TextureMultBirthUvOffset = textureMultBirthUvOffset,
                 TextureMultBirthUvScrollRate = textureMultBirthUvScrollRate,
-                TextureMultBirthUvRotateRate = textureMultBirthUvRotateRate
+                TextureMultBirthUvRotateRate = textureMultBirthUvRotateRate,
+                LingerFrom = -1f
             });
             ParticleLifecycle?.Invoke(this, d, s.Particles[^1].Pos, false);
         }
@@ -538,24 +760,55 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             if (s.Instances.Length < instanceCount * InstanceStride)
                 s.Instances = new float[Math.Max(instanceCount * InstanceStride, InstanceStride * 4)];
             var buf = s.Instances;
+            float emitterT = EmitterTime(s);
             int k = 0;
             for (int i = 0; i < n; i++)
             {
                 var p = s.Particles[i];
                 float t = float.IsPositiveInfinity(p.Life) ? 0f : Math.Clamp(p.Age / p.Life, 0f, 1f);
-                var scaleMul = d.ScaleOverLife?.Sample(t) ?? Vector3.One;
+                float particleLingerT = 0f;
+                bool lingering = p.LingerFrom >= 0f;
+                if (lingering)
+                {
+                    float window = d.ParticleLingerType == 0
+                        ? LingerSeconds(d)
+                        : MathF.Max(0f, p.Life - p.LingerFrom);
+                    particleLingerT = window > 0f
+                        ? Math.Clamp((p.Age - p.LingerFrom) / window, 0f, 1f)
+                        : 1f;
+                }
+                var scaleMul = lingering && d.Linger?.Scale is { } lingerScale
+                    ? lingerScale.Sample(particleLingerT)
+                    : d.ScaleOverLife?.Sample(t) ?? Vector3.One;
                 if (d.IsUniformScale)
                     scaleMul = new Vector3(scaleMul.X);
-                var col = VfxColorSemantics.ResolveParticle(p.BirthColor, d.ColorOverLife, t);
+                Vector4 col = lingering && d.Linger?.Color is { } lingerColor
+                    ? p.BirthColor * lingerColor.Sample(particleLingerT)
+                    : VfxColorSemantics.ResolveParticle(p.BirthColor, d.ColorOverLife, t);
                 col = VfxColorSemantics.PremultiplyForAddOrSubtract(col, d.BlendMode, d.Distortion != null);
 
-                float frame = 0f;
+                float frame = Math.Clamp(d.StartFrame, 0f, Math.Max(0, d.NumFrames - 1));
                 if (d.NumFrames > 1)
-                    frame = MathF.Floor(p.FrameRate > 0f
-                        ? (p.StartFrame + p.Age * p.FrameRate) % d.NumFrames
-                        : (p.StartFrame + t * d.NumFrames) % d.NumFrames);
+                {
+                    float played = PositiveModulo(p.StartFrame + p.Age * p.FrameRate, d.NumFrames);
+                    int cells = Math.Max(1, (int)MathF.Round(MathF.Max(1f, d.TexDiv.X)) *
+                        (int)MathF.Round(MathF.Max(1f, d.TexDiv.Y)));
+                    frame = PositiveModulo(MathF.Floor(d.StartFrame + played), cells);
+                }
 
                 Vector3 position = p.Pos;
+                Vector3 orbitalAngles = p.BirthOrbitalVelocity * p.Age;
+                if (orbitalAngles.LengthSquared() > 1e-8f)
+                {
+                    Vector3 origin = new(_worldTransform.M41, _worldTransform.M42, _worldTransform.M43);
+                    Quaternion orbit = Quaternion.CreateFromYawPitchRoll(orbitalAngles.Y, orbitalAngles.X, orbitalAngles.Z);
+                    position = origin + Vector3.Transform(position - origin, orbit);
+                }
+                if (d.Acceleration is { } worldAcceleration && float.IsFinite(p.Life))
+                {
+                    float reached = t * p.Life * p.Life;
+                    position += worldAcceleration.Sample(emitterT) * reached;
+                }
                 float sizeX = p.BirthSize.X * scaleMul.X;
                 float sizeY = p.BirthSize.Y * scaleMul.Y;
                 if (d.PrimitiveKind == VfxPrimitiveKind.ArbitraryQuad)
@@ -565,77 +818,85 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     if (d.IsGroundLayer && d.IsUniformScale)
                         sizeY = sizeX;
                 }
-                Vector3 direction = p.Vel;
-                if (p.BirthOrbitalVelocity.LengthSquared() > 1e-8f)
-                    direction += Vector3.Cross(p.BirthOrbitalVelocity, p.Pos - s.BasePos);
-                if (d.PrimitiveKind == VfxPrimitiveKind.Ray && d.RayTargetOffset is { } targetOffset)
-                    direction = Vector3.TransformNormal(targetOffset, _worldTransform);
+                Vector3 direction = p.Travel;
 
+                if (d.IsDirectionOriented && d.PrimitiveKind != VfxPrimitiveKind.Ray && direction.LengthSquared() > 1e-8f)
+                {
+                    float stretch = MathF.Max(d.DirectionVelocityMinScale, direction.Length() * d.DirectionVelocityScale);
+                    sizeY *= stretch;
+                }
                 if (d.UseTextureAspect) sizeX *= s.SpriteAspect;
                 buf[k++] = position.X; buf[k++] = position.Y; buf[k++] = position.Z;
                 buf[k++] = sizeX;
                 buf[k++] = sizeY;
                 buf[k++] = col.X; buf[k++] = col.Y; buf[k++] = col.Z; buf[k++] = col.W;
-                buf[k++] = p.Rot;
+                int rotationSlot = k++;
                 buf[k++] = frame;
                 buf[k++] = t;
                 buf[k++] = direction.X; buf[k++] = direction.Y; buf[k++] = direction.Z;
-                Vector3 lifeRotation = Vector3.Zero;
-                if (d.IsRotationEnabled && d.RotationOverLife is { } rotationCurve)
-                {
-                    lifeRotation = rotationCurve.Sample(t);
-                    if (d.Rotation1 is { } rotationMax)
-                        lifeRotation = Vector3.Lerp(lifeRotation, rotationMax.Sample(t), p.RangeRandom);
-                    // rotation0 is an authored angular velocity, not an absolute angle.
-                    lifeRotation *= p.Age * (MathF.PI / 180f);
-                }
-                bool authoredPlane = d.IsArbitraryQuad || d.IsLocalOrientation || d.ParticleIsLocalOrientation || d.PrimitiveKind is
+                Vector3 currentRotation = p.BirthRotation;
+                float legacyRoll = d.LegacyRotation?.Sample(t) * (MathF.PI / 180f) ?? 0f;
+                buf[rotationSlot] = currentRotation.X + legacyRoll;
+                bool authoredPlane = d.IsArbitraryQuad || d.PrimitiveKind is
                     VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.PlanarProjection;
                 if (d.IsDirectionOriented && !authoredPlane && direction.LengthSquared() > 1e-6f)
                 {
                     Vector3 dir = Vector3.Normalize(direction);
                     float yaw = MathF.Atan2(dir.X, dir.Z);
                     float pitch = MathF.Asin(Math.Clamp(-dir.Y, -1f, 1f));
-                    buf[k++] = pitch + lifeRotation.X;
-                    buf[k++] = yaw + lifeRotation.Y;
-                    buf[k++] = p.BirthRotation.Z + lifeRotation.Z;
+                    buf[k++] = pitch + currentRotation.X;
+                    buf[k++] = yaw + currentRotation.Y;
+                    buf[k++] = currentRotation.Z;
                 }
                 else
                 {
-                    buf[k++] = p.BirthRotation.X + lifeRotation.X;
-                    buf[k++] = p.BirthRotation.Y + lifeRotation.Y;
-                    buf[k++] = p.BirthRotation.Z + lifeRotation.Z;
+                    buf[k++] = currentRotation.X;
+                    buf[k++] = currentRotation.Y;
+                    buf[k++] = currentRotation.Z;
                 }
                 float sizeZ = p.BirthSize.Z * scaleMul.Z;
                 buf[k++] = sizeZ;
-                Vector2 uvOffset = p.BirthUvOffset + p.BirthUvScrollRate * p.Age
-                    + SampleIntegrated(d.ParticleUvScrollRate, t, p.Age, p.Life);
+                Vector2 uvRamp = p.BirthUvOffset + p.BirthUvScrollRate * p.Age;
+                if (d.RenderState?.ClampUvScroll == true)
+                    uvRamp = Vector2.Clamp(uvRamp, new Vector2(-1f), Vector2.One);
+                Vector2 uvOffset = uvRamp + p.IntegratedUvOffset;
                 Vector2 uvScale = d.UvScale?.Sample(t) ?? Vector2.One;
                 float uvRotationDegrees = (d.UvRotation?.Sample(t) ?? 0f) + p.BirthUvRotateRate * p.Age
-                    + SampleIntegrated(d.ParticleUvRotateRate, t, p.Age, p.Life);
+                    + p.IntegratedUvRotation;
                 float uvRotation = uvRotationDegrees * (MathF.PI / 180f);
                 buf[k++] = uvOffset.X; buf[k++] = uvOffset.Y;
                 buf[k++] = uvScale.X; buf[k++] = uvScale.Y;
                 buf[k++] = uvRotation;
-                buf[k++] = d.AlphaErosion?.Drive.Sample(t) ?? 0f;
-                Vector4 erosionMixer = d.AlphaErosion?.ChannelMixer?.Sample(t) ?? new Vector4(1f, 0f, 0f, 0f);
+                float erosionDrive = lingering && d.AlphaErosion?.LingerDrive is { } lingerErosion
+                    ? lingerErosion.Sample(particleLingerT)
+                    : d.AlphaErosion?.Drive.Sample(t) ?? 1f;
+                buf[k++] = erosionDrive;
+                Vector4 erosionMixer = d.AlphaErosion?.ChannelMixer?.Sample(0f) ?? new Vector4(0f, 0f, 0f, 1f);
                 buf[k++] = erosionMixer.X; buf[k++] = erosionMixer.Y;
                 buf[k++] = erosionMixer.Z; buf[k++] = erosionMixer.W;
-                Vector2 textureMultUvOffset = p.TextureMultBirthUvOffset
-                    + p.TextureMultBirthUvScrollRate * p.Age
-                    + SampleIntegrated(d.TextureMultParticleUvScroll, t, p.Age, p.Life);
+                Vector2 textureMultRamp = p.TextureMultBirthUvOffset + p.TextureMultBirthUvScrollRate * p.Age;
+                if (d.TextureMultClampUvScroll)
+                    textureMultRamp = Vector2.Clamp(textureMultRamp, new Vector2(-1f), Vector2.One);
+                Vector2 textureMultUvOffset = textureMultRamp + p.IntegratedTextureMultUvOffset;
                 Vector2 textureMultUvScale = d.TextureMultUvScale?.Sample(t) ?? Vector2.One;
 
                 float textureMultUvRotationDegrees = (d.TextureMultUvRotation?.Sample(t) ?? 0f)
                     + p.TextureMultBirthUvRotateRate * p.Age
-                    + SampleIntegrated(d.TextureMultParticleUvRotate, t, p.Age, p.Life);
+                    + p.IntegratedTextureMultUvRotation;
                 buf[k++] = textureMultUvOffset.X; buf[k++] = textureMultUvOffset.Y;
                 buf[k++] = textureMultUvScale.X; buf[k++] = textureMultUvScale.Y;
                 buf[k++] = textureMultUvRotationDegrees * (MathF.PI / 180f);
-                buf[k++] = p.TextureMultFrame;
-                buf[k++] = d.PaletteDefinition?.PaletteSelector.Sample(t).X ?? 0f;
+                buf[k++] = p.RangeRandom;
+                buf[k++] = d.PaletteDefinition?.PaletteSelector.Sample(0f).X ?? 0f;
             }
             s.InstanceCount = k / InstanceStride;
+        }
+
+        private static float PositiveModulo(float value, float span)
+        {
+            if (span <= 0f) return 0f;
+            float wrapped = value % span;
+            return wrapped < 0f ? wrapped + span : wrapped;
         }
 
         private static Vector2 SampleIntegrated(VfxCurve2? curve, float normalizedAge, float age, float life)

@@ -75,6 +75,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 runtime.SetTransform(_localTransforms[runtime] * _rootTransform);
             }
         }
+        public void SetTarget(Vector3 worldTarget)
+        {
+            foreach (VfxPlaybackRuntime runtime in _runtimes)
+                runtime.SetTarget(worldTarget);
+        }
+
         public void SetStartDelay(float seconds) => Root.SetStartDelay(seconds);
 
         public void Kill()
@@ -121,6 +127,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             Root.ParticleLifecycle -= OnParticleLifecycle;
             Root.ParticleLifecycle += OnParticleLifecycle;
             Root.Reset();
+            Root.WarmUp();
         }
 
         public void Update(float deltaTime)
@@ -168,6 +175,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             runtime.ParticleLifecycle += OnParticleLifecycle;
             _depth[runtime] = depth;
             _localTransforms[runtime] = effectiveLocalTransform;
+            runtime.WarmUp();
             return runtime;
         }
 

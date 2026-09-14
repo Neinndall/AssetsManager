@@ -34,11 +34,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 PixelFormat.Bgra,
                 PixelType.UnsignedByte,
                 new ReadOnlySpan<byte>(bgra));
-            _gl.GenerateMipmap(TextureTarget.Texture2D);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
+            // League's particle samplers do not use mipmaps. Atlas mip levels blend neighbouring
+            // cells and show up as rectangular halos around otherwise transparent particles.
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
             _ownedTextures.Add(texture);
             return texture;
@@ -78,9 +79,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 PixelFormat.Rgba,
                 PixelType.UnsignedByte,
                 new ReadOnlySpan<byte>(transparentPixel));
-            _gl.GenerateMipmap(TextureTarget.Texture2D);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
             return texture;
         }

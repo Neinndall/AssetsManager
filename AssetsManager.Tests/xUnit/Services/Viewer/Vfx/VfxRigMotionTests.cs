@@ -30,16 +30,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(100f, atEnd.Origin.Y, tolerance: 0.1f);
             Assert.True(atEnd.IsStopped);
 
-            // Missile yaw preserves the vertical axis.
+            // LTK's missile object convention carries local +Y along flight and local +Z down.
             Vector3 localY = Vector3.TransformNormal(Vector3.UnitY, atStart.Transform);
-            Assert.Equal(0f, localY.X, tolerance: 1e-4f);
-            Assert.Equal(1f, localY.Y, tolerance: 1e-4f);
+            Assert.Equal(1f, localY.X, tolerance: 1e-4f);
+            Assert.Equal(0f, localY.Y, tolerance: 1e-4f);
             Assert.Equal(0f, localY.Z, tolerance: 1e-4f);
 
-            // Local +Z follows the flight direction.
             Vector3 localZ = Vector3.TransformNormal(Vector3.UnitZ, atStart.Transform);
-            Assert.Equal(1f, localZ.X, tolerance: 1e-4f);
-            Assert.Equal(0f, localZ.Y, tolerance: 1e-4f);
+            Assert.Equal(0f, localZ.X, tolerance: 1e-4f);
+            Assert.Equal(-1f, localZ.Y, tolerance: 1e-4f);
             Assert.Equal(0f, localZ.Z, tolerance: 1e-4f);
         }
 

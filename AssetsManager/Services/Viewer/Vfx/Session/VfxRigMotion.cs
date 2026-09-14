@@ -17,7 +17,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         Vector3 Moved,
         bool IsStopped,
         float Phase,
-        float TotalSpan);
+        float TotalSpan)
+    {
+        public Vector3 Target { get; init; }
+    }
 
     /// <summary>
     /// Implements rig motion simulation for VFX playback (Still, Burst, Missile flight path, and Trail orbit),
@@ -31,6 +34,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public const float StandHeight = ChampionHeight * 0.5f; // 100 engine units
         public const float OrbitRadius = ChampionHeight * 1.5f; // 300 engine units
         public const float OrbitPeriod = 3.0f;                  // 3 seconds per revolution
+        public const float TargetReach = ChampionHeight * 3f;   // 600 engine units
 
 
         /// <summary>
@@ -62,11 +66,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     Vector3 to = new(flightRange * 0.5f, standHeight, 0f);
                     Vector3 origin = Vector3.Lerp(from, to, progress);
 
-                    // The preview rig yaws toward its target while preserving the up axis.
+                    // Missile-attached VFX author travel on local +Y. The rig therefore
+                    // carries +Y along the flight path, +X to the side, and +Z downward.
                     Matrix4x4 flightBasis = new(
                         0f,  0f, -1f, 0f,
-                        0f,  1f,  0f, 0f,
                         1f,  0f,  0f, 0f,
+                        0f, -1f,  0f, 0f,
                         0f,  0f,  0f, 1f
                     );
                     Matrix4x4 transform = flightBasis * Matrix4x4.CreateTranslation(origin);
@@ -74,7 +79,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         ? origin - lastOrigin.Value
                         : Vector3.Zero;
 
-                    return new VfxRigStep(transform, origin, moved, isStopped, phase, totalSpan);
+                    return new VfxRigStep(transform, origin, moved, isStopped, phase, totalSpan)
+                    {
+                        Target = to
+                    };
                 }
 
                 case VfxRigPreset.Trail:
@@ -106,7 +114,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         ? origin - lastOrigin.Value
                         : Vector3.Zero;
 
-                    return new VfxRigStep(transform, origin, moved, false, phase, totalSpan);
+                    return new VfxRigStep(transform, origin, moved, false, phase, totalSpan)
+                    {
+                        Target = new Vector3(0f, standHeight, 0f)
+                    };
                 }
 
                 case VfxRigPreset.Burst:
@@ -115,7 +126,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     float phase = totalSpan > 0f ? (float)(time % totalSpan) : (float)time;
                     Vector3 origin = new(0f, standHeight, 0f);
                     Matrix4x4 transform = Matrix4x4.CreateTranslation(origin);
-                    return new VfxRigStep(transform, origin, Vector3.Zero, false, phase, totalSpan);
+                    return new VfxRigStep(transform, origin, Vector3.Zero, false, phase, totalSpan)
+                    {
+                        Target = origin + new Vector3(TargetReach, 0f, 0f)
+                    };
                 }
 
                 case VfxRigPreset.Still:
@@ -124,7 +138,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     float totalSpan = (float)Math.Max(1.0, systemDuration);
                     Vector3 origin = new(0f, standHeight, 0f);
                     Matrix4x4 transform = Matrix4x4.CreateTranslation(origin);
-                    return new VfxRigStep(transform, origin, Vector3.Zero, false, (float)time, totalSpan);
+                    return new VfxRigStep(transform, origin, Vector3.Zero, false, (float)time, totalSpan)
+                    {
+                        Target = origin + new Vector3(TargetReach, 0f, 0f)
+                    };
                 }
             }
         }

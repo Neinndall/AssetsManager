@@ -112,6 +112,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             {
                 _graphPlacements[graph] = step.Transform;
                 graph.SetTransform(step.Transform * _worldTransform);
+                graph.SetTarget(Vector3.Transform(step.Target, _worldTransform));
                 graph.IsStopped = step.IsStopped;
             }
         }
