@@ -778,6 +778,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     IsMuted = false,
                     PrimitiveKindName = primKind,
                     EmitterDef = emitter,
+                    ImagePreview = tex,
                     TexturePath = texPath ?? "N/A",
                     TextureSources = DescribeTextureSources(emitter),
                     TextureStatus = textureStatus,
@@ -1057,22 +1058,33 @@ namespace AssetsManager.Views.Controls.Viewer
 
             double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
 
-            Brush[] palette = new Brush[]
+            // Soft, refined translucent slate-blue palette matching LTK-Manager timeline reference
+            Brush[] fillPalette = new Brush[]
             {
-                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00E676")), // Teal / Green
-                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00D1FF")), // Cyan
-                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5C85FF")), // Slate Blue
-                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF6B35")), // Coral / Orange
-                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD600")), // Amber / Gold
-                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A855F7")), // Purple
-                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EC4899"))  // Pink
+                new SolidColorBrush(Color.FromArgb(60, 59, 130, 246)),  // Soft Accent Blue
+                new SolidColorBrush(Color.FromArgb(60, 14, 165, 233)),  // Soft Sky Blue
+                new SolidColorBrush(Color.FromArgb(60, 99, 102, 241)),  // Soft Indigo
+                new SolidColorBrush(Color.FromArgb(60, 45, 212, 191)),  // Soft Teal
+                new SolidColorBrush(Color.FromArgb(60, 168, 85, 247))   // Soft Purple
             };
+            Brush[] borderPalette = new Brush[]
+            {
+                new SolidColorBrush(Color.FromArgb(160, 59, 130, 246)),
+                new SolidColorBrush(Color.FromArgb(160, 14, 165, 233)),
+                new SolidColorBrush(Color.FromArgb(160, 99, 102, 241)),
+                new SolidColorBrush(Color.FromArgb(160, 45, 212, 191)),
+                new SolidColorBrush(Color.FromArgb(160, 168, 85, 247))
+            };
+
+            foreach (var b in fillPalette) b.Freeze();
+            foreach (var b in borderPalette) b.Freeze();
 
             int idx = 1;
             foreach (var emitter in _model.Emitters)
             {
                 emitter.IndexNumber = idx;
-                emitter.TrackBrush = palette[(idx - 1) % palette.Length];
+                emitter.TrackBrush = fillPalette[(idx - 1) % fillPalette.Length];
+                emitter.TrackBorderBrush = borderPalette[(idx - 1) % borderPalette.Length];
 
                 double delay = emitter.EmitterDef?.TimeBeforeFirstEmission ?? 0;
                 VfxEmitterDefinition definition = emitter.EmitterDef;
@@ -1136,7 +1148,14 @@ namespace AssetsManager.Views.Controls.Viewer
 
             PlayheadLine.X1 = posX;
             PlayheadLine.X2 = posX;
-            Canvas.SetLeft(PlayheadHandle, posX - 4);
+            if (PlayheadTimeChip != null)
+            {
+                Canvas.SetLeft(PlayheadTimeChip, Math.Clamp(posX - 18, 0, Math.Max(0, availableWidth - 36)));
+            }
+            if (PlayheadTimeText != null)
+            {
+                PlayheadTimeText.Text = $"{_model.CurrentTime:F2}";
+            }
 
             if (LoopBoundaryLine != null && LoopBoundaryHandle != null)
             {
@@ -1147,6 +1166,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 LoopBoundaryLine.X1 = loopPosX;
                 LoopBoundaryLine.X2 = loopPosX;
                 Canvas.SetLeft(LoopBoundaryHandle, loopPosX - 7);
+                if (LoopRegionRect != null)
+                {
+                    LoopRegionRect.Width = Math.Max(0, loopPosX);
+                }
             }
         }
 
@@ -1235,6 +1258,142 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _model.CurrentTime = seekTime;
             _vfxRenderer?.Seek(seekTime);
+        }
+
+        private void StepBack_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model == null) return;
+            _model.CurrentTime = 0;
+            _vfxRenderer?.Seek(0);
+            UpdatePlayheadPosition();
+        }
+
+        private void StepForward_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model == null) return;
+            double step = 1.0 / 30.0;
+            double newTime = Math.Min(_model.TotalDuration, _model.CurrentTime + step);
+            _model.CurrentTime = newTime;
+            _vfxRenderer?.Seek(newTime);
+            UpdatePlayheadPosition();
+        }
+
+        private void PlayPauseToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model == null) return;
+
+            if (_model.IsPlaying)
+            {
+                _vfxRenderer?.Pause();
+                _model.IsPlaying = false;
+                return;
+            }
+
+            if (_model.IsAnimationMode && _model.SelectedAnimation != null)
+            {
+                if (_model.CurrentTime >= _model.TotalDuration)
+                {
+                    PlaySelectedAnimation(_model.SelectedAnimation);
+                }
+                else
+                {
+                    _model.IsPlaying = true;
+                    _vfxRenderer?.Play();
+                }
+                return;
+            }
+
+            if (_model.SelectedSystem != null)
+            {
+                if (!HasSelectedSystemReady())
+                {
+                    RequestSystemInspection(_model.SelectedSystem);
+                }
+                else if (_model.CurrentTime >= _model.TotalDuration)
+                {
+                    _vfxRenderer.Stop();
+                    _model.CurrentTime = 0;
+                    _vfxRenderer.Seek(0);
+                    _vfxRenderer.Play();
+                    _model.IsPlaying = true;
+                }
+                else
+                {
+                    _vfxRenderer.Play();
+                    _model.IsPlaying = true;
+                }
+            }
+        }
+
+        private void EmitterFilter_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplyEmitterFilter();
+        }
+
+        private void ClearEmitterFilter_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model != null)
+            {
+                _model.EmitterFilterText = string.Empty;
+            }
+            ApplyEmitterFilter();
+        }
+
+        private void ApplyEmitterFilter()
+        {
+            if (_model == null) return;
+            string filter = _model.EmitterFilterText?.Trim() ?? string.Empty;
+            var view = CollectionViewSource.GetDefaultView(_model.Emitters);
+            if (view != null)
+            {
+                if (string.IsNullOrWhiteSpace(filter))
+                {
+                    view.Filter = null;
+                }
+                else
+                {
+                    view.Filter = obj =>
+                    {
+                        if (obj is VfxEmitterDiagnosticItem item)
+                        {
+                            return (item.Name != null && item.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)) ||
+                                   item.IndexNumber.ToString().Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                                   (item.PrimitiveKindName != null && item.PrimitiveKindName.Contains(filter, StringComparison.OrdinalIgnoreCase));
+                        }
+                        return false;
+                    };
+                }
+            }
+        }
+
+        private bool _isRulerDragging;
+
+        private void Ruler_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (TracksCanvasContainer == null) return;
+            _isRulerDragging = true;
+            ((UIElement)sender).CaptureMouse();
+            UpdateSeekFromTimeline(e.GetPosition(TracksCanvasContainer).X);
+            e.Handled = true;
+        }
+
+        private void Ruler_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isRulerDragging && e.LeftButton == MouseButtonState.Pressed && TracksCanvasContainer != null)
+            {
+                UpdateSeekFromTimeline(e.GetPosition(TracksCanvasContainer).X);
+                e.Handled = true;
+            }
+        }
+
+        private void Ruler_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isRulerDragging)
+            {
+                _isRulerDragging = false;
+                ((UIElement)sender).ReleaseMouseCapture();
+                e.Handled = true;
+            }
         }
 
         #endregion

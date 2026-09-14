@@ -259,6 +259,20 @@ namespace AssetsManager.Views.Models.Viewer
             set { _trackBrush = value; OnPropertyChanged(); }
         }
 
+        private Brush _trackBorderBrush = Brushes.SlateBlue;
+        public Brush TrackBorderBrush
+        {
+            get => _trackBorderBrush;
+            set { _trackBorderBrush = value; OnPropertyChanged(); }
+        }
+
+        private BitmapSource _imagePreview;
+        public BitmapSource ImagePreview
+        {
+            get => _imagePreview;
+            set { _imagePreview = value; OnPropertyChanged(); }
+        }
+
         public Thickness TrackMargin
         {
             get => _trackMargin;
@@ -681,6 +695,23 @@ namespace AssetsManager.Views.Models.Viewer
             get => _searchQuery;
             set { _searchQuery = value; OnPropertyChanged(); }
         }
+
+        private string _emitterFilterText = string.Empty;
+        public string EmitterFilterText
+        {
+            get => _emitterFilterText;
+            set
+            {
+                if (_emitterFilterText != value)
+                {
+                    _emitterFilterText = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(HasEmitterFilter));
+                }
+            }
+        }
+
+        public bool HasEmitterFilter => !string.IsNullOrWhiteSpace(_emitterFilterText);
 
         public VfxSystemDiagnosticItem SelectedSystem
         {

@@ -349,149 +349,216 @@
                 <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" 
                               Background="Transparent" Cursor="SizeNS" ShowsPreview="False"/>
 
-                <!-- 2. TIMELINE & TRANSPORT DECK (Independent Card outside Viewport, DAW / LTK Style) -->
+                <!-- 2. TIMELINE & TRANSPORT DECK (Independent Card outside Viewport, LTK-Manager / DAW Studio Style) -->
                 <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="10" 
                         BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="12,10">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/> <!-- 1. Modern Transport Controls Bar -->
+                            <RowDefinition Height="Auto"/> <!-- 1. Top Transport Controls & Search Bar -->
                             <RowDefinition Height="Auto"/> <!-- 2. Separator -->
-                            <RowDefinition Height="Auto"/> <!-- 3. Time Ruler Header -->
+                            <RowDefinition Height="Auto"/> <!-- 3. Time Ruler Header (Aligned with Tracks) -->
                             <RowDefinition Height="*"/>    <!-- 4. Scrollable Emitter Lanes & Interactive Tracks Grid -->
                         </Grid.RowDefinitions>
 
-                        <!-- 1. MODERN TRANSPORT CONTROLS BAR (Play/Replay, Pause/Stop, Slider, Speed, BG, Loop) -->
+                        <!-- 1. TOP TRANSPORT CONTROLS & SEARCH BAR (LTK-Manager layout) -->
                         <Grid Grid.Row="0" Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/> <!-- Replay/Play & Pause/Stop Buttons -->
-                                <ColumnDefinition Width="*"/>    <!-- Main Time Slider & Readout -->
-                                <ColumnDefinition Width="Auto"/> <!-- Speed Selector & Loop -->
-                                <ColumnDefinition Width="Auto"/> <!-- Background Selector -->
+                                <ColumnDefinition Width="Auto"/> <!-- Left: Badge & Filter Search -->
+                                <ColumnDefinition Width="*"/>    <!-- Middle spacer -->
+                                <ColumnDefinition Width="Auto"/> <!-- Right: Transport Buttons, Time, Speed, Loop, BG -->
                             </Grid.ColumnDefinitions>
 
-                            <!-- Transport Action Buttons (Play/Replay, Pause/Stop) -->
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                <!-- Play / Replay Button -->
-                                <Button Click="Play_Click" Margin="0,0,6,0" Padding="8,5">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-                                            <Setter Property="ToolTip" Value="Play"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsReplayState}" Value="True">
-                                                    <Setter Property="ToolTip" Value="Replay / Restart from 0.00s"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
+                            <!-- Hidden Slider to preserve two-way time binding & event hooks -->
+                            <Slider x:Name="TimeSlider" Visibility="Collapsed" Minimum="0" Maximum="{Binding TotalDuration}" 
+                                    Value="{Binding CurrentTime, Mode=TwoWay}" ValueChanged="TimeSlider_ValueChanged"
+                                    PreviewMouseDown="TimeSlider_PreviewMouseDown" PreviewMouseUp="TimeSlider_PreviewMouseUp"/>
+
+                            <!-- LEFT: [TIMELINE] BADGE & FILTER SEARCH BOX -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- TIMELINE Pill Badge -->
+                                <Border Background="#161A24" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                        CornerRadius="4" Padding="8,4" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <TextBlock Text="TIMELINE" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" VerticalAlignment="Center"/>
+                                </Border>
+
+                                <!-- Filter Emitters Search Input -->
+                                <Border Background="{StaticResource DarkBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                        CornerRadius="5" Height="28" Width="180" VerticalAlignment="Center">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="26"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FilterVariant" Width="13" Height="13" 
+                                                                    Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Column="1" x:Name="EmitterFilterTextBox"
+                                                 Text="{Binding EmitterFilterText, UpdateSourceTrigger=PropertyChanged}"
+                                                 TextChanged="EmitterFilter_TextChanged"
+                                                 Background="Transparent" BorderThickness="0"
+                                                 Foreground="{StaticResource TextPrimary}" CaretBrush="White"
+                                                 FontSize="11" VerticalContentAlignment="Center" Padding="0,0,4,0"/>
+                                        <!-- Watermark / Placeholder -->
+                                        <TextBlock Grid.Column="1" Text="Filter emitters..." Foreground="{StaticResource TextMuted}" FontSize="11"
+                                                   VerticalAlignment="Center" IsHitTestVisible="False">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding EmitterFilterText}" Value="">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding EmitterFilterText}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <Button Grid.Column="2" Click="ClearEmitterFilter_Click" Style="{StaticResource TransparentIconButton}"
+                                                Width="20" Height="20" Margin="0,0,2,0" ToolTip="Clear Filter"
+                                                Visibility="{Binding HasEmitterFilter, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12" Foreground="{StaticResource TextMuted}"/>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- RIGHT: TRANSPORT ACTION BUTTONS, TIME READOUT, SPEED, LOOP, BG -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Step Back Button (|<) -->
+                                <Button Click="StepBack_Click" Style="{StaticResource TransparentIconButton}"
+                                        Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="Step Back / Rewind to 0.00s">
+                                    <materialIcons:MaterialIcon Kind="SkipPrevious" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
+                                </Button>
+
+                                <!-- Dynamic Play / Pause / Replay Button -->
+                                <Button Click="PlayPauseToggle_Click" Width="30" Height="28" Padding="0" Margin="0,0,4,0"
+                                        Background="#1E2330" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Cursor="Hand">
+                                    <Button.Resources>
+                                        <Style TargetType="Border">
+                                            <Setter Property="CornerRadius" Value="4"/>
                                         </Style>
-                                    </Button.Style>
-                                    <materialIcons:MaterialIcon Width="15" Height="15">
+                                    </Button.Resources>
+                                    <materialIcons:MaterialIcon Width="16" Height="16">
                                         <materialIcons:MaterialIcon.Style>
                                             <Style TargetType="materialIcons:MaterialIcon">
                                                 <Setter Property="Kind" Value="Play"/>
                                                 <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsReplayState}" Value="True">
+                                                    <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                                        <Setter Property="Kind" Value="Pause"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                                    </DataTrigger>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsPlaying}" Value="False"/>
+                                                            <Condition Binding="{Binding IsReplayState}" Value="True"/>
+                                                        </MultiDataTrigger.Conditions>
                                                         <Setter Property="Kind" Value="Replay"/>
                                                         <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                                    </DataTrigger>
+                                                    </MultiDataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </materialIcons:MaterialIcon.Style>
                                     </materialIcons:MaterialIcon>
                                 </Button>
 
-                                <!-- Pause / Stop Button -->
-                                <Button Click="StopResume_Click" Margin="0,0,0,0" Padding="8,5">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-                                            <Setter Property="ToolTip" Value="Resume"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsPlaying}" Value="True">
-                                                    <Setter Property="ToolTip" Value="Pause / Stop"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialIcons:MaterialIcon Width="15" Height="15">
-                                        <materialIcons:MaterialIcon.Style>
-                                            <Style TargetType="materialIcons:MaterialIcon">
-                                                <Setter Property="Kind" Value="Pause"/>
-                                                <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsPlaying}" Value="True">
-                                                        <Setter Property="Kind" Value="Stop"/>
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialIcons:MaterialIcon.Style>
-                                    </materialIcons:MaterialIcon>
+                                <!-- Step Forward Button (>|) -->
+                                <Button Click="StepForward_Click" Style="{StaticResource TransparentIconButton}"
+                                        Width="28" Height="28" Padding="0" Margin="0,0,10,0" ToolTip="Step Forward (+1 frame)">
+                                    <materialIcons:MaterialIcon Kind="SkipNext" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
                                 </Button>
-                            </StackPanel>
 
-                            <!-- Slider + Time Readout -->
-                            <Grid Grid.Column="1" Margin="0,0,14,0" VerticalAlignment="Center">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Slider x:Name="TimeSlider" Grid.Column="0" Minimum="0" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" 
-                                        ValueChanged="TimeSlider_ValueChanged" 
-                                        PreviewMouseDown="TimeSlider_PreviewMouseDown" 
-                                        PreviewMouseUp="TimeSlider_PreviewMouseUp" 
-                                        VerticalAlignment="Center" Height="14" 
-                                        Style="{StaticResource HUDSliderStyle}"/>
-                                <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" FontFamily="Consolas">
-                                    <Run Text="{Binding CurrentTime, Mode=OneWay, StringFormat={}{0:F2}s}" Foreground="{StaticResource AccentBrush}"/>
+                                <!-- Time Readout: 0.36 / 11.75 s -->
+                                <TextBlock VerticalAlignment="Center" Margin="0,0,12,0" FontSize="11" FontWeight="SemiBold" FontFamily="Consolas">
+                                    <Run Text="{Binding CurrentTime, Mode=OneWay, StringFormat={}{0:F2}}" Foreground="{StaticResource TextPrimary}"/>
                                     <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
-                                    <Run Text="{Binding TotalDuration, Mode=OneWay, StringFormat={}{0:F2}s}" Foreground="{StaticResource TextMuted}"/>
-                                    <Run Text="{Binding ActiveLoopDurationText, Mode=OneWay}" Foreground="#FFD700"/>
+                                    <Run Text="{Binding TotalDuration, Mode=OneWay, StringFormat={}{0:F2} s}" Foreground="{StaticResource TextMuted}"/>
+                                    <Run Text="{Binding ActiveLoopDurationText, Mode=OneWay}" Foreground="{StaticResource AccentBrush}"/>
                                 </TextBlock>
-                            </Grid>
 
-                            <!-- Speed Selector & Loop Toggle -->
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                <ToggleButton IsChecked="{Binding IsPreviewLoopEnabled, Mode=TwoWay}" 
-                                              Style="{StaticResource TransparentIconToggleButton}" 
-                                              Width="28" Height="26" Margin="0,0,10,0" 
-                                              ToolTip="Toggle Timeline Loop">
-                                    <materialIcons:MaterialIcon Kind="Autorenew" Width="15" Height="15"/>
-                                </ToggleButton>
-                                <TextBlock Text="Speed:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="88" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="2">
+                                <!-- Separator -->
+                                <Border Width="1" Height="18" Background="{StaticResource BorderColor}" Margin="0,0,10,0" VerticalAlignment="Center" Opacity="0.6"/>
+
+                                <!-- Speed Control -->
+                                <materialIcons:MaterialIcon Kind="Speedometer" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="76" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="2" Margin="0,0,8,0">
                                     <ComboBoxItem Content="0.25x" Tag="0.25"/>
                                     <ComboBoxItem Content="0.5x" Tag="0.5"/>
                                     <ComboBoxItem Content="1.0x" Tag="1.0"/>
                                     <ComboBoxItem Content="1.5x" Tag="1.5"/>
                                     <ComboBoxItem Content="2.0x" Tag="2.0"/>
                                 </ComboBox>
-                            </StackPanel>
 
-                            <!-- BG Mode Selector -->
-                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="BG:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <ComboBox x:Name="BgComboBox" Style="{StaticResource ModernComboBox}" Width="95" Height="26" SelectionChanged="BgMode_SelectionChanged" SelectedIndex="0">
+                                <!-- Loop Toggle Pill Button -->
+                                <ToggleButton IsChecked="{Binding IsPreviewLoopEnabled, Mode=TwoWay}"
+                                              Height="26" Padding="8,0" Margin="0,0,8,0" Cursor="Hand" ToolTip="Toggle Loop Boundary">
+                                    <ToggleButton.Style>
+                                        <Style TargetType="ToggleButton">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                            <Setter Property="BorderThickness" Value="1"/>
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Setter Property="FontSize" Value="11"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ToggleButton">
+                                                        <Border Background="{TemplateBinding Background}"
+                                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                                CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter Property="Background" Value="#253B82F6"/>
+                                                    <Setter Property="BorderBrush" Value="#3B82F6"/>
+                                                    <Setter Property="Foreground" Value="#60A5FA"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ToggleButton.Style>
+                                    <TextBlock Text="Loop" VerticalAlignment="Center"/>
+                                </ToggleButton>
+
+                                <!-- BG Mode Selector -->
+                                <TextBlock Text="BG:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <ComboBox x:Name="BgComboBox" Style="{StaticResource ModernComboBox}" Width="80" Height="26" SelectionChanged="BgMode_SelectionChanged" SelectedIndex="0">
                                     <ComboBoxItem Content="Dark"/>
                                     <ComboBoxItem Content="Light"/>
-                                    <ComboBoxItem Content="Transparent"/>
+                                    <ComboBoxItem Content="Alpha"/>
                                 </ComboBox>
                             </StackPanel>
                         </Grid>
 
                         <!-- 2. SUBTLE SEPARATOR -->
-                        <Border Grid.Row="1" Height="1" Background="{StaticResource BorderColor}" Margin="0,0,0,8" Opacity="0.7"/>
+                        <Border Grid.Row="1" Height="1" Background="{StaticResource BorderColor}" Margin="0,0,0,6" Opacity="0.6"/>
 
                         <!-- 3. TIME RULER HEADER (Aligned with lanes) -->
-                        <Grid Grid.Row="2" Margin="0,0,0,6">
+                        <Grid Grid.Row="2" Margin="0,0,0,4"
+                              PreviewMouseDown="Ruler_PreviewMouseDown"
+                              PreviewMouseMove="Ruler_PreviewMouseMove"
+                              PreviewMouseUp="Ruler_PreviewMouseUp"
+                              Cursor="Hand">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="260"/> <!-- Name & Solo/Mute Header Column -->
-                                <ColumnDefinition Width="*"/>   <!-- Time Ruler Ticks -->
+                                <ColumnDefinition Width="280"/> <!-- Name & Solo/Mute Header Column -->
+                                <ColumnDefinition Width="*"/>   <!-- Time Ruler Ticks & Loop Indicator -->
                             </Grid.ColumnDefinitions>
 
                             <Grid Grid.Column="0">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="24"/> <!-- Mute All -->
+                                    <ColumnDefinition Width="24"/> <!-- Mute All Toggle -->
                                     <ColumnDefinition Width="24"/> <!-- Clear Solos -->
                                     <ColumnDefinition Width="*"/>  <!-- Label -->
+                                    <ColumnDefinition Width="24"/> <!-- Header Solo Tag -->
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Mute All Toggle -->
@@ -520,21 +587,27 @@
 
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
                                     <materialIcons:MaterialIcon Kind="LayersOutline" Width="13" Height="13" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0"/>
-                                    <TextBlock Text="EMITTERS &amp; LANES" FontSize="9.5" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="EMITTERS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
                                 </StackPanel>
+
+                                <TextBlock Grid.Column="3" Text="S" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Grid>
 
+                            <!-- Ruler Ticks & Live Caption Header -->
                             <Grid Grid.Column="1" Margin="8,0,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="40"/> <!-- Live Count Column Header -->
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="0.00s" FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Left"/>
                                 <TextBlock Grid.Column="1" Text="{Binding QuarterDuration, StringFormat={}{0:F2}s}" FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Left"/>
                                 <TextBlock Grid.Column="2" Text="{Binding HalfDuration, StringFormat={}{0:F2}s}" FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Left"/>
-                                <TextBlock Grid.Column="3" Text="{Binding TotalDuration, StringFormat={}{0:F2}s}" FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Column="3" Text="{Binding TotalDuration, StringFormat={}{0:F2}s}" FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" Margin="0,0,10,0"/>
+                                <TextBlock Grid.Column="4" Text="live" FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" Margin="0,0,2,0"/>
                             </Grid>
                         </Grid>
 
@@ -545,151 +618,227 @@
                                   PreviewMouseMove="TimelineGrid_PreviewMouseMove" 
                                   PreviewMouseUp="TimelineGrid_PreviewMouseUp">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="260"/> <!-- Names, Toggles & Live Badges Column -->
+                                    <ColumnDefinition Width="280"/> <!-- Names, Thumbnails, Toggles & Solos Column -->
                                     <ColumnDefinition Width="*"/>   <!-- Tracks Canvas Column -->
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Left Column: Master System Row + Emitters List -->
                                 <StackPanel Grid.Column="0">
                                     <!-- Row #0: Master VFX System Name -->
-                                    <Grid Height="26" Margin="0,2">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="20"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="AutoAwesome" Width="13" Height="13" Foreground="#22C55E" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding SelectedSystem.Name, FallbackValue='VFX System'}" FontSize="11" FontWeight="Bold" Foreground="#22C55E" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                    </Grid>
+                                    <Border Height="24" Margin="0,1" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Background="#08FFFFFF">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="22"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="AutoAwesome" Width="13" Height="13" Foreground="#22C55E" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding SelectedSystem.Name, FallbackValue='VFX System'}" FontSize="11" FontWeight="Bold" Foreground="#22C55E" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
 
                                     <!-- Emitter Rows -->
                                     <ItemsControl ItemsSource="{Binding Emitters}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid Height="26" Margin="0,2">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="22"/> <!-- Mute (Eye) -->
-                                                        <ColumnDefinition Width="22"/> <!-- Solo ('S') -->
-                                                        <ColumnDefinition Width="22"/> <!-- Index [1] -->
-                                                        <ColumnDefinition Width="48"/> <!-- Primitive Badge -->
-                                                        <ColumnDefinition Width="*"/>  <!-- Emitter Name -->
-                                                        <ColumnDefinition Width="34"/> <!-- Live Particle Count Badge -->
-                                                    </Grid.ColumnDefinitions>
+                                                <Border Height="24" Margin="0,1" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Opacity" Value="1.0"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                                                    <Setter Property="Opacity" Value="0.4"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                                    <Setter Property="Opacity" Value="0.4"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="22"/> <!-- Mute (Eye) -->
+                                                            <ColumnDefinition Width="22"/> <!-- Thumbnail Image/Icon -->
+                                                            <ColumnDefinition Width="*"/>  <!-- Emitter Name -->
+                                                            <ColumnDefinition Width="Auto"/> <!-- Index [16] -->
+                                                            <ColumnDefinition Width="24"/> <!-- Solo ('S') -->
+                                                        </Grid.ColumnDefinitions>
 
-                                                    <!-- Mute Button -->
-                                                    <Button Grid.Column="0" Click="EmitterMute_Click" Style="{StaticResource TransparentIconButton}" 
-                                                            Width="20" Height="20" Padding="0" ToolTip="Mute (Hide) this emitter">
-                                                        <materialIcons:MaterialIcon Width="13" Height="13">
-                                                            <materialIcons:MaterialIcon.Style>
-                                                                <Style TargetType="materialIcons:MaterialIcon">
-                                                                    <Setter Property="Kind" Value="EyeOutline"/>
-                                                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsMuted}" Value="True">
-                                                                            <Setter Property="Kind" Value="EyeOffOutline"/>
-                                                                            <Setter Property="Foreground" Value="#EF4444"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </materialIcons:MaterialIcon.Style>
-                                                        </materialIcons:MaterialIcon>
-                                                    </Button>
+                                                        <!-- Mute Button (Eye) -->
+                                                        <Button Grid.Column="0" Click="EmitterMute_Click" Style="{StaticResource TransparentIconButton}" 
+                                                                Width="20" Height="20" Padding="0" ToolTip="Mute (Hide) this emitter" VerticalAlignment="Center">
+                                                            <materialIcons:MaterialIcon Width="13" Height="13">
+                                                                <materialIcons:MaterialIcon.Style>
+                                                                    <Style TargetType="materialIcons:MaterialIcon">
+                                                                        <Setter Property="Kind" Value="EyeOutline"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                                                                <Setter Property="Kind" Value="EyeOffOutline"/>
+                                                                                <Setter Property="Foreground" Value="#EF4444"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </materialIcons:MaterialIcon.Style>
+                                                            </materialIcons:MaterialIcon>
+                                                        </Button>
 
-                                                    <!-- Solo Button -->
-                                                    <Button Grid.Column="1" Click="EmitterSolo_Click" Width="20" Height="20" Padding="0" ToolTip="Solo this emitter">
-                                                        <Button.Style>
-                                                            <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
-                                                                <Setter Property="Background" Value="Transparent"/>
-                                                                <Setter Property="BorderThickness" Value="1"/>
-                                                                <Setter Property="BorderBrush" Value="Transparent"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsSolo}" Value="True">
-                                                                        <Setter Property="Background" Value="#33FFD700"/>
-                                                                        <Setter Property="BorderBrush" Value="#FFD700"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Button.Style>
-                                                        <TextBlock Text="S" FontSize="10" FontWeight="Black">
-                                                            <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                        <!-- Thumbnail Swatch (Image preview if loaded, else primitive icon) -->
+                                                        <Border Grid.Column="1" Width="18" Height="18" CornerRadius="2" 
+                                                                BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
+                                                                Background="#10FFFFFF" ClipToBounds="True" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                            <Grid>
+                                                                <Image Source="{Binding ImagePreview}" Width="16" Height="16" Stretch="UniformToFill" 
+                                                                       RenderOptions.BitmapScalingMode="HighQuality">
+                                                                    <Image.Style>
+                                                                        <Style TargetType="Image">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding ImagePreview}" Value="{x:Null}">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Image.Style>
+                                                                </Image>
+                                                                <materialIcons:MaterialIcon Kind="TextureBox" Width="11" Height="11" Foreground="{StaticResource TextMuted}"
+                                                                                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <materialIcons:MaterialIcon.Style>
+                                                                        <Style TargetType="materialIcons:MaterialIcon">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding ImagePreview}" Value="{x:Null}">
+                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </materialIcons:MaterialIcon.Style>
+                                                                </materialIcons:MaterialIcon>
+                                                            </Grid>
+                                                        </Border>
+
+                                                        <!-- Emitter Name -->
+                                                        <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="10.5" FontWeight="SemiBold" 
+                                                                   Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" 
+                                                                   ToolTip="{Binding Name}" Margin="4,0,2,0"/>
+
+                                                        <!-- Index Number [16] -->
+                                                        <TextBlock Grid.Column="3" Text="{Binding IndexNumber, StringFormat='[{0}]'}" FontSize="9.5" FontFamily="Consolas" 
+                                                                   FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+
+                                                        <!-- Solo Button ('S') -->
+                                                        <Button Grid.Column="4" Click="EmitterSolo_Click" Width="20" Height="20" Padding="0" ToolTip="Solo this emitter" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                                                    <Setter Property="Background" Value="Transparent"/>
+                                                                    <Setter Property="BorderThickness" Value="1"/>
+                                                                    <Setter Property="BorderBrush" Value="Transparent"/>
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding IsSolo}" Value="True">
-                                                                            <Setter Property="Foreground" Value="#FFD700"/>
+                                                                            <Setter Property="Background" Value="#33FFD700"/>
+                                                                            <Setter Property="BorderBrush" Value="#FFD700"/>
                                                                         </DataTrigger>
                                                                     </Style.Triggers>
                                                                 </Style>
-                                                            </TextBlock.Style>
-                                                        </TextBlock>
-                                                    </Button>
-
-                                                    <!-- Index Number -->
-                                                    <TextBlock Grid.Column="2" Text="{Binding IndexNumber, StringFormat='[{0}]'}" FontSize="9.5" FontFamily="Consolas" 
-                                                               FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-
-                                                    <!-- Primitive Kind Pill -->
-                                                    <Border Grid.Column="3" Background="#14FFFFFF" CornerRadius="3" Padding="4,1" Margin="2,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                                        <TextBlock Text="{Binding PrimitiveKindName}" FontSize="8" FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
-                                                    </Border>
-
-                                                    <!-- Emitter Name -->
-                                                    <TextBlock Grid.Column="4" Text="{Binding Name}" FontSize="10.5" FontWeight="SemiBold" 
-                                                               Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" 
-                                                               ToolTip="{Binding Name}" Margin="2,0"/>
-
-                                                    <!-- Live Active Particle Badge -->
-                                                    <Border Grid.Column="5" Background="#14000000" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
-                                                            CornerRadius="3" Padding="3,1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,2,0">
-                                                        <TextBlock Text="{Binding ActiveParticleCount}" FontSize="9" FontFamily="Consolas" FontWeight="Bold" 
-                                                                   Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center"/>
-                                                    </Border>
-                                                </Grid>
+                                                            </Button.Style>
+                                                            <TextBlock Text="S" FontSize="10" FontWeight="Black">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsSolo}" Value="True">
+                                                                                <Setter Property="Foreground" Value="#FFD700"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Button>
+                                                    </Grid>
+                                                </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                 </StackPanel>
 
                                 <!-- Right Column: Master Track Bar + Emitter Tracks Bars + Sweeping Needles -->
-                                <Grid Grid.Column="1" Margin="8,0" x:Name="TracksCanvasContainer" SizeChanged="TracksCanvasContainer_SizeChanged">
+                                <Grid Grid.Column="1" Margin="8,0,0,0" x:Name="TracksCanvasContainer" SizeChanged="TracksCanvasContainer_SizeChanged">
                                     <StackPanel>
-                                        <!-- Row #0: Master VFX System Bar (Solid Green Bar across entire duration) -->
-                                        <Grid Height="26" Margin="0,2">
-                                            <Border Background="#1F22C55E" BorderBrush="#22C55E" BorderThickness="1" CornerRadius="4" Height="16" VerticalAlignment="Center" HorizontalAlignment="Stretch">
-                                                <Border Background="#22C55E" CornerRadius="3" Opacity="0.85"/>
-                                            </Border>
-                                        </Grid>
+                                        <!-- Row #0: Master VFX System Bar (Subtle sleek bar) -->
+                                        <Border Height="24" Margin="0,1" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Background="#08FFFFFF">
+                                            <Border Background="#2022C55E" BorderBrush="#8022C55E" BorderThickness="1" CornerRadius="2" Height="14" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="0,0,44,0"/>
+                                        </Border>
 
                                         <!-- Emitter Bars Stack -->
                                         <ItemsControl ItemsSource="{Binding Emitters}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid Height="26" Margin="0,2">
-                                                        <!-- Authored emitter interval -->
-                                                        <Border Background="{Binding TrackBrush}" CornerRadius="4" Height="14" VerticalAlignment="Center" 
-                                                                Margin="{Binding TrackMargin}" HorizontalAlignment="Left" Width="{Binding TrackWidth}">
-                                                            <Border.Effect>
-                                                                <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.35"/>
-                                                            </Border.Effect>
-                                                        </Border>
+                                                    <Border Height="24" Margin="0,1" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Opacity" Value="1.0"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                                                        <Setter Property="Opacity" Value="0.4"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                                        <Setter Property="Opacity" Value="0.4"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Grid>
+                                                            <!-- Authored emitter interval (soft, translucent slate-blue bar with 1px border) -->
+                                                            <Border Background="{Binding TrackBrush}" BorderBrush="{Binding TrackBorderBrush}" BorderThickness="1"
+                                                                    CornerRadius="2" Height="14" VerticalAlignment="Center" 
+                                                                    Margin="{Binding TrackMargin}" HorizontalAlignment="Left" Width="{Binding TrackWidth}">
+                                                                <Border.Effect>
+                                                                    <DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="1" Opacity="0.25"/>
+                                                                </Border.Effect>
+                                                            </Border>
 
-                                                        <!-- Emission trigger marker -->
-                                                        <Ellipse Width="8" Height="8" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1" 
-                                                                 HorizontalAlignment="Left" VerticalAlignment="Center" 
-                                                                 Margin="{Binding DelayMarkerMargin}" 
-                                                                 Visibility="{Binding HasDelay, Converter={StaticResource BoolToVisibilityConverter}}" 
-                                                                 ToolTip="{Binding DelayTime, StringFormat='Emission Trigger: {0:F2}s'}"/>
-                                                    </Grid>
+                                                            <!-- Emission trigger marker -->
+                                                            <Ellipse Width="7" Height="7" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1" 
+                                                                     HorizontalAlignment="Left" VerticalAlignment="Center" 
+                                                                     Margin="{Binding DelayMarkerMargin}" 
+                                                                     Visibility="{Binding HasDelay, Converter={StaticResource BoolToVisibilityConverter}}" 
+                                                                     ToolTip="{Binding DelayTime, StringFormat='Emission Trigger: {0:F2}s'}"/>
+
+                                                            <!-- Live Particle Count on Far Right Edge -->
+                                                            <TextBlock Text="{Binding ActiveParticleCount}" FontSize="9.5" FontFamily="Consolas" FontWeight="SemiBold"
+                                                                       Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                        </Grid>
+                                                    </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                     </StackPanel>
 
+                                    <!-- Active System Loop Region Translucent Background Overlay -->
+                                    <Canvas x:Name="LoopRegionCanvas" IsHitTestVisible="False" Panel.ZIndex="5">
+                                        <Canvas.Style>
+                                            <Style TargetType="Canvas">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsPreviewLoopEnabled}" Value="False">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Canvas.Style>
+                                        <Rectangle x:Name="LoopRegionRect" Canvas.Left="0" Canvas.Top="0" Height="800"
+                                                   Fill="#143B82F6" IsHitTestVisible="False"/>
+                                    </Canvas>
+
                                     <!-- Playhead Needle Overlay Canvas -->
                                     <Canvas x:Name="PlayheadCanvas" IsHitTestVisible="False" Panel.ZIndex="10">
-                                        <Line x:Name="PlayheadLine" X1="0" Y1="0" X2="0" Y2="400" 
-                                              Stroke="#FF4D4D" StrokeThickness="2"/>
-                                        <Ellipse x:Name="PlayheadHandle" Canvas.Left="-4" Canvas.Top="0" 
-                                                 Width="8" Height="8" Fill="#FF4D4D" Stroke="#18181B" StrokeThickness="1"/>
+                                        <Line x:Name="PlayheadLine" X1="0" Y1="0" X2="0" Y2="800" 
+                                              Stroke="#3B82F6" StrokeThickness="1.5"/>
+                                        <!-- Playhead Time Chip Flag (LTK-Manager style blue pill reading e.g. 0.38) -->
+                                        <Border x:Name="PlayheadTimeChip" Canvas.Left="-18" Canvas.Top="0"
+                                                Background="#3B82F6" CornerRadius="2" Padding="3,1" Width="36">
+                                            <TextBlock x:Name="PlayheadTimeText" Text="0.00" FontSize="9" FontWeight="Bold" FontFamily="Consolas"
+                                                       Foreground="White" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                        </Border>
                                     </Canvas>
 
                                     <!-- Active System Loop Boundary Needle Overlay Canvas -->
@@ -704,8 +853,8 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </Canvas.Style>
-                                        <Line x:Name="LoopBoundaryLine" X1="0" Y1="0" X2="0" Y2="400" 
-                                              Stroke="#FFD700" StrokeThickness="2" IsHitTestVisible="False"/>
+                                        <Line x:Name="LoopBoundaryLine" X1="0" Y1="0" X2="0" Y2="800" 
+                                              Stroke="#FFD700" StrokeThickness="1.5" IsHitTestVisible="False"/>
                                         <Ellipse x:Name="LoopBoundaryHandle" Canvas.Left="-7" Canvas.Top="1" Cursor="SizeWE" 
                                                  Width="14" Height="14" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1.5" 
                                                  PreviewMouseDown="LoopBoundaryHandle_PreviewMouseDown" 

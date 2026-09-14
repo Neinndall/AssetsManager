@@ -79,5 +79,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Contains(nameof(VfxInspectorModel.ShowChampionMesh), changed);
             Assert.Contains(nameof(VfxInspectorModel.HasChampionMesh), changed);
         }
+
+        [Fact]
+        public void InspectorModelEmitterFilterAndPreviewPropertiesNotifyBindings()
+        {
+            var model = new VfxInspectorModel();
+            var changed = new List<string>();
+            model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+            model.EmitterFilterText = "Trail";
+
+            Assert.Equal("Trail", model.EmitterFilterText);
+            Assert.True(model.HasEmitterFilter);
+            Assert.Contains(nameof(VfxInspectorModel.EmitterFilterText), changed);
+            Assert.Contains(nameof(VfxInspectorModel.HasEmitterFilter), changed);
+
+            var item = new VfxEmitterDiagnosticItem { Name = "TrailDark" };
+            item.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+            item.TrackBorderBrush = System.Windows.Media.Brushes.SlateBlue;
+            Assert.Contains(nameof(VfxEmitterDiagnosticItem.TrackBorderBrush), changed);
+        }
     }
 }
