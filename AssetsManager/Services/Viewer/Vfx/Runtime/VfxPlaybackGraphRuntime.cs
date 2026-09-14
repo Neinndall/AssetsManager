@@ -10,8 +10,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
     /// <summary>Executes one complete VFX graph, including particle-authored child systems.</summary>
     public sealed class VfxPlaybackGraphRuntime
     {
-        private const int MaximumGraphDepth = 8;
-        private const int MaximumActiveChildSystems = 2048;
+        // LTK bounds recursive particle children at four levels and 512 live systems.
+        private const int MaximumGraphDepth = 4;
+        private const int MaximumActiveChildSystems = 512;
 
         private readonly IReadOnlyDictionary<uint, VfxSystemDefinition> _systems;
         private readonly IReadOnlyDictionary<uint, uint> _resourceMap;
@@ -20,10 +21,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private readonly List<VfxPlaybackRuntime> _pendingChildren = new();
         private readonly Dictionary<VfxPlaybackRuntime, int> _depth = new();
         private readonly Dictionary<VfxPlaybackRuntime, Matrix4x4> _localTransforms = new();
+        private readonly Dictionary<VfxPlaybackRuntime, string> _paths = new();
         private readonly int _initialSeed;
-        private Random _random;
-        private int _nextSeed;
         private Matrix4x4 _rootTransform;
+        private Matrix4x4 _orientationRootTransform;
 
         public VfxPlaybackGraphRuntime(
             VfxSystemDefinition rootDefinition,
@@ -38,11 +39,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _resourceMap = resourceMap ?? throw new ArgumentNullException(nameof(resourceMap));
             _runtimeFactory = runtimeFactory ?? throw new ArgumentNullException(nameof(runtimeFactory));
             _initialSeed = seed;
-            _random = new Random(seed);
-            _nextSeed = seed;
             _rootTransform = rootTransform;
+            _orientationRootTransform = rootTransform;
 
-            Root = CreateRuntime(rootDefinition, Matrix4x4.Identity, 0);
+            Root = CreateRuntime(rootDefinition, Matrix4x4.Identity, 0, string.Empty, seed);
             _runtimes.Add(Root);
         }
 
@@ -68,11 +68,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         }
 
         public void SetTransform(Matrix4x4 transform)
+            => SetTransform(transform, transform);
+
+        public void SetTransform(Matrix4x4 transform, Matrix4x4 orientationRootTransform)
         {
             _rootTransform = transform;
+            _orientationRootTransform = orientationRootTransform;
             foreach (VfxPlaybackRuntime runtime in _runtimes)
             {
-                runtime.SetTransform(_localTransforms[runtime] * _rootTransform);
+                Matrix4x4 local = _localTransforms[runtime];
+                runtime.SetTransform(local * _rootTransform, local * _orientationRootTransform);
             }
         }
         public void SetTarget(Vector3 worldTarget)
@@ -93,14 +98,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             foreach (VfxPlaybackRuntime pending in _pendingChildren)
             {
                 pending.ParticleLifecycle -= OnParticleLifecycle;
-                _depth.Remove(pending);
-                _localTransforms.Remove(pending);
+                Forget(pending);
             }
             _pendingChildren.Clear();
             for (int index = _runtimes.Count - 1; index > 0; index--)
             {
-                _depth.Remove(_runtimes[index]);
-                _localTransforms.Remove(_runtimes[index]);
+                Forget(_runtimes[index]);
                 _runtimes.RemoveAt(index);
             }
         }
@@ -111,23 +114,26 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             {
                 VfxPlaybackRuntime runtime = _runtimes[index];
                 runtime.ParticleLifecycle -= OnParticleLifecycle;
-                _depth.Remove(runtime);
-                _localTransforms.Remove(runtime);
+                Forget(runtime);
                 _runtimes.RemoveAt(index);
             }
             foreach (VfxPlaybackRuntime pending in _pendingChildren)
             {
                 pending.ParticleLifecycle -= OnParticleLifecycle;
-                _depth.Remove(pending);
-                _localTransforms.Remove(pending);
+                Forget(pending);
             }
             _pendingChildren.Clear();
-            _random = new Random(_initialSeed);
-            _nextSeed = unchecked(_initialSeed + 1);
             Root.ParticleLifecycle -= OnParticleLifecycle;
             Root.ParticleLifecycle += OnParticleLifecycle;
             Root.Reset();
             Root.WarmUp();
+        }
+
+        private void Forget(VfxPlaybackRuntime runtime)
+        {
+            _depth.Remove(runtime);
+            _localTransforms.Remove(runtime);
+            _paths.Remove(runtime);
         }
 
         public void Update(float deltaTime)
@@ -158,23 +164,31 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 VfxPlaybackRuntime runtime = _runtimes[index];
                 if (!runtime.IsComplete) continue;
                 runtime.ParticleLifecycle -= OnParticleLifecycle;
-                _depth.Remove(runtime);
-                _localTransforms.Remove(runtime);
+                Forget(runtime);
                 _runtimes.RemoveAt(index);
             }
         }
 
-        private VfxPlaybackRuntime CreateRuntime(VfxSystemDefinition definition, Matrix4x4 localTransform, int depth)
+        private VfxPlaybackRuntime CreateRuntime(
+            VfxSystemDefinition definition,
+            Matrix4x4 localTransform,
+            int depth,
+            string path,
+            int seed)
         {
             Matrix4x4 effectiveLocalTransform =
                 definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * localTransform;
             VfxPlaybackRuntime runtime = _runtimeFactory(
                 definition,
-                localTransform * _rootTransform,
-                unchecked(++_nextSeed));
+                effectiveLocalTransform * _rootTransform,
+                seed);
+            runtime.SetTransform(
+                effectiveLocalTransform * _rootTransform,
+                effectiveLocalTransform * _orientationRootTransform);
             runtime.ParticleLifecycle += OnParticleLifecycle;
             _depth[runtime] = depth;
             _localTransforms[runtime] = effectiveLocalTransform;
+            _paths[runtime] = path;
             runtime.WarmUp();
             return runtime;
         }
@@ -182,22 +196,46 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private void OnParticleLifecycle(
             VfxPlaybackRuntime parentRuntime,
             VfxEmitterDefinition emitter,
-            Vector3 particlePosition,
-            bool died)
+            VfxPlaybackRuntime.ParticleLifecycleInfo particle)
         {
             VfxChildParticleSetDefinition childSet = emitter.ChildParticleSet;
-            if (childSet is null || childSet.EmitOnDeath != died || childSet.Children.Count == 0) return;
+            if (childSet is null || childSet.EmitOnDeath != particle.Died || childSet.Children.Count == 0) return;
 
             int parentDepth = _depth.TryGetValue(parentRuntime, out int value) ? value : 0;
             if (parentDepth >= MaximumGraphDepth || _runtimes.Count + _pendingChildren.Count >= MaximumActiveChildSystems)
                 return;
 
-            float probability = Math.Clamp(childSet.Probability.SampleBirth(_random), 0f, 1f);
-            if (_random.NextDouble() > probability) return;
+            string parentPath = _paths.GetValueOrDefault(parentRuntime, string.Empty);
+            string emitterPath = $"{(string.IsNullOrEmpty(parentPath) ? string.Empty : parentPath + "/")}{particle.SourceOrder}";
+            int selectionSeed = ChildSeed(_initialSeed, emitterPath, particle.Serial);
+            var rng = new VfxXorShift64Random(unchecked((ulong)(uint)selectionSeed));
 
-            Vector3 relativeOffset = parentRuntime.TransformOffset(childSet.RelativeOffset.SampleBirth(_random));
-            Vector3 childPosition = particlePosition + relativeOffset;
-            Matrix4x4 childWorldTransform = parentRuntime.WorldTransform;
+            int slot;
+            if (childSet.Children.Count == 1)
+            {
+                slot = 0;
+            }
+            else
+            {
+                float selected = childSet.Probability.Prob is { Length: > 0 } && !childSet.Probability.Prob[0].IsEmpty
+                    ? childSet.Probability.SampleBirth(particle.ParticleTime, rng)
+                    : childSet.Probability.Sample(particle.ParticleTime);
+                slot = Math.Max(0, (int)MathF.Truncate(selected)) % childSet.Children.Count;
+            }
+
+            VfxChildSystemReference child = childSet.Children[slot];
+            VfxSystemDefinition definition = ResolveSystem(child, _systems, _resourceMap);
+            if (definition is null) return;
+
+            int mode = childSet.InheritanceMode;
+            Vector3 relativeOffset = childSet.RelativeOffset.Sample(0f);
+            if ((mode & 0x1) == 0)
+                relativeOffset = Vector3.TransformNormal(relativeOffset, particle.Basis);
+            Vector3 childPosition = particle.Position + relativeOffset;
+
+            // 0x2 drops the particle's own local turn from the child and keeps only the
+            // frame it stands in. Otherwise the whole unscaled particle basis is inherited.
+            Matrix4x4 childWorldTransform = (mode & 0x2) != 0 ? particle.Frame : particle.Basis;
             childWorldTransform.M41 = childPosition.X;
             childWorldTransform.M42 = childPosition.Y;
             childWorldTransform.M43 = childPosition.Z;
@@ -206,13 +244,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             if (Matrix4x4.Invert(_rootTransform, out Matrix4x4 inverseRoot))
                 childLocalTransform = childWorldTransform * inverseRoot;
 
-            foreach (VfxChildSystemReference child in childSet.Children)
-            {
-                VfxSystemDefinition definition = ResolveSystem(child, _systems, _resourceMap);
-                if (definition is null) continue;
-                if (_runtimes.Count + _pendingChildren.Count >= MaximumActiveChildSystems) break;
-                _pendingChildren.Add(CreateRuntime(definition, childLocalTransform, parentDepth + 1));
-            }
+            string childPath = $"{emitterPath}.{slot}";
+            int childSeed = ChildSeed(_initialSeed, childPath, particle.Serial);
+            _pendingChildren.Add(CreateRuntime(definition, childLocalTransform, parentDepth + 1, childPath, childSeed));
+        }
+
+        private static int ChildSeed(int seed, string path, uint serial)
+        {
+            uint pathHash = Fnv1a.HashLower(path ?? string.Empty);
+            uint lineage = unchecked((serial + 1u) * 0x9e3779b1u);
+            return unchecked(seed ^ (int)pathHash ^ (int)lineage);
         }
 
         internal static VfxSystemDefinition ResolveSystem(

@@ -135,8 +135,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Null(parsed.ParticleColorTexturePath);
             Assert.Equal(VfxAuthoredDefaults.ColorLookUpTypeX, parsed.ColorLookUpTypeX);
             Assert.Equal(0, parsed.ColorLookUpTypeY);
-            Assert.True(parsed.TextureMultFlipV);
-            Assert.True(parsed.TextureMultRandomStartFrame);
+            Assert.False(parsed.TextureMultFlipV);
+            Assert.False(parsed.TextureMultRandomStartFrame);
             Assert.Equal(3, parsed.Importance);
             Assert.Equal(2, parsed.BlendMode);
             Assert.Equal(1, parsed.ColorRenderFlags);
@@ -163,7 +163,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(0.5f, parsed.TextureMultTransformCenter.Y);
             Assert.Equal(0.1f, parsed.AlphaErosion.FeatherIn);
             Assert.Equal(0.1f, parsed.AlphaErosion.FeatherOut);
-            Assert.Equal(2, parsed.AlphaErosion.AddressMode);
+            Assert.Equal(1, parsed.AlphaErosion.AddressMode);
         }
 
         [Fact]

@@ -158,7 +158,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void UniformBillboardBirthScalePreservesAuthoredAxes()
+        public void UniformBillboardBirthScaleUsesFirstAuthoredAxisOnBothQuadAxes()
         {
             var emitter = CreateEmitter(new Vector3(100f, 230f, 0f), VfxEmitterRenderState.Default) with
             {
@@ -173,11 +173,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(100f, state.Instances[3]);
-            Assert.Equal(230f, state.Instances[4]);
+            Assert.Equal(100f, state.Instances[4]);
         }
 
         [Fact]
-        public void ArbitraryQuadScalePreservesAuthoredAxes()
+        public void UniformArbitraryQuadScaleUsesFirstAuthoredAxisOnBothQuadAxes()
         {
             var emitter = CreateEmitter(new Vector3(345f, 400f, 50f), VfxEmitterRenderState.Default) with
             {
@@ -193,7 +193,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(690f, state.Instances[3]);
-            Assert.Equal(800f, state.Instances[4]);
+            Assert.Equal(690f, state.Instances[4]);
         }
 
         [Fact]
@@ -427,14 +427,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             simulator.Update(0.05f);
 
             var state = Assert.Single(simulator.Emitters);
-            Assert.Equal(0.25f, state.Instances[11], 3);
-            Assert.Equal(1.6f, state.Instances[19], 3);
+            Assert.Equal(0.15f, state.Instances[11], 3);
+            Assert.Equal(1.0f, state.Instances[19], 3);
             Assert.Equal(0.2f, state.Instances[20], 3);
-            Assert.Equal(MathF.PI / 6f, state.Instances[23], 3);
-            Assert.Equal(0.25f, state.Instances[29], 3);
+            Assert.Equal(18f * MathF.PI / 180f, state.Instances[23], 3);
+            Assert.Equal(0.19f, state.Instances[29], 3);
             Assert.Equal(0.5f, state.Instances[31], 3);
             Assert.Equal(0.75f, state.Instances[32], 3);
-            Assert.Equal(25f * MathF.PI / 180f, state.Instances[33], 3);
+            Assert.Equal(19f * MathF.PI / 180f, state.Instances[33], 3);
         }
 
         [Fact]
@@ -454,7 +454,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             for (int step = 0; step < 5; step++) simulator.Update(0.1f);
 
             var state = Assert.Single(simulator.Emitters);
-            Assert.Equal(0.25f, state.Instances[19], 3);
+            Assert.Equal(0.2f, state.Instances[19], 3);
         }
 
         [Fact]
@@ -479,7 +479,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             float secondFrame = Assert.Single(second.Emitters).Instances[34];
             Assert.Equal(firstFrame, secondFrame);
             Assert.InRange(firstFrame, 0f, 7f);
-            Assert.Equal(36, VfxPlaybackRuntime.InstanceStride);
+            Assert.Equal(45, VfxPlaybackRuntime.InstanceStride);
         }
 
         [Fact]
@@ -560,6 +560,42 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             graph.SetTransform(Matrix4x4.CreateTranslation(10f, 0f, 0f));
 
             Assert.Equal(12f, childRuntime.Emitters[0].BasePos.X, precision: 4);
+        }
+
+        [Fact]
+        public void LocalOrientationControlsRigYawWithoutDroppingRigOrigin()
+        {
+            VfxEmitterDefinition local = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterPosition = VfxCurve3.Const(Vector3.UnitX),
+                BirthVelocity = VfxCurve3.Const(Vector3.UnitX),
+                IsLocalOrientation = true
+            };
+            VfxEmitterDefinition worldOriented = local with { IsLocalOrientation = false };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "orientation", "orientation", new[] { local, worldOriented }), Vector3.Zero);
+
+            Matrix4x4 origin = Matrix4x4.CreateTranslation(10f, 20f, 30f);
+            Matrix4x4 rig = Matrix4x4.CreateRotationY(MathF.PI / 2f) * origin;
+            runtime.SetTransform(rig, origin);
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.Particle localParticle = Assert.Single(runtime.Emitters[0].Particles);
+            VfxPlaybackRuntime.Particle worldParticle = Assert.Single(runtime.Emitters[1].Particles);
+            Vector3 expectedLocalPosition = Vector3.Transform(Vector3.UnitX, rig);
+            Vector3 expectedWorldPosition = Vector3.Transform(Vector3.UnitX, origin);
+            Vector3 expectedLocalVelocity = Vector3.TransformNormal(Vector3.UnitX, rig);
+            Vector3 expectedWorldVelocity = Vector3.UnitX;
+
+            Assert.Equal(expectedLocalPosition.X, localParticle.Pos.X, precision: 5);
+            Assert.Equal(expectedLocalPosition.Y, localParticle.Pos.Y, precision: 5);
+            Assert.Equal(expectedLocalPosition.Z, localParticle.Pos.Z, precision: 5);
+            Assert.Equal(expectedWorldPosition.X, worldParticle.Pos.X, precision: 5);
+            Assert.Equal(expectedWorldPosition.Y, worldParticle.Pos.Y, precision: 5);
+            Assert.Equal(expectedWorldPosition.Z, worldParticle.Pos.Z, precision: 5);
+            Assert.Equal(expectedLocalVelocity.X, localParticle.Vel.X, precision: 5);
+            Assert.Equal(expectedLocalVelocity.Z, localParticle.Vel.Z, precision: 5);
+            Assert.Equal(expectedWorldVelocity, worldParticle.Vel);
         }
 
         [Fact]
@@ -679,7 +715,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             double duration = VfxDurationCalculator.CalculatePreview(system, seed: 17);
 
-            Assert.Equal(0.25d, duration, precision: 5);
+            Assert.Equal(0.25d + 1d / 60d, duration, precision: 5);
         }
 
         [Fact]
@@ -696,7 +732,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             double duration = VfxDurationCalculator.CalculatePreview(system, seed: 17);
 
-            Assert.Equal(5d, duration, precision: 5);
+            Assert.Equal(5d + 1d / 60d, duration, precision: 5);
         }
 
         [Fact]
@@ -712,7 +748,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void GroundLayersDoNotFadeThemselvesAgainstSceneDepth()
+        public void GroundAndPlanarQuadsUseAuthoredSoftParticleFade()
         {
             var soft = new VfxSoftParticleDefinition(0f, 80f, 0f, 0f);
             VfxEmitterDefinition regular = CreateEmitter(
@@ -726,9 +762,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxEmitterDefinition projection = regular with { PrimitiveKind = VfxPrimitiveKind.PlanarProjection };
 
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: true));
-            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(ground, hasSceneDepth: true));
-            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(terrain, hasSceneDepth: true));
-            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(projection, hasSceneDepth: true));
+            Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(ground, hasSceneDepth: true));
+            Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(terrain, hasSceneDepth: true));
+            Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(projection, hasSceneDepth: true));
             Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: false));
 
             VfxEmitterDefinition groundRotation = regular with
@@ -736,7 +772,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 BirthRotation = VfxCurve3.Const(new Vector3(-90f, -90f, 0f))
             };
             Assert.True(VfxOpenGlRenderer.IsGroundLikeBirthRotation(groundRotation.BirthRotation));
-            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(groundRotation, hasSceneDepth: true));
+            Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(groundRotation, hasSceneDepth: true));
         }
 
         [Fact]
@@ -772,9 +808,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
             Assert.Equal(1, state.InstanceCount);
-            Assert.Equal(20f * MathF.PI / 180f, state.Instances[15], precision: 5);
-            Assert.Equal(32.5f * MathF.PI / 180f, state.Instances[16], precision: 5);
-            Assert.Equal(45f * MathF.PI / 180f, state.Instances[17], precision: 5);
+            Assert.Equal(17.5f * MathF.PI / 180f, state.Instances[15], precision: 5);
+            Assert.Equal(29.375f * MathF.PI / 180f, state.Instances[16], precision: 5);
+            Assert.Equal(41.25f * MathF.PI / 180f, state.Instances[17], precision: 5);
         }
 
         [Fact]
@@ -809,7 +845,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void BirthScaleAndRotationRangesUseTheAuthoredSecondEndpoint()
+        public void BirthScaleRangeAndRotationRateUseTheAuthoredSecondEndpoint()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -825,9 +861,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             runtime.Update(1f);
 
             VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
-            float range = state.Particles[0].RangeRandom;
+            VfxPlaybackRuntime.Particle particle = state.Particles[0];
+            float range = particle.RangeRandom;
+            float rotationRate = 10f + (20f - 10f) * range;
             Assert.Equal(2f + (4f - 2f) * range, state.Instances[3], precision: 5);
-            Assert.Equal((10f + (20f - 10f) * range) * MathF.PI / 180f, state.Instances[15], precision: 5);
+            Assert.Equal(rotationRate * 60f * particle.Age * MathF.PI / 180f, state.Instances[15], precision: 5);
         }
 
         [Fact]
@@ -1215,7 +1253,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void LegacySpawnRotationKeepsOffsetAndMotionInTheSameFrame()
+        public void LegacySpawnRotationKeepsOffsetAndVelocityInTheSameFrameWithoutMovingNewborn()
         {
             var shape = new VfxSpawnShape(
                 VfxSpawnShapeKind.Legacy,
@@ -1237,7 +1275,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
             Matrix4x4 rotation = Matrix4x4.CreateRotationY(MathF.PI / 2f);
             Vector3 expectedVelocity = Vector3.TransformNormal(new Vector3(5f, 0f, 0f), rotation);
-            Vector3 expectedPosition = Vector3.Transform(new Vector3(3f, 0f, 0f), rotation) + expectedVelocity * 0.02f;
+            Vector3 expectedPosition = Vector3.Transform(new Vector3(3f, 0f, 0f), rotation);
             Assert.Equal(expectedVelocity.X, particle.Vel.X, precision: 5);
             Assert.Equal(expectedVelocity.Y, particle.Vel.Y, precision: 5);
             Assert.Equal(expectedVelocity.Z, particle.Vel.Z, precision: 5);

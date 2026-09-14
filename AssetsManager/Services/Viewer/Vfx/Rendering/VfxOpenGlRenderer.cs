@@ -166,6 +166,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             gl.EnableVertexAttribArray(13); gl.VertexAttribPointer(13, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(31 * sizeof(float)));
             gl.EnableVertexAttribArray(14); gl.VertexAttribPointer(14, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(33 * sizeof(float)));
             gl.EnableVertexAttribArray(15); gl.VertexAttribPointer(15, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(34 * sizeof(float)));
+            gl.EnableVertexAttribArray(16); gl.VertexAttribPointer(16, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(36 * sizeof(float)));
+            gl.EnableVertexAttribArray(17); gl.VertexAttribPointer(17, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(39 * sizeof(float)));
+            gl.EnableVertexAttribArray(18); gl.VertexAttribPointer(18, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(42 * sizeof(float)));
 
             gl.VertexAttribDivisor(1, 1);
             gl.VertexAttribDivisor(2, 1);
@@ -182,6 +185,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             gl.VertexAttribDivisor(13, 1);
             gl.VertexAttribDivisor(14, 1);
             gl.VertexAttribDivisor(15, 1);
+            gl.VertexAttribDivisor(16, 1);
+            gl.VertexAttribDivisor(17, 1);
+            gl.VertexAttribDivisor(18, 1);
 
             gl.BindVertexArray(0);
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
@@ -191,8 +197,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _trailVbo = gl.GenBuffer();
             gl.BindVertexArray(_trailVao);
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
-            int[] sizes = { 2, 3, 2, 4, 2, 4, 4, 2, 2, 1, 1, 4, 2, 2, 1, 2 };
-            int[] offsets = { 0, 2, 5, 7, 11, 13, 17, 21, 23, 25, 26, 27, 31, 33, 35, 36 };
+            int[] sizes = { 2, 3, 2, 4, 2, 4, 4, 2, 2, 1, 1, 4, 2, 2, 1, 2, 3, 3, 3 };
+            int[] offsets = { 0, 2, 5, 7, 11, 13, 17, 21, 23, 25, 26, 27, 31, 33, 35, 36, 38, 41, 44 };
             for (uint attribute = 0; attribute < sizes.Length; attribute++)
             {
                 gl.EnableVertexAttribArray(attribute);

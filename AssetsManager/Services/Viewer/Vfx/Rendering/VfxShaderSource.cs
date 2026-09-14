@@ -107,6 +107,9 @@ layout(location=12) in vec2 aUvOffsetMult;
 layout(location=13) in vec2 aUvScaleMult;
 layout(location=14) in float aUvRotationMult;
 layout(location=15) in vec2 aTextureMultFramePalette;
+layout(location=16) in vec3 aBasisX;
+layout(location=17) in vec3 aBasisY;
+layout(location=18) in vec3 aBasisZ;
 uniform mat4 uViewProj;
 uniform vec3 uCamRight;
 uniform vec3 uCamUp;
@@ -160,39 +163,34 @@ void main(){
     bool rayPrimitive = uPrimitiveKind == 7;
     bool trailPrimitive = uPrimitiveKind == 5 || uPrimitiveKind == 6 || uPrimitiveKind == 8 || uPrimitiveKind == 10;
     float rotation = (uArbitraryQuad != 0 || rayPrimitive || trailPrimitive || uDirectionOriented != 0) ? 0.0 : aRotFrame.x;
-    vec3 localRight = rotateEuler(vec3(1.0, 0.0, 0.0), aRotationSize.xyz);
-    vec3 localUp = rotateEuler(vec3(0.0, 1.0, 0.0), aRotationSize.xyz);
-    vec3 localForward = rotateEuler(vec3(0.0, 0.0, 1.0), aRotationSize.xyz);
-    vec3 placedRight = uPlacementRight * localRight.x + uPlacementUp * localRight.y + uPlacementForward * localRight.z;
-    vec3 placedUp = uPlacementRight * localUp.x + uPlacementUp * localUp.y + uPlacementForward * localUp.z;
-    vec3 placedForward = uPlacementRight * localForward.x + uPlacementUp * localForward.y + uPlacementForward * localForward.z;
+    vec3 placedRight = normalize(aBasisX);
+    vec3 placedUp = normalize(aBasisY);
+    vec3 placedForward = normalize(aBasisZ);
     vec3 right = uArbitraryQuad != 0 ? placedRight : uCamRight;
     vec3 up = uArbitraryQuad != 0 ? placedUp : uCamUp;
-    vec3 cameraForward = normalize(cross(uCamRight, uCamUp));
 
     if (rayPrimitive) {
-        // Rays lie on the particle's own +Z, independent of its travel. They only turn
-        // around that axis enough to face the eye.
-        up = normalize(placedForward);
+        // Rays lie on the particle's own +Z and roll about that axis just enough to face
+        // the eye. The basis is computed per particle on the CPU, as in LTK.
+        up = placedForward;
         vec3 side = cross(up, uCamPos - aCenter);
         if (dot(side, side) < 0.0001) side = cross(up, uCamUp);
         if (dot(side, side) < 0.0001) side = cross(up, uCamRight);
         right = -normalize(side);
     } else if (uDirectionOriented != 0) {
-        vec3 vel = aAgeVelX.yzw;
-        float lenSq = dot(vel, vel);
-        if (lenSq > 0.0001) {
-            vec3 dir = vel * inversesqrt(lenSq);
-            vec3 side = uArbitraryQuad != 0 ? cross(placedForward, dir) : cross(dir, cameraForward);
-            if (dot(side, side) < 0.0001)
-                side = uArbitraryQuad != 0 ? cross(placedUp, dir) : cross(dir, uCamUp);
-            if (dot(side, side) < 0.0001)
-                side = uArbitraryQuad != 0 ? cross(placedRight, dir) : cross(dir, uCamRight);
-            right = normalize(side);
-            up = dir;
-        } else {
+        // LTK projects the particle basis' +Y (travel direction) into camera space for
+        // billboards, while arbitrary quads use the world-space basis directly.
+        if (uArbitraryQuad != 0) {
             right = placedRight;
             up = placedUp;
+        } else {
+            vec2 projectedUp = vec2(dot(placedUp, uCamRight), dot(placedUp, uCamUp));
+            float projectedLen = dot(projectedUp, projectedUp);
+            if (projectedLen > 0.000001) {
+                projectedUp *= inversesqrt(projectedLen);
+                right = uCamRight * projectedUp.y - uCamUp * projectedUp.x;
+                up = uCamRight * projectedUp.x + uCamUp * projectedUp.y;
+            }
         }
     }
 
@@ -216,7 +214,7 @@ void main(){
         world = aCenter + planeU * (rc.y * aSize.y) + planeV * (rc.x * aSize.x);
         if (uIsGroundLayer != 0) world.y = 0.02;
     } else if (uIsGroundLayer != 0 || uPrimitiveKind == 9) {
-        vec3 groundForward = uArbitraryQuad != 0 ? (uPlacementRight * localUp.x + uPlacementUp * localUp.y + uPlacementForward * localUp.z) : vec3(0.0, 0.0, 1.0);
+        vec3 groundForward = uArbitraryQuad != 0 ? placedUp : vec3(0.0, 0.0, 1.0);
         vec3 groundRight = uArbitraryQuad != 0 ? placedRight : vec3(1.0, 0.0, 0.0);
         if (dot(cross(groundRight, groundForward), vec3(0.0, 1.0, 0.0)) < 0.0) {
             vec3 authoredRight = groundRight;
