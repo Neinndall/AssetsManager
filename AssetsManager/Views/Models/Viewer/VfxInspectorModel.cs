@@ -537,6 +537,7 @@ namespace AssetsManager.Views.Models.Viewer
         private VfxAnimationItem _selectedAnimation;
         private bool _isAnimationMode = true;
         private bool _isPlaying;
+        private bool _isReplayState;
         private double _currentTime;
         private double _totalDuration = 5.0;
         private double _activeLoopDuration = 0.0;
@@ -690,13 +691,29 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsPlaying
         {
             get => _isPlaying;
-            set { _isPlaying = value; OnPropertyChanged(); }
+            set
+            {
+                if (_isPlaying != value)
+                {
+                    _isPlaying = value;
+                    OnPropertyChanged();
+                    UpdateReplayState();
+                }
+            }
         }
 
         public double CurrentTime
         {
             get => _currentTime;
-            set { _currentTime = value; OnPropertyChanged(); }
+            set
+            {
+                if (Math.Abs(_currentTime - value) > 0.0001)
+                {
+                    _currentTime = value;
+                    OnPropertyChanged();
+                    UpdateReplayState();
+                }
+            }
         }
 
         public double TotalDuration
@@ -704,11 +721,38 @@ namespace AssetsManager.Views.Models.Viewer
             get => _totalDuration;
             set
             {
-                _totalDuration = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(QuarterDuration));
-                OnPropertyChanged(nameof(HalfDuration));
-                OnPropertyChanged(nameof(ThreeQuarterDuration));
+                if (Math.Abs(_totalDuration - value) > 0.0001)
+                {
+                    _totalDuration = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(QuarterDuration));
+                    OnPropertyChanged(nameof(HalfDuration));
+                    OnPropertyChanged(nameof(ThreeQuarterDuration));
+                    UpdateReplayState();
+                }
+            }
+        }
+
+        public bool IsReplayState
+        {
+            get => _isReplayState;
+            set
+            {
+                if (_isReplayState != value)
+                {
+                    _isReplayState = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private void UpdateReplayState()
+        {
+            bool newState = _isPlaying || (_totalDuration > 0 && _currentTime >= _totalDuration - 0.02);
+            if (_isReplayState != newState)
+            {
+                _isReplayState = newState;
+                OnPropertyChanged(nameof(IsReplayState));
             }
         }
 

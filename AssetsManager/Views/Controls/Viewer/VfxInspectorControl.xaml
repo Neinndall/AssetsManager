@@ -646,20 +646,48 @@
                                                 <ColumnDefinition Width="Auto"/> <!-- Background Selector -->
                                             </Grid.ColumnDefinitions>
 
-                                            <!-- Transport Action Buttons (Replay, Play, Pause/Stop) -->
+                                            <!-- Transport Action Buttons (Play/Replay, Pause/Stop) -->
                                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                                <!-- Replay Button -->
-                                                <Button Click="Replay_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,5" ToolTip="Replay / Restart from 0.00s">
-                                                    <materialIcons:MaterialIcon Kind="Replay" Width="15" Height="15" Foreground="{StaticResource AccentBrush}"/>
-                                                </Button>
-
-                                                <!-- Play Button -->
-                                                <Button Click="Play_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,5" ToolTip="Play">
-                                                    <materialIcons:MaterialIcon Kind="Play" Width="15" Height="15" Foreground="{StaticResource AccentGreen}"/>
+                                                <!-- Play / Replay Button -->
+                                                <Button Click="Play_Click" Margin="0,0,6,0" Padding="8,5">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                                            <Setter Property="ToolTip" Value="Play"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsReplayState}" Value="True">
+                                                                    <Setter Property="ToolTip" Value="Replay / Restart from 0.00s"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                    <materialIcons:MaterialIcon Width="15" Height="15">
+                                                        <materialIcons:MaterialIcon.Style>
+                                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                                <Setter Property="Kind" Value="Play"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsReplayState}" Value="True">
+                                                                        <Setter Property="Kind" Value="Replay"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialIcons:MaterialIcon.Style>
+                                                    </materialIcons:MaterialIcon>
                                                 </Button>
 
                                                 <!-- Pause / Stop Button -->
-                                                <Button Click="StopResume_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,0,0" Padding="8,5" ToolTip="Pause / Resume">
+                                                <Button Click="StopResume_Click" Margin="0,0,0,0" Padding="8,5">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                                            <Setter Property="ToolTip" Value="Resume"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                                                    <Setter Property="ToolTip" Value="Pause / Stop"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
                                                     <materialIcons:MaterialIcon Width="15" Height="15">
                                                         <materialIcons:MaterialIcon.Style>
                                                             <Style TargetType="materialIcons:MaterialIcon">
@@ -667,8 +695,8 @@
                                                                 <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsPlaying}" Value="True">
-                                                                        <Setter Property="Kind" Value="Pause"/>
-                                                                        <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                                                        <Setter Property="Kind" Value="Stop"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>

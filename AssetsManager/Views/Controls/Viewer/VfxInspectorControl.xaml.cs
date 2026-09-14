@@ -1034,27 +1034,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.IsAllMuted = _model.Emitters.Count > 0 && _model.Emitters.All(em => em.IsMuted);
         }
 
-        private void Replay_Click(object sender, RoutedEventArgs e)
-        {
-            if (_model.IsAnimationMode && _model.SelectedAnimation != null)
-            {
-                PlaySelectedAnimation(_model.SelectedAnimation);
-                return;
-            }
-
-            if (_vfxRenderer?.ActiveSystem != null)
-            {
-                _vfxRenderer.Stop();
-                _model.CurrentTime = 0;
-                _vfxRenderer.Seek(0);
-                _vfxRenderer.Play();
-                _model.IsPlaying = true;
-            }
-            else if (_model.SelectedSystem != null)
-            {
-                RequestSystemInspection(_model.SelectedSystem);
-            }
-        }
+        private void Replay_Click(object sender, RoutedEventArgs e) => Play_Click(sender, e);
 
         private void ResetCamera_Click(object sender, RoutedEventArgs e)
         {
@@ -1365,13 +1345,15 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_model.IsAnimationMode && _model.SelectedAnimation != null)
             {
-                if (_model.CurrentTime >= _model.TotalDuration)
+                if (_model.IsPlaying || _model.CurrentTime >= _model.TotalDuration)
                 {
-                    _model.CurrentTime = 0;
-                    _vfxRenderer?.Seek(0);
+                    PlaySelectedAnimation(_model.SelectedAnimation);
                 }
-                _model.IsPlaying = true;
-                _vfxRenderer?.Play();
+                else
+                {
+                    _model.IsPlaying = true;
+                    _vfxRenderer?.Play();
+                }
                 return;
             }
 
@@ -1384,6 +1366,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 else
                 {
                     _vfxRenderer.Stop();
+                    _model.CurrentTime = 0;
+                    _vfxRenderer.Seek(0);
                     _vfxRenderer.Play();
                     _model.IsPlaying = true;
                 }
