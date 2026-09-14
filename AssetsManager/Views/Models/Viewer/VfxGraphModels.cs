@@ -162,7 +162,6 @@ namespace AssetsManager.Views.Models.Viewer
         VfxCurve2? RateByVelocityFunction = null,
         bool HasPostRotateOrientation = false,
         bool ParticlesShareRandomValue = false,
-        string FalloffTexturePath = null,
         string AudioSoundOnCreate = null,
         IReadOnlyList<string> FilteringKeywordsExcluded = null,
         Vector4? ModulationFactor = null,
