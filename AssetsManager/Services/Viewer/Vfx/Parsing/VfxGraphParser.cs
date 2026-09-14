@@ -126,7 +126,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             HashAlgorithms.Fnv1a("scaleEmitOffsetByBoundObjectSize");
         private static readonly uint F_directionVelocityScale = HashAlgorithms.Fnv1a("directionVelocityScale");
         private static readonly uint F_directionVelocityMinScale = HashAlgorithms.Fnv1a("directionVelocityMinScale");
-        private static readonly uint F_rateByVelocityFunction = HashAlgorithms.Fnv1a("rateByVelocityFunction");
         private static readonly uint F_paletteDefinition = HashAlgorithms.Fnv1a("paletteDefinition");
         private static readonly uint F_paletteCount = HashAlgorithms.Fnv1a("paletteCount");
         private static readonly uint F_paletteSelector = HashAlgorithms.Fnv1a("paletteSelector");
@@ -138,7 +137,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_paletteAddressMode = HashAlgorithms.Fnv1a("PaletteTextureAddressMode");
         private static readonly uint F_audio = HashAlgorithms.Fnv1a("Audio");
         private static readonly uint F_soundOnCreate = HashAlgorithms.Fnv1a("SoundOnCreate");
-        private static readonly uint F_hasPostRotateOrientation = HashAlgorithms.Fnv1a("hasPostRotateOrientation");
         private static readonly uint F_particlesShareRandomValue = HashAlgorithms.Fnv1a("ParticlesShareRandomValue");
         private static readonly uint F_filtering = HashAlgorithms.Fnv1a("Filtering");
         private static readonly uint F_keywordsExcluded = HashAlgorithms.Fnv1a("keywordsExcluded");
@@ -155,7 +153,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_translationOverride = HashAlgorithms.Fnv1a("translationOverride");
         private static readonly uint F_rotationOverride = HashAlgorithms.Fnv1a("rotationOverride");
         private static readonly uint F_scaleOverride = HashAlgorithms.Fnv1a("scaleOverride");
-        private static readonly uint F_postRotateOrientationAxis = HashAlgorithms.Fnv1a("postRotateOrientationAxis");
         private static readonly uint F_period = HashAlgorithms.Fnv1a("period");
         private static readonly uint F_timeActiveDuringPeriod = HashAlgorithms.Fnv1a("timeActiveDuringPeriod");
         private const uint F_spawnShape              = 0x3bf0b4ed; // SpawnShape
@@ -193,7 +190,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_textureMultTransformCenter = HashAlgorithms.Fnv1a("uvTransformCenterMult");
         private static readonly uint F_textureMultClampUv = HashAlgorithms.Fnv1a("uvScrollClampMult");
         private static readonly uint F_textureMultEmitterUvScroll = HashAlgorithms.Fnv1a("emitterUvScrollRateMult");
-        private static readonly uint F_textureMultScrollAlpha = HashAlgorithms.Fnv1a("uvScrollAlphaMult");
         private static readonly uint F_birthUvOffset = HashAlgorithms.Fnv1a("birthUVOffset");
         private static readonly uint F_uvScale       = HashAlgorithms.Fnv1a("uvScale");
         private static readonly uint F_uvRotation    = HashAlgorithms.Fnv1a("uvRotation");
@@ -724,7 +720,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             bool textureMultFlipV = false;
             bool textureMultFlipU = false;
             bool textureMultClampUv = false;
-            bool textureMultScrollAlpha = false;
             Vector2 textureMultTransformCenter = new(0.5f, 0.5f);
             Vector2 textureMultEmitterUvScroll = Vector2.Zero;
             if (Get(p, F_textureMult) is BinTreeStruct textureMult)
@@ -747,7 +742,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 textureMultClampUv = GetBool(textureMult.Properties, F_textureMultClampUv);
                 textureMultEmitterUvScroll =
                     GetVec2(textureMult.Properties, F_textureMultEmitterUvScroll) ?? Vector2.Zero;
-                textureMultScrollAlpha = GetBool(textureMult.Properties, F_textureMultScrollAlpha);
             }
 
             VfxCurve2? birthUvScrollRate = ReadCurve2(p, F_birthUvScroll);
@@ -933,7 +927,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 TextureMultTransformCenter: textureMultTransformCenter,
                 TextureMultClampUvScroll: textureMultClampUv,
                 TextureMultEmitterUvScrollRate: textureMultEmitterUvScroll,
-                TextureMultScrollAlpha: textureMultScrollAlpha,
                 SoftParticle: softParticle,
                 Reflection: reflection,
                 Importance: (byte)(GetU8(p, F_importance) ?? VfxAuthoredDefaults.Importance),
@@ -945,8 +938,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 PaletteDefinition: palette,
                 DirectionVelocityScale: GetF32(p, F_directionVelocityScale) ?? 0f,
                 DirectionVelocityMinScale: GetF32(p, F_directionVelocityMinScale) ?? 1f,
-                RateByVelocityFunction: ReadCurve2(p, F_rateByVelocityFunction),
-                HasPostRotateOrientation: GetBool(p, F_hasPostRotateOrientation),
                 ParticlesShareRandomValue: GetBool(p, F_particlesShareRandomValue),
                 AudioSoundOnCreate: audioSoundOnCreate,
                 FilteringKeywordsExcluded: filteringKeywords,
@@ -973,7 +964,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     HasTranslationOverride: HasValue(p, F_translationOverride),
                     HasRotationOverride: HasValue(p, F_rotationOverride),
                     HasScaleOverride: HasValue(p, F_scaleOverride),
-                    HasPostRotateOrientationAxis: HasValue(p, F_postRotateOrientationAxis),
                     HasPeriodControl: HasValue(p, F_period) || HasValue(p, F_timeActiveDuringPeriod)));
         }
 

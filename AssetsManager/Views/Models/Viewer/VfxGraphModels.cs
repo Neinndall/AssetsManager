@@ -145,7 +145,6 @@ namespace AssetsManager.Views.Models.Viewer
         Vector2 TextureMultTransformCenter = default,
         bool TextureMultClampUvScroll = false,
         Vector2 TextureMultEmitterUvScrollRate = default,
-        bool TextureMultScrollAlpha = false,
         VfxSoftParticleDefinition SoftParticle = null,
         VfxReflectionDefinition Reflection = null,
         Vector3? RayTargetOffset = null,
@@ -158,8 +157,6 @@ namespace AssetsManager.Views.Models.Viewer
         VfxPaletteDefinition PaletteDefinition = null,
         float DirectionVelocityScale = 0f,
         float DirectionVelocityMinScale = 1f,
-        VfxCurve2? RateByVelocityFunction = null,
-        bool HasPostRotateOrientation = false,
         bool ParticlesShareRandomValue = false,
         string AudioSoundOnCreate = null,
         IReadOnlyList<string> FilteringKeywordsExcluded = null,
@@ -202,7 +199,6 @@ namespace AssetsManager.Views.Models.Viewer
         bool HasTranslationOverride = false,
         bool HasRotationOverride = false,
         bool HasScaleOverride = false,
-        bool HasPostRotateOrientationAxis = false,
         bool HasPeriodControl = false);
 
     public sealed record VfxEmitterRenderState(
