@@ -1148,14 +1148,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
             PlayheadLine.X1 = posX;
             PlayheadLine.X2 = posX;
-            if (PlayheadTimeChip != null)
-            {
-                Canvas.SetLeft(PlayheadTimeChip, Math.Clamp(posX - 18, 0, Math.Max(0, availableWidth - 36)));
-            }
-            if (PlayheadTimeText != null)
-            {
-                PlayheadTimeText.Text = $"{_model.CurrentTime:F2}";
-            }
 
             if (LoopBoundaryLine != null && LoopBoundaryHandle != null)
             {
@@ -1166,10 +1158,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 LoopBoundaryLine.X1 = loopPosX;
                 LoopBoundaryLine.X2 = loopPosX;
                 Canvas.SetLeft(LoopBoundaryHandle, loopPosX - 7);
-                if (LoopRegionRect != null)
-                {
-                    LoopRegionRect.Width = Math.Max(0, loopPosX);
-                }
             }
         }
 

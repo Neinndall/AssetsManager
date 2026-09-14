@@ -428,27 +428,20 @@
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <!-- Step Back Button (|<) -->
                                 <Button Click="StepBack_Click" Style="{StaticResource TransparentIconButton}"
-                                        Width="28" Height="28" Padding="0" Margin="0,0,4,0" ToolTip="Step Back / Rewind to 0.00s">
-                                    <materialIcons:MaterialIcon Kind="SkipPrevious" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
+                                        Width="28" Height="28" Padding="0" Margin="0,0,2,0" ToolTip="Step Back / Rewind to 0.00s">
+                                    <materialIcons:MaterialIcon Kind="SkipPrevious" Width="18" Height="18"/>
                                 </Button>
 
                                 <!-- Dynamic Play / Pause / Replay Button -->
-                                <Button Click="PlayPauseToggle_Click" Width="30" Height="28" Padding="0" Margin="0,0,4,0"
-                                        Background="#1E2330" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Cursor="Hand">
-                                    <Button.Resources>
-                                        <Style TargetType="Border">
-                                            <Setter Property="CornerRadius" Value="4"/>
-                                        </Style>
-                                    </Button.Resources>
-                                    <materialIcons:MaterialIcon Width="16" Height="16">
+                                <Button Click="PlayPauseToggle_Click" Style="{StaticResource TransparentIconButton}"
+                                        Width="28" Height="28" Padding="0" Margin="0,0,2,0" ToolTip="Play / Pause / Replay">
+                                    <materialIcons:MaterialIcon Width="18" Height="18">
                                         <materialIcons:MaterialIcon.Style>
                                             <Style TargetType="materialIcons:MaterialIcon">
                                                 <Setter Property="Kind" Value="Play"/>
-                                                <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsPlaying}" Value="True">
                                                         <Setter Property="Kind" Value="Pause"/>
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
                                                     </DataTrigger>
                                                     <MultiDataTrigger>
                                                         <MultiDataTrigger.Conditions>
@@ -456,7 +449,6 @@
                                                             <Condition Binding="{Binding IsReplayState}" Value="True"/>
                                                         </MultiDataTrigger.Conditions>
                                                         <Setter Property="Kind" Value="Replay"/>
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                                     </MultiDataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -466,8 +458,8 @@
 
                                 <!-- Step Forward Button (>|) -->
                                 <Button Click="StepForward_Click" Style="{StaticResource TransparentIconButton}"
-                                        Width="28" Height="28" Padding="0" Margin="0,0,10,0" ToolTip="Step Forward (+1 frame)">
-                                    <materialIcons:MaterialIcon Kind="SkipNext" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
+                                        Width="28" Height="28" Padding="0" Margin="0,0,8,0" ToolTip="Step Forward (+1 frame)">
+                                    <materialIcons:MaterialIcon Kind="SkipNext" Width="18" Height="18"/>
                                 </Button>
 
                                 <!-- Time Readout: 0.36 / 11.75 s -->
@@ -622,20 +614,8 @@
                                     <ColumnDefinition Width="*"/>   <!-- Tracks Canvas Column -->
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Left Column: Master System Row + Emitters List -->
+                                <!-- Left Column: Emitters List -->
                                 <StackPanel Grid.Column="0">
-                                    <!-- Row #0: Master VFX System Name -->
-                                    <Border Height="24" Margin="0,1" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Background="#08FFFFFF">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="22"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="AutoAwesome" Width="13" Height="13" Foreground="#22C55E" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding SelectedSystem.Name, FallbackValue='VFX System'}" FontSize="11" FontWeight="Bold" Foreground="#22C55E" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                        </Grid>
-                                    </Border>
-
                                     <!-- Emitter Rows -->
                                     <ItemsControl ItemsSource="{Binding Emitters}">
                                         <ItemsControl.ItemTemplate>
@@ -760,14 +740,9 @@
                                     </ItemsControl>
                                 </StackPanel>
 
-                                <!-- Right Column: Master Track Bar + Emitter Tracks Bars + Sweeping Needles -->
-                                <Grid Grid.Column="1" Margin="8,0,0,0" x:Name="TracksCanvasContainer" SizeChanged="TracksCanvasContainer_SizeChanged">
+                                <!-- Right Column: Emitter Tracks Bars + Sweeping Needles -->
+                                <Grid Grid.Column="1" Margin="8,0,0,0" x:Name="TracksCanvasContainer" SizeChanged="TracksCanvasContainer_SizeChanged" ClipToBounds="True">
                                     <StackPanel>
-                                        <!-- Row #0: Master VFX System Bar (Subtle sleek bar) -->
-                                        <Border Height="24" Margin="0,1" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Background="#08FFFFFF">
-                                            <Border Background="#2022C55E" BorderBrush="#8022C55E" BorderThickness="1" CornerRadius="2" Height="14" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="0,0,44,0"/>
-                                        </Border>
-
                                         <!-- Emitter Bars Stack -->
                                         <ItemsControl ItemsSource="{Binding Emitters}">
                                             <ItemsControl.ItemTemplate>
@@ -813,32 +788,10 @@
                                         </ItemsControl>
                                     </StackPanel>
 
-                                    <!-- Active System Loop Region Translucent Background Overlay -->
-                                    <Canvas x:Name="LoopRegionCanvas" IsHitTestVisible="False" Panel.ZIndex="5">
-                                        <Canvas.Style>
-                                            <Style TargetType="Canvas">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsPreviewLoopEnabled}" Value="False">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Canvas.Style>
-                                        <Rectangle x:Name="LoopRegionRect" Canvas.Left="0" Canvas.Top="0" Height="800"
-                                                   Fill="#143B82F6" IsHitTestVisible="False"/>
-                                    </Canvas>
-
                                     <!-- Playhead Needle Overlay Canvas -->
                                     <Canvas x:Name="PlayheadCanvas" IsHitTestVisible="False" Panel.ZIndex="10">
                                         <Line x:Name="PlayheadLine" X1="0" Y1="0" X2="0" Y2="800" 
-                                              Stroke="#3B82F6" StrokeThickness="1.5"/>
-                                        <!-- Playhead Time Chip Flag (LTK-Manager style blue pill reading e.g. 0.38) -->
-                                        <Border x:Name="PlayheadTimeChip" Canvas.Left="-18" Canvas.Top="0"
-                                                Background="#3B82F6" CornerRadius="2" Padding="3,1" Width="36">
-                                            <TextBlock x:Name="PlayheadTimeText" Text="0.00" FontSize="9" FontWeight="Bold" FontFamily="Consolas"
-                                                       Foreground="White" HorizontalAlignment="Center" TextAlignment="Center"/>
-                                        </Border>
+                                              Stroke="{StaticResource AccentBrush}" StrokeThickness="1.5" Opacity="0.85"/>
                                     </Canvas>
 
                                     <!-- Active System Loop Boundary Needle Overlay Canvas -->
