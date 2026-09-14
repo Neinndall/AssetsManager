@@ -313,8 +313,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_resourceMap = HashAlgorithms.Fnv1a("resourceMap");
         private static readonly uint F_mResourceMap = HashAlgorithms.Fnv1a("mResourceMap");
 
-        // animation particle event fields
+        // AnimationGraph clip event fields
+        private static readonly uint SubmeshVisibilityEventClass = 0xbcf56e70;
         private static readonly uint ParticleEventClass = HashAlgorithms.Fnv1a("ParticleEventData");
+        private static readonly uint JointSnapEventClass = 0xb5c1b6ad;
+        private static readonly uint ConformToPathEventClass = 0x82377a1d;
         private static readonly uint F_eventDataMap = HashAlgorithms.Fnv1a("mEventDataMap");
         private static readonly uint F_clipDataMap = HashAlgorithms.Fnv1a("mClipDataMap");
         private static readonly uint F_clipTickDuration = HashAlgorithms.Fnv1a("mTickDuration");
@@ -342,6 +345,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_eventPairList = HashAlgorithms.Fnv1a("mParticleEventDataPairList");
         private static readonly uint F_eventSourceBone = HashAlgorithms.Fnv1a("mBoneName");
         private static readonly uint F_eventTargetBone = HashAlgorithms.Fnv1a("mTargetBoneName");
+        private static readonly uint F_eventShowSubmeshes = 0x6d4d42d0;
+        private static readonly uint F_eventHideSubmeshes = 0xbb41a45b;
+        private static readonly uint F_eventJoint = 0xac70ab62;
+        private static readonly uint F_eventSnapTo = 0xf6e6d893;
+        private static readonly uint F_eventOffset = 0x14c8d3ca;
+        private static readonly uint F_eventMaskDataName = 0x0359739b;
+        private static readonly uint F_eventBlendIn = 0xdf2f42a9;
+        private static readonly uint F_eventBlendOut = 0xa8c578b4;
+        private static readonly uint F_parametricPairs = 0x2ec3ba66;
+        private static readonly uint F_parametricPairValue = 0x24f2ec89;
         private static readonly uint F_idleParticlesEffects = 0x84186f3c;
         private static readonly uint F_idlePosition = 0x934f4e0a;
         private static readonly uint F_animationResourceData = 0xb49f754e;
@@ -419,9 +432,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return null;
         }
 
-        private static IReadOnlyList<VfxEventSequenceDefinition> ExtractEventSequences(BinTree tree)
+        private static IReadOnlyList<AnimationClipDefinition> ExtractEventSequences(BinTree tree)
         {
-            var sequences = new List<VfxEventSequenceDefinition>();
+            var sequences = new List<AnimationClipDefinition>();
             foreach (BinTreeObject owner in tree.Objects.Values)
             {
                 AddEventSequence(sequences, owner.PathHash, owner.ClassHash, owner.Properties);
@@ -451,6 +464,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                         animFilePath,
                         owner.PathHash,
                         ReadClipChildren(clip.Properties),
+                        ReadClipParameters(clip.Properties),
                         includeEmpty: true);
                 }
             }
@@ -458,7 +472,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         }
 
         private static void AddEventSequence(
-            ICollection<VfxEventSequenceDefinition> sequences,
+            ICollection<AnimationClipDefinition> sequences,
             uint ownerPathHash,
             uint ownerClassHash,
             IReadOnlyDictionary<uint, BinTreeProperty> properties,
@@ -466,20 +480,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             string animationFilePath = null,
             uint graphPathHash = 0,
             IReadOnlyList<uint> childClipHashes = null,
+            IReadOnlyList<float> childParameters = null,
             bool includeEmpty = false)
         {
-            var events = new List<VfxParticleEventDefinition>();
+            var events = new List<AnimationClipEventDefinition>();
             if (Get(properties, F_eventDataMap) is BinTreeMap eventMap)
             {
                 foreach (var pair in eventMap)
                 {
-                    if (pair.Value is not BinTreeStruct eventData || eventData.ClassHash != ParticleEventClass)
-                        continue;
-                    events.Add(ParseParticleEvent(AsU32(pair.Key) ?? 0u, eventData));
+                    if (pair.Value is not BinTreeStruct eventData) continue;
+                    events.Add(ParseClipEvent(AsU32(pair.Key) ?? 0u, eventData));
                 }
             }
             if (events.Count == 0 && !includeEmpty) return;
-            sequences.Add(new VfxEventSequenceDefinition(
+            sequences.Add(new AnimationClipDefinition(
                 ownerPathHash,
                 ownerClassHash,
                 GetF32(properties, F_clipTickDuration) is { } tick && float.IsFinite(tick) && tick > 0 ? tick : 0,
@@ -489,7 +503,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 clipName,
                 animationFilePath,
                 graphPathHash,
-                childClipHashes));
+                childClipHashes,
+                childParameters));
         }
 
         private static IReadOnlyList<uint> ReadClipChildren(IReadOnlyDictionary<uint, BinTreeProperty> properties)
@@ -516,6 +531,77 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 else Add(value);
             }
             return children;
+        }
+
+        private static IReadOnlyList<float> ReadClipParameters(IReadOnlyDictionary<uint, BinTreeProperty> properties)
+        {
+            if (Get(properties, F_parametricPairs) is not BinTreeContainer pairs)
+                return Array.Empty<float>();
+
+            var values = new List<float>(pairs.Elements.Count);
+            foreach (BinTreeStruct pair in pairs.Elements.OfType<BinTreeStruct>())
+                values.Add(GetF32(pair.Properties, F_parametricPairValue) ?? 0f);
+            return values;
+        }
+
+        private static AnimationClipEventDefinition ParseClipEvent(uint eventHash, BinTreeStruct eventData)
+        {
+            IReadOnlyDictionary<uint, BinTreeProperty> properties = eventData.Properties;
+            float startFrame = GetF32(properties, F_eventStartFrame) ?? 0f;
+            float endFrame = GetF32(properties, F_eventEndFrame) ?? -1f;
+
+            if (eventData.ClassHash == ParticleEventClass)
+                return ParseParticleEvent(eventHash, eventData);
+
+            if (eventData.ClassHash == SubmeshVisibilityEventClass)
+            {
+                return new AnimationSubmeshVisibilityEventDefinition(
+                    eventHash,
+                    startFrame,
+                    endFrame,
+                    ReadHashList(Get(properties, F_eventShowSubmeshes)),
+                    ReadHashList(Get(properties, F_eventHideSubmeshes)));
+            }
+
+            if (eventData.ClassHash == JointSnapEventClass)
+            {
+                return new AnimationJointSnapEventDefinition(
+                    eventHash,
+                    startFrame,
+                    endFrame,
+                    AsU32(Get(properties, F_eventJoint)) ?? 0u,
+                    AsU32(Get(properties, F_eventSnapTo)) ?? 0u,
+                    AsVec3(Get(properties, F_eventOffset)) ?? Vector3.Zero);
+            }
+
+            if (eventData.ClassHash == ConformToPathEventClass)
+            {
+                return new AnimationConformToPathEventDefinition(
+                    eventHash,
+                    startFrame,
+                    endFrame,
+                    AsU32(Get(properties, F_eventMaskDataName)) ?? 0u,
+                    GetF32(properties, F_eventBlendIn) ?? 0f,
+                    GetF32(properties, F_eventBlendOut) ?? 0f);
+            }
+
+            return new AnimationOtherClipEventDefinition(
+                eventHash,
+                startFrame,
+                endFrame,
+                eventData.ClassHash);
+        }
+
+        private static IReadOnlyList<uint> ReadHashList(BinTreeProperty property)
+        {
+            if (property is not BinTreeContainer container)
+                return AsU32(property) is uint single && single != 0u ? new[] { single } : Array.Empty<uint>();
+
+            return container.Elements
+                .Select(AsU32)
+                .Where(value => value.HasValue && value.Value != 0u)
+                .Select(value => value.Value)
+                .ToArray();
         }
 
         private static VfxParticleEventDefinition ParseParticleEvent(uint eventHash, BinTreeStruct eventData)

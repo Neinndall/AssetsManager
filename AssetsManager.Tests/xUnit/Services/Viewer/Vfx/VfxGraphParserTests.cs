@@ -411,8 +411,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             VfxBinDocument document = VfxGraphParser.ParseDocument(stream.ToArray());
 
-            VfxEventSequenceDefinition sequence = Assert.Single(document.EventSequences);
-            VfxParticleEventDefinition parsed = Assert.Single(sequence.Events);
+            AnimationClipDefinition sequence = Assert.Single(document.EventSequences);
+            VfxParticleEventDefinition parsed = Assert.Single(sequence.ParticleEvents);
             Assert.Equal(55u, parsed.EventHash);
             Assert.Equal(3f, parsed.StartFrame);
             Assert.Equal(9f, parsed.EndFrame);
@@ -424,6 +424,96 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxParticleEventAttachment parsedAttachment = Assert.Single(parsed.Attachments);
             Assert.Equal(11u, parsedAttachment.SourceBoneHash);
             Assert.Equal(22u, parsedAttachment.TargetBoneHash);
+        }
+
+        [Fact]
+        public void PreservesTypedVisualClipEventsAndUnknownEvents()
+        {
+            var visibility = new BinTreeStruct(
+                0,
+                0xbcf56e70,
+                new BinTreeProperty[]
+                {
+                    new BinTreeF32(Fnv1a.HashLower("mStartFrame"), 2f),
+                    new BinTreeF32(Fnv1a.HashLower("mEndFrame"), 6f),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("mShowSubmeshList"),
+                        BinPropertyType.Hash,
+                        new BinTreeProperty[] { new BinTreeHash(0, 11) }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("mHideSubmeshList"),
+                        BinPropertyType.Hash,
+                        new BinTreeProperty[] { new BinTreeHash(0, 22) })
+                });
+            var snap = new BinTreeStruct(
+                0,
+                0xb5c1b6ad,
+                new BinTreeProperty[]
+                {
+                    new BinTreeF32(Fnv1a.HashLower("mStartFrame"), 3f),
+                    new BinTreeF32(Fnv1a.HashLower("mEndFrame"), 7f),
+                    new BinTreeHash(Fnv1a.HashLower("mJointNameToOverride"), 33),
+                    new BinTreeHash(Fnv1a.HashLower("mJointNameToSnapTo"), 44),
+                    new BinTreeVector3(Fnv1a.HashLower("offset"), new Vector3(1f, 2f, 3f))
+                });
+            var conform = new BinTreeStruct(
+                0,
+                0x82377a1d,
+                new BinTreeProperty[]
+                {
+                    new BinTreeF32(Fnv1a.HashLower("mStartFrame"), 4f),
+                    new BinTreeHash(Fnv1a.HashLower("mMaskDataName"), 55),
+                    new BinTreeF32(Fnv1a.HashLower("mBlendInTime"), 0.2f),
+                    new BinTreeF32(Fnv1a.HashLower("mBlendOutTime"), 0.4f)
+                });
+            var unknown = new BinTreeStruct(
+                0,
+                0x12345678,
+                new BinTreeProperty[]
+                {
+                    new BinTreeF32(Fnv1a.HashLower("mStartFrame"), 5f)
+                });
+            var eventMap = new BinTreeMap(
+                Fnv1a.HashLower("mEventDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, 101), visibility),
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, 102), snap),
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, 103), conform),
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, 104), unknown)
+                });
+            var clip = new BinTreeObject(
+                "Animations/VisualEvents",
+                "AtomicClipData",
+                new BinTreeProperty[] { eventMap });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { clip }, System.Array.Empty<string>()).Write(stream);
+
+            AnimationClipDefinition parsed = Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).EventSequences);
+
+            var parsedVisibility = Assert.IsType<AnimationSubmeshVisibilityEventDefinition>(
+                parsed.Events.Single(item => item.EventHash == 101));
+            Assert.Equal(new uint[] { 11 }, parsedVisibility.ShowSubmeshHashes);
+            Assert.Equal(new uint[] { 22 }, parsedVisibility.HideSubmeshHashes);
+            Assert.Equal(6f, parsedVisibility.EndFrame);
+
+            var parsedSnap = Assert.IsType<AnimationJointSnapEventDefinition>(
+                parsed.Events.Single(item => item.EventHash == 102));
+            Assert.Equal(33u, parsedSnap.JointHash);
+            Assert.Equal(44u, parsedSnap.SnapToHash);
+            Assert.Equal(new Vector3(1f, 2f, 3f), parsedSnap.Offset);
+
+            var parsedConform = Assert.IsType<AnimationConformToPathEventDefinition>(
+                parsed.Events.Single(item => item.EventHash == 103));
+            Assert.Equal(55u, parsedConform.MaskHash);
+            Assert.Equal(0.2f, parsedConform.BlendInSeconds);
+            Assert.Equal(0.4f, parsedConform.BlendOutSeconds);
+
+            var parsedUnknown = Assert.IsType<AnimationOtherClipEventDefinition>(
+                parsed.Events.Single(item => item.EventHash == 104));
+            Assert.Equal(0x12345678u, parsedUnknown.ClassHash);
         }
 
         [Fact]
@@ -472,7 +562,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             using var stream = new MemoryStream();
             new BinTree(new[] { graph }, System.Array.Empty<string>()).Write(stream);
 
-            VfxEventSequenceDefinition sequence = Assert.Single(
+            AnimationClipDefinition sequence = Assert.Single(
                 VfxGraphParser.ParseDocument(stream.ToArray()).EventSequences);
 
             Assert.Equal(123u, sequence.OwnerPathHash);

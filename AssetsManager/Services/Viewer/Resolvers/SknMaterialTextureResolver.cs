@@ -19,6 +19,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         IReadOnlySet<string> MaterialOverrideKeys,
         ModelMaterialEffectDefinition DefaultEffect)
     {
+        internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
+
         internal ModelMaterialEffectDefinition ResolveEffect(string normalizedSubmeshName)
         {
             if (string.IsNullOrEmpty(normalizedSubmeshName))
@@ -82,6 +84,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         IReadOnlyDictionary<string, IReadOnlyList<string>> OverrideTexturePaths,
         IReadOnlyDictionary<string, SknMaterialDefinition> OverrideMaterials)
     {
+        internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
+
         internal IEnumerable<string> ReferencedTexturePaths =>
             OverrideTexturePaths.Values
                 .SelectMany(paths => paths)
@@ -101,6 +105,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint StaticMaterialClass = Fnv1a.HashLower("StaticMaterialDef");
         private static readonly uint SkinMeshProperties = Fnv1a.HashLower("skinMeshProperties");
         private static readonly uint SimpleSkin = Fnv1a.HashLower("simpleSkin");
+        private static readonly uint InitialSubmeshToHide = Fnv1a.HashLower("initialSubmeshToHide");
         private static readonly uint MaterialOverride = Fnv1a.HashLower("materialOverride");
         private static readonly uint Texture = Fnv1a.HashLower("texture");
         private static readonly uint Submesh = Fnv1a.HashLower("submesh");
@@ -150,6 +155,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
             var materialDefinitions = BuildMaterialDefinitionMap(trees, wadChunkPathResolver);
             var overrideTexturePaths = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
             var overrideMaterials = new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
+            IReadOnlyList<string> initialHiddenSubmeshes = Array.Empty<string>();
+            bool readInitialHiddenSubmeshes = false;
             string defaultTexturePath = null;
             SknMaterialDefinition defaultMaterial = null;
 
@@ -162,6 +169,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         meshProperty is not BinTreeStruct meshProperties)
                     {
                         continue;
+                    }
+
+                    if (!readInitialHiddenSubmeshes && ReferenceEquals(tree, primaryTree))
+                    {
+                        readInitialHiddenSubmeshes = true;
+                        if (TryGetString(meshProperties, InitialSubmeshToHide, out string hiddenSubmeshes))
+                            initialHiddenSubmeshes = SplitSubmeshNames(hiddenSubmeshes);
                     }
 
                     if (defaultTexturePath == null &&
@@ -241,7 +255,10 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 defaultTexturePath,
                 defaultMaterial,
                 overrideTexturePaths,
-                overrideMaterials);
+                overrideMaterials)
+            {
+                InitialHiddenSubmeshes = initialHiddenSubmeshes
+            };
         }
 
         internal static SknMaterialTextureResolution Resolve(
@@ -295,7 +312,10 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 metadata.OverrideTexturePaths.Keys
                     .Concat(metadata.OverrideMaterials.Keys)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase),
-                defaultEffect);
+                defaultEffect)
+            {
+                InitialHiddenSubmeshes = metadata.InitialHiddenSubmeshes ?? Array.Empty<string>()
+            };
         }
 
         internal static string TryResolveBinPath(string sknPath)
@@ -877,6 +897,17 @@ namespace AssetsManager.Services.Viewer.Resolvers
                    normalized.Contains("color")
                 ? 100
                 : 0;
+        }
+
+        private static IReadOnlyList<string> SplitSubmeshNames(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return Array.Empty<string>();
+            return value
+                .Split((char[])null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .SelectMany(token => token.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         private static bool TryGetString(BinTreeStruct value, uint propertyHash, out string result)

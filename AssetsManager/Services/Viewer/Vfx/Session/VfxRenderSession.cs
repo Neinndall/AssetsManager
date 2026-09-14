@@ -85,6 +85,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public VfxSystemModel ActiveSystem => _activeSystem;
         public IReadOnlyList<VfxPlaybackGraphRuntime> Graphs => _graphs;
+        public double CurrentTime => _activeSystem?.CurrentTime ?? 0d;
         public double RigDuration => _activeSystem?.Definition is null ? _activeSystem?.TotalDuration ?? 0d : _rigDuration;
         private bool HasFinitePlaybackDuration => double.IsFinite(RigDuration) && RigDuration > 0d;
 
@@ -317,7 +318,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         TargetBoneHash = pair.TargetBoneHash,
                         EffectKey = effectKey,
                         StartTime = startSeconds,
-                        IsDetachable = cue.IsDetachable,
+                        // LTK's Animation Clip viewport keeps a cue riding its source joint;
+                        // ParticleEventData's detachable field is not part of that playback contract.
+                        IsDetachable = false,
                         LocalOffset = Vector3.Zero,
                         BaseTransform = scaleMatrix,
                         IsIdleEffect = false
@@ -543,6 +546,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             AdvanceTo(target);
         }
 
+        /// <summary>
+        /// Advances an animation-driven VFX session to the canonical clip time without
+        /// running an independent playback clock. Backward jumps rebuild deterministically.
+        /// </summary>
+        public void SynchronizeTo(double seconds)
+        {
+            if (_activeSystem == null || !double.IsFinite(seconds)) return;
+            double target = Math.Max(0d, seconds);
+            if (target + 1e-9 < _activeSystem.CurrentTime)
+            {
+                Seek(target);
+                return;
+            }
+            AdvanceTo(target);
+        }
+
         public void SetBoneTransformSampler(Func<double, string, uint, Matrix4x4?> sampler)
             => _boneTransformSampler = sampler;
 
@@ -557,6 +576,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     if (kill.Time > previous && kill.Time < next) next = kill.Time;
                 foreach (double stopTime in _graphStopTimes.Values)
                     if (stopTime > previous && stopTime < next) next = stopTime;
+                foreach (GraphAttachmentInfo attachment in _graphAttachments.Values)
+                    if (attachment.StartTime > previous && attachment.StartTime < next) next = attachment.StartTime;
                 KillGraphsAt(previous);
                 _activeSystem.CurrentTime = next;
                 ApplyRigTransform();

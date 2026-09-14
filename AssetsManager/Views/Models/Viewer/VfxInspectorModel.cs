@@ -488,73 +488,6 @@ namespace AssetsManager.Views.Models.Viewer
     }
 
     /// <summary>
-    /// Item model representing a champion animation with linked VFX cues and duration.
-    /// </summary>
-    public class VfxAnimationItem : INotifyPropertyChanged
-    {
-        private string _name;
-        private string _displayName;
-        private string _filePath;
-        private float _duration;
-        private bool _hasVfx;
-        private string _vfxSummary;
-        private VfxAbilityComposition _composition;
-
-        public string Name
-        {
-            get => _name;
-            set { _name = value; OnPropertyChanged(); }
-        }
-
-        public string DisplayName
-        {
-            get => _displayName;
-            set { _displayName = value; OnPropertyChanged(); }
-        }
-
-        public string FilePath
-        {
-            get => _filePath;
-            set { _filePath = value; OnPropertyChanged(); }
-        }
-
-        public float Duration
-        {
-            get => _duration;
-            set { _duration = value; OnPropertyChanged(); }
-        }
-
-        public bool HasVfx
-        {
-            get => _hasVfx;
-            set { _hasVfx = value; OnPropertyChanged(); }
-        }
-
-        public string VfxSummary
-        {
-            get => _vfxSummary;
-            set { _vfxSummary = value; OnPropertyChanged(); }
-        }
-
-        public VfxAbilityComposition Composition
-        {
-            get => _composition;
-            set { _composition = value; OnPropertyChanged(); }
-        }
-
-        private LeagueToolkit.Core.Animation.IAnimationAsset _animationAsset;
-        public LeagueToolkit.Core.Animation.IAnimationAsset AnimationAsset
-        {
-            get => _animationAsset;
-            set { _animationAsset = value; OnPropertyChanged(); }
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string prop = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
-    }
-
-    /// <summary>
     /// Primary view model for the VFX Inspector & Diagnostic Studio window.
     /// Manages root directory scanning, system selection, emitter live controls, and diagnostics.
     /// </summary>
@@ -564,7 +497,7 @@ namespace AssetsManager.Views.Models.Viewer
         private VfxSkinItem _selectedSkin;
         private string _searchQuery;
         private VfxSystemDiagnosticItem _selectedSystem;
-        private VfxAnimationItem _selectedAnimation;
+        private AnimationClipCatalogItem _selectedAnimation;
         private bool _isAnimationMode = true;
         private bool _isPlaying;
         private bool _isReplayState;
@@ -624,7 +557,7 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsTrailRig => _rigPreset == VfxRigPreset.Trail;
 
         public ObservableCollection<VfxSkinItem> DetectedSkins { get; } = new();
-        public ObservableCollection<VfxAnimationItem> DetectedAnimations { get; } = new();
+        public ObservableCollection<AnimationClipCatalogItem> DetectedAnimations { get; } = new();
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxTextureDiagnosticItem> Textures { get; } = new();
@@ -643,7 +576,7 @@ namespace AssetsManager.Views.Models.Viewer
             set { IsAnimationMode = !value; }
         }
 
-        public VfxAnimationItem SelectedAnimation
+        public AnimationClipCatalogItem SelectedAnimation
         {
             get => _selectedAnimation;
             set { _selectedAnimation = value; OnPropertyChanged(); }

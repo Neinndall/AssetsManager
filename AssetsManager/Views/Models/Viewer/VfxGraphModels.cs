@@ -30,7 +30,7 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyDictionary<uint, VfxSystemDefinition> Systems,
         IReadOnlyDictionary<uint, uint> ResourceMap,
         IReadOnlyList<string> Dependencies,
-        IReadOnlyList<VfxEventSequenceDefinition> EventSequences,
+        IReadOnlyList<AnimationClipDefinition> EventSequences,
         VfxOwnerSceneContext OwnerSceneContext,
         IReadOnlyList<VfxIdleEffectDefinition> IdleEffects = null);
 

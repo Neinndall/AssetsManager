@@ -48,10 +48,12 @@ namespace AssetsManager.Views
             // Service injection (Peer-to-Peer Support)
             ViewportControl.LogService = _logService;
             ViewportControl.AppSettings = appSettings;
+            ViewportControl.VfxLoadingService = _vfxLoadingService;
 
             PanelControl.SknLoadingService = sknLoadingService;
             PanelControl.MapGeometryLoadingService = mapGeometryLoadingService;
             PanelControl.ChromaLoadingService = chromaLoadingService;
+            PanelControl.VfxLoadingService = _vfxLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = customMessageBoxService;
             PanelControl.TaskCancellationManager = _taskCancellationManager;

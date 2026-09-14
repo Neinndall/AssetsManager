@@ -42,7 +42,7 @@
                 <TextBlock Text="{Binding Name}" FontSize="11" MaxWidth="235" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
         </DataTemplate>
-        <DataTemplate DataType="{x:Type models:VfxAnimationItem}">
+        <DataTemplate DataType="{x:Type models:AnimationClipCatalogItem}">
             <StackPanel Orientation="Horizontal" Margin="2,4" ToolTip="{Binding VfxSummary}">
                 <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,7,0"/>
                 <TextBlock Text="{Binding DisplayName}" FontSize="11" MaxWidth="195" TextTrimming="CharacterEllipsis"/>

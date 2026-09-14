@@ -29,8 +29,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             public Dictionary<uint, VfxSystemDefinition> Systems { get; } = new();
             public Dictionary<uint, uint> ResourceMap { get; } = new();
             public Dictionary<uint, string> SystemSources { get; } = new();
-            public Dictionary<uint, VfxEventSequenceDefinition> EventSequences { get; } = new();
-            public List<VfxEventSequenceDefinition> Clips { get; } = new();
+            public Dictionary<uint, AnimationClipDefinition> EventSequences { get; } = new();
+            public List<AnimationClipDefinition> Clips { get; } = new();
             public List<VfxIdleEffectDefinition> IdleEffects { get; } = new();
             public VfxOwnerSceneContext OwnerSceneContext { get; set; }
             public List<string> LoadedBins { get; } = new();
@@ -115,7 +115,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         }
                         foreach (var kv in document.ResourceMap)
                             bundle.ResourceMap.TryAdd(kv.Key, kv.Value);
-                        foreach (VfxEventSequenceDefinition sequence in document.EventSequences)
+                        foreach (AnimationClipDefinition sequence in document.EventSequences)
                         {
                             bundle.EventSequences.TryAdd(sequence.OwnerPathHash, sequence);
                             if (clipKeys.Add((sequence.GraphPathHash, sequence.OwnerPathHash)))

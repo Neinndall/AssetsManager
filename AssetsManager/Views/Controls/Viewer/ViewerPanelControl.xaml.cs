@@ -13,6 +13,8 @@ using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Interaction;
+using AssetsManager.Services.Viewer.Vfx.Composition;
+using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Formatting;
@@ -35,6 +37,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public SknLoadingService SknLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public ChromaLoadingService ChromaLoadingService { get; set; }
+        public VfxLoadingService VfxLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
@@ -236,6 +239,8 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 foreach (var animModel in _viewModel.AnimationModels)
                 {
+                    if (animModel.AnimationData.IsAuthoredClip)
+                        continue;
                     if (!model.Animations.Any(a => a.Name == animModel.Name))
                     {
                         model.Animations.Add(animModel.AnimationData);
@@ -516,27 +521,20 @@ namespace AssetsManager.Views.Controls.Viewer
         private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
         {
             if (_viewModel.SelectedModel == null) return;
-
-            // DataContext of the toggle is the SelectedAnimation (inherited from the panel Border).
             if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
 
             if (_currentlyPlayingAnimation != null && _currentlyPlayingAnimation != animationModel)
-            {
                 _currentlyPlayingAnimation.IsPlaying = false;
-            }
 
             _currentlyPlayingAnimation = animationModel;
-
-            if (animationModel.IsPlaying)
+            if (Viewport?.IsAnimationActive(animationModel) == true)
             {
-                // Was playing -> Pause
-                animationModel.IsPlaying = false;
-                Viewport?.TogglePauseResume(animationModel);
+                // Resume/pause the existing clock. Do not rebuild the clip and lose seek state.
+                Viewport.TogglePauseResume(animationModel);
             }
             else
             {
-                // Was paused/stopped -> Play
-                animationModel.IsPlaying = true;
+                // A stopped or different clip starts a fresh pass at zero.
                 Viewport?.SetAnimation(animationModel);
             }
         }
@@ -544,30 +542,26 @@ namespace AssetsManager.Views.Controls.Viewer
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
-
-            // Toggle pause/resume at current time (NO reset to 0).
-            // The Viewport's TogglePauseResume updates IsAnimationPaused and notifies
-            // the panel via SetAnimationPlayingState, which keeps the binding in sync.
-            Viewport?.TogglePauseResume(animationModel);
+            if (Viewport?.IsAnimationActive(animationModel) == true)
+                Viewport.StopAnimation();
+            animationModel.IsPlaying = false;
+            animationModel.CurrentTime = 0d;
+            if (ReferenceEquals(_currentlyPlayingAnimation, animationModel))
+                _currentlyPlayingAnimation = null;
         }
 
         private void CloseAnimationPlayer_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
 
-            // Stop playback if currently playing
-            if (animationModel.IsPlaying)
-            {
-                animationModel.IsPlaying = false;
-                Viewport?.TogglePauseResume(animationModel);
-            }
-
-            if (_currentlyPlayingAnimation == animationModel)
-            {
+            if (Viewport?.IsAnimationActive(animationModel) == true)
+                Viewport.StopAnimation();
+            animationModel.IsPlaying = false;
+            animationModel.CurrentTime = 0d;
+            if (ReferenceEquals(_currentlyPlayingAnimation, animationModel))
                 _currentlyPlayingAnimation = null;
-            }
 
-            // Clear the selection to hide the player (preserves the animation in the list)
+            // Hiding the player also tears down clip events, restoring authored submesh state.
             _viewModel.SelectedAnimation = null;
         }
 
@@ -684,6 +678,18 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (newModel != null)
             {
+                try
+                {
+                    await LoadAuthoredAnimationClipsAsync(newModel, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                catch (OperationCanceledException)
+                {
+                    SafeDisposeModel(newModel);
+                    LogService?.LogDebug("AnimationGraph clip loading cancelled before model activation.");
+                    return;
+                }
+
                 if (isInitialLoad)
                 {
                     if (_viewModel.LoadedModels.Count == 0)
@@ -705,6 +711,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     foreach (var animModel in _viewModel.AnimationModels)
                     {
+                        if (animModel.AnimationData.IsAuthoredClip)
+                            continue;
                         if (!newModel.Animations.Any(a => a.Name == animModel.Name))
                         {
                             newModel.Animations.Add(animModel.AnimationData);
@@ -717,6 +725,79 @@ namespace AssetsManager.Views.Controls.Viewer
                 ModelsListBox.SelectedItem = newModel;
 
                 Viewport?.SnapCamera();
+            }
+        }
+
+        private async Task LoadAuthoredAnimationClipsAsync(SceneModel model, CancellationToken cancellationToken)
+        {
+            if (model == null ||
+                VfxLoadingService == null ||
+                string.IsNullOrWhiteSpace(model.SkinBinPath) ||
+                !File.Exists(model.SkinBinPath))
+            {
+                return;
+            }
+
+            VfxClipCatalog catalog = null;
+            try
+            {
+                VfxLoadingService.Bundle bundle = await VfxLoadingService.LoadAsync(
+                    model.SkinBinPath,
+                    LogService,
+                    cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                string searchDirectory = Path.GetDirectoryName(model.SkinBinPath)
+                    ?? Path.GetDirectoryName(model.FilePath)
+                    ?? string.Empty;
+                catalog = new VfxClipCatalog();
+                IReadOnlyList<AnimationClipCatalogItem> clips = await Task.Run(
+                    () => catalog.Build(
+                        bundle,
+                        path => VfxLoadingService.ResolveAssetPath(path, searchDirectory, ".anm"),
+                        LogService),
+                    cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var context = new AnimationClipVfxContext(
+                    bundle.IdleEffects.ToArray(),
+                    bundle.Systems,
+                    bundle.ResourceMap,
+                    bundle.OwnerSceneContext,
+                    searchDirectory);
+
+                model.AnimationClipResources?.Dispose();
+                model.AnimationClipResources = catalog;
+                catalog = null;
+                model.AnimationClipVfxContext = context;
+
+                foreach (AnimationClipCatalogItem clip in clips)
+                {
+                    model.Animations.Add(new AnimationData
+                    {
+                        Name = clip.Name,
+                        FilePath = clip.FilePath,
+                        AnimationAsset = clip.AnimationAsset,
+                        AuthoredClip = clip,
+                        ClipVfxContext = context
+                    });
+                }
+
+                if (clips.Count > 0)
+                {
+                    LogService?.LogDebug(
+                        $"Loaded {clips.Count} authored AnimationGraph clips for '{model.Name}'.");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                catalog?.Dispose();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                catalog?.Dispose();
+                LogService?.LogError(ex, $"Failed to load AnimationGraph clips for '{model.Name}'.");
             }
         }
 
