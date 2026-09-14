@@ -111,7 +111,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             foreach (var graph in _graphs)
             {
                 _graphPlacements[graph] = step.Transform;
-                graph.SetTransform(step.Transform * _worldTransform);
+                Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(step.Origin) * _worldTransform;
+                graph.SetTransform(step.Transform * _worldTransform, orientationRoot);
                 graph.SetTarget(Vector3.Transform(step.Target, _worldTransform));
                 graph.IsStopped = step.IsStopped;
             }
@@ -404,14 +405,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         {
                             boneTransform = Matrix4x4.CreateTranslation(attachment.LocalOffset) * boneTransform;
                         }
-                        graph.SetTransform(attachment.BaseTransform * boneTransform * _worldTransform);
+                        Matrix4x4 orientationRoot =
+                            attachment.BaseTransform * Matrix4x4.CreateTranslation(boneTransform.Translation) * _worldTransform;
+                        graph.SetTransform(
+                            attachment.BaseTransform * boneTransform * _worldTransform,
+                            orientationRoot);
                         continue;
                     }
                 }
 
                 if (_graphPlacements.TryGetValue(graph, out var basePlacement))
                 {
-                    graph.SetTransform(basePlacement * _worldTransform);
+                    Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(basePlacement.Translation) * _worldTransform;
+                    graph.SetTransform(basePlacement * _worldTransform, orientationRoot);
                 }
             }
         }
@@ -467,7 +473,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 {
                     if (!_graphAttachments.ContainsKey(graph))
                     {
-                        graph.SetTransform(_graphPlacements.GetValueOrDefault(graph, Matrix4x4.Identity) * _worldTransform);
+                        Matrix4x4 placement = _graphPlacements.GetValueOrDefault(graph, Matrix4x4.Identity);
+                        Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(placement.Translation) * _worldTransform;
+                        graph.SetTransform(placement * _worldTransform, orientationRoot);
                     }
                 }
             }
