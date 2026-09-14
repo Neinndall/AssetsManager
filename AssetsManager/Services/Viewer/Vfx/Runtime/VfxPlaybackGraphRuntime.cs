@@ -278,8 +278,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
     public static class VfxDurationCalculator
     {
         private const int MaximumGraphDepth = 8;
-        private const double PreviewStep = 1d / 60d;
-        private const double MaximumPreviewSimulation = 10d;
+        private const double EndlessSpan = 5d;
+        private const double MinimumSpan = 1d;
+        private const double MaximumSpan = 60d;
 
         public static double Calculate(
             VfxSystemDefinition system,
@@ -318,44 +319,43 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return Math.Max(0.05, maximum);
         }
 
-        public static double CalculatePreview(
-            VfxSystemDefinition system,
-            int seed,
-            IReadOnlyDictionary<uint, VfxSystemDefinition> systems = null,
-            IReadOnlyDictionary<uint, uint> resourceMap = null)
+        public static double SystemSpan(VfxSystemDefinition system)
         {
-            double authoredDuration = Calculate(system, systems, resourceMap);
-            if (!double.IsFinite(authoredDuration) || authoredDuration <= 0 ||
-                authoredDuration > MaximumPreviewSimulation ||
-                system.Emitters.Any(emitter => !emitter.Disabled && emitter.EmitterLifetime is null))
+            if (system is null) return MinimumSpan;
+
+            double span = MinimumSpan;
+            foreach (VfxEmitterDefinition emitter in system.Emitters)
             {
-                return authoredDuration;
+                if (emitter.Disabled) continue;
+                double emitting = emitter.EmitterLifetime ?? EndlessSpan;
+                span = Math.Max(
+                    span,
+                    emitter.TimeBeforeFirstEmission + emitting + Peak(emitter.ParticleLifetime));
             }
+            return Math.Min(span, MaximumSpan);
+        }
 
-            systems ??= new Dictionary<uint, VfxSystemDefinition>();
-            resourceMap ??= new Dictionary<uint, uint>();
-            var runtime = new VfxPlaybackGraphRuntime(
-                system,
-                Matrix4x4.Identity,
-                seed,
-                systems,
-                resourceMap,
-                static (definition, transform, runtimeSeed) =>
-                {
-                    var childRuntime = new VfxPlaybackRuntime(runtimeSeed);
-                    childRuntime.SetSystem(definition, transform);
-                    return childRuntime;
-                });
+        public static double LingerTail(VfxSystemDefinition system, double stoppedAt)
+        {
+            if (system is null) return 0d;
 
-            double elapsed = 0;
-            double simulationLimit = Math.Min(MaximumPreviewSimulation, authoredDuration + 1d);
-            while (!runtime.IsComplete && elapsed < simulationLimit)
+            double age = stoppedAt + system.BuildUpTime;
+            double tail = 0d;
+            foreach (VfxEmitterDefinition emitter in system.Emitters)
             {
-                runtime.Update((float)PreviewStep);
-                elapsed += PreviewStep;
+                if (emitter.Disabled) continue;
+                double wait = Math.Max(VfxPlaybackRuntime.StopWaitSeconds(emitter) - age, 0d);
+                tail = Math.Max(tail, wait + VfxPlaybackRuntime.LingerSeconds(emitter));
             }
+            return tail;
+        }
 
-            return runtime.IsComplete ? elapsed : authoredDuration;
+        private static double Peak(VfxCurveF curve)
+        {
+            double peak = Math.Max(curve.Constant, 0f);
+            if (curve.Values is not { Length: > 0 }) return peak;
+            foreach (float value in curve.Values) peak = Math.Max(peak, value);
+            return peak;
         }
 
         private static double CalculateSystem(

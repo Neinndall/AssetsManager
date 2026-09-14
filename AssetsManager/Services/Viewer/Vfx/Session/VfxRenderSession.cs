@@ -49,6 +49,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private readonly Dictionary<VfxPlaybackGraphRuntime, GraphAttachmentInfo> _graphAttachments = new();
         private VfxSystemModel _activeSystem;
         private VfxRigPreset _rigPreset = VfxRigPreset.Still;
+        private double _rigDuration;
         private Vector3? _lastRigOrigin;
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private bool _isPlaying;
@@ -84,6 +85,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public VfxSystemModel ActiveSystem => _activeSystem;
         public IReadOnlyList<VfxPlaybackGraphRuntime> Graphs => _graphs;
+        public double RigDuration => _activeSystem?.Definition is null ? _activeSystem?.TotalDuration ?? 0d : _rigDuration;
+        private bool HasFinitePlaybackDuration => double.IsFinite(RigDuration) && RigDuration > 0d;
 
         public VfxRigPreset RigPreset
         {
@@ -91,6 +94,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             set
             {
                 _rigPreset = value;
+                if (_activeSystem?.Definition is { } definition)
+                    _rigDuration = VfxRigMotion.RunLength(value, definition);
                 _lastRigOrigin = null;
                 ApplyRigTransform();
             }
@@ -103,7 +108,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             var step = VfxRigMotion.Evaluate(
                 _rigPreset,
                 _activeSystem.CurrentTime,
-                _activeSystem.TotalDuration,
+                RigDuration,
                 _lastRigOrigin);
 
             _lastRigOrigin = step.Origin;
@@ -130,6 +135,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         {
             _isPlaying = false;
             _activeSystem = system;
+            _rigDuration = system?.Definition is { } definition
+                ? VfxRigMotion.RunLength(_rigPreset, definition)
+                : system?.TotalDuration ?? 0d;
             _graph = null;
             _graphs.Clear();
             _graphPlacements.Clear();
@@ -500,13 +508,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             AdvanceTo(_activeSystem.CurrentTime + elapsed);
 
             if (ShouldFinishPlayback(
-                    _activeSystem.HasFiniteDuration,
+                    HasFinitePlaybackDuration,
                     _activeSystem.CurrentTime,
-                    _activeSystem.TotalDuration,
+                    RigDuration,
                     _graphs.All(graph => graph.IsComplete)))
             {
-                if (_activeSystem.HasFiniteDuration)
-                    _activeSystem.CurrentTime = _activeSystem.TotalDuration;
+                if (HasFinitePlaybackDuration)
+                    _activeSystem.CurrentTime = RigDuration;
                 _isPlaying = false;
             }
         }
@@ -523,7 +531,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void Seek(double seconds)
         {
             if (_activeSystem == null) return;
-            double maxDuration = _activeSystem.HasFiniteDuration ? _activeSystem.TotalDuration : 10.0;
+            double maxDuration = HasFinitePlaybackDuration ? RigDuration : 10.0;
             double target = Math.Clamp(seconds, 0, maxDuration);
             _lastRigOrigin = null;
             foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Reset();

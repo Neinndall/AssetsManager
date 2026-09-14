@@ -540,13 +540,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_vfxRenderer != null)
                 {
                     _vfxRenderer.RigPreset = preset;
-                    if (preset == VfxRigPreset.Missile)
-                    {
-                        double missileDuration = (VfxRigMotion.FlightRange / VfxRigMotion.FlightSpeed) + 0.75;
-                        _model.ActiveLoopDuration = missileDuration;
-                        _model.TotalDuration = missileDuration;
-                        _model.IsPreviewLoopEnabled = true;
-                    }
+                    double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
+                    _model.ActiveLoopDuration = duration;
+                    _model.TotalDuration = duration;
+                    _model.IsPreviewLoopEnabled = preset is VfxRigPreset.Burst or VfxRigPreset.Missile;
                     _vfxRenderer.Seek(0);
                     _vfxRenderer.Play();
                     _model.IsPlaying = true;
@@ -755,9 +752,6 @@ namespace AssetsManager.Views.Controls.Viewer
         internal static bool HasPlayableEmitters(VfxSystemDefinition definition)
             => definition?.Emitters.Any(emitter => !emitter.Disabled) == true;
 
-        internal static double CalculatePlaybackDuration(VfxSystemDefinition definition)
-            => VfxDurationCalculator.Calculate(definition);
-
         #endregion
 
         #region System & Emitter Diagnostics
@@ -779,11 +773,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             int playbackSeed = HashCode.Combine(def.PathHash, systemItem.Name);
-            double playbackDuration = VfxDurationCalculator.CalculatePreview(
-                def,
-                playbackSeed,
-                _activeBundle?.Systems,
-                _activeBundle?.ResourceMap);
 
             // 1. Prepare playback in OpenGL Viewport
             var systemModel = new VfxSystemModel
@@ -795,7 +784,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 SearchDirectory = searchDir,
                 OwnerSceneContext = _activeBundle?.OwnerSceneContext,
                 PlaybackSeed = playbackSeed,
-                TotalDuration = playbackDuration,
+                TotalDuration = VfxDurationCalculator.SystemSpan(def),
                 Speed = _model.Speed
             };
 
@@ -804,11 +793,11 @@ namespace AssetsManager.Views.Controls.Viewer
             _vfxRenderer?.SetVfxSystem(systemModel);
             if (_vfxRenderer != null) _model.RigPreset = _vfxRenderer.RigPreset;
 
-            double timelineMax = ResolveTimelineDuration(playbackDuration);
-            _model.ActiveLoopDuration = double.IsFinite(playbackDuration) && playbackDuration > 0
-                ? playbackDuration
-                : timelineMax;
+            double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(_model.RigPreset, def);
+            double timelineMax = ResolveTimelineDuration(rigDuration);
+            _model.ActiveLoopDuration = timelineMax;
             _model.TotalDuration = timelineMax;
+            _model.IsPreviewLoopEnabled = _model.RigPreset is VfxRigPreset.Burst or VfxRigPreset.Missile;
             _vfxRenderer?.Play();
             _model.IsPlaying = true;
 

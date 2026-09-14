@@ -1,5 +1,7 @@
 using System;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Session
 {
@@ -37,13 +39,29 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public const float TargetReach = ChampionHeight * 3f;   // 600 engine units
 
 
+        public static double RunLength(
+            VfxRigPreset preset,
+            VfxSystemDefinition system,
+            float flightRange = FlightRange,
+            float flightSpeed = FlightSpeed,
+            float orbitPeriod = OrbitPeriod)
+        {
+            double span = VfxDurationCalculator.SystemSpan(system);
+            if (preset == VfxRigPreset.Missile)
+            {
+                double flight = flightSpeed > 0f ? flightRange / flightSpeed : 0d;
+                return flight > 0d ? flight + VfxDurationCalculator.LingerTail(system, flight) : span;
+            }
+            return preset == VfxRigPreset.Trail ? Math.Max(orbitPeriod, span) : span;
+        }
+
         /// <summary>
         /// Evaluates origin, orientation basis, displacement, and lifecycle state at simulation time.
         /// </summary>
         public static VfxRigStep Evaluate(
             VfxRigPreset preset,
             double time,
-            double systemDuration,
+            double runSpan,
             Vector3? lastOrigin = null,
             float flightRange = FlightRange,
             float flightSpeed = FlightSpeed,
@@ -55,12 +73,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             {
                 case VfxRigPreset.Missile:
                 {
-                    float flightTime = flightSpeed > 0f ? flightRange / flightSpeed : 0.75f;
-                    float tail = 0.75f;
-                    float totalSpan = flightTime + tail;
+                    float flightTime = flightSpeed > 0f ? flightRange / flightSpeed : 0f;
+                    float totalSpan = (float)Math.Max(runSpan, flightTime);
                     float phase = totalSpan > 0f ? (float)(time % totalSpan) : (float)time;
-                    float progress = Math.Clamp(phase / flightTime, 0f, 1f);
-                    bool isStopped = phase >= flightTime;
+                    float progress = flightTime > 0f ? Math.Clamp(phase / flightTime, 0f, 1f) : 1f;
+                    bool isStopped = flightTime > 0f && phase >= flightTime;
 
                     Vector3 from = new(-flightRange * 0.5f, standHeight, 0f);
                     Vector3 to = new(flightRange * 0.5f, standHeight, 0f);
@@ -87,7 +104,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
                 case VfxRigPreset.Trail:
                 {
-                    float totalSpan = Math.Max(orbitPeriod, (float)systemDuration);
+                    float totalSpan = (float)Math.Max(runSpan, orbitPeriod);
                     float phase = orbitPeriod > 0f ? (float)(time % orbitPeriod) : (float)time;
                     float turn = orbitPeriod > 0f ? (phase / orbitPeriod) * MathF.PI * 2f : 0f;
 
@@ -122,7 +139,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
                 case VfxRigPreset.Burst:
                 {
-                    float totalSpan = (float)Math.Max(1.0, systemDuration);
+                    float totalSpan = (float)runSpan;
                     float phase = totalSpan > 0f ? (float)(time % totalSpan) : (float)time;
                     Vector3 origin = new(0f, standHeight, 0f);
                     Matrix4x4 transform = Matrix4x4.CreateTranslation(origin);
@@ -135,7 +152,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 case VfxRigPreset.Still:
                 default:
                 {
-                    float totalSpan = (float)Math.Max(1.0, systemDuration);
+                    float totalSpan = (float)runSpan;
                     Vector3 origin = new(0f, standHeight, 0f);
                     Matrix4x4 transform = Matrix4x4.CreateTranslation(origin);
                     return new VfxRigStep(transform, origin, Vector3.Zero, false, (float)time, totalSpan)

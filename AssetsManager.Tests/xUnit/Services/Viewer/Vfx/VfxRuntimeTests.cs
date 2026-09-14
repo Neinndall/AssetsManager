@@ -700,39 +700,30 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void PreviewDurationMatchesDeterministicParticleCompletion()
+        public void SystemSpanUsesAuthoredEmissionAndParticleWindows()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
-                EmitterLifetime = 1f,
-                ParticleLifetime = new VfxCurveF(
-                    1f,
-                    null,
-                    null,
-                    new[] { new VfxProbTable(new[] { 0f, 1f }, new[] { 0.25f, 0.25f }) })
-            };
-            var system = new VfxSystemDefinition(1, "preview", "preview", new[] { emitter });
-
-            double duration = VfxDurationCalculator.CalculatePreview(system, seed: 17);
-
-            Assert.Equal(0.25d + 1d / 60d, duration, precision: 5);
-        }
-
-        [Fact]
-        public void PreviewDurationIncludesInitialContinuousEmission()
-        {
-            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
-            {
-                IsSingleParticle = false,
-                Rate = VfxCurveF.Const(2f),
+                TimeBeforeFirstEmission = 0.25f,
                 EmitterLifetime = 0.5f,
                 ParticleLifetime = VfxCurveF.Const(5f)
             };
             var system = new VfxSystemDefinition(1, "finite", "finite", new[] { emitter });
 
-            double duration = VfxDurationCalculator.CalculatePreview(system, seed: 17);
+            Assert.Equal(5.75d, VfxDurationCalculator.SystemSpan(system), precision: 5);
+        }
 
-            Assert.Equal(5d + 1d / 60d, duration, precision: 5);
+        [Fact]
+        public void SystemSpanUsesFiveSecondWindowForEndlessEmitter()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = null,
+                ParticleLifetime = VfxCurveF.Const(0.3f)
+            };
+            var system = new VfxSystemDefinition(1, "endless", "endless", new[] { emitter });
+
+            Assert.Equal(5.3d, VfxDurationCalculator.SystemSpan(system), precision: 5);
         }
 
         [Fact]
@@ -1137,7 +1128,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new[] { playable, disabled });
 
             Assert.True(VfxInspectorControl.HasPlayableEmitters(system));
-            Assert.Equal(1.5, VfxInspectorControl.CalculatePlaybackDuration(system), precision: 3);
+            Assert.Equal(1.5, VfxDurationCalculator.SystemSpan(system), precision: 3);
         }
 
         [Fact]
