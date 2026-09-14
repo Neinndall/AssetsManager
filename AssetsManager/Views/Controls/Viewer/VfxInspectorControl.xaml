@@ -266,9 +266,12 @@
                 </Grid.RowDefinitions>
 
                 <!-- 1. 3D REAL-TIME VIEWPORT CARD (Edge-to-Edge) -->
-                <Border Grid.Row="0" Background="#0A0A0E" CornerRadius="10" 
-                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
-                    <Grid>
+                <Grid Grid.Row="0">
+                    <!-- Base background with rounded corners -->
+                    <Border Background="#0A0A0E" CornerRadius="10"/>
+
+                    <!-- Viewport surface clipped cleanly to rounded geometry -->
+                    <Grid x:Name="ViewportClipGrid" SizeChanged="ViewportClipGrid_SizeChanged">
                         <glWpfControl:GLWpfControl x:Name="OpenTkControl" 
                                              Ready="OpenTkControl_Ready" 
                                              Render="OpenTkControl_Render"/>
@@ -343,10 +346,13 @@
                             </StackPanel>
                         </Border>
                     </Grid>
-                </Border>
+
+                    <!-- Rounded Border Stroke Overlay (crisp 1px outline, unclipped, hit-test transparent) -->
+                    <Border CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" IsHitTestVisible="False"/>
+                </Grid>
 
                 <!-- SPLITTER (Seamless Viewport vs Timeline height adjust) -->
-                <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" 
+                <GridSplitter Grid.Row="1" Height="8" HorizontalAlignment="Stretch" VerticalAlignment="Center" 
                               Background="Transparent" Cursor="SizeNS" ShowsPreview="False"/>
 
                 <!-- 2. TIMELINE & TRANSPORT DECK (Independent Card outside Viewport, LTK-Manager / DAW Studio Style) -->
@@ -373,14 +379,8 @@
                                     Value="{Binding CurrentTime, Mode=TwoWay}" ValueChanged="TimeSlider_ValueChanged"
                                     PreviewMouseDown="TimeSlider_PreviewMouseDown" PreviewMouseUp="TimeSlider_PreviewMouseUp"/>
 
-                            <!-- LEFT: [TIMELINE] BADGE & FILTER SEARCH BOX -->
+                            <!-- LEFT: FILTER SEARCH BOX -->
                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                <!-- TIMELINE Pill Badge -->
-                                <Border Background="#161A24" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                        CornerRadius="4" Padding="8,4" Margin="0,0,10,0" VerticalAlignment="Center">
-                                    <TextBlock Text="TIMELINE" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" VerticalAlignment="Center"/>
-                                </Border>
-
                                 <!-- Filter Emitters Search Input -->
                                 <Border Background="{StaticResource DarkBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                                         CornerRadius="5" Height="28" Width="180" VerticalAlignment="Center">

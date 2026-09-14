@@ -106,9 +106,26 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void OnControlLoaded(object sender, RoutedEventArgs e)
         {
+            UpdateViewportClip();
             if (_isActive)
             {
                 EnsureOpenGlStarted();
+            }
+        }
+
+        private void ViewportClipGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateViewportClip();
+        }
+
+        private void UpdateViewportClip()
+        {
+            if (ViewportClipGrid == null) return;
+            double w = ViewportClipGrid.ActualWidth;
+            double h = ViewportClipGrid.ActualHeight;
+            if (w > 0 && h > 0)
+            {
+                ViewportClipGrid.Clip = new RectangleGeometry(new Rect(0, 0, w, h), 10, 10);
             }
         }
 
