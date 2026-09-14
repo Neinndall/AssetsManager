@@ -1202,12 +1202,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             => Get(p, hash) is BinTreeString s ? s.Value : null;
 
         private static string ReadAsset(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash, string extension)
-            => Get(p, hash) switch
+        {
+            var prop = Get(p, hash);
+            if (prop is BinTreeOptional opt)
+                prop = opt.Value;
+
+            return prop switch
             {
-                BinTreeString text => text.Value,
-                BinTreeWadChunkLink link => $"{link.Value:x16}{extension}",
+                BinTreeString text => string.IsNullOrWhiteSpace(text.Value) ? null : text.Value,
+                BinTreeWadChunkLink link when link.Value != 0 => $"{link.Value:x16}{extension}",
+                BinTreeU64 u64 when u64.Value != 0 => $"{u64.Value:x16}{extension}",
+                BinTreeHash h when h.Value != 0 => $"{h.Value:x8}{extension}",
+                BinTreeObjectLink ol when ol.Value != 0 => $"{ol.Value:x8}{extension}",
+                BinTreeU32 u32 when u32.Value != 0 => $"{u32.Value:x8}{extension}",
                 _ => null
             };
+        }
 
         private static float? GetF32(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash) => AsF32(Get(p, hash));
 

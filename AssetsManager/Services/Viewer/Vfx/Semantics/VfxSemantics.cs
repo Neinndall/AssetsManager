@@ -35,6 +35,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
             return Multiply(Normalize(birthColor), color);
         }
 
+        public static Vector4 PremultiplyForAddOrSubtract(Vector4 color, int blendMode, bool isDistortion = false)
+        {
+            if (isDistortion) return color;
+            if (blendMode is not (0 or 2)) return color;
+            return new Vector4(color.X * color.W, color.Y * color.W, color.Z * color.W, 1f);
+        }
+
         private static bool IsFinite(Vector4 value)
             => float.IsFinite(value.X) && float.IsFinite(value.Y) &&
                float.IsFinite(value.Z) && float.IsFinite(value.W);

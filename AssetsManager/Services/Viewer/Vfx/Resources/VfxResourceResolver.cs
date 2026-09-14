@@ -532,9 +532,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                     _byHash.TryAdd(assetsHashKey + ext, fullPath);
                 }
 
-                // If the file on disk was extracted with a 16-hex hash name, also index it
+                // If the file on disk was extracted with a 16-hex or 8-hex hash name, also index it
                 string stem = Path.GetFileNameWithoutExtension(fullPath);
-                if (stem.Length == 16 && ulong.TryParse(stem, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _))
+                if ((stem.Length == 16 || stem.Length == 8) && ulong.TryParse(stem, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _))
                 {
                     string stemLower = stem.ToLowerInvariant();
                     _byHash.TryAdd(stemLower, fullPath);
@@ -611,11 +611,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 if (_byRelativePath.TryGetValue(candidate, out string exact)) return new[] { exact };
             }
 
-            // Authored path is a 16-hex hash string (e.g. "aa5a8ee2e6b5d8c4.anm" or "0xaa5a8ee2e6b5d8c4")
+            // Authored path is a 16-hex or 8-hex hash string (e.g. "aa5a8ee2e6b5d8c4.anm" or "0xaa5a8ee2e6b5d8c4")
             string authoredStem = Path.GetFileNameWithoutExtension(normalized);
             if (authoredStem.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
                 authoredStem = authoredStem[2..];
-            if (authoredStem.Length == 16 && ulong.TryParse(authoredStem, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _))
+            if ((authoredStem.Length == 16 || authoredStem.Length == 8) &&
+                ulong.TryParse(authoredStem, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _))
             {
                 string hexLower = authoredStem.ToLowerInvariant();
                 if (_byHash.TryGetValue(hexLower, out string matched)) return new[] { matched };
@@ -623,6 +624,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 {
                     if (_byHash.TryGetValue(hexLower + extension, out string matchedWithExt))
                         return new[] { matchedWithExt };
+                    if (_byFileName.TryGetValue(hexLower + extension, out string[] matchedByName) && matchedByName.Length > 0)
+                        return matchedByName;
                 }
             }
 

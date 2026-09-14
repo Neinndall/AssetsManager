@@ -549,6 +549,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 if (d.IsUniformScale)
                     scaleMul = new Vector3(scaleMul.X);
                 var col = VfxColorSemantics.ResolveParticle(p.BirthColor, d.ColorOverLife, t);
+                col = VfxColorSemantics.PremultiplyForAddOrSubtract(col, d.BlendMode, d.Distortion != null);
 
                 float frame = 0f;
                 if (d.NumFrames > 1)

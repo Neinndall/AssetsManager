@@ -70,12 +70,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Theory]
+        [InlineData(0, 0, false)]
+        [InlineData(0, 5, true)]
         [InlineData(1, 0, false)]
         [InlineData(1, 5, true)]
-        [InlineData(0, 5, false)]
-        [InlineData(4, 255, false)]
+        [InlineData(2, 5, true)]
+        [InlineData(3, 5, true)]
+        [InlineData(4, 0, false)]
+        [InlineData(4, 255, true)]
+        [InlineData(8, 5, false)]
         [InlineData(255, 5, true)]
-        public void AppliesAlphaTestOnlyToNonAdditiveModes(int rawMode, int alphaReference, bool expected)
+        public void EvaluatesAlphaTestAgainstAlphaReference(int rawMode, int alphaReference, bool expected)
         {
             Assert.Equal(expected, VfxBlendModes.ShouldAlphaTest(rawMode, alphaReference));
         }

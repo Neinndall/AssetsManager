@@ -667,6 +667,19 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         return true;
                     }
                 }
+                else if (simpleSkinProperty is BinTreeU64 u64)
+                {
+                    if (XxHash64Ext.Hash(normalizedSkn) == u64.Value)
+                    {
+                        return true;
+                    }
+
+                    int assetsIdx = normalizedSkn.IndexOf("assets/", StringComparison.OrdinalIgnoreCase);
+                    if (assetsIdx >= 0 && XxHash64Ext.Hash(normalizedSkn.AsSpan(assetsIdx)) == u64.Value)
+                    {
+                        return true;
+                    }
+                }
             }
 
             return false;
@@ -898,6 +911,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 result = PathUtils.ToVirtualPath(
                     string.IsNullOrWhiteSpace(resolvedPath)
                         ? $"{link.Value:x16}"
+                        : resolvedPath);
+                return true;
+            }
+            if (property is BinTreeU64 u64)
+            {
+                string resolvedPath = wadChunkPathResolver?.Invoke(u64.Value);
+                result = PathUtils.ToVirtualPath(
+                    string.IsNullOrWhiteSpace(resolvedPath)
+                        ? $"{u64.Value:x16}"
                         : resolvedPath);
                 return true;
             }

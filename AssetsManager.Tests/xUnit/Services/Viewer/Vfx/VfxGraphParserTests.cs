@@ -480,5 +480,75 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(0.025f, sequence.TickDuration);
             Assert.Equal(4f, Assert.Single(sequence.Events).StartFrame);
         }
+
+        [Fact]
+        public void ParsesHashBasedAssetReferencesIntoExtensionPaths()
+        {
+            var meshStruct = new BinTreeStruct(
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("simpleSkin"), 0xa1b2c3d4e5f60718ul),
+                    new BinTreeU64(Fnv1a.HashLower("skeleton"), 0x1122334455667788ul),
+                });
+            var skinMeshProperties = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("simpleSkin"), 0xa1b2c3d4e5f60718ul),
+                    new BinTreeU64(Fnv1a.HashLower("skeleton"), 0x1122334455667788ul),
+                });
+            var skinObj = new BinTreeObject(
+                "SkinData/TestSkin",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[]
+                {
+                    skinMeshProperties
+                });
+
+            var animResource = new BinTreeStruct(
+                Fnv1a.HashLower("mAnimationResourceData"),
+                Fnv1a.HashLower("AnimationResourceData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeU64(Fnv1a.HashLower("mAnimationFilePath"), 0x9988776655443322ul)
+                });
+            var clip = new BinTreeStruct(
+                Fnv1a.HashLower("AtomicClipData"),
+                Fnv1a.HashLower("AtomicClipData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mClipName"), "Attack_01"),
+                    animResource
+                });
+            var clipMap = new BinTreeMap(
+                Fnv1a.HashLower("mClipDataMap"),
+                BinPropertyType.String,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeString(0, "Attack_01"),
+                        clip)
+                });
+            var animObj = new BinTreeObject(
+                "Animations/TestAnim",
+                "AnimationGraphData",
+                new BinTreeProperty[] { clipMap });
+
+            using var stream = new MemoryStream();
+            new BinTree(new[] { skinObj, animObj }, System.Array.Empty<string>()).Write(stream);
+
+            VfxBinDocument doc = VfxGraphParser.ParseDocument(stream.ToArray());
+
+            Assert.NotNull(doc.OwnerSceneContext);
+            Assert.Equal("a1b2c3d4e5f60718.skn", doc.OwnerSceneContext.MeshPath);
+            Assert.Equal("1122334455667788.skl", doc.OwnerSceneContext.SkeletonPath);
+
+            var seq = Assert.Single(doc.EventSequences);
+            Assert.Equal("9988776655443322.anm", seq.AnimationFilePath);
+        }
     }
 }

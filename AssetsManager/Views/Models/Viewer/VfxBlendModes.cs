@@ -49,7 +49,7 @@ namespace AssetsManager.Views.Models.Viewer
         private static readonly VfxBlendModeDescriptor[] AuthoredModes =
         {
             // 0: ADD -> One, One, Add (Pure additive)
-            new(0, "Add", VfxBlendModeKind.Additive, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: false, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+            new(0, "Add", VfxBlendModeKind.Additive, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
 
             // 1: ALPHA -> SrcAlpha, OneMinusSrcAlpha, Add
             new(1, "Alpha Blend", VfxBlendModeKind.Alpha, VfxBlendFactor.SourceAlpha, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendFactor.One, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
@@ -61,7 +61,7 @@ namespace AssetsManager.Views.Models.Viewer
             new(3, "None (Opaque)", VfxBlendModeKind.Opaque, VfxBlendFactor.One, VfxBlendFactor.Zero, VfxBlendFactor.One, VfxBlendFactor.Zero, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: true, NeutralizeTransparentRgb: false),
 
             // 4: ALPHA_ADD -> SrcAlpha, One, Add (Alpha-modulated additive)
-            new(4, "Alpha Add", VfxBlendModeKind.Additive, VfxBlendFactor.SourceAlpha, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: false, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
+            new(4, "Alpha Add", VfxBlendModeKind.Additive, VfxBlendFactor.SourceAlpha, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),
 
             // 5: PREMULTIPLIED_ALPHA -> One, OneMinusSrcAlpha, Add
             new(5, "Premultiplied Alpha", VfxBlendModeKind.Alpha, VfxBlendFactor.One, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendFactor.One, VfxBlendFactor.OneMinusSourceAlpha, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false),

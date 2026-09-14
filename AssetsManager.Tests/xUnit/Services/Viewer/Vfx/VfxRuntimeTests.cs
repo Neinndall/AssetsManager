@@ -1286,7 +1286,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 TimeBeforeFirstEmission: 0f,
                 IsSingleParticle: true,
                 Disabled: false,
-                BlendMode: 2,
+                BlendMode: 1,
                 BirthScale: VfxCurve3.Const(birthScale),
                 ScaleOverLife: null,
                 BirthColor: VfxCurve4.Const(Vector4.One),
