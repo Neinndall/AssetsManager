@@ -27,10 +27,12 @@ internal sealed class VfxClipCatalog : IDisposable
             var events = new List<VfxCompositionEvent>();
             float start = 0;
             bool missing = false;
+            string firstResolvedPath = null;
             foreach (var atomic in playlist)
             {
                 string path = resolve(atomic.AnimationFilePath);
                 if (path == null) { missing = true; break; }
+                firstResolvedPath ??= path;
                 if (!_assets.TryGetValue(path, out var asset))
                 {
                     try
@@ -62,7 +64,20 @@ internal sealed class VfxClipCatalog : IDisposable
                 log?.LogWarning($"VFX clip 0x{clip.OwnerPathHash:x8} has an unavailable animation dependency.");
                 continue;
             }
-            string name = clip.ClipName ?? Path.GetFileNameWithoutExtension(playlist[0].AnimationFilePath);
+
+            string resolvedFilename = firstResolvedPath != null
+                ? Path.GetFileNameWithoutExtension(firstResolvedPath)
+                : null;
+
+            bool isHexHashName = !string.IsNullOrEmpty(clip.ClipName) &&
+                ((clip.ClipName.Length == 16 && ulong.TryParse(clip.ClipName, System.Globalization.NumberStyles.HexNumber, null, out _)) ||
+                 (clip.ClipName.StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
+                  ulong.TryParse(clip.ClipName.AsSpan(2), System.Globalization.NumberStyles.HexNumber, null, out _)));
+
+            string name = (!string.IsNullOrWhiteSpace(clip.ClipName) && !isHexHashName)
+                ? clip.ClipName
+                : (resolvedFilename ?? Path.GetFileNameWithoutExtension(playlist[0].AnimationFilePath));
+
             int resolved = events.Count(cue => cue.System != null && !cue.Event.IsKillEvent);
             var merged = new VfxAbilityComposition(clip.OwnerPathHash, clip.OwnerClassHash, 1, 0, start,
                 events.OrderBy(cue => cue.Event.StartFrame).ToArray(), name, clip.AnimationFilePath,
@@ -71,7 +86,7 @@ internal sealed class VfxClipCatalog : IDisposable
             {
                 Name = name,
                 DisplayName = $"{name} · {clip.OwnerPathHash:x8}",
-                FilePath = playlist[0].AnimationFilePath,
+                FilePath = firstResolvedPath ?? playlist[0].AnimationFilePath,
                 Duration = start,
                 AnimationAsset = new ClipPlaylist(steps),
                 Composition = merged,

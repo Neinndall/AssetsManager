@@ -9,6 +9,7 @@ using LeagueToolkit.Core.Memory;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Hashing;
 using System.Numerics;
+using System.Globalization;
 using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Viewer.Vfx.Resources
@@ -489,12 +490,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
         private readonly string _root;
         private readonly Dictionary<string, string> _byRelativePath;
+        private readonly Dictionary<string, string> _byHash;
         private readonly Dictionary<string, string[]> _byFileName;
 
         private VfxResourceIndex(string root)
         {
             _root = Path.GetFullPath(root);
             _byRelativePath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            _byHash = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var byName = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (string path in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
@@ -505,6 +508,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 string relativePath = Normalize(Path.GetRelativePath(_root, fullPath));
                 _byRelativePath.TryAdd(relativePath, fullPath);
 
+                string ext = Path.GetExtension(fullPath);
                 string fileName = Path.GetFileName(fullPath);
                 if (!byName.TryGetValue(fileName, out var paths))
                 {
@@ -512,6 +516,30 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                     byName[fileName] = paths;
                 }
                 paths.Add(fullPath);
+
+                // Index by XxHash64 of the virtual relative path (e.g. assets/characters/lulu/...)
+                ulong hash = XxHash64Ext.Hash(relativePath.ToLowerInvariant());
+                string hashKey = hash.ToString("x16");
+                _byHash.TryAdd(hashKey, fullPath);
+                _byHash.TryAdd(hashKey + ext, fullPath);
+
+                if (!relativePath.StartsWith("assets/", StringComparison.OrdinalIgnoreCase) &&
+                    !relativePath.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
+                {
+                    ulong assetsHash = XxHash64Ext.Hash(("assets/" + relativePath).ToLowerInvariant());
+                    string assetsHashKey = assetsHash.ToString("x16");
+                    _byHash.TryAdd(assetsHashKey, fullPath);
+                    _byHash.TryAdd(assetsHashKey + ext, fullPath);
+                }
+
+                // If the file on disk was extracted with a 16-hex hash name, also index it
+                string stem = Path.GetFileNameWithoutExtension(fullPath);
+                if (stem.Length == 16 && ulong.TryParse(stem, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _))
+                {
+                    string stemLower = stem.ToLowerInvariant();
+                    _byHash.TryAdd(stemLower, fullPath);
+                    _byHash.TryAdd(stemLower + ext, fullPath);
+                }
             }
 
             _byFileName = byName.ToDictionary(
@@ -583,11 +611,28 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 if (_byRelativePath.TryGetValue(candidate, out string exact)) return new[] { exact };
             }
 
+            // Authored path is a 16-hex hash string (e.g. "aa5a8ee2e6b5d8c4.anm" or "0xaa5a8ee2e6b5d8c4")
+            string authoredStem = Path.GetFileNameWithoutExtension(normalized);
+            if (authoredStem.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                authoredStem = authoredStem[2..];
+            if (authoredStem.Length == 16 && ulong.TryParse(authoredStem, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _))
+            {
+                string hexLower = authoredStem.ToLowerInvariant();
+                if (_byHash.TryGetValue(hexLower, out string matched)) return new[] { matched };
+                foreach (string extension in extensions)
+                {
+                    if (_byHash.TryGetValue(hexLower + extension, out string matchedWithExt))
+                        return new[] { matchedWithExt };
+                }
+            }
+
             // Unresolved WAD entries keep the hash of their full virtual path, including DATA/ASSETS.
             foreach (string sourceExtension in extensions)
             {
                 string virtualPath = Path.ChangeExtension(normalized, sourceExtension).ToLowerInvariant();
                 string hash = XxHash64Ext.Hash(virtualPath).ToString("x16");
+                if (_byHash.TryGetValue(hash, out string hashedMatch))
+                    return new[] { hashedMatch };
                 foreach (string storedExtension in extensions)
                 {
                     if (_byFileName.TryGetValue(hash + storedExtension, out string[] hashed))

@@ -350,6 +350,72 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             }
         }
 
+        [Fact]
+        public void ResourceIndexResolvesFileByItsXxHash64()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerXxHash", Guid.NewGuid().ToString("N"));
+            string animDir = Path.Combine(root, "assets", "characters", "lulu", "skins", "base", "animations");
+            Directory.CreateDirectory(animDir);
+            try
+            {
+                string animPath = Path.Combine(animDir, "lulu_attack1.anm");
+                File.WriteAllBytes(animPath, Array.Empty<byte>());
+
+                var index = VfxResourceIndex.Build(root);
+
+                string relPath = "assets/characters/lulu/skins/base/animations/lulu_attack1.anm";
+                ulong hash = XxHash64Ext.Hash(relPath);
+                string hexHash = hash.ToString("x16");
+
+                string resolved = index.Resolve($"{hexHash}.anm", new[] { ".anm" });
+                Assert.Equal(animPath, resolved);
+
+                resolved = index.Resolve(hexHash, new[] { ".anm" });
+                Assert.Equal(animPath, resolved);
+
+                resolved = index.Resolve($"0x{hexHash}.anm", new[] { ".anm" });
+                Assert.Equal(animPath, resolved);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void FolderCatalogPrioritizesChampionOverCompanionPet()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "Lulu.wad.client");
+            string champSkinDir = Path.Combine(root, "data", "characters", "lulu", "skins");
+            string petSkinDir = Path.Combine(root, "data", "characters", "jade_lulufaerie", "skins");
+            Directory.CreateDirectory(champSkinDir);
+            Directory.CreateDirectory(petSkinDir);
+            try
+            {
+                string champSkin = Path.Combine(champSkinDir, "skin0.bin");
+                string petSkin = Path.Combine(petSkinDir, "skin0.bin");
+                WriteSkinBin(champSkin);
+                WriteSkinBin(petSkin);
+
+                var skins = VfxFolderCatalog.Scan(root, System.Threading.CancellationToken.None);
+                Assert.Equal(2, skins.Count);
+                Assert.Equal(champSkin, skins[0].BinPath);
+                Assert.Equal(petSkin, skins[1].BinPath);
+            }
+            finally
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            }
+        }
+
+        private static void WriteSkinBin(string path)
+        {
+            var obj = new BinTreeObject("SkinData", "SkinCharacterDataProperties", Array.Empty<BinTreeProperty>());
+            var tree = new BinTree(new[] { obj }, Array.Empty<string>());
+            using var stream = File.Create(path);
+            tree.Write(stream);
+        }
+
         private static BinTreeObject CreateSystem(string path, string name)
             => new(
                 path,
