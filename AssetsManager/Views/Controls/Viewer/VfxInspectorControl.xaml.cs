@@ -652,7 +652,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.IsRawSystemsMode = true;
                     _model.SelectedSystem = system;
                     break;
-                case VfxAnimationItem animation:
+                case AnimationClipCatalogItem animation:
                     _model.IsAnimationMode = true;
                     _model.SelectedAnimation = animation;
                     break;
@@ -975,7 +975,7 @@ namespace AssetsManager.Views.Controls.Viewer
             return File.Exists(sameName) ? sameName : null;
         }
 
-        private void PlaySelectedAnimation(VfxAnimationItem animItem)
+        private void PlaySelectedAnimation(AnimationClipCatalogItem animItem)
         {
             if (animItem == null || _championModel == null) return;
 
@@ -1498,7 +1498,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     animView.Filter = obj =>
                     {
-                        if (obj is VfxAnimationItem item)
+                        if (obj is AnimationClipCatalogItem item)
                         {
                             return item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
                                 || item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)

@@ -12,7 +12,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         {
             var firstSystem = new VfxSystemDefinition(100, "First", "first", new VfxEmitterDefinition[0]);
             var secondSystem = new VfxSystemDefinition(200, "Second", "second", new VfxEmitterDefinition[0]);
-            var sequence = new VfxEventSequenceDefinition(
+            var sequence = new AnimationClipDefinition(
                 10,
                 20,
                 1f / 30f,
@@ -41,7 +41,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             var ally = new VfxSystemDefinition(100, "Ally", "ally", new VfxEmitterDefinition[0]);
             var enemy = new VfxSystemDefinition(200, "Enemy", "enemy", new VfxEmitterDefinition[0]);
             VfxParticleEventDefinition particleEvent = Event(1, 0f, 100) with { EnemyEffectKey = 200 };
-            var sequence = new VfxEventSequenceDefinition(10, 20, 1f / 30f, 0f, 30f, new[] { particleEvent });
+            var sequence = new AnimationClipDefinition(10, 20, 1f / 30f, 0f, 30f, new[] { particleEvent });
             var systems = new Dictionary<uint, VfxSystemDefinition> { [100] = ally, [200] = enemy };
 
             VfxAbilityComposition composition = VfxAbilityCompositionBuilder.Build(
@@ -57,9 +57,31 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void AnimationClipModeCanRequireExactResolverKeyInsteadOfEffectNameFallback()
+        {
+            var named = new VfxSystemDefinition(100, "Effects/Named", "named", new VfxEmitterDefinition[0]);
+            VfxParticleEventDefinition particleEvent = Event(1, 0f, 999) with { EffectName = "Effects/Named", IsKillEvent = false };
+            var sequence = new AnimationClipDefinition(10, 20, 1f / 30f, 0f, 30f, new[] { particleEvent });
+            var systems = new Dictionary<uint, VfxSystemDefinition> { [100] = named };
+
+            Assert.Same(
+                named,
+                Assert.Single(VfxAbilityCompositionBuilder.Build(
+                    sequence,
+                    systems,
+                    new Dictionary<uint, uint>()).Events).System);
+            Assert.Null(
+                Assert.Single(VfxAbilityCompositionBuilder.Build(
+                    sequence,
+                    systems,
+                    new Dictionary<uint, uint>(),
+                    allowEffectNameFallback: false).Events).System);
+        }
+
+        [Fact]
         public void KeepsUnresolvedEventsVisibleForDiagnostics()
         {
-            var sequence = new VfxEventSequenceDefinition(10, 20, 1f / 30f, 0f, 30f, new[] { Event(1, 0f, 999) });
+            var sequence = new AnimationClipDefinition(10, 20, 1f / 30f, 0f, 30f, new[] { Event(1, 0f, 999) });
 
             VfxAbilityComposition composition = VfxAbilityCompositionBuilder.Build(
                 sequence,
@@ -77,11 +99,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             var selected = new VfxSystemDefinition(100, "Dash", "dash", new VfxEmitterDefinition[0]);
             var sibling = new VfxSystemDefinition(200, "Dash_Trail", "dash_trail", new VfxEmitterDefinition[0]);
             VfxAbilityComposition exact = VfxAbilityCompositionBuilder.Build(
-                new VfxEventSequenceDefinition(20, 1, 1f / 30f, 0, 30, new[] { Event(1, 0, 100) }),
+                new AnimationClipDefinition(20, 1, 1f / 30f, 0, 30, new[] { Event(1, 0, 100) }),
                 new Dictionary<uint, VfxSystemDefinition> { [100] = selected, [200] = sibling },
                 new Dictionary<uint, uint>());
             VfxAbilityComposition nameOnlySibling = VfxAbilityCompositionBuilder.Build(
-                new VfxEventSequenceDefinition(10, 1, 1f / 30f, 0, 30, new[] { Event(2, 0, 200) }),
+                new AnimationClipDefinition(10, 1, 1f / 30f, 0, 30, new[] { Event(2, 0, 200) }),
                 new Dictionary<uint, VfxSystemDefinition> { [100] = selected, [200] = sibling },
                 new Dictionary<uint, uint>());
 
@@ -98,11 +120,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             var selected = new VfxSystemDefinition(100, "Trail", "trail", new VfxEmitterDefinition[0]);
             var systems = new Dictionary<uint, VfxSystemDefinition> { [100] = selected };
             VfxAbilityComposition first = VfxAbilityCompositionBuilder.Build(
-                new VfxEventSequenceDefinition(30, 1, 1f / 30f, 0, 30, new[] { Event(1, 2, 100) }),
+                new AnimationClipDefinition(30, 1, 1f / 30f, 0, 30, new[] { Event(1, 2, 100) }),
                 systems,
                 new Dictionary<uint, uint>());
             VfxAbilityComposition second = VfxAbilityCompositionBuilder.Build(
-                new VfxEventSequenceDefinition(10, 1, 1f / 30f, 0, 30, new[] { Event(2, 8, 100) }),
+                new AnimationClipDefinition(10, 1, 1f / 30f, 0, 30, new[] { Event(2, 8, 100) }),
                 systems,
                 new Dictionary<uint, uint>());
 

@@ -73,6 +73,7 @@ namespace AssetsManager.Services.Viewer.Loading
                         Path.GetFileNameWithoutExtension(filePath),
                         materialTextures,
                         filePath,
+                        SknMaterialTextureResolver.TryResolveBinPath(textureDirectoryPath),
                         cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -115,6 +116,7 @@ namespace AssetsManager.Services.Viewer.Loading
                         Path.GetFileNameWithoutExtension(filePath),
                         materialTextures,
                         filePath,
+                        SknMaterialTextureResolver.TryResolveBinPath(filePath),
                         cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -198,6 +200,7 @@ namespace AssetsManager.Services.Viewer.Loading
             string modelName,
             SknMaterialTextureResolution materialTextures,
             string filePath,
+            string skinBinPath,
             CancellationToken cancellationToken)
         {
             var availableTextureNames = new ObservableRangeCollection<string>(
@@ -283,6 +286,8 @@ namespace AssetsManager.Services.Viewer.Loading
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            var initiallyHiddenSubmeshes = (materialTextures?.InitialHiddenSubmeshes ?? Array.Empty<string>())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             RigResource skeleton = null;
             string skeletonPath = Path.ChangeExtension(filePath, ".skl");
             if (File.Exists(skeletonPath))
@@ -293,7 +298,14 @@ namespace AssetsManager.Services.Viewer.Loading
 
             return await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh, FilePath = filePath, Skeleton = skeleton };
+                var sceneModel = new SceneModel
+                {
+                    Name = modelName,
+                    SkinnedMesh = skinnedMesh,
+                    FilePath = filePath,
+                    SkinBinPath = skinBinPath ?? string.Empty,
+                    Skeleton = skeleton
+                };
                 _logService.LogDebug("--- Displaying Model ---");
                 var parts = new List<ModelPart>();
 
@@ -329,6 +341,8 @@ namespace AssetsManager.Services.Viewer.Loading
                     };
 
                     TextureUtils.UpdateMaterial(modelPart);
+                    if (initiallyHiddenSubmeshes.Contains(modelPart.Name))
+                        modelPart.IsVisible = false;
 
                     parts.Add(modelPart);
                 }

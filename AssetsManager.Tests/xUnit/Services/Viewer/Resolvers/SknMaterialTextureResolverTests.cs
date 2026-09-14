@@ -28,6 +28,31 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         };
 
         [Fact]
+        public void ReadMetadata_ParsesInitialHiddenSubmeshesLikeLtk()
+        {
+            var meshProperties = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(
+                        Fnv1a.HashLower("initialSubmeshToHide"),
+                        "Hair, Weapon   Cape\tExtra")
+                });
+            var skin = new BinTreeObject(
+                "Characters/Test/Skins/Skin0",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[] { meshProperties });
+            var tree = new BinTree(new[] { skin }, Array.Empty<string>());
+
+            SknMaterialTextureMetadata metadata = SknResolver.ReadMetadata(tree);
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(tree, Array.Empty<string>());
+
+            Assert.Equal(new[] { "Hair", "Weapon", "Cape", "Extra" }, metadata.InitialHiddenSubmeshes);
+            Assert.Equal(metadata.InitialHiddenSubmeshes, resolution.InitialHiddenSubmeshes);
+        }
+
+        [Fact]
         public void Resolve_UsesSkinMeshTextureAsDefaultWithoutStaticMaterials()
         {
             BinTree tree = CreateSkinTree(

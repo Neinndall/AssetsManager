@@ -9,10 +9,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
     public static class VfxAbilityCompositionBuilder
     {
         public static VfxAbilityComposition Build(
-            VfxEventSequenceDefinition sequence,
+            AnimationClipDefinition sequence,
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
             IReadOnlyDictionary<uint, uint> resourceMap,
-            bool useEnemyEffects = false)
+            bool useEnemyEffects = false,
+            bool allowEffectNameFallback = true)
         {
             ArgumentNullException.ThrowIfNull(sequence);
             ArgumentNullException.ThrowIfNull(systems);
@@ -22,10 +23,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
                 .Where(pair => !string.IsNullOrWhiteSpace(pair.Value.Name))
                 .GroupBy(pair => pair.Value.Name, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-            var compositionEvents = new List<VfxCompositionEvent>(sequence.Events.Count);
+            var particleEvents = sequence.ParticleEvents.OrderBy(item => item.StartFrame).ToArray();
+            var compositionEvents = new List<VfxCompositionEvent>(particleEvents.Length);
             int resolvedCount = 0;
 
-            foreach (VfxParticleEventDefinition particleEvent in sequence.Events.OrderBy(item => item.StartFrame))
+            foreach (VfxParticleEventDefinition particleEvent in particleEvents)
             {
                 bool usesEnemyEffect = useEnemyEffects && particleEvent.EnemyEffectKey != 0;
                 uint effectKey = usesEnemyEffect ? particleEvent.EnemyEffectKey : particleEvent.EffectKey;
@@ -34,7 +36,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
                     particleEvent.EffectName,
                     systems,
                     resourceMap,
-                    systemsByName);
+                    systemsByName,
+                    allowEffectNameFallback);
                 if (system is not null) resolvedCount++;
                 compositionEvents.Add(new VfxCompositionEvent(
                     particleEvent,
@@ -60,7 +63,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
         }
 
         public static IReadOnlyList<VfxAbilityComposition> BuildAll(
-            IEnumerable<VfxEventSequenceDefinition> sequences,
+            IEnumerable<AnimationClipDefinition> sequences,
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
             IReadOnlyDictionary<uint, uint> resourceMap,
             bool useEnemyEffects = false)
@@ -98,12 +101,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
             string effectName,
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
             IReadOnlyDictionary<uint, uint> resourceMap,
-            IReadOnlyDictionary<string, KeyValuePair<uint, VfxSystemDefinition>> systemsByName)
+            IReadOnlyDictionary<string, KeyValuePair<uint, VfxSystemDefinition>> systemsByName,
+            bool allowEffectNameFallback)
         {
             if (TryResolveHash(effectKey, systems, resourceMap, out uint systemHash, out VfxSystemDefinition system))
                 return (systemHash, system);
 
-            if (!string.IsNullOrWhiteSpace(effectName))
+            if (allowEffectNameFallback && !string.IsNullOrWhiteSpace(effectName))
             {
                 uint nameHash = Fnv1a.HashLower(effectName);
                 if (TryResolveHash(nameHash, systems, resourceMap, out systemHash, out system))

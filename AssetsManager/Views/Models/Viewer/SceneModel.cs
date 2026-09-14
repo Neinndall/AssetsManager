@@ -28,6 +28,9 @@ namespace AssetsManager.Views.Models.Viewer
         }
         public string SourceType { get; set; } = "Model"; // "Model" or "Chroma"
         public string FilePath { get; set; } = string.Empty;
+        public string SkinBinPath { get; set; } = string.Empty;
+        public AnimationClipVfxContext AnimationClipVfxContext { get; set; }
+        public IDisposable AnimationClipResources { get; set; }
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
         public MapLightingProfile MapLightingProfile { get; set; }
@@ -285,7 +288,7 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 if (sender is ModelPart part)
                 {
-                    if (IsMeshSyncEnabled)
+                    if (!_isUpdatingVisibility && IsMeshSyncEnabled)
                     {
                         MeshVisibilityChanged?.Invoke(part);
                     }
@@ -320,6 +323,29 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 _isUpdatingVisibility = false;
             }
+        }
+
+        /// <summary>
+        /// Applies clip-authored submesh visibility without treating the change as a user
+        /// mesh-sync edit. The master model visibility is refreshed once after the batch.
+        /// </summary>
+        internal void ApplyAnimationVisibility(IReadOnlyDictionary<ModelPart, bool> visibility)
+        {
+            if (visibility == null || Parts == null) return;
+            try
+            {
+                _isUpdatingVisibility = true;
+                foreach (ModelPart part in Parts)
+                {
+                    if (visibility.TryGetValue(part, out bool isVisible))
+                        part.IsVisible = isVisible;
+                }
+            }
+            finally
+            {
+                _isUpdatingVisibility = false;
+            }
+            UpdateMasterVisibility();
         }
 
         public void Dispose()
@@ -359,6 +385,10 @@ namespace AssetsManager.Views.Models.Viewer
                 }
             }
             Animations?.Clear();
+            AnimationClipResources?.Dispose();
+            AnimationClipResources = null;
+            AnimationClipVfxContext = null;
+            SkinBinPath = string.Empty;
 
             if (_userTransformGroup.Children.Contains(_scaleTransform))
             {

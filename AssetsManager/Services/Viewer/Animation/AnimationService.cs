@@ -17,8 +17,12 @@ namespace AssetsManager.Services.Viewer.Animation
 
         // Persistent buffers to avoid per-frame allocations
         private Matrix4x4[] _boneTransforms;
+        private Matrix4x4[] _baseBoneTransforms;
+        private Matrix4x4[] _localTransforms;
         private Matrix4x4[] _finalBoneTransforms;
         private uint[] _jointHashes;
+        private uint[] _jointFnvHashes;
+        private IReadOnlyList<AnimationJointSnapCue> _jointSnapCues = Array.Empty<AnimationJointSnapCue>();
         private GpuSkinningData _gpuSkinningData;
         private IAnimationAsset _lastAnimation;
         private IAnimationAsset _evaluatedAnimation;
@@ -56,6 +60,7 @@ namespace AssetsManager.Services.Viewer.Animation
             _evaluatedAnimation = null;
             _evaluatedSkeleton = null;
             _gpuSkinningData = null;
+            _jointSnapCues = Array.Empty<AnimationJointSnapCue>();
             _currentPose.Clear();
         }
 
@@ -74,11 +79,16 @@ namespace AssetsManager.Services.Viewer.Animation
                 !ReferenceEquals(_lastSkeleton, skeleton))
             {
                 _boneTransforms = new Matrix4x4[jointCount];
+                _baseBoneTransforms = new Matrix4x4[jointCount];
+                _localTransforms = new Matrix4x4[jointCount];
                 _finalBoneTransforms = new Matrix4x4[jointCount];
                 _jointHashes = new uint[jointCount];
+                _jointFnvHashes = new uint[jointCount];
                 for (int i = 0; i < jointCount; i++)
                 {
-                    _jointHashes[i] = Elf.HashLower(skeleton.Joints[i].Name);
+                    string jointName = skeleton.Joints[i].Name;
+                    _jointHashes[i] = Elf.HashLower(jointName);
+                    _jointFnvHashes[i] = Fnv1a.HashLower(jointName);
                 }
             }
 
@@ -103,6 +113,12 @@ namespace AssetsManager.Services.Viewer.Animation
                         $"GPU skinning unavailable for model '{modelName}': {failureReason ?? "Unsupported skin data."} The model will remain in bind pose.");
                 }
             }
+        }
+
+        public void SetJointSnapCues(IReadOnlyList<AnimationJointSnapCue> cues)
+        {
+            _jointSnapCues = cues ?? Array.Empty<AnimationJointSnapCue>();
+            _evaluatedTime = float.NaN;
         }
 
         public void Update(
@@ -153,8 +169,13 @@ namespace AssetsManager.Services.Viewer.Animation
 
         private void EvaluatePose(float totalSeconds, IAnimationAsset animation, RigResource skeleton)
         {
-            if (ReferenceEquals(animation, _evaluatedAnimation) && ReferenceEquals(skeleton, _evaluatedSkeleton) && totalSeconds == _evaluatedTime)
+            if (ReferenceEquals(animation, _evaluatedAnimation) &&
+                ReferenceEquals(skeleton, _evaluatedSkeleton) &&
+                totalSeconds == _evaluatedTime)
+            {
                 return;
+            }
+
             _evaluatedAnimation = animation;
             _evaluatedSkeleton = skeleton;
             _evaluatedTime = totalSeconds;
@@ -164,25 +185,99 @@ namespace AssetsManager.Services.Viewer.Animation
                 : 0f;
             animation.Evaluate(currentTime, _currentPose);
 
-            // Calculate bone matrices hierarchically so attachment consumers receive the
-            // same transforms as GPU skinning, including joints omitted by the animation.
+            // Build the base local/world pose first. LTK resolves joint-snap targets and
+            // parents against this unmodified pose, then rewrites the snapped local joint.
             for (int i = 0; i < skeleton.Joints.Count; i++)
             {
                 var joint = skeleton.Joints[i];
-                var jointHash = _jointHashes[i];
-
-                var localTransform = joint.LocalTransform;
-                if (_currentPose.TryGetValue(jointHash, out var pose))
+                Matrix4x4 localTransform = joint.LocalTransform;
+                if (_currentPose.TryGetValue(_jointHashes[i], out var pose))
                 {
                     localTransform = Matrix4x4.CreateScale(pose.Scale) *
                                      Matrix4x4.CreateFromQuaternion(pose.Rotation) *
                                      Matrix4x4.CreateTranslation(pose.Translation);
                 }
 
-                _boneTransforms[i] = joint.ParentId > -1
-                    ? localTransform * _boneTransforms[joint.ParentId]
+                _localTransforms[i] = localTransform;
+                _baseBoneTransforms[i] = joint.ParentId > -1
+                    ? localTransform * _baseBoneTransforms[joint.ParentId]
                     : localTransform;
             }
+
+            if (_jointSnapCues.Count > 0)
+            {
+                double folded = animation.Duration > 0f
+                    ? PositiveModulo(totalSeconds, animation.Duration)
+                    : 0d;
+
+                foreach (AnimationJointSnapCue snap in _jointSnapCues)
+                {
+                    if (folded < snap.AtSeconds ||
+                        (snap.UntilSeconds.HasValue && folded >= snap.UntilSeconds.Value))
+                    {
+                        continue;
+                    }
+
+                    int jointIndex = FindJointIndex(skeleton, snap.JointHash);
+                    int targetIndex = FindJointIndex(skeleton, snap.SnapToHash);
+                    if (jointIndex < 0 || targetIndex < 0 || jointIndex == targetIndex)
+                        continue;
+
+                    Matrix4x4 snappedLocal =
+                        Matrix4x4.CreateTranslation(snap.Offset) * _baseBoneTransforms[targetIndex];
+                    int parentIndex = skeleton.Joints[jointIndex].ParentId;
+                    if (parentIndex >= 0 &&
+                        Matrix4x4.Invert(_baseBoneTransforms[parentIndex], out Matrix4x4 inverseParent))
+                    {
+                        snappedLocal *= inverseParent;
+                    }
+
+                    // Three.js decomposes the snapped local and writes all three components.
+                    // Recompose after decomposition to normalize the quaternion/matrix path.
+                    if (Matrix4x4.Decompose(
+                            snappedLocal,
+                            out Vector3 snappedScale,
+                            out Quaternion snappedRotation,
+                            out Vector3 snappedTranslation))
+                    {
+                        _localTransforms[jointIndex] =
+                            Matrix4x4.CreateScale(snappedScale) *
+                            Matrix4x4.CreateFromQuaternion(snappedRotation) *
+                            Matrix4x4.CreateTranslation(snappedTranslation);
+                    }
+                }
+            }
+
+            // Recompose from the (possibly snapped) locals so descendants and VFX
+            // attachments follow the same pose that GPU skinning draws.
+            for (int i = 0; i < skeleton.Joints.Count; i++)
+            {
+                int parentIndex = skeleton.Joints[i].ParentId;
+                _boneTransforms[i] = parentIndex > -1
+                    ? _localTransforms[i] * _boneTransforms[parentIndex]
+                    : _localTransforms[i];
+            }
+        }
+
+        private int FindJointIndex(RigResource skeleton, uint hash)
+        {
+            if (hash == 0u) return -1;
+            for (int i = 0; i < skeleton.Joints.Count; i++)
+            {
+                if ((_jointHashes != null && _jointHashes[i] == hash) ||
+                    (_jointFnvHashes != null && _jointFnvHashes[i] == hash))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private static double PositiveModulo(double value, double span)
+        {
+            if (!(span > 0d)) return 0d;
+            double wrapped = value % span;
+            return wrapped < 0d ? wrapped + span : wrapped;
         }
 
         private bool TryGetBoneTransform(string boneName, uint boneHash, out Matrix4x4 transform)
@@ -253,8 +348,11 @@ namespace AssetsManager.Services.Viewer.Animation
             // Clear persistent buffers so the GC can reclaim the memory
             ClearCache();
             _boneTransforms = null;
+            _baseBoneTransforms = null;
+            _localTransforms = null;
             _finalBoneTransforms = null;
             _jointHashes = null;
+            _jointFnvHashes = null;
         }
     }
 }
