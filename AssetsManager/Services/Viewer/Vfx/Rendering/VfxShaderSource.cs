@@ -382,7 +382,7 @@ void main(){
     vec2 vUvMult = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uAddressModeMult);
     vec4 texel = (uHasTex != 0)
         ? texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode)
-        : vec4(0.0);
+        : vec4(1.0);
     if (uHasTex != 0 && uUvMode == 2)
         texel.a = texture(uTex, vCornerUv).a;
     if (uHasPalette != 0) {
@@ -464,6 +464,7 @@ in float vPaletteSelector;
 in vec3 vColorDynamics;
 uniform sampler2D uTex;
 uniform int uHasTex;
+uniform int uPrimitiveKind;
 uniform sampler2D uTexMult;
 uniform int uHasTexMult;
 uniform int uAddressMode;
@@ -533,9 +534,15 @@ vec4 applyParticleColor(vec4 tex){
 void main(){
     vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uAddressMode);
     vec2 vUvMult = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uAddressModeMult);
-    vec4 t = (uHasTex != 0)
-        ? texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode)
-        : vec4(0.0);
+    vec4 t;
+    if (uHasTex != 0) {
+        t = texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode);
+    } else {
+        t = vec4(1.0);
+        bool ribbonPrimitive = uPrimitiveKind == 5 || uPrimitiveKind == 6 || uPrimitiveKind == 8 || uPrimitiveKind == 10;
+        if (!ribbonPrimitive)
+            t.a = 1.0 - smoothstep(0.0, 0.5, length(vCornerUv - vec2(0.5)));
+    }
     if (uHasTex != 0 && uUvMode == 2)
         t.a = texture(uTex, vCornerUv).a;
     if (uHasPalette != 0) {

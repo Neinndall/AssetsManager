@@ -140,7 +140,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_soundOnCreate = HashAlgorithms.Fnv1a("SoundOnCreate");
         private static readonly uint F_hasPostRotateOrientation = HashAlgorithms.Fnv1a("hasPostRotateOrientation");
         private static readonly uint F_particlesShareRandomValue = HashAlgorithms.Fnv1a("ParticlesShareRandomValue");
-        private static readonly uint F_falloffTexture = HashAlgorithms.Fnv1a("falloffTexture");
         private static readonly uint F_filtering = HashAlgorithms.Fnv1a("Filtering");
         private static readonly uint F_keywordsExcluded = HashAlgorithms.Fnv1a("keywordsExcluded");
         private static readonly uint F_customMaterial = HashAlgorithms.Fnv1a("CustomMaterial");
@@ -953,7 +952,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 RateByVelocityFunction: ReadCurve2(p, F_rateByVelocityFunction),
                 HasPostRotateOrientation: GetBool(p, F_hasPostRotateOrientation),
                 ParticlesShareRandomValue: GetBool(p, F_particlesShareRandomValue),
-                FalloffTexturePath: ReadAsset(p, F_falloffTexture, ".tex"),
                 AudioSoundOnCreate: audioSoundOnCreate,
                 FilteringKeywordsExcluded: filteringKeywords,
                 LegacyBirthScale: legacyBirthScale,

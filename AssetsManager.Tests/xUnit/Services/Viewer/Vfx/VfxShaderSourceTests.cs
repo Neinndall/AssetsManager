@@ -6,10 +6,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
     public sealed class VfxShaderSourceTests
     {
         [Fact]
-        public void MissingTexturesRemainTransparentWithoutInventedAlpha()
+        public void MissingTexturesFollowLtkFallbackSemantics()
         {
-            Assert.Contains(": vec4(0.0)", VfxShaderSource.MeshFragment);
-            Assert.Contains(": vec4(0.0);", VfxShaderSource.ParticleFragment);
+            Assert.Contains(": vec4(1.0);", VfxShaderSource.MeshFragment);
+            Assert.Contains("t = vec4(1.0);", VfxShaderSource.ParticleFragment);
+            Assert.Contains("1.0 - smoothstep(0.0, 0.5", VfxShaderSource.ParticleFragment);
+            Assert.Contains("if (!ribbonPrimitive)", VfxShaderSource.ParticleFragment);
             Assert.DoesNotContain("uDeriveAlphaFromRgb", VfxShaderSource.MeshFragment);
             Assert.DoesNotContain("uDeriveAlphaFromRgb", VfxShaderSource.ParticleFragment);
         }
