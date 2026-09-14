@@ -22,7 +22,6 @@ uniform int uClampUv;
 uniform vec2 uUvOffsetMult;
 uniform vec2 uUvScaleMult;
 uniform float uUvRotationMult;
-uniform float uTextureMultFrame;
 uniform vec2 uEmitterUvOffsetMult;
 uniform vec2 uTexDivMult;
 uniform vec2 uTexSizeMult;
@@ -83,7 +82,7 @@ void main(){
     vLocalUvMult = multUv;
     vec2 multDiv = max(uTexDivMult, vec2(1.0));
     float multCols = multDiv.x;
-    float multFrame = floor(uTextureMultFrame + 0.0001);
+    float multFrame = floor(uFrame + 0.0001);
     vec2 multCell = vec2(mod(multFrame, multCols), floor(multFrame / multCols));
     vCellMult = multCell;
     vMeshColor = aColor;
@@ -106,7 +105,7 @@ layout(location=11) in vec4 aErosionMixer;
 layout(location=12) in vec2 aUvOffsetMult;
 layout(location=13) in vec2 aUvScaleMult;
 layout(location=14) in float aUvRotationMult;
-layout(location=15) in vec2 aTextureMultFramePalette;
+layout(location=15) in vec2 aRangeRandomPalette;
 layout(location=16) in vec3 aBasisX;
 layout(location=17) in vec3 aBasisY;
 layout(location=18) in vec3 aBasisZ;
@@ -265,10 +264,10 @@ void main(){
     vec2 multCell = vec2(mod(multFrame, multCols), floor(multFrame / multCols));
     vCellMult = multCell;
     vColor = aColor;
-    vPaletteSelector = aTextureMultFramePalette.y;
+    vPaletteSelector = aRangeRandomPalette.y;
     vErosionDrive = aErosionDrive;
     vErosionMixer = aErosionMixer;
-    vColorDynamics = vec3(aAgeVelX.x, length(aAgeVelX.yzw), aTextureMultFramePalette.x);
+    vColorDynamics = vec3(aAgeVelX.x, length(aAgeVelX.yzw), aRangeRandomPalette.x);
 }";
 
 

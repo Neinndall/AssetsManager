@@ -190,7 +190,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_texAddressMult = HashAlgorithms.Fnv1a("texAddressModeMult");
         private static readonly uint F_textureMultFlipV = HashAlgorithms.Fnv1a("TextureMultFilpV");
         private static readonly uint F_textureMultFlipU = HashAlgorithms.Fnv1a("TextureMultFilpU");
-        private static readonly uint F_textureMultRandomStart = HashAlgorithms.Fnv1a("isRandomStartFrameMult");
         private static readonly uint F_textureMultTransformCenter = HashAlgorithms.Fnv1a("uvTransformCenterMult");
         private static readonly uint F_textureMultClampUv = HashAlgorithms.Fnv1a("uvScrollClampMult");
         private static readonly uint F_textureMultEmitterUvScroll = HashAlgorithms.Fnv1a("emitterUvScrollRateMult");
@@ -724,7 +723,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             int textureMultAddressMode = 0;
             bool textureMultFlipV = false;
             bool textureMultFlipU = false;
-            bool textureMultRandomStart = false;
             bool textureMultClampUv = false;
             bool textureMultScrollAlpha = false;
             Vector2 textureMultTransformCenter = new(0.5f, 0.5f);
@@ -744,7 +742,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 textureMultAddressMode = GetU8(textureMult.Properties, F_texAddressMult) ?? 0;
                 textureMultFlipV = GetBool(textureMult.Properties, F_textureMultFlipV);
                 textureMultFlipU = GetBool(textureMult.Properties, F_textureMultFlipU);
-                textureMultRandomStart = GetBool(textureMult.Properties, F_textureMultRandomStart);
                 textureMultTransformCenter =
                     GetVec2(textureMult.Properties, F_textureMultTransformCenter) ?? new Vector2(0.5f, 0.5f);
                 textureMultClampUv = GetBool(textureMult.Properties, F_textureMultClampUv);
@@ -933,7 +930,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 IsTexturePixelated: GetBool(p, F_isTexturePixelated),
                 UvTransformCenter: GetVec2(p, F_uvTransformCenter) ?? new Vector2(0.5f, 0.5f),
                 TextureMultFlipU: textureMultFlipU,
-                TextureMultRandomStartFrame: textureMultRandomStart,
                 TextureMultTransformCenter: textureMultTransformCenter,
                 TextureMultClampUvScroll: textureMultClampUv,
                 TextureMultEmitterUvScrollRate: textureMultEmitterUvScroll,
