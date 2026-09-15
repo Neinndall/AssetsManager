@@ -375,6 +375,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - 3D Mesh Analyzer / Auto-Rotate now rotates the complete comparison scene, including diff overlays and combined geometry.
   - Viewer / Hardened resource cleanup so VFX, viewport, panel and shared loader teardown continue independently if one release step fails.
   - VFX Studio / Champion mesh GPU resources are now released when switching skins or leaving the active VFX project.
   - VFX Studio / Loop now stays enabled or disabled when switching between VFX systems.

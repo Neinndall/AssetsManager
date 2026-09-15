@@ -1234,8 +1234,19 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             double deltaTime = Math.Clamp(frameDelta.TotalSeconds, 0, 0.25);
 
-            if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
-                _activeSceneModel.RotationY = (_activeSceneModel.RotationY + 30.0 * deltaTime) % 360;
+            if (_viewModel.IsAutoRotateActive)
+            {
+                double rotationDelta = 30.0 * deltaTime;
+                if (IsDiffMode)
+                {
+                    foreach (SceneModel model in _loadedModels)
+                        model.RotationY = (model.RotationY + rotationDelta) % 360;
+                }
+                else if (_activeSceneModel != null)
+                {
+                    _activeSceneModel.RotationY = (_activeSceneModel.RotationY + rotationDelta) % 360;
+                }
+            }
 
             if (_loadedModels.Count == 0) return;
 
