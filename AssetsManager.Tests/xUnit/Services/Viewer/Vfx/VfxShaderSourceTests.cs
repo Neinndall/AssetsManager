@@ -1,3 +1,5 @@
+using System.Linq;
+using System.Text.RegularExpressions;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using Xunit;
 
@@ -14,6 +16,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Contains("if (!ribbonPrimitive)", VfxShaderSource.ParticleFragment);
             Assert.DoesNotContain("uDeriveAlphaFromRgb", VfxShaderSource.MeshFragment);
             Assert.DoesNotContain("uDeriveAlphaFromRgb", VfxShaderSource.ParticleFragment);
+        }
+
+        [Fact]
+        public void ParticleVertexFitsThePortableAttributeLimit()
+        {
+            int[] locations = Regex.Matches(VfxShaderSource.ParticleVertex, @"layout\(location=(\d+)\)")
+                .Select(match => int.Parse(match.Groups[1].Value))
+                .ToArray();
+
+            Assert.NotEmpty(locations);
+            Assert.True(locations.Max() <= 15, $"Particle shader uses vertex attribute {locations.Max()}, above OpenGL's guaranteed 0..15 range.");
+            Assert.Contains("layout(location=12) in vec3 aBasisX;", VfxShaderSource.ParticleVertex);
+            Assert.Contains("layout(location=14) in vec3 aBasisZ;", VfxShaderSource.ParticleVertex);
         }
 
         [Fact]

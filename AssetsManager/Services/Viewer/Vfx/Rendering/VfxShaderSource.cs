@@ -97,18 +97,14 @@ layout(location=3) in vec4 aColor;
 layout(location=4) in vec2 aRotFrame;
 layout(location=5) in vec4 aAgeVelX;
 layout(location=6) in vec4 aRotationSize;
-layout(location=7) in vec2 aUvOffset;
-layout(location=8) in vec2 aUvScale;
-layout(location=9) in float aUvRotation;
-layout(location=10) in float aErosionDrive;
-layout(location=11) in vec4 aErosionMixer;
-layout(location=12) in vec2 aUvOffsetMult;
-layout(location=13) in vec2 aUvScaleMult;
-layout(location=14) in float aUvRotationMult;
-layout(location=15) in vec2 aRangeRandomPalette;
-layout(location=16) in vec3 aBasisX;
-layout(location=17) in vec3 aBasisY;
-layout(location=18) in vec3 aBasisZ;
+layout(location=7) in vec4 aUvBase;
+layout(location=8) in vec4 aUvErosion;
+layout(location=9) in vec2 aErosionMixerZW;
+layout(location=10) in vec4 aUvMult;
+layout(location=11) in vec3 aUvMultDynamics;
+layout(location=12) in vec3 aBasisX;
+layout(location=13) in vec3 aBasisY;
+layout(location=14) in vec3 aBasisZ;
 uniform mat4 uViewProj;
 uniform vec3 uCamRight;
 uniform vec3 uCamUp;
@@ -238,11 +234,11 @@ void main(){
         ? aCorner
         : vec2(cell.x, 1.0 - cell.y);
     vCornerUv = localUv;
-    vec2 centeredUv = (localUv - uUvTransformCenter) * aUvScale;
-    float uvSin = sin(aUvRotation); float uvCos = cos(aUvRotation);
+    vec2 centeredUv = (localUv - uUvTransformCenter) * aUvBase.zw;
+    float uvSin = sin(aUvErosion.x); float uvCos = cos(aUvErosion.x);
     centeredUv = vec2(centeredUv.x * uvCos - centeredUv.y * uvSin,
                       centeredUv.x * uvSin + centeredUv.y * uvCos);
-    localUv = centeredUv + uUvTransformCenter + aUvOffset + uEmitterUvOffset;
+    localUv = centeredUv + uUvTransformCenter + aUvBase.xy + uEmitterUvOffset;
     if (uFlipU != 0) localUv.x = 1.0 - localUv.x;
     if (uFlipV != 0) localUv.y = 1.0 - localUv.y;
     vLocalUv = localUv;
@@ -250,11 +246,11 @@ void main(){
     vec2 multUv = trailPrimitive
         ? aCorner
         : vec2(cell.x, 1.0 - cell.y);
-    vec2 centeredMultUv = (multUv - uUvTransformCenterMult) * aUvScaleMult;
-    float multSin = sin(aUvRotationMult); float multCos = cos(aUvRotationMult);
+    vec2 centeredMultUv = (multUv - uUvTransformCenterMult) * aUvMult.zw;
+    float multSin = sin(aUvMultDynamics.x); float multCos = cos(aUvMultDynamics.x);
     centeredMultUv = vec2(centeredMultUv.x * multCos - centeredMultUv.y * multSin,
                           centeredMultUv.x * multSin + centeredMultUv.y * multCos);
-    multUv = centeredMultUv + uUvTransformCenterMult + aUvOffsetMult + uUvScrollRateMult;
+    multUv = centeredMultUv + uUvTransformCenterMult + aUvMult.xy + uUvScrollRateMult;
     if (uFlipUMult != 0) multUv.x = 1.0 - multUv.x;
     if (uFlipVMult != 0) multUv.y = 1.0 - multUv.y;
     vLocalUvMult = multUv;
@@ -264,10 +260,10 @@ void main(){
     vec2 multCell = vec2(mod(multFrame, multCols), floor(multFrame / multCols));
     vCellMult = multCell;
     vColor = aColor;
-    vPaletteSelector = aRangeRandomPalette.y;
-    vErosionDrive = aErosionDrive;
-    vErosionMixer = aErosionMixer;
-    vColorDynamics = vec3(aAgeVelX.x, length(aAgeVelX.yzw), aRangeRandomPalette.x);
+    vPaletteSelector = aUvMultDynamics.z;
+    vErosionDrive = aUvErosion.y;
+    vErosionMixer = vec4(aUvErosion.zw, aErosionMixerZW);
+    vColorDynamics = vec3(aAgeVelX.x, length(aAgeVelX.yzw), aUvMultDynamics.y);
 }";
 
 

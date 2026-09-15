@@ -266,11 +266,21 @@ namespace AssetsManager.Views.Controls.Viewer
             if (model == null || _gl == null || VfxLoadingService == null) return null;
             if (_clipVfxSessions.TryGetValue(model, out VfxRenderSession existing)) return existing;
 
-            EnsureSceneRenderers(required: true);
-            var session = new VfxRenderSession(LogService, VfxLoadingService);
-            session.Initialize(_gl);
-            _clipVfxSessions[model] = session;
-            return session;
+            VfxRenderSession session = null;
+            try
+            {
+                EnsureSceneRenderers(required: true);
+                session = new VfxRenderSession(LogService, VfxLoadingService);
+                session.Initialize(_gl);
+                _clipVfxSessions[model] = session;
+                return session;
+            }
+            catch (Exception ex)
+            {
+                session?.Dispose();
+                LogService?.LogError(ex, $"Failed to initialize Animation Clip VFX for '{model.Name}'. Animation playback will continue without clip VFX.");
+                return null;
+            }
         }
 
         private CustomCameraController _cameraController;
@@ -834,24 +844,32 @@ namespace AssetsManager.Views.Controls.Viewer
             VfxRenderSession session = EnsureClipVfxSession(model);
             if (session == null) return;
 
-            session.SetBoneTransformSampler((time, name, hash) =>
-                animationService.TrySampleBoneTransform((float)time, name, hash, out Matrix4x4 sampled)
-                    ? sampled
-                    : null);
+            try
+            {
+                session.SetBoneTransformSampler((time, name, hash) =>
+                    animationService.TrySampleBoneTransform((float)time, name, hash, out Matrix4x4 sampled)
+                        ? sampled
+                        : null);
 
-            int seed = unchecked((int)(clip.Clip.OwnerPathHash ^ 0x9e3779b9u));
-            session.SetAnimationSession(
-                clip.Composition,
-                context.IdleEffects,
-                context.Systems,
-                context.ResourceMap,
-                context.SearchDirectory,
-                seed,
-                clip.Duration,
-                context.OwnerSceneContext);
-            session.SetWorldTransform(ViewerInteractionService.CreateWorldMatrix(model));
-            session.SynchronizeTo(0d);
-            UpdateClipBoneAttachments(session, animationService);
+                int seed = unchecked((int)(clip.Clip.OwnerPathHash ^ 0x9e3779b9u));
+                session.SetAnimationSession(
+                    clip.Composition,
+                    context.IdleEffects,
+                    context.Systems,
+                    context.ResourceMap,
+                    context.SearchDirectory,
+                    seed,
+                    clip.Duration,
+                    context.OwnerSceneContext);
+                session.SetWorldTransform(ViewerInteractionService.CreateWorldMatrix(model));
+                session.SynchronizeTo(0d);
+                UpdateClipBoneAttachments(session, animationService);
+            }
+            catch (Exception ex)
+            {
+                session.Stop();
+                LogService?.LogError(ex, $"Failed to prepare Animation Clip VFX for '{clip.Name}'. Animation playback will continue without clip VFX.");
+            }
         }
 
         private static void UpdateClipBoneAttachments(VfxRenderSession session, AnimationService animationService)

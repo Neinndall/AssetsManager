@@ -678,18 +678,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (newModel != null)
             {
-                try
-                {
-                    await LoadAuthoredAnimationClipsAsync(newModel, cancellationToken);
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
-                catch (OperationCanceledException)
-                {
-                    SafeDisposeModel(newModel);
-                    LogService?.LogDebug("AnimationGraph clip loading cancelled before model activation.");
-                    return;
-                }
-
                 if (isInitialLoad)
                 {
                     if (_viewModel.LoadedModels.Count == 0)
@@ -725,6 +713,25 @@ namespace AssetsManager.Views.Controls.Viewer
                 ModelsListBox.SelectedItem = newModel;
 
                 Viewport?.SnapCamera();
+
+                // Keep the model interactive immediately. AnimationGraph/VFX discovery can
+                // build a recursive resource index, so it must never gate scene activation.
+                try
+                {
+                    await LoadAuthoredAnimationClipsAsync(newModel, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (ReferenceEquals(_viewModel.SelectedModel, newModel))
+                    {
+                        _viewModel.AnimationModels.ReplaceRange(
+                            newModel.Animations.Select(animation => new AnimationModel(animation)));
+                        UpdateHeroStats();
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    LogService?.LogDebug("AnimationGraph clip loading cancelled after model activation.");
+                }
             }
         }
 
@@ -746,6 +753,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     LogService,
                     cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                LogService?.LogDebug(
+                    $"AnimationGraph scan for '{model.Name}': {bundle.Clips.Count} clip definitions, {bundle.Systems.Count} VFX systems.");
 
                 string searchDirectory = Path.GetDirectoryName(model.SkinBinPath)
                     ?? Path.GetDirectoryName(model.FilePath)
@@ -787,6 +796,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     LogService?.LogDebug(
                         $"Loaded {clips.Count} authored AnimationGraph clips for '{model.Name}'.");
+                }
+                else if (bundle.Clips.Count > 0)
+                {
+                    LogService?.LogWarning(
+                        $"AnimationGraph for '{model.Name}' declared {bundle.Clips.Count} clips, but none had resolvable animation assets.");
                 }
             }
             catch (OperationCanceledException)
