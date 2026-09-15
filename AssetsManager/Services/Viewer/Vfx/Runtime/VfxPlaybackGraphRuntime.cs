@@ -25,6 +25,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private readonly int _initialSeed;
         private Matrix4x4 _rootTransform;
         private Matrix4x4 _orientationRootTransform;
+        private bool _allEmittersVisible = true;
 
         public VfxPlaybackGraphRuntime(
             VfxSystemDefinition rootDefinition,
@@ -87,6 +88,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         }
 
         public void SetStartDelay(float seconds) => Root.SetStartDelay(seconds);
+
+        public void SetAllEmittersVisible(bool isVisible)
+        {
+            _allEmittersVisible = isVisible;
+            foreach (VfxPlaybackRuntime runtime in _runtimes)
+            {
+                foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+                    emitter.IsVisible = isVisible;
+            }
+            foreach (VfxPlaybackRuntime runtime in _pendingChildren)
+            {
+                foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+                    emitter.IsVisible = isVisible;
+            }
+        }
 
         public void Kill()
         {
@@ -190,6 +206,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _localTransforms[runtime] = effectiveLocalTransform;
             _paths[runtime] = path;
             runtime.WarmUp();
+            if (!_allEmittersVisible)
+            {
+                foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+                    emitter.IsVisible = false;
+            }
             return runtime;
         }
 

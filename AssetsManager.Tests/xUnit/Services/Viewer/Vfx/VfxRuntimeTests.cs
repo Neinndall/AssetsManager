@@ -520,6 +520,50 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void PlaybackGraphGlobalVisibilityCoversCurrentAndFutureChildEmitters()
+        {
+            var childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            var parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                TexturePath = string.Empty,
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    false,
+                    VfxCurveF.Const(1f),
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            var graph = new VfxPlaybackGraphRuntime(
+                parent,
+                Matrix4x4.Identity,
+                7,
+                new Dictionary<uint, VfxSystemDefinition> { [1] = parent, [2] = child },
+                new Dictionary<uint, uint>(),
+                (definition, transform, seed) =>
+                {
+                    var runtime = new VfxPlaybackRuntime(seed);
+                    runtime.SetSystem(definition, transform);
+                    return runtime;
+                });
+
+            graph.SetAllEmittersVisible(false);
+            Assert.False(Assert.Single(graph.Root.Emitters).IsVisible);
+
+            graph.Update(0.02f);
+
+            Assert.Equal(2, graph.Runtimes.Count);
+            Assert.All(graph.Runtimes, runtime => Assert.All(runtime.Emitters, emitter => Assert.False(emitter.IsVisible)));
+
+            graph.SetAllEmittersVisible(true);
+            Assert.All(graph.Runtimes, runtime => Assert.All(runtime.Emitters, emitter => Assert.True(emitter.IsVisible)));
+        }
+
+        [Fact]
         public void PlaybackGraphPreservesChildPlacementWhenRootTransformChanges()
         {
             VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
