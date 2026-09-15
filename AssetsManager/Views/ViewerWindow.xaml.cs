@@ -63,6 +63,7 @@ namespace AssetsManager.Views
 
             VfxInspectorControl.LogService = _logService;
             VfxInspectorControl.VfxLoadingService = _vfxLoadingService;
+            VfxInspectorControl.ExitRequested += (_, _) => _viewModel.IsVfxStudioVisible = false;
 
             // Peer-to-Peer wiring between sub-controls
             PanelControl.Viewport = ViewportControl;

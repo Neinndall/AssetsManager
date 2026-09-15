@@ -101,26 +101,34 @@
                     <TextBlock Text="Browse skins, effects and animations" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
                 </StackPanel>
 
-                <!-- Right: Asset folder selection -->
-                <Border Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
-                        Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,4"
-                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                    <WrapPanel VerticalAlignment="Center">
-                        <!-- ROOT Path Group -->
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="FolderSearchOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="Folder:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBox x:Name="RootPathTextBox" Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Height="32" Padding="10,0" VerticalContentAlignment="Center" FontSize="11" Width="220"
-                                     VerticalAlignment="Center" KeyDown="RootPathTextBox_KeyDown"/>
-                            <Button Click="BrowseRoot_Click"
-                                    Style="{StaticResource BrowseButtonStyle}" Width="32" Height="32" Padding="0" Margin="6,0,0,0" ToolTip="Browse ROOT Directory">
-                                <materialIcons:MaterialIcon Kind="FolderOpen" Width="16" Height="16"/>
-                            </Button>
-                        </StackPanel>
+                <!-- Right: Studio exit and asset folder selection -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Click="ExitStudio_Click"
+                            Style="{StaticResource TransparentIconButton}"
+                            Width="26" Height="26"
+                            Margin="0,0,8,0"
+                            ToolTip="Exit VFX Studio">
+                        <materialIcons:MaterialIcon Kind="ExitToApp" Width="14" Height="14"/>
+                    </Button>
 
-                    </WrapPanel>
-                </Border>
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,4"
+                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <WrapPanel VerticalAlignment="Center">
+                            <!-- ROOT Path Group -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="FolderSearchOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Folder:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBox x:Name="RootPathTextBox" Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBox}" Height="32" Padding="10,0" VerticalContentAlignment="Center" FontSize="11" Width="220"
+                                         VerticalAlignment="Center" KeyDown="RootPathTextBox_KeyDown"/>
+                                <Button Click="BrowseRoot_Click"
+                                        Style="{StaticResource BrowseButtonStyle}" Width="32" Height="32" Padding="0" Margin="6,0,0,0" ToolTip="Browse ROOT Directory">
+                                    <materialIcons:MaterialIcon Kind="FolderOpen" Width="16" Height="16"/>
+                                </Button>
+                            </StackPanel>
+                        </WrapPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 
