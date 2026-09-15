@@ -71,7 +71,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
         }
 
         // Dedicated, opt-in coverage for the v1 check_iter patterns used by CDTB tooling.
-        // It deliberately stays out of Basic and Extended because its wordlist cross-product is expensive.
+        // It lives under LCU Extended because its wordlist cross-product is intentionally exhaustive.
         internal int RunV1PathPatterns(
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,
@@ -100,6 +100,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             IReadOnlyDictionary<ulong, string> knownHashes = HashFile.Load();
+            var seenFileNames = new HashSet<string>(StringComparer.Ordinal);
 
             const string v1Prefix = "plugins/rcp-be-lol-game-data/global/";
             const string source = "LCU v1 path patterns";
@@ -118,6 +119,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
 
             bool CheckDefaultThenLocales(string fileName, string phase)
             {
+                if (!seenFileNames.Add(fileName)) return true;
+
                 string defaultPath = $"{v1Prefix}default/v1/{fileName}";
                 checkedCandidates += CheckIter(
                     engine,

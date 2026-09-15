@@ -2000,6 +2000,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains("home", words);
             Assert.DoesNotContain("hidden", words);
             Assert.DoesNotContain("secret", words);
+            Assert.DoesNotContain("0123456789abcdef0123456789abcdef", words);
         }
 
         [Fact]
@@ -2170,6 +2171,58 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             HashGuessMatch match = Assert.Single(engine.Matches).Value;
             Assert.Equal(paths[0], match.Path);
             Assert.Equal(3, engine.RemainingUnknownCount);
+        }
+
+        [Fact]
+        public void LcuV1UniquePatternsMatchOriginalCdtbCandidateSetWithoutDuplicateChecks()
+        {
+            string[] words = { "a", "ab", "b", "c", "bc" };
+            const string prefix = "plugins/rcp-be-lol-game-data/global/default/v1/";
+            var expected = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (string a in words)
+            {
+                foreach (string b in words)
+                {
+                    expected.Add(prefix + $"tft{b}{a}s.json");
+                    expected.Add(prefix + $"tft{b}-{a}s.json");
+                    expected.Add(prefix + $"tft{a}-{b}s.json");
+                    expected.Add(prefix + $"tft{a}{b}s.json");
+                    expected.Add(prefix + $"tft{b}{a}.json");
+                    expected.Add(prefix + $"tft{b}-{a}.json");
+                    expected.Add(prefix + $"tft{a}-{b}.json");
+                    expected.Add(prefix + $"tft{a}.json");
+                    expected.Add(prefix + $"tft{b}.json");
+                    expected.Add(prefix + $"tft{a}s.json");
+                    expected.Add(prefix + $"tft{b}s.json");
+                    expected.Add(prefix + $"tft-{a}{b}.json");
+                    expected.Add(prefix + $"{b}{a}s.json");
+                    expected.Add(prefix + $"{a}{b}n.json");
+                    expected.Add(prefix + $"{b}-{a}s.json");
+                    expected.Add(prefix + $"{a}-{b}s.json");
+                    expected.Add(prefix + $"{b}{a}.json");
+                    expected.Add(prefix + $"{b}-{a}.json");
+                    expected.Add(prefix + $"{a}-{b}.json");
+                    expected.Add(prefix + $"{a}{b}.json");
+                    expected.Add(prefix + $"{a}{b}");
+                }
+                expected.Add(prefix + $"{a}.json");
+            }
+
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Lcu,
+                expected.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, Array.Empty<string>()), null);
+
+            int checkedCandidates = lcu.RunV1PathPatterns(
+                engine,
+                progress: null,
+                cancellationToken: CancellationToken.None,
+                words: words);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Equal(expected.Count, engine.Matches.Count);
+            Assert.Equal(expected.Count, checkedCandidates);
         }
 
         [Fact]
