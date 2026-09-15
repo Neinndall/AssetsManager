@@ -570,7 +570,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             HashGuessEngine engine,
             IEnumerable<string> names,
             CancellationToken cancellationToken = default,
-            string source = "Basenames")
+            string source = "Basenames",
+            HashGuessStrategy strategy = HashGuessStrategy.PluginVariant,
+            ulong sourceChunkHash = 0)
         {
             ArgumentNullException.ThrowIfNull(names);
             IReadOnlyList<string> dirs = DirectoryList();
@@ -582,9 +584,10 @@ namespace AssetsManager.Services.Hashes.Guessers
                 checkedCount += CheckIter(
                     engine,
                     dirs.Select(dir => string.IsNullOrEmpty(dir) ? name : $"{dir}/{name}"),
-                    HashGuessStrategy.PluginVariant,
+                    strategy,
                     source,
-                    cancellationToken);
+                    cancellationToken,
+                    sourceChunkHash);
             }
             return checkedCount;
         }
