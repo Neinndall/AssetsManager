@@ -200,6 +200,20 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void CheckBasenamesFastPathMatchesRegularUtf8Hashing()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/imágenes/icono-é.png";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(
+                new[] { "plugins/rcp-fe-test/global/default/imágenes/existing.json" },
+                null);
+
+            guesser.CheckBasenames(engine, new[] { "icono-é.png" });
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
         public void ComposedPathHashingMatchesRegularUtf8HashingWithoutLengthLimits()
         {
             string[] relativePaths = { "imágenes/icono-é.js", new string('a', 1_100) + ".json" };
