@@ -798,7 +798,7 @@ namespace AssetsManager.Views.Controls.Viewer
             double timelineMax = ResolveTimelineDuration(rigDuration);
             _model.ActiveLoopDuration = timelineMax;
             _model.TotalDuration = timelineMax;
-            _model.IsPreviewLoopEnabled = _model.RigPreset is VfxRigPreset.Burst or VfxRigPreset.Missile;
+            // System selection must not overwrite the user's transport loop preference.
             _vfxRenderer?.Play();
             _model.IsPlaying = true;
 
