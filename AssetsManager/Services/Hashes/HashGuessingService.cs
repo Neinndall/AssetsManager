@@ -642,7 +642,6 @@ namespace AssetsManager.Services.Hashes
                 if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-ext-v1tft"))
                 {
                     progress?.Report(engine.CreateProgress("LCU Extended: V1 TFT patterns", checkedCandidates));
-                    int progressOffset = checkedCandidates;
                     checkedCandidates += _lcuGuesser.RunV1PathPatterns(
                         engine,
                         progress,
