@@ -15,7 +15,10 @@ namespace AssetsManager.Services.Hashes
         private readonly Dictionary<InternalHashKind, HashSet<ulong>> _targets;
         private readonly Dictionary<InternalHashKind, HashSet<ulong>> _matched;
         private readonly Dictionary<(InternalHashKind Kind, ulong Hash, string Value), InternalHashGuessMatch> _matches = new();
+        private readonly Dictionary<(InternalHashKind Kind, uint Hash), string> _verifiedValues = new();
         private readonly List<InternalHashGuessMatch> _pendingMatches = new();
+        private readonly HashSet<uint> _observedItemDataEntries = new();
+        private readonly HashSet<uint> _observedItemListHashes = new();
 
         internal InternalHashEvidenceMatcher(Dictionary<InternalHashKind, HashSet<ulong>> targets)
         {
@@ -35,6 +38,16 @@ namespace AssetsManager.Services.Hashes
             _targets.TryGetValue(kind, out HashSet<ulong> values)
                 ? Math.Max(0, values.Count - _matched[kind].Count)
                 : 0;
+
+        internal bool TryGetVerifiedValue(InternalHashKind kind, uint hash, out string value) =>
+            _verifiedValues.TryGetValue((kind, hash), out value);
+
+        internal void ObserveItemDataEntry(uint hash) => _observedItemDataEntries.Add(hash);
+
+        internal void ObserveItemListHash(uint hash) => _observedItemListHashes.Add(hash);
+
+        internal uint[] GetCollectedItemHashCandidates() =>
+            _observedItemListHashes.Where(_observedItemDataEntries.Contains).ToArray();
 
         internal IReadOnlyList<InternalHashGuessMatch> TakePendingMatches()
         {
@@ -192,6 +205,7 @@ namespace AssetsManager.Services.Hashes
                 EvidenceOrigin = GetEvidenceOrigin(evidence)
             };
             _matches[key] = match;
+            if (verified) _verifiedValues[(kind, hash)] = candidate;
             _pendingMatches.Add(match);
             return true;
         }
@@ -327,6 +341,10 @@ namespace AssetsManager.Services.Hashes
                     .Where(item => item.Kind == kind && item.Hash == (ulong)hash).ToList())
                     _matches.Remove(candidateKey);
             }
+            else if (conflicting)
+            {
+                _verifiedValues.Remove((kind, hash));
+            }
             _matched[kind].Add(hash);
             var match = new InternalHashGuessMatch
             {
@@ -346,6 +364,7 @@ namespace AssetsManager.Services.Hashes
                 EvidenceOrigin = GetEvidenceOrigin(evidence)
             };
             _matches[key] = match;
+            if (verified && !conflicting) _verifiedValues[(kind, hash)] = value;
             _pendingMatches.Add(match);
         }
 

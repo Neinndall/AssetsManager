@@ -264,6 +264,119 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void ContextReusesEntryPathsDiscoveredEarlierInTheSameRun()
+        {
+            const string linkedPath = "Characters/Test/Particles/SessionTrail";
+            const string expectedKey = "SessionTrail";
+            uint linkedHash = Fnv1a.HashLower(linkedPath);
+            uint expectedKeyHash = Fnv1a.HashLower(expectedKey);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(linkedHash);
+            targets[InternalHashKind.BinHashes].Add(expectedKeyHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            var sourceTree = new BinTree(new[]
+            {
+                new BinTreeObject(linkedHash, Fnv1a.HashLower("UiComponent"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), linkedPath)
+                })
+            }, Array.Empty<string>());
+            BinContentEvidenceSource.MatchBinContextualEvidence(sourceTree, matcher, "source.bin");
+
+            var resourceMap = new BinTreeMap(
+                Fnv1a.HashLower("resourceMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.ObjectLink,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, expectedKeyHash),
+                        new BinTreeObjectLink(0, linkedHash))
+                });
+            var resolverTree = new BinTree(new[]
+            {
+                new BinTreeObject(
+                    0x11111111,
+                    Fnv1a.HashLower("ResourceResolver"),
+                    new BinTreeProperty[] { resourceMap })
+            }, Array.Empty<string>());
+            BinContentEvidenceSource.MatchBinContextualEvidence(resolverTree, matcher, "resolver.bin");
+
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinEntries && match.Value == linkedPath);
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinHashes && match.Value == expectedKey);
+        }
+
+        [Fact]
+        public void ItemGroupReusesHashValuesDiscoveredEarlierInTheSameRun()
+        {
+            const string groupId = "SyntheticGroup";
+            uint groupIdHash = Fnv1a.HashLower(groupId);
+            const string groupPath = "Items/ItemGroup/SyntheticGroup";
+            uint groupPathHash = Fnv1a.HashLower(groupPath);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(groupIdHash);
+            targets[InternalHashKind.BinEntries].Add(groupPathHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            Assert.True(matcher.CheckContextualCandidate(
+                InternalHashKind.BinHashes,
+                groupId,
+                "seed.bin",
+                observedHash: groupIdHash));
+
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(groupPathHash, Fnv1a.HashLower("ItemGroup"), new BinTreeProperty[]
+                {
+                    new BinTreeHash(Fnv1a.HashLower("mItemGroupID"), groupIdHash)
+                })
+            }, Array.Empty<string>());
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "item-group.bin");
+
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinEntries && match.Value == groupPath);
+        }
+
+        [Fact]
+        public void ContextCollectsItemListsAgainstItemDataSeenInTheSameRun()
+        {
+            const uint itemId = 4242;
+            const string itemPath = "Items/4242";
+            uint itemHash = Fnv1a.HashLower(itemPath);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(itemHash);
+            targets[InternalHashKind.BinHashes].Add(itemHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            var itemTree = new BinTree(new[]
+            {
+                new BinTreeObject(itemHash, Fnv1a.HashLower("ItemData"), new BinTreeProperty[]
+                {
+                    new BinTreeU32(Fnv1a.HashLower("itemID"), itemId)
+                })
+            }, Array.Empty<string>());
+            BinContentEvidenceSource.MatchBinContextualEvidence(itemTree, matcher, "items.bin");
+
+            var itemList = new BinTreeContainer(
+                Fnv1a.HashLower("mItems"),
+                BinPropertyType.Hash,
+                new BinTreeProperty[] { new BinTreeHash(0, itemHash) });
+            var listTree = new BinTree(new[]
+            {
+                new BinTreeObject(0x22222222, Fnv1a.HashLower("GameModeItemList"), new BinTreeProperty[] { itemList })
+            }, Array.Empty<string>());
+            BinContentEvidenceSource.MatchBinContextualEvidence(listTree, matcher, "item-list.bin");
+
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinEntries && match.Value == itemPath);
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinHashes && match.Value == itemPath);
+        }
+
+        [Fact]
         public void CdragonTftShopPatternResolvesSetScopedEntryPath()
         {
             const string name = "SyntheticShopItem";
@@ -779,6 +892,32 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains(hash, targets[InternalHashKind.BinEntries]);
         }
 
+        [Fact]
+        public void ObjectPathReusesEntryPathDiscoveredByTheSameContextPass()
+        {
+            const string entryPath = "Characters/Test/Particles/TestVfx";
+            uint entryHash = Fnv1a.HashLower(entryPath);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(entryHash);
+            targets[InternalHashKind.BinHashes].Add(entryHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(entryHash, Fnv1a.HashLower("VfxSystemDefinitionData"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("particlePath"), entryPath),
+                    new BinTreeHash(Fnv1a.HashLower("objectPath"), entryHash)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "vfx.bin");
+
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinEntries && match.Value == entryPath);
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinHashes && match.Value == entryPath);
+        }
+
         [Theory]
         [InlineData("VfxSystemDefinitionData")]
         [InlineData("SpellObject")]
@@ -859,6 +998,64 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains(matcher.Matches, m => m.Value == skinPath);
             Assert.Contains(matcher.Matches, m => m.Value == expectedResourcePath);
             Assert.Contains(matcher.Matches, m => m.Value == expectedAnimPath);
+        }
+
+        [Fact]
+        public void CharacterRecordReadsOptionalAttackNamesLikeCdragon()
+        {
+            const string spellPath = "Characters/Aatrox/Spells/AatroxBasicAttack";
+            uint spellHash = Fnv1a.HashLower(spellPath);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(spellHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var basicAttack = new BinTreeEmbedded(
+                Fnv1a.HashLower("basicAttack"),
+                Fnv1a.HashLower("AttackSlotData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeOptional(
+                        Fnv1a.HashLower("mAttackName"),
+                        new BinTreeString(0, "AatroxBasicAttack"))
+                });
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x11111111, Fnv1a.HashLower("CharacterRecord"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mCharacterName"), "Aatrox"),
+                    basicAttack
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "character.bin");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(spellPath, match.Value);
+            Assert.Equal(InternalHashKind.BinEntries, match.Kind);
+        }
+
+        [Fact]
+        public void SkinCharacterDataReadsOptionalIconSquareLikeCdragon()
+        {
+            const string skinPath = "Characters/Ahri/Skins/Skin17";
+            uint skinHash = Fnv1a.HashLower(skinPath);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(skinHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(skinHash, Fnv1a.HashLower("SkinCharacterDataProperties"), new BinTreeProperty[]
+                {
+                    new BinTreeOptional(
+                        Fnv1a.HashLower("iconSquare"),
+                        new BinTreeString(0, "ASSETS/Characters/Ahri/HUD/Ahri_Square.dds"))
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "skin.bin");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(skinPath, match.Value);
+            Assert.Equal(InternalHashKind.BinEntries, match.Kind);
         }
 
         [Fact]
