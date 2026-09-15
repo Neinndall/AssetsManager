@@ -375,6 +375,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Hardened resource cleanup so VFX, viewport, panel and shared loader teardown continue independently if one release step fails.
   - VFX Studio / Champion mesh GPU resources are now released when switching skins or leaving the active VFX project.
   - VFX Studio / Loop now stays enabled or disabled when switching between VFX systems.
   - Viewer / Corrected VFX texture wrapping, trails, blending and distortion to improve effect previews.

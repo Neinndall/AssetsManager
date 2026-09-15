@@ -207,12 +207,11 @@ namespace AssetsManager.Views.Controls.Viewer
             _isExitPending = false;
             Deactivate();
             _isCleanedUp = true;
-            _scanCancellation?.Cancel();
-            _binCancellation?.Cancel();
             _model.PropertyChanged -= OnModelPropertyChanged;
             _championLoadGeneration++;
-            _clipCatalog?.Dispose();
-            _clipCatalog = null;
+
+            RunReleaseStep("VFX folder scan cancellation", () => _scanCancellation?.Cancel());
+            RunReleaseStep("VFX BIN load cancellation", () => _binCancellation?.Cancel());
 
             var cameraController = _cameraController;
             _cameraController = null;
@@ -230,13 +229,23 @@ namespace AssetsManager.Views.Controls.Viewer
             _championMeshRenderer = null;
             RunReleaseStep(nameof(GlMeshRenderer), () => championMeshRenderer?.Dispose(), gpuBound: true);
 
+            var championAnimationService = _championAnimationService;
+            _championAnimationService = null;
+            RunReleaseStep(nameof(AnimationService), () => championAnimationService?.Dispose());
+
             var championModel = _championModel;
             _championModel = null;
             RunReleaseStep("Champion SceneModel", () => championModel?.Dispose());
 
-            var championAnimationService = _championAnimationService;
-            _championAnimationService = null;
-            RunReleaseStep(nameof(AnimationService), () => championAnimationService?.Dispose());
+            var clipCatalog = _clipCatalog;
+            _clipCatalog = null;
+            RunReleaseStep(nameof(VfxClipCatalog), () => clipCatalog?.Dispose());
+
+            _activeBundle = null;
+            _championBundle = null;
+            _abilityCompositions = Array.Empty<VfxAbilityComposition>();
+            _pendingSystem = null;
+            _inspectedSystem = null;
 
             var gl = _gl;
             _gl = null;
@@ -244,6 +253,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             RunReleaseStep(nameof(OpenTkControl), OpenTkControl.Dispose, gpuBound: true);
             _isGlStarted = false;
+            ExitRequested = null;
 
             _model.LogMessages.Add("[GL] VFX Studio resources released.");
         }
@@ -266,6 +276,10 @@ namespace AssetsManager.Views.Controls.Viewer
             catch (Silk.NET.Core.Loader.SymbolLoadingException) when (gpuBound)
             {
                 // The OpenGL context owns these handles and may have released them already.
+            }
+            catch (ObjectDisposedException) when (gpuBound)
+            {
+                // A WPF teardown can dispose the GL context before the control releases its handles.
             }
             catch (Exception ex)
             {
@@ -599,15 +613,17 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_championModel != null)
             {
-                _championMeshRenderer?.QueueRelease(_championModel);
-                _championModel.CurrentAnimation = null;
-                _championModel.Dispose();
+                var championModel = _championModel;
                 _championModel = null;
+                _championMeshRenderer?.QueueRelease(championModel);
+                championModel.CurrentAnimation = null;
+                RunReleaseStep("Champion SceneModel", championModel.Dispose);
             }
 
-            _championAnimationService?.ClearCache();
-            _clipCatalog?.Dispose();
+            RunReleaseStep("Champion animation cache", () => _championAnimationService?.ClearCache());
+            var clipCatalog = _clipCatalog;
             _clipCatalog = null;
+            RunReleaseStep(nameof(VfxClipCatalog), () => clipCatalog?.Dispose());
             _activeBundle = null;
             _championBundle = null;
             _abilityCompositions = Array.Empty<VfxAbilityComposition>();
@@ -754,15 +770,17 @@ namespace AssetsManager.Views.Controls.Viewer
             _vfxRenderer?.SetSystem(null);
             if (_championModel != null)
             {
-                _championMeshRenderer?.QueueRelease(_championModel);
-                _championModel.Dispose();
+                var championModel = _championModel;
+                _championModel = null;
+                _championMeshRenderer?.QueueRelease(championModel);
+                RunReleaseStep("Champion SceneModel", championModel.Dispose);
             }
-            _championModel = null;
             _championBundle = null;
             _model.HasChampionMesh = false;
-            _championAnimationService?.ClearCache();
-            _clipCatalog?.Dispose();
+            RunReleaseStep("Champion animation cache", () => _championAnimationService?.ClearCache());
+            var clipCatalog = _clipCatalog;
             _clipCatalog = null;
+            RunReleaseStep(nameof(VfxClipCatalog), () => clipCatalog?.Dispose());
 
             try
             {
