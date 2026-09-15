@@ -375,6 +375,57 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
         }
 
 
+        internal int GuessEvidenceFamilies(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int candidateBudget = 1_000_000,
+            Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0 || engine.RemainingUnknownCount == 0) return 0;
+
+            const string prefix = "plugins/rcp-be-lol-game-data/global/default/v1/champion-chroma-images/";
+            const string source = "LCU evidence-driven asset families";
+            var directories = KnownPaths
+                .Where(path => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Select(path => PathUtils.NormalizeSeparators(Path.GetDirectoryName(path)))
+                .Where(path => !string.IsNullOrEmpty(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToList();
+
+            int checkedCount = 0;
+            foreach (string directory in directories)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
+
+                int separator = directory.LastIndexOf('/');
+                if (separator < 0 || separator + 1 >= directory.Length) continue;
+                string championText = directory[(separator + 1)..];
+                if (!int.TryParse(championText, out int championId)) continue;
+
+                for (int suffix = 0; suffix <= 999; suffix++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
+
+                    Check(
+                        engine,
+                        $"{directory}/{championId}{suffix:000}.png",
+                        HashGuessStrategy.LcuPattern,
+                        source);
+                    checkedCount++;
+                    if ((checkedCount & 0x1fff) == 0) progress?.Invoke(checkedCount);
+                }
+            }
+
+            progress?.Invoke(checkedCount);
+            return checkedCount;
+        }
+
+
         internal int RunCustomAttacks(
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,
@@ -396,14 +447,27 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
                 }
             }
 
-            // Phase 1: High-precision Scoped Plugin Engine (Intra-directory cross-product, scoped modifiers, scoped substitutions)
+            // Phase 1: Evidence-driven stable asset families discovered from unresolved inventories.
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-families"))
+            {
+                string stage = "LCU Custom: evidence-driven families";
+                progress?.Report(engine.CreateProgress(stage, checkedCandidates));
+                int progressOffset = checkedCandidates;
+                int count = GuessEvidenceFamilies(
+                    engine,
+                    cancellationToken,
+                    progress: current => ReportCustomThrottled(stage, progressOffset + current));
+                checkedCandidates += count;
+            }
+
+            // Phase 2: High-precision Scoped Plugin Engine (Intra-directory cross-product, scoped modifiers, scoped substitutions)
             if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-scoped"))
             {
                 int count = RunScopedPluginAttacks(engine, progress, cancellationToken);
                 checkedCandidates += count;
             }
 
-            // Phase 2: Deep Directory Mirroring (/images/, /assets/, root)
+            // Phase 3: Deep Directory Mirroring (/images/, /assets/, root)
             if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-mirroring"))
             {
                 string stage = "LCU Custom: Directory mirroring";
@@ -416,7 +480,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
                 checkedCandidates += count;
             }
 
-            // Phase 3: Universal Modifier Matrix across all plugins
+            // Phase 4: Universal Modifier Matrix across all plugins
             if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-modifiers"))
             {
                 string stage = "LCU Custom: Universal modifier attack";
