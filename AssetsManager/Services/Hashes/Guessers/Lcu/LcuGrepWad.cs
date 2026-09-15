@@ -71,6 +71,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
                         HashGuessStrategy.LcuEmbeddedPath)));
 
             CheckLcuCandidates(ExtractCssSpriteSourceCandidates(text, sourcePath));
+            CheckLcuCandidates(ExtractDynamicCardFrameCandidates(text));
 
             var relativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             void CheckRelativeReference(string value)
@@ -111,6 +112,60 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
 
             CheckLcuCandidates(relativePaths.Select(path =>
                 new HashGuessCandidate(path, HashGuessStrategy.LcuRelativeBasename)));
+        }
+
+
+        private IEnumerable<HashGuessCandidate> ExtractDynamicCardFrameCandidates(string text)
+        {
+            const string staticAssetsRoot = "plugins/rcp-fe-lol-static-assets/global/default";
+            const string sanctumTemplate = "/fe/lol-static-assets/videos/sanctum/card-frame-tier${";
+            const string exaltedTemplate = "/fe/lol-static-assets/videos/exalted/card-frame-${";
+
+            bool hasSanctumTemplate = text.IndexOf(sanctumTemplate, StringComparison.OrdinalIgnoreCase) >= 0;
+            bool hasExaltedTemplate = text.IndexOf(exaltedTemplate, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!hasSanctumTemplate && !hasExaltedTemplate)
+                yield break;
+
+            string[] states = Regex.Matches(
+                    text,
+                    @"getCardVideoAssetByTier\([^,]+,\s*[""']([a-zA-Z0-9_-]+)[""']\)",
+                    RegexOptions.IgnoreCase)
+                .Cast<Match>()
+                .Select(match => match.Groups[1].Value.ToLowerInvariant())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (states.Length == 0)
+                yield break;
+
+            if (hasSanctumTemplate)
+            {
+                const string imagePrefix = staticAssetsRoot + "/images/sanctum/card-frame-tier";
+                foreach (string tier in KnownPaths
+                             .Where(path => path.StartsWith(imagePrefix, StringComparison.OrdinalIgnoreCase) &&
+                                 path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                             .Select(path => path[imagePrefix.Length..^4])
+                             .Where(tier => tier.Length > 0 && tier.All(char.IsDigit))
+                             .Distinct(StringComparer.OrdinalIgnoreCase))
+                foreach (string state in states)
+                    yield return new HashGuessCandidate(
+                        $"{staticAssetsRoot}/videos/sanctum/card-frame-tier{tier}-{state}.webm",
+                        HashGuessStrategy.LcuPattern);
+            }
+
+            if (hasExaltedTemplate)
+            {
+                const string imagePrefix = staticAssetsRoot + "/images/exalted/card-frame-";
+                foreach (string tier in KnownPaths
+                             .Where(path => path.StartsWith(imagePrefix, StringComparison.OrdinalIgnoreCase) &&
+                                 path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                             .Select(path => path[imagePrefix.Length..^4])
+                             .Where(tier => tier.Length > 0 && tier.All(char.IsLetterOrDigit))
+                             .Distinct(StringComparer.OrdinalIgnoreCase))
+                foreach (string state in states)
+                    yield return new HashGuessCandidate(
+                        $"{staticAssetsRoot}/videos/exalted/card-frame-{tier}-{state}.webm",
+                        HashGuessStrategy.LcuPattern);
+            }
         }
 
 
