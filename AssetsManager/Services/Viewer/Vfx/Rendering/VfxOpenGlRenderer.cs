@@ -157,18 +157,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             gl.EnableVertexAttribArray(4); gl.VertexAttribPointer(4, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(9 * sizeof(float)));
             gl.EnableVertexAttribArray(5); gl.VertexAttribPointer(5, 4, VertexAttribPointerType.Float, false, bstride, new IntPtr(11 * sizeof(float)));
             gl.EnableVertexAttribArray(6); gl.VertexAttribPointer(6, 4, VertexAttribPointerType.Float, false, bstride, new IntPtr(15 * sizeof(float)));
-            gl.EnableVertexAttribArray(7); gl.VertexAttribPointer(7, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(19 * sizeof(float)));
-            gl.EnableVertexAttribArray(8); gl.VertexAttribPointer(8, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(21 * sizeof(float)));
-            gl.EnableVertexAttribArray(9); gl.VertexAttribPointer(9, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(23 * sizeof(float)));
-            gl.EnableVertexAttribArray(10); gl.VertexAttribPointer(10, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(24 * sizeof(float)));
-            gl.EnableVertexAttribArray(11); gl.VertexAttribPointer(11, 4, VertexAttribPointerType.Float, false, bstride, new IntPtr(25 * sizeof(float)));
-            gl.EnableVertexAttribArray(12); gl.VertexAttribPointer(12, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(29 * sizeof(float)));
-            gl.EnableVertexAttribArray(13); gl.VertexAttribPointer(13, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(31 * sizeof(float)));
-            gl.EnableVertexAttribArray(14); gl.VertexAttribPointer(14, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(33 * sizeof(float)));
-            gl.EnableVertexAttribArray(15); gl.VertexAttribPointer(15, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(34 * sizeof(float)));
-            gl.EnableVertexAttribArray(16); gl.VertexAttribPointer(16, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(36 * sizeof(float)));
-            gl.EnableVertexAttribArray(17); gl.VertexAttribPointer(17, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(39 * sizeof(float)));
-            gl.EnableVertexAttribArray(18); gl.VertexAttribPointer(18, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(42 * sizeof(float)));
+            // Pack the authored 45-float instance record into at most 14 instance attributes.
+            // OpenGL guarantees only 16 generic attributes; location 0 is the quad corner.
+            gl.EnableVertexAttribArray(7); gl.VertexAttribPointer(7, 4, VertexAttribPointerType.Float, false, bstride, new IntPtr(19 * sizeof(float)));
+            gl.EnableVertexAttribArray(8); gl.VertexAttribPointer(8, 4, VertexAttribPointerType.Float, false, bstride, new IntPtr(23 * sizeof(float)));
+            gl.EnableVertexAttribArray(9); gl.VertexAttribPointer(9, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(27 * sizeof(float)));
+            gl.EnableVertexAttribArray(10); gl.VertexAttribPointer(10, 4, VertexAttribPointerType.Float, false, bstride, new IntPtr(29 * sizeof(float)));
+            gl.EnableVertexAttribArray(11); gl.VertexAttribPointer(11, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(33 * sizeof(float)));
+            gl.EnableVertexAttribArray(12); gl.VertexAttribPointer(12, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(36 * sizeof(float)));
+            gl.EnableVertexAttribArray(13); gl.VertexAttribPointer(13, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(39 * sizeof(float)));
+            gl.EnableVertexAttribArray(14); gl.VertexAttribPointer(14, 3, VertexAttribPointerType.Float, false, bstride, new IntPtr(42 * sizeof(float)));
 
             gl.VertexAttribDivisor(1, 1);
             gl.VertexAttribDivisor(2, 1);
@@ -184,10 +182,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             gl.VertexAttribDivisor(12, 1);
             gl.VertexAttribDivisor(13, 1);
             gl.VertexAttribDivisor(14, 1);
-            gl.VertexAttribDivisor(15, 1);
-            gl.VertexAttribDivisor(16, 1);
-            gl.VertexAttribDivisor(17, 1);
-            gl.VertexAttribDivisor(18, 1);
 
             gl.BindVertexArray(0);
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
@@ -197,8 +191,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _trailVbo = gl.GenBuffer();
             gl.BindVertexArray(_trailVao);
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
-            int[] sizes = { 2, 3, 2, 4, 2, 4, 4, 2, 2, 1, 1, 4, 2, 2, 1, 2, 3, 3, 3 };
-            int[] offsets = { 0, 2, 5, 7, 11, 13, 17, 21, 23, 25, 26, 27, 31, 33, 35, 36, 38, 41, 44 };
+            int[] sizes = { 2, 3, 2, 4, 2, 4, 4, 4, 4, 2, 4, 3, 3, 3, 3 };
+            int[] offsets = { 0, 2, 5, 7, 11, 13, 17, 21, 25, 29, 31, 35, 38, 41, 44 };
             for (uint attribute = 0; attribute < sizes.Length; attribute++)
             {
                 gl.EnableVertexAttribArray(attribute);
