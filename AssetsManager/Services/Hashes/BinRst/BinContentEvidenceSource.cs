@@ -748,7 +748,7 @@ namespace AssetsManager.Services.Hashes
             {
                 BinTreeObject item = pair.Value;
                 MatchEntry(pair.Key, pair.Value);
-                if (resolver != null && ObjectPathTypes.Contains(item.ClassHash))
+                if (ObjectPathTypes.Contains(item.ClassHash))
                     MatchObjectPathFromEntry(pair.Key, item);
 
                 foreach (BinTreeProperty property in item.Properties.Values)
@@ -757,17 +757,33 @@ namespace AssetsManager.Services.Hashes
             foreach (var item in tree.DataOverrides)
                 Visit(item.Property);
 
+            MatchCollectedItemHashes();
+
+            string ResolveEntryPath(uint hash)
+            {
+                if (matcher.TryGetVerifiedValue(InternalHashKind.BinEntries, hash, out string matched))
+                    return matched;
+                if (resolver == null) return null;
+                string resolved = resolver.ResolveBinEntry(hash);
+                return string.Equals(resolved, hash.ToString("x8"), StringComparison.OrdinalIgnoreCase) ? null : resolved;
+            }
+
+            string ResolveHashValue(uint hash)
+            {
+                if (matcher.TryGetVerifiedValue(InternalHashKind.BinHashes, hash, out string matched))
+                    return matched;
+                if (resolver == null) return null;
+                string resolved = resolver.ResolveBinHashGeneral(hash);
+                return string.Equals(resolved, hash.ToString("x8"), StringComparison.OrdinalIgnoreCase) ? null : resolved;
+            }
+
             void MatchObjectPathFromEntry(uint entryHash, BinTreeObject item)
             {
                 if (!TryGetObjectPathHash(item.Properties, out uint objectPathHash))
                     return;
 
-                string entryPath = resolver.ResolveBinHashGeneral(entryHash);
-                if (string.IsNullOrWhiteSpace(entryPath) ||
-                    string.Equals(entryPath, entryHash.ToString("x8"), StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
+                string entryPath = ResolveEntryPath(entryHash);
+                if (string.IsNullOrWhiteSpace(entryPath)) return;
 
                 matcher.CheckContextualCandidate(InternalHashKind.BinHashes, entryPath, path, wadPath, objectPathHash);
             }
@@ -836,6 +852,7 @@ namespace AssetsManager.Services.Hashes
                     else if (classHash == Fnv1a.HashLower("ItemData"))
                     {
                         MatchEntryFromU32(entryHash, item, "itemID", value => $"Items/{value}");
+                        matcher.ObserveItemDataEntry(entryHash);
                         if (item.Properties.TryGetValue(Fnv1a.HashLower("mVFXResourceResolver"), out BinTreeProperty resolverProperty) &&
                             resolverProperty is BinTreeStruct vfxResolver)
                         {
@@ -880,16 +897,12 @@ namespace AssetsManager.Services.Hashes
                     }
                     else if (classHash == Fnv1a.HashLower("ItemGroup"))
                     {
-                        if (resolver != null &&
-                            item.Properties.TryGetValue(Fnv1a.HashLower("mItemGroupID"), out BinTreeProperty idProp) &&
+                        if (item.Properties.TryGetValue(Fnv1a.HashLower("mItemGroupID"), out BinTreeProperty idProp) &&
                             idProp is BinTreeHash idHash && idHash.Value != 0)
                         {
-                            string idStr = resolver.ResolveBinHashGeneral(idHash.Value);
-                            if (!string.IsNullOrWhiteSpace(idStr) &&
-                                !string.Equals(idStr, idHash.Value.ToString("x8"), StringComparison.OrdinalIgnoreCase))
-                            {
+                            string idStr = ResolveHashValue(idHash.Value);
+                            if (!string.IsNullOrWhiteSpace(idStr))
                                 MatchObservedEntry(entryHash, $"Items/ItemGroup/{idStr}");
-                            }
                         }
                     }
                     else if (classHash == Fnv1a.HashLower("ItemShopGameModeData"))
@@ -984,7 +997,7 @@ namespace AssetsManager.Services.Hashes
 
                 if (item.Properties.TryGetValue(Fnv1a.HashLower("basicAttack"), out BinTreeProperty basicProp) &&
                     basicProp is BinTreeStruct basicStruct &&
-                    TryGetString(basicStruct.Properties, "mAttackName", out string basicName))
+                    TryGetStringOrOptional(basicStruct.Properties, "mAttackName", out string basicName))
                 {
                     MatchAnyEntry($"{prefix}/Spells/{basicName}");
                 }
@@ -1000,7 +1013,7 @@ namespace AssetsManager.Services.Hashes
                         foreach (BinTreeProperty elem in container.Elements)
                         {
                             if (elem is BinTreeStruct attackStruct &&
-                                TryGetString(attackStruct.Properties, "mAttackName", out string attackName))
+                                TryGetStringOrOptional(attackStruct.Properties, "mAttackName", out string attackName))
                             {
                                 MatchAnyEntry($"{prefix}/Spells/{attackName}");
                             }
@@ -1103,17 +1116,7 @@ namespace AssetsManager.Services.Hashes
 
             void MatchSkinCharacterData(uint entryHash, BinTreeObject item)
             {
-                string skinPath = null;
-
-                if (resolver != null)
-                {
-                    string resolved = resolver.ResolveBinHashGeneral(entryHash);
-                    if (!string.IsNullOrWhiteSpace(resolved) &&
-                        !string.Equals(resolved, entryHash.ToString("x8"), StringComparison.OrdinalIgnoreCase))
-                    {
-                        skinPath = resolved;
-                    }
-                }
+                string skinPath = ResolveEntryPath(entryHash);
 
                 if (skinPath == null && TryGetString(item.Properties, "championSkinName", out string champSkinName))
                 {
@@ -1129,7 +1132,7 @@ namespace AssetsManager.Services.Hashes
                     }
                 }
 
-                if (skinPath == null && TryGetString(item.Properties, "iconSquare", out string iconSquare))
+                if (skinPath == null && TryGetStringOrOptional(item.Properties, "iconSquare", out string iconSquare))
                 {
                     string normIcon = InternalHashEvidenceMatcher.NormalizeCandidate(iconSquare);
                     if (normIcon.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase))
@@ -1271,12 +1274,12 @@ namespace AssetsManager.Services.Hashes
 
             void MatchHashLinkMapProperties(Dictionary<uint, BinTreeProperty> properties, string field)
             {
-                if (resolver == null || !properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) || property is not BinTreeMap map) return;
+                if (!properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) || property is not BinTreeMap map) return;
                 foreach (var pair in map)
                 {
                     if (pair.Key is not BinTreeHash key || pair.Value is not BinTreeObjectLink link) continue;
-                    string target = resolver.ResolveBinEntry(link.Value);
-                    if (string.Equals(target, link.Value.ToString("x8"), StringComparison.Ordinal)) continue;
+                    string target = ResolveEntryPath(link.Value);
+                    if (string.IsNullOrWhiteSpace(target)) continue;
                     if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, target, path, wadPath, key.Value)) continue;
                     int slash = target.LastIndexOf('/');
                     if (slash < 0) continue;
@@ -1299,12 +1302,12 @@ namespace AssetsManager.Services.Hashes
 
             void MatchGenericHashLinkMap(BinTreeMap map)
             {
-                if (resolver == null || map.KeyType != BinPropertyType.Hash || map.ValueType != BinPropertyType.ObjectLink) return;
+                if (map.KeyType != BinPropertyType.Hash || map.ValueType != BinPropertyType.ObjectLink) return;
                 foreach (var pair in map)
                 {
                     if (pair.Key is not BinTreeHash key || pair.Value is not BinTreeObjectLink link) continue;
-                    string target = resolver.ResolveBinEntry(link.Value);
-                    if (string.Equals(target, link.Value.ToString("x8"), StringComparison.Ordinal)) continue;
+                    string target = ResolveEntryPath(link.Value);
+                    if (string.IsNullOrWhiteSpace(target)) continue;
                     matcher.CheckContextualCandidate(InternalHashKind.BinHashes, target, path, wadPath, key.Value);
                 }
             }
@@ -1339,21 +1342,37 @@ namespace AssetsManager.Services.Hashes
 
             void CheckListContainer(BinTreeContainer container)
             {
-                if (resolver == null) return;
                 foreach (BinTreeProperty elem in container.Elements)
                 {
                     uint hashVal = 0;
-                    if (elem is BinTreeHash h) hashVal = h.Value;
-                    else if (elem is BinTreeObjectLink l) hashVal = (uint)l.Value;
-                    if (hashVal != 0)
+                    bool isHashValue = false;
+                    if (elem is BinTreeHash h)
                     {
-                        string candidate = resolver.ResolveBinEntry(hashVal);
-                        if (!string.IsNullOrWhiteSpace(candidate) &&
-                            !string.Equals(candidate, hashVal.ToString("x8"), StringComparison.OrdinalIgnoreCase))
-                        {
-                            matcher.CheckContextualCandidate(InternalHashKind.BinHashes, candidate, path, wadPath, hashVal);
-                        }
+                        hashVal = h.Value;
+                        isHashValue = true;
                     }
+                    else if (elem is BinTreeObjectLink l)
+                    {
+                        hashVal = (uint)l.Value;
+                    }
+
+                    if (hashVal == 0) continue;
+                    if (isHashValue) matcher.ObserveItemListHash(hashVal);
+
+                    string candidate = ResolveEntryPath(hashVal);
+                    if (!string.IsNullOrWhiteSpace(candidate))
+                        matcher.CheckContextualCandidate(InternalHashKind.BinHashes, candidate, path, wadPath, hashVal);
+                }
+            }
+
+            void MatchCollectedItemHashes()
+            {
+                foreach (uint hash in matcher.GetCollectedItemHashCandidates())
+                {
+                    if (!matcher.IsRemaining(InternalHashKind.BinHashes, hash)) continue;
+                    string candidate = ResolveEntryPath(hash);
+                    if (!string.IsNullOrWhiteSpace(candidate))
+                        matcher.CheckContextualCandidate(InternalHashKind.BinHashes, candidate, path, wadPath, hash);
                 }
             }
 
@@ -1430,6 +1449,30 @@ namespace AssetsManager.Services.Hashes
 
             static bool TryGetString(Dictionary<uint, BinTreeProperty> properties, string field, out string value) =>
                 TryGetStringByHash(properties, Fnv1a.HashLower(field), out value);
+
+            static bool TryGetStringOrOptional(Dictionary<uint, BinTreeProperty> properties, string field, out string value)
+            {
+                if (!properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property))
+                {
+                    value = null;
+                    return false;
+                }
+
+                if (property is BinTreeString text)
+                {
+                    value = text.Value;
+                    return true;
+                }
+
+                if (property is BinTreeOptional option && option.Value is BinTreeString optionalText)
+                {
+                    value = optionalText.Value;
+                    return true;
+                }
+
+                value = null;
+                return false;
+            }
 
             static bool TryGetStringByHash(Dictionary<uint, BinTreeProperty> properties, uint fieldHash, out string value)
             {
