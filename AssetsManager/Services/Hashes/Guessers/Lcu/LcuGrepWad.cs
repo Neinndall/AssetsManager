@@ -89,8 +89,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
                 if (contextualPath.Length > 0)
                     CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
 
-                bool hasDirectoryContext = relativePath.IndexOf('/') >= 0 || relativePath.IndexOf('\\') >= 0;
-                if (!relativePath.StartsWith('/') && (contextualPath.Length == 0 || !hasDirectoryContext))
+                if (!relativePath.StartsWith('/'))
                     relativePaths.Add(relativePath.ToLowerInvariant());
             }
 
@@ -110,8 +109,13 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
             foreach (Match match in Regex.Matches(text, @"sourceMappingURL=(.*?\.js)\.map"))
                 CheckRelativeReference(match.Groups[1].Value);
 
-            CheckLcuCandidates(relativePaths.Select(path =>
-                new HashGuessCandidate(path, HashGuessStrategy.LcuRelativeBasename)));
+            CheckBasenames(
+                engine,
+                relativePaths.Select(path => path.ToLowerInvariant()),
+                cancellationToken,
+                sourceWadPath,
+                HashGuessStrategy.LcuRelativeBasename,
+                sourceChunkHash);
         }
 
 

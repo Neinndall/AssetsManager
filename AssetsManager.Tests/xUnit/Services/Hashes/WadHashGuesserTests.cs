@@ -184,6 +184,22 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void CheckBasenamesKeepsDefaultPluginVariantBehavior()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/images/icon.png";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(
+                new[] { "plugins/rcp-fe-test/global/default/images/existing.json" },
+                null);
+
+            int checkedCount = guesser.CheckBasenames(engine, new[] { "icon.png" });
+
+            Assert.True(checkedCount > 0);
+            AssertResolved(engine, expected);
+            Assert.Equal(HashGuessStrategy.PluginVariant, engine.Matches.Values.Single().Strategy);
+        }
+
+        [Fact]
         public void ComposedPathHashingMatchesRegularUtf8HashingWithoutLengthLimits()
         {
             string[] relativePaths = { "imágenes/icono-é.js", new string('a', 1_100) + ".json" };
@@ -338,6 +354,29 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 1);
 
             AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void LcuGrepPreservesGlobalBasenameExpansionWhenContextualPathExists()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/feature/images/icon.png";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(
+                new[] { "plugins/rcp-fe-test/global/default/feature/existing.json" },
+                null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("const icon = \"images/icon.png\";"),
+                "plugins/rcp-fe-test/global/default/components/init.js",
+                "test.wad",
+                0x6666);
+
+            AssertResolved(engine, expected);
+            HashGuessMatch match = engine.Matches.Values.Single();
+            Assert.Equal(HashGuessStrategy.LcuRelativeBasename, match.Strategy);
+            Assert.Equal("test.wad", match.SourceWadPath);
+            Assert.Equal(0x6666UL, match.SourceChunkHash);
         }
 
         [Fact]
