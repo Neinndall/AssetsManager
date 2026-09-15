@@ -41,6 +41,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isCleanedUp;
         private bool _isActive;
         private bool _isGlStarted;
+        private bool _isExitPending;
         private bool _isBulkEmitterStateChange;
         private VfxSystemDiagnosticItem _pendingSystem;
         private VfxSystemDiagnosticItem _inspectedSystem;
@@ -58,6 +59,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         /// <summary>Injected by the host and owned by ViewerWindow.</summary>
         public VfxLoadingService VfxLoadingService { get; set; }
+
+        public event EventHandler ExitRequested;
 
         // VFX Studio dedicated camera framing (elevated 3/4 perspective looking down at origin Y=0)
         private static readonly Point3D VfxCameraPosition = new(0, 320, 500);
@@ -201,6 +204,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_isCleanedUp) return;
 
+            _isExitPending = false;
             Deactivate();
             _isCleanedUp = true;
             _scanCancellation?.Cancel();
@@ -390,7 +394,18 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void OpenTkControl_Render(TimeSpan delta)
         {
-            if (_gl == null || !_isActive || !IsVisible) return;
+            if (_gl == null) return;
+
+            _championMeshRenderer?.ProcessPendingReleases();
+            if (_isExitPending)
+            {
+                _vfxRenderer?.SetSystem(null);
+                _isExitPending = false;
+                ExitRequested?.Invoke(this, EventArgs.Empty);
+                return;
+            }
+
+            if (!_isActive || !IsVisible) return;
 
             float dt = (float)delta.TotalSeconds;
             if (dt <= 0 || dt > 0.5f) dt = 1f / 60f;
@@ -557,6 +572,69 @@ namespace AssetsManager.Views.Controls.Viewer
 
         #region Directory & BIN Scanning
 
+        private void ExitStudio_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isExitPending) return;
+
+            ReleaseCurrentProject();
+            if (_gl != null && _isGlStarted && _isActive && IsVisible)
+            {
+                // Finish GPU teardown on the render callback while the OpenGL context is current.
+                _isExitPending = true;
+                return;
+            }
+
+            ExitRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void ReleaseCurrentProject()
+        {
+            _scanCancellation?.Cancel();
+            _binCancellation?.Cancel();
+            _championLoadGeneration++;
+            _model.IsPlaying = false;
+            _vfxRenderer?.Pause();
+            _pendingSystem = null;
+            _inspectedSystem = null;
+
+            if (_championModel != null)
+            {
+                _championMeshRenderer?.QueueRelease(_championModel);
+                _championModel.CurrentAnimation = null;
+                _championModel.Dispose();
+                _championModel = null;
+            }
+
+            _championAnimationService?.ClearCache();
+            _clipCatalog?.Dispose();
+            _clipCatalog = null;
+            _activeBundle = null;
+            _championBundle = null;
+            _abilityCompositions = Array.Empty<VfxAbilityComposition>();
+
+            _model.SelectedAnimation = null;
+            _model.SelectedSystem = null;
+            _model.SelectedSkin = null;
+            _model.DetectedAnimations.Clear();
+            _model.Systems.Clear();
+            _model.Emitters.Clear();
+            _model.Textures.Clear();
+            _model.Meshes.Clear();
+            _model.DetectedSkins.Clear();
+            _model.LogMessages.Clear();
+            _model.RootPath = string.Empty;
+            _model.SearchQuery = string.Empty;
+            _model.EmitterFilterText = string.Empty;
+            _model.CurrentTime = 0;
+            _model.TotalDuration = 5.0;
+            _model.ActiveLoopDuration = 0;
+            _model.LiveParticleCount = 0;
+            _model.HasChampionMesh = false;
+            _model.HasAnySolo = false;
+            _model.IsAllMuted = false;
+            _model.StatusText = "Ready";
+        }
+
         private void BrowseRoot_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new OpenFolderDialog
@@ -674,7 +752,11 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.SelectedAnimation = null;
             _model.DetectedAnimations.Clear();
             _vfxRenderer?.SetSystem(null);
-            _championModel?.Dispose();
+            if (_championModel != null)
+            {
+                _championMeshRenderer?.QueueRelease(_championModel);
+                _championModel.Dispose();
+            }
             _championModel = null;
             _championBundle = null;
             _model.HasChampionMesh = false;
@@ -925,7 +1007,11 @@ namespace AssetsManager.Views.Controls.Viewer
                         var oldModel = _championModel;
                         _championModel = loaded;
                         _championBundle = bundle;
-                        oldModel?.Dispose();
+                        if (oldModel != null)
+                        {
+                            _championMeshRenderer?.QueueRelease(oldModel);
+                            oldModel.Dispose();
+                        }
                         _model.HasChampionMesh = true;
 
                         // Ensure skeleton is loaded

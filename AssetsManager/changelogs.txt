@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Added an Exit action that releases the active VFX project and returns to the main Viewer while keeping the studio reusable.
   - Viewer / Browse VFX systems and animations in a skin and BIN tree with on-demand loading.
   - Viewer / Resolved companion and chibi model textures and materials by resolving companion BIN paths, matching WadChunkLink texture hashes, and applying semantic submesh token matching.
   - Explorer / EXTRACT and SAVE now preserve the WAD container folder name and relative virtual path hierarchy for selected subtrees and files, maintaining root archive alignment across assets and data.
@@ -374,6 +375,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Champion mesh GPU resources are now released when switching skins or leaving the active VFX project.
   - VFX Studio / Loop now stays enabled or disabled when switching between VFX systems.
   - Viewer / Corrected VFX texture wrapping, trails, blending and distortion to improve effect previews.
   - Diff Viewer / Fixed severe 10-minute freeze and horizontal line blowout when viewing minified JavaScript files (e.g. rcp-fe-lol-navigation.js). Replaced quadratic Jsbeautifier and broken fallback with a high-performance linear JavaScript tokenizer/beautifier featuring regex-literal aware string tokenization, bounded line wrapping, and clamped indentation.
