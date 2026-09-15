@@ -78,7 +78,7 @@ namespace AssetsManager.Views
             // Project Explorer event wiring
             ProjectExplorer.ModelSelected += ProjectExplorer_ModelSelected;
             ProjectExplorer.AnimationsSelected += (_, paths) => PanelControl.LoadAnimationsDirectly(paths);
-            ProjectExplorer.CloseRequested += (s, e) => _viewModel.IsProjectExplorerVisible = false;
+            ProjectExplorer.CloseRequested += (_, _) => _viewModel.IsProjectExplorerVisible = false;
 
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
@@ -215,29 +215,26 @@ namespace AssetsManager.Views
             if (_isCleanedUp) return;
             _isCleanedUp = true;
 
+            _viewModel.IsVfxStudioVisible = false;
+
+            // Keep teardown independent so one faulty consumer cannot prevent the others from releasing resources.
+            RunCleanupStep(nameof(VfxInspectorControl), () => VfxInspectorControl?.Cleanup());
+            RunCleanupStep(nameof(ViewportControl), () => ViewportControl?.Cleanup());
+            RunCleanupStep(nameof(PanelControl), () => PanelControl?.Cleanup());
+
+            // The shared VFX loader must be the last resource released because both viewer surfaces consume it.
+            RunCleanupStep(nameof(VfxLoadingService), () => _vfxLoadingService?.Dispose());
+        }
+
+        private void RunCleanupStep(string componentName, Action cleanup)
+        {
             try
             {
-                _viewModel.IsVfxStudioVisible = false;
-
-                // Release the VFX consumer before disposing the service it uses.
-                VfxInspectorControl?.Cleanup();
-                ViewportControl?.Cleanup();
-                PanelControl?.Cleanup();
+                cleanup?.Invoke();
             }
             catch (Exception ex)
             {
-                _logService.LogDebug($"Notice during ViewerWindow.CleanupResources: {ex.Message}");
-            }
-            finally
-            {
-                try
-                {
-                    _vfxLoadingService?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogDebug($"Notice during VfxLoadingService cleanup: {ex.Message}");
-                }
+                _logService.LogDebug($"Notice during ViewerWindow {componentName} cleanup: {ex.Message}");
             }
         }
     }
