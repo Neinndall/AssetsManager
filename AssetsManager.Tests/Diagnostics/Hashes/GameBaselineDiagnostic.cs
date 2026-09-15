@@ -69,7 +69,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 var resolver = new HashResolverService(directories, log);
                 var service = new HashGuessingService(resolver, pathStore, persistence, log, directories);
 
-                var summary = new List<(string Suite, TimeSpan Elapsed, int Candidates, int Resolved)>();
+                var summary = new List<(string Suite, TimeSpan Elapsed, long Candidates, int Resolved)>();
                 var resolvedPaths = new List<HashGuessMatch>();
                 var totalStopwatch = Stopwatch.StartNew();
 
@@ -143,7 +143,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
         private static async Task RunSuiteAsync(
             string suiteName,
             Func<Task<HashGuessRunResult>> run,
-            List<(string Suite, TimeSpan Elapsed, int Candidates, int Resolved)> summary,
+            List<(string Suite, TimeSpan Elapsed, long Candidates, int Resolved)> summary,
             List<HashGuessMatch> resolvedPaths)
         {
             Console.WriteLine();

@@ -626,7 +626,7 @@ namespace AssetsManager.Services.Hashes
             {
                 Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
                 engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown, reportMatch);
-                int checkedCandidates = 0;
+                long checkedCandidates = 0;
                 bool ShouldRun(string subId) => selectedSubMethods == null || selectedSubMethods.Contains(subId);
 
                 if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-ext-wordaddition"))
@@ -641,7 +641,7 @@ namespace AssetsManager.Services.Hashes
 
                 if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-ext-v1tft"))
                 {
-                    progress?.Report(engine.CreateProgress("LCU Extended: V1 TFT patterns", checkedCandidates));
+                    progress?.Report(engine.CreateProgress("LCU Extended: V1 TFT patterns"));
                     checkedCandidates += _lcuGuesser.RunV1PathPatterns(
                         engine,
                         progress,
@@ -653,7 +653,7 @@ namespace AssetsManager.Services.Hashes
             }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
 
             var matches = runResult.Item1;
-            int checkedCandidates = runResult.Item2;
+            long checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await PersistGuessingRunAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
@@ -817,13 +817,13 @@ namespace AssetsManager.Services.Hashes
             {
                 Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
                 engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown, reportMatch);
-                int checkedCandidates = _lcuGuesser.RunV1PathPatterns(engine, progress, cancellationToken);
+                long checkedCandidates = _lcuGuesser.RunV1PathPatterns(engine, progress, cancellationToken);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
             }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
 
             var matches = runResult.Item1;
-            int checkedCandidates = runResult.Item2;
+            long checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await PersistGuessingRunAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };

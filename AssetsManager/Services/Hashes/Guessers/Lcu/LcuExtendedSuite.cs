@@ -72,7 +72,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
 
         // Dedicated, opt-in coverage for the v1 check_iter patterns used by CDTB tooling.
         // It lives under LCU Extended because its wordlist cross-product is intentionally exhaustive.
-        internal int RunV1PathPatterns(
+        internal long RunV1PathPatterns(
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken,
@@ -81,7 +81,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
         {
             ArgumentNullException.ThrowIfNull(engine);
 
-            string[] wordList = (words ?? BuildWordlist())
+            string[] lcuWordList = (words ?? BuildWordlist())
                 .Where(word => !string.IsNullOrWhiteSpace(word))
                 .Select(PathUtils.NormalizePath)
                 .Where(word => word.Length > 0)
@@ -99,56 +99,66 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
                 .Select(locale => locale.ToLowerInvariant())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            IReadOnlyDictionary<ulong, string> knownHashes = HashFile.Load();
-            var seenFileNames = new HashSet<string>(StringComparer.Ordinal);
-
+            IReadOnlyDictionary<ulong, string> knownHashes = localeList.Length == 0 ? null : HashFile.Load();
             const string v1Prefix = "plugins/rcp-be-lol-game-data/global/";
+            const string defaultV1Prefix = "plugins/rcp-be-lol-game-data/global/default/v1/";
             const string source = "LCU v1 path patterns";
-            int checkedCandidates = 0;
-            int lastReported = -1;
+            long checkedCandidates = 0;
+            long lastReported = -1;
             var progressClock = Stopwatch.StartNew();
 
             void Report(string phase, bool force = false)
             {
-                if (!force && ((checkedCandidates & 0x3fff) != 0 || progressClock.ElapsedMilliseconds < 100)) return;
+                if (!force && progressClock.ElapsedMilliseconds < 100) return;
                 if (lastReported == checkedCandidates) return;
-                progress?.Report(engine.CreateProgress($"LCU V1 Paths: {phase}", checkedCandidates));
+                progress?.Report(engine.CreateProgress($"LCU V1 Paths: {phase}"));
                 lastReported = checkedCandidates;
                 progressClock.Restart();
             }
 
             bool CheckDefaultThenLocales(string fileName, string phase)
             {
-                if (!seenFileNames.Add(fileName)) return true;
+                engine.CheckNormalizedParts(
+                    defaultV1Prefix.AsSpan(),
+                    fileName.AsSpan(),
+                    ReadOnlySpan<char>.Empty,
+                    HashGuessStrategy.LcuPattern,
+                    source);
+                checkedCandidates++;
 
-                string defaultPath = $"{v1Prefix}default/v1/{fileName}";
-                checkedCandidates += CheckIter(
-                    engine,
-                    new[] { new HashGuessCandidate(defaultPath, HashGuessStrategy.LcuPattern) },
-                    source,
-                    cancellationToken);
-                Report(phase);
-                if (engine.RemainingUnknownCount == 0) return false;
+                if ((checkedCandidates & 0x3fff) == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Report(phase);
+                    if (engine.RemainingUnknownCount == 0) return false;
+                }
+
+                if (localeList.Length == 0) return true;
 
                 // A localized path is only attempted after its default counterpart is known or resolved.
-                // This preserves the useful locale expansion without multiplying every word pair by all locales.
-                ulong defaultHash = XxHash64Ext.Hash(PathUtils.NormalizePath(defaultPath));
+                string defaultPath = string.Concat(defaultV1Prefix, fileName);
+                ulong defaultHash = XxHash64Ext.Hash(defaultPath);
                 bool hasDefaultEvidence = engine.Matches.ContainsKey(defaultHash) || knownHashes.ContainsKey(defaultHash);
                 if (!hasDefaultEvidence) return true;
 
-                checkedCandidates += CheckIter(
-                    engine,
-                    localeList.Select(locale => new HashGuessCandidate(
-                        $"{v1Prefix}{locale}/v1/{fileName}",
-                        HashGuessStrategy.LcuPattern)),
-                    source,
-                    cancellationToken);
+                foreach (string locale in localeList)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string localizedPrefix = string.Concat(v1Prefix, locale, "/v1/");
+                    engine.CheckNormalizedParts(
+                        localizedPrefix.AsSpan(),
+                        fileName.AsSpan(),
+                        ReadOnlySpan<char>.Empty,
+                        HashGuessStrategy.LcuPattern,
+                        source);
+                    checkedCandidates++;
+                }
                 Report(phase);
-                return true;
+                return engine.RemainingUnknownCount > 0;
             }
 
             Report("preparing", force: true);
-            foreach (string a in wordList)
+            foreach (string a in lcuWordList)
             {
                 // The non-TFT paths are first because they are both broadly useful and cheap to resolve early.
                 if (!CheckDefaultThenLocales($"{a}.json", "single names") ||
@@ -159,7 +169,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
                     return checkedCandidates;
                 }
 
-                foreach (string b in wordList)
+                foreach (string b in lcuWordList)
                 {
                     // These are the unique candidate sets from the 24 CDTB check_iter expressions.
                     // Because both words iterate over the full list, swapping a/b would only repeat work.

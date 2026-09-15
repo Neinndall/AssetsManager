@@ -2174,9 +2174,9 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
-        public void LcuV1UniquePatternsMatchOriginalCdtbCandidateSetWithoutDuplicateChecks()
+        public void LcuV1UniquePatternsMatchOriginalCdtbCandidateSet()
         {
-            string[] words = { "a", "ab", "b", "c", "bc" };
+            string[] words = { "alpha", "beta", "gamma", "delta", "epsilon" };
             const string prefix = "plugins/rcp-be-lol-game-data/global/default/v1/";
             var expected = new HashSet<string>(StringComparer.Ordinal);
 
@@ -2214,7 +2214,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 expected.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
             var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, Array.Empty<string>()), null);
 
-            int checkedCandidates = lcu.RunV1PathPatterns(
+            long checkedCandidates = lcu.RunV1PathPatterns(
                 engine,
                 progress: null,
                 cancellationToken: CancellationToken.None,
@@ -2222,6 +2222,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 
             Assert.Equal(0, engine.RemainingUnknownCount);
             Assert.Equal(expected.Count, engine.Matches.Count);
+            Assert.Equal(3L * words.Length + 11L * words.Length * words.Length, checkedCandidates);
             Assert.Equal(expected.Count, checkedCandidates);
         }
 

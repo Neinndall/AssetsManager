@@ -39,7 +39,7 @@ namespace AssetsManager.Views.Models.Hashes
     {
         public HashGuessDomain Domain { get; init; }
         public int UnknownHashesAtStart { get; init; }
-        public int ScannedChunks { get; init; }
+        public long ScannedChunks { get; init; }
         public IReadOnlyList<HashGuessMatch> Matches { get; init; } = Array.Empty<HashGuessMatch>();
     }
 
