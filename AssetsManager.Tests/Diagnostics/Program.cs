@@ -157,6 +157,11 @@ namespace AssetsManager.Tests.Diagnostics
                 LcuUnknownsAuditDiagnostic.Run(pbe);
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "lcu-unknown-tracker", StringComparison.OrdinalIgnoreCase))
+            {
+                LcuUnknownTrackerDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "lcu-export-unknowns", StringComparison.OrdinalIgnoreCase))
             {
                 LcuExportUnknownsDiagnostic.Run(args.Skip(1).ToArray());

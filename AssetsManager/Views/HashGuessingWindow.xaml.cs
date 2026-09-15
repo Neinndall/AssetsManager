@@ -206,6 +206,7 @@ namespace AssetsManager.Views
                 BadgeBrush = accentTeal,
                 EstimatedTime = "~15s"
             };
+            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-families", Name = "GuessEvidenceFamilies", Description = "Evidence-driven stable LCU asset families inferred from unresolved inventories", BadgeText = "⚡ ~1s", BadgeBrush = accentPurple });
             lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-scoped", Name = "GuessScopedPlugins", Description = "Intra-plugin directory topology, vocabulary, numeric ranges & component synthesis", BadgeText = "⚡ ~5s", BadgeBrush = accentTeal });
             lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-mirroring", Name = "MirrorDirectories", Description = "Deep directory mirroring across /images/, /assets/, and root structures", BadgeText = "⚡ ~1s", BadgeBrush = accentPurple });
             lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-modifiers", Name = "GuessUniversalModifiers", Description = "Riot UI states (hover, active, disabled, tier1-4, mini, lg)", BadgeText = "⚡ ~2s", BadgeBrush = accentBrush });

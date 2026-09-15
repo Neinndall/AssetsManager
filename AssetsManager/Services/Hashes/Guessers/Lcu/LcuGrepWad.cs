@@ -70,36 +70,101 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
                         $"plugins/rcp-be-lol-game-data/global/default/{match.Groups[1].Value}".ToLowerInvariant(),
                         HashGuessStrategy.LcuEmbeddedPath)));
 
-            foreach (Match match in Regex.Matches(text, @"url\(\s*[""']?([^""')?#]+)", RegexOptions.IgnoreCase))
-            {
-                string contextualPath = ResolveRelativePath(sourcePath, match.Groups[1].Value);
-                if (contextualPath.Length > 0)
-                    CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
-            }
-            foreach (Match match in Regex.Matches(text, @"(?:src|href|poster|data-src)\s*=\s*[""']([^""'?#]+)", RegexOptions.IgnoreCase))
-            {
-                string contextualPath = ResolveRelativePath(sourcePath, match.Groups[1].Value);
-                if (contextualPath.Length > 0)
-                    CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
-            }
+            CheckLcuCandidates(ExtractCssSpriteSourceCandidates(text, sourcePath));
 
             var relativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (Match match in Regex.Matches(text, @"[^a-zA-Z0-9/_.\\-]((?:\.|\.\.)/[a-zA-Z0-9/_.-]+)"))
+            void CheckRelativeReference(string value)
             {
-                string relativePath = match.Groups[1].Value;
-                relativePaths.Add(relativePath);
+                string relativePath = PathUtils.NormalizeSeparators(value.Trim());
+                if (relativePath.Length == 0 || relativePath.StartsWith('#') || relativePath.StartsWith("//", StringComparison.Ordinal) ||
+                    relativePath.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ||
+                    relativePath.StartsWith("http:", StringComparison.OrdinalIgnoreCase) ||
+                    relativePath.StartsWith("https:", StringComparison.OrdinalIgnoreCase)) return;
+
+                if (relativePath.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase))
+                    CheckLcuCandidates(new[] { new HashGuessCandidate(NormalizePath(relativePath), HashGuessStrategy.LcuEmbeddedPath) });
+
                 string contextualPath = ResolveRelativePath(sourcePath, relativePath);
                 if (contextualPath.Length > 0)
                     CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
-            }
-            foreach (Match match in Regex.Matches(text, @"[""']([a-zA-Z0-9][a-zA-Z0-9/_.@-]*\.(?:js|json|webm|html|[a-z]{3}))\b"))
-                relativePaths.Add(match.Groups[1].Value);
-            foreach (Match match in Regex.Matches(text, @"<template id=""[^""]*-template-([^""]+)"""))
-                relativePaths.Add(match.Groups[1].Value + "/template.html");
-            foreach (Match match in Regex.Matches(text, @"sourceMappingURL=(.*?\.js)\.map"))
-                relativePaths.Add(match.Groups[1].Value);
 
-            CheckBasenames(engine, relativePaths.Select(p => p.ToLowerInvariant()), cancellationToken, sourceWadPath);
+                bool hasDirectoryContext = relativePath.IndexOf('/') >= 0 || relativePath.IndexOf('\\') >= 0;
+                if (!relativePath.StartsWith('/') && (contextualPath.Length == 0 || !hasDirectoryContext))
+                    relativePaths.Add(relativePath.ToLowerInvariant());
+            }
+
+            foreach (Match match in Regex.Matches(text, @"url\(\s*[""']?([^""')?#]+)", RegexOptions.IgnoreCase))
+                CheckRelativeReference(match.Groups[1].Value);
+            foreach (Match match in Regex.Matches(text, @"(?:src|href|poster|data-src)\s*=\s*[""']([^""'?#]+)", RegexOptions.IgnoreCase))
+                CheckRelativeReference(match.Groups[1].Value);
+            foreach (Match match in Regex.Matches(text, @"[^a-zA-Z0-9/_.\\-]((?:\.|\.\.)/[a-zA-Z0-9/_.@-]+)"))
+                CheckRelativeReference(match.Groups[1].Value);
+            foreach (Match match in Regex.Matches(
+                         text,
+                         @"[""']([^""'?#\r\n]+?\.(?:js|json|css|html?|map|png|jpe?g|svg|webp|gif|ico|webm|mp4|ogg|mp3|wav|woff2?|ttf|otf|eot))(?=[""'?#\s])",
+                         RegexOptions.IgnoreCase))
+                CheckRelativeReference(match.Groups[1].Value);
+            foreach (Match match in Regex.Matches(text, @"<template id=""[^""]*-template-([^""]+)"""))
+                CheckRelativeReference(match.Groups[1].Value + "/template.html");
+            foreach (Match match in Regex.Matches(text, @"sourceMappingURL=(.*?\.js)\.map"))
+                CheckRelativeReference(match.Groups[1].Value);
+
+            CheckLcuCandidates(relativePaths.Select(path =>
+                new HashGuessCandidate(path, HashGuessStrategy.LcuRelativeBasename)));
+        }
+
+
+        private IEnumerable<HashGuessCandidate> ExtractCssSpriteSourceCandidates(string text, string sourcePath)
+        {
+            if (text.IndexOf("background-position", StringComparison.OrdinalIgnoreCase) < 0)
+                yield break;
+
+            string normalizedSourcePath = NormalizePath(sourcePath);
+            if (!normalizedSourcePath.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase))
+                yield break;
+
+            int pluginEnd = normalizedSourcePath.IndexOf('/', "plugins/".Length);
+            if (pluginEnd < 0)
+                yield break;
+
+            string pluginPrefix = normalizedSourcePath[..(pluginEnd + 1)];
+            string[] spriteDirectories = GetKnownDirectories()
+                .Where(directory => directory.StartsWith(pluginPrefix, StringComparison.OrdinalIgnoreCase))
+                .Where(directory => directory.EndsWith("/sprite-source", StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (spriteDirectories.Length == 0)
+                yield break;
+
+            var classNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            const string backgroundPosition = "background-position";
+            int searchIndex = 0;
+            while (searchIndex < text.Length)
+            {
+                int propertyIndex = text.IndexOf(backgroundPosition, searchIndex, StringComparison.OrdinalIgnoreCase);
+                if (propertyIndex < 0) break;
+                searchIndex = propertyIndex + backgroundPosition.Length;
+
+                int openBrace = text.LastIndexOf('{', propertyIndex);
+                if (openBrace < 0) continue;
+                int closeBrace = text.IndexOf('}', propertyIndex);
+                if (closeBrace < 0) continue;
+
+                int previousCloseBrace = text.LastIndexOf('}', openBrace);
+                int selectorStart = previousCloseBrace < 0 ? 0 : previousCloseBrace + 1;
+                int selectorLength = openBrace - selectorStart;
+                if (selectorLength <= 0 || selectorLength > 2048) continue;
+
+                string selectors = text.Substring(selectorStart, selectorLength);
+                foreach (Match selector in Regex.Matches(selectors, @"\.([a-zA-Z_][a-zA-Z0-9_-]*)"))
+                    classNames.Add(selector.Groups[1].Value.ToLowerInvariant());
+            }
+
+            foreach (string directory in spriteDirectories)
+            foreach (string className in classNames)
+                yield return new HashGuessCandidate(
+                    $"{directory}/{className}.png",
+                    HashGuessStrategy.LcuPattern);
         }
 
 
@@ -211,22 +276,33 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
 
         private static string ResolveRelativePath(string sourcePath, string relativePath)
         {
-            if (!sourcePath.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)) return string.Empty;
-            relativePath = relativePath.Trim();
-            if (relativePath.Length == 0 || relativePath.StartsWith('/') || relativePath.StartsWith('#') ||
+            string normalizedSource = NormalizePath(sourcePath);
+            if (!normalizedSource.StartsWith("plugins/", StringComparison.Ordinal)) return string.Empty;
+            relativePath = PathUtils.NormalizeSeparators(relativePath.Trim());
+            if (relativePath.Length == 0 || relativePath.StartsWith('#') || relativePath.StartsWith("//", StringComparison.Ordinal) ||
                 relativePath.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ||
                 relativePath.StartsWith("http:", StringComparison.OrdinalIgnoreCase) ||
                 relativePath.StartsWith("https:", StringComparison.OrdinalIgnoreCase)) return string.Empty;
 
-            int separator = sourcePath.LastIndexOf('/');
+            string[] sourceSegments = normalizedSource.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            int pluginRootLength = GetPluginRootLength(sourceSegments);
+            if (pluginRootLength == 0) return string.Empty;
+
+            if (relativePath.StartsWith('/'))
+            {
+                string pluginRoot = string.Join('/', sourceSegments.Take(pluginRootLength));
+                return NormalizePath($"{pluginRoot}/{relativePath.TrimStart('/')}");
+            }
+
+            int separator = normalizedSource.LastIndexOf('/');
             if (separator < 0) return string.Empty;
-            var segments = new List<string>(sourcePath[..separator].Split('/', StringSplitOptions.RemoveEmptyEntries));
-            foreach (string segment in PathUtils.NormalizeSeparators(relativePath).Split('/', StringSplitOptions.RemoveEmptyEntries))
+            var segments = new List<string>(normalizedSource[..separator].Split('/', StringSplitOptions.RemoveEmptyEntries));
+            foreach (string segment in relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
             {
                 if (segment == ".") continue;
                 if (segment == "..")
                 {
-                    if (segments.Count <= 1) return string.Empty;
+                    if (segments.Count <= pluginRootLength) return string.Empty;
                     segments.RemoveAt(segments.Count - 1);
                 }
                 else
@@ -235,6 +311,18 @@ namespace AssetsManager.Services.Hashes.Guessers.Lcu
                 }
             }
             return NormalizePath(string.Join('/', segments));
+        }
+
+
+        private static int GetPluginRootLength(IReadOnlyList<string> segments)
+        {
+            if (segments.Count < 2 || !segments[0].Equals("plugins", StringComparison.OrdinalIgnoreCase)) return 0;
+            for (int index = 2; index + 1 < segments.Count; index++)
+            {
+                if (segments[index].Equals("global", StringComparison.OrdinalIgnoreCase))
+                    return index + 2;
+            }
+            return 2;
         }
 
     }

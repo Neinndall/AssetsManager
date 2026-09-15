@@ -341,6 +341,90 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void LcuGrepResolvesQuotedRelativePathAgainstSourceDirectory()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/components/images/icon.png";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("const icon = \"images/icon.png\";"),
+                "plugins/rcp-fe-test/global/default/components/init.js",
+                "test.wad",
+                0x1111);
+
+            AssertResolved(engine, expected);
+            Assert.Equal(HashGuessStrategy.LcuEmbeddedPath, engine.Matches.Values.Single().Strategy);
+            Assert.Equal(0x1111UL, engine.Matches.Values.Single().SourceChunkHash);
+        }
+
+        [Fact]
+        public void LcuGrepResolvesPluginRootAssetReferences()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/assets/icon.svg";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("<img src=\"/assets/icon.svg\">"),
+                "plugins/rcp-fe-test/global/default/components/template.html",
+                "test.wad",
+                0x2222);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void LcuGrepRelativeBasenameFallbackPreservesSourceProvenance()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/images/icon.png";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(
+                new[] { "plugins/rcp-fe-test/global/default/images/existing.json" },
+                null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("\"icon.png\""),
+                "init.js",
+                "test.wad",
+                0x3333);
+
+            AssertResolved(engine, expected);
+            HashGuessMatch match = engine.Matches.Values.Single();
+            Assert.Equal(HashGuessStrategy.LcuRelativeBasename, match.Strategy);
+            Assert.Equal(0x3333UL, match.SourceChunkHash);
+        }
+
+        [Fact]
+        public void LcuGrepDerivesSpriteSourceFilenamesFromCssSelectors()
+        {
+            const string expected = "plugins/rcp-fe-lol-store/global/default/storefront/addon/public/img/sprite-source/btn-gifting-hover.png";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(
+                new[]
+                {
+                    "plugins/rcp-fe-lol-store/global/default/storefront/addon/public/img/sprite-source/existing.png",
+                    "plugins/rcp-fe-other/global/default/sprite-source/btn-gifting-hover.png"
+                },
+                null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes(".btn-gifting-hover,.btn-gifting:hover{background-position:0 -713px}"),
+                "plugins/rcp-fe-lol-store/global/default/rcp-fe-lol-store.js",
+                "store.wad",
+                0x4444);
+
+            AssertResolved(engine, expected);
+            HashGuessMatch match = engine.Matches.Values.Single();
+            Assert.Equal(HashGuessStrategy.LcuPattern, match.Strategy);
+            Assert.Equal(0x4444UL, match.SourceChunkHash);
+        }
+
+        [Fact]
         public void LcuLootTranslationGrepAddsHextechImagePaths()
         {
             const string expected = "plugins/rcp-be-lol-game-data/global/default/v1/hextech-images/item.png";
@@ -1216,6 +1300,21 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains("honor", words);
             Assert.Contains("outro", words);
             Assert.DoesNotContain("icon", words);
+        }
+
+        [Fact]
+        public void LcuEvidenceFamiliesDiscoverChampionChromaNumericPaths()
+        {
+            const string known = "plugins/rcp-be-lol-game-data/global/default/v1/champion-chroma-images/60028/60028302.png";
+            const string expected = "plugins/rcp-be-lol-game-data/global/default/v1/champion-chroma-images/60028/60028303.png";
+            var guesser = new LcuHashGuesser(new[] { known }, null);
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+
+            int checkedCount = guesser.GuessEvidenceFamilies(engine, CancellationToken.None);
+
+            Assert.True(checkedCount > 0);
+            AssertResolved(engine, expected);
+            Assert.Equal(HashGuessStrategy.LcuPattern, engine.Matches.Values.Single().Strategy);
         }
 
         [Fact]
