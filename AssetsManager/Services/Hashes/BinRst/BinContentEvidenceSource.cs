@@ -47,7 +47,8 @@ namespace AssetsManager.Services.Hashes
             Fnv1a.HashLower("UiElementSpineAnimationData"),
             Fnv1a.HashLower("UiElementTextData"),
             Fnv1a.HashLower("UiSceneViewPaneData"),
-            Fnv1a.HashLower("UiComponent")
+            Fnv1a.HashLower("UiComponent"),
+            0x857c08ad
         };
 
         private static readonly HashSet<uint> ObjectPathTypes = new()
@@ -833,7 +834,14 @@ namespace AssetsManager.Services.Hashes
                     else if (classHash == Fnv1a.HashLower("X3DSharedSamplerDef"))
                         MatchSharedSamplerDef(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("ItemData"))
+                    {
                         MatchEntryFromU32(entryHash, item, "itemID", value => $"Items/{value}");
+                        if (item.Properties.TryGetValue(Fnv1a.HashLower("mVFXResourceResolver"), out BinTreeProperty resolverProperty) &&
+                            resolverProperty is BinTreeStruct vfxResolver)
+                        {
+                            MatchHashLinkMapProperties(vfxResolver.Properties, "resourceMap");
+                        }
+                    }
                     else if (classHash == Fnv1a.HashLower("SummonerEmote"))
                         MatchEntryFromU32(entryHash, item, "summonerEmoteId", value => $"Loadouts/SummonerEmotes/{value}");
                     else if (classHash == Fnv1a.HashLower("TftMapSkin"))
@@ -1259,9 +1267,11 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
-            void MatchHashLinkMap(BinTreeObject item, string field)
+            void MatchHashLinkMap(BinTreeObject item, string field) => MatchHashLinkMapProperties(item.Properties, field);
+
+            void MatchHashLinkMapProperties(Dictionary<uint, BinTreeProperty> properties, string field)
             {
-                if (resolver == null || !item.Properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) || property is not BinTreeMap map) return;
+                if (resolver == null || !properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) || property is not BinTreeMap map) return;
                 foreach (var pair in map)
                 {
                     if (pair.Key is not BinTreeHash key || pair.Value is not BinTreeObjectLink link) continue;
@@ -1275,7 +1285,7 @@ namespace AssetsManager.Services.Hashes
                         matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename + "_BV2", path, wadPath, key.Value)) continue;
                     if (basename.Contains("Base_", StringComparison.Ordinal))
                         matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename.Replace("Base_", "", StringComparison.Ordinal), path, wadPath, key.Value);
-                    for (int skin = 1; skin < 30; skin++)
+                    for (int skin = 1; skin < 90; skin++)
                     {
                         string prefix = $"Skin{skin:00}_";
                         if (basename.Contains(prefix, StringComparison.Ordinal))
