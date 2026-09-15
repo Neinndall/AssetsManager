@@ -425,6 +425,28 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void LcuGrepExpandsDynamicCardFrameTemplatesFromCatalogTiers()
+        {
+            const string knownTier = "plugins/rcp-fe-lol-static-assets/global/default/images/sanctum/card-frame-tier2.svg";
+            const string expected = "plugins/rcp-fe-lol-static-assets/global/default/videos/sanctum/card-frame-tier2-hover.webm";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(new[] { knownTier }, null);
+            const string source = "const getCardVideoAssetByTier=(e,t)=>`/fe/lol-static-assets/videos/sanctum/card-frame-tier${e}-${t}.webm`;const hover=getCardVideoAssetByTier(e,\"hover\");";
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes(source),
+                "plugins/rcp-fe-lol-loot/global/default/rcp-fe-lol-loot.js",
+                "loot.wad",
+                0x5555);
+
+            AssertResolved(engine, expected);
+            HashGuessMatch match = engine.Matches.Values.Single();
+            Assert.Equal(HashGuessStrategy.LcuPattern, match.Strategy);
+            Assert.Equal(0x5555UL, match.SourceChunkHash);
+        }
+
+        [Fact]
         public void LcuLootTranslationGrepAddsHextechImagePaths()
         {
             const string expected = "plugins/rcp-be-lol-game-data/global/default/v1/hextech-images/item.png";
