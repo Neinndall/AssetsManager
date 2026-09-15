@@ -576,18 +576,43 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             ArgumentNullException.ThrowIfNull(names);
             IReadOnlyList<string> dirs = DirectoryList();
+            var dirPrefixes = new string[dirs.Count];
+            var normalizedDirs = new bool[dirs.Count];
+            for (int i = 0; i < dirs.Count; i++)
+            {
+                string dir = dirs[i];
+                normalizedDirs[i] = string.Equals(dir, PathUtils.NormalizePath(dir), StringComparison.Ordinal);
+                dirPrefixes[i] = string.IsNullOrEmpty(dir) ? string.Empty : string.Concat(dir, "/");
+            }
+
             int checkedCount = 0;
             foreach (string name in ProgressIterator(names.OrderBy(n => n, StringComparer.Ordinal).ToList(), value => value, cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (engine.RemainingUnknownCount == 0) break;
-                checkedCount += CheckIter(
-                    engine,
-                    dirs.Select(dir => string.IsNullOrEmpty(dir) ? name : $"{dir}/{name}"),
-                    strategy,
-                    source,
-                    cancellationToken,
-                    sourceChunkHash);
+                bool normalizedName = string.Equals(name, PathUtils.NormalizePath(name), StringComparison.Ordinal);
+
+                for (int i = 0; i < dirs.Count; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (normalizedName && normalizedDirs[i])
+                    {
+                        engine.CheckNormalizedParts(
+                            dirPrefixes[i].AsSpan(),
+                            name.AsSpan(),
+                            ReadOnlySpan<char>.Empty,
+                            strategy,
+                            source,
+                            sourceChunkHash);
+                    }
+                    else
+                    {
+                        engine.CheckCombined(dirs[i], name, strategy, source, sourceChunkHash);
+                    }
+
+                    checkedCount++;
+                    if (engine.RemainingUnknownCount == 0) break;
+                }
             }
             return checkedCount;
         }
