@@ -436,6 +436,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public bool SetEmitterVisibility(int sourceOrder, bool isVisible)
             => _graph?.Root.SetEmitterVisibility(sourceOrder, isVisible) ?? false;
 
+        public void SetAllEmittersVisibility(bool isVisible)
+        {
+            foreach (VfxPlaybackGraphRuntime graph in _graphs)
+                graph.SetAllEmittersVisible(isVisible);
+        }
+
         public int GetEmitterLiveCount(int sourceOrder)
         {
             if (_graph?.Root != null)

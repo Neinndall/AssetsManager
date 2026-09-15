@@ -41,6 +41,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isCleanedUp;
         private bool _isActive;
         private bool _isGlStarted;
+        private bool _isBulkEmitterStateChange;
         private VfxSystemDiagnosticItem _pendingSystem;
         private VfxSystemDiagnosticItem _inspectedSystem;
         private GlMeshRenderer _championMeshRenderer;
@@ -849,7 +850,11 @@ namespace AssetsManager.Views.Controls.Viewer
                     _vfxRenderer?.SetEmitterVisibility(item.SourceOrder, enabled);
                     _model.LogMessages.Add($"[EMITTER TOGGLE] {item.Name} set to {(enabled ? "ENABLED" : "DISABLED")}");
                 };
-                emitterDiagnostic.OnVisibilityStateChanged += item => UpdateEmittersVisibility();
+                emitterDiagnostic.OnVisibilityStateChanged += item =>
+                {
+                    if (!_isBulkEmitterStateChange)
+                        UpdateEmittersVisibility();
+                };
 
                 _model.Emitters.Add(emitterDiagnostic);
 
@@ -1030,8 +1035,8 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (sender is FrameworkElement fe && fe.DataContext is VfxEmitterDiagnosticItem item)
             {
+                _vfxRenderer?.SetAllEmittersVisibility(true);
                 item.IsSolo = !item.IsSolo;
-                UpdateEmittersVisibility();
             }
         }
 
@@ -1039,28 +1044,45 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (sender is FrameworkElement fe && fe.DataContext is VfxEmitterDiagnosticItem item)
             {
+                _vfxRenderer?.SetAllEmittersVisibility(true);
                 item.IsMuted = !item.IsMuted;
-                UpdateEmittersVisibility();
             }
         }
 
-        private void ClearAllSolos_Click(object sender, RoutedEventArgs e)
+        private void ToggleSoloAll_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var emitter in _model.Emitters)
+            if (_model.Emitters.Count == 0) return;
+            bool newSolo = !_model.Emitters.All(emitter => emitter.IsSolo);
+            _vfxRenderer?.SetAllEmittersVisibility(true);
+            try
             {
-                emitter.IsSolo = false;
+                _isBulkEmitterStateChange = true;
+                foreach (VfxEmitterDiagnosticItem emitter in _model.Emitters)
+                    emitter.IsSolo = newSolo;
+            }
+            finally
+            {
+                _isBulkEmitterStateChange = false;
             }
             UpdateEmittersVisibility();
         }
 
         private void ToggleMuteAll_Click(object sender, RoutedEventArgs e)
         {
-            bool allMuted = _model.Emitters.Count > 0 && _model.Emitters.All(em => em.IsMuted);
-            bool newMute = !allMuted;
-            foreach (var emitter in _model.Emitters)
+            if (_model.Emitters.Count == 0) return;
+            bool newMute = !_model.Emitters.All(emitter => emitter.IsMuted);
+            try
             {
-                emitter.IsMuted = newMute;
+                _isBulkEmitterStateChange = true;
+                foreach (VfxEmitterDiagnosticItem emitter in _model.Emitters)
+                    emitter.IsMuted = newMute;
             }
+            finally
+            {
+                _isBulkEmitterStateChange = false;
+            }
+
+            _vfxRenderer?.SetAllEmittersVisibility(!newMute);
             UpdateEmittersVisibility();
         }
 
@@ -1102,10 +1124,17 @@ namespace AssetsManager.Views.Controls.Viewer
             UpdatePlayheadPosition();
         }
 
+        private const double TimelineLiveColumnWidth = 40d;
+
+        private double GetTimelineTrackWidth()
+            => TracksCanvasContainer == null
+                ? 0d
+                : Math.Max(0d, TracksCanvasContainer.ActualWidth - TimelineLiveColumnWidth);
+
         private void UpdateTimelineTrackMetrics()
         {
             if (_model == null || TracksCanvasContainer == null) return;
-            double availableWidth = TracksCanvasContainer.ActualWidth;
+            double availableWidth = GetTimelineTrackWidth();
             if (availableWidth <= 0) return;
 
             double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
@@ -1191,7 +1220,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void UpdatePlayheadPosition()
         {
             if (_model == null || TracksCanvasContainer == null || PlayheadLine == null) return;
-            double availableWidth = TracksCanvasContainer.ActualWidth;
+            double availableWidth = GetTimelineTrackWidth();
             if (availableWidth <= 0) return;
 
             double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
@@ -1200,6 +1229,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             PlayheadLine.X1 = posX;
             PlayheadLine.X2 = posX;
+            if (PlayheadHandle != null)
+                Canvas.SetLeft(PlayheadHandle, posX - 5);
 
             if (LoopBoundaryLine != null && LoopBoundaryHandle != null)
             {
@@ -1253,7 +1284,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void UpdateLoopBoundaryFromMouse(double mouseX)
         {
             if (_model == null || TracksCanvasContainer == null) return;
-            double availableWidth = TracksCanvasContainer.ActualWidth;
+            double availableWidth = GetTimelineTrackWidth();
             if (availableWidth <= 0) return;
 
             double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
@@ -1290,7 +1321,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void UpdateSeekFromTimeline(double mouseX)
         {
-            double availableWidth = TracksCanvasContainer.ActualWidth;
+            double availableWidth = GetTimelineTrackWidth();
             if (availableWidth <= 0 || _model == null) return;
 
             double ratio = Math.Clamp(mouseX / availableWidth, 0.0, 1.0);
