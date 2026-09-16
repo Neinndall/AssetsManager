@@ -20,6 +20,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
         ModelMaterialEffectDefinition DefaultEffect)
     {
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
+        internal ModelMaterialDefinition DefaultMaterialDefinition { get; init; } = ModelMaterialDefinition.Default;
+        internal IReadOnlyDictionary<string, ModelMaterialDefinition> MaterialDefinitions { get; init; } =
+            new Dictionary<string, ModelMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
 
         internal ModelMaterialEffectDefinition ResolveEffect(string normalizedSubmeshName)
         {
@@ -39,6 +42,24 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             return ModelMaterialEffectDefinition.None;
+        }
+
+        internal ModelMaterialDefinition ResolveMaterialDefinition(string normalizedSubmeshName)
+        {
+            if (string.IsNullOrEmpty(normalizedSubmeshName))
+            {
+                return DefaultMaterialDefinition;
+            }
+
+            if (MaterialDefinitions != null &&
+                MaterialDefinitions.TryGetValue(normalizedSubmeshName, out ModelMaterialDefinition material))
+            {
+                return material;
+            }
+
+            return MaterialOverrideKeys != null && MaterialOverrideKeys.Contains(normalizedSubmeshName)
+                ? ModelMaterialDefinition.Default
+                : DefaultMaterialDefinition;
         }
     }
 
@@ -229,6 +250,16 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             BinTree primaryTree = trees[0];
             var materialDefinitions = BuildMaterialDefinitionMap(trees, wadChunkPathResolver, binEntryResolver);
+            var shaderDefinitions = new Dictionary<uint, SknShaderDefinition>();
+            foreach (BinTree tree in trees)
+            {
+                foreach ((uint shaderHash, SknShaderDefinition shader) in
+                         ReadShaderDefinitions(tree, wadChunkPathResolver, binEntryResolver))
+                {
+                    shaderDefinitions.TryAdd(shaderHash, shader);
+                }
+            }
+
             var overrideTexturePaths = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
             var overrideMaterials = new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
             IReadOnlyList<string> initialHiddenSubmeshes = Array.Empty<string>();
@@ -333,7 +364,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 overrideTexturePaths,
                 overrideMaterials)
             {
-                InitialHiddenSubmeshes = initialHiddenSubmeshes
+                InitialHiddenSubmeshes = initialHiddenSubmeshes,
+                ShaderDefinitions = shaderDefinitions
             };
         }
 
@@ -377,21 +409,99 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     textureKeys,
                     metadata.OverrideTexturePaths.Keys);
 
-            return new SknMaterialTextureResolution(
+            string defaultTextureKey =
                 MatchTextureKey(
                     SelectColorTexturePath(metadata.DefaultMaterial?.Samplers),
                     textureKeys) ??
                 MatchTextureKey(metadata.DefaultTexturePath, textureKeys) ??
-                FindBaseDiffuseTextureKey(textureKeys),
+                FindBaseDiffuseTextureKey(textureKeys);
+            IReadOnlySet<string> materialOverrideKeys = metadata.OverrideTexturePaths.Keys
+                .Concat(metadata.OverrideMaterials.Keys)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            ModelMaterialDefinition defaultMaterialDefinition = SknStaticMaterialResolver.Resolve(
+                metadata.DefaultMaterial,
+                ResolveShaderDefinition(metadata, metadata.DefaultMaterial),
+                textureKeys,
+                defaultTextureKey,
+                defaultEffect);
+            var materialDefinitions = new Dictionary<string, ModelMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
+            foreach (string submesh in materialOverrideKeys)
+            {
+                metadata.OverrideMaterials.TryGetValue(submesh, out SknMaterialDefinition material);
+                overrides.TryGetValue(submesh, out string fallbackTextureKey);
+                effects.TryGetValue(submesh, out ModelMaterialEffectDefinition effect);
+                materialDefinitions[submesh] = SknStaticMaterialResolver.Resolve(
+                    material,
+                    ResolveShaderDefinition(metadata, material),
+                    textureKeys,
+                    fallbackTextureKey,
+                    effect ?? ModelMaterialEffectDefinition.None);
+            }
+
+            return new SknMaterialTextureResolution(
+                defaultTextureKey,
                 overrides,
                 effects,
-                metadata.OverrideTexturePaths.Keys
-                    .Concat(metadata.OverrideMaterials.Keys)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase),
+                materialOverrideKeys,
                 defaultEffect)
             {
-                InitialHiddenSubmeshes = metadata.InitialHiddenSubmeshes ?? Array.Empty<string>()
+                InitialHiddenSubmeshes = metadata.InitialHiddenSubmeshes ?? Array.Empty<string>(),
+                DefaultMaterialDefinition = defaultMaterialDefinition,
+                MaterialDefinitions = materialDefinitions
             };
+        }
+
+        private static SknShaderDefinition ResolveShaderDefinition(
+            SknMaterialTextureMetadata metadata,
+            SknMaterialDefinition material)
+        {
+            if (material == null || material.ShaderHash == 0 || metadata?.ShaderDefinitions == null)
+            {
+                return null;
+            }
+
+            return metadata.ShaderDefinitions.TryGetValue(material.ShaderHash, out SknShaderDefinition shader)
+                ? shader
+                : null;
+        }
+
+        internal static string TryResolveShaderBinPath(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return null;
+            }
+
+            string normalizedPath = Path.GetFullPath(assetPath)
+                .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string assetsMarker = $"{Path.DirectorySeparatorChar}assets{Path.DirectorySeparatorChar}";
+            string dataMarker = $"{Path.DirectorySeparatorChar}data{Path.DirectorySeparatorChar}";
+            int markerIndex = normalizedPath.IndexOf(assetsMarker, StringComparison.OrdinalIgnoreCase);
+            if (markerIndex < 0)
+            {
+                markerIndex = normalizedPath.IndexOf(dataMarker, StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (markerIndex >= 0)
+            {
+                string rootPath = normalizedPath[..markerIndex];
+                string namedPath = Path.Combine(rootPath, "data", "shaders", "shaders.bin");
+                if (File.Exists(namedPath))
+                {
+                    return namedPath;
+                }
+
+                string hashedPath = Path.Combine(
+                    rootPath,
+                    $"{XxHash64Ext.Hash("data/shaders/shaders.bin"):x16}.bin");
+                if (File.Exists(hashedPath))
+                {
+                    return hashedPath;
+                }
+            }
+
+            return null;
         }
 
         internal static string TryResolveBinPath(string sknPath)

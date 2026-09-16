@@ -271,6 +271,13 @@ namespace AssetsManager.Services.Viewer.Loading
                 string normalizedMaterialName = SknMaterialTextureResolver.NormalizeMaterialKey(materialName);
                 ModelMaterialEffectDefinition materialEffect =
                     materialTextures?.ResolveEffect(normalizedMaterialName) ?? ModelMaterialEffectDefinition.None;
+                ModelMaterialDefinition materialDefinition =
+                    materialTextures?.ResolveMaterialDefinition(normalizedMaterialName) ??
+                    ModelMaterialDefinition.Default with
+                    {
+                        BaseTextureName = initialMatchingKey,
+                        Effect = materialEffect
+                    };
 
                 dataList.Add(new SubmeshData(
                     materialName,
@@ -279,6 +286,7 @@ namespace AssetsManager.Services.Viewer.Loading
                     subTexCoords.ToArray(),
                     sourceVertexIndices.ToArray(),
                     initialMatchingKey,
+                    materialDefinition,
                     materialEffect));
             }
 
@@ -332,6 +340,7 @@ namespace AssetsManager.Services.Viewer.Loading
                         AllTextures = loadedTextures,
                         AvailableTextureNames = availableTextureNames,
                         SelectedTextureName = data.TexturePath,
+                        MaterialDefinition = data.MaterialDefinition,
                         MaterialEffect = data.MaterialEffect,
                         ColorTint = data.MaterialEffect.MaterialTint
                     };
@@ -397,17 +406,36 @@ namespace AssetsManager.Services.Viewer.Loading
 
             try
             {
-                IReadOnlyList<BinTree> binTrees = LoadMaterialBinTrees(skinBinPath);
+                var binTrees = LoadMaterialBinTrees(skinBinPath).ToList();
                 if (binTrees.Count == 0)
                 {
                     return null;
                 }
 
+                string shaderBinPath = SknMaterialTextureResolver.TryResolveShaderBinPath(assetPath);
+                if (!string.IsNullOrEmpty(shaderBinPath) &&
+                    !Path.GetFullPath(shaderBinPath).Equals(Path.GetFullPath(skinBinPath), StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        using var shaderStream = File.OpenRead(shaderBinPath);
+                        binTrees.Add(new BinTree(shaderStream));
+                    }
+                    catch (Exception ex)
+                    {
+                        // Shader definitions are optional; material-authored values remain valid when the shared file is absent or unreadable.
+                        _logService.LogDebug($"Could not read optional shader definitions '{shaderBinPath}': {ex.Message}");
+                    }
+                }
+
                 Func<ulong, string> wadChunkPathResolver = _hashResolverService == null
                     ? null
                     : _hashResolverService.ResolveHash;
+                Func<uint, string> binEntryResolver = _hashResolverService == null
+                    ? null
+                    : _hashResolverService.ResolveBinEntry;
                 SknMaterialTextureMetadata metadata =
-                    SknMaterialTextureResolver.ReadMetadata(binTrees, wadChunkPathResolver);
+                    SknMaterialTextureResolver.ReadMetadata(binTrees, wadChunkPathResolver, binEntryResolver);
                 if (loadReferencedTextures)
                 {
                     foreach (string texturePath in metadata.ReferencedTexturePaths)
@@ -494,6 +522,7 @@ namespace AssetsManager.Services.Viewer.Loading
             System.Windows.Point[] TextureCoordinates,
             int[] SourceVertexIndices,
             string TexturePath,
+            ModelMaterialDefinition MaterialDefinition,
             ModelMaterialEffectDefinition MaterialEffect);
 
     }

@@ -79,6 +79,9 @@ namespace AssetsManager.Views.Models.Viewer
         internal bool UsesBakedDiffuse { get; set; }
         internal byte[] VertexColors { get; set; }
         public MapLightmapBinding Lightmap { get; set; }
+
+        // SKN loaders attach the authored material once here so every model surface shares the same material structure.
+        public ModelMaterialDefinition MaterialDefinition { get; set; } = ModelMaterialDefinition.Default;
         public ModelMaterialEffectDefinition MaterialEffect { get; set; } = ModelMaterialEffectDefinition.None;
 
         public Dictionary<string, BitmapSource> AllTextures
@@ -151,6 +154,7 @@ namespace AssetsManager.Views.Models.Viewer
             SourceVertexIndices = null;
             VertexColors = null;
             Lightmap = null;
+            MaterialDefinition = ModelMaterialDefinition.Default;
             MaterialEffect = ModelMaterialEffectDefinition.None;
 
             PropertyChanged = null;
