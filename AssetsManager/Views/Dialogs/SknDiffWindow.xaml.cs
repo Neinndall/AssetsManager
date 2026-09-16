@@ -86,6 +86,27 @@ namespace AssetsManager.Views.Dialogs
             Loaded += SknDiffWindow_Loaded;
         }
 
+        private void SknDiffWindow_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            // Restore explicit title-bar dragging only for the mesh analyzer dialog.
+            Point position = e.GetPosition(this);
+            if (position.Y < 0 || position.Y > 36)
+                return;
+
+            // Keep the standard title-bar double-click behavior for maximize / restore.
+            if (e.ClickCount == 2 && ShowMaximizeButton)
+            {
+                if (WindowState == WindowState.Maximized)
+                    SystemCommands.RestoreWindow(this);
+                else
+                    SystemCommands.MaximizeWindow(this);
+            }
+            else if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed && WindowState == WindowState.Normal)
+            {
+                DragMove();
+            }
+        }
+
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);

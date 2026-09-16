@@ -1,6 +1,5 @@
 using System;
 using System.Windows;
-using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using AssetsManager.Utils.Win;
@@ -75,7 +74,6 @@ namespace AssetsManager.Views.Helpers
             this.AllowsTransparency = false;
 
             this.StateChanged += HudWindow_StateChanged;
-            this.MouseLeftButtonDown += HudWindow_MouseLeftButtonDown;
 
             this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.CloseWindowCommand, (s, e) => SystemCommands.CloseWindow(this)));
             this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.MaximizeWindowCommand, (s, e) => SystemCommands.MaximizeWindow(this)));
@@ -105,25 +103,6 @@ namespace AssetsManager.Views.Helpers
             else
             {
                 this.MaximizedMargin = new Thickness(0);
-            }
-        }
-
-        private void HudWindow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            // Keep the explicit drag behavior that the original custom title bar used.
-            if (e.GetPosition(this).Y > 36)
-                return;
-
-            if (e.ClickCount == 2 && ShowMaximizeButton)
-            {
-                if (WindowState == WindowState.Maximized)
-                    SystemCommands.RestoreWindow(this);
-                else
-                    SystemCommands.MaximizeWindow(this);
-            }
-            else if (e.LeftButton == MouseButtonState.Pressed && WindowState == WindowState.Normal)
-            {
-                DragMove();
             }
         }
 
