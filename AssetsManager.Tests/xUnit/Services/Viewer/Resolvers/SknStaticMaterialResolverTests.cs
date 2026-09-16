@@ -28,6 +28,94 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_UsesShaderDefaultForStringAuthoredSamplerPath()
+        {
+            SknShaderDefinition shader = new(
+                "Shaders/Test/Body",
+                new[]
+                {
+                    Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex")
+                },
+                new Dictionary<string, Vector4>(),
+                new Dictionary<string, bool>(),
+                new Dictionary<string, string>());
+            SknMaterialDefinition material = CreateMaterial(
+                samplers: new[]
+                {
+                    new SknMaterialSampler(
+                        "Diffuse_Texture",
+                        null,
+                        UsesShaderDefaultTexture: true)
+                });
+
+            ModelMaterialDefinition resolved = Resolve(
+                material,
+                new[] { "test_tx_cm" },
+                shader: shader);
+
+            Assert.Equal("test_tx_cm", resolved.BaseTextureName);
+        }
+
+        [Fact]
+        public void ResolveMetadata_PreservesMissingLinkedDefaultMaterial()
+        {
+            var metadata = new SknMaterialTextureMetadata(
+                "ASSETS/Characters/Test/Test_TX_CM.tex",
+                null,
+                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase))
+            {
+                HasDefaultMaterialLink = true
+            };
+
+            SknMaterialTextureResolution resolved = SknMaterialTextureResolver.Resolve(
+                metadata,
+                new[] { "test_tx_cm" });
+
+            Assert.Equal(ModelMaterialBindingKind.Missing, resolved.DefaultMaterialDefinition.BindingKind);
+            Assert.Null(resolved.DefaultMaterialDefinition.BaseTextureName);
+        }
+
+        [Fact]
+        public void ResolveMetadata_UsesTextureOnlyForDirectOverrideWithoutMaterial()
+        {
+            var metadata = new SknMaterialTextureMetadata(
+                "ASSETS/Characters/Test/Test_TX_CM.tex",
+                null,
+                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["hat"] = new[] { "ASSETS/Characters/Test/Test_Hat_TX_CM.tex" }
+                },
+                new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase))
+            {
+                DirectOverrideTexturePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["hat"] = "ASSETS/Characters/Test/Test_Hat_TX_CM.tex"
+                }
+            };
+
+            SknMaterialTextureResolution resolved = SknMaterialTextureResolver.Resolve(
+                metadata,
+                new[] { "test_tx_cm", "test_hat_tx_cm" });
+            ModelMaterialDefinition hat = resolved.ResolveMaterialDefinition("hat");
+
+            Assert.Equal(ModelMaterialBindingKind.TextureOnly, hat.BindingKind);
+            Assert.Equal("test_hat_tx_cm", hat.BaseTextureName);
+        }
+
+        [Fact]
+        public void ModelPart_AuthoredOpaqueMaterialDoesNotInferBlendFromTintAlpha()
+        {
+            var part = new ModelPart
+            {
+                ColorTint = new Vector4(1f, 1f, 1f, 0.25f),
+                MaterialDefinition = ModelMaterialDefinition.TextureOnly("test_tx_cm")
+            };
+
+            Assert.False(part.IsAlphaBlended);
+        }
+
+        [Fact]
         public void Resolve_PreservesNormalBlendWhenOpacitySlotExistsAtOne()
         {
             SknMaterialDefinition material = CreateMaterial(

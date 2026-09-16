@@ -80,6 +80,10 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uLightMapColorScale;
         private int _uColorTint;
         private int _uAlphaCutoff;
+        private int _uMaterialUvRepeat;
+        private int _uMaterialUvScroll;
+        private int _uMaterialUnlit;
+        private int _uMaterialPremultipliedAlpha;
         private int _uUsesBakedDiffuse;
         private int _uHasVertexColor;
         private bool _ready;
@@ -174,20 +178,21 @@ namespace AssetsManager.Services.Viewer.Rendering
                 (float)((Stopwatch.GetTimestamp() - _startTimestamp) / (double)Stopwatch.Frequency));
             _gl.Uniform1(_uLightMapColorScale, lightmapScale);
 
+            // Per-part state below owns blending, depth and culling. Start and end from
+            // conservative defaults so Map/Diff parts keep the legacy behavior unchanged.
             _gl.Enable(EnableCap.DepthTest);
             _gl.DepthMask(true);
             _gl.Disable(EnableCap.Blend);
+            _gl.Disable(EnableCap.CullFace);
             RenderParts(model, false, false, cameraPosition, world);
             RenderParts(model, true, false, cameraPosition, world);
-
-            _gl.Enable(EnableCap.Blend);
-            _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-            _gl.DepthMask(false);
             RenderParts(model, false, true, cameraPosition, world);
             RenderParts(model, true, true, cameraPosition, world);
 
             _gl.Disable(EnableCap.PolygonOffsetFill);
             _gl.Disable(EnableCap.Blend);
+            _gl.Disable(EnableCap.CullFace);
+            _gl.Enable(EnableCap.DepthTest);
             _gl.DepthMask(true);
             _gl.BindVertexArray(0);
             UnbindSceneTextures();
@@ -253,6 +258,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uLightMapColorScale = gl.GetUniformLocation(_program, "uLightMapColorScale");
             _uColorTint = gl.GetUniformLocation(_program, "uColorTint");
             _uAlphaCutoff = gl.GetUniformLocation(_program, "uAlphaCutoff");
+            _uMaterialUvRepeat = gl.GetUniformLocation(_program, "uMaterialUvRepeat");
+            _uMaterialUvScroll = gl.GetUniformLocation(_program, "uMaterialUvScroll");
+            _uMaterialUnlit = gl.GetUniformLocation(_program, "uMaterialUnlit");
+            _uMaterialPremultipliedAlpha = gl.GetUniformLocation(_program, "uMaterialPremultipliedAlpha");
             _uUsesBakedDiffuse = gl.GetUniformLocation(_program, "uUsesBakedDiffuse");
             _uHasVertexColor = gl.GetUniformLocation(_program, "uHasVertexColor");
         }
@@ -297,6 +306,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                 GlMeshResourceCache.PartResources resources = _resources.Ensure(model, part);
                 if (resources.Vao == 0) continue;
 
+                ModelMaterialDefinition material = part.MaterialDefinition;
+                ApplyPartRenderState(part, material);
+
                 _gl.BindVertexArray(resources.Vao);
                 _gl.Uniform1(
                     _uUseSkinning,
@@ -310,13 +322,26 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gl.BindTexture(TextureTarget.Texture2D, targetTex0);
                     lastBoundTex0 = targetTex0;
                 }
+                if (resources.Texture != 0)
+                    ApplyBaseTextureWrap(material);
 
-                ModelMaterialEffectDefinition effect =
+                ModelMaterialEffectDefinition effect = material?.Effect ??
                     part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
                 ModelIridescenceDefinition iridescence = effect.Iridescence;
+                Vector4 colorTint = material?.Color ?? part.ColorTint;
+                float alphaCutoff = material?.AlphaCutoff ??
+                    (part.IsAlphaBlended ? 0f : part.AlphaCutoff);
+                Vector2 uvRepeat = material?.UvRepeat ?? Vector2.One;
+                Vector2 uvScroll = material?.UvScroll ?? Vector2.Zero;
 
-                _gl.Uniform4(_uColorTint, part.ColorTint.X, part.ColorTint.Y, part.ColorTint.Z, part.ColorTint.W);
-                _gl.Uniform1(_uAlphaCutoff, part.IsAlphaBlended ? 0f : part.AlphaCutoff);
+                _gl.Uniform4(_uColorTint, colorTint.X, colorTint.Y, colorTint.Z, colorTint.W);
+                _gl.Uniform1(_uAlphaCutoff, alphaCutoff);
+                _gl.Uniform2(_uMaterialUvRepeat, uvRepeat.X, uvRepeat.Y);
+                _gl.Uniform2(_uMaterialUvScroll, uvScroll.X, uvScroll.Y);
+                _gl.Uniform1(_uMaterialUnlit, material != null && !material.IsLit ? 1 : 0);
+                _gl.Uniform1(
+                    _uMaterialPremultipliedAlpha,
+                    material?.RenderState.PremultipliedAlpha == true ? 1 : 0);
                 _gl.Uniform1(_uUsesBakedDiffuse, part.UsesBakedDiffuse ? 1 : 0);
                 _gl.Uniform1(_uHasVertexColor, resources.ColorVbo != 0 ? 1 : 0);
 
@@ -424,6 +449,113 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
+
+        private void ApplyPartRenderState(ModelPart part, ModelMaterialDefinition material)
+        {
+            if (material == null)
+            {
+                ApplyLegacyPartRenderState(part.IsAlphaBlended);
+                return;
+            }
+
+            ModelMaterialRenderState state = material.RenderState;
+            ModelMaterialEffectDefinition effect = material.Effect ??
+                part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
+            bool effectForcesBlend =
+                state.Blending == ModelMaterialBlendMode.Opaque &&
+                effect.RequiresAlphaBlend;
+            ModelMaterialBlendMode blending = effectForcesBlend
+                ? ModelMaterialBlendMode.Normal
+                : state.Blending;
+
+            if (blending == ModelMaterialBlendMode.Opaque)
+            {
+                _gl.Disable(EnableCap.Blend);
+            }
+            else
+            {
+                _gl.Enable(EnableCap.Blend);
+                if (blending == ModelMaterialBlendMode.Additive)
+                {
+                    _gl.BlendFunc(
+                        state.PremultipliedAlpha ? BlendingFactor.One : BlendingFactor.SrcAlpha,
+                        BlendingFactor.One);
+                }
+                else
+                {
+                    _gl.BlendFunc(
+                        state.PremultipliedAlpha ? BlendingFactor.One : BlendingFactor.SrcAlpha,
+                        BlendingFactor.OneMinusSrcAlpha);
+                }
+            }
+
+            if (state.DepthTest)
+                _gl.Enable(EnableCap.DepthTest);
+            else
+                _gl.Disable(EnableCap.DepthTest);
+
+            // Specialized alpha effects predate the generic material model and relied on
+            // transparent depth writes being disabled; keep that only when the effect is the reason for blending.
+            _gl.DepthMask(effectForcesBlend ? false : state.DepthWrite);
+
+            if (state.DoubleSided)
+            {
+                _gl.Disable(EnableCap.CullFace);
+            }
+            else
+            {
+                _gl.Enable(EnableCap.CullFace);
+                // LTK mirrors X before Three.js, which reverses winding. AssetsManager keeps
+                // SKN coordinates unchanged, so Riot's default CCW cull maps to OpenGL Front.
+                _gl.CullFace(state.Inverted ? TriangleFace.Back : TriangleFace.Front);
+            }
+        }
+
+        private void ApplyLegacyPartRenderState(bool alphaBlended)
+        {
+            _gl.Enable(EnableCap.DepthTest);
+            _gl.Disable(EnableCap.CullFace);
+            if (alphaBlended)
+            {
+                _gl.Enable(EnableCap.Blend);
+                _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                _gl.DepthMask(false);
+            }
+            else
+            {
+                _gl.Disable(EnableCap.Blend);
+                _gl.DepthMask(true);
+            }
+        }
+
+        private void ApplyBaseTextureWrap(ModelMaterialDefinition material)
+        {
+            if (material == null)
+                return;
+
+            // LTK forces repeat while an authored UV scale is active; otherwise the sampler's
+            // own addressU/addressV modes are preserved. OpenGL has no equivalent border mode here.
+            bool forceRepeat = material.UvRepeat != Vector2.One;
+            ModelMaterialWrapMode wrapU = forceRepeat ? ModelMaterialWrapMode.Repeat : material.WrapU;
+            ModelMaterialWrapMode wrapV = forceRepeat ? ModelMaterialWrapMode.Repeat : material.WrapV;
+            _gl.TexParameter(
+                TextureTarget.Texture2D,
+                TextureParameterName.TextureWrapS,
+                (int)ToTextureWrapMode(wrapU));
+            _gl.TexParameter(
+                TextureTarget.Texture2D,
+                TextureParameterName.TextureWrapT,
+                (int)ToTextureWrapMode(wrapV));
+        }
+
+        private static TextureWrapMode ToTextureWrapMode(ModelMaterialWrapMode wrap) =>
+            wrap switch
+            {
+                ModelMaterialWrapMode.Clamp => TextureWrapMode.ClampToEdge,
+                ModelMaterialWrapMode.Mirror => TextureWrapMode.MirroredRepeat,
+                ModelMaterialWrapMode.Border => TextureWrapMode.ClampToEdge,
+                _ => TextureWrapMode.Repeat
+            };
 
         private void UnbindSceneTextures()
         {

@@ -72,16 +72,18 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsDoubleSided { get; set; } = true;
         public bool IsDecal { get; set; }
         public System.Numerics.Vector4 ColorTint { get; set; } = System.Numerics.Vector4.One;
-        internal bool IsAlphaBlended =>
-            ColorTint.W < 0.999f ||
-            MaterialEffect?.RequiresAlphaBlend == true;
+        internal bool IsAlphaBlended => MaterialDefinition != null
+            ? MaterialDefinition.RenderState.Blending != ModelMaterialBlendMode.Opaque ||
+              MaterialEffect?.RequiresAlphaBlend == true
+            : ColorTint.W < 0.999f ||
+              MaterialEffect?.RequiresAlphaBlend == true;
         internal float AlphaCutoff { get; set; } = 0.1f;
         internal bool UsesBakedDiffuse { get; set; }
         internal byte[] VertexColors { get; set; }
         public MapLightmapBinding Lightmap { get; set; }
 
-        // SKN loaders attach the authored material once here so every model surface shares the same material structure.
-        public ModelMaterialDefinition MaterialDefinition { get; set; } = ModelMaterialDefinition.Default;
+        // SKN loaders attach the authored material here; other mesh pipelines keep their own material semantics.
+        public ModelMaterialDefinition MaterialDefinition { get; set; }
         public ModelMaterialEffectDefinition MaterialEffect { get; set; } = ModelMaterialEffectDefinition.None;
 
         public Dictionary<string, BitmapSource> AllTextures
@@ -154,7 +156,7 @@ namespace AssetsManager.Views.Models.Viewer
             SourceVertexIndices = null;
             VertexColors = null;
             Lightmap = null;
-            MaterialDefinition = ModelMaterialDefinition.Default;
+            MaterialDefinition = null;
             MaterialEffect = ModelMaterialEffectDefinition.None;
 
             PropertyChanged = null;

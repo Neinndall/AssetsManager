@@ -115,6 +115,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					uniform float uLightMapColorScale;
 					uniform vec4 uColorTint;
 					uniform float uAlphaCutoff;
+					uniform vec2 uMaterialUvRepeat;
+					uniform vec2 uMaterialUvScroll;
+					uniform int uMaterialUnlit;
+					uniform int uMaterialPremultipliedAlpha;
 					uniform int uUsesBakedDiffuse;
 					uniform vec3 uLightDir;
 					uniform vec3 uLightColor;
@@ -147,7 +151,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 						return sampleValue.rgb;
 					}
 					void main(){
-							vec4 texColor = texture(uTex, vUv);
+							vec2 materialUv = vUv * uMaterialUvRepeat + uMaterialUvScroll * uEffectTime;
+							vec4 texColor = texture(uTex, materialUv);
 							if (texColor.a * vColor.a * uColorTint.a < uAlphaCutoff) discard;
 							texColor.rgb /= max(texColor.a, 0.0039215686);
 							texColor *= vColor * uColorTint;
@@ -155,7 +160,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 							float diff2 = max(dot(vNormal, uLightDir2), 0.0);
 							vec3 finalLight = clamp(uAmbient + diff1 * uLightColor + diff2 * uLightColor2, 0.0, 1.0);
 							vec3 finalColor;
-							if (uUsesBakedDiffuse != 0 && uHasLightmap != 0)
+							if (uMaterialUnlit != 0)
+							{
+									finalColor = texColor.rgb;
+							}
+							else if (uUsesBakedDiffuse != 0 && uHasLightmap != 0)
 							{
 									finalColor = texture(uLightmap, vLightmapUv).rgb * vColor.rgb;
 							}
@@ -203,8 +212,9 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 									vec2 flow = texture(
 										uEffectTex,
 										effectUv + uEffectScrollSpeed * uEffectTime).rg * 2.0 - 1.0;
-									vec2 flowUv = vUv + flow * uFlowIntensity;
-									vec3 flowColor = texture(uTex, flowUv).rgb * finalLight;
+									vec2 flowUv = materialUv + flow * uFlowIntensity;
+									vec3 flowColor = texture(uTex, flowUv).rgb *
+										(uMaterialUnlit != 0 ? vec3(1.0) : finalLight);
 									finalColor = mix(
 										finalColor,
 										flowColor,
@@ -307,6 +317,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 								texColor.a *= mix(1.0, fresnelAlpha, fadeMask);
 							}
 							if (texColor.a <= 0.0001) discard;
+							if (uMaterialPremultipliedAlpha != 0)
+								finalColor *= texColor.a;
 							fragColor = vec4(finalColor, texColor.a);
 				}";
     }

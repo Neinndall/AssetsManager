@@ -137,11 +137,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
         {
             if (material == null)
             {
-                return ModelMaterialDefinition.Default with
-                {
-                    BaseTextureName = fallbackTextureKey,
-                    Effect = effect ?? ModelMaterialEffectDefinition.None
-                };
+                return ModelMaterialDefinition.TextureOnly(
+                    fallbackTextureKey,
+                    effect ?? ModelMaterialEffectDefinition.None);
             }
 
             IReadOnlyList<SknMaterialSampler> samplers = MergeSamplers(material, shader);
@@ -155,7 +153,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     "Shaders/SkinnedMesh/AlphaBlend_Additive_Scroll_Packed",
                     StringComparison.OrdinalIgnoreCase);
 
-            (SknMaterialSampler baseSampler, _) = SelectBaseSampler(samplers, switches, switchedShader);
+            (SknMaterialSampler baseSampler, ModelMaterialBaseRule baseRule) =
+                SelectBaseSampler(samplers, switches, switchedShader);
             string baseTextureKey = baseSampler == null
                 ? null
                 : SknMaterialTextureResolver.MatchTextureKey(baseSampler.TexturePath, textureKeys);
@@ -182,6 +181,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             return new ModelMaterialDefinition(
                 baseTextureKey,
+                baseRule,
                 color,
                 alphaCutoff,
                 uvRepeat,
@@ -189,6 +189,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 baseSampler?.WrapU ?? ModelMaterialWrapMode.Repeat,
                 baseSampler?.WrapV ?? ModelMaterialWrapMode.Repeat,
                 renderState,
+                ModelMaterialBindingKind.Authored,
                 material.IsAnimated,
                 shaderPath,
                 effect ?? ModelMaterialEffectDefinition.None);
@@ -198,16 +199,33 @@ namespace AssetsManager.Services.Viewer.Resolvers
             SknMaterialDefinition material,
             SknShaderDefinition shader)
         {
-            var result = new List<SknMaterialSampler>(material.Samplers ?? Array.Empty<SknMaterialSampler>());
-            if (shader?.DefaultSamplers == null) return result;
+            var result = new List<SknMaterialSampler>();
+            IReadOnlyList<SknMaterialSampler> shaderSamplers = shader?.DefaultSamplers ?? Array.Empty<SknMaterialSampler>();
+            var shaderByName = shaderSamplers.ToDictionary(sampler => sampler.TextureName, StringComparer.Ordinal);
 
-            var authored = result
+            foreach (SknMaterialSampler authoredSampler in material.Samplers ?? Array.Empty<SknMaterialSampler>())
+            {
+                SknMaterialSampler sampler = authoredSampler;
+                if (authoredSampler.UsesShaderDefaultTexture &&
+                    shaderByName.TryGetValue(authoredSampler.TextureName, out SknMaterialSampler shaderSampler))
+                {
+                    sampler = authoredSampler with
+                    {
+                        TexturePath = shaderSampler.TexturePath,
+                        UsesShaderDefaultTexture = false
+                    };
+                }
+
+                result.Add(sampler);
+            }
+
+            var authoredNames = result
                 .Select(sampler => sampler.TextureName)
                 .ToHashSet(StringComparer.Ordinal);
-            foreach (SknMaterialSampler sampler in shader.DefaultSamplers)
+            foreach (SknMaterialSampler shaderSampler in shaderSamplers)
             {
-                if (!authored.Contains(sampler.TextureName))
-                    result.Add(sampler);
+                if (!authoredNames.Contains(shaderSampler.TextureName))
+                    result.Add(shaderSampler);
             }
             return result;
         }
@@ -248,22 +266,17 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     result[name] = value;
             }
 
-            bool HasDeclaration(string name) => shader == null || shader.DefaultSwitches.ContainsKey(name);
+            // LTK records undeclared switches as diagnostics, but the authored state still
+            // participates in the preview semantics (notably the packed switched shader).
             if (material.SwitchStates != null && material.SwitchStates.Count > 0)
             {
                 foreach ((string name, bool value) in material.SwitchStates)
-                {
-                    if (HasDeclaration(name))
-                        result[name] = value;
-                }
+                    result[name] = value;
             }
             else
             {
                 foreach (string name in material.Switches ?? new HashSet<string>())
-                {
-                    if (HasDeclaration(name))
-                        result[name] = true;
-                }
+                    result[name] = true;
             }
             return result;
         }

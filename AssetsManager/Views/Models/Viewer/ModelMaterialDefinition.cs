@@ -7,6 +7,7 @@ namespace AssetsManager.Views.Models.Viewer
     /// </summary>
     public sealed record ModelMaterialDefinition(
         string BaseTextureName,
+        ModelMaterialBaseRule BaseRule,
         Vector4 Color,
         float AlphaCutoff,
         Vector2 UvRepeat,
@@ -14,19 +15,46 @@ namespace AssetsManager.Views.Models.Viewer
         ModelMaterialWrapMode WrapU,
         ModelMaterialWrapMode WrapV,
         ModelMaterialRenderState RenderState,
+        ModelMaterialBindingKind BindingKind,
         bool IsAnimated,
         string ShaderPath,
         ModelMaterialEffectDefinition Effect)
     {
-        public static ModelMaterialDefinition Default { get; } = new(
+        public bool IsLit =>
+            BindingKind != ModelMaterialBindingKind.Missing &&
+            RenderState.Blending != ModelMaterialBlendMode.Additive;
+
+        public static ModelMaterialDefinition Default { get; } = TextureOnly(null);
+
+        public static ModelMaterialDefinition TextureOnly(
+            string baseTextureName,
+            ModelMaterialEffectDefinition effect = null) =>
+            new(
+                baseTextureName,
+                ModelMaterialBaseRule.None,
+                Vector4.One,
+                0f,
+                Vector2.One,
+                Vector2.Zero,
+                ModelMaterialWrapMode.Repeat,
+                ModelMaterialWrapMode.Repeat,
+                ModelMaterialRenderState.TextureOnly,
+                ModelMaterialBindingKind.TextureOnly,
+                false,
+                null,
+                effect ?? ModelMaterialEffectDefinition.None);
+
+        public static ModelMaterialDefinition Missing { get; } = new(
             null,
+            ModelMaterialBaseRule.None,
             Vector4.One,
             0f,
             Vector2.One,
             Vector2.Zero,
             ModelMaterialWrapMode.Repeat,
             ModelMaterialWrapMode.Repeat,
-            ModelMaterialRenderState.Default,
+            ModelMaterialRenderState.TextureOnly,
+            ModelMaterialBindingKind.Missing,
             false,
             null,
             ModelMaterialEffectDefinition.None);
@@ -47,6 +75,22 @@ namespace AssetsManager.Views.Models.Viewer
             false,
             true,
             true);
+
+        // A skin with no StaticMaterialDef is drawn from its texture alone and keeps both faces.
+        public static ModelMaterialRenderState TextureOnly { get; } = new(
+            ModelMaterialBlendMode.Opaque,
+            false,
+            true,
+            false,
+            true,
+            true);
+    }
+
+    public enum ModelMaterialBindingKind
+    {
+        TextureOnly,
+        Authored,
+        Missing
     }
 
     public enum ModelMaterialBlendMode
