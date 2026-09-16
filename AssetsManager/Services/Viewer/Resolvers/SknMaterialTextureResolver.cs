@@ -44,8 +44,14 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
     internal sealed record SknMaterialSampler(
         string TextureName,
-        string TexturePath);
+        string TexturePath,
+        ModelMaterialWrapMode WrapU = ModelMaterialWrapMode.Repeat,
+        ModelMaterialWrapMode WrapV = ModelMaterialWrapMode.Repeat);
 
+    /// <summary>
+    /// Raw authored StaticMaterialDef data. Generic material semantics are resolved separately
+    /// so shader render state does not compete with optional League-specific effect layers.
+    /// </summary>
     internal sealed record SknMaterialDefinition(
         IReadOnlyList<SknMaterialSampler> Samplers,
         IReadOnlyDictionary<string, Vector4> Parameters)
@@ -53,7 +59,16 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal IReadOnlySet<string> Switches { get; init; } =
             new HashSet<string>(StringComparer.Ordinal);
 
+        internal IReadOnlyDictionary<string, bool> SwitchStates { get; init; } =
+            new Dictionary<string, bool>(StringComparer.Ordinal);
+
+        internal IReadOnlyDictionary<string, string> ShaderMacros { get; init; } =
+            new Dictionary<string, string>(StringComparer.Ordinal);
+
+        internal SknMaterialPassDefinition Pass { get; init; }
+        internal bool IsAnimated { get; init; }
         internal uint ShaderHash { get; init; }
+        internal string ShaderPath { get; init; }
 
         private Dictionary<string, SknMaterialSampler> _normalizedSamplers;
 
@@ -75,8 +90,28 @@ namespace AssetsManager.Services.Viewer.Resolvers
         }
 
         internal bool HasSwitch(params string[] names) =>
-            names.Any(name => Switches.Contains(SknMaterialTextureResolver.NormalizeToken(name)));
+            names.Any(name => SwitchStates.TryGetValue(name, out bool enabled)
+                ? enabled
+                : Switches.Contains(SknMaterialTextureResolver.NormalizeToken(name)));
     }
+
+    internal sealed record SknMaterialPassDefinition(
+        uint ShaderHash,
+        IReadOnlyDictionary<string, Vector4> Parameters,
+        IReadOnlyDictionary<string, string> ShaderMacros,
+        bool? BlendEnabled,
+        uint? DestinationColorBlendFactor,
+        bool? CullEnabled,
+        uint? WindingToCull,
+        bool? DepthEnabled,
+        uint? WriteMask);
+
+    internal sealed record SknShaderDefinition(
+        string Path,
+        IReadOnlyList<SknMaterialSampler> DefaultSamplers,
+        IReadOnlyDictionary<string, Vector4> DefaultParameters,
+        IReadOnlyDictionary<string, bool> DefaultSwitches,
+        IReadOnlyDictionary<string, string> FeatureDefines);
 
     internal sealed record SknMaterialTextureMetadata(
         string DefaultTexturePath,
@@ -85,6 +120,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         IReadOnlyDictionary<string, SknMaterialDefinition> OverrideMaterials)
     {
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
+        internal IReadOnlyDictionary<uint, SknShaderDefinition> ShaderDefinitions { get; init; } =
+            new Dictionary<uint, SknShaderDefinition>();
 
         internal IEnumerable<string> ReferencedTexturePaths =>
             OverrideTexturePaths.Values
@@ -94,15 +131,32 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         .Select(sampler => sampler.TexturePath)))
                 .Concat((DefaultMaterial?.Samplers ?? Array.Empty<SknMaterialSampler>())
                     .Select(sampler => sampler.TexturePath))
+                .Concat(ReferencedShaderDefaultTextures())
                 .Prepend(DefaultTexturePath)
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        private IEnumerable<string> ReferencedShaderDefaultTextures()
+        {
+            if (ShaderDefinitions == null || ShaderDefinitions.Count == 0)
+                return Enumerable.Empty<string>();
+
+            return OverrideMaterials.Values
+                .Append(DefaultMaterial)
+                .Where(material => material != null && material.ShaderHash != 0)
+                .Select(material => material.ShaderHash)
+                .Distinct()
+                .Where(ShaderDefinitions.ContainsKey)
+                .SelectMany(hash => ShaderDefinitions[hash].DefaultSamplers)
+                .Select(sampler => sampler.TexturePath);
+        }
     }
 
     internal static class SknMaterialTextureResolver
     {
         private static readonly uint SkinPropertiesClass = Fnv1a.HashLower("SkinCharacterDataProperties");
         private static readonly uint StaticMaterialClass = Fnv1a.HashLower("StaticMaterialDef");
+        private static readonly uint CustomShaderClass = Fnv1a.HashLower("CustomShaderDef");
         private static readonly uint SkinMeshProperties = Fnv1a.HashLower("skinMeshProperties");
         private static readonly uint SimpleSkin = Fnv1a.HashLower("simpleSkin");
         private static readonly uint InitialSubmeshToHide = Fnv1a.HashLower("initialSubmeshToHide");
@@ -113,31 +167,53 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint SamplerValues = Fnv1a.HashLower("samplerValues");
         private static readonly uint TextureName = Fnv1a.HashLower("textureName");
         private static readonly uint TexturePath = Fnv1a.HashLower("texturePath");
+        private static readonly uint AddressU = Fnv1a.HashLower("addressU");
+        private static readonly uint AddressV = Fnv1a.HashLower("addressV");
         private static readonly uint ParamValues = Fnv1a.HashLower("paramValues");
         private static readonly uint SwitchesProperty = Fnv1a.HashLower("switches");
         private static readonly uint SwitchOn = Fnv1a.HashLower("on");
+        private static readonly uint ShaderMacros = Fnv1a.HashLower("shaderMacros");
+        private static readonly uint DynamicMaterial = Fnv1a.HashLower("dynamicMaterial");
         private static readonly uint ParameterName = Fnv1a.HashLower("name");
         private static readonly uint ParameterValue = Fnv1a.HashLower("value");
         private static readonly uint Techniques = Fnv1a.HashLower("techniques");
         private static readonly uint Passes = Fnv1a.HashLower("passes");
         private static readonly uint Shader = Fnv1a.HashLower("shader");
+        private static readonly uint BlendEnable = Fnv1a.HashLower("blendEnable");
+        private static readonly uint DestinationColorBlendFactor = Fnv1a.HashLower("dstColorBlendFactor");
+        private static readonly uint CullEnable = Fnv1a.HashLower("cullEnable");
+        private static readonly uint WindingToCull = Fnv1a.HashLower("windingToCull");
+        private static readonly uint DepthEnable = Fnv1a.HashLower("depthEnable");
+        private static readonly uint WriteMask = Fnv1a.HashLower("writeMask");
+        private static readonly uint ObjectPath = Fnv1a.HashLower("objectPath");
+        private static readonly uint ShaderTextures = Fnv1a.HashLower("textures");
+        private static readonly uint ShaderParameters = Fnv1a.HashLower("parameters");
+        private static readonly uint StaticSwitches = Fnv1a.HashLower("staticSwitches");
+        private static readonly uint FeatureDefines = Fnv1a.HashLower("featureDefines");
+        private static readonly uint DefaultTexturePath = Fnv1a.HashLower("defaultTexturePath");
+        private static readonly uint ParameterData = Fnv1a.HashLower("data");
+        private static readonly uint LogicalParameters = Fnv1a.HashLower("logicalParameters");
+        private static readonly uint OnByDefault = Fnv1a.HashLower("onByDefault");
 
         internal static SknMaterialTextureResolution Resolve(
             BinTree binTree,
             IEnumerable<string> availableTextureKeys,
-            Func<ulong, string> wadChunkPathResolver = null) =>
-            Resolve(ReadMetadata(binTree, wadChunkPathResolver), availableTextureKeys);
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null) =>
+            Resolve(ReadMetadata(binTree, wadChunkPathResolver, binEntryResolver), availableTextureKeys);
 
         internal static SknMaterialTextureMetadata ReadMetadata(
             BinTree binTree,
-            Func<ulong, string> wadChunkPathResolver = null)
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null)
         {
-            return ReadMetadata(new[] { binTree }, wadChunkPathResolver);
+            return ReadMetadata(new[] { binTree }, wadChunkPathResolver, binEntryResolver);
         }
 
         internal static SknMaterialTextureMetadata ReadMetadata(
             IEnumerable<BinTree> binTrees,
-            Func<ulong, string> wadChunkPathResolver = null)
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null)
         {
             List<BinTree> trees = (binTrees ?? Enumerable.Empty<BinTree>())
                 .Where(tree => tree != null)
@@ -152,7 +228,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             BinTree primaryTree = trees[0];
-            var materialDefinitions = BuildMaterialDefinitionMap(trees, wadChunkPathResolver);
+            var materialDefinitions = BuildMaterialDefinitionMap(trees, wadChunkPathResolver, binEntryResolver);
             var overrideTexturePaths = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
             var overrideMaterials = new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
             IReadOnlyList<string> initialHiddenSubmeshes = Array.Empty<string>();
@@ -727,9 +803,98 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return Regex.Replace(key, @"[^a-z0-9]", string.Empty);
         }
 
+        internal static IReadOnlyDictionary<uint, SknShaderDefinition> ReadShaderDefinitions(
+            BinTree shaderTree,
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null)
+        {
+            var result = new Dictionary<uint, SknShaderDefinition>();
+            if (shaderTree == null)
+                return result;
+
+            foreach ((uint pathHash, BinTreeObject obj) in shaderTree.Objects)
+            {
+                if (obj.ClassHash != CustomShaderClass)
+                    continue;
+
+                string shaderPath = TryGetString(obj.Properties, ObjectPath, out string objectPath)
+                    ? objectPath
+                    : ResolveBinEntryName(pathHash, binEntryResolver);
+
+                var defaultSamplers = new List<SknMaterialSampler>();
+                if (obj.Properties.TryGetValue(ShaderTextures, out BinTreeProperty textureProperty) &&
+                    textureProperty is BinTreeContainer textures)
+                {
+                    foreach (BinTreeStruct texture in textures.Elements.OfType<BinTreeStruct>())
+                    {
+                        if (!TryGetString(texture, ParameterName, out string name))
+                            continue;
+
+                        TryGetTexturePath(
+                            texture.Properties,
+                            DefaultTexturePath,
+                            wadChunkPathResolver,
+                            out string texturePath);
+                        defaultSamplers.Add(new SknMaterialSampler(name, texturePath));
+                    }
+                }
+
+                var defaultParameters = new Dictionary<string, Vector4>(StringComparer.Ordinal);
+                if (obj.Properties.TryGetValue(ShaderParameters, out BinTreeProperty parameterProperty) &&
+                    parameterProperty is BinTreeContainer parameters)
+                {
+                    foreach (BinTreeStruct parameter in parameters.Elements.OfType<BinTreeStruct>())
+                    {
+                        Vector4 data = parameter.Properties.TryGetValue(ParameterData, out BinTreeProperty dataValue) &&
+                                       dataValue is BinTreeVector4 vector
+                            ? vector.Value
+                            : Vector4.Zero;
+
+                        if (parameter.Properties.TryGetValue(LogicalParameters, out BinTreeProperty logicalProperty) &&
+                            logicalProperty is BinTreeContainer logicalParameters)
+                        {
+                            foreach (BinTreeStruct logical in logicalParameters.Elements.OfType<BinTreeStruct>())
+                            {
+                                if (TryGetString(logical, ParameterName, out string logicalName))
+                                    defaultParameters[logicalName] = data;
+                            }
+                        }
+
+                        if (TryGetString(parameter, ParameterName, out string physicalName))
+                            defaultParameters[physicalName] = data;
+                    }
+                }
+
+                var defaultSwitches = new Dictionary<string, bool>(StringComparer.Ordinal);
+                if (obj.Properties.TryGetValue(StaticSwitches, out BinTreeProperty switchProperty) &&
+                    switchProperty is BinTreeContainer switches)
+                {
+                    foreach (BinTreeStruct switchDefinition in switches.Elements.OfType<BinTreeStruct>())
+                    {
+                        if (!TryGetString(switchDefinition, ParameterName, out string name))
+                            continue;
+
+                        defaultSwitches[name] = switchDefinition.Properties.TryGetValue(OnByDefault, out BinTreeProperty onByDefault)
+                            ? ReadBool(onByDefault, false)
+                            : false;
+                    }
+                }
+
+                result[pathHash] = new SknShaderDefinition(
+                    shaderPath,
+                    defaultSamplers,
+                    defaultParameters,
+                    defaultSwitches,
+                    ReadStringMap(obj.Properties, FeatureDefines));
+            }
+
+            return result;
+        }
+
         private static Dictionary<uint, SknMaterialDefinition> BuildMaterialDefinitionMap(
             IEnumerable<BinTree> binTrees,
-            Func<ulong, string> wadChunkPathResolver)
+            Func<ulong, string> wadChunkPathResolver,
+            Func<uint, string> binEntryResolver)
         {
             var result = new Dictionary<uint, SknMaterialDefinition>();
             foreach (BinTree binTree in binTrees ?? Enumerable.Empty<BinTree>())
@@ -747,14 +912,30 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     }
 
                     List<SknMaterialSampler> samplers = ReadSamplers(obj, wadChunkPathResolver);
-                    Dictionary<string, Vector4> parameters = ReadParameters(obj);
-                    HashSet<string> switches = ReadSwitches(obj);
-                    if (samplers.Count > 0 || parameters.Count > 0 || switches.Count > 0)
+                    Dictionary<string, Vector4> parameters = ReadParameters(obj.Properties);
+                    Dictionary<string, bool> switchStates = ReadSwitchStates(obj.Properties);
+                    HashSet<string> switches = switchStates
+                        .Where(pair => pair.Value)
+                        .Select(pair => NormalizeToken(pair.Key))
+                        .ToHashSet(StringComparer.Ordinal);
+                    Dictionary<string, string> shaderMacros = ReadStringMap(obj.Properties, ShaderMacros);
+                    SknMaterialPassDefinition pass = ReadMaterialPass(obj.Properties);
+                    if (samplers.Count > 0 ||
+                        parameters.Count > 0 ||
+                        switchStates.Count > 0 ||
+                        pass != null ||
+                        obj.Properties.ContainsKey(DynamicMaterial))
                     {
                         result[pathHash] = new SknMaterialDefinition(samplers, parameters)
                         {
                             Switches = switches,
-                            ShaderHash = ReadShaderHash(obj.Properties)
+                            SwitchStates = switchStates,
+                            ShaderMacros = shaderMacros,
+                            Pass = pass,
+                            IsAnimated = obj.Properties.TryGetValue(DynamicMaterial, out BinTreeProperty dynamicValue) &&
+                                         dynamicValue is BinTreeStruct,
+                            ShaderHash = pass?.ShaderHash ?? 0,
+                            ShaderPath = ResolveBinEntryName(pass?.ShaderHash ?? 0, binEntryResolver)
                         };
                     }
                 }
@@ -776,21 +957,28 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             foreach (BinTreeProperty element in samplers.Elements)
             {
-                if (element is BinTreeStruct sampler &&
-                    TryGetString(sampler, TextureName, out string textureName) &&
-                    TryGetTexturePath(sampler, TexturePath, wadChunkPathResolver, out string texturePath))
+                if (element is not BinTreeStruct sampler ||
+                    !TryGetString(sampler, TextureName, out string textureName) ||
+                    !TryGetTexturePath(sampler, TexturePath, wadChunkPathResolver, out string texturePath))
                 {
-                    result.Add(new SknMaterialSampler(textureName, texturePath));
+                    continue;
                 }
+
+                result.Add(new SknMaterialSampler(
+                    textureName,
+                    texturePath,
+                    ReadWrap(sampler.Properties, AddressU),
+                    ReadWrap(sampler.Properties, AddressV)));
             }
 
             return result;
         }
 
-        private static Dictionary<string, Vector4> ReadParameters(BinTreeObject materialObject)
+        private static Dictionary<string, Vector4> ReadParameters(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties)
         {
-            var result = new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase);
-            if (!materialObject.Properties.TryGetValue(ParamValues, out BinTreeProperty property) ||
+            var result = new Dictionary<string, Vector4>(StringComparer.Ordinal);
+            if (!properties.TryGetValue(ParamValues, out BinTreeProperty property) ||
                 property is not BinTreeContainer parameters)
             {
                 return result;
@@ -799,23 +987,26 @@ namespace AssetsManager.Services.Viewer.Resolvers
             foreach (BinTreeProperty element in parameters.Elements)
             {
                 if (element is not BinTreeStruct parameter ||
-                    !TryGetString(parameter, ParameterName, out string name) ||
-                    !parameter.Properties.TryGetValue(ParameterValue, out BinTreeProperty value) ||
-                    value is not BinTreeVector4 vector)
+                    !TryGetString(parameter, ParameterName, out string name))
                 {
                     continue;
                 }
 
-                result[name] = vector.Value;
+                // League writes an omitted parameter value as zeros rather than falling back to the shader default.
+                result[name] = parameter.Properties.TryGetValue(ParameterValue, out BinTreeProperty value) &&
+                               value is BinTreeVector4 vector
+                    ? vector.Value
+                    : Vector4.Zero;
             }
 
             return result;
         }
 
-        private static HashSet<string> ReadSwitches(BinTreeObject materialObject)
+        private static Dictionary<string, bool> ReadSwitchStates(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties)
         {
-            var result = new HashSet<string>(StringComparer.Ordinal);
-            if (!materialObject.Properties.TryGetValue(SwitchesProperty, out BinTreeProperty property) ||
+            var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+            if (!properties.TryGetValue(SwitchesProperty, out BinTreeProperty property) ||
                 property is not BinTreeContainer switches)
             {
                 return result;
@@ -824,41 +1015,130 @@ namespace AssetsManager.Services.Viewer.Resolvers
             foreach (BinTreeProperty element in switches.Elements)
             {
                 if (element is not BinTreeStruct switchDefinition ||
-                    !TryGetString(switchDefinition, ParameterName, out string name) ||
-                    (switchDefinition.Properties.TryGetValue(SwitchOn, out BinTreeProperty enabled) &&
-                     enabled is BinTreeBool flag && !flag.Value))
+                    !TryGetString(switchDefinition, ParameterName, out string name))
                 {
                     continue;
                 }
 
-                result.Add(NormalizeToken(name));
+                // An authored switch with no `on` field is enabled by the BIN class default.
+                result[name] = !switchDefinition.Properties.TryGetValue(SwitchOn, out BinTreeProperty enabled) ||
+                               ReadBool(enabled, true);
             }
 
             return result;
         }
 
-        private static uint ReadShaderHash(IReadOnlyDictionary<uint, BinTreeProperty> properties)
+        private static SknMaterialPassDefinition ReadMaterialPass(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties)
         {
             if (!properties.TryGetValue(Techniques, out BinTreeProperty techniquesProperty) ||
                 techniquesProperty is not BinTreeContainer techniques)
             {
-                return 0;
+                return null;
             }
 
-            BinTreeStruct technique = techniques.Elements.OfType<BinTreeStruct>().FirstOrDefault();
+            BinTreeStruct technique = techniques.Elements
+                .OfType<BinTreeStruct>()
+                .FirstOrDefault(candidate =>
+                    TryGetString(candidate, ParameterName, out string name) &&
+                    name.Equals("normal", StringComparison.Ordinal)) ??
+                techniques.Elements.OfType<BinTreeStruct>().FirstOrDefault();
             if (technique == null ||
                 !technique.Properties.TryGetValue(Passes, out BinTreeProperty passesProperty) ||
                 passesProperty is not BinTreeContainer passes)
             {
-                return 0;
+                return null;
             }
 
             BinTreeStruct pass = passes.Elements.OfType<BinTreeStruct>().FirstOrDefault();
-            return pass != null &&
-                   pass.Properties.TryGetValue(Shader, out BinTreeProperty shaderProperty) &&
-                   shaderProperty is BinTreeObjectLink shader
+            if (pass == null)
+            {
+                return null;
+            }
+
+            uint shaderHash = pass.Properties.TryGetValue(Shader, out BinTreeProperty shaderProperty) &&
+                              shaderProperty is BinTreeObjectLink shader
                 ? shader.Value
                 : 0;
+            return new SknMaterialPassDefinition(
+                shaderHash,
+                ReadParameters(pass.Properties),
+                ReadStringMap(pass.Properties, ShaderMacros),
+                ReadOptionalBool(pass.Properties, BlendEnable),
+                ReadOptionalUInt(pass.Properties, DestinationColorBlendFactor),
+                ReadOptionalBool(pass.Properties, CullEnable),
+                ReadOptionalUInt(pass.Properties, WindingToCull),
+                ReadOptionalBool(pass.Properties, DepthEnable),
+                ReadOptionalUInt(pass.Properties, WriteMask));
+        }
+
+        private static Dictionary<string, string> ReadStringMap(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            uint propertyHash)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (!properties.TryGetValue(propertyHash, out BinTreeProperty property) ||
+                property is not BinTreeMap map)
+            {
+                return result;
+            }
+
+            foreach ((BinTreeProperty key, BinTreeProperty value) in map)
+            {
+                if (key is BinTreeString keyString && value is BinTreeString valueString)
+                    result[keyString.Value] = valueString.Value;
+            }
+            return result;
+        }
+
+        private static ModelMaterialWrapMode ReadWrap(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            uint propertyHash)
+        {
+            uint value = ReadOptionalUInt(properties, propertyHash) ?? 0;
+            return value switch
+            {
+                1 => ModelMaterialWrapMode.Clamp,
+                2 => ModelMaterialWrapMode.Mirror,
+                3 => ModelMaterialWrapMode.Border,
+                _ => ModelMaterialWrapMode.Repeat
+            };
+        }
+
+        private static bool? ReadOptionalBool(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            uint propertyHash) =>
+            properties.TryGetValue(propertyHash, out BinTreeProperty value)
+                ? ReadBool(value, false)
+                : null;
+
+        private static bool ReadBool(BinTreeProperty property, bool fallback) =>
+            property switch
+            {
+                BinTreeBool value => value.Value,
+                BinTreeBitBool value => value.Value,
+                _ => fallback
+            };
+
+        private static uint? ReadOptionalUInt(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            uint propertyHash)
+        {
+            if (!properties.TryGetValue(propertyHash, out BinTreeProperty property))
+                return null;
+
+            return property switch
+            {
+                BinTreeU8 value => value.Value,
+                BinTreeU16 value => value.Value,
+                BinTreeU32 value => value.Value,
+                BinTreeU64 value when value.Value <= uint.MaxValue => (uint)value.Value,
+                BinTreeI8 value when value.Value >= 0 => (uint)value.Value,
+                BinTreeI16 value when value.Value >= 0 => (uint)value.Value,
+                BinTreeI32 value when value.Value >= 0 => (uint)value.Value,
+                BinTreeI64 value when value.Value >= 0 && value.Value <= uint.MaxValue => (uint)value.Value,
+                _ => null
+            };
         }
 
         private static string SelectColorTexturePath(IReadOnlyList<SknMaterialSampler> samplers) =>
@@ -910,9 +1190,16 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .ToArray();
         }
 
-        private static bool TryGetString(BinTreeStruct value, uint propertyHash, out string result)
+        private static bool TryGetString(BinTreeStruct value, uint propertyHash, out string result) =>
+            TryGetString(value?.Properties, propertyHash, out result);
+
+        private static bool TryGetString(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            uint propertyHash,
+            out string result)
         {
-            if (value.Properties.TryGetValue(propertyHash, out BinTreeProperty property) &&
+            if (properties != null &&
+                properties.TryGetValue(propertyHash, out BinTreeProperty property) &&
                 property is BinTreeString text &&
                 !string.IsNullOrWhiteSpace(text.Value))
             {
@@ -928,9 +1215,16 @@ namespace AssetsManager.Services.Viewer.Resolvers
             BinTreeStruct value,
             uint propertyHash,
             Func<ulong, string> wadChunkPathResolver,
+            out string result) =>
+            TryGetTexturePath(value?.Properties, propertyHash, wadChunkPathResolver, out result);
+
+        private static bool TryGetTexturePath(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            uint propertyHash,
+            Func<ulong, string> wadChunkPathResolver,
             out string result)
         {
-            if (!value.Properties.TryGetValue(propertyHash, out BinTreeProperty property))
+            if (properties == null || !properties.TryGetValue(propertyHash, out BinTreeProperty property))
             {
                 result = null;
                 return false;
@@ -957,6 +1251,18 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             result = null;
             return false;
+        }
+
+        private static string ResolveBinEntryName(uint hash, Func<uint, string> binEntryResolver)
+        {
+            if (hash == 0 || binEntryResolver == null)
+                return null;
+
+            string resolved = binEntryResolver(hash);
+            return string.IsNullOrWhiteSpace(resolved) ||
+                   resolved.Equals(hash.ToString("x8"), StringComparison.OrdinalIgnoreCase)
+                ? null
+                : resolved;
         }
 
         internal static string MatchTextureKey(string texturePath, IReadOnlyList<string> availableKeys)
