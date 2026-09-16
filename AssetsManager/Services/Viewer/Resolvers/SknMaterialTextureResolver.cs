@@ -13,53 +13,21 @@ using LeagueToolkit.Hashing;
 namespace AssetsManager.Services.Viewer.Resolvers
 {
     internal sealed record SknMaterialTextureResolution(
-        string DefaultTextureKey,
-        IReadOnlyDictionary<string, string> Overrides,
-        IReadOnlyDictionary<string, ModelMaterialEffectDefinition> Effects,
-        IReadOnlySet<string> MaterialOverrideKeys,
-        ModelMaterialEffectDefinition DefaultEffect)
+        ModelMaterialDefinition DefaultMaterialDefinition,
+        IReadOnlyDictionary<string, ModelMaterialDefinition> MaterialDefinitions)
     {
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
-        internal ModelMaterialDefinition DefaultMaterialDefinition { get; init; } = ModelMaterialDefinition.Default;
-        internal IReadOnlyDictionary<string, ModelMaterialDefinition> MaterialDefinitions { get; init; } =
-            new Dictionary<string, ModelMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
-
-        internal ModelMaterialEffectDefinition ResolveEffect(string normalizedSubmeshName)
-        {
-            if (string.IsNullOrEmpty(normalizedSubmeshName))
-            {
-                return DefaultEffect;
-            }
-
-            if (Effects != null && Effects.TryGetValue(normalizedSubmeshName, out ModelMaterialEffectDefinition effect))
-            {
-                return effect;
-            }
-
-            if (MaterialOverrideKeys != null && !MaterialOverrideKeys.Contains(normalizedSubmeshName))
-            {
-                return DefaultEffect;
-            }
-
-            return ModelMaterialEffectDefinition.None;
-        }
 
         internal ModelMaterialDefinition ResolveMaterialDefinition(string normalizedSubmeshName)
         {
-            if (string.IsNullOrEmpty(normalizedSubmeshName))
-            {
-                return DefaultMaterialDefinition;
-            }
-
-            if (MaterialDefinitions != null &&
+            if (!string.IsNullOrEmpty(normalizedSubmeshName) &&
+                MaterialDefinitions != null &&
                 MaterialDefinitions.TryGetValue(normalizedSubmeshName, out ModelMaterialDefinition material))
             {
                 return material;
             }
 
-            return MaterialOverrideKeys != null && MaterialOverrideKeys.Contains(normalizedSubmeshName)
-                ? ModelMaterialDefinition.Default
-                : DefaultMaterialDefinition;
+            return DefaultMaterialDefinition;
         }
     }
 
@@ -138,7 +106,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
     internal sealed record SknMaterialTextureMetadata(
         string DefaultTexturePath,
         SknMaterialDefinition DefaultMaterial,
-        IReadOnlyDictionary<string, IReadOnlyList<string>> OverrideTexturePaths,
         IReadOnlyDictionary<string, SknMaterialDefinition> OverrideMaterials)
     {
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
@@ -151,8 +118,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         internal IEnumerable<string> ReferencedTexturePaths =>
-            OverrideTexturePaths.Values
-                .SelectMany(paths => paths)
+            DirectOverrideTexturePaths.Values
                 .Concat(OverrideMaterials.Values
                     .SelectMany(material => material.Samplers
                         .Select(sampler => sampler.TexturePath)))
@@ -250,7 +216,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return new SknMaterialTextureMetadata(
                     null,
                     null,
-                    new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
                     new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase));
             }
 
@@ -266,7 +231,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 }
             }
 
-            var overrideTexturePaths = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
             var overrideMaterials = new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
             var overrideMaterialLinkKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var directOverrideTexturePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -331,42 +295,26 @@ namespace AssetsManager.Services.Viewer.Resolvers
                             continue;
                         }
 
-                        var candidates = new List<string>(2);
-                        bool hasAuthoredOverride = false;
                         if (entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
                             linkProperty is BinTreeObjectLink materialLink)
                         {
-                            hasAuthoredOverride = true;
                             overrideMaterialLinkKeys.Add(normalizedSubmesh);
                             if (materialDefinitions.TryGetValue(
                                     materialLink.Value,
-                                    out SknMaterialDefinition materialDefinition))
+                                    out SknMaterialDefinition materialDefinition) &&
+                                (materialDefinition.Samplers.Count > 0 ||
+                                 materialDefinition.Parameters.Count > 0 ||
+                                 materialDefinition.Switches.Count > 0 ||
+                                 materialDefinition.Pass != null ||
+                                 materialDefinition.IsAnimated))
                             {
-                                string materialTexturePath = SelectColorTexturePath(materialDefinition.Samplers);
-                                if (!string.IsNullOrWhiteSpace(materialTexturePath))
-                                {
-                                    candidates.Add(materialTexturePath);
-                                }
-
-                                if (materialDefinition.Samplers.Count > 0 ||
-                                    materialDefinition.Parameters.Count > 0 ||
-                                    materialDefinition.Switches.Count > 0)
-                                {
-                                    overrideMaterials[normalizedSubmesh] = materialDefinition;
-                                }
+                                overrideMaterials[normalizedSubmesh] = materialDefinition;
                             }
                         }
 
                         if (TryGetTexturePath(entry, Texture, wadChunkPathResolver, out string directTexturePath))
                         {
-                            hasAuthoredOverride = true;
                             directOverrideTexturePaths[normalizedSubmesh] = directTexturePath;
-                            candidates.Add(directTexturePath);
-                        }
-
-                        if (hasAuthoredOverride && !overrideTexturePaths.ContainsKey(normalizedSubmesh))
-                        {
-                            overrideTexturePaths[normalizedSubmesh] = candidates;
                         }
                     }
                 }
@@ -375,7 +323,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return new SknMaterialTextureMetadata(
                 defaultTexturePath,
                 defaultMaterial,
-                overrideTexturePaths,
                 overrideMaterials)
             {
                 InitialHiddenSubmeshes = initialHiddenSubmeshes,
@@ -403,28 +350,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     directOverrideTextureKeys[submesh] = textureKey;
             }
 
-            // Keep the legacy maps coherent until their remaining consumers are removed below.
-            var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach ((string submesh, IReadOnlyList<string> texturePaths) in metadata.OverrideTexturePaths)
-            {
-                string textureKey = texturePaths
-                    .Select(path => MatchTextureKey(path, textureKeys))
-                    .FirstOrDefault(key => key != null);
-                if (textureKey != null)
-                    overrides[submesh] = textureKey;
-            }
-
-            var effects = new Dictionary<string, ModelMaterialEffectDefinition>(StringComparer.OrdinalIgnoreCase);
-            foreach ((string submesh, SknMaterialDefinition material) in metadata.OverrideMaterials)
-            {
-                ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
-                    material,
-                    submesh,
-                    textureKeys,
-                    metadata.OverrideTexturePaths.Keys);
-                if (effect.Kind != ModelMaterialEffectKind.None || effect.MaterialTint != Vector4.One)
-                    effects[submesh] = effect;
-            }
+            IReadOnlySet<string> overrideSubmeshKeys = metadata.OverrideMaterialLinkKeys
+                .Concat(metadata.DirectOverrideTexturePaths.Keys)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             ModelMaterialEffectDefinition defaultEffect = metadata.DefaultMaterial == null
                 ? ModelMaterialEffectDefinition.None
@@ -432,7 +360,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     metadata.DefaultMaterial,
                     string.Empty,
                     textureKeys,
-                    metadata.OverrideTexturePaths.Keys);
+                    overrideSubmeshKeys);
 
             ModelMaterialDefinition defaultMaterialDefinition;
             if (metadata.HasDefaultMaterialLink)
@@ -451,12 +379,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 defaultMaterialDefinition = ModelMaterialDefinition.TextureOnly(skinTextureKey);
             }
 
-            IReadOnlySet<string> materialOverrideKeys = metadata.OverrideTexturePaths.Keys
-                .Concat(metadata.OverrideMaterialLinkKeys)
-                .Concat(metadata.DirectOverrideTexturePaths.Keys)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var materialDefinitions = new Dictionary<string, ModelMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
-            foreach (string submesh in materialOverrideKeys)
+            foreach (string submesh in overrideSubmeshKeys)
             {
                 bool hasMaterialLink = metadata.OverrideMaterialLinkKeys.Contains(submesh);
                 metadata.OverrideMaterials.TryGetValue(submesh, out SknMaterialDefinition material);
@@ -472,13 +396,17 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         continue;
                     }
 
-                    effects.TryGetValue(submesh, out ModelMaterialEffectDefinition effect);
+                    ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                        material,
+                        submesh,
+                        textureKeys,
+                        overrideSubmeshKeys);
                     materialDefinitions[submesh] = SknStaticMaterialResolver.Resolve(
                         material,
                         ResolveShaderDefinition(metadata, material),
                         textureKeys,
                         textureFallback,
-                        effect ?? ModelMaterialEffectDefinition.None);
+                        effect);
                     continue;
                 }
 
@@ -486,17 +414,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 materialDefinitions[submesh] = ModelMaterialDefinition.TextureOnly(textureFallback);
             }
 
-            string defaultTextureKey = defaultMaterialDefinition.BaseTextureName;
             return new SknMaterialTextureResolution(
-                defaultTextureKey,
-                overrides,
-                effects,
-                materialOverrideKeys,
-                defaultEffect)
+                defaultMaterialDefinition,
+                materialDefinitions)
             {
-                InitialHiddenSubmeshes = metadata.InitialHiddenSubmeshes ?? Array.Empty<string>(),
-                DefaultMaterialDefinition = defaultMaterialDefinition,
-                MaterialDefinitions = materialDefinitions
+                InitialHiddenSubmeshes = metadata.InitialHiddenSubmeshes ?? Array.Empty<string>()
             };
         }
 
@@ -941,13 +863,20 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         internal static IReadOnlyList<string> GetSelectableTextureCandidates(
             IEnumerable<string> textureKeys,
-            SknMaterialTextureResolution materialTextures = null) =>
-            (textureKeys ?? Enumerable.Empty<string>())
-                .Concat(materialTextures?.Overrides?.Values ?? Enumerable.Empty<string>())
-                .Append(materialTextures?.DefaultTextureKey)
+            SknMaterialTextureResolution materialTextures = null)
+        {
+            IEnumerable<string> materialTextureKeys = materialTextures == null
+                ? Enumerable.Empty<string>()
+                : materialTextures.MaterialDefinitions.Values
+                    .Select(material => material?.BaseTextureName)
+                    .Append(materialTextures.DefaultMaterialDefinition?.BaseTextureName);
+
+            return (textureKeys ?? Enumerable.Empty<string>())
+                .Concat(materialTextureKeys)
                 .Where(key => !string.IsNullOrWhiteSpace(key) && !IsPresentationTexture(key))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
 
         internal static string NormalizeMaterialKey(string materialName)
         {
@@ -1315,43 +1244,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             };
         }
 
-        private static string SelectColorTexturePath(IReadOnlyList<SknMaterialSampler> samplers) =>
-            (samplers ?? Array.Empty<SknMaterialSampler>())
-                .Where(sampler => RankColorSampler(sampler.TextureName) > 0)
-                .OrderByDescending(sampler => RankColorSampler(sampler.TextureName))
-                .Select(sampler => sampler.TexturePath)
-                .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path));
-
         internal static bool IsNeutralTexturePath(string texturePath) =>
             NormalizeToken(PathUtils.TruncateAtDot(
                 Path.GetFileNameWithoutExtension(texturePath ?? string.Empty))) == "black";
-
-
-        private static int RankColorSampler(string slotName)
-        {
-            string normalized = NormalizeToken(slotName);
-            if (normalized == "maintexture") return 300;
-            if (normalized == "layertex01") return 250;
-            if (normalized == "diffusetexture") return 200;
-
-            if (normalized.Contains("mask") ||
-                normalized.Contains("normal") ||
-                normalized.Contains("spec") ||
-                normalized.Contains("rough") ||
-                normalized.Contains("metal") ||
-                normalized.Contains("matcap") ||
-                normalized.Contains("emissive"))
-            {
-                return 0;
-            }
-
-            return normalized.Contains("basecolor") ||
-                   normalized.Contains("albedo") ||
-                   normalized.Contains("diffuse") ||
-                   normalized.Contains("color")
-                ? 100
-                : 0;
-        }
 
         private static IReadOnlyList<string> SplitSubmeshNames(string value)
         {

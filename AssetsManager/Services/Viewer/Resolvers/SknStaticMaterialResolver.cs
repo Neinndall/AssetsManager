@@ -159,7 +159,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ? null
                 : SknMaterialTextureResolver.MatchTextureKey(baseSampler.TexturePath, textureKeys);
 
-            (Vector4 color, bool hasOpacity) = ResolveColor(parameters);
+            (Vector4 color, bool hasOpacity) = ResolveColor(parameters, effect);
             float alphaCutoff = ResolveAlphaCutoff(parameters, macros, shaderPath);
             Vector2 uvRepeat = ResolveUvRepeat(parameters);
             Vector2 uvScroll = ResolveUvScroll(parameters);
@@ -364,7 +364,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         }
 
         private static (Vector4 Color, bool HasOpacity) ResolveColor(
-            IReadOnlyDictionary<string, Vector4> parameters)
+            IReadOnlyDictionary<string, Vector4> parameters,
+            ModelMaterialEffectDefinition effect)
         {
             Vector4 tint = Vector4.One;
             bool hasTint = TryFirst(parameters, TintNames, out Vector4 tintValue) &&
@@ -378,6 +379,21 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 opacityValue.X >= 0f && opacityValue.X <= 1f;
             if (hasOpacity)
                 tint.W = opacityValue.X;
+
+            // Specialized shader families can supply a base-color fallback that LTK's generic
+            // slot model does not describe. Generic authored tint/opacity always stay authoritative.
+            Vector4 specializedColor = effect?.MaterialTint ?? Vector4.One;
+            if (!hasTint && specializedColor != Vector4.One)
+            {
+                tint.X = specializedColor.X;
+                tint.Y = specializedColor.Y;
+                tint.Z = specializedColor.Z;
+            }
+            if (!hasOpacity && specializedColor.W < 0.9999f)
+            {
+                tint.W = specializedColor.W;
+                hasOpacity = true;
+            }
 
             return (tint, hasOpacity);
         }

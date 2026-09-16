@@ -62,7 +62,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             var metadata = new SknMaterialTextureMetadata(
                 "ASSETS/Characters/Test/Test_TX_CM.tex",
                 null,
-                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
                 new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase))
             {
                 HasDefaultMaterialLink = true
@@ -82,10 +81,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             var metadata = new SknMaterialTextureMetadata(
                 "ASSETS/Characters/Test/Test_TX_CM.tex",
                 null,
-                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["hat"] = new[] { "ASSETS/Characters/Test/Test_Hat_TX_CM.tex" }
-                },
                 new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase))
             {
                 DirectOverrideTexturePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -104,7 +99,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void ModelPart_AuthoredOpaqueMaterialDoesNotInferBlendFromTintAlpha()
+        public void ModelPart_RuntimeOpacityCanBlendAnAuthoredOpaqueMaterial()
         {
             var part = new ModelPart
             {
@@ -112,7 +107,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 MaterialDefinition = ModelMaterialDefinition.TextureOnly("test_tx_cm")
             };
 
-            Assert.False(part.IsAlphaBlended);
+            Assert.True(part.IsAlphaBlended);
         }
 
         [Fact]
@@ -292,6 +287,59 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             Assert.Equal("test_tx_cm", resolved.BaseTextureName);
             Assert.Equal(ModelMaterialBlendMode.Additive, resolved.RenderState.Blending);
+        }
+
+        [Fact]
+        public void Resolve_SwitchedShaderWithMainTextureDisabledKeepsDiffuse()
+        {
+            uint shaderHash = Fnv1a.HashLower(SwitchedShaderPath);
+            SknMaterialDefinition material = CreateMaterial(
+                samplers: new[]
+                {
+                    Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Diffuse_TX_CM.tex"),
+                    Sampler("Main_Texture", "ASSETS/Characters/Test/Main_TX_CM.tex")
+                },
+                switches: new Dictionary<string, bool>
+                {
+                    ["MAINTEX_ON"] = false
+                },
+                pass: Pass(shaderHash: shaderHash),
+                shaderHash: shaderHash);
+
+            ModelMaterialDefinition resolved = Resolve(
+                material,
+                new[] { "diffuse_tx_cm", "main_tx_cm" });
+
+            Assert.Equal("diffuse_tx_cm", resolved.BaseTextureName);
+            Assert.Equal(ModelMaterialBaseRule.Exact, resolved.BaseRule);
+        }
+
+        [Fact]
+        public void Resolve_AppliesTintAndUvGuardsLikeLtk()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                parameters: new Dictionary<string, Vector4>
+                {
+                    ["TintColor"] = new Vector4(0.1f, -0.03f, -0.06f, 1f),
+                    ["MainTex_Tile"] = Vector4.One,
+                    ["ScrollSpeedMainTex"] = new Vector4(0.5f, 0f, 0f, 0f)
+                });
+
+            ModelMaterialDefinition resolved = Resolve(material, Array.Empty<string>());
+
+            Assert.Equal(Vector4.One, resolved.Color);
+            Assert.Equal(Vector2.One, resolved.UvRepeat);
+            Assert.Equal(new Vector2(0.5f, 0f), resolved.UvScroll);
+        }
+
+        [Fact]
+        public void Resolve_MissingPassUsesClassRenderDefaults()
+        {
+            SknMaterialDefinition material = CreateMaterial();
+
+            ModelMaterialDefinition resolved = Resolve(material, Array.Empty<string>());
+
+            Assert.Equal(ModelMaterialRenderState.Default, resolved.RenderState);
         }
 
         [Fact]

@@ -62,8 +62,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "belvethloadscreen_0", "belveth_base_main_tx" });
 
-            Assert.Equal("belveth_base_main_tx", resolution.DefaultTextureKey);
-            Assert.Empty(resolution.Overrides);
+            Assert.Equal("belveth_base_main_tx", resolution.DefaultMaterialDefinition.BaseTextureName);
+            Assert.Empty(resolution.MaterialDefinitions);
         }
 
         [Fact]
@@ -101,8 +101,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 new[] { "aatrox_base_tx_cm", "aatrox_base_sword_tx_cm" },
                 resolvePath);
 
-            Assert.Equal("aatrox_base_tx_cm", resolution.DefaultTextureKey);
-            Assert.Equal("aatrox_base_sword_tx_cm", resolution.Overrides["sword"]);
+            Assert.Equal("aatrox_base_tx_cm", resolution.DefaultMaterialDefinition.BaseTextureName);
+            Assert.Equal("aatrox_base_sword_tx_cm", resolution.ResolveMaterialDefinition("sword").BaseTextureName);
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree, resolvePath);
             AssertContainsPath(defaultTexturePath, metadata.ReferencedTexturePaths);
             AssertContainsPath(materialTexturePath, metadata.ReferencedTexturePaths);
@@ -126,7 +126,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             Assert.Equal(
                 "belveth_skin29_pixies_autumn_tx_cm",
-                resolution.Overrides["autumnpixie"]);
+                resolution.ResolveMaterialDefinition("autumnpixie").BaseTextureName);
         }
 
         [Fact]
@@ -149,7 +149,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "belveth_skin29_tx_cm" });
 
-            Assert.Equal("belveth_skin29_tx_cm", resolution.Overrides["head"]);
+            Assert.Equal("belveth_skin29_tx_cm", resolution.ResolveMaterialDefinition("head").BaseTextureName);
         }
 
         [Fact]
@@ -203,8 +203,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "pyke_skin45_tx_cm" });
 
-            Assert.Contains("wfins", resolution.MaterialOverrideKeys);
-            Assert.DoesNotContain("wfins", resolution.Overrides.Keys);
+            Assert.Contains("wfins", resolution.MaterialDefinitions.Keys);
+            Assert.Equal(ModelMaterialBindingKind.Missing, resolution.ResolveMaterialDefinition("wfins").BindingKind);
+            Assert.Null(resolution.ResolveMaterialDefinition("wfins").BaseTextureName);
         }
 
         [Fact]
@@ -252,7 +253,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "aatrox_skin33_sword_vfx_tx_cm", "aatrox_skin33_tx_cm" });
 
-            Assert.Equal("aatrox_skin33_tx_cm", resolution.DefaultTextureKey);
+            Assert.Equal("aatrox_skin33_tx_cm", resolution.DefaultMaterialDefinition.BaseTextureName);
             AssertContainsPath(
                 materialTexturePath,
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
@@ -290,12 +291,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "aatrox_skin33_tx_cm", "aatrox_skin33_sword_tx_cm", "aatrox_skin33_vfx_tx_cm" });
 
-            // Submesh 0 (Body/Default) falls back to DefaultTextureKey
-            Assert.Equal("aatrox_skin33_tx_cm", resolution.DefaultTextureKey);
+            // Submesh 0 (Body/Default) falls back to the default material texture.
+            Assert.Equal("aatrox_skin33_tx_cm", resolution.DefaultMaterialDefinition.BaseTextureName);
 
-            // Submesh 1 (Sword) resolves via MaterialOverride
-            Assert.True(resolution.Overrides.ContainsKey("sword"));
-            Assert.Equal("aatrox_skin33_sword_tx_cm", resolution.Overrides["sword"]);
+            // Submesh 1 (Sword) resolves via MaterialOverride.
+            Assert.True(resolution.MaterialDefinitions.ContainsKey("sword"));
+            Assert.Equal("aatrox_skin33_sword_tx_cm", resolution.ResolveMaterialDefinition("sword").BaseTextureName);
 
             // Verified metadata contains both referenced texture paths
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
@@ -323,7 +324,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "belveth_skin29_tx_cm" });
 
-            Assert.Equal("belveth_skin29_tx_cm", resolution.Overrides["head"]);
+            Assert.Equal("belveth_skin29_tx_cm", resolution.ResolveMaterialDefinition("head").BaseTextureName);
         }
 
         [Theory]
@@ -364,7 +365,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 new[] { textureName.ToLowerInvariant() });
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
 
-            Assert.Equal(textureName.ToLowerInvariant(), resolution.Overrides[expectedMaterialKey]);
+            Assert.Equal(textureName.ToLowerInvariant(), resolution.ResolveMaterialDefinition(expectedMaterialKey).BaseTextureName);
             AssertContainsPath(texturePath, metadata.ReferencedTexturePaths);
             AssertContainsPath(
                 "ASSETS/Characters/Shared/Overlay.tex",
@@ -372,7 +373,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void Resolve_PrefersMainTextureOverDiffuseMask()
+        public void Resolve_PrioritizesExactDiffuseSamplerLikeLtk()
         {
             const string materialPath = "Characters/Belveth/Skins/Skin29/Materials/Creaturebody";
             BinTreeEmbedded creatureOverride = CreateOverride(
@@ -394,11 +395,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "belveth_skin29_mask_tx_cm", "belveth_skin29_tx_cm" });
 
-            Assert.Equal("belveth_skin29_tx_cm", resolution.Overrides["creaturebody"]);
+            Assert.Equal("belveth_skin29_mask_tx_cm", resolution.ResolveMaterialDefinition("creaturebody").BaseTextureName);
         }
 
         [Fact]
-        public void Resolve_PreservesMaterialTintWithoutEnablingAnEffect()
+        public void Resolve_UsesLtkTintRgbWithoutTreatingTintAlphaAsOpacity()
         {
             const string materialPath = "Characters/Aurora/Skins/Base/Materials/Tinted";
             BinTree tree = CreateSkinTree(
@@ -420,9 +421,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "aurora_base_tx_cm" });
 
-            ModelMaterialEffectDefinition effect = resolution.ResolveEffect("base");
-            Assert.Equal(ModelMaterialEffectKind.None, effect.Kind);
-            Assert.Equal(new Vector4(0.65f, 0.8f, 0.9f, 0.75f), effect.MaterialTint);
+            ModelMaterialDefinition material = resolution.ResolveMaterialDefinition("base");
+            Assert.Equal(ModelMaterialEffectKind.None, material.Effect.Kind);
+            Assert.Equal(new Vector4(0.65f, 0.8f, 0.9f, 1f), material.Color);
+            Assert.Equal(Vector4.One, material.Effect.MaterialTint);
         }
 
         [Fact]
@@ -459,8 +461,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     "aurora_base_mat_hatmask"
                 });
 
-            Assert.False(resolution.Effects.ContainsKey("base"));
-            ModelMaterialEffectDefinition effect = resolution.Effects["hat"];
+            Assert.Equal(
+                ModelMaterialEffectKind.None,
+                resolution.ResolveMaterialDefinition("base").Effect.Kind);
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("hat").Effect;
             Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, effect.Kind);
             Assert.Equal("aurora_base_mat_tile01", effect.TextureName);
             Assert.Equal("aurora_base_mat_hatmask", effect.MaskTextureName);
@@ -550,8 +554,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 CreateSeraphineIridescentBodyTree(includeAdditiveTint: false),
                 SeraphineBodyTextureKeys);
 
-            Assert.Equal("seraphine_skin69_body_tx_cm", resolution.Overrides["body"]);
-            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.Equal("seraphine_skin69_body_tx_cm", resolution.ResolveMaterialDefinition("body").BaseTextureName);
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.False((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
             Assert.True((effect.Kind & ModelMaterialEffectKind.Iridescence) != 0);
             Assert.Equal("seraphine_skin69_cloth_iridescent", effect.Iridescence.LutTextureName);
@@ -571,7 +575,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 CreateSeraphineIridescentBodyTree(includeAdditiveTint: true),
                 SeraphineBodyTextureKeys);
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
             Assert.True((effect.Kind & ModelMaterialEffectKind.Iridescence) != 0);
             Assert.Equal("seraphine_skin69_cloth_tx_cm_mask", effect.Iridescence.MaskTextureName);
@@ -586,7 +590,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     includeExplicitWhiteTint: true),
                 SeraphineBodyTextureKeys);
 
-            Assert.True((resolution.Effects["body"].Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
+            Assert.True((resolution.ResolveMaterialDefinition("body").Effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
         }
 
         [Fact]
@@ -598,7 +602,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     includeZeroAdditiveSpeed: true),
                 SeraphineBodyTextureKeys);
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.False((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
             Assert.Equal("seraphine_skin69_cloth_tx_cm_mask", effect.Iridescence.MaskTextureName);
         }
@@ -612,7 +616,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     includeIridescenceSwitches: false),
                 SeraphineBodyTextureKeys);
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.False(effect.Iridescence.UsesPulse);
             Assert.False(effect.Iridescence.UsesLocalizedAlpha);
             Assert.False(effect.RequiresAlphaBlend);
@@ -707,11 +711,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             if (!expectFresnel)
             {
-                Assert.DoesNotContain("body", resolution.Effects);
+                Assert.Equal(
+                    ModelMaterialEffectKind.None,
+                    resolution.ResolveMaterialDefinition("body").Effect.Kind);
                 return;
             }
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
             Assert.Equal(maskName, effect.MaskTextureName);
         }
@@ -735,7 +741,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "test_tx_cm" });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
             Assert.Null(effect.MaskTextureName);
         }
@@ -769,7 +775,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "test_tx_cm", "test_scroll", "test_scroll_mask" });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
             Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
             Assert.Equal("test_scroll_mask", effect.MaskTextureName);
@@ -810,7 +816,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     "brand_skin53_hairalpha_tx_cm"
                 });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["hair"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("hair").Effect;
             Assert.Equal(
                 ModelMaterialEffectKind.Fresnel |
                 ModelMaterialEffectKind.Bloom |
@@ -862,7 +868,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     "aatrox_base_r_mat_gradient"
                 });
 
-            Assert.DoesNotContain("wings", resolution.Effects);
+            Assert.Equal(
+                ModelMaterialEffectKind.None,
+                resolution.ResolveMaterialDefinition("wings").Effect.Kind);
         }
 
         [Fact]
@@ -903,7 +911,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     "gradient_test_01"
                 });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.Equal(ModelMaterialEffectKind.GradientPulse, effect.Kind);
             Assert.Equal("gradient_test_01", effect.TextureName);
             Assert.Equal("aatrox_base_r_body_mask", effect.MaskTextureName);
@@ -952,7 +960,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     "gradient_test_01"
                 });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["wings"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("wings").Effect;
             Assert.Equal(ModelMaterialEffectKind.GradientPulse, effect.Kind);
             Assert.Equal(new Vector2(-0.5f, -0.5f), effect.ScrollSpeed);
             Assert.Equal(0.785f, effect.DissolveThreshold);
@@ -990,7 +998,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     "lux_scroll_mask"
                 });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, effect.Kind);
             Assert.Equal("lux_scroll", effect.TextureName);
             Assert.Equal("lux_scroll_mask", effect.MaskTextureName);
@@ -1026,7 +1034,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "pyke_skin45_z_material_colors_03", "pyke_skin45_z_material_flames_03" });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["wfins"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("wfins").Effect;
             Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, effect.Kind);
             Assert.Equal("pyke_skin45_z_material_flames_03", effect.TextureName);
             Assert.Null(effect.MaskTextureName);
@@ -1089,7 +1097,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "missfortune_skin48_tx_cm", "dissolve_texture" });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.Equal(ModelMaterialEffectKind.Dissolve, effect.Kind);
             Assert.Equal("dissolve_texture", effect.TextureName);
             Assert.Equal(0.35f, effect.DissolveThreshold);
@@ -1129,8 +1137,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "gwen_base_main_tx_cm", "gwen_base_r_smokeerode" });
 
-            Assert.Equal("gwen_base_main_tx_cm", resolution.Overrides["body"]);
-            Assert.DoesNotContain("body", resolution.Effects);
+            Assert.Equal("gwen_base_main_tx_cm", resolution.ResolveMaterialDefinition("body").BaseTextureName);
+            Assert.Equal(
+                ModelMaterialEffectKind.None,
+                resolution.ResolveMaterialDefinition("body").Effect.Kind);
         }
 
         [Fact]
@@ -1167,7 +1177,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     "aatrox_skin37_sword_emissionmask"
                 });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["sword"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("sword").Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.Emission) != 0);
             Assert.False((effect.Kind & ModelMaterialEffectKind.Bloom) != 0);
             Assert.Equal("aatrox_skin37_sword_distortion", effect.EmissionTextureName);
@@ -1205,7 +1215,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "aatrox_skin37_sword_tx_cm" });
 
-            Assert.DoesNotContain("sword", resolution.Effects);
+            Assert.Equal(
+                ModelMaterialEffectKind.None,
+                resolution.ResolveMaterialDefinition("sword").Effect.Kind);
         }
 
         [Fact]
@@ -1238,8 +1250,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "gun25_gold_tx_cm" });
 
-            Assert.Equal("gun25_gold_tx_cm", resolution.Overrides["cgun25"]);
-            Assert.DoesNotContain("cgun25", resolution.Effects);
+            Assert.Equal("gun25_gold_tx_cm", resolution.ResolveMaterialDefinition("cgun25").BaseTextureName);
+            Assert.Equal(
+                ModelMaterialEffectKind.None,
+                resolution.ResolveMaterialDefinition("cgun25").Effect.Kind);
         }
 
         [Fact]
@@ -1269,7 +1283,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     "belveth_skin29_ult_bloommask_tx_cm"
                 });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["ult"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("ult").Effect;
             Assert.Equal(ModelMaterialEffectKind.Bloom, effect.Kind);
             Assert.Equal("belveth_skin29_ult_bloommask_tx_cm", effect.MaskTextureName);
             Assert.Equal(5f, effect.BloomIntensity);
@@ -1308,7 +1322,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     "belveth_transition_state"
                 });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["armor"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("armor").Effect;
             Assert.Equal(ModelMaterialEffectKind.Dissolve, effect.Kind);
             Assert.Equal("belveth_transition_noise", effect.TextureName);
             Assert.Equal("belveth_transition_state", effect.MaskTextureName);
@@ -1346,7 +1360,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "brand_skin53_tx_cm", "brand_skin53_hair_tx_cm", "cloudfm_tx_cm" });
 
-            ModelMaterialEffectDefinition effect = resolution.Effects["hair"];
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("hair").Effect;
             Assert.Equal(ModelMaterialEffectKind.FlowMap, effect.Kind);
             Assert.Equal("cloudfm_tx_cm", effect.TextureName);
             Assert.Equal(new Vector2(0.2f, -0.1f), effect.ScrollSpeed);
@@ -1380,7 +1394,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "locke_base_main_tx_cm", "flowmap", "locke_additionalscrollcombo" });
 
-            Assert.Empty(resolution.Effects);
+            Assert.Equal(
+                ModelMaterialEffectKind.None,
+                resolution.DefaultMaterialDefinition.Effect.Kind);
+            Assert.All(
+                resolution.MaterialDefinitions.Values,
+                material => Assert.Equal(ModelMaterialEffectKind.None, material.Effect.Kind));
         }
 
         [Fact]
@@ -1411,14 +1430,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         public void GetSelectableTextureCandidatesIncludesResolvedPrimaryMaterialTextures()
         {
             var resolution = new SknMaterialTextureResolution(
-                "pyke_skin01_tx_cm",
-                new Dictionary<string, string>
+                ModelMaterialDefinition.TextureOnly("pyke_skin01_tx_cm"),
+                new Dictionary<string, ModelMaterialDefinition>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["pykeskin01scrollmat"] = "pyke_base_scroll_tx_cm"
-                },
-                new Dictionary<string, ModelMaterialEffectDefinition>(),
-                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-                ModelMaterialEffectDefinition.None);
+                    ["pykeskin01scrollmat"] = ModelMaterialDefinition.TextureOnly("pyke_base_scroll_tx_cm")
+                });
 
             IReadOnlyList<string> candidates =
                 SknResolver.GetSelectableTextureCandidates(
@@ -1830,11 +1846,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "janna_skin67_tx_cm" });
 
-            Assert.True(resolution.MaterialOverrideKeys.Contains("glass"));
-            ModelMaterialEffectDefinition effect = resolution.ResolveEffect("glass");
+            Assert.True(resolution.MaterialDefinitions.ContainsKey("glass"));
+            ModelMaterialDefinition material = resolution.ResolveMaterialDefinition("glass");
+            ModelMaterialEffectDefinition effect = material.Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
-            Assert.True(effect.MaterialTint.W < 0.1f);
-            Assert.Equal(0.31f, effect.MaterialTint.X, 2);
+            Assert.True(material.Color.W < 0.1f);
+            Assert.Equal(0.31f, material.Color.X, 2);
             Assert.Equal(1f, effect.FresnelColor.X, 2);
         }
 

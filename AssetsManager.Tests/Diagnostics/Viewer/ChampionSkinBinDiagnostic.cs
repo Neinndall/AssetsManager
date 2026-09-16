@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
@@ -106,10 +107,13 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 .ToArray();
             SknMaterialTextureResolution resolution =
                 SknMaterialTextureResolver.Resolve(metadata, textureKeys);
-            Console.WriteLine($"  ResolvedEffects={resolution.Effects.Count}");
-            foreach (var (submesh, effect) in resolution.Effects)
+            var resolvedEffects = resolution.MaterialDefinitions
+                .Where(pair => pair.Value?.Effect?.Kind != ModelMaterialEffectKind.None)
+                .ToArray();
+            Console.WriteLine($"  ResolvedEffects={resolvedEffects.Length}");
+            foreach ((string submesh, ModelMaterialDefinition material) in resolvedEffects)
             {
-                Console.WriteLine($"    {submesh}: {effect.Kind}");
+                Console.WriteLine($"    {submesh}: {material.Effect.Kind}");
             }
         }
 

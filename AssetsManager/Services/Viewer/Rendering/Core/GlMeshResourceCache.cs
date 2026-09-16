@@ -327,8 +327,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         private void EnsureEffectTextures(ModelPart part, PartResources resources)
         {
-            ModelMaterialEffectDefinition effect =
-                part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
+            ModelMaterialEffectDefinition effect = ResolveMaterialEffect(part);
             string effectTextureKey = effect.Kind == ModelMaterialEffectKind.None
                 ? null
                 : effect.TextureName;
@@ -369,8 +368,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         private void EnsureEmissionTextures(ModelPart part, PartResources resources)
         {
-            ModelMaterialEffectDefinition effect =
-                part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
+            ModelMaterialEffectDefinition effect = ResolveMaterialEffect(part);
             bool hasEmission = (effect.Kind & ModelMaterialEffectKind.Emission) != 0;
             string emissionTextureKey = hasEmission ? effect.EmissionTextureName : null;
             string emissionMaskTextureKey = hasEmission ? effect.EmissionMaskTextureName : null;
@@ -412,8 +410,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         private void EnsureIridescenceTextures(ModelPart part, PartResources resources)
         {
-            ModelMaterialEffectDefinition effect =
-                part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
+            ModelMaterialEffectDefinition effect = ResolveMaterialEffect(part);
             ModelIridescenceDefinition iridescence = effect.Iridescence;
             string iridescenceTextureKey = iridescence?.LutTextureName;
             string iridescenceMaskTextureKey = iridescence?.MaskTextureName;
@@ -455,6 +452,12 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                         resources.LoadedIridescenceMaskBitmap,
                         premultiplyAlpha: false));
             }
+        }
+
+        private static ModelMaterialEffectDefinition ResolveMaterialEffect(ModelPart part)
+        {
+            // Specialized SKN layers are owned by the authored material definition.
+            return part.MaterialDefinition?.Effect ?? ModelMaterialEffectDefinition.None;
         }
 
         private void ReleaseIridescenceTextures(PartResources resources)

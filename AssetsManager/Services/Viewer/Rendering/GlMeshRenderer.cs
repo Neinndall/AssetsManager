@@ -84,6 +84,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uMaterialUvScroll;
         private int _uMaterialUnlit;
         private int _uMaterialPremultipliedAlpha;
+        private int _uMaterialSrgb;
         private int _uUsesBakedDiffuse;
         private int _uHasVertexColor;
         private bool _ready;
@@ -262,6 +263,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uMaterialUvScroll = gl.GetUniformLocation(_program, "uMaterialUvScroll");
             _uMaterialUnlit = gl.GetUniformLocation(_program, "uMaterialUnlit");
             _uMaterialPremultipliedAlpha = gl.GetUniformLocation(_program, "uMaterialPremultipliedAlpha");
+            _uMaterialSrgb = gl.GetUniformLocation(_program, "uMaterialSrgb");
             _uUsesBakedDiffuse = gl.GetUniformLocation(_program, "uUsesBakedDiffuse");
             _uHasVertexColor = gl.GetUniformLocation(_program, "uHasVertexColor");
         }
@@ -325,10 +327,12 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (resources.Texture != 0)
                     ApplyBaseTextureWrap(material);
 
-                ModelMaterialEffectDefinition effect = material?.Effect ??
-                    part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
+                ModelMaterialEffectDefinition effect = material?.Effect ?? ModelMaterialEffectDefinition.None;
                 ModelIridescenceDefinition iridescence = effect.Iridescence;
-                Vector4 colorTint = material?.Color ?? part.ColorTint;
+                // Authored SKN color and runtime Viewer/Diff tint are separate concerns and combine multiplicatively.
+                Vector4 colorTint = material != null
+                    ? material.Color * part.ColorTint
+                    : part.ColorTint;
                 float alphaCutoff = material?.AlphaCutoff ??
                     (part.IsAlphaBlended ? 0f : part.AlphaCutoff);
                 Vector2 uvRepeat = material?.UvRepeat ?? Vector2.One;
@@ -342,6 +346,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Uniform1(
                     _uMaterialPremultipliedAlpha,
                     material?.RenderState.PremultipliedAlpha == true ? 1 : 0);
+                // Character textures and authored tint follow LTK's sRGB working/output semantics.
+                _gl.Uniform1(_uMaterialSrgb, material != null ? 1 : 0);
                 _gl.Uniform1(_uUsesBakedDiffuse, part.UsesBakedDiffuse ? 1 : 0);
                 _gl.Uniform1(_uHasVertexColor, resources.ColorVbo != 0 ? 1 : 0);
 
@@ -459,12 +465,11 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
 
             ModelMaterialRenderState state = material.RenderState;
-            ModelMaterialEffectDefinition effect = material.Effect ??
-                part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
-            bool effectForcesBlend =
+            ModelMaterialEffectDefinition effect = material.Effect ?? ModelMaterialEffectDefinition.None;
+            bool runtimeForcesBlend =
                 state.Blending == ModelMaterialBlendMode.Opaque &&
-                effect.RequiresAlphaBlend;
-            ModelMaterialBlendMode blending = effectForcesBlend
+                (effect.RequiresAlphaBlend || part.ColorTint.W < 0.999f);
+            ModelMaterialBlendMode blending = runtimeForcesBlend
                 ? ModelMaterialBlendMode.Normal
                 : state.Blending;
 
@@ -494,9 +499,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             else
                 _gl.Disable(EnableCap.DepthTest);
 
-            // Specialized alpha effects predate the generic material model and relied on
-            // transparent depth writes being disabled; keep that only when the effect is the reason for blending.
-            _gl.DepthMask(effectForcesBlend ? false : state.DepthWrite);
+            // Runtime opacity and specialized alpha layers use the transparent pass without overriding authored depth state otherwise.
+            _gl.DepthMask(runtimeForcesBlend ? false : state.DepthWrite);
 
             if (state.DoubleSided)
             {

@@ -104,6 +104,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / SKN materials now use one authored material pipeline with LTK-aligned sRGB texture/tint/output handling across model loads.
   - Viewer / SKN materials now honor authored blend, depth, culling, UV tiling/scroll, wrapping, alpha test, and premultiplied alpha across model loads.
   - 3D Mesh Analyzer / Mesh Parts now uses a compact HUD layout with clearer change states and quick Show All / Hide All controls.
   - 3D Mesh Analyzer / Mesh Parts now identifies per-part NEW-only and OLD-only triangle deltas with precise topology matching and ownership tooltips.

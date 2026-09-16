@@ -202,7 +202,9 @@ namespace AssetsManager.Services.Viewer.Loading
         {
             var availableTextureNames = new ObservableRangeCollection<string>(
                 SknMaterialTextureResolver.GetSelectableTextureCandidates(selectableTextureKeys, materialTextures));
-            string defaultTextureKey = materialTextures?.DefaultTextureKey;
+            string defaultTextureKey = materialTextures != null
+                ? materialTextures.DefaultMaterialDefinition.BaseTextureName
+                : SknMaterialTextureResolver.FindBaseDiffuseTextureKey(loadedTextures.Keys.ToList());
 
             var dataList = new List<SubmeshData>();
             var vertexAccessor = skinnedMesh.VerticesView.GetAccessor(VertexElement.POSITION.Name);
@@ -326,9 +328,7 @@ namespace AssetsManager.Services.Viewer.Loading
                         AllTextures = loadedTextures,
                         AvailableTextureNames = availableTextureNames,
                         SelectedTextureName = data.MaterialDefinition.BaseTextureName,
-                        MaterialDefinition = data.MaterialDefinition,
-                        MaterialEffect = data.MaterialDefinition.Effect,
-                        ColorTint = data.MaterialDefinition.Color
+                        MaterialDefinition = data.MaterialDefinition
                     };
 
                     TextureUtils.UpdateMaterial(modelPart);
@@ -342,40 +342,6 @@ namespace AssetsManager.Services.Viewer.Loading
                 _logService.LogDebug("--- Finished displaying model ---");
                 return sceneModel;
             });
-        }
-
-        private string ResolveMaterialTexture(
-            string materialName,
-            string defaultTextureKey,
-            IReadOnlyDictionary<string, string> materialTextureOverrides,
-            IReadOnlySet<string> materialOverrideKeys,
-            Dictionary<string, BitmapSource> loadedTextures)
-        {
-            string normalizedMaterialName = SknMaterialTextureResolver.NormalizeMaterialKey(materialName);
-            if (!string.IsNullOrEmpty(normalizedMaterialName) &&
-                materialTextureOverrides != null &&
-                materialTextureOverrides.TryGetValue(normalizedMaterialName, out string overrideTextureKey) &&
-                loadedTextures.ContainsKey(overrideTextureKey))
-            {
-                _logService.LogDebug($"Found material-bin texture '{overrideTextureKey}' for submesh '{materialName}'.");
-                return overrideTextureKey;
-            }
-
-            if (!string.IsNullOrEmpty(normalizedMaterialName) &&
-                materialOverrideKeys?.Contains(normalizedMaterialName) == true)
-            {
-                _logService.LogDebug(
-                    $"Material-bin override for submesh '{materialName}' could not be resolved; " +
-                    "the skin default will not be substituted.");
-                return null;
-            }
-
-            if (defaultTextureKey != null)
-            {
-                _logService.LogDebug($"Using skin-bin default texture '{defaultTextureKey}' for submesh '{materialName}'.");
-            }
-
-            return defaultTextureKey;
         }
 
         private SknMaterialTextureResolution LoadMaterialTextures(
@@ -442,9 +408,9 @@ namespace AssetsManager.Services.Viewer.Loading
                 SknMaterialTextureResolution resolution =
                     SknMaterialTextureResolver.Resolve(metadata, loadedTextures.Keys);
                 _logService.LogDebug(
-                    $"Loaded skin texture metadata from '{Path.GetFileName(skinBinPath)}': " +
-                    $"default='{resolution.DefaultTextureKey ?? "none"}', " +
-                    $"overrides={resolution.Overrides.Count}, effects={resolution.Effects.Count}.");
+                    $"Loaded skin material metadata from '{Path.GetFileName(skinBinPath)}': " +
+                    $"default='{resolution.DefaultMaterialDefinition?.BaseTextureName ?? "none"}', " +
+                    $"submeshMaterials={resolution.MaterialDefinitions.Count}.");
                 return resolution;
             }
             catch (Exception ex)

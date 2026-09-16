@@ -119,6 +119,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					uniform vec2 uMaterialUvScroll;
 					uniform int uMaterialUnlit;
 					uniform int uMaterialPremultipliedAlpha;
+					uniform int uMaterialSrgb;
 					uniform int uUsesBakedDiffuse;
 					uniform vec3 uLightDir;
 					uniform vec3 uLightColor;
@@ -130,6 +131,26 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					const float GRADIENT_PULSE_SCALE = 0.1;
 					const float EMISSION_TEXTURE_SCALE = 0.5;
 					out vec4 fragColor;
+					vec3 srgbToLinear(vec3 value){
+						vec3 low = value / 12.92;
+						vec3 high = pow((value + 0.055) / 1.055, vec3(2.4));
+						return mix(high, low, lessThanEqual(value, vec3(0.04045)));
+					}
+					vec3 linearToSrgb(vec3 value){
+						value = max(value, vec3(0.0));
+						vec3 low = value * 12.92;
+						vec3 high = 1.055 * pow(value, vec3(1.0 / 2.4)) - 0.055;
+						return mix(high, low, lessThanEqual(value, vec3(0.0031308)));
+					}
+					vec4 readBaseTexture(vec2 uv){
+						vec4 sampleValue = texture(uTex, uv);
+						// Viewer textures are uploaded premultiplied for the legacy WPF/OpenGL path.
+						// Recover straight authored RGB before applying LTK's sRGB character semantics.
+						sampleValue.rgb /= max(sampleValue.a, 0.0039215686);
+						if (uMaterialSrgb != 0)
+							sampleValue.rgb = srgbToLinear(sampleValue.rgb);
+						return sampleValue;
+					}
 					float effectHash(vec2 value){
 							return fract(sin(dot(value, vec2(127.1, 311.7))) * 43758.5453);
 					}
@@ -152,10 +173,12 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					}
 					void main(){
 							vec2 materialUv = vUv * uMaterialUvRepeat + uMaterialUvScroll * uEffectTime;
-							vec4 texColor = texture(uTex, materialUv);
+							vec4 texColor = readBaseTexture(materialUv);
 							if (texColor.a * vColor.a * uColorTint.a < uAlphaCutoff) discard;
-							texColor.rgb /= max(texColor.a, 0.0039215686);
-							texColor *= vColor * uColorTint;
+							vec3 tintRgb = uMaterialSrgb != 0
+								? srgbToLinear(uColorTint.rgb)
+								: uColorTint.rgb;
+							texColor *= vec4(vColor.rgb * tintRgb, vColor.a * uColorTint.a);
 							float diff1 = max(dot(vNormal, uLightDir), 0.0);
 							float diff2 = max(dot(vNormal, uLightDir2), 0.0);
 							vec3 finalLight = clamp(uAmbient + diff1 * uLightColor + diff2 * uLightColor2, 0.0, 1.0);
@@ -213,7 +236,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 										uEffectTex,
 										effectUv + uEffectScrollSpeed * uEffectTime).rg * 2.0 - 1.0;
 									vec2 flowUv = materialUv + flow * uFlowIntensity;
-									vec3 flowColor = texture(uTex, flowUv).rgb *
+									vec3 flowColor = readBaseTexture(flowUv).rgb *
 										(uMaterialUnlit != 0 ? vec3(1.0) : finalLight);
 									finalColor = mix(
 										finalColor,
@@ -319,6 +342,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 							if (texColor.a <= 0.0001) discard;
 							if (uMaterialPremultipliedAlpha != 0)
 								finalColor *= texColor.a;
+							if (uMaterialSrgb != 0)
+								finalColor = linearToSrgb(finalColor);
 							fragColor = vec4(finalColor, texColor.a);
 				}";
     }
