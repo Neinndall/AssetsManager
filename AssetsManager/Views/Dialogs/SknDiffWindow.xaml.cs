@@ -114,12 +114,15 @@ namespace AssetsManager.Views.Dialogs
             }
             catch (TimeoutException)
             {
-                _logService?.LogWarning("[3D-DIFF] Initial OpenGL frame timed out; keeping the live render scheduler active.");
+                // Keep the live scheduler running so the viewports can recover on a later frame.
+                _logService.LogWarning("Initial OpenGL frame timed out; keeping the live render scheduler active.");
             }
 
+            // Move focus to the analyzer only after both viewport surfaces had a chance to render.
             Activate();
             Focus();
 
+            // Close the loading handover once the analyzer is ready for interaction.
             if (LoadingWindow != null)
             {
                 try
@@ -128,7 +131,7 @@ namespace AssetsManager.Views.Dialogs
                 }
                 catch (Exception ex)
                 {
-                    _logService?.LogError(ex, "[3D-DIFF] Failed to close loading window after initial render.");
+                    _logService.LogError(ex, "Failed to close loading window after initial render.");
                 }
                 LoadingWindow = null;
             }
@@ -138,6 +141,7 @@ namespace AssetsManager.Views.Dialogs
         {
             base.OnClosed(e);
 
+            // Close any remaining loading handover before releasing comparison resources.
             if (LoadingWindow != null)
             {
                 try
@@ -146,7 +150,8 @@ namespace AssetsManager.Views.Dialogs
                 }
                 catch (Exception ex)
                 {
-                    _logService?.LogError(ex, "[3D-DIFF] Failed to close loading window during shutdown.");
+                    // Report shutdown cleanup failures without interrupting the window close path.
+                    _logService.LogError(ex, "Failed to close loading window during shutdown.");
                 }
                 LoadingWindow = null;
             }
@@ -343,7 +348,8 @@ namespace AssetsManager.Views.Dialogs
             }
             catch (Exception ex)
             {
-                _logService?.LogError(ex, $"[3D-DIFF] [{label}] Failed to load model: {path}");
+                // Preserve the side label so model-loading failures remain easy to correlate.
+                _logService.LogError(ex, $"[{label}] Failed to load model: {path}");
                 return null;
             }
             finally
@@ -354,7 +360,8 @@ namespace AssetsManager.Views.Dialogs
                 }
                 catch (Exception ex)
                 {
-                    _logService?.LogError(ex, $"[3D-DIFF] [{label}] Failed to remove temporary model: {tempFile}");
+                    // Keep temporary-file cleanup failures visible without hiding the original load result.
+                    _logService.LogError(ex, $"[{label}] Failed to remove temporary model: {tempFile}");
                 }
             }
         }
