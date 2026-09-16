@@ -114,6 +114,7 @@ namespace AssetsManager.Views.Controls.Viewer
             RenderScene(framebufferWidth, framebufferHeight, frameDelta, updateVfx: true);
             RecordRenderedFrame();
             ProcessPendingSnapshot();
+            _firstRenderedFrame.TrySetResult(true);
         }
 
         private void RenderScene(int framebufferWidth, int framebufferHeight, TimeSpan frameDelta, bool updateVfx)
@@ -314,6 +315,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private ViewportModelInteractionController _modelInteractionController;
         private bool _isCleanedUp;
         private bool _isOpenTkStarted;
+        private TaskCompletionSource<bool> _firstRenderedFrame = CreateFrameCompletionSource();
 
         private struct ModelUpdateKey
         {
@@ -404,38 +406,37 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ApplyFpsLimitMode()
         {
-            if (_isCleanedUp || OpenTkControl == null) return;
+            if (_isCleanedUp || !_isOpenTkStarted || OpenTkControl == null) return;
 
             ResetRenderTiming();
 
-            if (_viewModel.LimitFps)
+            // Drive rendering from one AssetsManager-owned scheduler instead of relying on
+            // GLWpfControl.IsVisibleChanged, which can be missed when Start happens late.
+            OpenTkControl.RenderContinuously = false;
+            if (!_isCompositionTargetHooked)
             {
-                OpenTkControl.RenderContinuously = false;
-                if (!_isCompositionTargetHooked)
-                {
-                    CompositionTarget.Rendering += OnCompositionTargetRendering;
-                    _isCompositionTargetHooked = true;
-                }
-            }
-            else
-            {
-                if (_isCompositionTargetHooked)
-                {
-                    CompositionTarget.Rendering -= OnCompositionTargetRendering;
-                    _isCompositionTargetHooked = false;
-                }
-                OpenTkControl.RenderContinuously = true;
+                CompositionTarget.Rendering += OnCompositionTargetRendering;
+                _isCompositionTargetHooked = true;
             }
         }
 
         private void OnCompositionTargetRendering(object sender, EventArgs e)
         {
-            if (_isCleanedUp || OpenTkControl == null || !OpenTkControl.IsLoaded || !OpenTkControl.IsVisible)
+            if (_isCleanedUp || !_isOpenTkStarted || OpenTkControl == null ||
+                !OpenTkControl.IsLoaded || !OpenTkControl.IsVisible)
+            {
                 return;
+            }
 
             TimeSpan now = _renderStopwatch.Elapsed;
-            TimeSpan targetFrameTime = TimeSpan.FromSeconds(1.0 / 60.0);
+            if (!_viewModel.LimitFps)
+            {
+                _lastInvalidatedAt = now;
+                OpenTkControl.InvalidateVisual();
+                return;
+            }
 
+            TimeSpan targetFrameTime = TimeSpan.FromSeconds(1.0 / 60.0);
             if (_lastInvalidatedAt == TimeSpan.Zero || now >= _nextLimitedFrame)
             {
                 _nextLimitedFrame = _nextLimitedFrame == TimeSpan.Zero || now - _nextLimitedFrame > targetFrameTime * 4
@@ -447,7 +448,18 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private static TaskCompletionSource<bool> CreateFrameCompletionSource() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         internal OpenTK.Windowing.Common.IGraphicsContext OpenTkContext => OpenTkControl?.Context;
+
+        internal Task WaitForFirstRenderedFrameAsync() => _firstRenderedFrame.Task;
+
+        internal void RequestRender()
+        {
+            if (_isOpenTkStarted && OpenTkControl != null)
+                OpenTkControl.InvalidateVisual();
+        }
 
         internal void EnsureOpenTkStarted(OpenTK.Windowing.Common.IGraphicsContext contextToUse = null)
         {
@@ -458,7 +470,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 MajorVersion = 3,
                 MinorVersion = 3,
                 Profile = OpenTK.Windowing.Common.ContextProfile.Core,
-                RenderContinuously = _viewModel?.LimitFps != true,
+                RenderContinuously = false,
                 ContextToUse = contextToUse
             };
 
@@ -484,6 +496,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             EnsureOpenTkStarted();
             ApplyFpsLimitMode();
+            OpenTkControl.InvalidateVisual();
             _fpsStopwatch.Restart();
         }
 
