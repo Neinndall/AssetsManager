@@ -29,6 +29,7 @@ namespace AssetsManager.Views.Dialogs
         private SceneModel _newScene;
         private SceneModel _combinedNewScene;
         private readonly List<MeshPartDiffItem> _partItems = new();
+        private bool _isBulkUpdatingMeshParts;
         private readonly List<SceneModel> _diffOverlayScenes = new();
         private readonly Dictionary<SceneModel, string> _diffOverlayOwners = new();
         private readonly Dictionary<SceneModel, ViewerViewportControl> _diffOverlayViewports = new();
@@ -761,8 +762,31 @@ namespace AssetsManager.Views.Dialogs
             MeshVisibilityPanel.Visibility = Visibility.Collapsed;
         }
 
+        private void ShowAllMeshParts_Click(object sender, RoutedEventArgs e) =>
+            SetAllMeshPartsVisibility(true);
+
+        private void HideAllMeshParts_Click(object sender, RoutedEventArgs e) =>
+            SetAllMeshPartsVisibility(false);
+
+        private void SetAllMeshPartsVisibility(bool isVisible)
+        {
+            _isBulkUpdatingMeshParts = true;
+            try
+            {
+                foreach (MeshPartDiffItem item in _partItems)
+                    item.IsVisible = isVisible;
+            }
+            finally
+            {
+                _isBulkUpdatingMeshParts = false;
+            }
+
+            ApplyMeshPartVisibility();
+        }
+
         private void MeshPartVisibility_Changed(object sender, RoutedEventArgs e)
         {
+            if (_isBulkUpdatingMeshParts) return;
             ApplyMeshPartVisibility();
         }
 
@@ -828,6 +852,8 @@ namespace AssetsManager.Views.Dialogs
                     int triangles = SknMeshDiffAnalyzer.GetTriangleCount(newPart.Geometry?.Geometry as MeshGeometry3D);
                     diffBrush = new SolidColorBrush(Colors.Green);
                     item.DeltaText = $"+{triangles:N0}";
+                    item.StatusLabel = "NEW";
+                    item.SortRank = 0;
                     item.StatusText = $"New mesh part — {triangles:N0} triangles only in NEW";
                 }
                 else if (oldPart != null && newPart == null)
@@ -835,6 +861,8 @@ namespace AssetsManager.Views.Dialogs
                     int triangles = SknMeshDiffAnalyzer.GetTriangleCount(oldPart.Geometry?.Geometry as MeshGeometry3D);
                     diffBrush = new SolidColorBrush(Colors.Red);
                     item.DeltaText = $"-{triangles:N0}";
+                    item.StatusLabel = "REMOVED";
+                    item.SortRank = 0;
                     item.StatusText = $"Removed mesh part — {triangles:N0} triangles only in OLD";
                 }
                 else if (oldPart != null && newPart != null)
@@ -850,17 +878,23 @@ namespace AssetsManager.Views.Dialogs
 
                         diffBrush = new SolidColorBrush(Colors.DodgerBlue);
                         item.DeltaText = $"+{addedTriangles:N0}/-{removedTriangles:N0}";
+                        item.StatusLabel = "MODIFIED";
+                        item.SortRank = 0;
                         item.StatusText = $"Modified mesh part — {addedTriangles:N0} NEW-only triangles, {removedTriangles:N0} OLD-only triangles";
                     }
                     else
                     {
                         diffBrush = new SolidColorBrush(Color.FromRgb(100, 100, 100));
+                        item.StatusLabel = "UNCHANGED";
+                        item.SortRank = 1;
                         item.StatusText = "Unchanged mesh part";
                     }
                 }
                 else
                 {
                     diffBrush = Brushes.Transparent;
+                    item.StatusLabel = "UNKNOWN";
+                    item.SortRank = 1;
                     item.StatusText = string.Empty;
                 }
 
@@ -869,6 +903,17 @@ namespace AssetsManager.Views.Dialogs
 
                 _partItems.Add(item);
             }
+
+            _partItems.Sort((left, right) =>
+            {
+                int rankComparison = left.SortRank.CompareTo(right.SortRank);
+                return rankComparison != 0
+                    ? rankComparison
+                    : StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+            });
+
+            int changedCount = _partItems.Count(item => item.SortRank == 0);
+            MeshPartsSummaryText.Text = $"{_partItems.Count:N0} parts · {changedCount:N0} changed";
 
             MeshPartsItemsControl.ItemsSource = null;
             MeshPartsItemsControl.ItemsSource = _partItems;
@@ -1131,7 +1176,9 @@ namespace AssetsManager.Views.Dialogs
         public string Name { get; set; }
         public SolidColorBrush DiffColorBrush { get; set; }
         public string StatusText { get; set; }
+        public string StatusLabel { get; set; } = string.Empty;
         public string DeltaText { get; set; } = string.Empty;
+        public int SortRank { get; set; } = 1;
 
         private bool _isVisible = true;
         public bool IsVisible

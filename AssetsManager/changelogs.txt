@@ -104,6 +104,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - 3D Mesh Analyzer / Mesh Parts now uses a compact HUD layout with clearer change states and quick Show All / Hide All controls.
   - 3D Mesh Analyzer / Mesh Parts now identifies per-part NEW-only and OLD-only triangle deltas with precise topology matching and ownership tooltips.
   - Hash Guessing Lab / Expanded Game Texture Build List learning coverage to capture all attested recurring skin and companion texture patterns.
   - Hash Guessing Lab / Accelerated WAD grep by skipping decompression of known media chunks without path evidence.
