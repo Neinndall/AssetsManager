@@ -127,24 +127,23 @@
                 </Border>
             </Grid>
 
-            <!-- Floating Overlay Control Panel (Mesh Visibility Checklist) -->
-            <Border x:Name="MeshVisibilityPanel" 
-                    HorizontalAlignment="Right" 
-                    VerticalAlignment="Top" 
-                    Width="280"
-                    MaxHeight="550"
-                    Margin="0,38,38,0"
-                    Background="#E618181B" 
-                    BorderBrush="{StaticResource BorderColor}" 
-                    BorderThickness="1" 
+            <!-- Floating mesh visibility / topology panel -->
+            <Border x:Name="MeshVisibilityPanel"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Width="320"
+                    MaxHeight="590"
+                    Margin="0,42,42,0"
+                    Background="{StaticResource SidebarBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
                     CornerRadius="12"
-                    Padding="14"
                     Visibility="Collapsed">
                 <Border.RenderTransform>
                     <TranslateTransform x:Name="MeshPanelTranslation" X="0" Y="0"/>
                 </Border.RenderTransform>
                 <Border.Effect>
-                    <DropShadowEffect Color="Black" BlurRadius="25" ShadowDepth="4" Opacity="0.5"/>
+                    <DropShadowEffect Color="Black" BlurRadius="28" ShadowDepth="5" Opacity="0.48"/>
                 </Border.Effect>
                 <Grid>
                     <Grid.RowDefinitions>
@@ -153,56 +152,120 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Header -->
-                    <Grid Grid.Row="0" Margin="0,0,0,10" Background="Transparent" Cursor="SizeAll"
-                          MouseLeftButtonDown="MeshPanelHeader_MouseLeftButtonDown"
-                          MouseMove="MeshPanelHeader_MouseMove"
-                          MouseLeftButtonUp="MeshPanelHeader_MouseLeftButtonUp">
+                    <!-- Draggable header -->
+                    <Border Grid.Row="0"
+                            Background="{StaticResource CardBackground}"
+                            BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="0,0,0,1"
+                            CornerRadius="11,11,0,0"
+                            Padding="12,10"
+                            Cursor="SizeAll"
+                            MouseLeftButtonDown="MeshPanelHeader_MouseLeftButtonDown"
+                            MouseMove="MeshPanelHeader_MouseMove"
+                            MouseLeftButtonUp="MeshPanelHeader_MouseLeftButtonUp">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Width="30" Height="30" CornerRadius="8"
+                                    Background="#1F9B6DFF" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <icons:MaterialIcon Kind="FormatListBulleted" Width="15" Height="15"
+                                                    Foreground="{StaticResource AccentPurple}"
+                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="MESH PARTS" FontSize="11" FontWeight="Bold"
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock x:Name="MeshPartsSummaryText" Text="Part visibility &amp; topology"
+                                           FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                            </StackPanel>
+
+                            <Button Grid.Column="2" Click="CloseMeshPanel_Click"
+                                    Style="{StaticResource SmallCloseButtonStyle}"
+                                    Width="24" Height="24" Margin="8,0,0,0"
+                                    VerticalAlignment="Center" ToolTip="Close panel"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Compact actions / delta legend -->
+                    <Grid Grid.Row="1" Margin="12,8,12,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
+
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <icons:MaterialIcon Kind="FormatListBulleted" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="MESH PARTS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                <TextBlock Text="Δ +NEW / -OLD triangles inside modified meshes" FontSize="8" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
-                            </StackPanel>
+                            <TextBlock Text="Δ" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,5,0"/>
+                            <TextBlock Text="+NEW / −OLD TRIANGLES" FontSize="8" FontWeight="Bold"
+                                       Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <Button Grid.Column="1" Click="CloseMeshPanel_Click" Style="{StaticResource TransparentIconButton}" Width="24" Height="24" ToolTip="Close Panel">
-                            <icons:MaterialIcon Kind="Close" Width="14" Height="14" Foreground="{StaticResource TextMuted}"/>
-                        </Button>
+
+                        <Button Grid.Column="1" Content="SHOW ALL" Click="ShowAllMeshParts_Click"
+                                Style="{StaticResource SmallTextButtonStyle}" FontSize="8" FontWeight="Bold"
+                                Margin="8,0,2,0" ToolTip="Show every mesh part"/>
+                        <Button Grid.Column="2" Content="HIDE ALL" Click="HideAllMeshParts_Click"
+                                Style="{StaticResource SmallTextButtonStyle}" FontSize="8" FontWeight="Bold"
+                                Margin="2,0,0,0" ToolTip="Hide every mesh part"/>
                     </Grid>
 
-                    <Separator Grid.Row="1" Background="{StaticResource BorderColor}" Margin="0,0,0,10"/>
-
-                    <!-- Scrollable list of Parts -->
-                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl x:Name="MeshPartsItemsControl">
+                    <!-- Scrollable part list -->
+                    <ScrollViewer Grid.Row="2" Margin="10,0,6,10"
+                                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="MeshPartsItemsControl" Margin="0,0,4,0">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="{StaticResource CardBackground}" CornerRadius="6"
+                                    <Border Background="{StaticResource CardBackground}"
                                             BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                            Margin="0,0,0,4" Padding="8,6" ToolTip="{Binding StatusText}">
-                                        <Grid>
+                                            CornerRadius="8" Margin="0,0,0,5" ToolTip="{Binding StatusText}">
+                                        <Grid MinHeight="42">
                                             <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="3"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            
-                                            <!-- Name of the Part -->
-                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
 
-                                            <!-- Triangle-level delta for this mesh part -->
-                                            <TextBlock Grid.Column="1" Text="{Binding DeltaText}" FontSize="9" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <Border Grid.Column="0" Background="{Binding DiffColorBrush}"
+                                                    CornerRadius="7,0,0,7"/>
 
-                                            <!-- Visual status badge (New/Mod/Del/Same) -->
-                                            <Border Grid.Column="2" Background="{Binding DiffColorBrush}" CornerRadius="4" Width="12" Height="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" Margin="10,6,8,6" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimary}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding StatusLabel}" FontSize="8" FontWeight="Bold"
+                                                           Foreground="{Binding DiffColorBrush}" Margin="0,1,0,0"/>
+                                            </StackPanel>
 
-                                            <!-- Checkbox to toggle visibility -->
-                                            <CheckBox Grid.Column="3" IsChecked="{Binding IsVisible, Mode=TwoWay}" Checked="MeshPartVisibility_Changed" Unchecked="MeshPartVisibility_Changed" Style="{StaticResource ModernCheckBox}" VerticalAlignment="Center"/>
+                                            <Border Grid.Column="2" Margin="0,0,8,0" Padding="6,3"
+                                                    Background="{StaticResource DarkBackground}"
+                                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                                    CornerRadius="5" VerticalAlignment="Center">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding DeltaText}" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding DeltaText}" FontFamily="Consolas" FontSize="9"
+                                                           FontWeight="Bold" Foreground="{StaticResource TextSecondary}"/>
+                                            </Border>
+
+                                            <CheckBox Grid.Column="3"
+                                                      IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                      Checked="MeshPartVisibility_Changed"
+                                                      Unchecked="MeshPartVisibility_Changed"
+                                                      Style="{StaticResource ModernCheckBox}"
+                                                      Margin="0" Width="26"
+                                                      VerticalAlignment="Center"/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
