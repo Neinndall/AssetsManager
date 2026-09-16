@@ -377,6 +377,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - HUD Windows / Restored reliable title-bar dragging across custom analyzer and dialog windows.
   - 3D Mesh Analyzer / Fixed a startup crash caused by initializing the OpenGL viewport before its WPF view model finished construction.
   - 3D Mesh Analyzer / View Differences now keeps OLD and NEW rendering from the first frame instead of remaining blank until a resize.
   - 3D Mesh Analyzer / Mesh visibility now keeps added and removed geometry overlays attached to their owning mesh without creating extra scene models.
