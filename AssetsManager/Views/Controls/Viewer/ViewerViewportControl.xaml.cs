@@ -359,16 +359,6 @@ namespace AssetsManager.Views.Controls.Viewer
             UpdateToolbarVisibility();
         }
 
-        protected override void OnInitialized(EventArgs e)
-        {
-            base.OnInitialized(e);
-
-            // Normal viewers own their context. Diff viewports defer startup so the
-            // comparison window can make OLD and NEW share one OpenGL context.
-            if (!IsDiffMode)
-                EnsureOpenTkStarted();
-        }
-
         private void InitializeModelInteraction()
         {
             if (_modelInteractionController != null) return;
@@ -468,7 +458,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 MajorVersion = 3,
                 MinorVersion = 3,
                 Profile = OpenTK.Windowing.Common.ContextProfile.Core,
-                RenderContinuously = !_viewModel.LimitFps,
+                RenderContinuously = _viewModel?.LimitFps != true,
                 ContextToUse = contextToUse
             };
 
