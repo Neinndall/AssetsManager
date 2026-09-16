@@ -348,6 +348,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _viewModel.PropertyChanged += OnViewportViewModelPropertyChanged;
 
+            // GLWpfControl is designed to be started before WPF raises Loaded so it can
+            // register its own initial invalidation and visibility-driven render loop.
+            EnsureOpenTkStarted();
+
             Loaded += OnViewportLoaded;
             Unloaded += OnViewportUnloaded;
 
@@ -444,7 +448,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        internal void EnsureOpenTkStarted()
+        private void EnsureOpenTkStarted()
         {
             if (_isOpenTkStarted || OpenTkControl == null) return;
 
