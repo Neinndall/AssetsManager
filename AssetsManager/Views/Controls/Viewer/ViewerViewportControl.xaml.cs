@@ -191,8 +191,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 _gridRenderer.Render(viewProj);
             }
 
-            // Render loaded models after the ground and grid.
+            // Render primary models, then auxiliary diff geometry.
             foreach (var model in _loadedModels)
+            {
+                _meshRenderer.Render(model, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+            }
+            foreach (var model in _auxiliaryModels)
             {
                 _meshRenderer.Render(model, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
@@ -237,7 +241,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void EnsureSceneRenderers(bool required = false)
         {
-            if (_gl == null || (!required && _loadedModels.Count == 0)) return;
+            if (_gl == null || (!required && _loadedModels.Count == 0 && _auxiliaryModels.Count == 0)) return;
 
             if (_meshRenderer == null)
             {
@@ -301,6 +305,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private SceneModel _activeSceneModel;
         private AnimationModel _activeAnimationModel;
         private readonly List<SceneModel> _loadedModels = new();
+        private readonly List<SceneModel> _auxiliaryModels = new();
         private ViewportModelInteractionController _modelInteractionController;
         private bool _isCleanedUp;
 
@@ -1071,7 +1076,16 @@ namespace AssetsManager.Views.Controls.Viewer
                 model.PropertyChanged -= Model_PropertyChanged;
                 model.Dispose();
             }
+            foreach (var model in _auxiliaryModels)
+            {
+                _meshRenderer?.QueueRelease(model);
+                if (Viewport.Children.Contains(model.RootVisual))
+                    Viewport.Children.Remove(model.RootVisual);
+                model.PropertyChanged -= Model_PropertyChanged;
+                model.Dispose();
+            }
             _loadedModels.Clear();
+            _auxiliaryModels.Clear();
             _activeSceneModel = null;
 
             _viewModel.IsAutoRotateActive = false;
@@ -1089,24 +1103,35 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
         }
 
-        public void AddModel(SceneModel model)
+        public void AddModel(SceneModel model) => AddModelCore(model, isAuxiliary: false);
+
+        public void AddAuxiliaryModel(SceneModel model) => AddModelCore(model, isAuxiliary: true);
+
+        private void AddModelCore(SceneModel model, bool isAuxiliary)
         {
-            _loadedModels.Add(model);
+            if (isAuxiliary)
+                _auxiliaryModels.Add(model);
+            else
+                _loadedModels.Add(model);
+
             EnsureSceneRenderers();
-            if (model.IsVisible)
-            {
-                if (!Viewport.Children.Contains(model.RootVisual))
-                    Viewport.Children.Add(model.RootVisual);
-            }
+            if (model.IsVisible && !Viewport.Children.Contains(model.RootVisual))
+                Viewport.Children.Add(model.RootVisual);
 
             model.PropertyChanged += Model_PropertyChanged;
-            SetActiveModel(model);
-            _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
+            if (!isAuxiliary)
+            {
+                SetActiveModel(model);
+                UpdateSceneDisplayFromPrimaryModels();
+            }
         }
+
+        private void UpdateSceneDisplayFromPrimaryModels() =>
+            _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
 
         public void ClearModels()
         {
-            var modelsToClear = _loadedModels.ToList();
+            var modelsToClear = _loadedModels.Concat(_auxiliaryModels).ToList();
             foreach (var model in modelsToClear)
             {
                 RemoveModel(model);
@@ -1115,6 +1140,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void RemoveModel(SceneModel model)
         {
+            bool wasAuxiliary = _auxiliaryModels.Remove(model);
+            bool wasPrimary = _loadedModels.Remove(model);
+            if (!wasAuxiliary && !wasPrimary) return;
+
             bool removingActiveModel = model == _activeSceneModel;
             if (removingActiveModel)
             {
@@ -1126,7 +1155,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _activeAnimationData.Remove(model);
             if (_clipVfxSessions.Remove(model, out VfxRenderSession clipSession))
                 RunReleaseStep(nameof(VfxRenderSession), clipSession.Dispose, gpuBound: true);
-            _loadedModels.Remove(model);
             _lastModelUpdates.Remove(model);
             _meshRenderer?.QueueRelease(model);
             if (_animationServices.TryGetValue(model, out var animationService))
@@ -1139,7 +1167,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 Viewport.Children.Remove(model.RootVisual);
             }
             model.Dispose();
-            _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
+            if (wasPrimary)
+                UpdateSceneDisplayFromPrimaryModels();
         }
 
         private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -1240,6 +1269,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (IsDiffMode)
                 {
                     foreach (SceneModel model in _loadedModels)
+                        model.RotationY = (model.RotationY + rotationDelta) % 360;
+                    foreach (SceneModel model in _auxiliaryModels)
                         model.RotationY = (model.RotationY + rotationDelta) % 360;
                 }
                 else if (_activeSceneModel != null)
