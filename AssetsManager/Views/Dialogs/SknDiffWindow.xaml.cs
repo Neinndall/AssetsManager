@@ -31,6 +31,8 @@ namespace AssetsManager.Views.Dialogs
         private SceneModel _combinedNewScene;
         private readonly List<MeshPartDiffItem> _partItems = new();
         private readonly List<SceneModel> _diffOverlayScenes = new();
+        private readonly Dictionary<SceneModel, string> _diffOverlayOwners = new();
+        private readonly Dictionary<SceneModel, ViewerViewportControl> _diffOverlayViewports = new();
         private readonly Dictionary<string, MeshGeometry3D> _addedGeometryCache = new();
         private readonly Dictionary<string, MeshGeometry3D> _removedGeometryCache = new();
 
@@ -168,6 +170,8 @@ namespace AssetsManager.Views.Dialogs
                 overlay.Dispose();
             }
             _diffOverlayScenes.Clear();
+            _diffOverlayOwners.Clear();
+            _diffOverlayViewports.Clear();
             _addedGeometryCache.Clear();
             _removedGeometryCache.Clear();
             if (_oldScene != null)
@@ -289,6 +293,8 @@ namespace AssetsManager.Views.Dialogs
                 overlay.Dispose();
             }
             _diffOverlayScenes.Clear();
+            _diffOverlayOwners.Clear();
+            _diffOverlayViewports.Clear();
             _addedGeometryCache.Clear();
             _removedGeometryCache.Clear();
 
@@ -311,7 +317,7 @@ namespace AssetsManager.Views.Dialogs
                     if (_combinedNewScene != null)
                     {
                         _combinedNewScene.IsVisible = false;
-                        OldViewport.AddModel(_combinedNewScene);
+                        OldViewport.AddAuxiliaryModel(_combinedNewScene);
                     }
                 }
             }
@@ -401,22 +407,26 @@ namespace AssetsManager.Views.Dialogs
             return true;
         }
 
-        private void AddDiffOverlay(ViewerViewportControl viewport, string name, MeshGeometry3D mesh, System.Numerics.Vector4 tint, float alphaCutoff)
+        private void AddDiffOverlay(ViewerViewportControl viewport, string ownerPartName, string name, MeshGeometry3D mesh, System.Numerics.Vector4 tint, float alphaCutoff)
         {
+            bool isVisible = IsPartUserVisible(ownerPartName);
             var part = new ModelPart(name, new GeometryModel3D(mesh, null))
             {
                 ColorTint = tint,
-                AlphaCutoff = alphaCutoff
+                AlphaCutoff = alphaCutoff,
+                IsVisible = isVisible
             };
             var scene = new SceneModel
             {
                 Name = name,
-                IsVisible = true,
+                IsVisible = isVisible,
                 PositionY = SceneElements.GroundLevel
             };
             scene.AddPart(part);
-            viewport.AddModel(scene);
+            viewport.AddAuxiliaryModel(scene);
             _diffOverlayScenes.Add(scene);
+            _diffOverlayOwners[scene] = ownerPartName;
+            _diffOverlayViewports[scene] = viewport;
         }
 
         private void UpdateVisualHighlighting()
@@ -426,14 +436,17 @@ namespace AssetsManager.Views.Dialogs
             bool isGhostMode = OldViewport.IsGhostModeChecked;
             bool isCombined = OldViewport.IsCombinedModeChecked;
 
-            // Clear old overlays
+            // Clear old overlays without disturbing the primary diff scenes.
             foreach (var overlay in _diffOverlayScenes)
             {
-                OldViewport.RemoveModel(overlay);
-                NewViewport.RemoveModel(overlay);
-                overlay.Dispose();
+                if (_diffOverlayViewports.TryGetValue(overlay, out ViewerViewportControl viewport))
+                    viewport.RemoveModel(overlay);
+                else
+                    overlay.Dispose();
             }
             _diffOverlayScenes.Clear();
+            _diffOverlayOwners.Clear();
+            _diffOverlayViewports.Clear();
 
             if (_oldScene == null && _newScene != null)
             {
@@ -505,17 +518,17 @@ namespace AssetsManager.Views.Dialogs
                     // Check cache for newly added geometry pieces inside this modified part (e.g. piercings)
                     if (_addedGeometryCache.TryGetValue(newPart.Name, out var addedMesh))
                     {
-                        AddDiffOverlay(NewViewport, "AddedOverlay_" + newPart.Name, addedMesh, new System.Numerics.Vector4(0f, 1f, 0f, 1f), 0.5f);
+                        AddDiffOverlay(NewViewport, newPart.Name, "AddedOverlay_" + newPart.Name, addedMesh, new System.Numerics.Vector4(0f, 1f, 0f, 1f), 0.5f);
                         if (isCombined)
                         {
-                            AddDiffOverlay(OldViewport, "CombinedAddedOverlay_" + newPart.Name, addedMesh, new System.Numerics.Vector4(0f, 1f, 0f, 1f), 0.5f);
+                            AddDiffOverlay(OldViewport, newPart.Name, "CombinedAddedOverlay_" + newPart.Name, addedMesh, new System.Numerics.Vector4(0f, 1f, 0f, 1f), 0.5f);
                         }
                     }
 
                     // Check cache for newly deleted geometry pieces inside this modified part
                     if (_removedGeometryCache.TryGetValue(newPart.Name, out var removedMesh))
                     {
-                        AddDiffOverlay(OldViewport, "RemovedOverlay_" + newPart.Name, removedMesh, new System.Numerics.Vector4(1f, 0f, 0f, 0.8f), 0f);
+                        AddDiffOverlay(OldViewport, newPart.Name, "RemovedOverlay_" + newPart.Name, removedMesh, new System.Numerics.Vector4(1f, 0f, 0f, 0.8f), 0f);
                     }
                 }
                 else
@@ -770,7 +783,31 @@ namespace AssetsManager.Views.Dialogs
 
         private void MeshPartVisibility_Changed(object sender, RoutedEventArgs e)
         {
-            UpdateVisualHighlighting();
+            ApplyMeshPartVisibility();
+        }
+
+        private void ApplyMeshPartVisibility()
+        {
+            if (_oldScene != null)
+            {
+                foreach (ModelPart part in _oldScene.Parts)
+                    part.IsVisible = IsPartUserVisible(part.Name);
+            }
+
+            if (_newScene != null)
+            {
+                foreach (ModelPart part in _newScene.Parts)
+                    part.IsVisible = IsPartUserVisible(part.Name);
+            }
+
+            if (_combinedNewScene != null)
+            {
+                foreach (ModelPart part in _combinedNewScene.Parts)
+                    part.IsVisible = IsPartUserVisible(part.Name);
+            }
+
+            foreach (var pair in _diffOverlayOwners)
+                pair.Key.IsVisible = IsPartUserVisible(pair.Value);
         }
 
         private void BuildMeshPartsList()
