@@ -29,14 +29,17 @@ namespace AssetsManager.Views.Dialogs.Controls
             FileTypeFilter.FilterChanged += FileTypeFilter_FilterChanged;
         }
 
-        public void SetItems(List<WadResultItemModel> items)
+        public void SetItems(List<WadResultItemModel> items, string searchText)
         {
             _allItems = items ?? new List<WadResultItemModel>();
+            _searchText = searchText ?? string.Empty;
             CountText.Text = _allItems.Count.ToString();
             RetryFailedButton.Visibility = _allItems.Any(i => i.CanExport && i.IsFailed)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             UpdateActionButtonsEnabled();
+
+            // Apply the current text and file-type filters together so the grid is rebuilt only once.
             ApplyFilter(FileTypeFilter.SelectedFilter);
         }
 

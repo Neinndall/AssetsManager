@@ -41,6 +41,7 @@ namespace AssetsManager.Views.Dialogs
         private readonly SemaphoreSlim _thumbnailLoadLimiter = new(2, 2);
         private readonly Dictionary<SerializableChunkDiff, CancellationTokenSource> _thumbnailLoads = new();
         private readonly Dictionary<SerializableChunkDiff, WadResultItemModel> _resultItems = new();
+        private readonly DispatcherTimer _searchDebounceTimer;
 
         private string _oldPbePath;
         private string _newPbePath;
@@ -77,6 +78,13 @@ namespace AssetsManager.Views.Dialogs
             _backupManager = backupManager;
             _extractionService = extractionService;
             _directoriesCreator = directoriesCreator;
+
+            // Debounce only this window's expensive result projection so typing stays responsive.
+            _searchDebounceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(150)
+            };
+            _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
 
             // Peer Injection
             ResultsTree.ParentWindow = this;
@@ -159,6 +167,8 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnTreeFilterChanged(object sender, EventArgs e)
         {
+            // A type-filter change already applies the latest search text, so discard any pending duplicate refresh.
+            _searchDebounceTimer.Stop();
             Dispatcher.InvokeAsync(() => ApplyFilters());
         }
 
@@ -211,19 +221,23 @@ namespace AssetsManager.Views.Dialogs
             if (_thumbnailLoads.Remove(item, out var cancellation)) cancellation.Cancel();
         }
 
-        public void ApplyFilters()
+        public void ApplyFilters(bool refreshResultItems = true)
         {
             if (_serializableDiffs == null) return;
 
             var typeFiltered = _serializableDiffs.Where(d => IsDiffTypeVisible(d.Type)).ToList();
-            var filtered = typeFiltered.Where(d =>
-            {
-                if (string.IsNullOrWhiteSpace(_viewModel.FilterText)) return true;
-                return d.FileName.IndexOf(_viewModel.FilterText, StringComparison.OrdinalIgnoreCase) >= 0;
-            }).ToList();
+            string filterText = _viewModel.FilterText;
+            var filtered = string.IsNullOrWhiteSpace(filterText)
+                ? typeFiltered
+                : typeFiltered.Where(d => d.FileName.IndexOf(filterText, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
 
             _viewModel.SetResults(filtered, PrepareGroupedResults(filtered));
-            SetFilteredResultItems(typeFiltered);
+
+            // Text-only searches keep the same result item pool; rebuilding it would trigger a redundant grid filter.
+            if (refreshResultItems)
+            {
+                SetFilteredResultItems(typeFiltered);
+            }
         }
 
         private bool IsDiffTypeVisible(ChunkDiffType type) => type switch
@@ -280,6 +294,8 @@ namespace AssetsManager.Views.Dialogs
         {
             Loaded -= WadComparisonResultWindow_Loaded;
             Closed -= OnWindowClosed;
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Tick -= SearchDebounceTimer_Tick;
             ResultsControl.ItemVisibilityChanged -= OnResultsItemVisibilityChanged;
             ResultsControl.FilterApplied -= OnResultsFilterApplied;
             ResetThumbnailLoading();
@@ -319,15 +335,29 @@ namespace AssetsManager.Views.Dialogs
         private void GlobalSearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             _viewModel.FilterText = globalSearchBox.Text;
-            ApplyFilters();
-            ResultsControl.SetSearchText(globalSearchBox.Text);
+
+            // Let WPF paint the typed text first, then refresh the expensive projections once input settles.
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
+        }
+
+        private void SearchDebounceTimer_Tick(object sender, EventArgs e)
+        {
+            _searchDebounceTimer.Stop();
+            ApplySearchText(_viewModel.FilterText);
+        }
+
+        private void ApplySearchText(string text)
+        {
+            _viewModel.FilterText = text ?? string.Empty;
+            ApplyFilters(refreshResultItems: false);
+            ResultsControl.SetSearchText(_viewModel.FilterText);
         }
 
         public void HandleSearchTextChanged(string text)
         {
-            _viewModel.FilterText = text;
-            ApplyFilters();
-            ResultsControl.SetSearchText(text);
+            _searchDebounceTimer.Stop();
+            ApplySearchText(text);
         }
 
         public void HandleTreeSelectionChanged(object selectedItem)
@@ -452,7 +482,7 @@ namespace AssetsManager.Views.Dialogs
                 return item;
             }).ToList();
 
-            ResultsControl.SetItems(items);
+            ResultsControl.SetItems(items, _viewModel.FilterText);
         }
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)

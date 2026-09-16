@@ -116,6 +116,7 @@ Improvements
   - GAME Custom basename attacks now share the standard exhaustive substitution engine without truncating source paths.
   - Hash Guessing Lab progress now refreshes at a consistent rate across GAME, LCU, BIN, and RST methods.
   - Explorer and comparison views now reduce temporary path allocations during large scans and result classification.
+  - Comparator / Comparison Results search now stays responsive on large comparisons while preserving all existing filters and result views.
   - Monitor / Watcher and History searches now avoid temporary text allocations while filtering.
   - Monitor / Version manifests now load without blocking navigation, while brief backup refreshes no longer flash a loading indicator.
   - Hash Guessing Lab / GAME Custom and Extended now cover every path without global candidate cutoffs while bounding custom vocabularies to 50,000 words and BIN/DDS/TEX/SwordList to 20,000.
