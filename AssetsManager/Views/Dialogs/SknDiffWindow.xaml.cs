@@ -86,6 +86,16 @@ namespace AssetsManager.Views.Dialogs
             Loaded += SknDiffWindow_Loaded;
         }
 
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            // Start OpenGL before the child controls reach Loaded so GLWpfControl can
+            // register its own first-frame invalidation through the normal WPF lifecycle.
+            OldViewport.EnsureOpenTkStarted();
+            NewViewport.EnsureOpenTkStarted();
+        }
+
         private async void SknDiffWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Loaded -= SknDiffWindow_Loaded;

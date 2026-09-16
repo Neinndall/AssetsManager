@@ -89,7 +89,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
-                LogService.LogError(ex, "Failed to initialize Silk.NET OpenGL context.");
+                LogService?.LogError(ex, "Failed to initialize Silk.NET OpenGL context.");
             }
         }
 
@@ -308,6 +308,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly List<SceneModel> _auxiliaryModels = new();
         private ViewportModelInteractionController _modelInteractionController;
         private bool _isCleanedUp;
+        private bool _isOpenTkStarted;
 
         private struct ModelUpdateKey
         {
@@ -443,6 +444,22 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        internal void EnsureOpenTkStarted()
+        {
+            if (_isOpenTkStarted || OpenTkControl == null) return;
+
+            var settings = new GLWpfControlSettings
+            {
+                MajorVersion = 3,
+                MinorVersion = 3,
+                Profile = OpenTK.Windowing.Common.ContextProfile.Core,
+                RenderContinuously = !_viewModel.LimitFps
+            };
+
+            OpenTkControl.Start(settings);
+            _isOpenTkStarted = true;
+        }
+
         private void OnViewportLoaded(object sender, RoutedEventArgs e)
         {
             _isCleanedUp = false;
@@ -459,14 +476,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_isCleanedUp) return;
 
-            var settings = new GLWpfControlSettings
-            {
-                MajorVersion = 3,
-                MinorVersion = 3,
-                Profile = OpenTK.Windowing.Common.ContextProfile.Core
-            };
-            OpenTkControl.Start(settings);
-
+            EnsureOpenTkStarted();
             ApplyFpsLimitMode();
             _fpsStopwatch.Restart();
         }
@@ -701,6 +711,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 RunReleaseStep("OpenGL API", () => gl?.Dispose());
 
                 RunReleaseStep(nameof(OpenTkControl), OpenTkControl.Dispose, gpuBound: true);
+                _isOpenTkStarted = false;
             }
             catch (Exception ex)
             {

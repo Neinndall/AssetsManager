@@ -376,6 +376,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - 3D Mesh Analyzer / View Differences now initializes both OpenGL viewports before Loaded so OLD and NEW models render on the first frame without requiring a window resize.
   - 3D Mesh Analyzer / Mesh visibility now keeps added and removed geometry overlays attached to their owning mesh without creating extra scene models.
   - 3D Mesh Analyzer / Auto-Rotate now rotates the complete comparison scene, including diff overlays and combined geometry.
   - Viewer / Hardened resource cleanup so VFX, viewport, panel and shared loader teardown continue independently if one release step fails.
