@@ -954,23 +954,21 @@ namespace AssetsManager.Views.Dialogs
 
         private void MeshPanelHeader_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            var grid = sender as Grid;
-            if (grid == null) return;
+            // The header is a Border now, so keep dragging independent from its concrete container type.
+            if (sender is not FrameworkElement header) return;
 
             _isDraggingMeshPanel = true;
             _meshPanelDragStart = e.GetPosition(this);
             _meshPanelInitialX = MeshPanelTranslation.X;
             _meshPanelInitialY = MeshPanelTranslation.Y;
 
-            grid.CaptureMouse();
+            header.CaptureMouse();
         }
 
         private void MeshPanelHeader_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
         {
             if (!_isDraggingMeshPanel) return;
-
-            var grid = sender as Grid;
-            if (grid == null) return;
+            if (sender is not FrameworkElement) return;
 
             Point currentPoint = e.GetPosition(this);
             double deltaX = currentPoint.X - _meshPanelDragStart.X;
@@ -985,11 +983,10 @@ namespace AssetsManager.Views.Dialogs
             if (!_isDraggingMeshPanel) return;
 
             _isDraggingMeshPanel = false;
-            var grid = sender as Grid;
-            if (grid != null)
-            {
-                grid.ReleaseMouseCapture();
-            }
+
+            // Release whichever header element captured the drag gesture.
+            if (sender is FrameworkElement header)
+                header.ReleaseMouseCapture();
         }
 
         private void PrecalculateGeometryDiffs()
