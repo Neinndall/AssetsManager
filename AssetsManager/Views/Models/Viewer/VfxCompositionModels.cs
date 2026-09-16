@@ -164,11 +164,4 @@ namespace AssetsManager.Views.Models.Viewer
         public int VfxEventCount => Composition?.Events.Count(eventCue => !eventCue.Event.IsKillEvent) ?? 0;
     }
 
-    /// <summary>Shared data a champion clip needs to resolve and render its VFX events.</summary>
-    public sealed record AnimationClipVfxContext(
-        IReadOnlyList<VfxIdleEffectDefinition> IdleEffects,
-        IReadOnlyDictionary<uint, VfxSystemDefinition> Systems,
-        IReadOnlyDictionary<uint, uint> ResourceMap,
-        VfxOwnerSceneContext OwnerSceneContext,
-        string SearchDirectory);
 }

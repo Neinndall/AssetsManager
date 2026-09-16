@@ -13,8 +13,6 @@ using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Interaction;
-using AssetsManager.Services.Viewer.Vfx.Composition;
-using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Formatting;
@@ -37,7 +35,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public SknLoadingService SknLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public ChromaLoadingService ChromaLoadingService { get; set; }
-        public VfxLoadingService VfxLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
@@ -239,8 +236,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 foreach (var animModel in _viewModel.AnimationModels)
                 {
-                    if (animModel.AnimationData.IsAuthoredClip)
-                        continue;
                     if (!model.Animations.Any(a => a.Name == animModel.Name))
                     {
                         model.Animations.Add(animModel.AnimationData);
@@ -699,8 +694,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     foreach (var animModel in _viewModel.AnimationModels)
                     {
-                        if (animModel.AnimationData.IsAuthoredClip)
-                            continue;
                         if (!newModel.Animations.Any(a => a.Name == animModel.Name))
                         {
                             newModel.Animations.Add(animModel.AnimationData);
@@ -713,105 +706,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 ModelsListBox.SelectedItem = newModel;
 
                 Viewport?.SnapCamera();
-
-                // Keep the model interactive immediately. AnimationGraph/VFX discovery can
-                // build a recursive resource index, so it must never gate scene activation.
-                try
-                {
-                    await LoadAuthoredAnimationClipsAsync(newModel, cancellationToken);
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    if (ReferenceEquals(_viewModel.SelectedModel, newModel))
-                    {
-                        _viewModel.AnimationModels.ReplaceRange(
-                            newModel.Animations.Select(animation => new AnimationModel(animation)));
-                        UpdateHeroStats();
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    LogService?.LogDebug("AnimationGraph clip loading cancelled after model activation.");
-                }
-            }
-        }
-
-        private async Task LoadAuthoredAnimationClipsAsync(SceneModel model, CancellationToken cancellationToken)
-        {
-            if (model == null ||
-                VfxLoadingService == null ||
-                string.IsNullOrWhiteSpace(model.SkinBinPath) ||
-                !File.Exists(model.SkinBinPath))
-            {
-                return;
-            }
-
-            VfxClipCatalog catalog = null;
-            try
-            {
-                VfxLoadingService.Bundle bundle = await VfxLoadingService.LoadAsync(
-                    model.SkinBinPath,
-                    LogService,
-                    cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-                LogService?.LogDebug(
-                    $"AnimationGraph scan for '{model.Name}': {bundle.Clips.Count} clip definitions, {bundle.Systems.Count} VFX systems.");
-
-                string searchDirectory = Path.GetDirectoryName(model.SkinBinPath)
-                    ?? Path.GetDirectoryName(model.FilePath)
-                    ?? string.Empty;
-                catalog = new VfxClipCatalog();
-                IReadOnlyList<AnimationClipCatalogItem> clips = await Task.Run(
-                    () => catalog.Build(
-                        bundle,
-                        path => VfxLoadingService.ResolveAssetPath(path, searchDirectory, ".anm"),
-                        LogService),
-                    cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var context = new AnimationClipVfxContext(
-                    bundle.IdleEffects.ToArray(),
-                    bundle.Systems,
-                    bundle.ResourceMap,
-                    bundle.OwnerSceneContext,
-                    searchDirectory);
-
-                model.AnimationClipResources?.Dispose();
-                model.AnimationClipResources = catalog;
-                catalog = null;
-                model.AnimationClipVfxContext = context;
-
-                foreach (AnimationClipCatalogItem clip in clips)
-                {
-                    model.Animations.Add(new AnimationData
-                    {
-                        Name = clip.Name,
-                        FilePath = clip.FilePath,
-                        AnimationAsset = clip.AnimationAsset,
-                        AuthoredClip = clip,
-                        ClipVfxContext = context
-                    });
-                }
-
-                if (clips.Count > 0)
-                {
-                    LogService?.LogDebug(
-                        $"Loaded {clips.Count} authored AnimationGraph clips for '{model.Name}'.");
-                }
-                else if (bundle.Clips.Count > 0)
-                {
-                    LogService?.LogWarning(
-                        $"AnimationGraph for '{model.Name}' declared {bundle.Clips.Count} clips, but none had resolvable animation assets.");
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                catalog?.Dispose();
-                throw;
-            }
-            catch (Exception ex)
-            {
-                catalog?.Dispose();
-                LogService?.LogError(ex, $"Failed to load AnimationGraph clips for '{model.Name}'.");
             }
         }
 

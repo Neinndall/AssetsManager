@@ -378,6 +378,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Normal model and Chroma loads no longer initialize VFX systems reserved for VFX Studio.
   - 3D Mesh Analyzer / Restored reliable title-bar dragging for the View Differences window.
   - 3D Mesh Analyzer / Mesh Parts panel can be dragged again after the panel redesign.
   - 3D Mesh Analyzer / Fixed a startup crash caused by initializing the OpenGL viewport before its WPF view model finished construction.

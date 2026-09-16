@@ -48,12 +48,10 @@ namespace AssetsManager.Views
             // Service injection (Peer-to-Peer Support)
             ViewportControl.LogService = _logService;
             ViewportControl.AppSettings = appSettings;
-            ViewportControl.VfxLoadingService = _vfxLoadingService;
 
             PanelControl.SknLoadingService = sknLoadingService;
             PanelControl.MapGeometryLoadingService = mapGeometryLoadingService;
             PanelControl.ChromaLoadingService = chromaLoadingService;
-            PanelControl.VfxLoadingService = _vfxLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = customMessageBoxService;
             PanelControl.TaskCancellationManager = _taskCancellationManager;
@@ -222,7 +220,7 @@ namespace AssetsManager.Views
             RunCleanupStep(nameof(ViewportControl), () => ViewportControl?.Cleanup());
             RunCleanupStep(nameof(PanelControl), () => PanelControl?.Cleanup());
 
-            // The shared VFX loader must be the last resource released because both viewer surfaces consume it.
+            // VFX Studio owns the shared loader within ViewerWindow, so release it after the studio teardown.
             RunCleanupStep(nameof(VfxLoadingService), () => _vfxLoadingService?.Dispose());
         }
 
