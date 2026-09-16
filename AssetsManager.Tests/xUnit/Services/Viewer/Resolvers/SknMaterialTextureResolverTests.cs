@@ -467,9 +467,80 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal(new Vector2(-0.1f, 0.1f), effect.ScrollSpeed);
             Assert.Equal(new Vector2(3f, 2f), effect.Tiling);
             Assert.Equal(new Vector4(0.18f, 0.67f, 1f, 0f), effect.Color);
+
+            ModelMaterialDefinition materialDefinition = resolution.ResolveMaterialDefinition("hat");
+            Assert.Equal("aurora_base_tx_cm", materialDefinition.BaseTextureName);
+            Assert.Equal(ModelMaterialBlendMode.Opaque, materialDefinition.RenderState.Blending);
+            Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, materialDefinition.Effect.Kind);
+            Assert.Equal("aurora_base_mat_tile01", materialDefinition.Effect.TextureName);
             AssertContainsPath(
                 "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_Mat_HatMask.tex",
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+        }
+
+        [Fact]
+        public void Resolve_BuildsDefaultMaterialDefinitionFromStaticMaterial()
+        {
+            const string materialPath = "Characters/Test/Skins/Skin1/Materials/Body";
+            const string texturePath = "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex";
+            BinTree tree = CreateSkinTree(
+                texturePath,
+                material: CreateMaterialWithParameters(
+                    materialPath,
+                    new[] { CreateSampler("Diffuse_Texture", texturePath) },
+                    CreateParameter("TintColor", new Vector4(0.4f, 0.6f, 0.8f, 1f)),
+                    CreateParameter("Opacity", new Vector4(0.65f, 0f, 0f, 0f))),
+                defaultMaterialPath: materialPath);
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "test_tx_cm" });
+
+            ModelMaterialDefinition definition = resolution.DefaultMaterialDefinition;
+            Assert.Equal("test_tx_cm", definition.BaseTextureName);
+            Assert.Equal(new Vector4(0.4f, 0.6f, 0.8f, 0.65f), definition.Color);
+            Assert.Equal(ModelMaterialBlendMode.Opaque, definition.RenderState.Blending);
+            Assert.Same(definition, resolution.ResolveMaterialDefinition("unoverriddenpart"));
+        }
+
+        [Fact]
+        public void Resolve_BuildsDirectTextureOverrideWithoutInheritingSkinDefault()
+        {
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex",
+                CreateOverride(
+                    "Accessory",
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Test_Accessory_TX_CM.tex")));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "test_tx_cm", "test_accessory_tx_cm" });
+
+            ModelMaterialDefinition definition = resolution.ResolveMaterialDefinition("accessory");
+            Assert.Equal("test_accessory_tx_cm", definition.BaseTextureName);
+            Assert.Equal(ModelMaterialBlendMode.Opaque, definition.RenderState.Blending);
+            Assert.Equal("test_tx_cm", resolution.ResolveMaterialDefinition("body").BaseTextureName);
+        }
+
+        [Fact]
+        public void Resolve_MissingLinkedOverrideKeepsMaterialBaseEmpty()
+        {
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex",
+                CreateOverride(
+                    "Missing",
+                    new BinTreeObjectLink(
+                        Fnv1a.HashLower("Material"),
+                        Fnv1a.HashLower("Characters/Test/Skins/Skin1/Materials/DoesNotExist"))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "test_tx_cm" });
+
+            Assert.Null(resolution.ResolveMaterialDefinition("missing").BaseTextureName);
+            Assert.Equal("test_tx_cm", resolution.ResolveMaterialDefinition("body").BaseTextureName);
         }
 
         [Fact]
@@ -1418,6 +1489,45 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 Assert.Equal(
                     skinBinPath,
                     SknMaterialTextureResolver.TryResolveBinPath(chromaDirectory));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void TryResolveShaderBinPath_UsesNamedOrHashedShaderDefinitions(bool hashed)
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-shaders-{Guid.NewGuid():N}");
+            string sknPath = Path.Combine(
+                root,
+                "assets",
+                "characters",
+                "test",
+                "skins",
+                "skin0",
+                "test.skn");
+            string shaderPath = hashed
+                ? Path.Combine(root, $"{XxHash64Ext.Hash("data/shaders/shaders.bin"):x16}.bin")
+                : Path.Combine(root, "data", "shaders", "shaders.bin");
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(sknPath)!);
+                Directory.CreateDirectory(Path.GetDirectoryName(shaderPath)!);
+                File.WriteAllBytes(sknPath, Array.Empty<byte>());
+                File.WriteAllBytes(shaderPath, Array.Empty<byte>());
+
+                Assert.Equal(
+                    shaderPath,
+                    SknResolver.TryResolveShaderBinPath(sknPath),
+                    ignoreCase: true);
             }
             finally
             {

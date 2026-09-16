@@ -276,6 +276,64 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void ReadMetadata_CollectsShaderDefinitionsAndUsesTheirDefaults()
+        {
+            const string materialPath = "Characters/Test/Skins/Base/Materials/Body";
+            const string shaderPath = "Shaders/Test/Body";
+            const string texturePath = "ASSETS/Characters/Test/Skins/Base/Test_TX_CM.tex";
+            uint shaderHash = Fnv1a.HashLower(shaderPath);
+
+            BinTreeEmbedded sampler = Embedded(
+                "StaticMaterialShaderSamplerDef",
+                new BinTreeString(Fnv1a.HashLower("textureName"), "Diffuse_Texture"),
+                new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), 0x1234UL));
+            BinTreeEmbedded pass = Embedded(
+                "StaticMaterialPassDef",
+                new BinTreeObjectLink(Fnv1a.HashLower("shader"), shaderHash),
+                new BinTreeBool(Fnv1a.HashLower("blendEnable"), true));
+            BinTreeEmbedded technique = Embedded(
+                "StaticMaterialTechniqueDef",
+                new BinTreeString(Fnv1a.HashLower("name"), "normal"),
+                Container("passes", pass));
+            BinTreeObject material = new(
+                materialPath,
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    Container("samplerValues", sampler),
+                    Container("techniques", technique)
+                });
+            BinTree skinTree = new(new[] { Skin(materialPath), material }, Array.Empty<string>());
+
+            BinTreeEmbedded shaderParameter = Embedded(
+                "ShaderPhysicalParameter",
+                new BinTreeString(Fnv1a.HashLower("name"), "Alpha"),
+                new BinTreeVector4(Fnv1a.HashLower("data"), new Vector4(0.75f, 0f, 0f, 0f)));
+            BinTreeObject shader = new(
+                shaderPath,
+                "CustomShaderDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("objectPath"), shaderPath),
+                    Container("parameters", shaderParameter)
+                });
+            BinTree shaderTree = new(new[] { shader }, Array.Empty<string>());
+
+            SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(
+                new[] { skinTree, shaderTree },
+                hash => hash == 0x1234UL ? texturePath : $"{hash:x16}",
+                hash => hash == shaderHash ? shaderPath : $"{hash:x8}");
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                metadata,
+                new[] { "test_tx_cm" });
+
+            Assert.True(metadata.ShaderDefinitions.ContainsKey(shaderHash));
+            Assert.Equal(shaderPath, resolution.DefaultMaterialDefinition.ShaderPath);
+            Assert.Equal(0.75f, resolution.DefaultMaterialDefinition.Color.W);
+            Assert.Equal(ModelMaterialBlendMode.Normal, resolution.DefaultMaterialDefinition.RenderState.Blending);
+        }
+
+        [Fact]
         public void ReadShaderDefinitions_ParsesDefaultsLogicalParametersAndFeatureDefines()
         {
             const string shaderPath = "Shaders/Test/Body";
