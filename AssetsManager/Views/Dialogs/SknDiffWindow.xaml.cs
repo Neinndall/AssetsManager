@@ -84,8 +84,6 @@ namespace AssetsManager.Views.Dialogs
 
             // Initial focus on origin and smooth loading handover
             Loaded += SknDiffWindow_Loaded;
-
-            CompositionTarget.Rendering += OnDiffRendering;
         }
 
         private async void SknDiffWindow_Loaded(object sender, RoutedEventArgs e)
@@ -102,21 +100,15 @@ namespace AssetsManager.Views.Dialogs
 
             if (LoadingWindow != null)
             {
-                try { LoadingWindow.Close(); } catch { }
+                try
+                {
+                    LoadingWindow.Close();
+                }
+                catch (Exception ex)
+                {
+                    _logService?.LogError(ex, "[3D-DIFF] Failed to close loading window after initial render.");
+                }
                 LoadingWindow = null;
-            }
-        }
-
-        private void OnDiffRendering(object sender, EventArgs e)
-        {
-            if (OldViewport.OpenTkControl != null && OldViewport.OpenTkControl.IsLoaded)
-            {
-                OldViewport.OpenTkControl.InvalidateVisual();
-            }
-
-            if (NewViewport.OpenTkControl != null && NewViewport.OpenTkControl.IsLoaded)
-            {
-                NewViewport.OpenTkControl.InvalidateVisual();
             }
         }
 
@@ -126,11 +118,16 @@ namespace AssetsManager.Views.Dialogs
 
             if (LoadingWindow != null)
             {
-                try { LoadingWindow.Close(); } catch { }
+                try
+                {
+                    LoadingWindow.Close();
+                }
+                catch (Exception ex)
+                {
+                    _logService?.LogError(ex, "[3D-DIFF] Failed to close loading window during shutdown.");
+                }
                 LoadingWindow = null;
             }
-
-            CompositionTarget.Rendering -= OnDiffRendering;
 
             // Unwire diff toolbar events
             OldViewport.CombinedModeToggled -= Viewport_CombinedModeToggled;
@@ -159,36 +156,19 @@ namespace AssetsManager.Views.Dialogs
             _oldCameraChangedHandler = null;
             _newCameraChangedHandler = null;
 
-            // Clean up viewports: rendering loops, cameras and controllers
+            // Viewports own every primary and auxiliary scene they contain.
             OldViewport.Cleanup();
             NewViewport.Cleanup();
 
-            // Clear lists and scenes
             _partItems.Clear();
-            foreach (var overlay in _diffOverlayScenes)
-            {
-                overlay.Dispose();
-            }
             _diffOverlayScenes.Clear();
             _diffOverlayOwners.Clear();
             _diffOverlayViewports.Clear();
             _addedGeometryCache.Clear();
             _removedGeometryCache.Clear();
-            if (_oldScene != null)
-            {
-                _oldScene.Dispose();
-                _oldScene = null;
-            }
-            if (_newScene != null)
-            {
-                _newScene.Dispose();
-                _newScene = null;
-            }
-            if (_combinedNewScene != null)
-            {
-                _combinedNewScene.Dispose();
-                _combinedNewScene = null;
-            }
+            _oldScene = null;
+            _newScene = null;
+            _combinedNewScene = null;
         }
 
         private void ResetCharacterCameras()
@@ -283,15 +263,9 @@ namespace AssetsManager.Views.Dialogs
 
             OldViewport.ClearModels();
             NewViewport.ClearModels();
-            if (_combinedNewScene != null)
-            {
-                _combinedNewScene.Dispose();
-                _combinedNewScene = null;
-            }
-            foreach (var overlay in _diffOverlayScenes)
-            {
-                overlay.Dispose();
-            }
+            _oldScene = null;
+            _newScene = null;
+            _combinedNewScene = null;
             _diffOverlayScenes.Clear();
             _diffOverlayOwners.Clear();
             _diffOverlayViewports.Clear();
@@ -333,9 +307,9 @@ namespace AssetsManager.Views.Dialogs
 
         private async Task<SceneModel> LoadModelFromBytesAsync(byte[] data, string path, string label)
         {
+            string tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".skn");
             try
             {
-                string tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".skn");
                 File.WriteAllBytes(tempFile, data);
                 var scene = await _sknLoadingService.LoadModel(tempFile);
                 if (scene != null)
@@ -343,16 +317,23 @@ namespace AssetsManager.Views.Dialogs
                     scene.Name = Path.GetFileNameWithoutExtension(path);
                     scene.PositionY = SceneElements.GroundLevel;
                 }
-                try { File.Delete(tempFile); } catch { }
                 return scene;
             }
             catch (Exception ex)
             {
-                if (_logService != null)
-                {
-                    _logService.LogError(ex, $"[3D-DIFF] [{label}] Failed to load model: {path}");
-                }
+                _logService?.LogError(ex, $"[3D-DIFF] [{label}] Failed to load model: {path}");
                 return null;
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(tempFile)) File.Delete(tempFile);
+                }
+                catch (Exception ex)
+                {
+                    _logService?.LogError(ex, $"[3D-DIFF] [{label}] Failed to remove temporary model: {tempFile}");
+                }
             }
         }
 
@@ -581,33 +562,11 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private bool ArePartsEqual(ModelPart p1, ModelPart p2)
+        private static bool ArePartsEqual(ModelPart p1, ModelPart p2)
         {
-            var m1 = p1.Geometry.Geometry as MeshGeometry3D;
-            var m2 = p2.Geometry.Geometry as MeshGeometry3D;
-
-            if (m1 == null || m2 == null) return m1 == m2;
-
-            if (m1.Positions.Count != m2.Positions.Count || m1.TriangleIndices.Count != m2.TriangleIndices.Count)
-                return false;
-
-            // Compare actual vertex positions with epsilon
-            for (int i = 0; i < m1.Positions.Count; i++)
-            {
-                var pt1 = m1.Positions[i];
-                var pt2 = m2.Positions[i];
-                if (Math.Abs(pt1.X - pt2.X) > 1e-5 || Math.Abs(pt1.Y - pt2.Y) > 1e-5 || Math.Abs(pt1.Z - pt2.Z) > 1e-5)
-                    return false;
-            }
-
-            // Compare triangle indices
-            for (int i = 0; i < m1.TriangleIndices.Count; i++)
-            {
-                if (m1.TriangleIndices[i] != m2.TriangleIndices[i])
-                    return false;
-            }
-
-            return true;
+            var m1 = p1?.Geometry?.Geometry as MeshGeometry3D;
+            var m2 = p2?.Geometry?.Geometry as MeshGeometry3D;
+            return SknMeshDiffAnalyzer.AreEquivalent(m1, m2);
         }
 
         private void HighlightPart(ModelPart part, Color color, double opacity = 1.0)
@@ -845,20 +804,32 @@ namespace AssetsManager.Views.Dialogs
                 SolidColorBrush diffBrush;
                 if (oldPart == null && newPart != null)
                 {
+                    int triangles = SknMeshDiffAnalyzer.GetTriangleCount(newPart.Geometry?.Geometry as MeshGeometry3D);
                     diffBrush = new SolidColorBrush(Colors.Green);
-                    item.StatusText = "New mesh part";
+                    item.DeltaText = $"+{triangles:N0}";
+                    item.StatusText = $"New mesh part — {triangles:N0} triangles only in NEW";
                 }
                 else if (oldPart != null && newPart == null)
                 {
+                    int triangles = SknMeshDiffAnalyzer.GetTriangleCount(oldPart.Geometry?.Geometry as MeshGeometry3D);
                     diffBrush = new SolidColorBrush(Colors.Red);
-                    item.StatusText = "Removed mesh part";
+                    item.DeltaText = $"-{triangles:N0}";
+                    item.StatusText = $"Removed mesh part — {triangles:N0} triangles only in OLD";
                 }
                 else if (oldPart != null && newPart != null)
                 {
                     if (!ArePartsEqual(oldPart, newPart))
                     {
+                        int addedTriangles = _addedGeometryCache.TryGetValue(name, out MeshGeometry3D addedGeometry)
+                            ? SknMeshDiffAnalyzer.GetTriangleCount(addedGeometry)
+                            : 0;
+                        int removedTriangles = _removedGeometryCache.TryGetValue(name, out MeshGeometry3D removedGeometry)
+                            ? SknMeshDiffAnalyzer.GetTriangleCount(removedGeometry)
+                            : 0;
+
                         diffBrush = new SolidColorBrush(Colors.DodgerBlue);
-                        item.StatusText = "Modified mesh part";
+                        item.DeltaText = $"+{addedTriangles:N0}/-{removedTriangles:N0}";
+                        item.StatusText = $"Modified mesh part — {addedTriangles:N0} NEW-only triangles, {removedTriangles:N0} OLD-only triangles";
                     }
                     else
                     {
@@ -927,23 +898,6 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private int GetOrCreateVertex(int origIdx, Point3D pos, MeshGeometry3D srcMesh, MeshGeometry3D dstMesh, Dictionary<int, int> map)
-        {
-            if (map.TryGetValue(origIdx, out int newIdx))
-                return newIdx;
-
-            int idx = dstMesh.Positions.Count;
-            dstMesh.Positions.Add(pos);
-            
-            if (srcMesh.Normals != null && srcMesh.Normals.Count > origIdx)
-                dstMesh.Normals.Add(srcMesh.Normals[origIdx]);
-            if (srcMesh.TextureCoordinates != null && srcMesh.TextureCoordinates.Count > origIdx)
-                dstMesh.TextureCoordinates.Add(srcMesh.TextureCoordinates[origIdx]);
-
-            map[origIdx] = idx;
-            return idx;
-        }
-
         private void PrecalculateGeometryDiffs()
         {
             _addedGeometryCache.Clear();
@@ -969,7 +923,7 @@ namespace AssetsManager.Views.Dialogs
                 if (newMesh == null || oldMesh == null) continue;
 
                 // 1. Detect added triangles (Old -> New)
-                var addedMesh = ExtractDifferenceMesh(oldMesh, newMesh);
+                var addedMesh = SknMeshDiffAnalyzer.ExtractDifferenceMesh(oldMesh, newMesh);
                 if (addedMesh != null)
                 {
                     addedMesh.Freeze();
@@ -977,7 +931,7 @@ namespace AssetsManager.Views.Dialogs
                 }
 
                 // 2. Detect removed triangles (New -> Old)
-                var removedMesh = ExtractDifferenceMesh(newMesh, oldMesh);
+                var removedMesh = SknMeshDiffAnalyzer.ExtractDifferenceMesh(newMesh, oldMesh);
                 if (removedMesh != null)
                 {
                     removedMesh.Freeze();
@@ -986,73 +940,168 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private MeshGeometry3D ExtractDifferenceMesh(MeshGeometry3D sourceMesh, MeshGeometry3D targetMesh)
-        {
-            var sourcePoints = new HashSet<VertexKey>();
-            foreach (var pos in sourceMesh.Positions)
-            {
-                sourcePoints.Add(new VertexKey(pos));
-            }
+    }
 
+    internal static class SknMeshDiffAnalyzer
+    {
+        private const double PositionScale = 100000.0;
+
+        internal static MeshGeometry3D ExtractDifferenceMesh(MeshGeometry3D sourceMesh, MeshGeometry3D targetMesh)
+        {
+            if (sourceMesh == null || targetMesh == null) return null;
+
+            Dictionary<TriangleKey, int> sourceTriangles = BuildTriangleCounts(sourceMesh);
             var diffMesh = new MeshGeometry3D();
             var diffMap = new Dictionary<int, int>();
 
-            for (int i = 0; i < targetMesh.TriangleIndices.Count; i += 3)
+            for (int i = 0; i + 2 < targetMesh.TriangleIndices.Count; i += 3)
             {
                 int i1 = targetMesh.TriangleIndices[i];
                 int i2 = targetMesh.TriangleIndices[i + 1];
                 int i3 = targetMesh.TriangleIndices[i + 2];
+                TriangleKey key = TriangleKey.Create(
+                    targetMesh.Positions[i1],
+                    targetMesh.Positions[i2],
+                    targetMesh.Positions[i3]);
 
-                var p1 = targetMesh.Positions[i1];
-                var p2 = targetMesh.Positions[i2];
-                var p3 = targetMesh.Positions[i3];
-
-                bool isDiff = !sourcePoints.Contains(new VertexKey(p1)) || 
-                              !sourcePoints.Contains(new VertexKey(p2)) || 
-                              !sourcePoints.Contains(new VertexKey(p3));
-
-                if (isDiff)
+                if (sourceTriangles.TryGetValue(key, out int remaining) && remaining > 0)
                 {
-                    int n1 = GetOrCreateVertex(i1, p1, targetMesh, diffMesh, diffMap);
-                    int n2 = GetOrCreateVertex(i2, p2, targetMesh, diffMesh, diffMap);
-                    int n3 = GetOrCreateVertex(i3, p3, targetMesh, diffMesh, diffMap);
-
-                    diffMesh.TriangleIndices.Add(n1);
-                    diffMesh.TriangleIndices.Add(n2);
-                    diffMesh.TriangleIndices.Add(n3);
+                    if (remaining == 1)
+                        sourceTriangles.Remove(key);
+                    else
+                        sourceTriangles[key] = remaining - 1;
+                    continue;
                 }
+
+                int n1 = GetOrCreateVertex(i1, targetMesh, diffMesh, diffMap);
+                int n2 = GetOrCreateVertex(i2, targetMesh, diffMesh, diffMap);
+                int n3 = GetOrCreateVertex(i3, targetMesh, diffMesh, diffMap);
+                diffMesh.TriangleIndices.Add(n1);
+                diffMesh.TriangleIndices.Add(n2);
+                diffMesh.TriangleIndices.Add(n3);
             }
 
             return diffMesh.TriangleIndices.Count > 0 ? diffMesh : null;
         }
 
-        private struct VertexKey : IEquatable<VertexKey>
+        internal static int GetTriangleCount(MeshGeometry3D mesh) =>
+            mesh?.TriangleIndices?.Count / 3 ?? 0;
+
+        internal static bool AreEquivalent(MeshGeometry3D left, MeshGeometry3D right)
         {
-            public readonly int X;
-            public readonly int Y;
-            public readonly int Z;
+            if (left == null || right == null) return left == right;
+            if (GetTriangleCount(left) != GetTriangleCount(right)) return false;
 
-            public VertexKey(Point3D point)
+            Dictionary<TriangleKey, int> leftTriangles = BuildTriangleCounts(left);
+            Dictionary<TriangleKey, int> rightTriangles = BuildTriangleCounts(right);
+            if (leftTriangles.Count != rightTriangles.Count) return false;
+
+            foreach ((TriangleKey key, int count) in leftTriangles)
             {
-                X = (int)Math.Round(point.X * 10.0);
-                Y = (int)Math.Round(point.Y * 10.0);
-                Z = (int)Math.Round(point.Z * 10.0);
+                if (!rightTriangles.TryGetValue(key, out int rightCount) || rightCount != count)
+                    return false;
+            }
+            return true;
+        }
+
+        private static Dictionary<TriangleKey, int> BuildTriangleCounts(MeshGeometry3D mesh)
+        {
+            var result = new Dictionary<TriangleKey, int>();
+            for (int i = 0; i + 2 < mesh.TriangleIndices.Count; i += 3)
+            {
+                int i1 = mesh.TriangleIndices[i];
+                int i2 = mesh.TriangleIndices[i + 1];
+                int i3 = mesh.TriangleIndices[i + 2];
+                TriangleKey key = TriangleKey.Create(
+                    mesh.Positions[i1],
+                    mesh.Positions[i2],
+                    mesh.Positions[i3]);
+                result.TryGetValue(key, out int count);
+                result[key] = count + 1;
+            }
+            return result;
+        }
+
+        private static int GetOrCreateVertex(
+            int sourceIndex,
+            MeshGeometry3D sourceMesh,
+            MeshGeometry3D targetMesh,
+            Dictionary<int, int> map)
+        {
+            if (map.TryGetValue(sourceIndex, out int mappedIndex))
+                return mappedIndex;
+
+            int index = targetMesh.Positions.Count;
+            targetMesh.Positions.Add(sourceMesh.Positions[sourceIndex]);
+            if (sourceMesh.Normals != null && sourceMesh.Normals.Count > sourceIndex)
+                targetMesh.Normals.Add(sourceMesh.Normals[sourceIndex]);
+            if (sourceMesh.TextureCoordinates != null && sourceMesh.TextureCoordinates.Count > sourceIndex)
+                targetMesh.TextureCoordinates.Add(sourceMesh.TextureCoordinates[sourceIndex]);
+            map[sourceIndex] = index;
+            return index;
+        }
+
+        private readonly struct VertexKey : IEquatable<VertexKey>, IComparable<VertexKey>
+        {
+            private readonly long _x;
+            private readonly long _y;
+            private readonly long _z;
+
+            private VertexKey(Point3D point)
+            {
+                _x = (long)Math.Round(point.X * PositionScale, MidpointRounding.AwayFromZero);
+                _y = (long)Math.Round(point.Y * PositionScale, MidpointRounding.AwayFromZero);
+                _z = (long)Math.Round(point.Z * PositionScale, MidpointRounding.AwayFromZero);
             }
 
-            public bool Equals(VertexKey other)
+            internal static VertexKey Create(Point3D point) => new(point);
+
+            public int CompareTo(VertexKey other)
             {
-                return X == other.X && Y == other.Y && Z == other.Z;
+                int result = _x.CompareTo(other._x);
+                if (result != 0) return result;
+                result = _y.CompareTo(other._y);
+                return result != 0 ? result : _z.CompareTo(other._z);
             }
 
-            public override bool Equals(object obj)
+            public bool Equals(VertexKey other) =>
+                _x == other._x && _y == other._y && _z == other._z;
+
+            public override bool Equals(object obj) => obj is VertexKey other && Equals(other);
+
+            public override int GetHashCode() => HashCode.Combine(_x, _y, _z);
+        }
+
+        private readonly struct TriangleKey : IEquatable<TriangleKey>
+        {
+            private readonly VertexKey _a;
+            private readonly VertexKey _b;
+            private readonly VertexKey _c;
+
+            private TriangleKey(VertexKey a, VertexKey b, VertexKey c)
             {
-                return obj is VertexKey other && Equals(other);
+                _a = a;
+                _b = b;
+                _c = c;
             }
 
-            public override int GetHashCode()
+            internal static TriangleKey Create(Point3D p1, Point3D p2, Point3D p3)
             {
-                return HashCode.Combine(X, Y, Z);
+                VertexKey a = VertexKey.Create(p1);
+                VertexKey b = VertexKey.Create(p2);
+                VertexKey c = VertexKey.Create(p3);
+                if (a.CompareTo(b) > 0) (a, b) = (b, a);
+                if (b.CompareTo(c) > 0) (b, c) = (c, b);
+                if (a.CompareTo(b) > 0) (a, b) = (b, a);
+                return new TriangleKey(a, b, c);
             }
+
+            public bool Equals(TriangleKey other) =>
+                _a.Equals(other._a) && _b.Equals(other._b) && _c.Equals(other._c);
+
+            public override bool Equals(object obj) => obj is TriangleKey other && Equals(other);
+
+            public override int GetHashCode() => HashCode.Combine(_a, _b, _c);
         }
     }
 
@@ -1061,6 +1110,7 @@ namespace AssetsManager.Views.Dialogs
         public string Name { get; set; }
         public SolidColorBrush DiffColorBrush { get; set; }
         public string StatusText { get; set; }
+        public string DeltaText { get; set; } = string.Empty;
 
         private bool _isVisible = true;
         public bool IsVisible
