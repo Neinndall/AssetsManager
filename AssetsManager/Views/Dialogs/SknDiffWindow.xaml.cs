@@ -9,7 +9,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
-using System.Windows.Threading;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Utils;
@@ -102,12 +101,23 @@ namespace AssetsManager.Views.Dialogs
             Loaded -= SknDiffWindow_Loaded;
             ResetCharacterCameras();
 
-            // 1. Wait for UI to process the initial rendering
-            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            // Keep the loading handover tied to an actual OpenGL frame from both sides.
+            OldViewport.RequestRender();
+            NewViewport.RequestRender();
+            try
+            {
+                await Task.WhenAll(
+                        OldViewport.WaitForFirstRenderedFrameAsync(),
+                        NewViewport.WaitForFirstRenderedFrameAsync())
+                    .WaitAsync(TimeSpan.FromSeconds(3));
+            }
+            catch (TimeoutException)
+            {
+                _logService?.LogWarning("[3D-DIFF] Initial OpenGL frame timed out; keeping the live render scheduler active.");
+            }
 
-            // 2. Smooth Handover: Take focus first, then close loader
-            this.Activate();
-            this.Focus();
+            Activate();
+            Focus();
 
             if (LoadingWindow != null)
             {
