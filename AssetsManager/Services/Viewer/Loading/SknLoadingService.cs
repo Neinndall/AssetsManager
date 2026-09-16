@@ -262,22 +262,10 @@ namespace AssetsManager.Services.Viewer.Loading
                     triangleIndices[i] = localIndex;
                 }
 
-                string initialMatchingKey = ResolveMaterialTexture(
-                    materialName,
-                    defaultTextureKey,
-                    materialTextures?.Overrides,
-                    materialTextures?.MaterialOverrideKeys,
-                    loadedTextures);
                 string normalizedMaterialName = SknMaterialTextureResolver.NormalizeMaterialKey(materialName);
-                ModelMaterialEffectDefinition materialEffect =
-                    materialTextures?.ResolveEffect(normalizedMaterialName) ?? ModelMaterialEffectDefinition.None;
                 ModelMaterialDefinition materialDefinition =
                     materialTextures?.ResolveMaterialDefinition(normalizedMaterialName) ??
-                    ModelMaterialDefinition.Default with
-                    {
-                        BaseTextureName = initialMatchingKey,
-                        Effect = materialEffect
-                    };
+                    ModelMaterialDefinition.TextureOnly(defaultTextureKey);
 
                 dataList.Add(new SubmeshData(
                     materialName,
@@ -285,9 +273,7 @@ namespace AssetsManager.Services.Viewer.Loading
                     triangleIndices,
                     subTexCoords.ToArray(),
                     sourceVertexIndices.ToArray(),
-                    initialMatchingKey,
-                    materialDefinition,
-                    materialEffect));
+                    materialDefinition));
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -339,10 +325,10 @@ namespace AssetsManager.Services.Viewer.Loading
                         SourceVertexIndices = data.SourceVertexIndices,
                         AllTextures = loadedTextures,
                         AvailableTextureNames = availableTextureNames,
-                        SelectedTextureName = data.TexturePath,
+                        SelectedTextureName = data.MaterialDefinition.BaseTextureName,
                         MaterialDefinition = data.MaterialDefinition,
-                        MaterialEffect = data.MaterialEffect,
-                        ColorTint = data.MaterialEffect.MaterialTint
+                        MaterialEffect = data.MaterialDefinition.Effect,
+                        ColorTint = data.MaterialDefinition.Color
                     };
 
                     TextureUtils.UpdateMaterial(modelPart);
@@ -521,9 +507,7 @@ namespace AssetsManager.Services.Viewer.Loading
             int[] TriangleIndices,
             System.Windows.Point[] TextureCoordinates,
             int[] SourceVertexIndices,
-            string TexturePath,
-            ModelMaterialDefinition MaterialDefinition,
-            ModelMaterialEffectDefinition MaterialEffect);
+            ModelMaterialDefinition MaterialDefinition);
 
     }
 }
