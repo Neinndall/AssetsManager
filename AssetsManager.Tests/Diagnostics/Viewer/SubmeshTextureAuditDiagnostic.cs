@@ -48,10 +48,10 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             Console.WriteLine($"\n--- METADATA READ FROM BIN ---");
             Console.WriteLine($"Default Texture Path: {metadata.DefaultTexturePath ?? "<none>"}");
             Console.WriteLine($"Default Material: {(metadata.DefaultMaterial != null ? $"{metadata.DefaultMaterial.Samplers.Count} samplers" : "<none>")}");
-            Console.WriteLine($"Override Textures ({metadata.OverrideTexturePaths.Count} submeshes):");
-            foreach ((string submesh, IReadOnlyList<string> paths) in metadata.OverrideTexturePaths)
+            Console.WriteLine($"Direct Texture Overrides ({metadata.DirectOverrideTexturePaths.Count} submeshes):");
+            foreach ((string submesh, string path) in metadata.DirectOverrideTexturePaths)
             {
-                Console.WriteLine($"  [{submesh}] -> {string.Join(", ", paths)}");
+                Console.WriteLine($"  [{submesh}] -> {path}");
             }
 
             Console.WriteLine($"Override Materials ({metadata.OverrideMaterials.Count} submeshes):");
@@ -74,17 +74,15 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(metadata, availableTextureFiles.Keys);
 
             Console.WriteLine($"\n--- RESOLUTION RESULTS ---");
-            Console.WriteLine($"Default Texture Key: {resolution.DefaultTextureKey ?? "<none>"}");
-            Console.WriteLine($"Default Effect: {resolution.DefaultEffect.Kind}");
-            Console.WriteLine($"Resolved Texture Overrides:");
-            foreach ((string submesh, string key) in resolution.Overrides)
+            Console.WriteLine($"Default Texture Key: {resolution.DefaultMaterialDefinition?.BaseTextureName ?? "<none>"}");
+            Console.WriteLine($"Default Effect: {resolution.DefaultMaterialDefinition?.Effect?.Kind ?? ModelMaterialEffectKind.None}");
+            Console.WriteLine($"Resolved Materials:");
+            foreach ((string submesh, ModelMaterialDefinition material) in resolution.MaterialDefinitions)
             {
-                Console.WriteLine($"  [{submesh}] -> {key}");
-            }
-            Console.WriteLine($"Resolved Effects:");
-            foreach ((string submesh, ModelMaterialEffectDefinition effect) in resolution.Effects)
-            {
-                Console.WriteLine($"  [{submesh}] -> Kind={effect.Kind} Texture={effect.TextureName ?? "<none>"} Mask={effect.MaskTextureName ?? "<none>"} Emission={effect.EmissionTextureName ?? "<none>"}");
+                ModelMaterialEffectDefinition effect = material?.Effect ?? ModelMaterialEffectDefinition.None;
+                Console.WriteLine(
+                    $"  [{submesh}] -> Texture={material?.BaseTextureName ?? "<none>"} " +
+                    $"Binding={material?.BindingKind} Effect={effect.Kind}");
             }
 
             if (sknPath != null && File.Exists(sknPath))
@@ -97,11 +95,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     string submeshName = range.Material.TrimEnd('\0');
                     string normalizedKey = SknMaterialTextureResolver.NormalizeMaterialKey(submeshName);
 
-                    string resolvedTextureKey = resolution.Overrides.TryGetValue(normalizedKey, out string overrideKey)
-                        ? overrideKey
-                        : resolution.DefaultTextureKey;
-
-                    ModelMaterialEffectDefinition effect = resolution.ResolveEffect(normalizedKey);
+                    ModelMaterialDefinition material = resolution.ResolveMaterialDefinition(normalizedKey);
+                    string resolvedTextureKey = material?.BaseTextureName;
+                    ModelMaterialEffectDefinition effect = material?.Effect ?? ModelMaterialEffectDefinition.None;
 
                     Console.WriteLine($"\nSubmesh: '{submeshName}' (normalized: '{normalizedKey}')");
                     Console.WriteLine($"  IndexCount={range.IndexCount} StartIndex={range.StartIndex} StartVertex={range.StartVertex} VertexCount={range.VertexCount}");

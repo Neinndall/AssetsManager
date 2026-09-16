@@ -51,7 +51,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         {
             if (IsCompositeOnsenMaterial(material))
             {
-                return ApplyMaterialTint(ModelMaterialEffectDefinition.None, material);
+                return ApplySpecializedBaseColor(ModelMaterialEffectDefinition.None, material);
             }
 
             ModelMaterialEffectDefinition effect = ResolveOverlay(
@@ -64,50 +64,48 @@ namespace AssetsManager.Services.Viewer.Resolvers
             effect = ApplyFresnel(effect, material, textureKeys);
             effect = ApplyEmission(effect, material, textureKeys);
             effect = ApplyIridescence(effect, material, textureKeys);
-            return ApplyMaterialTint(ApplySimpleWave(effect, material), material);
+            return ApplySpecializedBaseColor(ApplySimpleWave(effect, material), material);
         }
 
-        private static ModelMaterialEffectDefinition ApplyMaterialTint(
+        private static ModelMaterialEffectDefinition ApplySpecializedBaseColor(
             ModelMaterialEffectDefinition effect,
             SknMaterialDefinition material)
         {
-            Vector4 tint = ReadVector4(
+            bool hasGlassColor =
+                material.Parameters.ContainsKey("Glass_Color1") ||
+                material.Parameters.ContainsKey("GlassColor1") ||
+                material.Parameters.ContainsKey("Glass_Color") ||
+                material.Parameters.ContainsKey("GlassColor");
+            bool hasGlassAlpha =
+                material.Parameters.ContainsKey("Alpha_Bias") ||
+                material.Parameters.ContainsKey("AlphaBias") ||
+                material.Parameters.ContainsKey("Glass_Alpha") ||
+                material.Parameters.ContainsKey("Transparency");
+            if (!hasGlassColor && !hasGlassAlpha)
+                return effect;
+
+            Vector4 glassColor = ReadVector4(
                 material.Parameters,
                 Vector4.One,
-                "TintColor",
-                "MaterialTint",
-                "ColorTint");
+                "Glass_Color1",
+                "GlassColor1",
+                "Glass_Color",
+                "GlassColor");
+            float alpha = ReadFloat(
+                material.Parameters,
+                1f,
+                "Alpha_Bias",
+                "AlphaBias",
+                "Glass_Alpha",
+                "Transparency");
+            float finalAlpha = material.Parameters.ContainsKey("Alpha_Bias") || material.Parameters.ContainsKey("AlphaBias")
+                ? Math.Clamp(alpha, 0.01f, 0.95f)
+                : (glassColor.W > 0f && glassColor.W < 1f ? glassColor.W : 1f);
 
-            if (tint == Vector4.One &&
-                (material.Parameters.ContainsKey("Alpha_Bias") ||
-                 material.Parameters.ContainsKey("AlphaBias") ||
-                 material.Parameters.ContainsKey("Glass_Color1") ||
-                 material.Parameters.ContainsKey("GlassColor1")))
+            return effect with
             {
-                Vector4 glassColor = ReadVector4(
-                    material.Parameters,
-                    Vector4.One,
-                    "Glass_Color1",
-                    "GlassColor1",
-                    "Glass_Color",
-                    "GlassColor");
-
-                float alpha = ReadFloat(
-                    material.Parameters,
-                    1f,
-                    "Alpha_Bias",
-                    "AlphaBias",
-                    "Glass_Alpha",
-                    "Transparency");
-
-                float finalAlpha = material.Parameters.ContainsKey("Alpha_Bias") || material.Parameters.ContainsKey("AlphaBias")
-                    ? Math.Clamp(alpha, 0.01f, 0.95f)
-                    : (glassColor.W > 0f && glassColor.W < 1f ? glassColor.W : 1f);
-
-                tint = new Vector4(glassColor.X, glassColor.Y, glassColor.Z, finalAlpha);
-            }
-
-            return effect with { MaterialTint = tint };
+                MaterialTint = new Vector4(glassColor.X, glassColor.Y, glassColor.Z, finalAlpha)
+            };
         }
 
         private static ModelMaterialEffectDefinition ResolveOverlay(
