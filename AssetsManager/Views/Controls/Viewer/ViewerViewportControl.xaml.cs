@@ -9,15 +9,12 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
-using LeagueToolkit.Hashing;
 using System.Collections.Generic;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Rendering;
-using AssetsManager.Services.Viewer.Vfx.Loading;
-using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
@@ -34,9 +31,7 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         private Silk.NET.OpenGL.GL _gl;
         private GlMeshRenderer _meshRenderer;
-        private VfxRenderSession _vfxRenderer;
         private GridRenderer _gridRenderer;
-        private VfxSystemModel _selectedVfxSystem;
         private bool _isMapGeometry;
 
         private readonly ViewerViewportModel _viewModel;
@@ -52,7 +47,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
-        public VfxLoadingService VfxLoadingService { get; set; }
         public ViewerPanelControl Panel { get; set; }
         public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
@@ -98,7 +92,6 @@ namespace AssetsManager.Views.Controls.Viewer
             // invoking Render. Create GPU resources only here so multiple viewports
             // cannot initialize shaders or buffers against another control's context.
             EnsureSceneRenderers();
-            EnsureVfxRenderer();
 
             int framebufferWidth = OpenTkControl.FrameBufferWidth;
             int framebufferHeight = OpenTkControl.FrameBufferHeight;
@@ -111,13 +104,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _lastRenderedAt = renderTime;
             UpdateScene(frameDelta);
-            RenderScene(framebufferWidth, framebufferHeight, frameDelta, updateVfx: true);
+            RenderScene(framebufferWidth, framebufferHeight);
             RecordRenderedFrame();
             ProcessPendingSnapshot();
             _firstRenderedFrame.TrySetResult(true);
         }
 
-        private void RenderScene(int framebufferWidth, int framebufferHeight, TimeSpan frameDelta, bool updateVfx)
+        private void RenderScene(int framebufferWidth, int framebufferHeight)
         {
             _meshRenderer?.ProcessPendingReleases();
             _gl.Viewport(0, 0, (uint)framebufferWidth, (uint)framebufferHeight);
@@ -212,36 +205,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _meshRenderer.Render(_skyModel, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
 
-            // Render standalone VFX inspection/playback.
-            if (_vfxRenderer != null)
-            {
-                if (_activeSceneModel != null)
-                {
-                    _vfxRenderer.SetWorldTransform(
-                        ViewerInteractionService.CreateWorldMatrix(_activeSceneModel));
-                }
-                _vfxRenderer.SetViewportSize(framebufferWidth, framebufferHeight);
-                if (updateVfx)
-                    _vfxRenderer.Update((float)Math.Clamp(frameDelta.TotalSeconds, 0, 0.25));
-                _vfxRenderer.Render(viewProj, view);
-            }
-
-            // Animation-clip VFX belong to the model that owns the GraphClip. They use the
-            // animation clock rather than frameDelta, so snapshots and pauses draw the exact
-            // same deterministic state without advancing the simulation.
-            foreach ((SceneModel model, VfxRenderSession session) in _clipVfxSessions)
-            {
-                if (model.CurrentAnimation == null ||
-                    !_activeAnimationData.TryGetValue(model, out AnimationData clipData) ||
-                    !clipData.IsAuthoredClip)
-                {
-                    continue;
-                }
-
-                session.SetWorldTransform(ViewerInteractionService.CreateWorldMatrix(model));
-                session.SetViewportSize(framebufferWidth, framebufferHeight);
-                session.Render(viewProj, view);
-            }
         }
 
         private void EnsureSceneRenderers(bool required = false)
@@ -261,43 +224,8 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void EnsureVfxRenderer()
-        {
-            if (_vfxRenderer != null || _gl == null || _selectedVfxSystem == null) return;
-            EnsureSceneRenderers(required: true);
-            var renderer = new VfxRenderSession(LogService, VfxLoadingService);
-            renderer.Initialize(_gl);
-            renderer.SetVfxSystem(_selectedVfxSystem);
-            _vfxRenderer = renderer;
-        }
-
-        private VfxRenderSession EnsureClipVfxSession(SceneModel model)
-        {
-            if (model == null || _gl == null || VfxLoadingService == null) return null;
-            if (_clipVfxSessions.TryGetValue(model, out VfxRenderSession existing)) return existing;
-
-            VfxRenderSession session = null;
-            try
-            {
-                EnsureSceneRenderers(required: true);
-                session = new VfxRenderSession(LogService, VfxLoadingService);
-                session.Initialize(_gl);
-                _clipVfxSessions[model] = session;
-                return session;
-            }
-            catch (Exception ex)
-            {
-                session?.Dispose();
-                LogService?.LogError(ex, $"Failed to initialize Animation Clip VFX for '{model.Name}'. Animation playback will continue without clip VFX.");
-                return null;
-            }
-        }
-
         private CustomCameraController _cameraController;
         private readonly Dictionary<SceneModel, AnimationService> _animationServices = new();
-        private readonly Dictionary<SceneModel, VfxRenderSession> _clipVfxSessions = new();
-        private readonly Dictionary<SceneModel, AnimationData> _activeAnimationData = new();
-        private readonly Dictionary<SceneModel, ClipVisualState> _clipVisualStates = new();
         private readonly System.Diagnostics.Stopwatch _renderStopwatch = new();
         private readonly System.Diagnostics.Stopwatch _fpsStopwatch = new();
         private bool _isCompositionTargetHooked;
@@ -323,18 +251,6 @@ namespace AssetsManager.Views.Controls.Viewer
             public double AnimationTime;
             public int VisiblePartsHash;
             public bool IsVisible;
-        }
-
-        private sealed record ClipVisibilityChange(
-            double AtSeconds,
-            IReadOnlyList<uint> ShowHashes,
-            IReadOnlyList<uint> HideHashes);
-
-        private sealed class ClipVisualState
-        {
-            public AnimationData Animation { get; init; }
-            public Dictionary<ModelPart, bool> BaseVisibility { get; init; }
-            public IReadOnlyList<ClipVisibilityChange> VisibilityChanges { get; init; }
         }
 
         private readonly Dictionary<SceneModel, ModelUpdateKey> _lastModelUpdates = new();
@@ -720,11 +636,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _gridRenderer = null;
                 RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
 
-                var vfxRenderer = _vfxRenderer;
-                _vfxRenderer = null;
-                _selectedVfxSystem = null;
-                RunReleaseStep(nameof(VfxRenderSession), () => vfxRenderer?.Dispose(), gpuBound: true);
-
                 var gl = _gl;
                 _gl = null;
                 RunReleaseStep("OpenGL API", () => gl?.Dispose());
@@ -777,7 +688,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     AnimationData data = FindMatchingAnimation(model, animationModel.AnimationData);
                     if (data != null)
                         ActivateAnimation(model, data);
-                    else if (_activeAnimationData.ContainsKey(model))
+                    else if (model.CurrentAnimation != null)
                         DeactivateAnimation(model);
                 }
             }
@@ -792,16 +703,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private static AnimationData FindMatchingAnimation(SceneModel model, AnimationData source)
         {
             if (model?.Animations == null || source == null) return null;
-            if (source.IsAuthoredClip)
-            {
-                uint clipHash = source.AuthoredClip.Clip.OwnerPathHash;
-                return model.Animations.FirstOrDefault(candidate =>
-                    candidate.IsAuthoredClip &&
-                    candidate.AuthoredClip.Clip.OwnerPathHash == clipHash);
-            }
-
             return model.Animations.FirstOrDefault(candidate =>
-                !candidate.IsAuthoredClip &&
                 string.Equals(candidate.Name, source.Name, StringComparison.OrdinalIgnoreCase));
         }
 
@@ -836,156 +738,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (model == null || data?.AnimationAsset == null) return;
 
-            RestoreClipVisibility(model, removeState: true);
-            _activeAnimationData[model] = data;
             model.CurrentAnimation = data.AnimationAsset;
             model.AnimationTime = 0d;
             model.IsAnimationPaused = false;
             _lastModelUpdates.Remove(model);
-
-            AnimationService animationService = GetAnimationServiceForModel(model);
-            IReadOnlyList<AnimationJointSnapCue> snaps = data.AuthoredClip?.TimedCues
-                ?.OfType<AnimationJointSnapCue>()
-                .ToArray() ?? Array.Empty<AnimationJointSnapCue>();
-            animationService.SetJointSnapCues(snaps);
-
-            if (data.IsAuthoredClip)
-            {
-                PrepareClipVisualState(model, data);
-                animationService.Update(
-                    0f,
-                    data.AnimationAsset,
-                    model.Skeleton,
-                    model.SkinnedMesh,
-                    model.Parts,
-                    model.Name);
-                model.GpuSkinningData = animationService.SkinningData;
-                model.SkinningMatrices = animationService.FinalBoneTransforms;
-                ConfigureClipVfx(model, data, animationService);
-                ApplyClipVisibility(model, 0d);
-            }
-            else if (_clipVfxSessions.TryGetValue(model, out VfxRenderSession staleSession))
-            {
-                staleSession.Stop();
-            }
-        }
-
-        private void ConfigureClipVfx(SceneModel model, AnimationData data, AnimationService animationService)
-        {
-            AnimationClipVfxContext context = data?.ClipVfxContext;
-            AnimationClipCatalogItem clip = data?.AuthoredClip;
-            if (context == null || clip == null) return;
-
-            VfxRenderSession session = EnsureClipVfxSession(model);
-            if (session == null) return;
-
-            try
-            {
-                session.SetBoneTransformSampler((time, name, hash) =>
-                    animationService.TrySampleBoneTransform((float)time, name, hash, out Matrix4x4 sampled)
-                        ? sampled
-                        : null);
-
-                int seed = unchecked((int)(clip.Clip.OwnerPathHash ^ 0x9e3779b9u));
-                session.SetAnimationSession(
-                    clip.Composition,
-                    context.IdleEffects,
-                    context.Systems,
-                    context.ResourceMap,
-                    context.SearchDirectory,
-                    seed,
-                    clip.Duration,
-                    context.OwnerSceneContext);
-                session.SetWorldTransform(ViewerInteractionService.CreateWorldMatrix(model));
-                session.SynchronizeTo(0d);
-                UpdateClipBoneAttachments(session, animationService);
-            }
-            catch (Exception ex)
-            {
-                session.Stop();
-                LogService?.LogError(ex, $"Failed to prepare Animation Clip VFX for '{clip.Name}'. Animation playback will continue without clip VFX.");
-            }
-        }
-
-        private static void UpdateClipBoneAttachments(VfxRenderSession session, AnimationService animationService)
-        {
-            session?.UpdateBoneTransforms((name, hash) =>
-            {
-                if (!string.IsNullOrWhiteSpace(name) &&
-                    animationService.TryGetBoneTransform(name, out Matrix4x4 named))
-                {
-                    return named;
-                }
-                return animationService.TryGetBoneTransform(hash, out Matrix4x4 hashed)
-                    ? hashed
-                    : null;
-            });
-        }
-
-        private void PrepareClipVisualState(SceneModel model, AnimationData data)
-        {
-            var changes = new List<ClipVisibilityChange>();
-            foreach (AnimationSubmeshVisibilityCue cue in data.AuthoredClip.TimedCues.OfType<AnimationSubmeshVisibilityCue>())
-            {
-                changes.Add(new ClipVisibilityChange(
-                    cue.AtSeconds,
-                    cue.ShowSubmeshHashes,
-                    cue.HideSubmeshHashes));
-                if (cue.UntilSeconds.HasValue)
-                {
-                    changes.Add(new ClipVisibilityChange(
-                        cue.UntilSeconds.Value,
-                        cue.HideSubmeshHashes,
-                        cue.ShowSubmeshHashes));
-                }
-            }
-
-            _clipVisualStates[model] = new ClipVisualState
-            {
-                Animation = data,
-                BaseVisibility = model.Parts.ToDictionary(part => part, part => part.IsVisible),
-                VisibilityChanges = changes.OrderBy(change => change.AtSeconds).ToArray()
-            };
-        }
-
-        private void ApplyClipVisibility(SceneModel model, double clipTime)
-        {
-            if (!_clipVisualStates.TryGetValue(model, out ClipVisualState state) ||
-                !ReferenceEquals(state.Animation, _activeAnimationData.GetValueOrDefault(model)))
-            {
-                return;
-            }
-
-            var desired = new Dictionary<ModelPart, bool>(state.BaseVisibility);
-            var byHash = model.Parts
-                .GroupBy(part => Fnv1a.HashLower(part.Name ?? string.Empty))
-                .ToDictionary(group => group.Key, group => group.ToArray());
-
-            foreach (ClipVisibilityChange change in state.VisibilityChanges)
-            {
-                if (change.AtSeconds > clipTime + 1e-9) break;
-                foreach (uint hash in change.ShowHashes ?? Array.Empty<uint>())
-                {
-                    if (byHash.TryGetValue(hash, out ModelPart[] parts))
-                        foreach (ModelPart part in parts) desired[part] = true;
-                }
-                foreach (uint hash in change.HideHashes ?? Array.Empty<uint>())
-                {
-                    if (byHash.TryGetValue(hash, out ModelPart[] parts))
-                        foreach (ModelPart part in parts) desired[part] = false;
-                }
-            }
-
-            model.ApplyAnimationVisibility(desired);
-        }
-
-        private void RestoreClipVisibility(SceneModel model, bool removeState)
-        {
-            if (model != null && _clipVisualStates.TryGetValue(model, out ClipVisualState state))
-            {
-                model.ApplyAnimationVisibility(state.BaseVisibility);
-                if (removeState) _clipVisualStates.Remove(model);
-            }
         }
 
         public void TogglePauseResume(AnimationModel animationToToggle)
@@ -1020,7 +776,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 model.AnimationTime = duration > 0d
                     ? Math.Clamp(time.TotalSeconds, 0d, duration)
                     : Math.Max(0d, time.TotalSeconds);
-                SynchronizeClipAtCurrentTime(model);
                 _lastModelUpdates.Remove(model);
             }
 
@@ -1055,12 +810,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private void DeactivateAnimation(SceneModel model)
         {
             if (model == null) return;
-            RestoreClipVisibility(model, removeState: true);
-            if (_animationServices.TryGetValue(model, out AnimationService animationService))
-                animationService.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
-            if (_clipVfxSessions.TryGetValue(model, out VfxRenderSession session))
-                session.Stop();
-            _activeAnimationData.Remove(model);
             _lastModelUpdates.Remove(model);
             model.CurrentAnimation = null;
             model.AnimationTime = 0d;
@@ -1091,12 +840,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public void ResetScene()
         {
             StopAnimation();
-
-            foreach (VfxRenderSession session in _clipVfxSessions.Values)
-                RunReleaseStep(nameof(VfxRenderSession), session.Dispose, gpuBound: true);
-            _clipVfxSessions.Clear();
-            _activeAnimationData.Clear();
-            _clipVisualStates.Clear();
 
             foreach (var model in _loadedModels)
             {
@@ -1180,10 +923,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             model.PropertyChanged -= Model_PropertyChanged;
-            RestoreClipVisibility(model, removeState: true);
-            _activeAnimationData.Remove(model);
-            if (_clipVfxSessions.Remove(model, out VfxRenderSession clipSession))
-                RunReleaseStep(nameof(VfxRenderSession), clipSession.Dispose, gpuBound: true);
             _lastModelUpdates.Remove(model);
             _meshRenderer?.QueueRelease(model);
             if (_animationServices.TryGetValue(model, out var animationService))
@@ -1247,40 +986,7 @@ namespace AssetsManager.Views.Controls.Viewer
             Panel?.AutoArrangeSelectedModels();
         }
 
-        public void SelectVfxSystem(VfxSystemModel vfxSystem)
-        {
-            _selectedVfxSystem = vfxSystem;
-            _vfxRenderer?.SetVfxSystem(vfxSystem);
-        }
-
-        public void PlayVfx() => _vfxRenderer?.Play();
-
-        public void PauseVfx() => _vfxRenderer?.Pause();
-
-        public void StopVfx() => _vfxRenderer?.Stop();
-
-        public void SeekVfx(TimeSpan time) => _vfxRenderer?.Seek(time.TotalSeconds);
-
-        private void SynchronizeClipAtCurrentTime(SceneModel model)
-        {
-            if (model == null ||
-                !_activeAnimationData.TryGetValue(model, out AnimationData data) ||
-                !data.IsAuthoredClip)
-            {
-                return;
-            }
-
-            double playbackTime = FoldClipTime(model.AnimationTime, data.AnimationAsset?.Duration ?? 0f);
-            ApplyClipVisibility(model, playbackTime);
-            if (!_clipVfxSessions.TryGetValue(model, out VfxRenderSession session)) return;
-
-            AnimationService animationService = GetAnimationServiceForModel(model);
-            session.SetWorldTransform(ViewerInteractionService.CreateWorldMatrix(model));
-            session.SynchronizeTo(playbackTime);
-            UpdateClipBoneAttachments(session, animationService);
-        }
-
-        private static double FoldClipTime(double time, double duration)
+        private static double FoldAnimationTime(double time, double duration)
         {
             if (!(duration > 0d) || !double.IsFinite(time)) return 0d;
             double folded = time % duration;
@@ -1339,13 +1045,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     }
                 }
 
-                AnimationData data = _activeAnimationData.GetValueOrDefault(model);
-                double playbackTime = data?.IsAuthoredClip == true
-                    ? FoldClipTime(model.AnimationTime, model.CurrentAnimation.Duration)
-                    : model.AnimationTime;
-
-                if (data?.IsAuthoredClip == true)
-                    ApplyClipVisibility(model, playbackTime);
+                double playbackTime = model.AnimationTime;
 
                 int visiblePartsHash = model.Parts?.Sum(part => part.IsVisible ? 1 : 0) ?? 0;
                 var currentKey = new ModelUpdateKey
@@ -1377,13 +1077,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     model.SkinningMatrices = animationService.FinalBoneTransforms;
                 }
 
-                if (data?.IsAuthoredClip == true &&
-                    _clipVfxSessions.TryGetValue(model, out VfxRenderSession session))
-                {
-                    session.SetWorldTransform(ViewerInteractionService.CreateWorldMatrix(model));
-                    session.SynchronizeTo(playbackTime);
-                    UpdateClipBoneAttachments(session, animationService);
-                }
             }
 
             if (_activeSceneModel?.CurrentAnimation != null)
@@ -1401,7 +1094,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             double next = model.AnimationTime + elapsed;
             model.AnimationTime = next >= duration || next < 0d
-                ? FoldClipTime(next, duration)
+                ? FoldAnimationTime(next, duration)
                 : next;
         }
 
@@ -1684,7 +1377,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     request.Height,
                     OpenTkControl.FrameBufferWidth,
                     OpenTkControl.FrameBufferHeight,
-                    () => RenderScene(request.Width, request.Height, TimeSpan.Zero, updateVfx: false));
+                    () => RenderScene(request.Width, request.Height));
                 _ = SaveSnapshotAsync(snapshot, request.FilePath);
             }
             catch (Exception ex)

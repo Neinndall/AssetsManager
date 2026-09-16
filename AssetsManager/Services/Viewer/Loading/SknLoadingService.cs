@@ -73,7 +73,6 @@ namespace AssetsManager.Services.Viewer.Loading
                         Path.GetFileNameWithoutExtension(filePath),
                         materialTextures,
                         filePath,
-                        SknMaterialTextureResolver.TryResolveBinPath(textureDirectoryPath),
                         cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -116,7 +115,6 @@ namespace AssetsManager.Services.Viewer.Loading
                         Path.GetFileNameWithoutExtension(filePath),
                         materialTextures,
                         filePath,
-                        SknMaterialTextureResolver.TryResolveBinPath(filePath),
                         cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -200,7 +198,6 @@ namespace AssetsManager.Services.Viewer.Loading
             string modelName,
             SknMaterialTextureResolution materialTextures,
             string filePath,
-            string skinBinPath,
             CancellationToken cancellationToken)
         {
             var availableTextureNames = new ObservableRangeCollection<string>(
@@ -303,7 +300,6 @@ namespace AssetsManager.Services.Viewer.Loading
                     Name = modelName,
                     SkinnedMesh = skinnedMesh,
                     FilePath = filePath,
-                    SkinBinPath = skinBinPath ?? string.Empty,
                     Skeleton = skeleton
                 };
                 _logService.LogDebug("--- Displaying Model ---");

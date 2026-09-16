@@ -98,11 +98,6 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public string Name => AnimationData.Name;
-        public bool IsAuthoredClip => AnimationData.IsAuthoredClip;
-        public string KindLabel => AnimationData.KindLabel;
-        public int EventCount => AnimationData.EventCount;
-        public int VfxEventCount => AnimationData.VfxEventCount;
-        public string EventSummary => AnimationData.EventSummary;
 
         public AnimationModel(AnimationData animationData)
         {
