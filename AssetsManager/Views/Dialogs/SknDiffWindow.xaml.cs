@@ -86,6 +86,17 @@ namespace AssetsManager.Views.Dialogs
             Loaded += SknDiffWindow_Loaded;
         }
 
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            // OLD owns the OpenGL context and NEW reuses it. GLWpfControl explicitly
+            // supports ContextToUse for multiple controls, which keeps framebuffer and
+            // scene resource creation on one context throughout the comparison window.
+            OldViewport.EnsureOpenTkStarted();
+            NewViewport.EnsureOpenTkStarted(OldViewport.OpenTkContext);
+        }
+
         private async void SknDiffWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Loaded -= SknDiffWindow_Loaded;
@@ -156,9 +167,9 @@ namespace AssetsManager.Views.Dialogs
             _oldCameraChangedHandler = null;
             _newCameraChangedHandler = null;
 
-            // Viewports own every primary and auxiliary scene they contain.
-            OldViewport.Cleanup();
+            // NEW borrows OLD's OpenGL context, so dispose the dependent viewport first.
             NewViewport.Cleanup();
+            OldViewport.Cleanup();
 
             _partItems.Clear();
             _diffOverlayScenes.Clear();

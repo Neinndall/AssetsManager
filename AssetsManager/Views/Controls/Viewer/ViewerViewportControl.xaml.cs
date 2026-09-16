@@ -83,9 +83,6 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
-                EnsureSceneRenderers();
-                EnsureVfxRenderer();
-                _vfxRenderer?.SetVfxSystem(_selectedVfxSystem);
             }
             catch (Exception ex)
             {
@@ -96,6 +93,13 @@ namespace AssetsManager.Views.Controls.Viewer
         private void OpenTkControl_Render(TimeSpan delta)
         {
             if (_gl == null) return;
+
+            // GLWpfControl makes this viewport's context current immediately before
+            // invoking Render. Create GPU resources only here so multiple viewports
+            // cannot initialize shaders or buffers against another control's context.
+            EnsureSceneRenderers();
+            EnsureVfxRenderer();
+
             int framebufferWidth = OpenTkControl.FrameBufferWidth;
             int framebufferHeight = OpenTkControl.FrameBufferHeight;
             if (framebufferWidth <= 0 || framebufferHeight <= 0) return;
@@ -262,6 +266,7 @@ namespace AssetsManager.Views.Controls.Viewer
             EnsureSceneRenderers(required: true);
             var renderer = new VfxRenderSession(LogService, VfxLoadingService);
             renderer.Initialize(_gl);
+            renderer.SetVfxSystem(_selectedVfxSystem);
             _vfxRenderer = renderer;
         }
 
@@ -348,14 +353,20 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _viewModel.PropertyChanged += OnViewportViewModelPropertyChanged;
 
-            // GLWpfControl is designed to be started before WPF raises Loaded so it can
-            // register its own initial invalidation and visibility-driven render loop.
-            EnsureOpenTkStarted();
-
             Loaded += OnViewportLoaded;
             Unloaded += OnViewportUnloaded;
 
             UpdateToolbarVisibility();
+        }
+
+        protected override void OnInitialized(EventArgs e)
+        {
+            base.OnInitialized(e);
+
+            // Normal viewers own their context. Diff viewports defer startup so the
+            // comparison window can make OLD and NEW share one OpenGL context.
+            if (!IsDiffMode)
+                EnsureOpenTkStarted();
         }
 
         private void InitializeModelInteraction()
@@ -394,8 +405,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
                     break;
                 case nameof(ViewerViewportModel.IsGridVisible):
-                    if (_viewModel.IsGridVisible)
-                        EnsureSceneRenderers();
                     break;
                 case nameof(ViewerViewportModel.ShowSkybox):
                     SetSkyboxVisibility(_viewModel.ShowSkybox);
@@ -448,7 +457,9 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void EnsureOpenTkStarted()
+        internal OpenTK.Windowing.Common.IGraphicsContext OpenTkContext => OpenTkControl?.Context;
+
+        internal void EnsureOpenTkStarted(OpenTK.Windowing.Common.IGraphicsContext contextToUse = null)
         {
             if (_isOpenTkStarted || OpenTkControl == null) return;
 
@@ -457,7 +468,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 MajorVersion = 3,
                 MinorVersion = 3,
                 Profile = OpenTK.Windowing.Common.ContextProfile.Core,
-                RenderContinuously = !_viewModel.LimitFps
+                RenderContinuously = !_viewModel.LimitFps,
+                ContextToUse = contextToUse
             };
 
             OpenTkControl.Start(settings);
@@ -1129,7 +1141,6 @@ namespace AssetsManager.Views.Controls.Viewer
             else
                 _loadedModels.Add(model);
 
-            EnsureSceneRenderers();
             if (model.IsVisible && !Viewport.Children.Contains(model.RootVisual))
                 Viewport.Children.Add(model.RootVisual);
 
@@ -1236,7 +1247,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public void SelectVfxSystem(VfxSystemModel vfxSystem)
         {
             _selectedVfxSystem = vfxSystem;
-            EnsureVfxRenderer();
             _vfxRenderer?.SetVfxSystem(vfxSystem);
         }
 
