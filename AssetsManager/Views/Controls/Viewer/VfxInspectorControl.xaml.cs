@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -500,6 +500,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         _championModel.Name);
                     _championModel.SkinningMatrices = _championAnimationService.FinalBoneTransforms;
                     _championModel.GpuSkinningData = _championAnimationService.SkinningData;
+                    _vfxRenderer?.SetOwnerSkinningMatrices(_championAnimationService.FinalBoneTransforms);
                 }
 
                 _vfxRenderer?.UpdateBoneTransforms((boneName, boneHash) =>
@@ -1038,6 +1039,10 @@ namespace AssetsManager.Views.Controls.Viewer
                         _championModel.Scale = _activeBundle?.OwnerSceneContext is { SkinScale: > 0f } owner
                             ? owner.SkinScale
                             : 1f;
+                        IReadOnlyList<uint> initialHidden =
+                            _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>();
+                        ApplyOwnerSubmeshVisibility(initialHidden);
+                        _vfxRenderer?.SetOwnerHiddenSubmeshes(initialHidden);
                         if (oldModel != null)
                         {
                             _championMeshRenderer?.QueueRelease(oldModel);
@@ -1143,6 +1148,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     seed,
                     dur,
                     _activeBundle.OwnerSceneContext);
+                _vfxRenderer.SetOwnerSkinningMatrices(_championAnimationService?.FinalBoneTransforms);
                 _vfxRenderer.Play();
             }
 
@@ -1179,6 +1185,14 @@ namespace AssetsManager.Views.Controls.Viewer
                 _activeAnimationClip.TimedCues,
                 _animationBaseHiddenSubmeshes,
                 time);
+            ApplyOwnerSubmeshVisibility(hidden);
+            _vfxRenderer?.SetOwnerHiddenSubmeshes(hidden);
+        }
+
+        private void ApplyOwnerSubmeshVisibility(IEnumerable<uint> hiddenHashes)
+        {
+            if (_championModel == null) return;
+            var hidden = hiddenHashes as ISet<uint> ?? new HashSet<uint>(hiddenHashes ?? Array.Empty<uint>());
             foreach (ModelPart part in _championModel.Parts)
             {
                 if (string.IsNullOrWhiteSpace(part.Name)) continue;
@@ -1202,6 +1216,8 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationBasePartVisibility.Clear();
             _animationBaseHiddenSubmeshes.Clear();
             _championAnimationService?.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
+            _vfxRenderer?.SetOwnerHiddenSubmeshes(
+                _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>());
         }
 
         private string ResolveSknPath(string authoredPath, string searchDir)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
@@ -9,6 +9,7 @@ using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Hashing;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
@@ -125,6 +126,33 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void UnsupportedPrimitiveDoesNotFallThroughToBillboardRendering()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.Unsupported,
+                TexturePath = "visible.dds"
+            };
+
+            Assert.False(emitter.DrawsAsQuad);
+            Assert.False(emitter.IsVisual);
+        }
+
+        [Fact]
+        public void TrailPrimitiveWithoutTrailDefinitionDoesNotDraw()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.CameraTrail,
+                TexturePath = "trail.dds",
+                Trail = null
+            };
+
+            Assert.False(emitter.DrawsAsTrail);
+            Assert.False(emitter.IsVisual);
+        }
+
+        [Fact]
         public void MeshInstancesPreserveAuthoredZeroScaleComponents()
         {
             var emitter = CreateEmitter(new Vector3(7f, 0f, 7f), VfxEmitterRenderState.Default);
@@ -218,17 +246,41 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void MeshInterleavingPreservesPositionUvAndVertexColor()
+        public void MeshInterleavingPreservesPositionUvVertexColorNormalAndSkinningSlots()
         {
             float[] interleaved = VfxMeshResourceCache.BuildInterleaved(
                 new[] { 1f, 2f, 3f },
+                new[] { 0f, 1f, 0f },
                 new[] { 0.25f, 0.75f },
                 new[] { 0.1f, 0.2f, 0.3f, 0.4f });
 
             Assert.Equal(VfxMeshResourceCache.VertexStride, interleaved.Length);
             Assert.Equal(
-                new[] { 1f, 2f, 3f, 0.25f, 0.75f, 0.1f, 0.2f, 0.3f, 0.4f },
+                new[]
+                {
+                    1f, 2f, 3f,
+                    0.25f, 0.75f,
+                    0.1f, 0.2f, 0.3f, 0.4f,
+                    0f, 1f, 0f,
+                    0f, 0f, 0f, 0f,
+                    0f, 0f, 0f, 0f
+                },
                 interleaved);
+        }
+
+        [Fact]
+        public void MeshInterleavingPreservesAttachedOwnerBoneIndicesAndWeights()
+        {
+            float[] interleaved = VfxMeshResourceCache.BuildInterleaved(
+                new[] { 1f, 2f, 3f },
+                new[] { 0f, 1f, 0f },
+                new[] { 0.25f, 0.75f },
+                new[] { 1f, 1f, 1f, 1f },
+                new[] { 4f, 8f, 15f, 16f },
+                new[] { 0.4f, 0.3f, 0.2f, 0.1f });
+
+            Assert.Equal(new[] { 4f, 8f, 15f, 16f }, interleaved[12..16]);
+            Assert.Equal(new[] { 0.4f, 0.3f, 0.2f, 0.1f }, interleaved[16..20]);
         }
 
         [Fact]
@@ -305,6 +357,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             simulator.Update(0.1f);
 
             Assert.Equal(0, new VfxTrailGeometry().Build(Assert.Single(simulator.Emitters), Vector3.UnitZ));
+        }
+
+        [Fact]
+        public void BeamNamingMeshSuppressesItsRibbonLikeLtk()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.Beam,
+                MeshPath = "Effects/BeamMesh.scb",
+                Beam = new VfxBeamDefinition(
+                    0,
+                    0,
+                    0,
+                    VfxCurve3.Const(Vector3.Zero),
+                    VfxCurve4.Const(Vector4.One),
+                    false,
+                    Vector3.Zero,
+                    Vector3.Zero)
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(new VfxSystemDefinition(1, "beam-mesh", "beam-mesh", new[] { emitter }), Vector3.Zero);
+            simulator.Update(0.02f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.True(state.Def.SuppressesBeamRibbon);
+            Assert.False(state.Def.IsVisual);
+            Assert.Equal(0, new VfxBeamGeometry().Build(state, Vector3.UnitZ));
         }
 
         [Fact]
@@ -428,7 +508,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(0.15f, state.Instances[11], 3);
-            Assert.Equal(1.0f, state.Instances[19], 3);
+            // LTK folds wrap-mode offsets by one cell at draw time, so exactly 1.0 becomes 0.0.
+            Assert.Equal(0.0f, state.Instances[19], 3);
             Assert.Equal(0.2f, state.Instances[20], 3);
             Assert.Equal(18f * MathF.PI / 180f, state.Instances[23], 3);
             Assert.Equal(0.19f, state.Instances[29], 3);
@@ -1023,6 +1104,65 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void AttachedMeshLiveVisibilityMatchesLtkDrawAlwaysAndHiddenPrecedence()
+        {
+            uint body = Fnv1a.HashLower("Body");
+            uint cape = Fnv1a.HashLower("Cape");
+            uint hair = Fnv1a.HashLower("Hair");
+            var draw = new[] { cape };
+            var always = new[] { hair };
+            var hidden = new HashSet<uint> { cape, hair };
+
+            Assert.False(VfxOpenGlRenderer.ShouldDrawAttachedRange(body, narrowed: true, draw, always, hidden));
+            Assert.False(VfxOpenGlRenderer.ShouldDrawAttachedRange(cape, narrowed: true, draw, always, hidden));
+            Assert.True(VfxOpenGlRenderer.ShouldDrawAttachedRange(hair, narrowed: true, draw, always, hidden));
+
+            Assert.True(VfxOpenGlRenderer.ShouldDrawAttachedRange(body, narrowed: false, draw, always, new HashSet<uint>()));
+            Assert.False(VfxOpenGlRenderer.ShouldDrawAttachedRange(body, narrowed: false, draw, always, new HashSet<uint> { body }));
+        }
+
+        [Fact]
+        public void AttachedMeshDrawBudgetMatchesLtkEightSlotsAcrossSources()
+        {
+            Assert.Equal(8, VfxOpenGlRenderer.ResolveAttachedMeshDrawCount(0, 20));
+            Assert.Equal(3, VfxOpenGlRenderer.ResolveAttachedMeshDrawCount(5, 20));
+            Assert.Equal(0, VfxOpenGlRenderer.ResolveAttachedMeshDrawCount(8, 20));
+            Assert.Equal(0, VfxOpenGlRenderer.ResolveAttachedMeshDrawCount(12, 20));
+        }
+
+        [Fact]
+        public void AttachedMeshKeepsSourcePoolOrderInsteadOfBackToFrontSorting()
+        {
+            VfxEmitterDefinition attached = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.AttachedMesh,
+                IsMeshPrimitive = true,
+                BlendMode = 1
+            };
+            VfxEmitterDefinition mesh = attached with { PrimitiveKind = VfxPrimitiveKind.Mesh };
+
+            Assert.False(VfxOpenGlRenderer.ShouldSortInstances(attached, 4));
+            Assert.True(VfxOpenGlRenderer.ShouldSortInstances(mesh, 4));
+        }
+
+        [Fact]
+        public void PolygonOffsetMatchesLtkZeroAndAttachedOverlaySemantics()
+        {
+            VfxEmitterDefinition mesh = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.Mesh,
+                DepthBiasFactors = Vector2.Zero
+            };
+            VfxEmitterDefinition attached = mesh with { PrimitiveKind = VfxPrimitiveKind.AttachedMesh };
+
+            Assert.Null(VfxOpenGlRenderer.ResolvePolygonOffset(mesh));
+            Assert.Equal(new Vector2(-1f, -1f), VfxOpenGlRenderer.ResolvePolygonOffset(attached));
+            Assert.Equal(
+                new Vector2(2f, -3f),
+                VfxOpenGlRenderer.ResolvePolygonOffset(attached with { DepthBiasFactors = new Vector2(2f, -3f) }));
+        }
+
+        [Fact]
         public void UnnamedBaseTextureSamplesTransparentBlackWhileMissingNamedTextureStaysUntextured()
         {
             VfxEmitterDefinition unnamed = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -1076,11 +1216,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(terrain));
             Assert.True(VfxOpenGlRenderer.ShouldProjectToGround(ground));
-            Assert.True(VfxOpenGlRenderer.ShouldProjectToGround(projection));
+            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(projection));
+            Assert.False(projection.IsVisual);
         }
 
         [Fact]
-        public void GroundAndPlanarQuadsUseAuthoredSoftParticleFade()
+        public void DrawnQuadsUseAuthoredSoftParticleFadeButPlanarProjectionStaysUndrawn()
         {
             var soft = new VfxSoftParticleDefinition(0f, 80f, 0f, 0f);
             VfxEmitterDefinition regular = CreateEmitter(
@@ -1096,14 +1237,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: true));
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(ground, hasSceneDepth: true));
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(terrain, hasSceneDepth: true));
-            Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(projection, hasSceneDepth: true));
+            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(projection, hasSceneDepth: true));
+            Assert.False(projection.IsVisual);
             Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: false));
 
             VfxEmitterDefinition groundRotation = regular with
             {
                 BirthRotation = VfxCurve3.Const(new Vector3(-90f, -90f, 0f))
             };
-            Assert.True(VfxOpenGlRenderer.IsGroundLikeBirthRotation(groundRotation.BirthRotation));
+            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(groundRotation));
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(groundRotation, hasSceneDepth: true));
         }
 
@@ -1146,25 +1288,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void GroundLikeBirthRotationDetectionRecognizesAuthoredTilt()
+        public void GroundProjectionRequiresTheAuthoredGroundLayerFlag()
         {
-            VfxEmitterDefinition groundMesh = CreateEmitter(
-                Vector3.One,
-                VfxEmitterRenderState.Default) with
-            {
-                IsMeshPrimitive = true,
-                PrimitiveKind = VfxPrimitiveKind.Mesh,
-                IsGroundLayer = true,
-                BirthRotation = VfxCurve3.Const(new Vector3(90f, 20f, 30f))
-            };
-
-            Assert.True(VfxOpenGlRenderer.IsGroundLikeBirthRotation(groundMesh.BirthRotation));
-        }
-
-        [Fact]
-        public void NegativeNinetyBirthRotationIsRecognizedAsGroundLike()
-        {
-            VfxEmitterDefinition mesh = CreateEmitter(
+            VfxEmitterDefinition tiltedMesh = CreateEmitter(
                 Vector3.One,
                 VfxEmitterRenderState.Default) with
             {
@@ -1173,7 +1299,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 BirthRotation = VfxCurve3.Const(new Vector3(-90f, 0f, 0f))
             };
 
-            Assert.True(VfxOpenGlRenderer.IsGroundLikeBirthRotation(mesh.BirthRotation));
+            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(tiltedMesh));
+            Assert.True(VfxOpenGlRenderer.ShouldProjectToGround(tiltedMesh with { IsGroundLayer = true }));
         }
 
         [Fact]
@@ -1473,63 +1600,114 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void RenderOrderUsesPassThenImportanceThenSourceOrder()
+        public void RenderOrderUsesLtkPassAndSourceOrderAndIgnoresImportance()
         {
             var first = CreateEmitter(Vector3.One, new VfxEmitterRenderState(2, 0, 0, false, false, false, false)) with
             {
-                Name = "importance-low",
-                Importance = 1
+                Name = "source-first",
+                Importance = 9
             };
             var second = CreateEmitter(Vector3.One, new VfxEmitterRenderState(2, 0, 0, false, false, false, false)) with
             {
-                Name = "importance-high",
-                Importance = 5
+                Name = "source-second",
+                Importance = 0
             };
-            var third = CreateEmitter(Vector3.One, new VfxEmitterRenderState(3, 0, 0, false, false, false, false)) with
+            var laterPass = CreateEmitter(Vector3.One, new VfxEmitterRenderState(3, 0, 0, false, false, false, false)) with
             {
                 Name = "later-pass",
                 Importance = 0
             };
             var runtime = new VfxPlaybackRuntime(7);
             runtime.SetSystem(
-                new VfxSystemDefinition(1, "render-order", "render-order", new[] { third, second, first }),
+                new VfxSystemDefinition(1, "render-order", "render-order", new[] { laterPass, first, second }),
                 Vector3.Zero);
 
             runtime.ApplyRenderOrder();
 
-            Assert.Equal("importance-low", runtime.Emitters[0].Def.Name);
-            Assert.Equal("importance-high", runtime.Emitters[1].Def.Name);
+            Assert.Equal("source-first", runtime.Emitters[0].Def.Name);
+            Assert.Equal("source-second", runtime.Emitters[1].Def.Name);
             Assert.Equal("later-pass", runtime.Emitters[2].Def.Name);
         }
 
         [Fact]
-        public void GlobalRenderQueueUsesAuthoredPhaseBeforePass()
+        public void GlobalRenderQueueDrawsGroundLayerBeforeDefaultLayer()
         {
-            VfxEmitterDefinition latePhase = CreateEmitter(Vector3.One,
-                new VfxEmitterRenderState(0, 0, 0, false, false, false, false, RenderPhase: 8)) with { Name = "late-phase" };
-            VfxEmitterDefinition earlyPhase = CreateEmitter(Vector3.One,
-                new VfxEmitterRenderState(99, 0, 0, false, false, false, false, RenderPhase: 6)) with { Name = "early-phase" };
+            VfxEmitterDefinition defaultLayer = CreateEmitter(
+                Vector3.One,
+                new VfxEmitterRenderState(-100, 0, 0, false, false, false, false)) with
+            {
+                Name = "default",
+                BlendMode = 3
+            };
+            VfxEmitterDefinition groundLayer = CreateEmitter(
+                Vector3.One,
+                new VfxEmitterRenderState(999, 0, 0, false, false, false, false)) with
+            {
+                Name = "ground",
+                IsGroundLayer = true,
+                BlendMode = 8
+            };
             var runtime = new VfxPlaybackRuntime(7);
-            runtime.SetSystem(new VfxSystemDefinition(1, "phases", "phases", new[] { latePhase, earlyPhase }), Vector3.Zero);
+            runtime.SetSystem(
+                new VfxSystemDefinition(1, "ground-order", "ground-order", new[] { defaultLayer, groundLayer }),
+                Vector3.Zero);
 
             IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters }, Matrix4x4.Identity);
 
-            Assert.Equal("early-phase", queue[0].Emitter.Def.Name);
-            Assert.Equal("late-phase", queue[1].Emitter.Def.Name);
+            Assert.Equal("ground", queue[0].Emitter.Def.Name);
+            Assert.Equal("default", queue[1].Emitter.Def.Name);
         }
 
         [Fact]
-        public void GlobalRenderQueueSortsOptedInEmittersBackToFront()
+        public void GlobalRenderQueueMatchesLtkPassBlendMiscAndIgnoresRenderPhase()
         {
-            var sortedState = new VfxEmitterRenderState(
+            VfxEmitterDefinition alpha = CreateEmitter(Vector3.One,
+                new VfxEmitterRenderState(0, 0, 0, false, false, false, false, RenderPhase: 0)) with
+            {
+                Name = "alpha",
+                BlendMode = 1,
+                MiscRenderFlags = 0
+            };
+            VfxEmitterDefinition addMiscHigh = CreateEmitter(Vector3.One,
+                new VfxEmitterRenderState(0, 0, 0, false, false, false, false, RenderPhase: 1)) with
+            {
+                Name = "add-misc-high",
+                BlendMode = 0,
+                MiscRenderFlags = 9,
+                Importance = 0
+            };
+            VfxEmitterDefinition addMiscLow = CreateEmitter(Vector3.One,
+                new VfxEmitterRenderState(0, 0, 0, false, false, false, false, RenderPhase: 99)) with
+            {
+                Name = "add-misc-low",
+                BlendMode = 0,
+                MiscRenderFlags = 1,
+                Importance = 99
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(
+                new VfxSystemDefinition(1, "draw-kind", "draw-kind", new[] { alpha, addMiscHigh, addMiscLow }),
+                Vector3.Zero);
+
+            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters }, Matrix4x4.Identity);
+
+            Assert.Equal("add-misc-low", queue[0].Emitter.Def.Name);
+            Assert.Equal("add-misc-high", queue[1].Emitter.Def.Name);
+            Assert.Equal("alpha", queue[2].Emitter.Def.Name);
+        }
+
+        [Fact]
+        public void GlobalRenderQueueDoesNotUseEmitterPositionAsAnInternalDrawKindKey()
+        {
+            var authoredState = new VfxEmitterRenderState(
                 0, 0, 0, false, false, false, false,
                 SortEmittersByPosition: true);
-            VfxEmitterDefinition near = CreateEmitter(Vector3.One, sortedState) with
+            VfxEmitterDefinition near = CreateEmitter(Vector3.One, authoredState) with
             {
                 Name = "near",
                 EmitterPosition = VfxCurve3.Const(new Vector3(0f, 0f, -2f))
             };
-            VfxEmitterDefinition far = CreateEmitter(Vector3.One, sortedState) with
+            VfxEmitterDefinition far = CreateEmitter(Vector3.One, authoredState) with
             {
                 Name = "far",
                 EmitterPosition = VfxCurve3.Const(new Vector3(0f, 0f, -10f))
@@ -1539,8 +1717,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters }, Matrix4x4.Identity);
 
-            Assert.Equal("far", queue[0].Emitter.Def.Name);
-            Assert.Equal("near", queue[1].Emitter.Def.Name);
+            Assert.Equal("near", queue[0].Emitter.Def.Name);
+            Assert.Equal("far", queue[1].Emitter.Def.Name);
         }
 
         [Fact]
@@ -1824,6 +2002,101 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(9, (int)VfxPrimitiveKind.PlanarProjection);
         }
 
+        [Fact]
+        public void BeamDistanceColorUsesRawSystemDistanceBeforeLocalOffsets()
+        {
+            var distanceColor = new VfxCurve4(
+                Vector4.One,
+                new[] { 0f, 2f, 20f },
+                new[]
+                {
+                    new Vector4(0f, 0f, 0f, 0f),
+                    new Vector4(0.25f, 0.25f, 0.25f, 0.25f),
+                    Vector4.One
+                });
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.Beam,
+                Beam = new VfxBeamDefinition(
+                    0,
+                    0,
+                    0,
+                    VfxCurve3.Const(Vector3.One),
+                    distanceColor,
+                    true,
+                    new Vector3(10f, 0f, 0f),
+                    Vector3.Zero)
+            };
+            var state = BeamState(emitter, Vector3.Zero, new Vector3(0f, 0f, 2f), Vector3.Zero);
+
+            var geometry = new VfxBeamGeometry();
+            Assert.Equal(6, geometry.Build(state, new Vector3(0f, 5f, 5f)));
+
+            // LTK samples mAnimatedColorWithDistance at |systemTarget-systemOrigin| = 2,
+            // not at the longer segment after source/target local offsets are applied.
+            Assert.Equal(0.25f, geometry.Vertices[7], precision: 5);
+            Assert.Equal(0.25f, geometry.Vertices[8], precision: 5);
+            Assert.Equal(0.25f, geometry.Vertices[9], precision: 5);
+            Assert.Equal(0.25f, geometry.Vertices[10], precision: 5);
+        }
+
+        [Fact]
+        public void ArbitraryBeamKeepsDegenerateWidthWhenParticleLocalCancelsItsSide()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.Beam,
+                Beam = new VfxBeamDefinition(
+                    1,
+                    0,
+                    0,
+                    VfxCurve3.Const(Vector3.One),
+                    VfxCurve4.Const(Vector4.One),
+                    false,
+                    Vector3.Zero,
+                    Vector3.Zero)
+            };
+            // For a +X beam the arbitrary side begins at +Z. A local position of -Z
+            // cancels it exactly; Riot leaves the resulting width vector at zero.
+            var state = BeamState(emitter, Vector3.Zero, new Vector3(2f, 0f, 0f), new Vector3(0f, 0f, -1f));
+
+            var geometry = new VfxBeamGeometry();
+            Assert.Equal(6, geometry.Build(state, new Vector3(0f, 3f, 3f)));
+            int stride = VfxBeamGeometry.VertexStride;
+            Assert.Equal(geometry.Vertices[2], geometry.Vertices[stride + 2]);
+            Assert.Equal(geometry.Vertices[3], geometry.Vertices[stride + 3]);
+            Assert.Equal(geometry.Vertices[4], geometry.Vertices[stride + 4]);
+        }
+
+        private static VfxPlaybackRuntime.EmitterState BeamState(
+            VfxEmitterDefinition emitter,
+            Vector3 origin,
+            Vector3 target,
+            Vector3 particlePosition)
+        {
+            var state = new VfxPlaybackRuntime.EmitterState
+            {
+                Def = emitter,
+                SystemOrigin = origin,
+                SystemTarget = target,
+                Instances = new float[VfxPlaybackRuntime.InstanceStride],
+                InstanceCount = 1,
+                PlacementRight = Vector3.UnitX,
+                PlacementUp = Vector3.UnitY,
+                PlacementForward = Vector3.UnitZ
+            };
+            state.Instances[0] = particlePosition.X;
+            state.Instances[1] = particlePosition.Y;
+            state.Instances[2] = particlePosition.Z;
+            state.Instances[3] = 2f;
+            state.Instances[5] = state.Instances[6] = state.Instances[7] = state.Instances[8] = 1f;
+            state.Instances[21] = state.Instances[22] = 1f;
+            state.Instances[31] = state.Instances[32] = 1f;
+            state.Particles.Add(new VfxPlaybackRuntime.Particle { TrailTiling = Vector3.One });
+            return state;
+        }
         [Fact]
         public void TrailCutoffLimitsAccumulatedLengthAndPreservesJointAttributes()
         {

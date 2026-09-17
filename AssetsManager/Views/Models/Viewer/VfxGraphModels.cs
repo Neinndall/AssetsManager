@@ -164,6 +164,10 @@ namespace AssetsManager.Views.Models.Viewer
         string AudioSoundOnCreate = null,
         IReadOnlyList<string> FilteringKeywordsExcluded = null,
         Vector4? ModulationFactor = null,
+        // Keep the two authored submesh lists separate. League applies mSubmeshesToDraw
+        // as a narrowing mask and mSubmeshesToDrawAlways after visibility filtering.
+        IReadOnlyList<uint> SubmeshesToDraw = null,
+        IReadOnlyList<uint> SubmeshesToDrawAlways = null,
         IReadOnlyList<uint> AttachedSubmeshHashes = null,
         VfxEmitterAuthoredFeatures AuthoredFeatures = null,
         Vector3? TranslationOverride = null,
@@ -182,10 +186,33 @@ namespace AssetsManager.Views.Models.Viewer
         VfxBeamDefinition Beam = null,
         VfxLingerDefinition Linger = null)
     {
-        /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
-        public bool IsVisual => !Disabled && PrimitiveKind != VfxPrimitiveKind.AttachedMesh && (!string.IsNullOrEmpty(TexturePath) ||
-            !string.IsNullOrEmpty(TextureMultPath) || !string.IsNullOrEmpty(MeshPath) ||
-            Distortion is { NormalMapTexturePath.Length: > 0 });
+        /// <summary>LTK drawKind.ts: this emitter reaches the quad renderer.</summary>
+        public bool DrawsAsQuad => PrimitiveKind is
+            VfxPrimitiveKind.CameraQuad or
+            VfxPrimitiveKind.CameraUnitQuad or
+            VfxPrimitiveKind.ArbitraryQuad or
+            VfxPrimitiveKind.Ray;
+
+        /// <summary>LTK drawKind.ts: a trail exists only when trailDefinition was authored.</summary>
+        public bool DrawsAsTrail => Trail is not null;
+
+        /// <summary>LTK drawKind.ts: a beam ribbon is suppressed when the same primitive names a mesh.</summary>
+        public bool DrawsAsBeam => Beam is not null && string.IsNullOrWhiteSpace(MeshPath);
+
+        /// <summary>
+        /// Riot suppresses a beam's ribbon when its primitive also names a mesh. Because a beam
+        /// does not enter the mesh draw path either, that authored combination draws nothing.
+        /// </summary>
+        public bool SuppressesBeamRibbon => Beam is not null && !DrawsAsBeam;
+
+        /// <summary>Does this emitter reach one of VFX Studio's drawable non-attached paths?</summary>
+        public bool IsVisual => !Disabled &&
+            !SuppressesBeamRibbon &&
+            (DrawsAsQuad || DrawsAsTrail || DrawsAsBeam) &&
+            (!string.IsNullOrEmpty(TexturePath) ||
+             !string.IsNullOrEmpty(TextureMultPath) ||
+             !string.IsNullOrEmpty(MeshPath) ||
+             Distortion is { NormalMapTexturePath.Length: > 0 });
     }
 
     public sealed record VfxSystemAuthoredFeatures(
@@ -563,7 +590,8 @@ namespace AssetsManager.Views.Models.Viewer
         string MeshPath,
         string SkeletonPath,
         float SkinScale,
-        uint AnimationGraphPathHash = 0);
+        uint AnimationGraphPathHash = 0,
+        IReadOnlyList<uint> InitialHiddenSubmeshHashes = null);
 
     /// <summary>
     /// Authored defaults from League's VfxEmitterDefinitionData schema. BIN omits

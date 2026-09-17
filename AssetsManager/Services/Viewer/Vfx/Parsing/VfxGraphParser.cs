@@ -332,6 +332,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_simpleSkin = HashAlgorithms.Fnv1a("simpleSkin");
         private static readonly uint F_ownerSkeleton = HashAlgorithms.Fnv1a("skeleton");
         private static readonly uint F_skinScale = HashAlgorithms.Fnv1a("skinScale");
+        private static readonly uint F_initialSubmeshToHide = HashAlgorithms.Fnv1a("initialSubmeshToHide");
         private static readonly uint F_skinAnimationProperties = HashAlgorithms.Fnv1a("skinAnimationProperties");
         private static readonly uint F_animationGraphData = HashAlgorithms.Fnv1a("animationGraphData");
         private static readonly uint F_eventName = HashAlgorithms.Fnv1a("mName");
@@ -439,7 +440,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     meshPath,
                     ReadAsset(meshProperties.Properties, F_ownerSkeleton, ".skl") ?? string.Empty,
                     Math.Max(0.01f, GetF32(meshProperties.Properties, F_skinScale) ?? 1f),
-                    animationGraphPathHash);
+                    animationGraphPathHash,
+                    ReadSubmeshNameHashes(GetString(meshProperties.Properties, F_initialSubmeshToHide)));
             }
             return null;
         }
@@ -770,10 +772,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             bool meshIsSkinned = false;
             bool meshAlignPitch = false;
             bool meshAlignYaw = false;
+            IReadOnlyList<uint> submeshesToDraw = Array.Empty<uint>();
+            IReadOnlyList<uint> submeshesToDrawAlways = Array.Empty<uint>();
             IReadOnlyList<uint> attachedSubmeshHashes = Array.Empty<uint>();
             VfxTrailDefinition trail = null;
             VfxBeamDefinition beam = null;
-            if (isMesh && prim is BinTreeStruct ps2 && Get(ps2.Properties, F_meshDef) is BinTreeStruct md)
+            bool readsMeshDefinition = isMesh || primitiveKind is VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam;
+            if (readsMeshDefinition && prim is BinTreeStruct ps2 && Get(ps2.Properties, F_meshDef) is BinTreeStruct md)
             {
                 // LTK/engine precedence: a complete skinned mMeshName + mMeshSkeletonName
                 // pair wins. mSimpleMeshName is only the fallback when that pair is absent.
@@ -794,8 +799,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 meshAnm = ReadAsset(md.Properties, F_meshAnim, ".anm");
                 meshAlignPitch = GetBool(ps2.Properties, F_meshAlignPitch);
                 meshAlignYaw = GetBool(ps2.Properties, F_meshAlignYaw);
-                attachedSubmeshHashes = ReadHashContainer(Get(md.Properties, F_submeshesToDrawAlways))
-                    .Concat(ReadHashContainer(Get(md.Properties, F_submeshesToDraw)))
+                submeshesToDraw = ReadHashContainer(Get(md.Properties, F_submeshesToDraw));
+                submeshesToDrawAlways = ReadHashContainer(Get(md.Properties, F_submeshesToDrawAlways));
+                // Preserve the legacy union for diagnostics while retaining the two lists above
+                // so AttachedMesh rendering can follow League's draw/always semantics exactly.
+                attachedSubmeshHashes = submeshesToDrawAlways
+                    .Concat(submeshesToDraw)
                     .Distinct()
                     .ToArray();
             }
@@ -1075,6 +1084,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 DepthPushPull: GetF32(p, F_depthPushPull) ?? 0f,
                 Beam: beam,
                 Linger: linger,
+                SubmeshesToDraw: submeshesToDraw,
+                SubmeshesToDrawAlways: submeshesToDrawAlways,
                 AttachedSubmeshHashes: attachedSubmeshHashes,
                 AuthoredFeatures: new VfxEmitterAuthoredFeatures(
                     PrimitiveClassHash: primitiveClass,
@@ -1473,6 +1484,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 
         private static string GetString(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
             => Get(p, hash) is BinTreeString s ? s.Value : null;
+
+        private static IReadOnlyList<uint> ReadSubmeshNameHashes(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return Array.Empty<uint>();
+            return value
+                .Split((char[])null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .SelectMany(token => token.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(HashAlgorithms.Fnv1a)
+                .Distinct()
+                .ToArray();
+        }
 
         private static string ReadAsset(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash, string extension)
         {

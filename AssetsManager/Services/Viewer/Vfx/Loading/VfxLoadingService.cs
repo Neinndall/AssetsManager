@@ -227,7 +227,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 emitter.PendingErosionTexture = _resources.ResolveTexture(
                     emitter.Def.AlphaErosion?.TexturePath,
                     searchDirectory);
-                emitter.PendingReflectionTexture = _resources.ResolveTexture(
+                emitter.PendingReflectionTexture = _resources.ResolveCubeMap(
                     emitter.Def.Reflection?.TexturePath,
                     searchDirectory);
                 emitter.PendingPaletteTexture = _resources.ResolveTexture(
@@ -245,7 +245,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     {
                         emitter.PendingMesh = _resources.ResolveAttachedMesh(
                             ownerSceneContext.MeshPath,
-                            emitter.Def.AttachedSubmeshHashes,
+                            ownerSceneContext.SkeletonPath,
+                            emitter.Def.SubmeshesToDraw,
+                            emitter.Def.SubmeshesToDrawAlways,
+                            ownerSceneContext.InitialHiddenSubmeshHashes,
                             searchDirectory,
                             ownerSceneContext.SkinScale);
                     }
@@ -254,7 +257,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 {
                     if (!string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
                     {
-                        emitter.PendingMesh = _resources.ResolveMesh(emitter.Def.MeshPath, searchDirectory);
+                        emitter.PendingMesh = _resources.ResolveMesh(
+                            emitter.Def.MeshPath,
+                            emitter.Def.SubmeshesToDraw,
+                            emitter.Def.SubmeshesToDrawAlways,
+                            searchDirectory);
                         if (emitter.PendingMesh != null && !string.IsNullOrWhiteSpace(emitter.Def.MeshAnimationPath))
                         {
                             emitter.MeshAnimation = _resources.ResolveMeshAnimation(
@@ -305,7 +312,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         internal string ResolveAssetPath(string authoredPath, string searchDirectory, string extension)
             => _resources.ResolvePath(authoredPath, searchDirectory, new[] { extension });
 
-        internal (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? ResolveMesh(
+        internal VfxMeshData? ResolveMesh(
             string authoredPath,
             string searchDirectory)
             => _resources.ResolveMesh(authoredPath, searchDirectory);

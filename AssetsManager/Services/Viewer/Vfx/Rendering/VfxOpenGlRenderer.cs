@@ -4,6 +4,7 @@ using System.Numerics;
 using Silk.NET.OpenGL;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
 
@@ -23,7 +24,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _uUvTransformCenter, _uUvTransformCenterMult, _uAddressMode, _uAddressModeMult, _uClampUvMult;
         private int _uIsDistortion, _uDistortionTex, _uSceneTex, _uViewportSize, _uDistortionStrength;
         private int _uSceneDepthTex, _uHasSoftParticle, _uSoftParticleParams, _uSoftParticleControl, _uDepthProjection;
-        private int _uReflectionTex, _uHasReflection, _uReflectionOpacity, _uReflectionColor;
         private int _uDirectionOriented, _uArbitraryQuad, _uLegacyOrientation, _uPivotUp;
         private int _uPrimitiveKind;
         private int _uAlphaCutoff, _uAlphaTest, _uEmissiveStrength, _uIsMultiply, _uFlipU, _uFlipV, _uClampUv;
@@ -43,10 +43,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int[] _instanceOrder = Array.Empty<int>();
         private readonly Dictionary<uint, byte> _stencilReferences = new();
         private readonly bool[] _reservedStencilReferences = new bool[256];
+        private readonly HashSet<uint> _ownerHiddenSubmeshes = new();
         [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
         private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
         private DrawElementsDelegate _drawElements = null!;
         private const int Stride = VfxPlaybackRuntime.InstanceStride;
+        private const int AttachedMeshesPerEmitter = 8;
         private bool _gles;
         private Vector2 _depthProjectionValue;
         public void Initialize(GL gl)
@@ -91,10 +93,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uSoftParticleParams = gl.GetUniformLocation(_program, "uSoftParticleParams");
             _uSoftParticleControl = gl.GetUniformLocation(_program, "uSoftParticleControl");
             _uDepthProjection = gl.GetUniformLocation(_program, "uDepthProjection");
-            _uReflectionTex = gl.GetUniformLocation(_program, "uReflectionTex");
-            _uHasReflection = gl.GetUniformLocation(_program, "uHasReflection");
-            _uReflectionOpacity = gl.GetUniformLocation(_program, "uReflectionOpacity");
-            _uReflectionColor = gl.GetUniformLocation(_program, "uReflectionColor");
             _uDirectionOriented = gl.GetUniformLocation(_program, "uDirectionOriented");
             _uArbitraryQuad = gl.GetUniformLocation(_program, "uArbitraryQuad");
             _uLegacyOrientation = gl.GetUniformLocation(_program, "uLegacyOrientation");
@@ -208,6 +206,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         public uint UploadTexture(byte[] bgra, int width, int height)
             => _textures.Upload(bgra, width, height);
 
+        internal uint UploadCubeMap(VfxCubeMapData cube)
+            => _textures.UploadCube(cube);
+
         public void CaptureScene(uint width, uint height, bool captureColor, bool captureDepth)
             => _capture.Capture(width, height, captureColor, captureDepth);
 
@@ -257,10 +258,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.GetInteger(GLEnum.ArrayBufferBinding, out int arrayBuffer);
             _gl.GetInteger(GLEnum.ActiveTexture, out int activeTexture);
             var textureBindings = new int[9];
+            var cubeBindings = new int[9];
             for (int unit = 0; unit < textureBindings.Length; unit++)
             {
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
                 _gl.GetInteger(GLEnum.TextureBinding2D, out textureBindings[unit]);
+                _gl.GetInteger(GLEnum.TextureBindingCubeMap, out cubeBindings[unit]);
             }
 
             try
@@ -278,7 +281,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_uSceneTex, 2);
             _gl.Uniform1(_uDistortionTex, 3);
             _gl.Uniform1(_uErosionTex, 4);
-            _gl.Uniform1(_uReflectionTex, 5);
             _gl.Uniform1(_uSceneDepthTex, 6);
             _gl.Uniform2(_uViewportSize, (float)_capture.Width, (float)_capture.Height);
             _gl.Uniform2(_uDepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y);
@@ -293,6 +295,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Enable(EnableCap.Blend);
             _gl.BlendEquation(GLEnum.FuncAdd);
 
+            var attachedUsed = new Dictionary<(object Graph, string Path, int SourceOrder), int>();
             foreach (VfxRenderQueueEntry entry in renderQueue)
             {
                 VfxPlaybackRuntime.EmitterState es = entry.Emitter;
@@ -306,15 +309,25 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (es.Def.IsMeshPrimitive && es.MeshVao == 0)
                     continue;
 
-                int floats = es.InstanceCount * Stride;
-                ReadOnlySpan<float> instancesSpan;
-                if (es.Def.PrimitiveKind is not (VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail) &&
-                    VfxBlendModes.ShouldSortBackToFront(es.Def.BlendMode) && es.InstanceCount > 1)
+                bool attachedMesh = es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh;
+                int renderInstanceCount = es.InstanceCount;
+                if (attachedMesh)
                 {
-                    EnsureInstanceSortCapacity(es.InstanceCount, floats);
+                    var key = (es.RenderGraphKey ?? es, es.RenderPath ?? string.Empty, es.SourceOrder);
+                    int alreadyUsed = attachedUsed.GetValueOrDefault(key);
+                    renderInstanceCount = ResolveAttachedMeshDrawCount(alreadyUsed, es.InstanceCount);
+                    if (renderInstanceCount == 0) continue;
+                    attachedUsed[key] = alreadyUsed + renderInstanceCount;
+                }
+
+                int floats = renderInstanceCount * Stride;
+                ReadOnlySpan<float> instancesSpan;
+                if (ShouldSortInstances(es.Def, renderInstanceCount))
+                {
+                    EnsureInstanceSortCapacity(renderInstanceCount, floats);
                     VfxRenderQueue.CopyInstancesBackToFront(
                         es.Instances,
-                        es.InstanceCount,
+                        renderInstanceCount,
                         Stride,
                         view,
                         _sortedInstances,
@@ -331,12 +344,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     ApplyEmitterDepthState(es.Def, isDistortion: es.Def.Distortion != null);
                     ApplyBlendMode(es.Def.BlendMode, distortion: es.Def.Distortion != null);
-                    RenderMeshEmitter(es, viewProj, camPos, camUp, instancesSpan);
+                    RenderMeshEmitter(es, viewProj, camPos, camUp, instancesSpan, renderInstanceCount);
                     continue;
                 }
                 if (!es.Def.IsVisual) continue;
                 bool isDistortion = es.Def.Distortion is not null;
-                if (isDistortion && (es.DistortionTexture == 0 || _capture.ColorTexture == 0)) continue;
+                bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
+                if (warpsFrame && (es.DistortionTexture == 0 || _capture.ColorTexture == 0)) continue;
 
                 _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _instVbo);
                 if (floats > _instCapFloats)
@@ -349,9 +363,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, instancesSpan);
                 }
 
+                var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 _gl.Uniform2(_uTexDiv, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
                 _gl.Uniform2(_uTexSize, Math.Max(1f, es.TextureWidth), Math.Max(1f, es.TextureHeight));
-                Vector2 emitterUvOffset = es.Def.EmitterUvScrollRate * es.EmitterAge;
+                Vector2 emitterUvOffset = VfxUvSemantics.Periodic(
+                    es.Def.EmitterUvScrollRate * es.EmitterAge,
+                    renderState.TextureAddressMode);
                 _gl.Uniform2(_uEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
                 Vector2 uvCenter = EffectiveCenter(es.Def.UvTransformCenter);
                 _gl.Uniform2(_uUvTransformCenter, uvCenter.X, uvCenter.Y);
@@ -362,7 +379,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     _uTexSizeMult,
                     Math.Max(1f, es.TextureMultWidth),
                     Math.Max(1f, es.TextureMultHeight));
-                Vector2 emitterUvOffsetMult = es.Def.TextureMultEmitterUvScrollRate * es.EmitterAge;
+                Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
+                    es.Def.TextureMultEmitterUvScrollRate * es.EmitterAge,
+                    es.Def.TextureMultAddressMode);
                 _gl.Uniform2(_uUvScrollRateMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
                 Vector2 uvCenterMult = EffectiveCenter(es.Def.TextureMultTransformCenter);
                 _gl.Uniform2(_uUvTransformCenterMult, uvCenterMult.X, uvCenterMult.Y);
@@ -370,8 +389,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform1(_uFlipVMult, es.Def.TextureMultFlipV ? 1 : 0);
                 _gl.Uniform1(_uClampUvMult, es.Def.TextureMultClampUvScroll ? 1 : 0);
                 bool directional = es.Def.IsDirectionOriented || es.Def.PrimitiveKind == VfxPrimitiveKind.Ray;
-                bool arbitrary = es.Def.IsArbitraryQuad || es.Def.PrimitiveKind is
-                    VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.PlanarProjection;
+                bool arbitrary = es.Def.IsArbitraryQuad ||
+                    es.Def.PrimitiveKind == VfxPrimitiveKind.ArbitraryTrail;
                 _gl.Uniform1(_uDirectionOriented, directional ? 1 : 0);
                 _gl.Uniform1(_uArbitraryQuad, arbitrary ? 1 : 0);
                 _gl.Uniform1(_uLegacyOrientation, es.Def.LegacyOrientation);
@@ -382,7 +401,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 bool ribbonPrimitive = es.Def.PrimitiveKind is VfxPrimitiveKind.CameraTrail or
                     VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam;
                 _gl.Uniform1(_uDepthPushPull, ribbonPrimitive ? 0f : es.Def.DepthPushPull);
-                var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 ApplyEmitterDepthState(es.Def, isDistortion);
                 ApplyBlendMode(es.Def.BlendMode, isDistortion);
                 _gl.Uniform1(_uAlphaCutoff, renderState.AlphaCutoff);
@@ -456,21 +474,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 Vector4 softControl = ResolveSoftParticleControl(es.Def.BlendMode);
                 _gl.Uniform4(_uSoftParticleParams, softParams.X, softParams.Y, softParams.Z, softParams.W);
                 _gl.Uniform4(_uSoftParticleControl, softControl.X, softControl.Y, softControl.Z, softControl.W);
-                // LTK compiles reflection/rim only for mesh materials. Quad, trail and beam
-                // paths never sample the reflection definition.
-                _gl.Uniform1(_uHasReflection, 0);
-                VfxReflectionDefinition reflection = es.Def.Reflection;
-                _gl.Uniform2(
-                    _uReflectionOpacity,
-                    reflection?.DirectOpacity ?? 0f,
-                    reflection?.GlancingOpacity ?? 0f);
-                Vector4 reflectionColor = reflection?.ReflectionFresnelColor ?? Vector4.One;
-                _gl.Uniform4(
-                    _uReflectionColor,
-                    reflectionColor.X,
-                    reflectionColor.Y,
-                    reflectionColor.Z,
-                    reflectionColor.W);
                 _gl.Uniform3(_uPlacementRight, es.PlacementRight.X, es.PlacementRight.Y, es.PlacementRight.Z);
                 _gl.Uniform3(_uPlacementUp, es.PlacementUp.X, es.PlacementUp.Y, es.PlacementUp.Z);
                 _gl.Uniform3(_uPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
@@ -503,13 +506,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     _gl.ActiveTexture(TextureUnit.Texture4);
                     _gl.BindTexture(TextureTarget.Texture2D, es.ErosionTexture);
-                    ApplyAddressMode(2);
-                    _gl.ActiveTexture(TextureUnit.Texture0);
-                }
-                if (es.ReflectionTexture != 0)
-                {
-                    _gl.ActiveTexture(TextureUnit.Texture5);
-                    _gl.BindTexture(TextureTarget.Texture2D, es.ReflectionTexture);
                     ApplyAddressMode(2);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
@@ -547,6 +543,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 }
                 else if (es.Def.PrimitiveKind is VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam)
                 {
+                    // LTK suppresses a beam ribbon when the same primitive resolves mMesh.
+                    if (!string.IsNullOrWhiteSpace(es.Def.MeshPath))
+                        continue;
                     int vertices = _beamGeometry.Build(es, camPos);
                     if (vertices > 0)
                     {
@@ -609,6 +608,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
                     _gl.BindTexture(TextureTarget.Texture2D, (uint)textureBindings[unit]);
+                    _gl.BindTexture(TextureTarget.TextureCubeMap, (uint)cubeBindings[unit]);
                 }
                 _gl.ActiveTexture((TextureUnit)activeTexture);
                 _gl.BindVertexArray((uint)vertexArray);
@@ -640,10 +640,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (VfxBlendModes.ShouldTestDepth(definition.MiscRenderFlags)) _gl.Enable(EnableCap.DepthTest);
             else _gl.Disable(EnableCap.DepthTest);
 
-            if (definition.DepthBiasFactors is { } bias)
+            Vector2? bias = ResolvePolygonOffset(definition);
+            if (bias is { } polygonBias)
             {
                 _gl.Enable(EnableCap.PolygonOffsetFill);
-                _gl.PolygonOffset(bias.X, bias.Y);
+                _gl.PolygonOffset(polygonBias.X, polygonBias.Y);
             }
             else
             {
@@ -795,6 +796,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.DeleteBuffer(_instVbo);
             _gl.DeleteVertexArray(_vao);
             _gl.DeleteProgram(_program);
+            if (_meshBoneBuffer != 0) _gl.DeleteBuffer(_meshBoneBuffer);
+            _meshBoneBuffer = 0;
+            _ownerSkinningCount = 0;
             if (_meshProgram != 0) _gl.DeleteProgram(_meshProgram);
             _meshProgram = 0;
             _meshResources.Dispose();
@@ -802,8 +806,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _ready = false;
         }
 
+        private const uint OwnerBoneBinding = 1;
         private uint _meshProgram;
-        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muCamPos, _muCamUp, _muAlignPitchToCamera, _muAlignYawToCamera, _muMeshSkinned, _muDepthPushPull, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
+        private uint _meshBoneBuffer;
+        private int _ownerSkinningCount;
+        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muCamPos, _muCamUp, _muAlignPitchToCamera, _muAlignYawToCamera, _muMeshSkinned, _muUseOwnerSkinning, _muIsGroundLayer, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
         private int _muIsDistortion, _muDistortionTex, _muSceneTex, _muDistortionStrength;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
@@ -815,7 +822,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _muBirthUvOffset, _muUvScale, _muUvRotation;
         private int _muErosionTex, _muHasErosion, _muHasErosionMap, _muErosionAddressMode, _muErosionDefault;
         private int _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionSliceWidth, _muErosionMixer;
-        private int _muReflectionTex, _muHasReflection, _muReflectionOpacity, _muReflectionColor;
+        private int _muReflectionTex, _muHasReflection, _muFresnel, _muReflection, _muReflectionColor, _muAttachedMesh;
         private int _muSceneDepthTex, _muHasSoftParticle, _muSoftParticleParams, _muSoftParticleControl, _muDepthProjection, _muViewportSize;
 
         private void EnsureMeshProgram()
@@ -832,7 +839,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muAlignPitchToCamera = _gl.GetUniformLocation(_meshProgram, "uAlignPitchToCamera");
                 _muAlignYawToCamera = _gl.GetUniformLocation(_meshProgram, "uAlignYawToCamera");
                 _muMeshSkinned = _gl.GetUniformLocation(_meshProgram, "uMeshSkinned");
-                _muDepthPushPull = _gl.GetUniformLocation(_meshProgram, "uDepthPushPull");
+                _muUseOwnerSkinning = _gl.GetUniformLocation(_meshProgram, "uUseOwnerSkinning");
+                _muIsGroundLayer = _gl.GetUniformLocation(_meshProgram, "uIsGroundLayer");
                 _muColor = _gl.GetUniformLocation(_meshProgram, "uColor");
                 _muTex = _gl.GetUniformLocation(_meshProgram, "uTex");
                 _muHasTex = _gl.GetUniformLocation(_meshProgram, "uHasTex");
@@ -902,27 +910,68 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muErosionMixer = _gl.GetUniformLocation(_meshProgram, "uErosionMixer");
                 _muReflectionTex = _gl.GetUniformLocation(_meshProgram, "uReflectionTex");
                 _muHasReflection = _gl.GetUniformLocation(_meshProgram, "uHasReflection");
-                _muReflectionOpacity = _gl.GetUniformLocation(_meshProgram, "uReflectionOpacity");
+                _muFresnel = _gl.GetUniformLocation(_meshProgram, "uFresnel");
+                _muReflection = _gl.GetUniformLocation(_meshProgram, "uReflection");
                 _muReflectionColor = _gl.GetUniformLocation(_meshProgram, "uReflectionColor");
+                _muAttachedMesh = _gl.GetUniformLocation(_meshProgram, "uAttachedMesh");
                 _muSceneDepthTex = _gl.GetUniformLocation(_meshProgram, "uSceneDepthTex");
                 _muHasSoftParticle = _gl.GetUniformLocation(_meshProgram, "uHasSoftParticle");
                 _muSoftParticleParams = _gl.GetUniformLocation(_meshProgram, "uSoftParticleParams");
                 _muSoftParticleControl = _gl.GetUniformLocation(_meshProgram, "uSoftParticleControl");
                 _muDepthProjection = _gl.GetUniformLocation(_meshProgram, "uDepthProjection");
                 _muViewportSize = _gl.GetUniformLocation(_meshProgram, "uViewportSize");
+
+                uint boneBlock = _gl.GetUniformBlockIndex(_meshProgram, "VfxBoneTransforms");
+                if (boneBlock != uint.MaxValue)
+                    _gl.UniformBlockBinding(_meshProgram, boneBlock, OwnerBoneBinding);
+                _meshBoneBuffer = _gl.GenBuffer();
+                _gl.BindBuffer(BufferTargetARB.UniformBuffer, _meshBoneBuffer);
+                _gl.BufferData(
+                    BufferTargetARB.UniformBuffer,
+                    new ReadOnlySpan<float>(new float[GpuSkinningData.MaxBones * 16]),
+                    BufferUsageARB.DynamicDraw);
+                _gl.BindBufferBase(BufferTargetARB.UniformBuffer, OwnerBoneBinding, _meshBoneBuffer);
+                _gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
             }
         }
 
         public void UploadEmitterMesh(
             VfxPlaybackRuntime.EmitterState es,
             float[] positions,
+            float[] normals,
             float[] uvs,
             float[] colors,
-            uint[] indices = null)
+            uint[] indices = null,
+            float[] boneIndices = null,
+            float[] boneWeights = null)
         {
             if (!_ready) return;
             EnsureMeshProgram();
-            _meshResources.Upload(es, positions, uvs, colors, indices);
+            _meshResources.Upload(es, positions, normals, uvs, colors, indices, boneIndices, boneWeights);
+        }
+
+        internal void SetOwnerSkinningMatrices(Matrix4x4[] matrices)
+        {
+            _ownerSkinningCount = Math.Min(matrices?.Length ?? 0, GpuSkinningData.MaxBones);
+            if (!_ready || _ownerSkinningCount == 0)
+                return;
+
+            EnsureMeshProgram();
+            _gl.BindBuffer(BufferTargetARB.UniformBuffer, _meshBoneBuffer);
+            _gl.BufferSubData(
+                BufferTargetARB.UniformBuffer,
+                0,
+                new ReadOnlySpan<Matrix4x4>(matrices, 0, _ownerSkinningCount));
+            _gl.BindBufferBase(BufferTargetARB.UniformBuffer, OwnerBoneBinding, _meshBoneBuffer);
+            _gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
+        }
+
+        internal void SetOwnerHiddenSubmeshes(IEnumerable<uint> hashes)
+        {
+            _ownerHiddenSubmeshes.Clear();
+            if (hashes == null) return;
+            foreach (uint hash in hashes)
+                _ownerHiddenSubmeshes.Add(hash);
         }
 
         private void ReleaseMeshes()
@@ -939,11 +988,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Matrix4x4 viewProj,
             Vector3 camPos,
             Vector3 camUp,
-            ReadOnlySpan<float> instances)
+            ReadOnlySpan<float> instances,
+            int instanceCount)
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
             bool isDistortion = es.Def.Distortion != null;
-            if (isDistortion && (es.DistortionTexture == 0 || _capture.ColorTexture == 0)) return;
+            bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
+            if (warpsFrame && (es.DistortionTexture == 0 || _capture.ColorTexture == 0)) return;
             if (es.MeshAnimation != null)
                 UpdateEmitterMeshPositions(es, es.MeshAnimation.Evaluate(es.EmitterAge));
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
@@ -953,13 +1004,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.UniformMatrix4(_muViewProj, 1, false, in viewProj.M11);
             _gl.Uniform3(_muCamPos, camPos.X, camPos.Y, camPos.Z);
             _gl.Uniform3(_muCamUp, camUp.X, camUp.Y, camUp.Z);
+            bool attachedMesh = es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh;
+            bool useOwnerSkinning = attachedMesh && es.MeshHasSkinning && _ownerSkinningCount > 0;
+            _gl.Uniform1(_muUseOwnerSkinning, useOwnerSkinning ? 1 : 0);
+            if (useOwnerSkinning)
+                _gl.BindBufferBase(BufferTargetARB.UniformBuffer, OwnerBoneBinding, _meshBoneBuffer);
+
             // Direction-oriented mesh particles take precedence over camera alignment in LTK.
-            bool cameraAlignedMesh = !es.Def.IsDirectionOriented &&
+            bool cameraAlignedMesh = !attachedMesh && !es.Def.IsDirectionOriented &&
                 (es.Def.MeshAlignPitchToCamera || es.Def.MeshAlignYawToCamera);
             _gl.Uniform1(_muAlignPitchToCamera, cameraAlignedMesh && es.Def.MeshAlignPitchToCamera ? 1 : 0);
             _gl.Uniform1(_muAlignYawToCamera, cameraAlignedMesh && es.Def.MeshAlignYawToCamera ? 1 : 0);
             _gl.Uniform1(_muMeshSkinned, es.Def.MeshIsSkinned ? 1 : 0);
-            _gl.Uniform1(_muDepthPushPull, es.Def.DepthPushPull);
+            _gl.Uniform1(_muIsGroundLayer, es.Def.IsGroundLayer ? 1 : 0);
             _gl.Uniform1(_muTex, 0);
             _gl.Uniform1(_muTexMult, 1);
             _gl.Uniform1(_muColorMap, 7);
@@ -984,7 +1041,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 Math.Max(1f, es.TextureMultHeight));
             Vector2 uvCenterMult = EffectiveCenter(es.Def.TextureMultTransformCenter);
             _gl.Uniform2(_muUvTransformCenterMult, uvCenterMult.X, uvCenterMult.Y);
-            Vector2 emitterUvOffsetMult = es.Def.TextureMultEmitterUvScrollRate * es.EmitterAge;
+            Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
+                    es.Def.TextureMultEmitterUvScrollRate * es.EmitterAge,
+                    es.Def.TextureMultAddressMode);
             _gl.Uniform2(_muEmitterUvOffsetMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
             _gl.Uniform1(_muFlipUMult, es.Def.TextureMultFlipU ? 1 : 0);
             _gl.Uniform1(_muFlipVMult, es.Def.TextureMultFlipV ? 1 : 0);
@@ -1030,7 +1089,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_muDistortionStrength, es.Def.Distortion?.Strength ?? 0f);
             _gl.Uniform1(_muDistortionTex, 2);
             _gl.Uniform1(_muSceneTex, 3);
-            if (isDistortion)
+            if (warpsFrame)
             {
                 _gl.ActiveTexture(TextureUnit.Texture2);
                 _gl.BindTexture(TextureTarget.Texture2D, es.DistortionTexture);
@@ -1086,12 +1145,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 ApplyAddressMode(2);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
-            _gl.Uniform1(_muHasReflection, es.ReflectionTexture != 0 ? 1 : 0);
             VfxReflectionDefinition reflection = es.Def.Reflection;
-            _gl.Uniform2(
-                _muReflectionOpacity,
+            bool hasReflectionCube = reflection is not null && es.ReflectionTexture != 0;
+            _gl.Uniform1(_muHasReflection, hasReflectionCube ? 1 : 0);
+            _gl.Uniform1(_muAttachedMesh, attachedMesh ? 1 : 0);
+
+            Vector4 fresnelColor = reflection?.FresnelColor ?? Vector4.Zero;
+            _gl.Uniform4(
+                _muFresnel,
+                fresnelColor.X,
+                fresnelColor.Y,
+                fresnelColor.Z,
+                reflection?.Fresnel ?? 1f);
+            _gl.Uniform4(
+                _muReflection,
+                reflection?.ReflectionFresnel ?? 1f,
                 reflection?.DirectOpacity ?? 0f,
-                reflection?.GlancingOpacity ?? 0f);
+                reflection?.GlancingOpacity ?? 1f,
+                0f);
             Vector4 reflectionColor = reflection?.ReflectionFresnelColor ?? Vector4.One;
             _gl.Uniform4(
                 _muReflectionColor,
@@ -1099,11 +1170,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 reflectionColor.Y,
                 reflectionColor.Z,
                 reflectionColor.W);
-            if (es.ReflectionTexture != 0)
+            if (hasReflectionCube)
             {
                 _gl.ActiveTexture(TextureUnit.Texture5);
-                _gl.BindTexture(TextureTarget.Texture2D, es.ReflectionTexture);
-                ApplyAddressMode(2);
+                _gl.BindTexture(TextureTarget.TextureCubeMap, es.ReflectionTexture);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
             bool meshUsesSoftParticles = ShouldUseSoftParticles(es.Def, _capture.DepthTexture != 0);
@@ -1141,15 +1211,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Enable(EnableCap.CullFace);
             ApplyBlendMode(es.Def.BlendMode, isDistortion);
 
-            Vector2 emitterUvOffset = es.Def.EmitterUvScrollRate * es.EmitterAge;
+            Vector2 emitterUvOffset = VfxUvSemantics.Periodic(
+                    es.Def.EmitterUvScrollRate * es.EmitterAge,
+                    renderState.TextureAddressMode);
             _gl.Uniform2(_muEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
-            for (int i = 0; i < es.InstanceCount; i++)
+            for (int i = 0; i < instanceCount; i++)
             {
                 int o = i * Stride;
                 _gl.Uniform3(_muWorldPos, instances[o], instances[o + 1], instances[o + 2]);
-                float scaleX = ClampScale(instances[o + 3]);
-                float scaleY = ClampScale(instances[o + 4]);
-                float scaleZ = ClampScale(instances[o + 18]);
+                float ownerScale = attachedMesh && float.IsFinite(es.MeshOwnerScale) && es.MeshOwnerScale > 0f
+                    ? es.MeshOwnerScale
+                    : 1f;
+                float scaleX = ClampScale(instances[o + 3]) * ownerScale;
+                float scaleY = ClampScale(instances[o + 4]) * ownerScale;
+                float scaleZ = ClampScale(instances[o + 18]) * ownerScale;
                 _gl.Uniform3(_muScale, scaleX, scaleY, scaleZ);
                 Vector3 meshRotation = new(
                     instances[o + 15],
@@ -1176,7 +1251,32 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     if (_drawElements != null)
                     {
-                        _drawElements((uint)PrimitiveType.Triangles, es.MeshIndexCount, (uint)DrawElementsType.UnsignedInt, IntPtr.Zero);
+                        if (attachedMesh && es.MeshRanges is { Length: > 0 })
+                        {
+                            bool narrowed = HasAttachedDrawMatch(es.MeshRanges, es.Def.SubmeshesToDraw);
+                            foreach (VfxMeshRangeData range in es.MeshRanges)
+                            {
+                                if (!ShouldDrawAttachedRange(
+                                        range.Hash,
+                                        narrowed,
+                                        es.Def.SubmeshesToDraw,
+                                        es.Def.SubmeshesToDrawAlways,
+                                        _ownerHiddenSubmeshes))
+                                {
+                                    continue;
+                                }
+
+                                _drawElements(
+                                    (uint)PrimitiveType.Triangles,
+                                    range.IndexCount,
+                                    (uint)DrawElementsType.UnsignedInt,
+                                    new IntPtr(range.StartIndex * sizeof(uint)));
+                            }
+                        }
+                        else
+                        {
+                            _drawElements((uint)PrimitiveType.Triangles, es.MeshIndexCount, (uint)DrawElementsType.UnsignedInt, IntPtr.Zero);
+                        }
                     }
                 }
                 else _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)es.MeshVertexCount);
@@ -1187,11 +1287,75 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.BindVertexArray(_vao);
         }
 
+        internal static int ResolveAttachedMeshDrawCount(int alreadyUsed, int instanceCount)
+        {
+            if (instanceCount <= 0 || alreadyUsed >= AttachedMeshesPerEmitter) return 0;
+            return Math.Min(instanceCount, Math.Max(0, AttachedMeshesPerEmitter - Math.Max(0, alreadyUsed)));
+        }
+
+        internal static bool ShouldSortInstances(VfxEmitterDefinition definition, int instanceCount)
+            => definition is not null &&
+               instanceCount > 1 &&
+               definition.PrimitiveKind is not (
+                   VfxPrimitiveKind.CameraTrail or
+                   VfxPrimitiveKind.ArbitraryTrail or
+                   VfxPrimitiveKind.AttachedMesh) &&
+               VfxBlendModes.ShouldSortBackToFront(definition.BlendMode);
+
         private static float ClampScale(float value)
             => float.IsFinite(value) ? value : 1f;
 
+        private static bool HasAttachedDrawMatch(
+            IReadOnlyList<VfxMeshRangeData> ranges,
+            IReadOnlyList<uint> draw)
+        {
+            if (ranges == null || draw == null || draw.Count == 0) return false;
+            for (int rangeIndex = 0; rangeIndex < ranges.Count; rangeIndex++)
+            {
+                if (ContainsHash(draw, ranges[rangeIndex].Hash)) return true;
+            }
+            return false;
+        }
+
+        private static bool ContainsHash(IReadOnlyList<uint> values, uint hash)
+        {
+            if (values == null) return false;
+            for (int index = 0; index < values.Count; index++)
+            {
+                if (values[index] == hash) return true;
+            }
+            return false;
+        }
+
+        internal static bool ShouldDrawAttachedRange(
+            uint hash,
+            bool narrowed,
+            IReadOnlyList<uint> draw,
+            IReadOnlyList<uint> always,
+            ISet<uint> hidden)
+            => ((!narrowed || ContainsHash(draw, hash)) && !(hidden?.Contains(hash) ?? false)) ||
+               ContainsHash(always, hash);
+
         internal static bool ShouldSampleBaseTexture(VfxEmitterDefinition definition, uint textureHandle)
             => textureHandle != 0 || string.IsNullOrWhiteSpace(definition?.TexturePath);
+
+        internal static Vector2? ResolvePolygonOffset(VfxEmitterDefinition definition)
+        {
+            if (definition is null) return null;
+
+            if (definition.DepthBiasFactors is { } authored &&
+                (authored.X != 0f || authored.Y != 0f))
+            {
+                return authored;
+            }
+
+            // skinnedmesh/particle_ps gives AttachedMesh a small overlay offset whenever
+            // the emitter authors no effective bias. Riot treats an explicit [0,0] the same
+            // as an omitted pair here.
+            return definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh
+                ? new Vector2(-1f, -1f)
+                : null;
+        }
 
         internal static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture)
         {
@@ -1211,17 +1375,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             if (definition is null) return false;
 
-            // isFollowingTerrain offsets by terrain-height delta in the engine. Our preview terrain
-            // is flat, so that delta is zero; it must not be treated as the ground-layer technique.
-            return definition.IsGroundLayer ||
-                definition.PrimitiveKind == VfxPrimitiveKind.PlanarProjection ||
-                IsGroundLikeBirthRotation(definition.BirthRotation);
+            // LTK enables GROUND_LAYER only from the authored isGroundLayer flag. Neither
+            // isFollowingTerrain nor a ground-looking birth rotation selects this draw path.
+            return definition.IsGroundLayer;
         }
 
         internal static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
         {
             if (!hasSceneDepth || definition?.SoftParticle is null) return false;
-            if (definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh) return false;
+            if (definition.PrimitiveKind is VfxPrimitiveKind.AttachedMesh or VfxPrimitiveKind.PlanarProjection)
+                return false;
 
             // LTK's fixed-alpha quad/ribbon shader compiles no SOFT_PARTICLES. Meshes keep
             // their soft pass even when the emitter authors LOCK_ALPHA.
@@ -1247,25 +1410,5 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 5 => new Vector4(0f, 1f, 0f, 1f),
                 _ => new Vector4(0f, 1f, 1f, 0f)
             };
-
-        internal static bool IsGroundLikeBirthRotation(VfxCurve3? birthRotation)
-        {
-            if (birthRotation is not { } curve) return false;
-            Vector3 rotation = curve.Sample(0f);
-            float tiltX = MathF.Abs(MathF.Abs(rotation.X) - 90f);
-            float tiltY = MathF.Abs(MathF.Abs(rotation.Y) - 90f);
-            return (tiltX < 45f && tiltY < 45f) ||
-                   MathF.Abs(rotation.X - 270f) < 45f ||
-                   (MathF.Abs(MathF.Abs(rotation.X) - 90f) < 45f && MathF.Abs(rotation.Z) < 45f);
-        }
-
-
-
-
-
-
-
-
-
     }
 }

@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Added full Animation Clip playback from each skin's authored AnimationGraphData, preserving mClipDataMap clip identity/order and spawning ParticleEventData VFX systems with authored timing, skeleton attachments, visibility, joint snap, and idle effects.
   - VFX Studio / Added an Exit action that releases the active VFX project and returns to the main Viewer while keeping the studio reusable.
   - Viewer / Browse VFX systems and animations in a skin and BIN tree with on-demand loading.
   - Viewer / Resolved companion and chibi model textures and materials by resolving companion BIN paths, matching WadChunkLink texture hashes, and applying semantic submesh token matching.
@@ -104,6 +105,9 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio / Playback now matches the audited LTK behavior more closely with deterministic xorshift32 random streams, Animation Clip cue seed 7331, probability-table singleValue semantics, carried/death child systems, boneToSpawnAt lineage, and deterministic child RNG state.
+  - VFX Studio / Timeline seeking now restores bounded quarter-second simulation checkpoints instead of always replaying from zero, preserving particles, RNG, noise, transforms, child lineage, attachments, stop/kill state, and emitter timing while respecting a capped memory budget.
+  - VFX Studio / Improved authored mesh and render parity with skinned/simple mesh selection, camera pitch/yaw alignment, material culling, LOCK_ALPHA/color-ramp handling, additive fallback semantics, skinScale-aware bone placement, and single-application system transforms.
   - Viewer / SKN materials now use one authored material pipeline with LTK-aligned sRGB texture/tint/output handling across model loads.
   - Viewer / SKN materials now honor authored blend, depth, culling, UV tiling/scroll, wrapping, alpha test, and premultiplied alpha across model loads.
   - Viewer / SKN material effects now preserve simultaneous authored layers independently, including additive scroll, flow, Fresnel noise, transitions with a second state, emission/bloom, distortion, iridescence, channel masks, authored sampler wrapping, and supported vertex deformation.
@@ -381,6 +385,9 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Fixed duplicate and misleading Animation Clip entries by scoping the browser to the active skin's AnimationGraphData, preserving unresolved clip hashes instead of replacing them with shared .anm filenames, keeping authored clip order, and preferring the first idle clip for preview startup.
+  - VFX Studio / Fixed child VFX systems losing parent motion or lifecycle state by keeping carried children attached to their source particle, stopping them when the parent dies, preserving unresolved probability slots, and honoring boneToSpawnAt child anchors.
+  - VFX Studio / Fixed Animation Clip playback mismatches caused by applying ParticleEventData scale as a global VFX scale, incorrect skin-scale handling on bones/offsets, and authored VFX system transforms being applied more than once.
   - Viewer / Normal model and Chroma loads no longer initialize VFX systems reserved for VFX Studio.
   - 3D Mesh Analyzer / Restored reliable title-bar dragging for the View Differences window.
   - 3D Mesh Analyzer / Mesh Parts panel can be dragged again after the panel redesign.

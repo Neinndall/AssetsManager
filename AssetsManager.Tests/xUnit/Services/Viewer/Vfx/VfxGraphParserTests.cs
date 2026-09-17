@@ -285,6 +285,45 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void BeamPreservesNamedMeshSoItsRibbonCanBeSuppressed()
+        {
+            var meshDefinition = new BinTreeStruct(
+                0x0d89732d,
+                Fnv1a.HashLower("VfxMeshDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mSimpleMeshName"), "Effects/BeamMesh.scb")
+                });
+            var primitive = new BinTreeStruct(
+                Fnv1a.HashLower("primitive"),
+                Fnv1a.HashLower("VfxPrimitiveBeam"),
+                new BinTreeProperty[] { meshDefinition });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { primitive });
+            var system = new BinTreeObject(
+                "Effects/BeamMesh",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+            Assert.Equal(VfxPrimitiveKind.Beam, parsed.PrimitiveKind);
+            Assert.NotNull(parsed.Beam);
+            Assert.Equal("Effects/BeamMesh.scb", parsed.MeshPath);
+            Assert.True(parsed.SuppressesBeamRibbon);
+        }
+
+        [Fact]
         public void LeavesModulationFactorNeutralWhenBinOmitsIt()
         {
             var emitter = new BinTreeStruct(
@@ -467,7 +506,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                         {
                             new BinTreeString(Fnv1a.HashLower("simpleSkin"), "Characters/Test/Test.skn"),
                             new BinTreeString(Fnv1a.HashLower("skeleton"), "Characters/Test/Test.skl"),
-                            new BinTreeF32(Fnv1a.HashLower("skinScale"), 1.25f)
+                            new BinTreeF32(Fnv1a.HashLower("skinScale"), 1.25f),
+                            new BinTreeString(Fnv1a.HashLower("initialSubmeshToHide"), "Cape Hair")
                         }),
                     new BinTreeStruct(
                         Fnv1a.HashLower("skinAnimationProperties"),
@@ -486,7 +526,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal("Characters/Test/Test.skl", document.OwnerSceneContext.SkeletonPath);
             Assert.Equal(1.25f, document.OwnerSceneContext.SkinScale);
             Assert.Equal(0x12345678u, document.OwnerSceneContext.AnimationGraphPathHash);
+            Assert.Equal(
+                new[] { Fnv1a.HashLower("Cape"), Fnv1a.HashLower("Hair") },
+                document.OwnerSceneContext.InitialHiddenSubmeshHashes);
             VfxEmitterDefinition parsed = Assert.Single(Assert.Single(document.Systems).Value.Emitters);
+            Assert.Equal(new uint[] { 22, 33 }, parsed.SubmeshesToDraw);
+            Assert.Equal(new uint[] { 11, 22 }, parsed.SubmeshesToDrawAlways);
             Assert.Equal(new uint[] { 11, 22, 33 }, parsed.AttachedSubmeshHashes);
         }
 

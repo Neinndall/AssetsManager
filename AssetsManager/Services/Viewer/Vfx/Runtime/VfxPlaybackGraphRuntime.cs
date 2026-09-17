@@ -290,6 +290,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _depth[Root] = rootSaved.Depth;
             _localTransforms[Root] = rootSaved.LocalTransform;
             _paths[Root] = rootSaved.Path;
+            AssignRenderIdentity(Root, rootSaved.Path);
 
             var restored = new VfxPlaybackRuntime[snapshot.Runtimes.Length];
             restored[0] = Root;
@@ -347,6 +348,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _depth[runtime] = saved.Depth;
             _localTransforms[runtime] = saved.LocalTransform;
             _paths[runtime] = saved.Path;
+            AssignRenderIdentity(runtime, saved.Path);
             runtime.RestoreSnapshot(saved.State);
             return runtime;
         }
@@ -429,6 +431,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _depth[runtime] = depth;
             _localTransforms[runtime] = effectiveLocalTransform;
             _paths[runtime] = path;
+            AssignRenderIdentity(runtime, path);
             runtime.WarmUp();
             if (!_allEmittersVisible)
             {
@@ -436,6 +439,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     emitter.IsVisible = false;
             }
             return runtime;
+        }
+
+        private void AssignRenderIdentity(VfxPlaybackRuntime runtime, string path)
+        {
+            foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+            {
+                emitter.RenderGraphKey = this;
+                emitter.RenderPath = path ?? string.Empty;
+            }
         }
 
         private void OnParticleLifecycle(

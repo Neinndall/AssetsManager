@@ -335,6 +335,53 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void AttachedSubmeshSelectionKeepsDrawAlwaysSeparateFromOwnerVisibility()
+        {
+            uint body = Fnv1a.HashLower("Body");
+            uint cape = Fnv1a.HashLower("Cape");
+            uint hair = Fnv1a.HashLower("Hair");
+            uint weapon = Fnv1a.HashLower("Weapon");
+            uint missing = Fnv1a.HashLower("DoesNotExist");
+
+            bool[] narrowed = VfxMeshDecoder.SelectAttachedSubmeshRanges(
+                new[] { body, cape, hair, weapon },
+                new[] { cape, missing },
+                new[] { hair },
+                new[] { cape, hair });
+            Assert.Equal(new[] { false, false, true, false }, narrowed);
+
+            bool[] staleDrawFallsBackToWholeSkin = VfxMeshDecoder.SelectAttachedSubmeshRanges(
+                new[] { body, cape, hair, weapon },
+                new[] { missing },
+                new[] { cape },
+                new[] { hair });
+            Assert.Equal(new[] { true, true, false, true }, staleDrawFallsBackToWholeSkin);
+        }
+
+        [Fact]
+        public void MeshSubmeshSelectionMatchesLtkDrawAndAlwaysSemantics()
+        {
+            uint body = Fnv1a.HashLower("Body");
+            uint cape = Fnv1a.HashLower("Cape");
+            uint glow = Fnv1a.HashLower("Glow");
+            uint missing = Fnv1a.HashLower("DoesNotExist");
+
+            Assert.Equal(
+                new[] { true, true, true },
+                VfxMeshDecoder.SelectMeshSubmeshRanges(
+                    new[] { body, cape, glow },
+                    new[] { missing },
+                    new[] { cape }));
+
+            Assert.Equal(
+                new[] { true, true, false },
+                VfxMeshDecoder.SelectMeshSubmeshRanges(
+                    new[] { body, cape, glow },
+                    new[] { body },
+                    new[] { cape }));
+        }
+
+        [Fact]
         public void StaticMeshDecodePreservesAuthoredVertexColors()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxMesh", Guid.NewGuid().ToString("N"));

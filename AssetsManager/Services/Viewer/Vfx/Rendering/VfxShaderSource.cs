@@ -8,6 +8,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec2 aUv;
 layout(location=2) in vec4 aColor;
+layout(location=3) in vec3 aNormal;
+layout(location=4) in vec4 aBoneIndices;
+layout(location=5) in vec4 aBoneWeights;
 uniform mat4 uViewProj;
 uniform vec3 uWorldPos;
 uniform vec3 uScale;
@@ -17,7 +20,13 @@ uniform vec3 uCamUp;
 uniform int uAlignPitchToCamera;
 uniform int uAlignYawToCamera;
 uniform int uMeshSkinned;
-uniform float uDepthPushPull;
+uniform int uAttachedMesh;
+uniform int uUseOwnerSkinning;
+uniform int uIsGroundLayer;
+const int MAX_BONES = 512;
+layout(std140) uniform VfxBoneTransforms {
+    mat4 uBoneTransforms[MAX_BONES];
+};
 uniform vec2 uEmitterUvOffset;
 uniform vec2 uTexDiv;
 uniform vec2 uTexSize;
@@ -44,6 +53,8 @@ uniform int uClampUvMult;
 uniform vec2 uBirthUvOffset;
 uniform vec2 uUvScale;
 uniform float uUvRotation;
+uniform vec4 uFresnel;
+uniform vec4 uReflection;
 out vec2 vCell;
 out vec2 vCellMult;
 out vec2 vLocalUv;
@@ -51,15 +62,37 @@ out vec2 vLocalUvMult;
 out vec2 vCornerUv;
 out vec4 vMeshColor;
 out vec3 vColorDynamics;
+out vec3 vRim;
+out vec4 vReflect;
 
 void main(){
-    vec3 scaled = aPos * uScale;
+    vec3 sourcePosition = aPos;
+    vec3 sourceNormal = aNormal;
+    if (uUseOwnerSkinning != 0) {
+        ivec4 boneIndices = ivec4(aBoneIndices + vec4(0.5));
+        mat4 skinMatrix =
+            uBoneTransforms[boneIndices.x] * aBoneWeights.x +
+            uBoneTransforms[boneIndices.y] * aBoneWeights.y +
+            uBoneTransforms[boneIndices.z] * aBoneWeights.z +
+            uBoneTransforms[boneIndices.w] * aBoneWeights.w;
+        sourcePosition = (skinMatrix * vec4(aPos, 1.0)).xyz;
+        sourceNormal = mat3(skinMatrix) * aNormal;
+    }
+
+    vec3 scaled = sourcePosition * uScale;
     float sz = sin(uRotation.z); float cz = cos(uRotation.z);
     vec3 local = vec3(scaled.x * cz - scaled.y * sz, scaled.x * sz + scaled.y * cz, scaled.z);
     float sx = sin(uRotation.x); float cx = cos(uRotation.x);
     local = vec3(local.x, local.y * cx - local.z * sx, local.y * sx + local.z * cx);
     float sy = sin(uRotation.y); float cy = cos(uRotation.y);
     local = vec3(local.x * cy + local.z * sy, local.y, -local.x * sy + local.z * cy);
+
+    // LTK applies the same instance matrix to the authored surface normal as it does to
+    // the mesh vertex before evaluating rim/reflection facing.
+    vec3 surface = sourceNormal * uScale;
+    surface = vec3(surface.x * cz - surface.y * sz, surface.x * sz + surface.y * cz, surface.z);
+    surface = vec3(surface.x, surface.y * cx - surface.z * sx, surface.y * sx + surface.z * cx);
+    surface = vec3(surface.x * cy + surface.z * sy, surface.y, -surface.x * sy + surface.z * cy);
 
     vec3 placementRight = uPlacementRight;
     vec3 placementUp = uPlacementUp;
@@ -86,25 +119,57 @@ void main(){
         }
     }
 
-    vec3 p = placementRight * local.x + placementUp * local.y + placementForward * local.z + uWorldPos;
-    vec3 eyeRay = p - uCamPos;
-    if (uDepthPushPull != 0.0 && dot(eyeRay, eyeRay) > 0.000001)
-        p += normalize(eyeRay) * uDepthPushPull;
+    vec3 p;
+    vec3 worldSurface;
+    if (uAttachedMesh != 0) {
+        // LTK's AttachedMesh is the owner's DetachedBindMode skin at the scene origin.
+        // A particle contributes scale/tint/UV/erosion, not its translation or rotation.
+        p = scaled;
+        worldSurface = sourceNormal * uScale;
+    } else {
+        p = placementRight * local.x + placementUp * local.y + placementForward * local.z + uWorldPos;
+        worldSurface = placementRight * surface.x + placementUp * surface.y + placementForward * surface.z;
+    }
+    if (uIsGroundLayer != 0) p.y = 0.0;
+
+    // mesh_vs in LTK does not apply PARTICLE_DEPTH_PUSH_PULL. It derives the rim and
+    // reflected ray from the real surface normal and the eye-to-surface direction.
+    vRim = vec3(0.0);
+    vReflect = vec4(0.0);
+    if (dot(worldSurface, worldSurface) > 0.0) {
+        vec3 ray = normalize(p - uCamPos);
+        vec3 normal = normalize(worldSurface);
+        float facing = max(clamp(dot(-ray, normal), 0.0, 1.0), 1e-30);
+        vRim = (1.0 - pow(facing, uFresnel.w)) * uFresnel.rgb;
+        float glancing = 1.0 - pow(facing, uReflection.x);
+        // LTK crosses the mirrored X axis back before sampling the authored DDS cube.
+        vReflect = vec4(reflect(ray, normal) * vec3(-1.0, 1.0, 1.0),
+                        mix(uReflection.y, uReflection.z, glancing));
+    }
     gl_Position = uViewProj * vec4(p, 1.0);
     vec2 baseUv = aUv;
-    vec2 centeredUv = (baseUv - uUvTransformCenter) * uUvScale;
+    // mesh_ps_fixedalphauv samples the transformed-but-unscrolled coordinate. Unlike the
+    // normal layer transform this path has no authored centre or translation column.
+    vec2 alphaUv = baseUv * uUvScale;
     float uvSin = sin(uUvRotation); float uvCos = cos(uUvRotation);
+    alphaUv = vec2(alphaUv.x * uvCos - alphaUv.y * uvSin,
+                   alphaUv.x * uvSin + alphaUv.y * uvCos);
+    if (uFlipU != 0) alphaUv.x = 1.0 - alphaUv.x;
+    if (uFlipV != 0) alphaUv.y = 1.0 - alphaUv.y;
+    vCornerUv = alphaUv;
+
+    vec2 centeredUv = (baseUv - uUvTransformCenter) * uUvScale;
     centeredUv = vec2(centeredUv.x * uvCos - centeredUv.y * uvSin,
                       centeredUv.x * uvSin + centeredUv.y * uvCos);
-    vCornerUv = centeredUv + uUvTransformCenter;
-    baseUv = vCornerUv + uBirthUvOffset + uEmitterUvOffset;
+    baseUv = centeredUv + uUvTransformCenter + uBirthUvOffset + uEmitterUvOffset;
     if (uFlipU != 0) baseUv.x = 1.0 - baseUv.x;
     if (uFlipV != 0) baseUv.y = 1.0 - baseUv.y;
     vLocalUv = baseUv;
-    vec2 mainDiv = max(uTexDiv, vec2(1.0));
+    vec2 mainDiv = max(round(uTexDiv), vec2(1.0));
     float mainCols = mainDiv.x;
     float frame = floor(uFrame + 0.0001);
-    vec2 mainCell = vec2(mod(frame, mainCols), floor(frame / mainCols));
+    float mainFrame = mod(mod(frame, mainDiv.x * mainDiv.y) + mainDiv.x * mainDiv.y, mainDiv.x * mainDiv.y);
+    vec2 mainCell = vec2(mod(mainFrame, mainCols), floor(mainFrame / mainCols));
     vCell = mainCell;
     vec2 multUv = aUv;
     vec2 centeredMultUv = (multUv - uUvTransformCenterMult) * uUvScaleMult;
@@ -115,9 +180,9 @@ void main(){
     if (uFlipUMult != 0) multUv.x = 1.0 - multUv.x;
     if (uFlipVMult != 0) multUv.y = 1.0 - multUv.y;
     vLocalUvMult = multUv;
-    vec2 multDiv = max(uTexDivMult, vec2(1.0));
+    vec2 multDiv = max(round(uTexDivMult), vec2(1.0));
     float multCols = multDiv.x;
-    float multFrame = floor(uFrame + 0.0001);
+    float multFrame = mod(mod(frame, multDiv.x * multDiv.y) + multDiv.x * multDiv.y, multDiv.x * multDiv.y);
     vec2 multCell = vec2(mod(multFrame, multCols), floor(multFrame / multCols));
     vCellMult = multCell;
     vMeshColor = aColor;
@@ -180,6 +245,7 @@ out vec2 vLocalUvMult;
 out vec2 vCornerUv;
 out float vPaletteSelector;
 out vec3 vColorDynamics;
+out vec2 vRibbonLookup;
 vec3 rotateEuler(vec3 p, vec3 r){
     float sz = sin(r.z); float cz = cos(r.z);
     p = vec3(p.x * cz - p.y * sz, p.x * sz + p.y * cz, p.z);
@@ -242,19 +308,11 @@ void main(){
         vec3 planeU = uLegacyOrientation == 2 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
         vec3 planeV = uLegacyOrientation == 3 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 0.0, -1.0);
         world = aCenter + planeU * (rc.y * aSize.y) + planeV * (rc.x * aSize.x);
-        if (uIsGroundLayer != 0) world.y = 0.02;
-    } else if (uIsGroundLayer != 0 || uPrimitiveKind == 9) {
-        vec3 groundForward = uArbitraryQuad != 0 ? placedUp : vec3(0.0, 0.0, 1.0);
-        vec3 groundRight = uArbitraryQuad != 0 ? placedRight : vec3(1.0, 0.0, 0.0);
-        if (dot(cross(groundRight, groundForward), vec3(0.0, 1.0, 0.0)) < 0.0) {
-            vec3 authoredRight = groundRight;
-            groundRight = -groundForward;
-            groundForward = -authoredRight;
-        }
-        world = aCenter + groundRight * (rc.x * aSize.x) + groundForward * (rc.y * aSize.y) + vec3(0.0, 0.02, 0.0);
     } else {
         world = aCenter + right * (rc.x * aSize.x) + up * (rc.y * aSize.y);
     }
+    // LTK's GROUND_LAYER is a final world-space projection shared by quads, ribbons and meshes.
+    if (uIsGroundLayer != 0) world.y = 0.0;
     vec3 eyeRay = world - uCamPos;
     if (uDepthPushPull != 0.0 && dot(eyeRay, eyeRay) > 0.000001)
         world += normalize(eyeRay) * uDepthPushPull;
@@ -265,40 +323,48 @@ void main(){
     vec2 quadUv = uArbitraryQuad != 0
         ? vec2(aCorner.y + 0.5, aCorner.x + 0.5)
         : vec2(cell.x, 1.0 - cell.y);
-    float cols = max(uTexDiv.x, 1.0);
-    float rows = max(uTexDiv.y, 1.0);
-    float frame = floor(aRotFrame.y + 0.0001);
-    float fx = mod(frame, cols);
-    float fy = floor(frame / cols);
-    vec2 localUv = trailPrimitive
-        ? aCorner
-        : quadUv;
-    vCornerUv = localUv;
-    vec2 centeredUv = (localUv - uUvTransformCenter) * aUvBase.zw;
-    float uvSin = sin(aUvErosion.x); float uvCos = cos(aUvErosion.x);
-    centeredUv = vec2(centeredUv.x * uvCos - centeredUv.y * uvSin,
-                      centeredUv.x * uvSin + centeredUv.y * uvCos);
-    localUv = centeredUv + uUvTransformCenter + aUvBase.xy + uEmitterUvOffset;
-    if (uFlipU != 0) localUv.x = 1.0 - localUv.x;
-    if (uFlipV != 0) localUv.y = 1.0 - localUv.y;
-    vLocalUv = localUv;
-    vCell = vec2(fx, fy);
-    vec2 multUv = trailPrimitive
-        ? aCorner
-        : quadUv;
-    vec2 centeredMultUv = (multUv - uUvTransformCenterMult) * aUvMult.zw;
-    float multSin = sin(aUvMultDynamics.x); float multCos = cos(aUvMultDynamics.x);
-    centeredMultUv = vec2(centeredMultUv.x * multCos - centeredMultUv.y * multSin,
-                          centeredMultUv.x * multSin + centeredMultUv.y * multCos);
-    multUv = centeredMultUv + uUvTransformCenterMult + aUvMult.xy + uUvScrollRateMult;
-    if (uFlipUMult != 0) multUv.x = 1.0 - multUv.x;
-    if (uFlipVMult != 0) multUv.y = 1.0 - multUv.y;
-    vLocalUvMult = multUv;
-    vec2 multDiv = max(uTexDivMult, vec2(1.0));
-    float multCols = multDiv.x;
-    float multFrame = floor(aRotFrame.y + 0.0001);
-    vec2 multCell = vec2(mod(multFrame, multCols), floor(multFrame / multCols));
-    vCellMult = multCell;
+    if (trailPrimitive) {
+        // Ribbon geometry already carries the engine's final per-vertex layer transforms.
+        // This preserves its LOCK_ALPHA uv, independent base/mult cells and beam transpose.
+        vLocalUv = aCorner;
+        vCornerUv = aRotFrame;
+        vCell = aAgeVelX.xy;
+        vLocalUvMult = aRotationSize.xy;
+        vCellMult = aRotationSize.zw;
+        vRibbonLookup = aAgeVelX.zw;
+    } else {
+        float cols = max(round(uTexDiv.x), 1.0);
+        float rows = max(round(uTexDiv.y), 1.0);
+        float frame = floor(aRotFrame.y + 0.0001);
+        float baseFrame = mod(mod(frame, cols * rows) + cols * rows, cols * rows);
+        float fx = mod(baseFrame, cols);
+        float fy = floor(baseFrame / cols);
+        vec2 localUv = quadUv;
+        vCornerUv = localUv;
+        vec2 centeredUv = (localUv - uUvTransformCenter) * aUvBase.zw;
+        float uvSin = sin(aUvErosion.x); float uvCos = cos(aUvErosion.x);
+        centeredUv = vec2(centeredUv.x * uvCos - centeredUv.y * uvSin,
+                          centeredUv.x * uvSin + centeredUv.y * uvCos);
+        localUv = centeredUv + uUvTransformCenter + aUvBase.xy + uEmitterUvOffset;
+        if (uFlipU != 0) localUv.x = 1.0 - localUv.x;
+        if (uFlipV != 0) localUv.y = 1.0 - localUv.y;
+        vLocalUv = localUv;
+        vCell = vec2(fx, fy);
+        vec2 multUv = quadUv;
+        vec2 centeredMultUv = (multUv - uUvTransformCenterMult) * aUvMult.zw;
+        float multSin = sin(aUvMultDynamics.x); float multCos = cos(aUvMultDynamics.x);
+        centeredMultUv = vec2(centeredMultUv.x * multCos - centeredMultUv.y * multSin,
+                              centeredMultUv.x * multSin + centeredMultUv.y * multCos);
+        multUv = centeredMultUv + uUvTransformCenterMult + aUvMult.xy + uUvScrollRateMult;
+        if (uFlipUMult != 0) multUv.x = 1.0 - multUv.x;
+        if (uFlipVMult != 0) multUv.y = 1.0 - multUv.y;
+        vLocalUvMult = multUv;
+        vec2 multDiv = max(round(uTexDivMult), vec2(1.0));
+        float multCols = multDiv.x;
+        float multFrame = mod(mod(frame, multDiv.x * multDiv.y) + multDiv.x * multDiv.y, multDiv.x * multDiv.y);
+        vCellMult = vec2(mod(multFrame, multCols), floor(multFrame / multCols));
+        vRibbonLookup = vec2(0.0);
+    }
     vColor = aColor;
     vPaletteSelector = aUvMultDynamics.z;
     vErosionDrive = aUvErosion.y;
@@ -326,9 +392,12 @@ float addressMask(vec2 placed, int mode){
 vec4 sampleAddressed(sampler2D tex, vec2 placed, int mode){
     return texture(tex, addressedUv(placed, mode)) * addressMask(placed, mode);
 }
-vec2 atlasUv(vec2 local, vec2 cell, vec2 divisions, vec2 size, int mode){
+vec2 atlasUvRaw(vec2 local, vec2 cell, vec2 divisions){
     vec2 div = max(divisions, vec2(1.0));
-    return (cell + addressedUv(local, mode)) / div;
+    return (cell + local) / div;
+}
+vec2 atlasUv(vec2 local, vec2 cell, vec2 divisions, vec2 size, int mode){
+    return atlasUvRaw(addressedUv(local, mode), cell, divisions);
 }
 ";
 
@@ -340,6 +409,8 @@ in vec2 vLocalUvMult;
 in vec2 vCornerUv;
 in vec4 vMeshColor;
 in vec3 vColorDynamics;
+in vec3 vRim;
+in vec4 vReflect;
 uniform int uIsDistortion;
 uniform sampler2D uDistortionTex;
 uniform sampler2D uSceneTex;
@@ -389,9 +460,9 @@ uniform vec4 uSoftParticleParams;
 uniform vec4 uSoftParticleControl;
 uniform vec2 uDepthProjection;
 uniform vec2 uViewportSize;
-uniform sampler2D uReflectionTex;
+uniform samplerCube uReflectionTex;
 uniform int uHasReflection;
-uniform vec2 uReflectionOpacity;
+uniform int uAttachedMesh;
 uniform vec4 uReflectionColor;
 out vec4 fragColor;
 float colorLookUpDriver(int type){
@@ -408,7 +479,7 @@ vec4 applyParticleColor(vec4 texel){
     if (uColorLookUpTypeX != 0) colorUv.x += uColorLookUpOffsets.x;
     if (uColorLookUpTypeY != 0) colorUv.y += uColorLookUpOffsets.y;
     if (uRampAtMult != 0)
-        colorUv = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uAddressModeMult);
+        colorUv = atlasUvRaw(vLocalUvMult, vCellMult, uTexDivMult);
     return texel * texture(uColorMap, colorUv);
 }
 
@@ -419,7 +490,7 @@ void main(){
         ? texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode)
         : vec4(1.0);
     if (uHasTex != 0 && uUvMode == 2)
-        texel.a = texture(uTex, vCornerUv).a;
+        texel.a = sampleAddressed(uTex, vCornerUv, uAddressMode).a;
     if (uHasPalette != 0) {
         float paletteCoverage = texel.a;
         float paletteIndex = dot(texel, uPaletteMixMask);
@@ -436,7 +507,10 @@ void main(){
     }
     if (uHasErosion != 0) {
         vec4 erosionTexel = uHasErosionMap != 0
-            ? sampleAddressed(uErosionTex, vUv, uErosionAddressMode)
+            ? sampleAddressed(
+                uErosionTex,
+                atlasUvRaw(vLocalUv, vCell, uTexDiv),
+                uErosionAddressMode)
             : uErosionDefault;
         float erosion = clamp(dot(erosionTexel, uErosionMixer), 0.0, 1.0);
         float featherIn = max(0.0001, uErosionFeatherIn);
@@ -445,15 +519,22 @@ void main(){
         float lower = clamp((uErosionDrive - erosion) / featherOut, 0.0, 1.0);
         texel.a *= clamp(upper - lower, 0.0, 1.0);
     }
-    vec4 authoredColor = uColor * vMeshColor * uModulationFactor;
+    vec4 authoredColor = uColor * (uAttachedMesh != 0 ? vec4(1.0) : vMeshColor) * uModulationFactor;
     vec4 lit = texel * authoredColor;
     if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;
+
+    // LTK mesh_ps adds the Fresnel rim even when no cube map is available. The cube
+    // reflection itself is weighted by its facing-derived opacity, then tinted toward
+    // reflectionFresnelColor. Attached meshes use the base texel alpha as the carrier.
+    float sheenCarrier = uAttachedMesh != 0 ? texel.a : lit.a;
+    vec3 mirrored = vec3(0.0);
     if (uHasReflection != 0) {
-        vec4 reflection = texture(uReflectionTex, vUv);
-        float edge = clamp(length(vLocalUv - vec2(0.5)) * 1.4142, 0.0, 1.0);
-        float opacity = mix(uReflectionOpacity.x, uReflectionOpacity.y, edge);
-        lit.rgb = mix(lit.rgb, reflection.rgb * uReflectionColor.rgb, clamp(opacity * reflection.a, 0.0, 1.0));
+        mirrored = texture(uReflectionTex, vReflect.xyz).rgb * vReflect.w
+            * mix(vec3(1.0), uReflectionColor.rgb, vReflect.w);
+        if (uAttachedMesh != 0) mirrored *= texel.a;
     }
+    lit.rgb = clamp(lit.rgb + mirrored + vRim * sheenCarrier, vec3(0.0), vec3(1.0));
+
     if (uHasSoftParticle != 0) {
         vec2 sceneUv = gl_FragCoord.xy / max(uViewportSize, vec2(1.0));
         float storedNdc = texture(uSceneDepthTex, sceneUv).r * 2.0 - 1.0;
@@ -470,7 +551,7 @@ void main(){
         lit.rgb *= uSoftParticleControl.x + fade * uSoftParticleControl.y;
         lit.a *= uSoftParticleControl.z + fade * uSoftParticleControl.w;
     }
-    if (uIsDistortion != 0) {
+    if (uIsDistortion != 0 && uDistortionStrength != 0.0) {
         vec4 normalSample = texture(uDistortionTex, vLocalUv);
         float mask = normalSample.a * lit.a;
         vec2 normalOffset = normalSample.rg * 2.0 - vec2(1.0);
@@ -497,6 +578,7 @@ in vec2 vLocalUvMult;
 in vec2 vCornerUv;
 in float vPaletteSelector;
 in vec3 vColorDynamics;
+in vec2 vRibbonLookup;
 uniform sampler2D uTex;
 uniform int uHasTex;
 uniform int uPrimitiveKind;
@@ -543,10 +625,6 @@ uniform int uHasSoftParticle;
 uniform vec4 uSoftParticleParams;
 uniform vec4 uSoftParticleControl;
 uniform vec2 uDepthProjection;
-uniform sampler2D uReflectionTex;
-uniform int uHasReflection;
-uniform vec2 uReflectionOpacity;
-uniform vec4 uReflectionColor;
 out vec4 fragColor;
 float colorLookUpDriver(int type){
     if (type == 1) return vColorDynamics.x;
@@ -556,13 +634,18 @@ float colorLookUpDriver(int type){
 }
 vec4 applyParticleColor(vec4 tex){
     if (uHasColor == 0) return tex;
-    vec2 colorUv = vec2(
-        colorLookUpDriver(uColorLookUpTypeX) * uColorLookUpScales.x,
-        colorLookUpDriver(uColorLookUpTypeY) * uColorLookUpScales.y);
-    if (uColorLookUpTypeX != 0) colorUv.x += uColorLookUpOffsets.x;
-    if (uColorLookUpTypeY != 0) colorUv.y += uColorLookUpOffsets.y;
+    bool ribbonPrimitive = uPrimitiveKind == 5 || uPrimitiveKind == 6 || uPrimitiveKind == 8 || uPrimitiveKind == 10;
+    vec2 colorUv = ribbonPrimitive
+        ? vRibbonLookup
+        : vec2(
+            colorLookUpDriver(uColorLookUpTypeX) * uColorLookUpScales.x,
+            colorLookUpDriver(uColorLookUpTypeY) * uColorLookUpScales.y);
+    if (!ribbonPrimitive) {
+        if (uColorLookUpTypeX != 0) colorUv.x += uColorLookUpOffsets.x;
+        if (uColorLookUpTypeY != 0) colorUv.y += uColorLookUpOffsets.y;
+    }
     if (uRampAtMult != 0)
-        colorUv = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uAddressModeMult);
+        colorUv = atlasUvRaw(vLocalUvMult, vCellMult, uTexDivMult);
     return tex * texture(uColorMap, colorUv);
 }
 
@@ -579,7 +662,7 @@ void main(){
             t.a = 1.0 - smoothstep(0.0, 0.5, length(vCornerUv - vec2(0.5)));
     }
     if (uHasTex != 0 && uUvMode == 2)
-        t.a = texture(uTex, vCornerUv).a;
+        t.a = sampleAddressed(uTex, vCornerUv, uAddressMode).a;
     if (uHasPalette != 0) {
         float paletteCoverage = t.a;
         float paletteIndex = dot(t, uPaletteMixMask);
@@ -596,7 +679,10 @@ void main(){
     }
     if (uHasErosion != 0) {
         vec4 erosionTexel = uHasErosionMap != 0
-            ? sampleAddressed(uErosionTex, vUv, uErosionAddressMode)
+            ? sampleAddressed(
+                uErosionTex,
+                atlasUvRaw(vLocalUv, vCell, uTexDiv),
+                uErosionAddressMode)
             : uErosionDefault;
         float erosion = clamp(dot(erosionTexel, vErosionMixer), 0.0, 1.0);
         float featherIn = max(0.0001, uErosionFeatherIn);
@@ -624,7 +710,7 @@ void main(){
         lit.rgb *= uSoftParticleControl.x + fade * uSoftParticleControl.y;
         lit.a *= uSoftParticleControl.z + fade * uSoftParticleControl.w;
     }
-    if (uIsDistortion != 0) {
+    if (uIsDistortion != 0 && uDistortionStrength != 0.0) {
         vec4 normalSample = texture(uDistortionTex, vLocalUv);
         float mask = normalSample.a * lit.a;
         vec2 normalOffset = normalSample.rg * 2.0 - vec2(1.0);

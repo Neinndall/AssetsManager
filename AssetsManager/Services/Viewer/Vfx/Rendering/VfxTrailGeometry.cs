@@ -97,12 +97,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private void WritePoint(VfxPlaybackRuntime.EmitterState state, int source, int vertex, Vector3 position, float u, float v)
         {
             int offset = vertex * VertexStride;
-            _points[offset] = u;
-            _points[offset + 1] = v;
             Array.Copy(state.Instances, source, _points, offset + 2, VfxPlaybackRuntime.InstanceStride);
             _points[offset + 2] = position.X;
             _points[offset + 3] = position.Y;
             _points[offset + 4] = position.Z;
+            VfxRibbonVertexSemantics.Pack(state, source, _points, offset, u, v, transpose: false);
         }
 
         private void Copy(int point, ref int vertices)

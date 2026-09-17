@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Rendering
@@ -45,11 +46,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return entries;
         }
 
-        private static readonly int[] BlendRank = { 1, 2, 1, 0, 2, 2, 2, 2, 3 };
-
-        private static int GetBlendRank(int blendMode)
-            => blendMode >= 0 && blendMode < BlendRank.Length ? BlendRank[blendMode] : 1;
-
         private static int Compare(VfxRenderQueueEntry left, VfxRenderQueueEntry right)
         {
             // 1. Ground layer emitters render before default emitters (Riot / LTK drawKind.ts)
@@ -58,31 +54,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (leftGround != rightGround)
                 return leftGround ? -1 : 1;
 
-            VfxEmitterRenderState leftState = left.Emitter.Def.RenderState ?? VfxEmitterRenderState.Default;
-            VfxEmitterRenderState rightState = right.Emitter.Def.RenderState ?? VfxEmitterRenderState.Default;
-
-            int order = leftState.RenderPhase.CompareTo(rightState.RenderPhase);
-            if (order != 0) return order;
-            order = leftState.RenderPass.CompareTo(rightState.RenderPass);
+            // LTK ranks emitters inside each VFX system, then appends child systems after
+            // the system that owns them. Keep that hierarchy before comparing authored keys.
+            int order = left.RuntimeOrder.CompareTo(right.RuntimeOrder);
             if (order != 0) return order;
 
-            // 2. Blend rank: Mode 3 (NONE opaque) draws before transparent modes
-            int leftRank = GetBlendRank(left.Emitter.Def.BlendMode);
-            int rightRank = GetBlendRank(right.Emitter.Def.BlendMode);
-            order = leftRank.CompareTo(rightRank);
-            if (order != 0) return order;
-
-            if (leftState.SortEmittersByPosition && rightState.SortEmittersByPosition)
-            {
-                // OpenGL camera space looks down -Z: the more negative value is farther away.
-                order = left.ViewDepth.CompareTo(right.ViewDepth);
-                if (order != 0) return order;
-            }
-
-            int miscOrder = left.Emitter.Def.MiscRenderFlags.CompareTo(right.Emitter.Def.MiscRenderFlags);
-            if (miscOrder != 0) return miscOrder;
-
-            order = left.Emitter.Def.Importance.CompareTo(right.Emitter.Def.Importance);
+            order = VfxDrawOrderSemantics.Compare(
+                left.Emitter.Def,
+                left.Emitter.SourceOrder,
+                right.Emitter.Def,
+                right.Emitter.SourceOrder);
             return order != 0 ? order : left.QueueOrder.CompareTo(right.QueueOrder);
         }
 
