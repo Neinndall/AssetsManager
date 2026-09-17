@@ -38,6 +38,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private VfxTextureResourceCache _textures = null!;
         private VfxSceneCapture _capture = null!;
         private VfxMeshResourceCache _meshResources = null!;
+        private float[] _groupedInstances = Array.Empty<float>();
         private float[] _sortedInstances = Array.Empty<float>();
         private float[] _instanceDepths = Array.Empty<float>();
         private int[] _instanceOrder = Array.Empty<int>();
@@ -48,6 +49,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
         private DrawElementsDelegate _drawElements = null!;
         private const int Stride = VfxPlaybackRuntime.InstanceStride;
+        private const int QuadsPerEmitter = 4096;
+        private const int MeshesPerEmitter = 512;
+        private const int BeamsPerEmitter = 256;
         private const int AttachedMeshesPerEmitter = 8;
         private bool _gles;
         private Vector2 _depthProjectionValue;
@@ -295,7 +299,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Enable(EnableCap.Blend);
             _gl.BlendEquation(GLEnum.FuncAdd);
 
-            var attachedUsed = new Dictionary<(object Graph, string Path, int SourceOrder), int>();
+            var emitterUsed = new Dictionary<(object Graph, string Path, int SourceOrder), int>();
+            var firstSourceByEmitter = new Dictionary<(object Graph, string Path, int SourceOrder), VfxPlaybackRuntime.EmitterState>();
+            var sortedQuadGroups = new Dictionary<(object Graph, string Path, int SourceOrder), List<VfxPlaybackRuntime.EmitterState>>();
+            foreach (VfxRenderQueueEntry candidate in renderQueue)
+            {
+                VfxPlaybackRuntime.EmitterState candidateEmitter = candidate.Emitter;
+                var key = (candidateEmitter.RenderGraphKey ?? candidateEmitter,
+                    candidateEmitter.RenderPath ?? string.Empty,
+                    candidateEmitter.SourceOrder);
+                firstSourceByEmitter.TryAdd(key, candidateEmitter);
+                if (candidateEmitter.InstanceCount <= 0 || !candidateEmitter.IsVisible ||
+                    !ShouldSortInstances(candidateEmitter.Def, 2)) continue;
+                if (!sortedQuadGroups.TryGetValue(key, out List<VfxPlaybackRuntime.EmitterState> sources))
+                {
+                    sources = new List<VfxPlaybackRuntime.EmitterState>();
+                    sortedQuadGroups[key] = sources;
+                }
+                sources.Add(candidateEmitter);
+            }
+            var renderedSortedQuadGroups = new HashSet<(object Graph, string Path, int SourceOrder)>();
+
             foreach (VfxRenderQueueEntry entry in renderQueue)
             {
                 VfxPlaybackRuntime.EmitterState es = entry.Emitter;
@@ -309,42 +333,48 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (es.Def.IsMeshPrimitive && es.MeshVao == 0)
                     continue;
 
-                bool attachedMesh = es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh;
-                int renderInstanceCount = es.InstanceCount;
-                if (attachedMesh)
-                {
-                    var key = (es.RenderGraphKey ?? es, es.RenderPath ?? string.Empty, es.SourceOrder);
-                    int alreadyUsed = attachedUsed.GetValueOrDefault(key);
-                    renderInstanceCount = ResolveAttachedMeshDrawCount(alreadyUsed, es.InstanceCount);
-                    if (renderInstanceCount == 0) continue;
-                    attachedUsed[key] = alreadyUsed + renderInstanceCount;
-                }
-
-                int floats = renderInstanceCount * Stride;
+                // LTK allocates one draw component per graph/path/emitter definition. Every live
+                // source of that child path shares the same fixed draw budget and palette phase.
+                var emitterKey = (es.RenderGraphKey ?? es, es.RenderPath ?? string.Empty, es.SourceOrder);
+                VfxPlaybackRuntime.EmitterState paletteSource = firstSourceByEmitter.GetValueOrDefault(emitterKey) ?? es;
+                float sharedPalettePhase = ResolveEmitterPhase(es.Def, paletteSource.EmitterAge);
+                int renderInstanceCount;
                 ReadOnlySpan<float> instancesSpan;
-                if (ShouldSortInstances(es.Def, renderInstanceCount))
+                if (sortedQuadGroups.TryGetValue(emitterKey, out List<VfxPlaybackRuntime.EmitterState> quadSources))
                 {
-                    EnsureInstanceSortCapacity(renderInstanceCount, floats);
-                    VfxRenderQueue.CopyInstancesBackToFront(
-                        es.Instances,
-                        renderInstanceCount,
+                    // Quads.tsx gathers every live source first and sorts the combined set once.
+                    if (!renderedSortedQuadGroups.Add(emitterKey)) continue;
+                    EnsureInstanceSortCapacity(QuadsPerEmitter, QuadsPerEmitter * Stride);
+                    renderInstanceCount = VfxRenderQueue.CopyQuadSourcesBackToFront(
+                        quadSources,
+                        QuadsPerEmitter,
                         Stride,
                         view,
+                        _groupedInstances,
                         _sortedInstances,
                         _instanceDepths,
                         _instanceOrder);
-                    instancesSpan = new ReadOnlySpan<float>(_sortedInstances, 0, floats);
+                    if (renderInstanceCount == 0) continue;
+                    instancesSpan = new ReadOnlySpan<float>(_sortedInstances, 0, renderInstanceCount * Stride);
+                    emitterUsed[emitterKey] = renderInstanceCount;
                 }
                 else
                 {
-                    instancesSpan = new ReadOnlySpan<float>(es.Instances, 0, floats);
+                    int alreadyUsed = emitterUsed.GetValueOrDefault(emitterKey);
+                    renderInstanceCount = ResolveEmitterDrawCount(es.Def, alreadyUsed, es.InstanceCount);
+                    if (renderInstanceCount == 0) continue;
+                    emitterUsed[emitterKey] = alreadyUsed + renderInstanceCount;
+                    instancesSpan = new ReadOnlySpan<float>(es.Instances, 0, renderInstanceCount * Stride);
                 }
+
+                bool attachedMesh = es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh;
+                int floats = renderInstanceCount * Stride;
 
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
                     ApplyEmitterDepthState(es.Def, isDistortion: es.Def.Distortion != null);
                     ApplyBlendMode(es.Def.BlendMode, distortion: es.Def.Distortion != null);
-                    RenderMeshEmitter(es, viewProj, camPos, camUp, instancesSpan, renderInstanceCount);
+                    RenderMeshEmitter(es, viewProj, camPos, camUp, instancesSpan, renderInstanceCount, sharedPalettePhase);
                     continue;
                 }
                 if (!es.Def.IsVisual) continue;
@@ -367,7 +397,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform2(_uTexDiv, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
                 _gl.Uniform2(_uTexSize, Math.Max(1f, es.TextureWidth), Math.Max(1f, es.TextureHeight));
                 Vector2 emitterUvOffset = VfxUvSemantics.Periodic(
-                    es.Def.EmitterUvScrollRate * es.EmitterAge,
+                    es.Def.EmitterUvScrollRate * es.RenderTime,
                     renderState.TextureAddressMode);
                 _gl.Uniform2(_uEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
                 Vector2 uvCenter = EffectiveCenter(es.Def.UvTransformCenter);
@@ -380,7 +410,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     Math.Max(1f, es.TextureMultWidth),
                     Math.Max(1f, es.TextureMultHeight));
                 Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
-                    es.Def.TextureMultEmitterUvScrollRate * es.EmitterAge,
+                    es.Def.TextureMultEmitterUvScrollRate * es.RenderTime,
                     es.Def.TextureMultAddressMode);
                 _gl.Uniform2(_uUvScrollRateMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
                 Vector2 uvCenterMult = EffectiveCenter(es.Def.TextureMultTransformCenter);
@@ -435,12 +465,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform1(_uPaletteAddressMode, palette?.AddressMode ?? 0);
                 Vector4 paletteMask = palette?.PaletteSourceMixColor ?? Vector4.Zero;
                 _gl.Uniform4(_uPaletteMixMask, paletteMask.X, paletteMask.Y, paletteMask.Z, paletteMask.W);
-                float palettePhase = es.Def.EmitterLifetime is > 0f
-                    ? Math.Clamp(es.EmitterAge / es.Def.EmitterLifetime.Value, 0f, 1f)
-                    : 0f;
                 Vector2 paletteScroll = new(
-                    palette?.ScrollU?.Sample(palettePhase) ?? 0f,
-                    palette?.ScrollV?.Sample(palettePhase) ?? 0f);
+                    palette?.ScrollU?.Sample(sharedPalettePhase) ?? 0f,
+                    palette?.ScrollV?.Sample(sharedPalettePhase) ?? 0f);
                 _gl.Uniform2(_uPaletteScroll, paletteScroll.X, paletteScroll.Y);
                 _gl.Uniform1(_uIsAdditive, es.Def.BlendMode == 0 ? 1 : VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 2 : 0);
                 _gl.Uniform1(_uColorLookUpTypeX, es.Def.ColorLookUpTypeX ?? 0);
@@ -546,7 +573,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     // LTK suppresses a beam ribbon when the same primitive resolves mMesh.
                     if (!string.IsNullOrWhiteSpace(es.Def.MeshPath))
                         continue;
-                    int vertices = _beamGeometry.Build(es, camPos);
+                    int vertices = _beamGeometry.Build(es, camPos, renderInstanceCount);
                     if (vertices > 0)
                     {
                         _gl.BindVertexArray(_trailVao);
@@ -558,7 +585,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     }
                 }
                 else
-                    _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)es.InstanceCount);
+                    _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)renderInstanceCount);
             }
 
             }
@@ -654,6 +681,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private void EnsureInstanceSortCapacity(int instanceCount, int floatCount)
         {
+            if (_groupedInstances.Length < floatCount)
+                _groupedInstances = new float[Math.Max(floatCount, Stride * 64)];
             if (_sortedInstances.Length < floatCount)
                 _sortedInstances = new float[Math.Max(floatCount, Stride * 64)];
             if (_instanceDepths.Length < instanceCount)
@@ -989,7 +1018,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector3 camPos,
             Vector3 camUp,
             ReadOnlySpan<float> instances,
-            int instanceCount)
+            int instanceCount,
+            float sharedPalettePhase)
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
             bool isDistortion = es.Def.Distortion != null;
@@ -1042,7 +1072,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector2 uvCenterMult = EffectiveCenter(es.Def.TextureMultTransformCenter);
             _gl.Uniform2(_muUvTransformCenterMult, uvCenterMult.X, uvCenterMult.Y);
             Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
-                    es.Def.TextureMultEmitterUvScrollRate * es.EmitterAge,
+                    es.Def.TextureMultEmitterUvScrollRate * es.RenderTime,
                     es.Def.TextureMultAddressMode);
             _gl.Uniform2(_muEmitterUvOffsetMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
             _gl.Uniform1(_muFlipUMult, es.Def.TextureMultFlipU ? 1 : 0);
@@ -1113,12 +1143,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_muPaletteAddressMode, meshPalette?.AddressMode ?? 0);
             Vector4 meshPaletteMask = meshPalette?.PaletteSourceMixColor ?? Vector4.Zero;
             _gl.Uniform4(_muPaletteMixMask, meshPaletteMask.X, meshPaletteMask.Y, meshPaletteMask.Z, meshPaletteMask.W);
-            float meshPalettePhase = es.Def.EmitterLifetime is > 0f
-                ? Math.Clamp(es.EmitterAge / es.Def.EmitterLifetime.Value, 0f, 1f)
-                : 0f;
             Vector2 meshPaletteScroll = new(
-                meshPalette?.ScrollU?.Sample(meshPalettePhase) ?? 0f,
-                meshPalette?.ScrollV?.Sample(meshPalettePhase) ?? 0f);
+                meshPalette?.ScrollU?.Sample(sharedPalettePhase) ?? 0f,
+                meshPalette?.ScrollV?.Sample(sharedPalettePhase) ?? 0f);
             _gl.Uniform2(_muPaletteScroll, meshPaletteScroll.X, meshPaletteScroll.Y);
             _gl.Uniform1(_muIsAdditive, es.Def.BlendMode == 0 ? 1 : VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 2 : 0);
             _gl.Uniform1(_muColorLookUpTypeX, es.Def.ColorLookUpTypeX ?? 0);
@@ -1212,7 +1239,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             ApplyBlendMode(es.Def.BlendMode, isDistortion);
 
             Vector2 emitterUvOffset = VfxUvSemantics.Periodic(
-                    es.Def.EmitterUvScrollRate * es.EmitterAge,
+                    es.Def.EmitterUvScrollRate * es.RenderTime,
                     renderState.TextureAddressMode);
             _gl.Uniform2(_muEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
             for (int i = 0; i < instanceCount; i++)
@@ -1287,6 +1314,29 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.BindVertexArray(_vao);
         }
 
+        internal static int ResolveEmitterDrawCount(
+            VfxEmitterDefinition definition,
+            int alreadyUsed,
+            int instanceCount)
+        {
+            if (definition is null || instanceCount <= 0) return 0;
+
+            int limit = definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh
+                ? AttachedMeshesPerEmitter
+                : definition.IsMeshPrimitive
+                    ? MeshesPerEmitter
+                    : definition.DrawsAsBeam
+                        ? BeamsPerEmitter
+                        : definition.DrawsAsQuad
+                            ? QuadsPerEmitter
+                            : int.MaxValue;
+
+            if (limit == int.MaxValue) return instanceCount;
+            int used = Math.Max(0, alreadyUsed);
+            if (used >= limit) return 0;
+            return Math.Min(instanceCount, limit - used);
+        }
+
         internal static int ResolveAttachedMeshDrawCount(int alreadyUsed, int instanceCount)
         {
             if (instanceCount <= 0 || alreadyUsed >= AttachedMeshesPerEmitter) return 0;
@@ -1296,10 +1346,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal static bool ShouldSortInstances(VfxEmitterDefinition definition, int instanceCount)
             => definition is not null &&
                instanceCount > 1 &&
-               definition.PrimitiveKind is not (
-                   VfxPrimitiveKind.CameraTrail or
-                   VfxPrimitiveKind.ArbitraryTrail or
-                   VfxPrimitiveKind.AttachedMesh) &&
+               definition.DrawsAsQuad &&
                VfxBlendModes.ShouldSortBackToFront(definition.BlendMode);
 
         private static float ClampScale(float value)
@@ -1338,6 +1385,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal static bool ShouldSampleBaseTexture(VfxEmitterDefinition definition, uint textureHandle)
             => textureHandle != 0 || string.IsNullOrWhiteSpace(definition?.TexturePath);
+
+        internal static float ResolveEmitterPhase(VfxEmitterDefinition definition, float age)
+        {
+            float lifetime = definition?.EmitterLifetime ?? 0f;
+            if (lifetime <= 0f || !float.IsFinite(lifetime) || !float.IsFinite(age)) return 0f;
+            return Math.Clamp(age / lifetime, 0f, 1f);
+        }
 
         internal static Vector2? ResolvePolygonOffset(VfxEmitterDefinition definition)
         {

@@ -2193,6 +2193,75 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void TryResolveTexturePath_FindsUnresolvedChunkBesideFlatHashNamedSkn()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"janna-{Guid.NewGuid():N}.wad.client");
+            string sknPath = Path.Combine(root, "0123456789abcdef.skn");
+            string chunkTexturePath = Path.Combine(root, "cd174f650ce9caee.tex");
+
+            try
+            {
+                Directory.CreateDirectory(root);
+                File.WriteAllBytes(sknPath, Array.Empty<byte>());
+                File.WriteAllBytes(chunkTexturePath, Array.Empty<byte>());
+
+                Assert.Equal(
+                    chunkTexturePath,
+                    SknMaterialTextureResolver.TryResolveTexturePath(
+                        sknPath,
+                        "cd174f650ce9caee"),
+                    ignoreCase: true);
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Fact]
+        public void TryResolveTexturePath_RehashesResolvedVirtualPathForHashNamedWadRootFile()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-wad-root-{Guid.NewGuid():N}");
+            string sknPath = Path.Combine(
+                root,
+                "assets",
+                "characters",
+                "janna",
+                "skins",
+                "skin67",
+                "janna_skin67.skn");
+            const string virtualTexturePath =
+                "assets/characters/janna/skins/skin67/janna_skin67_tx_cm.tex";
+            string chunkTexturePath = Path.Combine(
+                root,
+                $"{XxHash64Ext.Hash(virtualTexturePath):x16}.tex");
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(sknPath)!);
+                File.WriteAllBytes(sknPath, Array.Empty<byte>());
+                File.WriteAllBytes(chunkTexturePath, Array.Empty<byte>());
+
+                Assert.Equal(
+                    chunkTexturePath,
+                    SknMaterialTextureResolver.TryResolveTexturePath(
+                        sknPath,
+                        virtualTexturePath),
+                    ignoreCase: true);
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Fact]
         public void Resolve_ResolvesProceduralGlassMaterialWithoutSamplers()
         {
             const string materialPath = "Characters/Janna/Skins/Skin67/Materials/Eyes_mat";

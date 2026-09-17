@@ -182,9 +182,13 @@ namespace AssetsManager.Views.Models.Viewer
         byte LegacyOrientation = 0,
         bool LegacyScaleUpFromOrigin = false,
         bool LegacyLockedToEmitter = false,
+        bool LegacyHasFixedOrbit = false,
+        byte LegacyFixedOrbitType = 1,
+        Vector2 LegacyParticleBind = default,
         float DepthPushPull = 0f,
         VfxBeamDefinition Beam = null,
-        VfxLingerDefinition Linger = null)
+        VfxLingerDefinition Linger = null,
+        bool IsSimpleEmitter = false)
     {
         /// <summary>LTK drawKind.ts: this emitter reaches the quad renderer.</summary>
         public bool DrawsAsQuad => PrimitiveKind is
@@ -229,7 +233,8 @@ namespace AssetsManager.Views.Models.Viewer
         bool HasTranslationOverride = false,
         bool HasRotationOverride = false,
         bool HasScaleOverride = false,
-        bool HasPeriodControl = false);
+        bool HasPeriodControl = false,
+        bool HasLegacySimple = false);
 
     public sealed record VfxEmitterRenderState(
         int RenderPass,
@@ -377,39 +382,53 @@ namespace AssetsManager.Views.Models.Viewer
         byte Flags = 0,
         VfxCurve3? BirthTranslation = null)
     {
-        public Vector3 SampleOffset(Random rng, float t, out Matrix4x4 rotation)
+        public Vector3 SampleOffset(Random rng, float t, float? birthChance, out Matrix4x4 rotation)
         {
             rotation = Matrix4x4.Identity;
             bool volume = (Flags & 1) != 0;
-            Vector3 offset = Kind switch
+
+            if (Kind == VfxSpawnShapeKind.Point)
+                return EmitOffset.Sample(t);
+
+            if (Kind == VfxSpawnShapeKind.Legacy)
             {
-                VfxSpawnShapeKind.Box => SampleBox(rng, Size, volume),
-                VfxSpawnShapeKind.Sphere => SampleSphere(rng, Radius, volume),
-                VfxSpawnShapeKind.Cylinder => SampleCylinder(rng, Radius, Height, volume),
-                _ => Vector3.Zero
-            };
-            if (Kind == VfxSpawnShapeKind.Box && !volume)
-            {
-                Matrix4x4 yTurn = Matrix4x4.CreateRotationY(rng.Next(4) * (MathF.PI * 0.5f));
-                Matrix4x4 zTurn = Matrix4x4.CreateRotationZ(rng.Next(2) * (MathF.PI * 0.5f));
-                offset = Vector3.Transform(Vector3.Transform(offset, yTurn), zTurn);
-                rotation *= yTurn;
-                rotation *= zTurn;
+                Vector3 offset = EmitOffset.SampleBirth(t, rng, birthChance);
+                if (BirthTranslation is { } translation)
+                    offset += translation.SampleBirth(t, rng, birthChance);
+
+                int count = Math.Min(RotationAxes.Count, RotationAngles.Count);
+                for (int i = 0; i < count; i++)
+                {
+                    Vector3 axis = RotationAxes[i];
+                    if (axis.LengthSquared() <= 1e-8f) continue;
+                    float radians = RotationAngles[i].SampleBirth(t, rng, birthChance) * (MathF.PI / 180f);
+                    Matrix4x4 step = Matrix4x4.CreateFromAxisAngle(Vector3.Normalize(axis), radians);
+                    offset = Vector3.Transform(offset, step);
+                    rotation *= step;
+                }
+                return offset;
             }
-            offset += EmitOffset.SampleBirth(t, rng);
-            if (Kind == VfxSpawnShapeKind.Legacy && BirthTranslation is { } translation)
-                offset += translation.SampleBirth(t, rng);
-            int count = Math.Min(RotationAxes.Count, RotationAngles.Count);
-            for (int i = 0; i < count; i++)
+
+            if (Kind == VfxSpawnShapeKind.Box)
             {
-                var axis = RotationAxes[i];
-                if (axis.LengthSquared() <= 1e-8f) continue;
-                float radians = RotationAngles[i].SampleBirth(t, rng) * (MathF.PI / 180f);
-                Matrix4x4 step = Matrix4x4.CreateFromAxisAngle(Vector3.Normalize(axis), radians);
-                offset = Vector3.Transform(offset, step);
-                rotation *= step;
+                Vector3 offset = SampleBox(rng, Size, volume);
+                if (!volume)
+                {
+                    Matrix4x4 yTurn = Matrix4x4.CreateRotationY(rng.Next(4) * (MathF.PI * 0.5f));
+                    Matrix4x4 zTurn = Matrix4x4.CreateRotationZ(rng.Next(2) * (MathF.PI * 0.5f));
+                    offset = Vector3.Transform(Vector3.Transform(offset, yTurn), zTurn);
+                    rotation = yTurn * zTurn;
+                }
+                return offset;
             }
-            return offset;
+
+            if (Kind == VfxSpawnShapeKind.Sphere)
+                return SampleSphere(rng, Radius, volume, out rotation);
+
+            if (Kind == VfxSpawnShapeKind.Cylinder)
+                return SampleCylinder(rng, Radius, Height, volume, out rotation);
+
+            return Vector3.Zero;
         }
 
         private static float SignedUnit(Random rng) => (float)(rng.NextDouble() * 2d - 1d);
@@ -422,22 +441,22 @@ namespace AssetsManager.Views.Models.Viewer
             return new Vector3(x, y, z);
         }
 
-        private static Vector3 SampleSphere(Random rng, float radius, bool volume)
+        private static Vector3 SampleSphere(Random rng, float radius, bool volume, out Matrix4x4 rotation)
         {
             float r = (volume ? (float)rng.NextDouble() : 1f) * radius;
             float angleY = (float)(rng.NextDouble() * Math.Tau);
             float angleZ = (float)(rng.NextDouble() * Math.Tau);
-            Matrix4x4 rot = Matrix4x4.CreateRotationY(angleY) * Matrix4x4.CreateRotationZ(angleZ);
-            return Vector3.Transform(new Vector3(r, 0, 0), rot);
+            rotation = Matrix4x4.CreateRotationY(angleY) * Matrix4x4.CreateRotationZ(angleZ);
+            return Vector3.Transform(new Vector3(r, 0, 0), rotation);
         }
 
-        private static Vector3 SampleCylinder(Random rng, float radius, float height, bool volume)
+        private static Vector3 SampleCylinder(Random rng, float radius, float height, bool volume, out Matrix4x4 rotation)
         {
             float r = (volume ? SignedUnit(rng) : 1f) * radius;
             float h = (float)rng.NextDouble() * height; // Upwards 0..height (Riot / LTK spawnShape.ts)
             float angleY = (float)(rng.NextDouble() * Math.Tau);
-            Matrix4x4 rot = Matrix4x4.CreateRotationY(angleY);
-            return Vector3.Transform(new Vector3(r, h, 0), rot);
+            rotation = Matrix4x4.CreateRotationY(angleY);
+            return Vector3.Transform(new Vector3(r, h, 0), rotation);
         }
     }
 
@@ -566,23 +585,28 @@ namespace AssetsManager.Views.Models.Viewer
 
     internal static class VfxCurve
     {
-        /// <summary>Piecewise-linear sample of (times,values) at t, clamped at both ends.</summary>
+        /// <summary>Piecewise-linear sample using LTK's last-key-at-or-before lookup.</summary>
         public static T Interp<T>(float[] times, T[] values, float t, Func<T, T, float, T> lerp)
         {
             int n = Math.Min(times.Length, values.Length);
             if (n == 0) return default!;
-            if (n == 1 || t <= times[0]) return values[0];
-            if (t >= times[n - 1]) return values[n - 1];
-            for (int i = 1; i < n; i++)
+
+            int under = -1;
+            for (int i = 0; i < n; i++)
             {
-                if (t <= times[i])
-                {
-                    float span = times[i] - times[i - 1];
-                    float f = span > 1e-6f ? (t - times[i - 1]) / span : 0f;
-                    return lerp(values[i - 1], values[i], f);
-                }
+                if (times[i] > t) break;
+                under = i;
             }
-            return values[n - 1];
+
+            int loIndex = Math.Max(under, 0);
+            T from = values[loIndex];
+            int hiIndex = under + 1;
+            if ((uint)hiIndex >= (uint)n) return from;
+
+            float span = times[hiIndex] - times[loIndex];
+            if (span <= 0f) return from;
+            float f = (t - times[loIndex]) / span;
+            return lerp(from, values[hiIndex], f);
         }
     }
 

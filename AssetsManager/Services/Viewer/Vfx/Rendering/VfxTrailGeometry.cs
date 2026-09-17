@@ -8,12 +8,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     internal sealed class VfxTrailGeometry
     {
         internal const int VertexStride = VfxPlaybackRuntime.InstanceStride + 2;
+        internal const int TrailPointsPerSource = 1024;
         internal float[] Vertices { get; private set; } = Array.Empty<float>();
         private float[] _points = Array.Empty<float>();
 
+        internal static int ResolvePointCount(int instanceCount)
+            => Math.Min(Math.Max(0, instanceCount), TrailPointsPerSource);
+
         internal int Build(VfxPlaybackRuntime.EmitterState state, Vector3 viewDirection)
         {
-            int count = state.InstanceCount;
+            int count = ResolvePointCount(state.InstanceCount);
             if (count < 2) return 0;
             int needed = count * 2 * VertexStride;
             if (_points.Length < needed) _points = new float[needed];
@@ -29,8 +33,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             for (int seen = 0; seen < count; seen++)
             {
                 int at = start + seen * step;
-                Vector3 point = Position(state, at, smoothed && seen != 0 && at != 0);
-                Vector3 tangent = seen == 0 ? Position(state, at + step, false) - point : point - last;
+                Vector3 point = Position(state, at, count, smoothed && seen != 0 && at != 0);
+                Vector3 tangent = seen == 0 ? Position(state, at + step, count, false) - point : point - last;
                 if (seen > 0)
                 {
                     walked += tangent.Length();
@@ -81,10 +85,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return vertices;
         }
 
-        private static Vector3 Position(VfxPlaybackRuntime.EmitterState state, int at, bool filtered)
+        private static Vector3 Position(VfxPlaybackRuntime.EmitterState state, int at, int count, bool filtered)
         {
             int first = filtered ? Math.Max(0, at - 3) : at;
-            int last = filtered ? Math.Min(state.InstanceCount - 1, at + 3) : at;
+            int last = filtered ? Math.Min(count - 1, at + 3) : at;
             Vector3 sum = default;
             for (int i = first; i <= last; i++)
             {

@@ -84,7 +84,23 @@ namespace AssetsManager.Services.Viewer.Loading
         }
 
         // Loads an SKN model and its textures from the SKN file directory (standard behavior).
-        public async Task<SceneModel> LoadModel(string filePath, CancellationToken cancellationToken = default)
+        public Task<SceneModel> LoadModel(string filePath, CancellationToken cancellationToken = default)
+            => LoadModelCore(filePath, null, cancellationToken);
+
+        /// <summary>
+        /// Loads an SKN while using the exact skin BIN already selected by the caller.
+        /// This avoids re-inferring the BIN from the SKN path when an extracted WAD is flat/hash-named.
+        /// </summary>
+        public Task<SceneModel> LoadModelWithSkinBin(
+            string filePath,
+            string skinBinPath,
+            CancellationToken cancellationToken = default)
+            => LoadModelCore(filePath, skinBinPath, cancellationToken);
+
+        private async Task<SceneModel> LoadModelCore(
+            string filePath,
+            string explicitSkinBinPath,
+            CancellationToken cancellationToken)
         {
             if (_hashResolverService != null)
                 await _hashResolverService.LoadHashesAsync();
@@ -105,7 +121,11 @@ namespace AssetsManager.Services.Viewer.Loading
 
                     var loadedTextures = LoadTexturesFromDirectory(modelDirectory, cancellationToken);
                     string[] selectableTextureKeys = loadedTextures.Keys.ToArray();
-                    var materialTextures = LoadMaterialTextures(filePath, loadedTextures, true);
+                    var materialTextures = LoadMaterialTextures(
+                        filePath,
+                        loadedTextures,
+                        true,
+                        explicitSkinBinPath);
 
                     _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
                     return await CreateSceneModel(
@@ -346,9 +366,12 @@ namespace AssetsManager.Services.Viewer.Loading
         private SknMaterialTextureResolution LoadMaterialTextures(
             string assetPath,
             Dictionary<string, BitmapSource> loadedTextures,
-            bool loadReferencedTextures)
+            bool loadReferencedTextures,
+            string explicitSkinBinPath = null)
         {
-            string skinBinPath = SknMaterialTextureResolver.TryResolveBinPath(assetPath);
+            string skinBinPath = !string.IsNullOrWhiteSpace(explicitSkinBinPath) && File.Exists(explicitSkinBinPath)
+                ? Path.GetFullPath(explicitSkinBinPath)
+                : SknMaterialTextureResolver.TryResolveBinPath(assetPath);
             if (string.IsNullOrEmpty(skinBinPath) || !File.Exists(skinBinPath))
             {
                 _logService.LogDebug($"No exact skin material bin found for '{Path.GetFileName(assetPath)}'.");

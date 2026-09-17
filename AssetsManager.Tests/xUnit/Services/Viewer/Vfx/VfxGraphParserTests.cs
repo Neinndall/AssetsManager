@@ -155,8 +155,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal("Effects/TestPalette.dds", parsed.PaletteDefinition.PaletteTexturePath);
             Assert.Equal(new Vector4(0f, 1f, 0f, 0f), parsed.PaletteDefinition.PaletteSourceMixColor);
             Assert.Equal(1f, parsed.BirthScale.Constant.X);
-            Assert.Equal(1f, parsed.Rate.Constant);
-            Assert.Equal(1f, parsed.ParticleLifetime.Constant);
+            Assert.Equal(0f, parsed.Rate.Constant);
+            Assert.Equal(3f, parsed.ParticleLifetime.Constant);
             Assert.Equal(new Vector4(0.1f, 0.2f, 0.3f, 0.4f), parsed.BirthColor.Constant);
             Assert.Equal(0.5f, parsed.UvTransformCenter.X);
             Assert.Equal(0.5f, parsed.TextureMultTransformCenter.Y);
@@ -285,6 +285,57 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void SimpleMeshUsesOnlyExtensionsAcceptedByLtk()
+        {
+            BinTreeStruct EmitterFor(string path) => new(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("primitive"),
+                        Fnv1a.HashLower("VfxPrimitiveMesh"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeStruct(
+                                0x0d89732d,
+                                Fnv1a.HashLower("VfxMeshDefinitionData"),
+                                new BinTreeProperty[]
+                                {
+                                    new BinTreeString(Fnv1a.HashLower("mSimpleMeshName"), path)
+                                })
+                        })
+                });
+
+            var system = new BinTreeObject(
+                "Effects/SimpleMeshExtensions",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[]
+                        {
+                            EmitterFor("Effects/One.scb"),
+                            EmitterFor("Effects/Two.tmesh"),
+                            EmitterFor("Effects/Three.GMESH"),
+                            EmitterFor("Effects/Wrong.sco")
+                        })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            IReadOnlyList<VfxEmitterDefinition> emitters = Assert.Single(
+                VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters;
+
+            Assert.Equal("Effects/One.scb", emitters[0].MeshPath);
+            Assert.Equal("Effects/Two.tmesh", emitters[1].MeshPath);
+            Assert.Equal("Effects/Three.GMESH", emitters[2].MeshPath);
+            Assert.Null(emitters[3].MeshPath);
+        }
+
+        [Fact]
         public void BeamPreservesNamedMeshSoItsRibbonCanBeSuppressed()
         {
             var meshDefinition = new BinTreeStruct(
@@ -393,6 +444,448 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void InvalidEnumBytesFallBackLikeLtkAndPaletteCountKeepsAuthoredZero()
+        {
+            var legacy = new BinTreeStruct(
+                Fnv1a.HashLower("LegacySimple"),
+                Fnv1a.HashLower("VfxEmitterLegacySimple"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeU8(Fnv1a.HashLower("orientation"), 99)
+                });
+            var palette = new BinTreeStruct(
+                Fnv1a.HashLower("paletteDefinition"),
+                Fnv1a.HashLower("VfxPaletteDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeI32(Fnv1a.HashLower("paletteCount"), 0),
+                    new BinTreeU8(Fnv1a.HashLower("PaletteTextureAddressMode"), 99)
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeU8(Fnv1a.HashLower("blendMode"), 99),
+                    new BinTreeU8(Fnv1a.HashLower("texAddressModeBase"), 99),
+                    new BinTreeU8(Fnv1a.HashLower("stencilMode"), 99),
+                    new BinTreeU8(Fnv1a.HashLower("stencilRef"), 7),
+                    new BinTreeU8(Fnv1a.HashLower("particleLingerType"), 99),
+                    new BinTreeU8(Fnv1a.HashLower("uvMode"), 99),
+                    new BinTreeU8(Fnv1a.HashLower("colorLookUpTypeX"), 99),
+                    new BinTreeU8(Fnv1a.HashLower("colorLookUpTypeY"), 99),
+                    legacy,
+                    palette
+                });
+            var system = new BinTreeObject(
+                "Effects/InvalidEnums",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal(0, parsed.BlendMode);
+            Assert.Equal(0, parsed.RenderState.TextureAddressMode);
+            Assert.Equal((byte)0, parsed.RenderState.StencilMode);
+            Assert.Equal((byte)0, parsed.RenderState.StencilReference);
+            Assert.False(parsed.RenderState.HasStencil);
+            Assert.Equal((byte)0, parsed.ParticleLingerType);
+            Assert.Equal((byte)0, parsed.UvMode);
+            Assert.Equal(VfxAuthoredDefaults.ColorLookUpTypeX, parsed.ColorLookUpTypeX);
+            Assert.Equal(VfxAuthoredDefaults.ColorLookUpTypeY, parsed.ColorLookUpTypeY);
+            Assert.Equal((byte)0, parsed.LegacyOrientation);
+            Assert.Equal(0, parsed.PaletteDefinition.PaletteCount);
+            Assert.Equal(1, parsed.PaletteDefinition.AddressMode);
+        }
+
+        [Fact]
+        public void NumericFieldsAcceptAllBinIntegerLeafTypesLikeLtkNumber()
+        {
+            var palette = new BinTreeStruct(
+                Fnv1a.HashLower("paletteDefinition"),
+                Fnv1a.HashLower("VfxPaletteDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeU16(Fnv1a.HashLower("paletteCount"), 6)
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeI32(Fnv1a.HashLower("rate"), 7),
+                    new BinTreeU32(Fnv1a.HashLower("particleLifetime"), 4),
+                    new BinTreeI16(Fnv1a.HashLower("texAddressModeBase"), 2),
+                    palette
+                });
+            var system = new BinTreeObject(
+                "Effects/NumericLeaves",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal(7f, parsed.Rate.Constant);
+            Assert.Equal(4f, parsed.ParticleLifetime.Constant);
+            Assert.Equal(2, parsed.RenderState.TextureAddressMode);
+            Assert.Equal(6, parsed.PaletteDefinition.PaletteCount);
+        }
+
+        [Fact]
+        public void TrailPrimitiveKeepsLtkDefaultsWhenTrailBlockIsMissing()
+        {
+            var primitive = new BinTreeStruct(
+                Fnv1a.HashLower("primitive"),
+                Fnv1a.HashLower("VfxPrimitiveCameraTrail"),
+                System.Array.Empty<BinTreeProperty>());
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { primitive });
+            var system = new BinTreeObject(
+                "Effects/TrailDefaults",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.NotNull(parsed.Trail);
+            Assert.Equal(0, parsed.Trail.Mode);
+            Assert.Equal(0, parsed.Trail.SmoothingMode);
+            Assert.Equal(0, parsed.Trail.MaxAddedPerFrame);
+            Assert.Equal(0f, parsed.Trail.Cutoff);
+            Assert.Equal(Vector3.Zero, parsed.Trail.BirthTilingSize.Constant);
+        }
+
+        [Fact]
+        public void FieldDefaultsMatchLtkMotionReader()
+        {
+            var acceleration = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxFieldAccelerationDefinitionData"),
+                System.Array.Empty<BinTreeProperty>());
+            var orbital = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxFieldOrbitalDefinitionData"),
+                System.Array.Empty<BinTreeProperty>());
+            var noise = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxFieldNoiseDefinitionData"),
+                System.Array.Empty<BinTreeProperty>());
+            var fields = new BinTreeStruct(
+                Fnv1a.HashLower("fieldCollectionDefinition"),
+                Fnv1a.HashLower("VfxFieldCollectionDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("fieldAccelerationDefinitions"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { acceleration }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("fieldOrbitalDefinitions"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { orbital }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("fieldNoiseDefinitions"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { noise })
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { fields });
+            var system = new BinTreeObject(
+                "Effects/FieldDefaults",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.NotNull(parsed.Fields);
+            Assert.True(Assert.Single(parsed.Fields.Acceleration).LocalSpace);
+            VfxOrbitalField parsedOrbital = Assert.Single(parsed.Fields.Orbital);
+            Assert.True(parsedOrbital.LocalSpace);
+            Assert.Equal(Vector3.UnitY, parsedOrbital.Direction.Constant);
+            Assert.Equal(Vector3.Zero, Assert.Single(parsed.Fields.Noise).AxisFraction);
+        }
+
+        [Fact]
+        public void EmptyFieldCollectionReadsAsNullLikeLtk()
+        {
+            var fields = new BinTreeStruct(
+                Fnv1a.HashLower("fieldCollectionDefinition"),
+                Fnv1a.HashLower("VfxFieldCollectionDefinitionData"),
+                System.Array.Empty<BinTreeProperty>());
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { fields });
+            var system = new BinTreeObject(
+                "Effects/EmptyFields",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Null(parsed.Fields);
+        }
+
+        [Fact]
+        public void SimpleEmitterListPreservesIdentityForLingerSemantics()
+        {
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeF32(Fnv1a.HashLower("emitterLinger"), 30f),
+                    new BinTreeF32(Fnv1a.HashLower("particleLinger"), 30f)
+                });
+            var system = new BinTreeObject(
+                "Effects/SimpleIdentity",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("simpleEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.True(parsed.IsSimpleEmitter);
+            Assert.Equal(10f, AssetsManager.Services.Viewer.Vfx.Runtime.VfxPlaybackRuntime.StopWaitSeconds(parsed));
+            Assert.Equal(10f, AssetsManager.Services.Viewer.Vfx.Runtime.VfxPlaybackRuntime.LingerSeconds(parsed));
+        }
+
+        [Fact]
+        public void PresentCurveStructsUseEachFieldsLtkFallbackConstant()
+        {
+            static BinTreeStruct EmptyCurve(string field, string valueClass) => new(
+                Fnv1a.HashLower(field),
+                Fnv1a.HashLower(valueClass),
+                System.Array.Empty<BinTreeProperty>());
+
+            var erosion = new BinTreeStruct(
+                Fnv1a.HashLower("alphaErosionDefinition"),
+                Fnv1a.HashLower("VfxAlphaErosionDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    EmptyCurve("erosionDriveCurve", "ValueFloat"),
+                    EmptyCurve("erosionMapChannelMixer", "ValueColor")
+                });
+            var palette = new BinTreeStruct(
+                Fnv1a.HashLower("paletteDefinition"),
+                Fnv1a.HashLower("VfxPaletteDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    EmptyCurve("palleteSrcMixColor", "ValueColor")
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    EmptyCurve("particleLifetime", "ValueFloat"),
+                    EmptyCurve("birthScale0", "ValueVector3"),
+                    EmptyCurve("scale0", "ValueVector3"),
+                    EmptyCurve("uvScale", "ValueVector2"),
+                    EmptyCurve("birthFrameRate", "ValueFloat"),
+                    erosion,
+                    palette
+                });
+            var system = new BinTreeObject(
+                "Effects/CurveFallbacks",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal(3f, parsed.ParticleLifetime.Constant);
+            Assert.Equal(Vector3.One, parsed.BirthScale.Constant);
+            Assert.Equal(Vector3.One, parsed.ScaleOverLife.Value.Constant);
+            Assert.Equal(Vector2.One, parsed.UvScale.Value.Constant);
+            Assert.Equal(1f, parsed.BirthFrameRate.Value.Constant);
+            Assert.Equal(1f, parsed.AlphaErosion.Drive.Constant);
+            Assert.Equal(new Vector4(0f, 0f, 0f, 1f), parsed.AlphaErosion.ChannelMixer.Value.Constant);
+            Assert.Equal(new Vector4(0.299f, 0.587f, 0.114f, 0f), parsed.PaletteDefinition.PaletteSourceMixColor.Value);
+        }
+
+        [Fact]
+        public void ChildSetKeepsLtkDefaultIndexAndBoneSlots()
+        {
+            static BinTreeStruct Child(string name) => new(
+                0,
+                Fnv1a.HashLower("VfxChildIdentifier"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("effectKey"), name)
+                });
+
+            var childSet = new BinTreeStruct(
+                Fnv1a.HashLower("childParticleSetDefinition"),
+                Fnv1a.HashLower("VfxChildParticleSetDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("childrenIdentifiers"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[]
+                        {
+                            Child("Effects/A"),
+                            Child("Effects/B"),
+                            Child("Effects/C")
+                        }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("boneToSpawnAt"),
+                        BinPropertyType.String,
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeString(0, "Root"),
+                            new BinTreeString(0, string.Empty),
+                            new BinTreeString(0, "Hand")
+                        })
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { childSet });
+            var system = new BinTreeObject(
+                "Effects/ChildSlots",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxChildParticleSetDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters).ChildParticleSet;
+
+            Assert.NotNull(parsed);
+            Assert.Equal(0f, parsed.Probability.Constant);
+            Assert.Equal(3, parsed.Children.Count);
+            Assert.Equal(3, parsed.Bones.Count);
+            Assert.Equal("Root", parsed.Bones[0]);
+            Assert.Equal(string.Empty, parsed.Bones[1]);
+            Assert.Equal("Hand", parsed.Bones[2]);
+        }
+
+        [Fact]
+        public void LegacyShapeRotationAnglesKeepOneSlotPerElementLikeLtk()
+        {
+            var shape = new BinTreeStruct(
+                Fnv1a.HashLower("SpawnShape"),
+                Fnv1a.HashLower("VfxShapeLegacy"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("emitRotationAxes"),
+                        BinPropertyType.Vector3,
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeVector3(0, Vector3.UnitX),
+                            new BinTreeVector3(0, Vector3.UnitY)
+                        }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("emitRotationAngles"),
+                        BinPropertyType.String,
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeString(0, "invalid"),
+                            new BinTreeString(0, "invalid")
+                        })
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { shape });
+            var system = new BinTreeObject(
+                "Effects/ShapeSlots",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxSpawnShape parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters).SpawnShape;
+
+            Assert.NotNull(parsed);
+            Assert.Equal(VfxSpawnShapeKind.Legacy, parsed.Kind);
+            Assert.Equal(2, parsed.RotationAxes.Count);
+            Assert.Equal(2, parsed.RotationAngles.Count);
+            Assert.All(parsed.RotationAngles, angle => Assert.Equal(0f, angle.Constant));
+        }
+
+        [Fact]
         public void PreservesAuthoredFeaturesNeededForCompatibilityAnalysis()
         {
             uint primitiveHash = Fnv1a.HashLower("VfxPrimitiveAttachedMesh");
@@ -412,6 +905,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     new BinTreeBitBool(Fnv1a.HashLower("SortEmittersByPos"), true),
                     new BinTreeString(Fnv1a.HashLower("emissionMeshName"), "Body"),
                     new BinTreeStruct(Fnv1a.HashLower("rotationOverride"), Fnv1a.HashLower("ValueVector3"), System.Array.Empty<BinTreeProperty>()),
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("LegacySimple"),
+                        Fnv1a.HashLower("VfxEmitterLegacySimple"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeBitBool(Fnv1a.HashLower("hasFixedOrbit"), true),
+                            new BinTreeU8(Fnv1a.HashLower("fixedOrbitType"), 5),
+                            new BinTreeVector2(Fnv1a.HashLower("particleBind"), new Vector2(0.25f, 0.75f))
+                        }),
                     new BinTreeF32(Fnv1a.HashLower("period"), 2f)
                 });
             var materialOverride = new BinTreeEmbedded(
@@ -453,6 +955,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.True(parsedEmitter.AuthoredFeatures.HasEmissionMesh);
             Assert.True(parsedEmitter.AuthoredFeatures.HasRotationOverride);
             Assert.True(parsedEmitter.AuthoredFeatures.HasPeriodControl);
+            Assert.True(parsedEmitter.AuthoredFeatures.HasLegacySimple);
+            Assert.True(parsedEmitter.LegacyHasFixedOrbit);
+            Assert.Equal((byte)5, parsedEmitter.LegacyFixedOrbitType);
+            Assert.Equal(new Vector2(0.25f, 0.75f), parsedEmitter.LegacyParticleBind);
         }
 
         [Fact]
