@@ -12,6 +12,12 @@ uniform mat4 uViewProj;
 uniform vec3 uWorldPos;
 uniform vec3 uScale;
 uniform vec3 uRotation;
+uniform vec3 uCamPos;
+uniform vec3 uCamUp;
+uniform int uAlignPitchToCamera;
+uniform int uAlignYawToCamera;
+uniform int uMeshSkinned;
+uniform float uDepthPushPull;
 uniform vec2 uEmitterUvOffset;
 uniform vec2 uTexDiv;
 uniform vec2 uTexSize;
@@ -54,7 +60,36 @@ void main(){
     local = vec3(local.x, local.y * cx - local.z * sx, local.y * sx + local.z * cx);
     float sy = sin(uRotation.y); float cy = cos(uRotation.y);
     local = vec3(local.x * cy + local.z * sy, local.y, -local.x * sy + local.z * cy);
-    vec3 p = uPlacementRight * local.x + uPlacementUp * local.y + uPlacementForward * local.z + uWorldPos;
+
+    vec3 placementRight = uPlacementRight;
+    vec3 placementUp = uPlacementUp;
+    vec3 placementForward = uPlacementForward;
+    if (uAlignPitchToCamera != 0 || uAlignYawToCamera != 0) {
+        vec3 facing = vec3(
+            uAlignYawToCamera != 0 ? uCamPos.x - uWorldPos.x : 0.0,
+            uAlignPitchToCamera != 0 ? uCamPos.y - uWorldPos.y : 0.0,
+            uCamPos.z - uWorldPos.z);
+        if (dot(facing, facing) > 0.000001) {
+            facing = normalize(facing);
+            vec3 aside = cross(uCamUp, facing);
+            if (dot(aside, aside) > 0.000001) {
+                aside = normalize(aside);
+                vec3 lift = cross(facing, aside);
+                if (uMeshSkinned == 0) {
+                    aside = -aside;
+                    facing = -facing;
+                }
+                placementRight = aside;
+                placementUp = lift;
+                placementForward = facing;
+            }
+        }
+    }
+
+    vec3 p = placementRight * local.x + placementUp * local.y + placementForward * local.z + uWorldPos;
+    vec3 eyeRay = p - uCamPos;
+    if (uDepthPushPull != 0.0 && dot(eyeRay, eyeRay) > 0.000001)
+        p += normalize(eyeRay) * uDepthPushPull;
     gl_Position = uViewProj * vec4(p, 1.0);
     vec2 baseUv = aUv;
     vec2 centeredUv = (baseUv - uUvTransformCenter) * uUvScale;
@@ -225,6 +260,11 @@ void main(){
         world += normalize(eyeRay) * uDepthPushPull;
     gl_Position = uViewProj * vec4(world, 1.0);
     vec2 cell = aCorner + vec2(0.5, 0.5);
+    // Arbitrary quads use Riot's authored plane UV orientation: U follows corner Y
+    // while V follows corner X in the mirrored render basis used by LTK.
+    vec2 quadUv = uArbitraryQuad != 0
+        ? vec2(aCorner.y + 0.5, aCorner.x + 0.5)
+        : vec2(cell.x, 1.0 - cell.y);
     float cols = max(uTexDiv.x, 1.0);
     float rows = max(uTexDiv.y, 1.0);
     float frame = floor(aRotFrame.y + 0.0001);
@@ -232,7 +272,7 @@ void main(){
     float fy = floor(frame / cols);
     vec2 localUv = trailPrimitive
         ? aCorner
-        : vec2(cell.x, 1.0 - cell.y);
+        : quadUv;
     vCornerUv = localUv;
     vec2 centeredUv = (localUv - uUvTransformCenter) * aUvBase.zw;
     float uvSin = sin(aUvErosion.x); float uvCos = cos(aUvErosion.x);
@@ -245,7 +285,7 @@ void main(){
     vCell = vec2(fx, fy);
     vec2 multUv = trailPrimitive
         ? aCorner
-        : vec2(cell.x, 1.0 - cell.y);
+        : quadUv;
     vec2 centeredMultUv = (multUv - uUvTransformCenterMult) * aUvMult.zw;
     float multSin = sin(aUvMultDynamics.x); float multCos = cos(aUvMultDynamics.x);
     centeredMultUv = vec2(centeredMultUv.x * multCos - centeredMultUv.y * multSin,

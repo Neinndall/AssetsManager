@@ -331,7 +331,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     ApplyEmitterDepthState(es.Def, isDistortion: es.Def.Distortion != null);
                     ApplyBlendMode(es.Def.BlendMode, distortion: es.Def.Distortion != null);
-                    RenderMeshEmitter(es, viewProj, instancesSpan);
+                    RenderMeshEmitter(es, viewProj, camPos, camUp, instancesSpan);
                     continue;
                 }
                 if (!es.Def.IsVisual) continue;
@@ -376,10 +376,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform1(_uArbitraryQuad, arbitrary ? 1 : 0);
                 _gl.Uniform1(_uLegacyOrientation, es.Def.LegacyOrientation);
                 _gl.Uniform1(_uPivotUp, es.Def.LegacyScaleUpFromOrigin ? 1 : 0);
-                bool groundLayer = es.Def.IsGroundLayer ||
-                    es.Def.IsFollowingTerrain ||
-                    es.Def.PrimitiveKind == VfxPrimitiveKind.PlanarProjection ||
-                    IsGroundLikeBirthRotation(es.Def.BirthRotation);
+                bool groundLayer = ShouldProjectToGround(es.Def);
                 _gl.Uniform1(_uIsGroundLayer, groundLayer ? 1 : 0);
                 _gl.Uniform1(_uPrimitiveKind, (int)es.Def.PrimitiveKind);
                 bool ribbonPrimitive = es.Def.PrimitiveKind is VfxPrimitiveKind.CameraTrail or
@@ -404,9 +401,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     modulationFactor.Z,
                     modulationFactor.W);
                 bool hasMultLayer = !string.IsNullOrWhiteSpace(es.Def.TextureMultPath);
-                bool useColorRamp = es.ColorGradientTexture != 0 &&
-                    es.Def.AlphaErosion is null &&
-                    !(hasMultLayer && es.Def.UvMode == 2);
+                bool useColorRamp = ShouldUseColorRamp(es.Def, es.ColorGradientTexture != 0);
                 _gl.Uniform1(_uHasColor, useColorRamp ? 1 : 0);
                 _gl.Uniform1(_uRampAtMult, useColorRamp && hasMultLayer ? 1 : 0);
                 _gl.Uniform1(_uUvMode, es.Def.UvMode);
@@ -481,7 +476,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform3(_uPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
-                _gl.Uniform1(_uHasTex, es.Texture != 0 ? 1 : 0);
+                _gl.Uniform1(_uHasTex, ShouldSampleBaseTexture(es.Def, es.Texture) ? 1 : 0);
                 ApplyAddressMode(2);
                 ApplyTextureSampling(es.Def.IsTexturePixelated);
                 if (es.TextureMult != 0)
@@ -808,7 +803,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         }
 
         private uint _meshProgram;
-        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
+        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muCamPos, _muCamUp, _muAlignPitchToCamera, _muAlignYawToCamera, _muMeshSkinned, _muDepthPushPull, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
         private int _muIsDistortion, _muDistortionTex, _muSceneTex, _muDistortionStrength;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
@@ -832,6 +827,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muWorldPos = _gl.GetUniformLocation(_meshProgram, "uWorldPos");
                 _muScale = _gl.GetUniformLocation(_meshProgram, "uScale");
                 _muRotation = _gl.GetUniformLocation(_meshProgram, "uRotation");
+                _muCamPos = _gl.GetUniformLocation(_meshProgram, "uCamPos");
+                _muCamUp = _gl.GetUniformLocation(_meshProgram, "uCamUp");
+                _muAlignPitchToCamera = _gl.GetUniformLocation(_meshProgram, "uAlignPitchToCamera");
+                _muAlignYawToCamera = _gl.GetUniformLocation(_meshProgram, "uAlignYawToCamera");
+                _muMeshSkinned = _gl.GetUniformLocation(_meshProgram, "uMeshSkinned");
+                _muDepthPushPull = _gl.GetUniformLocation(_meshProgram, "uDepthPushPull");
                 _muColor = _gl.GetUniformLocation(_meshProgram, "uColor");
                 _muTex = _gl.GetUniformLocation(_meshProgram, "uTex");
                 _muHasTex = _gl.GetUniformLocation(_meshProgram, "uHasTex");
@@ -936,6 +937,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private void RenderMeshEmitter(
             VfxPlaybackRuntime.EmitterState es,
             Matrix4x4 viewProj,
+            Vector3 camPos,
+            Vector3 camUp,
             ReadOnlySpan<float> instances)
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
@@ -948,6 +951,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.UseProgram(_meshProgram);
             _gl.BindVertexArray(es.MeshVao);
             _gl.UniformMatrix4(_muViewProj, 1, false, in viewProj.M11);
+            _gl.Uniform3(_muCamPos, camPos.X, camPos.Y, camPos.Z);
+            _gl.Uniform3(_muCamUp, camUp.X, camUp.Y, camUp.Z);
+            // Direction-oriented mesh particles take precedence over camera alignment in LTK.
+            bool cameraAlignedMesh = !es.Def.IsDirectionOriented &&
+                (es.Def.MeshAlignPitchToCamera || es.Def.MeshAlignYawToCamera);
+            _gl.Uniform1(_muAlignPitchToCamera, cameraAlignedMesh && es.Def.MeshAlignPitchToCamera ? 1 : 0);
+            _gl.Uniform1(_muAlignYawToCamera, cameraAlignedMesh && es.Def.MeshAlignYawToCamera ? 1 : 0);
+            _gl.Uniform1(_muMeshSkinned, es.Def.MeshIsSkinned ? 1 : 0);
+            _gl.Uniform1(_muDepthPushPull, es.Def.DepthPushPull);
             _gl.Uniform1(_muTex, 0);
             _gl.Uniform1(_muTexMult, 1);
             _gl.Uniform1(_muColorMap, 7);
@@ -996,7 +1008,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform3(_muPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
-            _gl.Uniform1(_muHasTex, es.Texture != 0 ? 1 : 0);
+            _gl.Uniform1(_muHasTex, ShouldSampleBaseTexture(es.Def, es.Texture) ? 1 : 0);
             var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
             ApplyAddressMode(2);
             _gl.Uniform1(_muAlphaCutoff, renderState.AlphaCutoff);
@@ -1121,9 +1133,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             ApplyAddressMode(2);
             ApplyTextureSampling(false);
             _gl.ActiveTexture(TextureUnit.Texture0);
-            // VFX meshes can be thin or single-sided. Attached owner submeshes also use
-            // authored particle material state here, so culling would hide valid surfaces.
-            _gl.Disable(EnableCap.CullFace);
+            // LTK/Riot cull mesh backfaces by default. disableBackfaceCull explicitly asks
+            // for a double-sided draw; do not make every particle mesh double-sided.
+            if (es.Def.RenderState?.DisableBackfaceCull == true)
+                _gl.Disable(EnableCap.CullFace);
+            else
+                _gl.Enable(EnableCap.CullFace);
             ApplyBlendMode(es.Def.BlendMode, isDistortion);
 
             Vector2 emitterUvOffset = es.Def.EmitterUvScrollRate * es.EmitterAge;
@@ -1174,6 +1189,34 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private static float ClampScale(float value)
             => float.IsFinite(value) ? value : 1f;
+
+        internal static bool ShouldSampleBaseTexture(VfxEmitterDefinition definition, uint textureHandle)
+            => textureHandle != 0 || string.IsNullOrWhiteSpace(definition?.TexturePath);
+
+        internal static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture)
+        {
+            if (!hasColorRampTexture || definition is null) return false;
+
+            // LTK's fixed-alpha quad/ribbon bundle drops ALPHA_EROSION. Once that pass is gone,
+            // the authored ramp is valid again unless LOCK_ALPHA is also occupying the mult pass.
+            bool fixedAlphaUv = definition.UvMode == 2 &&
+                definition.PrimitiveKind != VfxPrimitiveKind.Mesh &&
+                definition.PrimitiveKind != VfxPrimitiveKind.AttachedMesh;
+            bool erosionEnabled = definition.AlphaErosion is not null && !fixedAlphaUv;
+            bool hasMultLayer = !string.IsNullOrWhiteSpace(definition.TextureMultPath);
+            return !erosionEnabled && !(hasMultLayer && definition.UvMode == 2);
+        }
+
+        internal static bool ShouldProjectToGround(VfxEmitterDefinition definition)
+        {
+            if (definition is null) return false;
+
+            // isFollowingTerrain offsets by terrain-height delta in the engine. Our preview terrain
+            // is flat, so that delta is zero; it must not be treated as the ground-layer technique.
+            return definition.IsGroundLayer ||
+                definition.PrimitiveKind == VfxPrimitiveKind.PlanarProjection ||
+                IsGroundLikeBirthRotation(definition.BirthRotation);
+        }
 
         internal static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
         {

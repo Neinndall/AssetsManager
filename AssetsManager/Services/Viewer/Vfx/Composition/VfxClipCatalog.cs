@@ -27,9 +27,16 @@ internal sealed class VfxClipCatalog : IDisposable
         LogService log)
     {
         var items = new List<AnimationClipCatalogItem>();
-        foreach (AnimationClipDefinition clip in bundle.Clips)
+        IReadOnlyList<AnimationClipDefinition> graphClips = SelectGraphClips(
+            bundle.Clips,
+            bundle.OwnerSceneContext?.AnimationGraphPathHash ?? 0u);
+
+        // LTK's skin preview reads the one AnimationGraphData referenced by
+        // skinAnimationProperties.animationGraphData. Linked BINs are dependencies/resources,
+        // not additional clip tables to merge into the picker.
+        foreach (AnimationClipDefinition clip in graphClips)
         {
-            IReadOnlyList<AnimationClipDefinition> playlist = ResolvePlaylist(clip, bundle.Clips);
+            IReadOnlyList<AnimationClipDefinition> playlist = ResolvePlaylist(clip, graphClips);
             if (playlist.Count == 0) continue;
 
             var steps = new List<IAnimationAsset>();
@@ -139,13 +146,9 @@ internal sealed class VfxClipCatalog : IDisposable
                 continue;
             }
 
-            string resolvedFilename = firstResolvedPath != null
-                ? Path.GetFileNameWithoutExtension(firstResolvedPath)
-                : null;
-            bool isHexHashName = IsHexName(clip.ClipName);
-            string name = !string.IsNullOrWhiteSpace(clip.ClipName) && !isHexHashName
-                ? clip.ClipName
-                : resolvedFilename ?? Path.GetFileNameWithoutExtension(playlist[0].AnimationFilePath);
+            // Keep the graph key as the clip's identity. LTK shows the key's resolved name
+            // when available and its hex hash otherwise; it never substitutes the .anm filename.
+            string name = DisplayNameFor(clip);
 
             int resolvedVfx = particleEvents.Count(cue => cue.System != null && !cue.Event.IsKillEvent);
             var merged = new VfxAbilityComposition(
@@ -177,8 +180,23 @@ internal sealed class VfxClipCatalog : IDisposable
                 $"{resolvedVfx} VFX · {eventCount} events"));
         }
 
-        return items.OrderBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase).ToArray();
+        // LTK preserves mClipDataMap order in the preview picker. Filtering playable clips
+        // must not alphabetize or otherwise reorder the graph's authored map entries.
+        return items.ToArray();
     }
+
+    internal static IReadOnlyList<AnimationClipDefinition> SelectGraphClips(
+        IReadOnlyList<AnimationClipDefinition> clips,
+        uint animationGraphPathHash)
+    {
+        if (animationGraphPathHash == 0u) return clips;
+        return clips.Where(clip => clip.GraphPathHash == animationGraphPathHash).ToArray();
+    }
+
+    internal static string DisplayNameFor(AnimationClipDefinition clip)
+        => !string.IsNullOrWhiteSpace(clip?.ClipName)
+            ? clip.ClipName
+            : $"0x{clip?.OwnerPathHash ?? 0u:x8}";
 
     internal static IReadOnlyList<AnimationClipDefinition> ResolvePlaylist(
         AnimationClipDefinition clip,

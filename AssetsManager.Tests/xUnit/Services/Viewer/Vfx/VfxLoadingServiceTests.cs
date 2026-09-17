@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using AssetsManager.Services.Core;
@@ -305,6 +306,32 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             {
                 Directory.Delete(root, recursive: true);
             }
+        }
+
+        [Fact]
+        public void PlaybackGraphAppliesAuthoredSystemTransformExactlyOnce()
+        {
+            Matrix4x4 authoredTransform = Matrix4x4.CreateScale(2f);
+            Matrix4x4 placement = Matrix4x4.CreateTranslation(3f, 4f, 5f);
+            var definition = new VfxSystemDefinition(
+                1,
+                "transform",
+                "Effects/Transform",
+                Array.Empty<VfxEmitterDefinition>(),
+                Transform: authoredTransform);
+
+            using var logger = new LoggerConfiguration().CreateLogger();
+            using var service = new VfxLoadingService();
+            VfxPlaybackGraphRuntime graph = service.PreparePlaybackGraph(
+                definition,
+                new Dictionary<uint, VfxSystemDefinition> { [1] = definition },
+                new Dictionary<uint, uint>(),
+                string.Empty,
+                placement,
+                7,
+                new LogService(logger));
+
+            Assert.Equal(authoredTransform * placement, graph.Root.WorldTransform);
         }
 
         [Fact]

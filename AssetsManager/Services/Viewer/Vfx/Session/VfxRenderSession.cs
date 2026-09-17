@@ -21,6 +21,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
     /// </summary>
     public sealed class VfxRenderSession : IDisposable
     {
+        // LTK creates each Animation Clip particle cue with the same deterministic driver seed.
+        // Keep this separate from standalone/idle VFX seeds: cue playback is its own pipeline.
+        internal const int AnimationClipCueSeed = 7331;
         private readonly LogService _logService;
         private readonly VfxLoadingService _loadingService;
         private readonly bool _ownsLoadingService;
@@ -42,6 +45,31 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             public bool IsIdleEffect { get; set; }
         }
 
+        private sealed record AttachmentSnapshot(bool HasBoneTransform, Matrix4x4 BoneTransform);
+        private sealed record SessionSnapshot(
+            double Time,
+            Vector3? LastRigOrigin,
+            Matrix4x4[] Placements,
+            VfxPlaybackGraphRuntime.Snapshot[] Graphs,
+            AttachmentSnapshot[] Attachments,
+            long Bytes);
+        private sealed record Checkpoint(int Mark, SessionSnapshot State)
+        {
+            public double Time => State.Time;
+            public long Bytes => State.Bytes;
+        }
+
+        // LTK decision 2.46: one checkpoint mark per quarter second, at most 60 seconds,
+        // bounded so heavy particle systems automatically keep a wider stride.
+        private const double CheckpointInterval = 0.25d;
+        private const int MaximumCheckpointMarks = 240;
+        private const long CheckpointBudgetBytes = 256L * 1024L * 1024L;
+        private readonly Dictionary<int, Checkpoint> _checkpoints = new();
+        private long _checkpointBytes;
+        internal int CheckpointCount => _checkpoints.Count;
+        internal long CheckpointBytes => _checkpointBytes;
+        internal double LastSeekRestoreTime { get; private set; }
+
         private readonly List<VfxPlaybackGraphRuntime> _graphs = new();
         private readonly Dictionary<VfxPlaybackGraphRuntime, Matrix4x4> _graphPlacements = new();
         private readonly List<(double Time, uint EffectKey)> _scheduledEffectKills = new();
@@ -52,6 +80,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private double _rigDuration;
         private Vector3? _lastRigOrigin;
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
+        private VfxOwnerSceneContext _ownerSceneContext;
         private bool _isPlaying;
         private bool _ready;
         private bool _disposed;
@@ -95,6 +124,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             set
             {
                 _rigPreset = value;
+                ClearCheckpoints();
                 if (_activeSystem?.Definition is { } definition)
                     _rigDuration = VfxRigMotion.RunLength(value, definition);
                 _lastRigOrigin = null;
@@ -134,8 +164,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void SetVfxSystem(VfxSystemModel system) => SetSystem(system);
         public void SetSystem(VfxSystemModel system)
         {
+            ClearCheckpoints();
             _isPlaying = false;
             _activeSystem = system;
+            _ownerSceneContext = system?.OwnerSceneContext;
             _rigDuration = system?.Definition is { } definition
                 ? VfxRigMotion.RunLength(_rigPreset, definition)
                 : system?.TotalDuration ?? 0d;
@@ -203,9 +235,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             double animationDuration,
             VfxOwnerSceneContext ownerSceneContext = null)
         {
+            ClearCheckpoints();
             systems ??= new Dictionary<uint, VfxSystemDefinition>();
             resourceMap ??= new Dictionary<uint, uint>();
             _isPlaying = false;
+            _ownerSceneContext = ownerSceneContext;
             _graph = null;
             _graphs.Clear();
             _graphPlacements.Clear();
@@ -288,9 +322,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         continue;
                     }
                     if (compositionEvent.System is null) continue;
-                    float eventScale = Math.Max(0.01f, compositionEvent.Event.Scale);
-                    Matrix4x4 scaleMatrix = Matrix4x4.CreateScale(eventScale);
 
+                    // LTK keeps ParticleEventData.scale in the parsed event metadata but its
+                    // Animation Clip viewport does not apply it to the spawned VFX system.
+                    // Keep playback tied to the cue rig only; skinScale is handled separately.
                     var attachments = cue.Attachments is { Count: > 0 }
                         ? cue.Attachments
                         : new[] { new VfxParticleEventAttachment(0, 0) };
@@ -301,15 +336,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         systems,
                         resourceMap,
                         searchDirectory,
-                        scaleMatrix * _worldTransform,
-                        HashCode.Combine(seed, graphIndex++),
+                        _worldTransform,
+                        AnimationClipCueSeed,
                         _logService,
                         ownerSceneContext);
 
                     eventGraph.SetStartDelay(startSeconds);
 
                     _graphs.Add(eventGraph);
-                    _graphPlacements[eventGraph] = scaleMatrix;
+                    _graphPlacements[eventGraph] = Matrix4x4.Identity;
 
                     _graphAttachments[eventGraph] = new GraphAttachmentInfo
                     {
@@ -322,7 +357,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         // ParticleEventData's detachable field is not part of that playback contract.
                         IsDetachable = false,
                         LocalOffset = Vector3.Zero,
-                        BaseTransform = scaleMatrix,
+                        BaseTransform = Matrix4x4.Identity,
                         IsIdleEffect = false
                     };
 
@@ -377,8 +412,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _boneTransformProvider = boneTransformProvider;
             if (_graphs.Count == 0) return;
 
+            Func<string, Matrix4x4?> jointProvider = boneTransformProvider is null
+                ? null
+                : boneName => boneTransformProvider(boneName, 0) is { } raw
+                    ? PrepareBoneTransform(raw)
+                    : null;
+
             foreach (VfxPlaybackGraphRuntime graph in _graphs)
             {
+                // boneToSpawnAt children use the same live skeleton as clip/idle attachments.
+                graph.SetJointTransformProvider(jointProvider);
+
                 if (_graphAttachments.TryGetValue(graph, out var attachment) && boneTransformProvider != null)
                 {
                     Matrix4x4? boneMatrix = null;
@@ -393,11 +437,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
                     if (boneMatrix.HasValue)
                     {
-                        Matrix4x4 boneTransform = boneMatrix.Value;
+                        Matrix4x4 boneTransform = PrepareBoneTransform(boneMatrix.Value);
                         if (attachment.IsDetachable && attachment.HasBoneTransform)
                             boneTransform = attachment.BoneTransform;
-                        else if (attachment.TargetBoneHash != 0 && boneTransformProvider(null, attachment.TargetBoneHash) is { } target)
+                        else if (attachment.TargetBoneHash != 0 &&
+                                 boneTransformProvider(null, attachment.TargetBoneHash) is { } rawTarget)
                         {
+                            Matrix4x4 target = PrepareBoneTransform(rawTarget);
                             Vector3 forward = target.Translation - boneTransform.Translation;
                             if (forward.LengthSquared() > 1e-8f)
                             {
@@ -414,7 +460,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         }
                         if (attachment.LocalOffset != Vector3.Zero)
                         {
-                            boneTransform = Matrix4x4.CreateTranslation(attachment.LocalOffset) * boneTransform;
+                            Vector3 scaledOffset = attachment.LocalOffset * CurrentSkinScale;
+                            boneTransform = Matrix4x4.CreateTranslation(scaledOffset) * boneTransform;
                         }
                         Matrix4x4 orientationRoot =
                             attachment.BaseTransform * Matrix4x4.CreateTranslation(boneTransform.Translation) * _worldTransform;
@@ -431,6 +478,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     graph.SetTransform(basePlacement * _worldTransform, orientationRoot);
                 }
             }
+        }
+
+        private float CurrentSkinScale
+            => _ownerSceneContext is { SkinScale: > 0f } context && float.IsFinite(context.SkinScale)
+                ? context.SkinScale
+                : 1f;
+
+        private Matrix4x4 PrepareBoneTransform(Matrix4x4 transform)
+        {
+            static Vector3 Normal(Vector3 value, Vector3 fallback)
+                => value.LengthSquared() > 1e-8f ? Vector3.Normalize(value) : fallback;
+
+            Vector3 right = Normal(Vector3.TransformNormal(Vector3.UnitX, transform), Vector3.UnitX);
+            Vector3 up = Normal(Vector3.TransformNormal(Vector3.UnitY, transform), Vector3.UnitY);
+            Vector3 forward = Normal(Vector3.TransformNormal(Vector3.UnitZ, transform), Vector3.UnitZ);
+            Vector3 translation = transform.Translation * CurrentSkinScale;
+            return new Matrix4x4(
+                right.X, right.Y, right.Z, 0f,
+                up.X, up.Y, up.Z, 0f,
+                forward.X, forward.Y, forward.Z, 0f,
+                translation.X, translation.Y, translation.Z, 1f);
         }
 
         public bool SetEmitterVisibility(int sourceOrder, bool isVisible)
@@ -464,6 +532,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public void Stop()
         {
+            ClearCheckpoints();
             _isPlaying = false;
             _lastRigOrigin = null;
             foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Reset();
@@ -483,6 +552,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public void SetWorldTransform(Matrix4x4 transform)
         {
+            ClearCheckpoints();
             _worldTransform = transform;
             if (_graphAttachments.Count > 0)
             {
@@ -542,6 +612,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (_activeSystem == null) return;
             double maxDuration = HasFinitePlaybackDuration ? RigDuration : 10.0;
             double target = Math.Clamp(seconds, 0, maxDuration);
+
+            if (target + 1e-9 >= _activeSystem.CurrentTime)
+            {
+                LastSeekRestoreTime = _activeSystem.CurrentTime;
+                AdvanceTo(target);
+                return;
+            }
+
+            if (!TryRestoreCheckpoint(target))
+            {
+                LastSeekRestoreTime = 0d;
+                ResetSimulationToStart();
+            }
+            AdvanceTo(target);
+        }
+
+        private void ResetSimulationToStart()
+        {
             _lastRigOrigin = null;
             foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Reset();
             foreach (var attachment in _graphAttachments.Values) attachment.HasBoneTransform = false;
@@ -549,7 +637,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             ApplyRigTransform();
             if (_boneTransformSampler != null)
                 UpdateBoneTransforms((name, hash) => _boneTransformSampler(0, name, hash));
-            AdvanceTo(target);
         }
 
         /// <summary>
@@ -569,7 +656,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         public void SetBoneTransformSampler(Func<double, string, uint, Matrix4x4?> sampler)
-            => _boneTransformSampler = sampler;
+        {
+            ClearCheckpoints();
+            _boneTransformSampler = sampler;
+        }
 
         private void AdvanceTo(double target)
         {
@@ -584,6 +674,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     if (stopTime > previous && stopTime < next) next = stopTime;
                 foreach (GraphAttachmentInfo attachment in _graphAttachments.Values)
                     if (attachment.StartTime > previous && attachment.StartTime < next) next = attachment.StartTime;
+
+                // Land exactly on quarter-second marks so a checkpoint never captures a state
+                // from just before/after the time it represents.
+                double checkpointBoundary = NextCheckpointBoundary(previous);
+                if (checkpointBoundary > previous + 1e-9 && checkpointBoundary < next - 1e-9)
+                    next = checkpointBoundary;
+
                 KillGraphsAt(previous);
                 _activeSystem.CurrentTime = next;
                 ApplyRigTransform();
@@ -593,7 +690,129 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     UpdateBoneTransforms(_boneTransformProvider);
                 foreach (var graph in _graphs) graph.Update((float)(next - previous));
                 KillGraphsAt(next);
+                TryCaptureCheckpoint(next);
             }
+        }
+
+        private double NextCheckpointBoundary(double previous)
+        {
+            int nextMark = (int)Math.Floor(previous / CheckpointInterval + 1e-9) + 1;
+            return nextMark is >= 1 and <= MaximumCheckpointMarks
+                ? nextMark * CheckpointInterval
+                : double.PositiveInfinity;
+        }
+
+        private void ClearCheckpoints()
+        {
+            _checkpoints.Clear();
+            _checkpointBytes = 0;
+            LastSeekRestoreTime = 0d;
+        }
+
+        private SessionSnapshot CaptureSessionSnapshot()
+        {
+            var placements = new Matrix4x4[_graphs.Count];
+            var graphs = new VfxPlaybackGraphRuntime.Snapshot[_graphs.Count];
+            var attachments = new AttachmentSnapshot[_graphs.Count];
+            long bytes = 256;
+
+            for (int index = 0; index < _graphs.Count; index++)
+            {
+                VfxPlaybackGraphRuntime graph = _graphs[index];
+                placements[index] = _graphPlacements.GetValueOrDefault(graph, Matrix4x4.Identity);
+                VfxPlaybackGraphRuntime.Snapshot graphState = graph.CaptureSnapshot();
+                graphs[index] = graphState;
+                bytes += 128L + graphState.Bytes;
+
+                if (_graphAttachments.TryGetValue(graph, out GraphAttachmentInfo attachment))
+                {
+                    attachments[index] = new AttachmentSnapshot(
+                        attachment.HasBoneTransform,
+                        attachment.BoneTransform);
+                    bytes += 80;
+                }
+            }
+
+            return new SessionSnapshot(
+                _activeSystem.CurrentTime,
+                _lastRigOrigin,
+                placements,
+                graphs,
+                attachments,
+                bytes);
+        }
+
+        private void RestoreSessionSnapshot(SessionSnapshot snapshot)
+        {
+            if (snapshot.Graphs.Length != _graphs.Count)
+                throw new InvalidOperationException("VFX session checkpoint graph layout no longer matches the active session.");
+
+            _activeSystem.CurrentTime = snapshot.Time;
+            _lastRigOrigin = snapshot.LastRigOrigin;
+            for (int index = 0; index < _graphs.Count; index++)
+            {
+                VfxPlaybackGraphRuntime graph = _graphs[index];
+                _graphPlacements[graph] = snapshot.Placements[index];
+                graph.RestoreSnapshot(snapshot.Graphs[index]);
+
+                AttachmentSnapshot savedAttachment = snapshot.Attachments[index];
+                if (savedAttachment is not null && _graphAttachments.TryGetValue(graph, out GraphAttachmentInfo attachment))
+                {
+                    attachment.HasBoneTransform = savedAttachment.HasBoneTransform;
+                    attachment.BoneTransform = savedAttachment.BoneTransform;
+                }
+            }
+        }
+
+        private void TryCaptureCheckpoint(double time)
+        {
+            int mark = (int)Math.Round(time / CheckpointInterval);
+            if (mark < 1 || mark > MaximumCheckpointMarks || _checkpoints.ContainsKey(mark)) return;
+            double exact = mark * CheckpointInterval;
+            if (Math.Abs(time - exact) > 1e-8) return;
+
+            SessionSnapshot state = CaptureSessionSnapshot();
+            long size = state.Bytes;
+            if (size <= 0 || size > CheckpointBudgetBytes) return;
+
+            int remaining = MaximumCheckpointMarks - mark + 1;
+            int stride = 1;
+            while (Math.Ceiling(remaining / (double)stride) * size > CheckpointBudgetBytes)
+                stride *= 2;
+            if (mark % stride != 0) return;
+
+            if (_checkpointBytes + size > CheckpointBudgetBytes)
+                ThinCheckpoints(size);
+            if (_checkpointBytes + size > CheckpointBudgetBytes) return;
+
+            var checkpoint = new Checkpoint(mark, state);
+            _checkpoints[mark] = checkpoint;
+            _checkpointBytes += checkpoint.Bytes;
+        }
+
+        private void ThinCheckpoints(long requiredBytes)
+        {
+            for (int stride = 2; _checkpointBytes + requiredBytes > CheckpointBudgetBytes && stride <= 512; stride *= 2)
+            {
+                foreach (int mark in _checkpoints.Keys.Where(mark => mark % stride != 0).ToArray())
+                {
+                    _checkpointBytes -= _checkpoints[mark].Bytes;
+                    _checkpoints.Remove(mark);
+                }
+            }
+        }
+
+        private bool TryRestoreCheckpoint(double target)
+        {
+            int mark = Math.Min(MaximumCheckpointMarks, (int)Math.Floor(target / CheckpointInterval + 1e-9));
+            for (; mark >= 1; mark--)
+            {
+                if (!_checkpoints.TryGetValue(mark, out Checkpoint checkpoint)) continue;
+                RestoreSessionSnapshot(checkpoint.State);
+                LastSeekRestoreTime = checkpoint.Time;
+                return true;
+            }
+            return false;
         }
 
         private void KillGraphsAt(double seconds)

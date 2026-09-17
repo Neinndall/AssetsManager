@@ -64,5 +64,36 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.DoesNotContain("mix(vec3(1.0), fragColor.rgb", VfxShaderSource.ParticleFragment);
             Assert.DoesNotContain("mix(vec3(1.0), fragColor.rgb", VfxShaderSource.MeshFragment);
         }
+        [Fact]
+        public void ArbitraryQuadUsesAuthoredLtkUvOrientationForBothLayers()
+        {
+            Assert.Contains("vec2 quadUv = uArbitraryQuad != 0", VfxShaderSource.ParticleVertex);
+            Assert.Contains("? vec2(aCorner.y + 0.5, aCorner.x + 0.5)", VfxShaderSource.ParticleVertex);
+            Assert.Contains("vec2 localUv = trailPrimitive", VfxShaderSource.ParticleVertex);
+            Assert.Contains("vec2 multUv = trailPrimitive", VfxShaderSource.ParticleVertex);
+            Assert.Equal(2, Regex.Matches(VfxShaderSource.ParticleVertex, @"\s:\squadUv;").Count);
+        }
+
+        [Fact]
+        public void MeshCameraAlignmentMatchesLtkAxisSelection()
+        {
+            Assert.Contains("uniform int uAlignPitchToCamera;", VfxShaderSource.MeshVertex);
+            Assert.Contains("uniform int uAlignYawToCamera;", VfxShaderSource.MeshVertex);
+            Assert.Contains("uAlignYawToCamera != 0 ? uCamPos.x - uWorldPos.x : 0.0", VfxShaderSource.MeshVertex);
+            Assert.Contains("uAlignPitchToCamera != 0 ? uCamPos.y - uWorldPos.y : 0.0", VfxShaderSource.MeshVertex);
+            Assert.Contains("vec3 aside = cross(uCamUp, facing);", VfxShaderSource.MeshVertex);
+            Assert.Contains("if (uMeshSkinned == 0)", VfxShaderSource.MeshVertex);
+            Assert.Contains("aside = -aside;", VfxShaderSource.MeshVertex);
+            Assert.Contains("facing = -facing;", VfxShaderSource.MeshVertex);
+        }
+
+        [Fact]
+        public void MeshDepthPushPullMatchesParticleEyeRaySemantics()
+        {
+            Assert.Contains("uniform vec3 uCamPos;", VfxShaderSource.MeshVertex);
+            Assert.Contains("uniform float uDepthPushPull;", VfxShaderSource.MeshVertex);
+            Assert.Contains("vec3 eyeRay = p - uCamPos;", VfxShaderSource.MeshVertex);
+            Assert.Contains("p += normalize(eyeRay) * uDepthPushPull;", VfxShaderSource.MeshVertex);
+        }
     }
 }

@@ -153,13 +153,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void UnknownModesUseSafeAlphaFallback()
+        public void UnknownModesUseLtkAddFallback()
         {
             Assert.False(VfxBlendModes.IsKnown(255));
             VfxBlendModeDescriptor descriptor = VfxBlendModes.GetDescriptor(255);
             Assert.Equal(-1, descriptor.RawMode);
-            Assert.Equal(VfxBlendModeKind.Alpha, descriptor.Kind);
-            Assert.Contains("safe alpha fallback", VfxBlendModes.Describe(255));
+            Assert.Equal(VfxBlendModeKind.Additive, descriptor.Kind);
+            Assert.Equal(VfxBlendFactor.One, descriptor.SourceRgb);
+            Assert.Equal(VfxBlendFactor.One, descriptor.DestinationRgb);
+            Assert.Equal(VfxBlendFactor.One, descriptor.SourceAlpha);
+            Assert.Equal(VfxBlendFactor.One, descriptor.DestinationAlpha);
+            Assert.Contains("LTK add fallback", VfxBlendModes.Describe(255));
         }
     }
 }

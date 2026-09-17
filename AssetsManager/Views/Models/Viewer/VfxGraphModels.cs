@@ -76,6 +76,9 @@ namespace AssetsManager.Views.Models.Viewer
         Vector2 UvScrollRate = default, // birthUvScrollRate — mesh particles FLOW by scrolling UVs (waterfalls)
         string MeshSkeletonPath = null, // skinned mesh primitive (.skl)
         string MeshAnimationPath = null, // idle animation (.anm)
+        bool MeshIsSkinned = false,
+        bool MeshAlignPitchToCamera = false,
+        bool MeshAlignYawToCamera = false,
         VfxSpawnShape SpawnShape = null,
         VfxCurve3? BirthAcceleration = null,
         VfxCurve3? BirthOrbitalVelocity = null,
@@ -308,7 +311,8 @@ namespace AssetsManager.Views.Models.Viewer
         bool EmitOnDeath,
         VfxCurveF Probability,
         VfxCurve3 RelativeOffset,
-        int InheritanceMode);
+        int InheritanceMode,
+        IReadOnlyList<string> Bones = null);
 
     public sealed record VfxAccelerationField(VfxCurve3 Acceleration, bool LocalSpace);
     public sealed record VfxAttractionField(VfxCurveF Acceleration, VfxCurve3 Position, VfxCurveF Radius);
@@ -411,10 +415,22 @@ namespace AssetsManager.Views.Models.Viewer
     }
 
     /// <summary>One per-component probability table: a particle rolls r in 0..1 at birth and takes the piecewise-linear value at r.</summary>
-    public readonly record struct VfxProbTable(float[] Times, float[] Values)
+    public readonly record struct VfxProbTable(
+        float[] Times,
+        float[] Values,
+        float Single = 1f,
+        bool IsPresent = true)
     {
-        public bool IsEmpty => Times is not { Length: > 0 } || Values is not { Length: > 0 };
-        public float Sample(float r) => VfxCurve.Interp(Times, Values, r, static (a, b, f) => a + (b - a) * f);
+        // LTK keeps a probability-table slot valid even when it has no keys: in that case
+        // singleValue is the authored multiplier. A default struct represents an absent slot.
+        public bool IsEmpty => !IsPresent;
+
+        public float Sample(float r)
+        {
+            if (!IsPresent) return 1f;
+            if (Times is not { Length: > 0 } || Values is not { Length: > 0 }) return Single;
+            return VfxCurve.Interp(Times, Values, r, static (a, b, f) => a + (b - a) * f);
+        }
     }
 
     /// <summary>A scalar value that is either constant or an animation curve over normalised age (0..1).</summary>
@@ -546,7 +562,8 @@ namespace AssetsManager.Views.Models.Viewer
     public sealed record VfxOwnerSceneContext(
         string MeshPath,
         string SkeletonPath,
-        float SkinScale);
+        float SkinScale,
+        uint AnimationGraphPathHash = 0);
 
     /// <summary>
     /// Authored defaults from League's VfxEmitterDefinitionData schema. BIN omits

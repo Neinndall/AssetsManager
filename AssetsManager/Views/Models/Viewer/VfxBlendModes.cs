@@ -76,14 +76,14 @@ namespace AssetsManager.Views.Models.Viewer
             new(8, "Target Alpha", VfxBlendModeKind.Alpha, VfxBlendFactor.OneMinusDestinationAlpha, VfxBlendFactor.DestinationAlpha, VfxBlendFactor.One, VfxBlendFactor.One, VfxBlendEquationKind.Add, VfxBlendEquationKind.Add, AllowsAlphaTest: true, AllowsDepthWrite: false, NeutralizeTransparentRgb: false)
         };
 
-        private static readonly VfxBlendModeDescriptor SafeAlphaFallback = new(
+        private static readonly VfxBlendModeDescriptor UnknownAddFallback = new(
             -1,
-            "Safe Alpha Fallback",
-            VfxBlendModeKind.Alpha,
-            VfxBlendFactor.SourceAlpha,
-            VfxBlendFactor.OneMinusSourceAlpha,
+            "Unknown (LTK Add Fallback)",
+            VfxBlendModeKind.Additive,
             VfxBlendFactor.One,
-            VfxBlendFactor.OneMinusSourceAlpha,
+            VfxBlendFactor.One,
+            VfxBlendFactor.One,
+            VfxBlendFactor.One,
             VfxBlendEquationKind.Add,
             VfxBlendEquationKind.Add,
             AllowsAlphaTest: true,
@@ -93,7 +93,7 @@ namespace AssetsManager.Views.Models.Viewer
         public static bool IsKnown(int rawMode) => rawMode >= 0 && rawMode < AuthoredModes.Length;
 
         public static VfxBlendModeDescriptor GetDescriptor(int rawMode)
-            => IsKnown(rawMode) ? AuthoredModes[rawMode] : SafeAlphaFallback;
+            => IsKnown(rawMode) ? AuthoredModes[rawMode] : UnknownAddFallback;
 
         public static VfxBlendModeDescriptor GetDrawDescriptor(int rawMode, bool distortion)
             => GetDescriptor(distortion ? 1 : rawMode);
@@ -123,7 +123,7 @@ namespace AssetsManager.Views.Models.Viewer
         public static string Describe(int rawMode)
         {
             if (!IsKnown(rawMode))
-                return $"Unknown ({rawMode}, safe alpha fallback)";
+                return $"Unknown ({rawMode}, LTK add fallback)";
 
             return $"{GetDescriptor(rawMode).Name} ({rawMode})";
         }

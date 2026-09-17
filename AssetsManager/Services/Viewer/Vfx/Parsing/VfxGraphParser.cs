@@ -238,6 +238,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_reflectionMapTexture = HashAlgorithms.Fnv1a("reflectionMapTexture");
         private static readonly uint F_childParticleSet = HashAlgorithms.Fnv1a("childParticleSetDefinition");
         private static readonly uint F_childrenIdentifiers = HashAlgorithms.Fnv1a("childrenIdentifiers");
+        private static readonly uint F_boneToSpawnAt = HashAlgorithms.Fnv1a("boneToSpawnAt");
         private static readonly uint F_childEmitOnDeath = HashAlgorithms.Fnv1a("childEmitOnDeath");
         private static readonly uint F_childrenProbability = HashAlgorithms.Fnv1a("childrenProbability");
         private static readonly uint F_parentInheritance = HashAlgorithms.Fnv1a("ParentInheritanceDefinition");
@@ -269,9 +270,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_probTables    = HashAlgorithms.Fnv1a("probabilityTables");
         private static readonly uint F_keyTimes      = HashAlgorithms.Fnv1a("keyTimes");
         private static readonly uint F_keyValues     = HashAlgorithms.Fnv1a("keyValues");
+        private static readonly uint F_singleValue   = HashAlgorithms.Fnv1a("singleValue");
         private static readonly uint F_meshDef       = 0x0d89732d; // VfxPrimitiveMesh's VfxMeshDefinitionData field
         private static readonly uint F_simpleMesh    = HashAlgorithms.Fnv1a("mSimpleMeshName");
         private static readonly uint F_meshName      = HashAlgorithms.Fnv1a("mMeshName");
+        private static readonly uint F_meshAlignPitch = HashAlgorithms.Fnv1a("AlignPitchToCamera");
+        private static readonly uint F_meshAlignYaw = HashAlgorithms.Fnv1a("AlignYawToCamera");
         private static readonly uint F_submeshesToDrawAlways = HashAlgorithms.Fnv1a("mSubmeshesToDrawAlways");
         private static readonly uint F_submeshesToDraw = HashAlgorithms.Fnv1a("mSubmeshesToDraw");
         private static readonly uint F_birthUvScroll = HashAlgorithms.Fnv1a("birthUvScrollRate");
@@ -328,6 +332,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_simpleSkin = HashAlgorithms.Fnv1a("simpleSkin");
         private static readonly uint F_ownerSkeleton = HashAlgorithms.Fnv1a("skeleton");
         private static readonly uint F_skinScale = HashAlgorithms.Fnv1a("skinScale");
+        private static readonly uint F_skinAnimationProperties = HashAlgorithms.Fnv1a("skinAnimationProperties");
+        private static readonly uint F_animationGraphData = HashAlgorithms.Fnv1a("animationGraphData");
         private static readonly uint F_eventName = HashAlgorithms.Fnv1a("mName");
         private static readonly uint F_eventStartFrame = HashAlgorithms.Fnv1a("mStartFrame");
         private static readonly uint F_eventEndFrame = HashAlgorithms.Fnv1a("mEndFrame");
@@ -424,10 +430,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 
                 string meshPath = ReadAsset(meshProperties.Properties, F_simpleSkin, ".skn");
                 if (string.IsNullOrWhiteSpace(meshPath)) continue;
+
+                uint animationGraphPathHash = 0u;
+                if (Get(owner.Properties, F_skinAnimationProperties) is BinTreeStruct animationProperties)
+                    animationGraphPathHash = AsU32(Get(animationProperties.Properties, F_animationGraphData)) ?? 0u;
+
                 return new VfxOwnerSceneContext(
                     meshPath,
                     ReadAsset(meshProperties.Properties, F_ownerSkeleton, ".skl") ?? string.Empty,
-                    Math.Max(0.01f, GetF32(meshProperties.Properties, F_skinScale) ?? 1f));
+                    Math.Max(0.01f, GetF32(meshProperties.Properties, F_skinScale) ?? 1f),
+                    animationGraphPathHash);
             }
             return null;
         }
@@ -443,10 +455,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 {
                     if (clipPair.Value is not BinTreeStruct clip) continue;
 
+                    uint clipHash = AsU32(clipPair.Key) ?? 0u;
+                    // LTK identifies a clip by the mClipDataMap key. If the hash table cannot
+                    // spell that key, the clip stays a hex hash; the .anm filename is not its identity.
                     string clipName = clipPair.Key switch
                     {
-                        BinTreeString s => s.Value,
-                        _ => GetString(clip.Properties, F_clipName)
+                        BinTreeString s when !string.IsNullOrWhiteSpace(s.Value) => s.Value,
+                        _ when clipHash != 0u => $"0x{clipHash:x8}",
+                        _ => string.Empty
                     };
 
                     string animFilePath = null;
@@ -457,7 +473,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 
                     AddEventSequence(
                         sequences,
-                        AsU32(clipPair.Key) ?? 0u,
+                        clipHash,
                         clip.ClassHash,
                         clip.Properties,
                         clipName,
@@ -751,14 +767,33 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             bool isMesh = primitiveKind is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
             bool isArbitraryQuad = prim is BinTreeStruct aq && aq.ClassHash == PrimArbitraryQuad;
             string meshPath = null, meshSkl = null, meshAnm = null;
+            bool meshIsSkinned = false;
+            bool meshAlignPitch = false;
+            bool meshAlignYaw = false;
             IReadOnlyList<uint> attachedSubmeshHashes = Array.Empty<uint>();
             VfxTrailDefinition trail = null;
             VfxBeamDefinition beam = null;
             if (isMesh && prim is BinTreeStruct ps2 && Get(ps2.Properties, F_meshDef) is BinTreeStruct md)
             {
-                meshPath = ReadAsset(md.Properties, F_simpleMesh, ".scb") ?? ReadAsset(md.Properties, F_meshName, ".scb");
-                meshSkl = ReadAsset(md.Properties, F_meshSkeleton, ".skl");
+                // LTK/engine precedence: a complete skinned mMeshName + mMeshSkeletonName
+                // pair wins. mSimpleMeshName is only the fallback when that pair is absent.
+                string skinnedMesh = ReadAsset(md.Properties, F_meshName, ".skn");
+                string skeleton = ReadAsset(md.Properties, F_meshSkeleton, ".skl");
+                if (!IsNoMeshPath(skinnedMesh) && !IsNoMeshPath(skeleton))
+                {
+                    meshPath = skinnedMesh;
+                    meshSkl = skeleton;
+                    meshIsSkinned = true;
+                }
+                else
+                {
+                    string simpleMesh = ReadAsset(md.Properties, F_simpleMesh, ".scb");
+                    if (!IsNoMeshPath(simpleMesh)) meshPath = simpleMesh;
+                }
+
                 meshAnm = ReadAsset(md.Properties, F_meshAnim, ".anm");
+                meshAlignPitch = GetBool(ps2.Properties, F_meshAlignPitch);
+                meshAlignYaw = GetBool(ps2.Properties, F_meshAlignYaw);
                 attachedSubmeshHashes = ReadHashContainer(Get(md.Properties, F_submeshesToDrawAlways))
                     .Concat(ReadHashContainer(Get(md.Properties, F_submeshesToDraw)))
                     .Distinct()
@@ -926,6 +961,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 UvScrollRate: birthUvScrollRate?.Constant ?? Vector2.Zero,
                 MeshSkeletonPath: meshSkl,
                 MeshAnimationPath: meshAnm,
+                MeshIsSkinned: meshIsSkinned,
+                MeshAlignPitchToCamera: meshAlignPitch,
+                MeshAlignYawToCamera: meshAlignYaw,
                 SpawnShape: ReadSpawnShape(p),
                 BirthAcceleration: ReadCurve3(p, F_birthAccel),
                 AccelerationOverLife: ReadCurve3(p, F_accel),
@@ -1191,17 +1229,32 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             var children = new List<VfxChildSystemReference>();
             if (Get(childData.Properties, F_childrenIdentifiers) is BinTreeContainer identifiers)
             {
-                foreach (BinTreeStruct identifier in identifiers.Elements.OfType<BinTreeStruct>())
+                foreach (BinTreeProperty item in identifiers.Elements)
                 {
+                    if (item is not BinTreeStruct identifier)
+                    {
+                        // LTK preserves unresolved child slots so childrenProbability keeps its authored indices.
+                        children.Add(null);
+                        continue;
+                    }
+
                     string name = GetString(identifier.Properties, F_effectName)
                                ?? GetString(identifier.Properties, F_effectKey) ?? string.Empty;
                     uint systemHash = AsU32(Get(identifier.Properties, F_effect)) ?? 0u;
                     uint effectKey = AsU32(Get(identifier.Properties, F_effectKey))
                                   ?? (!string.IsNullOrEmpty(name) ? HashAlgorithms.Fnv1a(name) : 0u);
-                    if (!string.IsNullOrEmpty(name) || systemHash != 0 || effectKey != 0)
-                        children.Add(new VfxChildSystemReference(name, systemHash, effectKey));
+                    children.Add(!string.IsNullOrEmpty(name) || systemHash != 0 || effectKey != 0
+                        ? new VfxChildSystemReference(name, systemHash, effectKey)
+                        : null);
                 }
             }
+
+            IReadOnlyList<string> bones = Get(childData.Properties, F_boneToSpawnAt) is BinTreeContainer boneList
+                ? boneList.Elements.OfType<BinTreeString>()
+                    .Select(static value => value.Value)
+                    .Where(static value => !string.IsNullOrWhiteSpace(value))
+                    .ToArray()
+                : Array.Empty<string>();
 
             VfxCurve3 relativeOffset = VfxCurve3.Const(Vector3.Zero);
             int inheritanceMode = 0;
@@ -1216,7 +1269,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 GetBool(childData.Properties, F_childEmitOnDeath),
                 ReadCurveF(childData.Properties, F_childrenProbability) ?? VfxCurveF.Const(1f),
                 relativeOffset,
-                inheritanceMode);
+                inheritanceMode,
+                bones);
         }
 
         private static VfxPrimitiveKind GetPrimitiveKind(uint classHash) => classHash switch
@@ -1355,19 +1409,33 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             bool any = false;
             for (int tableIndex = 0; tableIndex < pc.Elements.Count; tableIndex++)
             {
-                var el = pc.Elements[tableIndex];
-                if (el is not BinTreeStruct s) continue;
-                if (Get(s.Properties, F_keyTimes) is not BinTreeContainer tc ||
-                    Get(s.Properties, F_keyValues) is not BinTreeContainer vc) continue;
-                int n = Math.Min(tc.Elements.Count, vc.Elements.Count);
-                if (n == 0) continue;
-                var times = new float[n]; var vals = new float[n];
+                if (pc.Elements[tableIndex] is not BinTreeStruct s) continue;
+
+                // LTK treats the table itself as present even with no keys. In that case
+                // singleValue (schema default 1) is the multiplier for the whole channel.
+                float single = GetF32(s.Properties, F_singleValue) ?? 1f;
+                var tc = Get(s.Properties, F_keyTimes) as BinTreeContainer;
+                var vc = Get(s.Properties, F_keyValues) as BinTreeContainer;
+
+                if (tc is not null && vc is not null && tc.Elements.Count > 0 && tc.Elements.Count != vc.Elements.Count)
+                {
+                    // The engine reads mismatched keyed tables as zero instead of truncating
+                    // to the shorter list.
+                    tables[tableIndex] = new VfxProbTable(null, null, 0f, IsPresent: true);
+                    any = true;
+                    continue;
+                }
+
+                int n = tc is not null && vc is not null ? Math.Min(tc.Elements.Count, vc.Elements.Count) : 0;
+                float[] times = n > 0 ? new float[n] : null;
+                float[] vals = n > 0 ? new float[n] : null;
                 for (int i = 0; i < n; i++)
                 {
                     times[i] = AsF32(tc.Elements[i]) ?? 0f;
                     vals[i] = AsF32(vc.Elements[i]) ?? 0f;
                 }
-                tables[tableIndex] = new VfxProbTable(times, vals);
+
+                tables[tableIndex] = new VfxProbTable(times, vals, single, IsPresent: true);
                 any = true;
             }
             return any ? tables : null;
@@ -1422,6 +1490,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 BinTreeU32 u32 when u32.Value != 0 => $"{u32.Value:x8}{extension}",
                 _ => null
             };
+        }
+
+        private static bool IsNoMeshPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return true;
+            string fileName = Path.GetFileName(path.Replace('\\', '/'));
+            return fileName.StartsWith("doesnotexist.", StringComparison.OrdinalIgnoreCase);
         }
 
         private static float? GetF32(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash) => AsF32(Get(p, hash));
