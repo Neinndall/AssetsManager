@@ -302,9 +302,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             for (int i = 0; i < 5; i++) simulator.Update(0.1f);
 
             var state = Assert.Single(simulator.Emitters);
-            Assert.Equal(5, state.InstanceCount);
+            // LTK truncates the exact floating-point debt without an epsilon. At 0.4s the
+            // accumulated 0.1 step is fractionally below one particle, so it is paid at 0.5s.
+            Assert.Equal(4, state.InstanceCount);
             int last = (state.InstanceCount - 1) * VfxPlaybackRuntime.InstanceStride;
             Assert.InRange(state.Instances[last + 8], 0.499f, 0.501f);
+        }
+
+        [Fact]
+        public void CurveSamplingUsesLtksLastDuplicateAndPositiveTinySpanRules()
+        {
+            var duplicate = new VfxCurveF(
+                0f,
+                new[] { 0f, 0f, 1f },
+                new[] { 1f, 2f, 4f });
+            var tinySpan = new VfxCurveF(
+                0f,
+                new[] { 0f, 0.0000005f },
+                new[] { 0f, 1f });
+
+            Assert.Equal(2f, duplicate.Sample(0f));
+            Assert.InRange(tinySpan.Sample(0.00000025f), 0.4999f, 0.5001f);
         }
 
         [Fact]
@@ -598,6 +616,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             Assert.Equal(2, graph.Runtimes.Count);
             Assert.Same(childEmitter, graph.Runtimes[1].Emitters[0].Def);
+            Assert.Equal(graph.Root.CurrentTime, graph.Runtimes[1].Emitters[0].RenderTime, precision: 5);
+            Assert.True(graph.Runtimes[1].CurrentTime < graph.Runtimes[1].Emitters[0].RenderTime);
+
+            graph.Update(0.02f);
+            Assert.Equal(graph.Root.CurrentTime, graph.Runtimes[1].Emitters[0].RenderTime, precision: 5);
+            Assert.True(graph.Runtimes[1].CurrentTime < graph.Runtimes[1].Emitters[0].RenderTime);
         }
 
         [Fact]
@@ -807,6 +831,58 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxPlaybackGraphRuntime resolved = Create(1f);
             resolved.Update(0.02f);
             Assert.Equal(2, resolved.Runtimes.Count);
+        }
+
+        [Fact]
+        public void LivePoolsKeepHiddenRootAndChildParticlesInTheSimulationTally()
+        {
+            var childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f,
+                ParticleLifetime = VfxCurveF.Const(1f)
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            var parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ParticleLifetime = VfxCurveF.Const(1f),
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    false,
+                    VfxCurveF.Const(0f),
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            var graph = new VfxPlaybackGraphRuntime(
+                parent,
+                Matrix4x4.Identity,
+                7,
+                new Dictionary<uint, VfxSystemDefinition> { [1] = parent, [2] = child },
+                new Dictionary<uint, uint>(),
+                (definition, transform, seed) =>
+                {
+                    var runtime = new VfxPlaybackRuntime(seed);
+                    runtime.SetSystem(definition, transform);
+                    return runtime;
+                });
+
+            graph.Update(0.02f);
+            Assert.Equal(2, graph.Runtimes.Count);
+            graph.Update(0.02f);
+
+            int before = 0;
+            foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
+                before += runtime.LiveParticleCount;
+            Assert.True(before >= 2);
+
+            graph.SetAllEmittersVisible(false);
+
+            Assert.All(graph.Runtimes, runtime =>
+                Assert.All(runtime.Emitters, emitter => Assert.False(emitter.IsVisible)));
+            int after = 0;
+            foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
+                after += runtime.LiveParticleCount;
+            Assert.Equal(before, after);
         }
 
         [Fact]
@@ -1060,8 +1136,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 0.3,
                 VfxDurationCalculator.Calculate(new VfxSystemDefinition(3, "external", "external", new[] { externalLifetime })),
                 precision: 3);
-            Assert.True(double.IsInfinity(VfxDurationCalculator.Calculate(
-                new VfxSystemDefinition(4, "loop", "loop", new[] { externalLifetime with { IsLoop = true } }))));
+            Assert.Equal(
+                0.3,
+                VfxDurationCalculator.Calculate(
+                    new VfxSystemDefinition(4, "loop", "loop", new[] { externalLifetime with { IsLoop = true } })),
+                precision: 3);
         }
 
         [Fact]
@@ -1131,7 +1210,90 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void AttachedMeshKeepsSourcePoolOrderInsteadOfBackToFrontSorting()
+        public void QuadDrawBudgetMatchesLtk4096AcrossLiveSources()
+        {
+            VfxEmitterDefinition quad = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+                IsMeshPrimitive = false
+            };
+
+            int first = VfxOpenGlRenderer.ResolveEmitterDrawCount(quad, 0, 3000);
+            int second = VfxOpenGlRenderer.ResolveEmitterDrawCount(quad, first, 3000);
+
+            Assert.Equal(3000, first);
+            Assert.Equal(1096, second);
+            Assert.Equal(0, VfxOpenGlRenderer.ResolveEmitterDrawCount(quad, first + second, 1));
+        }
+
+        [Fact]
+        public void MeshDrawBudgetMatchesLtk512AcrossLiveSources()
+        {
+            VfxEmitterDefinition mesh = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.Mesh,
+                IsMeshPrimitive = true
+            };
+
+            int first = VfxOpenGlRenderer.ResolveEmitterDrawCount(mesh, 0, 400);
+            int second = VfxOpenGlRenderer.ResolveEmitterDrawCount(mesh, first, 400);
+
+            Assert.Equal(400, first);
+            Assert.Equal(112, second);
+            Assert.Equal(0, VfxOpenGlRenderer.ResolveEmitterDrawCount(mesh, first + second, 1));
+        }
+
+        [Fact]
+        public void BeamDrawBudgetMatchesLtk256AcrossLiveSources()
+        {
+            VfxEmitterDefinition beam = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.Beam,
+                IsMeshPrimitive = false,
+                Beam = new VfxBeamDefinition(
+                    0,
+                    0,
+                    0,
+                    VfxCurve3.Const(Vector3.One),
+                    VfxCurve4.Const(Vector4.One),
+                    false,
+                    Vector3.Zero,
+                    Vector3.Zero)
+            };
+
+            int first = VfxOpenGlRenderer.ResolveEmitterDrawCount(beam, 0, 200);
+            int second = VfxOpenGlRenderer.ResolveEmitterDrawCount(beam, first, 200);
+
+            Assert.Equal(200, first);
+            Assert.Equal(56, second);
+            Assert.Equal(0, VfxOpenGlRenderer.ResolveEmitterDrawCount(beam, first + second, 1));
+        }
+
+        [Fact]
+        public void TrailPointBudgetMatchesLtk1024PerSource()
+        {
+            Assert.Equal(0, VfxTrailGeometry.ResolvePointCount(-4));
+            Assert.Equal(1000, VfxTrailGeometry.ResolvePointCount(1000));
+            Assert.Equal(1024, VfxTrailGeometry.ResolvePointCount(1024));
+            Assert.Equal(1024, VfxTrailGeometry.ResolvePointCount(5000));
+        }
+
+        [Fact]
+        public void AttachedMeshUsesItsEightSlotBudgetBeforeGenericMeshBudget()
+        {
+            VfxEmitterDefinition attached = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.AttachedMesh,
+                IsMeshPrimitive = true
+            };
+
+            Assert.Equal(8, VfxOpenGlRenderer.ResolveEmitterDrawCount(attached, 0, 512));
+            Assert.Equal(3, VfxOpenGlRenderer.ResolveEmitterDrawCount(attached, 5, 512));
+            Assert.Equal(0, VfxOpenGlRenderer.ResolveEmitterDrawCount(attached, 8, 512));
+        }
+
+        [Fact]
+        public void OnlyQuadDrawsUseBackToFrontParticleSorting()
         {
             VfxEmitterDefinition attached = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -1140,9 +1302,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 BlendMode = 1
             };
             VfxEmitterDefinition mesh = attached with { PrimitiveKind = VfxPrimitiveKind.Mesh };
+            VfxEmitterDefinition quad = attached with
+            {
+                PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+                IsMeshPrimitive = false
+            };
 
             Assert.False(VfxOpenGlRenderer.ShouldSortInstances(attached, 4));
-            Assert.True(VfxOpenGlRenderer.ShouldSortInstances(mesh, 4));
+            Assert.False(VfxOpenGlRenderer.ShouldSortInstances(mesh, 4));
+            Assert.True(VfxOpenGlRenderer.ShouldSortInstances(quad, 4));
         }
 
         [Fact]
@@ -1435,6 +1603,84 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void QuadSortingUsesSquaredEyeDistanceInsteadOfViewDepth()
+        {
+            const int stride = VfxPlaybackRuntime.InstanceStride;
+            var source = new float[stride * 2];
+            source[2] = -10f;
+            source[3] = 10f;
+            source[stride] = 100f;
+            source[stride + 2] = -9f;
+            source[stride + 3] = 9f;
+            var destination = new float[source.Length];
+
+            VfxRenderQueue.CopyInstancesBackToFront(
+                source,
+                2,
+                stride,
+                Matrix4x4.Identity,
+                destination,
+                new float[2],
+                new int[2]);
+
+            Assert.Equal(100f, destination[0]);
+            Assert.Equal(9f, destination[3]);
+            Assert.Equal(-10f, destination[stride + 2]);
+            Assert.Equal(10f, destination[stride + 3]);
+        }
+
+        [Fact]
+        public void QuadSourcesAreGatheredIntoOneSharedBudgetBeforeGlobalSorting()
+        {
+            const int stride = VfxPlaybackRuntime.InstanceStride;
+            VfxEmitterDefinition definition = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+                IsMeshPrimitive = false
+            };
+            var first = new VfxPlaybackRuntime.EmitterState
+            {
+                Def = definition,
+                Instances = new float[stride * 2],
+                InstanceCount = 2
+            };
+            first.Instances[2] = -5f;
+            first.Instances[3] = 1f;
+            first.Instances[stride + 2] = -1f;
+            first.Instances[stride + 3] = 2f;
+            var second = new VfxPlaybackRuntime.EmitterState
+            {
+                Def = definition,
+                Instances = new float[stride * 2],
+                InstanceCount = 2
+            };
+            second.Instances[2] = -10f;
+            second.Instances[3] = 3f;
+            second.Instances[stride + 2] = -20f;
+            second.Instances[stride + 3] = 4f;
+
+            var grouped = new float[stride * 3];
+            var sorted = new float[stride * 3];
+            int held = VfxRenderQueue.CopyQuadSourcesBackToFront(
+                new[] { first, second },
+                3,
+                stride,
+                Matrix4x4.Identity,
+                grouped,
+                sorted,
+                new float[3],
+                new int[3]);
+
+            Assert.Equal(3, held);
+            Assert.Equal(new[] { 3f, 1f, 2f }, new[]
+            {
+                sorted[3],
+                sorted[stride + 3],
+                sorted[stride * 2 + 3]
+            });
+        }
+
+        [Fact]
         public void AbilityCompositionSchedulesResolvedSystemFromAuthoredClipFrames()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
@@ -1533,6 +1779,47 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void IdleEffectsUseLtkDeterministicSeed()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var system = new VfxSystemDefinition(100, "idle", "idle", new[] { emitter });
+            var idle = new VfxIdleEffectDefinition(
+                EffectKey: 100,
+                EffectName: "idle",
+                BoneName: "R_Hand",
+                BoneNameHash: 0,
+                TargetBoneName: string.Empty,
+                TargetBoneNameHash: 0,
+                Position: Vector3.Zero);
+            using var session = new VfxRenderSession();
+
+            Assert.True(session.SetAnimationSession(
+                composition: null,
+                idleEffects: new[] { idle },
+                systems: new Dictionary<uint, VfxSystemDefinition> { [100] = system },
+                resourceMap: new Dictionary<uint, uint>(),
+                searchDirectory: Path.GetTempPath(),
+                seed: 987654,
+                animationDuration: 1d));
+
+            VfxPlaybackGraphRuntime graph = Assert.Single(session.Graphs);
+            Assert.Equal(VfxRenderSession.IdleEffectSeed, graph.InitialSeed);
+            Assert.Equal(1337, graph.InitialSeed);
+        }
+
+        [Fact]
+        public void MissingIdleBoneKeepsScaledAuthoredPositionAtSkeletonOrigin()
+        {
+            Matrix4x4 result = VfxRenderSession.IdleFallbackTransform(
+                Matrix4x4.Identity,
+                new Vector3(1f, 2f, 3f),
+                skinScale: 2f,
+                Matrix4x4.CreateTranslation(10f, 20f, 30f));
+
+            Assert.Equal(new Vector3(12f, 24f, 36f), result.Translation);
+        }
+
+        [Fact]
         public void SessionSeekRestoresNearestLtkCheckpointAndMatchesReplayFromZero()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -1627,6 +1914,74 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal("source-first", runtime.Emitters[0].Def.Name);
             Assert.Equal("source-second", runtime.Emitters[1].Def.Name);
             Assert.Equal("later-pass", runtime.Emitters[2].Def.Name);
+        }
+
+        [Fact]
+        public void GlobalRenderQueueUsesStableDefinitionRankAcrossLiveChildSources()
+        {
+            var graphKey = new object();
+            VfxEmitterDefinition laterDefinition = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Name = "later"
+            };
+            VfxEmitterDefinition earlierDefinition = laterDefinition with
+            {
+                Name = "earlier"
+            };
+
+            var laterRuntime = new VfxPlaybackRuntime(7);
+            laterRuntime.SetSystem(new VfxSystemDefinition(1, "later", "later", new[] { laterDefinition }), Vector3.Zero);
+            var earlierRuntime = new VfxPlaybackRuntime(8);
+            earlierRuntime.SetSystem(new VfxSystemDefinition(2, "earlier", "earlier", new[] { earlierDefinition }), Vector3.Zero);
+
+            VfxPlaybackRuntime.EmitterState later = Assert.Single(laterRuntime.Emitters);
+            later.RenderGraphKey = graphKey;
+            later.RenderPath = "0.1";
+            later.RenderRank = 5;
+
+            VfxPlaybackRuntime.EmitterState earlier = Assert.Single(earlierRuntime.Emitters);
+            earlier.RenderGraphKey = graphKey;
+            earlier.RenderPath = "0.0";
+            earlier.RenderRank = 2;
+
+            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(
+                new[] { laterRuntime.Emitters, earlierRuntime.Emitters },
+                Matrix4x4.Identity);
+
+            Assert.Equal("earlier", queue[0].Emitter.Def.Name);
+            Assert.Equal("later", queue[1].Emitter.Def.Name);
+        }
+
+        [Fact]
+        public void GlobalRenderQueuePreservesFirstLiveSourceForSharedEmitterUniforms()
+        {
+            var graphKey = new object();
+            VfxEmitterDefinition definition = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 4f
+            };
+            var firstRuntime = new VfxPlaybackRuntime(7);
+            firstRuntime.SetSystem(new VfxSystemDefinition(1, "shared", "shared", new[] { definition }), Vector3.Zero);
+            var secondRuntime = new VfxPlaybackRuntime(8);
+            secondRuntime.SetSystem(new VfxSystemDefinition(1, "shared", "shared", new[] { definition }), Vector3.Zero);
+
+            VfxPlaybackRuntime.EmitterState first = Assert.Single(firstRuntime.Emitters);
+            VfxPlaybackRuntime.EmitterState second = Assert.Single(secondRuntime.Emitters);
+            foreach (VfxPlaybackRuntime.EmitterState source in new[] { first, second })
+            {
+                source.RenderGraphKey = graphKey;
+                source.RenderPath = "0.0";
+                source.RenderRank = 2;
+            }
+
+            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(
+                new[] { firstRuntime.Emitters, secondRuntime.Emitters },
+                Matrix4x4.Identity);
+
+            Assert.Same(first, queue[0].Emitter);
+            Assert.Same(second, queue[1].Emitter);
+            Assert.Equal(0.5f, VfxOpenGlRenderer.ResolveEmitterPhase(definition, 2f), precision: 5);
+            Assert.Equal(0f, VfxOpenGlRenderer.ResolveEmitterPhase(definition with { EmitterLifetime = null }, 2f));
         }
 
         [Fact]
@@ -1938,6 +2293,35 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ModernSphereIgnoresLegacyEmitOffsetAndTurnsVelocityWithItsRadialFrame()
+        {
+            var shape = new VfxSpawnShape(
+                VfxSpawnShapeKind.Sphere,
+                VfxCurve3.Const(new Vector3(1000f, 0f, 0f)),
+                new[] { Vector3.UnitZ },
+                new[] { VfxCurveF.Const(90f) },
+                Radius: 50f,
+                Flags: 0);
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                SpawnShape = shape,
+                BirthVelocity = VfxCurve3.Const(Vector3.UnitX)
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "sphere", "sphere", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+            Assert.InRange(particle.Pos.Length(), 49.999f, 50.001f);
+            Vector3 radial = Vector3.Normalize(particle.Pos);
+            Vector3 velocity = Vector3.Normalize(particle.Vel);
+            Assert.True(Vector3.Dot(radial, velocity) > 0.9999f);
+        }
+
+        [Fact]
         public void LegacySpawnRotationKeepsOffsetAndVelocityInTheSameFrameWithoutMovingNewborn()
         {
             var shape = new VfxSpawnShape(
@@ -1990,6 +2374,79 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(MathF.PI / 2f, state.Instances[15], precision: 5);
             Assert.Equal(0f, state.Instances[16], precision: 5);
             Assert.Equal(0f, state.Instances[17], precision: 5);
+        }
+
+        [Fact]
+        public void DirectionOrientedQuadStretchesItsLocalYAxis()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+                IsDirectionOriented = true,
+                BirthVelocity = VfxCurve3.Const(new Vector3(10f, 0f, 0f)),
+                DirectionVelocityScale = 2f,
+                DirectionVelocityMinScale = 1f
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "quad", "quad", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.Equal(2f, state.Instances[3], precision: 4);
+            Assert.Equal(60f, state.Instances[4], precision: 4);
+            Assert.Equal(4f, state.Instances[18], precision: 4);
+        }
+
+        [Fact]
+        public void DirectionOrientedMeshStretchesItsLocalZAxis()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = true,
+                PrimitiveKind = VfxPrimitiveKind.Mesh,
+                BirthVelocity = VfxCurve3.Const(new Vector3(10f, 0f, 0f)),
+                IsDirectionOriented = true,
+                DirectionVelocityScale = 2f,
+                DirectionVelocityMinScale = 1f
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "mesh", "mesh", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.Equal(2f, state.Instances[3], precision: 4);
+            Assert.Equal(3f, state.Instances[4], precision: 4);
+            Assert.Equal(80f, state.Instances[18], precision: 4);
+        }
+
+        [Fact]
+        public void LegacySimpleDirectionOrientedEmitterDoesNotVelocityStretch()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+                BirthVelocity = VfxCurve3.Const(new Vector3(10f, 0f, 0f)),
+                IsDirectionOriented = true,
+                DirectionVelocityScale = 2f,
+                DirectionVelocityMinScale = 1f,
+                AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasLegacySimple: true)
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "legacy", "legacy", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.Equal(2f, state.Instances[3], precision: 4);
+            Assert.Equal(3f, state.Instances[4], precision: 4);
+            Assert.Equal(4f, state.Instances[18], precision: 4);
         }
 
         [Fact]

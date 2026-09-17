@@ -26,6 +26,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
 
         public sealed class Bundle
         {
+            public string PrimaryBinPath { get; internal set; }
             public Dictionary<uint, VfxSystemDefinition> Systems { get; } = new();
             public Dictionary<uint, uint> ResourceMap { get; } = new();
             public Dictionary<uint, string> SystemSources { get; } = new();
@@ -74,6 +75,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         {
             var bundle = new Bundle();
             if (string.IsNullOrEmpty(skinBinPath) || !File.Exists(skinBinPath)) return bundle;
+            bundle.PrimaryBinPath = Path.GetFullPath(skinBinPath);
 
             try
             {

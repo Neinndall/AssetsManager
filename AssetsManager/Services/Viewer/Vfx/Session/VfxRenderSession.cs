@@ -22,9 +22,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
     /// </summary>
     public sealed class VfxRenderSession : IDisposable
     {
-        // LTK creates each Animation Clip particle cue with the same deterministic driver seed.
-        // Keep this separate from standalone/idle VFX seeds: cue playback is its own pipeline.
+        // LTK creates each Animation Clip particle cue and each idle effect with fixed,
+        // independent deterministic driver seeds.
         internal const int AnimationClipCueSeed = 7331;
+        internal const int IdleEffectSeed = 1337;
         private readonly LogService _logService;
         private readonly VfxLoadingService _loadingService;
         private readonly bool _ownsLoadingService;
@@ -270,7 +271,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 .ToDictionary(group => group.Key, group => group.First().Value, StringComparer.OrdinalIgnoreCase);
 
             double duration = Math.Max(0.1, animationDuration);
-            int graphIndex = 0;
 
             // 1. Instantiate Idle Effects (continuous character-anchored auras)
             if (idleEffects != null)
@@ -299,7 +299,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         resourceMap,
                         searchDirectory,
                         _worldTransform,
-                        HashCode.Combine(seed, graphIndex++),
+                        IdleEffectSeed,
                         _logService,
                         ownerSceneContext);
 
@@ -483,6 +483,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     }
                 }
 
+                if (_graphAttachments.TryGetValue(graph, out attachment) && attachment.IsIdleEffect)
+                {
+                    // LTK keeps an idle effect at the skeleton origin when its authored bone
+                    // cannot be resolved, while still applying the authored local position.
+                    Matrix4x4 fallback = IdleFallbackTransform(
+                        attachment.BaseTransform,
+                        attachment.LocalOffset,
+                        CurrentSkinScale,
+                        _worldTransform);
+                    Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(fallback.Translation) * _worldTransform;
+                    graph.SetTransform(fallback, orientationRoot);
+                    continue;
+                }
+
                 if (_graphPlacements.TryGetValue(graph, out var basePlacement))
                 {
                     Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(basePlacement.Translation) * _worldTransform;
@@ -495,6 +509,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             => _ownerSceneContext is { SkinScale: > 0f } context && float.IsFinite(context.SkinScale)
                 ? context.SkinScale
                 : 1f;
+
+        internal static Matrix4x4 IdleFallbackTransform(
+            Matrix4x4 baseTransform,
+            Vector3 localOffset,
+            float skinScale,
+            Matrix4x4 worldTransform)
+        {
+            float scale = skinScale > 0f && float.IsFinite(skinScale) ? skinScale : 1f;
+            return baseTransform * Matrix4x4.CreateTranslation(localOffset * scale) * worldTransform;
+        }
 
         private Matrix4x4 PrepareBoneTransform(Matrix4x4 transform)
         {

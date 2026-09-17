@@ -14,14 +14,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal const int VertexStride = VfxPlaybackRuntime.InstanceStride + 2;
         internal float[] Vertices { get; private set; } = Array.Empty<float>();
 
-        internal int Build(VfxPlaybackRuntime.EmitterState state, Vector3 cameraPosition)
+        internal int Build(VfxPlaybackRuntime.EmitterState state, Vector3 cameraPosition, int instanceCount = int.MaxValue)
         {
             VfxBeamDefinition beam = state.Def.Beam;
             // LTK's draw-kind contract suppresses the beam ribbon when mMesh is authored.
             // The same primitive does not fall through to mesh rendering, so this is intentionally blank.
-            if (beam is null || state.Def.SuppressesBeamRibbon || state.InstanceCount == 0) return 0;
+            int count = Math.Min(Math.Max(0, instanceCount), state.InstanceCount);
+            if (beam is null || state.Def.SuppressesBeamRibbon || count == 0) return 0;
 
-            int vertexCount = state.InstanceCount * 6;
+            int vertexCount = count * 6;
             int needed = vertexCount * VertexStride;
             if (Vertices.Length < needed) Vertices = new float[needed];
 
@@ -33,7 +34,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector3 axis = length > 1e-8f ? delta / length : Vector3.Zero;
 
             int written = 0;
-            for (int particle = 0; particle < state.InstanceCount; particle++)
+            for (int particle = 0; particle < count; particle++)
             {
                 int instance = particle * VfxPlaybackRuntime.InstanceStride;
                 float width = state.Instances[instance + 3];

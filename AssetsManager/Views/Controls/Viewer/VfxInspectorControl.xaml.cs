@@ -18,6 +18,7 @@ using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Composition;
+using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils;
@@ -60,6 +61,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
         /// <summary>Injected by the host (ViewerWindow) following the peer-controls pattern.</summary>
         public LogService LogService { get; set; }
+
+        /// <summary>Injected by the host and shared with the main Viewer model pipeline.</summary>
+        public SknLoadingService SknLoadingService { get; set; }
 
         /// <summary>Injected by the host and owned by ViewerWindow.</summary>
         public VfxLoadingService VfxLoadingService { get; set; }
@@ -391,6 +395,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_cameraController == null)
                 {
                     _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
+                    ResetCamera();
                 }
 
                 _model.LogMessages.Add("[GL] OpenGL viewport, camera controller & 3D grid initialized successfully.");
@@ -553,10 +558,56 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void ResetCamera()
         {
+            if (!_model.IsAnimationMode && _model.SelectedSystem?.Definition is { } definition &&
+                FitCameraToSystem(definition, _model.RigPreset))
+            {
+                return;
+            }
+
             _cameraController?.FlyTo(
                 VfxCameraPosition,
                 VfxCameraTarget - VfxCameraPosition,
                 VfxCameraUpDirection);
+        }
+
+        private bool FitCameraToSystem(VfxSystemDefinition definition, VfxRigPreset preset)
+        {
+            if (_cameraController == null || definition == null ||
+                _dummyViewport.Camera is not PerspectiveCamera camera)
+            {
+                return false;
+            }
+
+            VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(definition, preset);
+            var currentLook = camera.LookDirection;
+            var direction = new Vector3(
+                -(float)currentLook.X,
+                -(float)currentLook.Y,
+                -(float)currentLook.Z);
+            if (direction.LengthSquared() <= 1e-8f)
+            {
+                direction = new Vector3(
+                    (float)(VfxCameraPosition.X - VfxCameraTarget.X),
+                    (float)(VfxCameraPosition.Y - VfxCameraTarget.Y),
+                    (float)(VfxCameraPosition.Z - VfxCameraTarget.Z));
+            }
+
+            float aspect = OpenTkControl.ActualHeight > 0
+                ? (float)Math.Max(1d, OpenTkControl.ActualWidth) / (float)OpenTkControl.ActualHeight
+                : 1f;
+            VfxCameraFrame frame = VfxSystemBounds.FramePerspective(
+                bounds,
+                (float)camera.FieldOfView,
+                aspect,
+                direction);
+
+            var position = new Point3D(frame.Position.X, frame.Position.Y, frame.Position.Z);
+            var target = new Point3D(frame.Target.X, frame.Target.Y, frame.Target.Z);
+            Vector3D up = camera.UpDirection.LengthSquared > 1e-8
+                ? camera.UpDirection
+                : VfxCameraUpDirection;
+            _cameraController.FlyTo(position, target - position, up);
+            return true;
         }
 
         private void RigPreset_Click(object sender, RoutedEventArgs e)
@@ -585,6 +636,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     _vfxRenderer.Play();
                     _model.IsPlaying = true;
                     _model.CurrentTime = 0;
+                    if (!_model.IsAnimationMode && _model.SelectedSystem?.Definition is { } definition)
+                        FitCameraToSystem(definition, preset);
                 }
             }
         }
@@ -902,6 +955,7 @@ namespace AssetsManager.Views.Controls.Viewer
             string playbackContext = "standalone system";
             _vfxRenderer?.SetVfxSystem(systemModel);
             if (_vfxRenderer != null) _model.RigPreset = _vfxRenderer.RigPreset;
+            FitCameraToSystem(def, _model.RigPreset);
 
             double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(_model.RigPreset, def);
             double timelineMax = ResolveTimelineDuration(rigDuration);
@@ -933,7 +987,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 var emitterDiagnostic = new VfxEmitterDiagnosticItem
                 {
-                    Name = emitter.Name ?? "Emitter",
+                    Name = string.IsNullOrWhiteSpace(emitter.Name) ? "Emitter" : emitter.Name,
                     SourceOrder = emitterIndex,
                     IsEnabled = true,
                     IsSolo = false,
@@ -1020,10 +1074,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 string authored = _activeBundle?.OwnerSceneContext?.MeshPath;
                 string sknPath = ResolveSknPath(authored, searchDir);
 
-                if (!string.IsNullOrEmpty(sknPath) && File.Exists(sknPath))
+                if (!string.IsNullOrEmpty(sknPath) && File.Exists(sknPath) && SknLoadingService != null)
                 {
-                    var sknLoader = new SknLoadingService(LogService);
-                    var loaded = await sknLoader.LoadModel(sknPath);
+                    var loaded = await SknLoadingService.LoadModelWithSkinBin(
+                        sknPath,
+                        bundle?.PrimaryBinPath);
                     if (generation != _championLoadGeneration || !ReferenceEquals(bundle, _activeBundle) || _isCleanedUp)
                     {
                         loaded?.Dispose();

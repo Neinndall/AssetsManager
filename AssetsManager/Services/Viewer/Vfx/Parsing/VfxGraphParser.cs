@@ -204,7 +204,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_legacyScaleBias = HashAlgorithms.Fnv1a("scaleBias");
         private static readonly uint F_legacyRotation = HashAlgorithms.Fnv1a("rotation");
         private static readonly uint F_legacyLockedToEmitter = HashAlgorithms.Fnv1a("lockedToEmitter");
+        private static readonly uint F_legacyHasFixedOrbit = HashAlgorithms.Fnv1a("hasFixedOrbit");
+        private static readonly uint F_legacyFixedOrbitType = HashAlgorithms.Fnv1a("fixedOrbitType");
         private static readonly uint F_legacyOrientation = HashAlgorithms.Fnv1a("orientation");
+        private static readonly uint F_legacyParticleBind = HashAlgorithms.Fnv1a("particleBind");
         private static readonly uint F_legacyUvScrollRate = HashAlgorithms.Fnv1a("uvScrollRate");
         private static readonly uint F_legacyScaleUpFromOrigin = HashAlgorithms.Fnv1a("scaleUpFromOrigin");
         private static readonly uint F_shape = HashAlgorithms.Fnv1a("shape");
@@ -697,9 +700,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             foreach (uint listHash in EmitterLists)
             {
                 if (Get(o.Properties, listHash) is not BinTreeContainer c) continue;
+                bool simple = listHash == EmitterLists[1];
                 foreach (var el in c.Elements)
                     if (el is BinTreeStruct s && s.ClassHash == EmitterClass)
-                        emitters.Add(ParseEmitter(s));
+                        emitters.Add(ParseEmitter(s, simple));
             }
             float radius = GetF32(o.Properties, F_visibilityRadius) ?? 0f;
             Matrix4x4? transform = Get(o.Properties, F_transform) is BinTreeMatrix44 matrix
@@ -723,27 +727,37 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 buildUpTime);
         }
 
-        private static VfxEmitterDefinition ParseEmitter(BinTreeStruct s)
+        private static VfxEmitterDefinition ParseEmitter(BinTreeStruct s, bool isSimpleEmitter)
         {
             var p = s.Properties;
 
             var legacy = Get(p, F_legacySimple) as BinTreeStruct;
-            var legacyBirthScale = legacy is null ? null : ReadCurveF(legacy.Properties, F_legacyBirthScale);
+            var legacyBirthScale = legacy is null ? null : ReadCurveF(legacy.Properties, F_legacyBirthScale, 1f);
             Vector2 legacyScaleBias = legacy is null
                 ? Vector2.One
                 : GetVec2(legacy.Properties, F_legacyScaleBias) ?? Vector2.One;
-            VfxCurveF? legacyScaleCurve = legacy is null ? null : ReadCurveF(legacy.Properties, F_legacyScale);
+            VfxCurveF? legacyScaleCurve = legacy is null ? null : ReadCurveF(legacy.Properties, F_legacyScale, 1f);
             VfxCurveF? legacyRotationCurve = legacy is null ? null : ReadCurveF(legacy.Properties, F_legacyRotation);
             bool legacyLockedToEmitter = legacy is not null && GetBool(legacy.Properties, F_legacyLockedToEmitter);
-            byte legacyOrientation = legacy is null ? (byte)0 : (byte)(GetU8(legacy.Properties, F_legacyOrientation) ?? 0);
+            bool legacyHasFixedOrbit = legacy is not null && GetBool(legacy.Properties, F_legacyHasFixedOrbit);
+            int legacyFixedOrbitRaw = legacy is null ? 1 : GetU8(legacy.Properties, F_legacyFixedOrbitType) ?? 1;
+            byte legacyFixedOrbitType = legacyFixedOrbitRaw is >= 0 and <= 5
+                ? (byte)legacyFixedOrbitRaw
+                : (byte)1;
+            byte legacyOrientation = legacy is null
+                ? (byte)0
+                : NormalizeEnumByte(GetU8(legacy.Properties, F_legacyOrientation), 3, 0);
+            Vector2 legacyParticleBind = legacy is null
+                ? Vector2.Zero
+                : GetVec2(legacy.Properties, F_legacyParticleBind) ?? Vector2.Zero;
             Vector2 legacyUvScroll = legacy is null
                 ? Vector2.Zero
                 : GetVec2(legacy.Properties, F_legacyUvScrollRate) ?? Vector2.Zero;
             bool legacyScaleUpFromOrigin = legacy is not null && GetBool(legacy.Properties, F_legacyScaleUpFromOrigin);
-            var birthScale = ReadCurve3(p, F_birthScale0)
+            var birthScale = ReadCurve3(p, F_birthScale0, Vector3.One)
                 ?? (legacyBirthScale is { } lbs ? ScalarSizeCurve(lbs) : VfxCurve3.Const(Vector3.One));
             var birthScale1 = ReadCurve3(p, F_birthScale1);
-            var scaleOverLife = ReadCurve3(p, F_scale0);
+            var scaleOverLife = ReadCurve3(p, F_scale0, Vector3.One);
             if (scaleOverLife is null && legacyScaleCurve is { } legacyScale)
                 scaleOverLife = ScalarScaleCurve(legacyScale);
             var birthRotation = ReadCurve3(p, F_birthRotation);
@@ -793,7 +807,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 else
                 {
                     string simpleMesh = ReadAsset(md.Properties, F_simpleMesh, ".scb");
-                    if (!IsNoMeshPath(simpleMesh)) meshPath = simpleMesh;
+                    if (!IsNoMeshPath(simpleMesh) && IsSupportedSimpleMeshPath(simpleMesh))
+                        meshPath = simpleMesh;
                 }
 
                 meshAnm = ReadAsset(md.Properties, F_meshAnim, ".anm");
@@ -809,15 +824,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     .ToArray();
             }
             if (primitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail &&
-                prim is BinTreeStruct trailPrimitive &&
-                Get(trailPrimitive.Properties, F_trailDefinition) is BinTreeStruct trailData)
+                prim is BinTreeStruct trailPrimitive)
             {
+                IReadOnlyDictionary<uint, BinTreeProperty> tp =
+                    Get(trailPrimitive.Properties, F_trailDefinition) is BinTreeStruct trailData
+                        ? trailData.Properties
+                        : new Dictionary<uint, BinTreeProperty>();
                 trail = new VfxTrailDefinition(
-                    ReadCurve3(trailData.Properties, F_trailBirthTilingSize) ?? VfxCurve3.Const(Vector3.Zero),
-                    GetU8(trailData.Properties, F_trailSmoothingMode) ?? 0,
-                    GetU8(trailData.Properties, F_trailMode) ?? 0,
-                    GetI32(trailData.Properties, F_trailMaxAddedPerFrame) ?? 0,
-                    GetF32(trailData.Properties, F_trailCutoff) ?? 0f);
+                    ReadCurve3(tp, F_trailBirthTilingSize) ?? VfxCurve3.Const(Vector3.Zero),
+                    NormalizeEnumByte(GetU8(tp, F_trailSmoothingMode), 2, 0),
+                    NormalizeEnumByte(GetU8(tp, F_trailMode), 1, 0),
+                    GetI32(tp, F_trailMaxAddedPerFrame) ?? 0,
+                    GetF32(tp, F_trailCutoff) ?? 0f);
             }
             if (primitiveKind is VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam &&
                 prim is BinTreeStruct beamPrimitive)
@@ -827,8 +845,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                         ? beamData.Properties
                         : new Dictionary<uint, BinTreeProperty>();
                 beam = new VfxBeamDefinition(
-                    GetU8(bp, F_trailMode) ?? GetI32(bp, F_trailMode) ?? 0,
-                    GetU8(bp, F_beamTrailMode) ?? GetI32(bp, F_beamTrailMode) ?? 0,
+                    NormalizeEnumByte(GetU8(bp, F_trailMode) ?? GetI32(bp, F_trailMode), 1, 0),
+                    NormalizeEnumByte(GetU8(bp, F_beamTrailMode) ?? GetI32(bp, F_beamTrailMode), 1, 0),
                     GetI32(bp, F_beamSegments) ?? GetU16(bp, F_beamSegments) ?? GetU8(bp, F_beamSegments) ?? 0,
                     ReadCurve3(bp, F_trailBirthTilingSize) ?? VfxCurve3.Const(Vector3.Zero),
                     ReadCurve4(bp, F_beamColor) ?? VfxCurve4.Const(Vector4.One),
@@ -860,11 +878,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 textureMultUvScroll = textureMultBirthUvScroll?.Constant ?? Vector2.Zero;
                 textureMultBirthUvOffset = ReadCurve2(textureMult.Properties, F_birthUvOffsetMult);
                 textureMultParticleUvScroll = ReadCurve2(textureMult.Properties, F_particleUvScrollMult);
-                textureMultUvScale = ReadCurve2(textureMult.Properties, F_uvScaleMult);
+                textureMultUvScale = ReadCurve2(textureMult.Properties, F_uvScaleMult, Vector2.One);
                 textureMultUvRotation = ReadCurveF(textureMult.Properties, F_uvRotationMult);
                 textureMultBirthUvRotate = ReadCurveF(textureMult.Properties, F_birthUvRotateMult);
                 textureMultParticleUvRotate = ReadCurveF(textureMult.Properties, F_particleUvRotateMult);
-                textureMultAddressMode = GetU8(textureMult.Properties, F_texAddressMult) ?? 0;
+                textureMultAddressMode = NormalizeEnumByte(
+                    GetU8(textureMult.Properties, F_texAddressMult),
+                    maxInclusive: 3,
+                    fallback: 0);
                 textureMultFlipV = GetBool(textureMult.Properties, F_textureMultFlipV);
                 textureMultFlipU = GetBool(textureMult.Properties, F_textureMultFlipU);
                 textureMultTransformCenter =
@@ -901,14 +922,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 };
                 alphaErosion = new VfxAlphaErosionDefinition(
                     ReadAsset(ep, F_erosionMapName, ".tex"),
-                    ReadCurveF(ep, F_erosionDriveCurve) ?? VfxCurveF.Const(1f),
+                    ReadCurveF(ep, F_erosionDriveCurve, 1f) ?? VfxCurveF.Const(1f),
                     GetF32(ep, F_erosionFeatherIn) ?? 0.1f,
                     GetF32(ep, F_erosionFeatherOut) ?? 0.1f,
                     samplerAddress,
-                    ReadCurve4(ep, F_erosionMapChannelMixer),
+                    ReadCurve4(ep, F_erosionMapChannelMixer, new Vector4(0f, 0f, 0f, 1f))
+                        ?? VfxCurve4.Const(new Vector4(0f, 0f, 0f, 1f)),
                     GetF32(ep, F_erosionSliceWidth) ?? 1.5f,
                     GetBool(ep, F_useLingerErosionDrive)
-                        ? ReadCurveF(ep, F_lingerErosionDrive) ?? VfxCurveF.Const(1f)
+                        ? ReadCurveF(ep, F_lingerErosionDrive, 1f) ?? VfxCurveF.Const(1f)
                         : null,
                     GetF32(ep, F_erosionDriveSource) ?? 0f);
             }
@@ -940,10 +962,33 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             }
 
             bool isSingle = GetBool(p, F_isSingle);
+            byte blendMode = NormalizeEnumByte(
+                GetU8(p, F_blendMode) ?? (int?)(AsU32(Get(p, F_blendMode))),
+                maxInclusive: 8,
+                fallback: (byte)VfxAuthoredDefaults.BlendMode);
+            byte stencilMode = NormalizeEnumByte(
+                GetU8(p, F_stencilMode),
+                maxInclusive: 4,
+                fallback: VfxAuthoredDefaults.StencilMode);
+            byte stencilReference = stencilMode == 0
+                ? (byte)0
+                : (byte)(GetU8(p, F_stencilRef) ?? VfxAuthoredDefaults.StencilReference);
+            byte textureAddressMode = NormalizeEnumByte(GetU8(p, F_texAddress), 3, 0);
+            byte colorLookupX = NormalizeEnumByte(
+                GetU8(p, F_colorLookUpX),
+                maxInclusive: 3,
+                fallback: VfxAuthoredDefaults.ColorLookUpTypeX);
+            byte colorLookupY = NormalizeEnumByte(
+                GetU8(p, F_colorLookUpY),
+                maxInclusive: 3,
+                fallback: VfxAuthoredDefaults.ColorLookUpTypeY);
+            byte lingerType = NormalizeEnumByte(GetU8(p, F_particleLingerType), 2, 0);
+            byte uvMode = NormalizeEnumByte(GetU8(p, F_uvMode), 5, 0);
+
             return new VfxEmitterDefinition(
-                Name: GetString(p, F_emitterName) ?? "(emitter)",
-                Rate: ReadCurveF(p, F_rate) ?? (isSingle ? VfxCurveF.Zero : VfxCurveF.Const(1f)),
-                ParticleLifetime: ReadCurveF(p, F_particleLife) ?? VfxCurveF.Const(1f),
+                Name: GetString(p, F_emitterName) ?? string.Empty,
+                Rate: ReadCurveF(p, F_rate) ?? VfxCurveF.Zero,
+                ParticleLifetime: ReadCurveF(p, F_particleLife, 3f) ?? VfxCurveF.Const(3f),
                 EmitterLifetime: GetOptionalF32(p, F_lifetime),
                 ParticleLinger: GetOptionalF32(p, F_particleLinger) ?? 0f,
                 TimeBeforeFirstEmission: GetF32(p, F_timeBefore) ?? 0f,
@@ -952,7 +997,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 RateIsPeriod: GetBool(p, F_rateIsPeriod),
                 BirthTimePeriod: GetF32(p, F_birthTimePeriod) ?? 0f,
                 IsLoop: GetBool(p, F_isLoop),
-                BlendMode: GetU8(p, F_blendMode) ?? (byte?)(AsU32(Get(p, F_blendMode))) ?? VfxAuthoredDefaults.BlendMode,
+                BlendMode: blendMode,
                 BirthScale: birthScale,
                 ScaleOverLife: scaleOverLife,
                 BirthColor: birthColor,
@@ -986,7 +1031,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 BirthRotation: birthRotation,
                 IsDirectionOriented: GetBool(p, F_direction),
                 IsArbitraryQuad: isArbitraryQuad,
-                BirthFrameRate: ReadCurveF(p, F_birthFrameRate),
+                BirthFrameRate: ReadCurveF(p, F_birthFrameRate, 1f),
                 FrameRate: GetF32(p, F_frameRate),
                 TextureMultPath: textureMultPath,
                 TextureMultTexDiv: textureMultTexDiv,
@@ -995,19 +1040,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 UseTextureAspect: legacy is not null,
                 Distortion: distortion,
                 ParticleColorTexturePath: ReadAsset(p, F_particleColorTex, ".tex"),
-                ColorLookUpTypeX: GetU8(p, F_colorLookUpX) ?? VfxAuthoredDefaults.ColorLookUpTypeX,
-                ColorLookUpTypeY: GetU8(p, F_colorLookUpY) ?? VfxAuthoredDefaults.ColorLookUpTypeY,
+                ColorLookUpTypeX: colorLookupX,
+                ColorLookUpTypeY: colorLookupY,
                 RenderState: new VfxEmitterRenderState(
                     RenderPass: GetI16(p, F_renderPass) ?? 0,
                     AlphaReference: (byte)(GetU8(p, F_alphaRef) ?? VfxAuthoredDefaults.AlphaReference),
-                    TextureAddressMode: GetU8(p, F_texAddress) ?? 0,
+                    TextureAddressMode: textureAddressMode,
                     ClampUvScroll: GetBool(p, F_uvScrollClamp),
                     FlipU: GetBool(p, F_textureFlipU),
                     FlipV: GetBool(p, F_textureFlipV),
                     DisableBackfaceCull: GetBool(p, F_disableCull),
                     RenderPhase: (byte)(GetU8(p, F_renderPhaseOverride) ?? VfxAuthoredDefaults.RenderPhaseOverride),
-                    StencilMode: (byte)(GetU8(p, F_stencilMode) ?? VfxAuthoredDefaults.StencilMode),
-                    StencilReference: (byte)(GetU8(p, F_stencilRef) ?? VfxAuthoredDefaults.StencilReference),
+                    StencilMode: stencilMode,
+                    StencilReference: stencilReference,
                     StencilReferenceId: AsU32(Get(p, F_stencilReferenceId)) ?? 0u,
                     WriteAlphaOnly: GetBool(p, F_writeAlphaOnly),
                     SortEmittersByPosition: GetBool(p, F_sortEmittersByPos)),
@@ -1020,12 +1065,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 VelocityOverLife: ReadCurve3(p, F_velocity),
                 RotationOverLife: ReadCurve3(p, F_rotation),
                 BirthUvOffset: ReadCurve2(p, F_birthUvOffset),
-                UvScale: ReadCurve2(p, F_uvScale),
+                UvScale: ReadCurve2(p, F_uvScale, Vector2.One),
                 UvRotation: ReadCurveF(p, F_uvRotation),
                 AlphaErosion: alphaErosion,
                 ChildParticleSet: childParticleSet,
                 Fields: fields,
-                ParticleLingerType: (byte)(GetU8(p, F_particleLingerType) ?? 0),
+                ParticleLingerType: lingerType,
                 EmitterLinger: GetOptionalF32(p, F_emitterLinger) ?? 0f,
                 IsEmitterSpace: legacyLockedToEmitter || GetBool(p, F_isEmitterSpace),
                 IsLocalOrientation: GetBool(p, F_isLocalOrientation, defaultValue: true),
@@ -1065,7 +1110,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 Importance: (byte)(GetU8(p, F_importance) ?? VfxAuthoredDefaults.Importance),
                 BirthScale1: birthScale1,
                 Rotation1: ReadCurve3(p, F_rotation1),
-                UvMode: (byte)(GetU8(p, F_uvMode) ?? 0),
+                UvMode: uvMode,
                 BindWeight: legacyLockedToEmitter ? VfxCurveF.Const(1f) : ReadCurveF(p, F_bindWeight),
                 FlexShape: flexShape,
                 PaletteDefinition: palette,
@@ -1081,17 +1126,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 LegacyOrientation: legacyOrientation,
                 LegacyScaleUpFromOrigin: legacyScaleUpFromOrigin,
                 LegacyLockedToEmitter: legacyLockedToEmitter,
+                LegacyHasFixedOrbit: legacyHasFixedOrbit,
+                LegacyFixedOrbitType: legacyFixedOrbitType,
+                LegacyParticleBind: legacyParticleBind,
                 DepthPushPull: GetF32(p, F_depthPushPull) ?? 0f,
                 Beam: beam,
                 Linger: linger,
+                IsSimpleEmitter: isSimpleEmitter,
                 SubmeshesToDraw: submeshesToDraw,
                 SubmeshesToDrawAlways: submeshesToDrawAlways,
                 AttachedSubmeshHashes: attachedSubmeshHashes,
                 AuthoredFeatures: new VfxEmitterAuthoredFeatures(
                     PrimitiveClassHash: primitiveClass,
                     HasCustomMaterial: HasValue(p, F_customMaterial),
-                    HasStencil: (GetU8(p, F_stencilMode) ?? 0) != 0 ||
-                        (GetU8(p, F_stencilRef) ?? 0) != 0 ||
+                    HasStencil: stencilMode != 0 ||
                         (AsU32(Get(p, F_stencilReferenceId)) ?? 0u) != 0,
                     HasEmissionMesh: HasValue(p, F_emissionMeshName),
                     HasEmissionSurface: HasValue(p, F_emissionSurfaceDefinition),
@@ -1099,7 +1147,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     HasTranslationOverride: HasValue(p, F_translationOverride),
                     HasRotationOverride: HasValue(p, F_rotationOverride),
                     HasScaleOverride: HasValue(p, F_scaleOverride),
-                    HasPeriodControl: HasValue(p, F_period) || HasValue(p, F_timeActiveDuringPeriod)));
+                    HasPeriodControl: HasValue(p, F_period) || HasValue(p, F_timeActiveDuringPeriod),
+                    HasLegacySimple: legacy is not null));
         }
 
         private static bool HasValue(IReadOnlyDictionary<uint, BinTreeProperty> properties, uint fieldHash)
@@ -1139,7 +1188,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 ? ReadCurve3(p, F_lingerRotation) ?? VfxCurve3.Const(Vector3.Zero)
                 : null;
             VfxCurve3? scale = GetBool(p, F_useLingerScale)
-                ? ReadCurve3(p, F_lingerScale) ?? VfxCurve3.Const(Vector3.One)
+                ? ReadCurve3(p, F_lingerScale, Vector3.One) ?? VfxCurve3.Const(Vector3.One)
                 : null;
             VfxCurve4? color = GetBool(p, F_useLingerColor)
                 ? ReadCurve4(p, F_lingerColor) ?? VfxCurve4.Const(Vector4.One)
@@ -1160,16 +1209,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             IReadOnlyDictionary<uint, BinTreeProperty> emitterProperties)
         {
             if (Get(emitterProperties, F_paletteDefinition) is not BinTreeStruct palette) return null;
-            VfxCurve4? sourceMixColor = ReadCurve4(palette.Properties, F_paletteSourceMixColor)
-                ?? ReadCurve4(palette.Properties, F_palleteSourceMixColor);
+            Vector4 luma = new(0.299f, 0.587f, 0.114f, 0f);
+            VfxCurve4? sourceMixColor = ReadCurve4(palette.Properties, F_paletteSourceMixColor, luma)
+                ?? ReadCurve4(palette.Properties, F_palleteSourceMixColor, luma);
             return new VfxPaletteDefinition(
-                Math.Max(1, GetI32(palette.Properties, F_paletteCount) ?? 1),
+                GetI32(palette.Properties, F_paletteCount) ?? 1,
                 ReadCurve3(palette.Properties, F_paletteSelector) ?? VfxCurve3.Const(Vector3.Zero),
                 ReadAsset(palette.Properties, F_paletteTexture, ".tex"),
-                sourceMixColor?.Constant ?? new Vector4(0.299f, 0.587f, 0.114f, 0f),
+                sourceMixColor?.Sample(0f) ?? luma,
                 ReadCurveF(palette.Properties, F_paletteScrollU) ?? VfxCurveF.Zero,
                 ReadCurveF(palette.Properties, F_paletteScrollV) ?? VfxCurveF.Zero,
-                GetU8(palette.Properties, F_paletteAddressMode) ?? 1);
+                NormalizeEnumByte(GetU8(palette.Properties, F_paletteAddressMode), 3, 1));
         }
 
         private static IReadOnlyList<string> ReadStringContainer(BinTreeProperty property)
@@ -1201,7 +1251,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             var acceleration = ReadStructContainer(fieldData.Properties, F_fieldAccelerationDefinitions)
                 .Select(value => new VfxAccelerationField(
                     ReadCurve3(value.Properties, F_accel) ?? VfxCurve3.Const(Vector3.Zero),
-                    GetBool(value.Properties, F_isLocalSpace))).ToArray();
+                    GetBool(value.Properties, F_isLocalSpace, defaultValue: true))).ToArray();
             var attraction = ReadStructContainer(fieldData.Properties, F_fieldAttractionDefinitions)
                 .Select(value => new VfxAttractionField(
                     ReadCurveF(value.Properties, F_accel) ?? VfxCurveF.Zero,
@@ -1214,15 +1264,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     ReadCurveF(value.Properties, F_radius) ?? VfxCurveF.Zero)).ToArray();
             var orbital = ReadStructContainer(fieldData.Properties, F_fieldOrbitalDefinitions)
                 .Select(value => new VfxOrbitalField(
-                    ReadCurve3(value.Properties, F_directionField) ?? VfxCurve3.Const(Vector3.Zero),
-                    GetBool(value.Properties, F_isLocalSpace))).ToArray();
+                    ReadCurve3(value.Properties, F_directionField, Vector3.UnitY) ?? VfxCurve3.Const(Vector3.UnitY),
+                    GetBool(value.Properties, F_isLocalSpace, defaultValue: true))).ToArray();
             var noise = ReadStructContainer(fieldData.Properties, F_fieldNoiseDefinitions)
                 .Select(value => new VfxNoiseField(
                     ReadCurveF(value.Properties, F_frequency) ?? VfxCurveF.Zero,
                     ReadCurveF(value.Properties, F_velocityDelta) ?? VfxCurveF.Zero,
                     ReadCurve3(value.Properties, F_position) ?? VfxCurve3.Const(Vector3.Zero),
                     ReadCurveF(value.Properties, F_radius) ?? VfxCurveF.Zero,
-                    AsVec3(Get(value.Properties, F_axisFraction)) ?? Vector3.One)).ToArray();
+                    AsVec3(Get(value.Properties, F_axisFraction)) ?? Vector3.Zero)).ToArray();
+            if (acceleration.Length == 0 && attraction.Length == 0 && drag.Length == 0 && orbital.Length == 0 && noise.Length == 0)
+                return null;
             return new VfxFieldCollectionDefinition(acceleration, attraction, drag, orbital, noise);
         }
 
@@ -1260,10 +1312,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 }
             }
 
+            // LTK keeps boneToSpawnAt positional and parallel to childrenIdentifiers.
+            // Preserve empty string slots: dropping one would shift every child after it.
             IReadOnlyList<string> bones = Get(childData.Properties, F_boneToSpawnAt) is BinTreeContainer boneList
                 ? boneList.Elements.OfType<BinTreeString>()
                     .Select(static value => value.Value)
-                    .Where(static value => !string.IsNullOrWhiteSpace(value))
                     .ToArray()
                 : Array.Empty<string>();
 
@@ -1278,7 +1331,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return new VfxChildParticleSetDefinition(
                 children,
                 GetBool(childData.Properties, F_childEmitOnDeath),
-                ReadCurveF(childData.Properties, F_childrenProbability) ?? VfxCurveF.Const(1f),
+                // childrenProbability is a zero-based child index, not a weight. Its schema
+                // default is zero, so an omitted curve must select the first child.
+                ReadCurveF(childData.Properties, F_childrenProbability) ?? VfxCurveF.Zero,
                 relativeOffset,
                 inheritanceMode,
                 bones);
@@ -1353,60 +1408,76 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             if (prop is not BinTreeContainer c || c.Elements.Count == 0) return Array.Empty<VfxCurveF>();
             var values = new List<VfxCurveF>(c.Elements.Count);
             foreach (var el in c.Elements)
-                if (ReadCurveFProperty(el) is { } value) values.Add(value);
+            {
+                // LTK's curves() preserves one slot per container element and substitutes
+                // DEFAULT.zero when an item cannot be read as a ValueFloat.
+                values.Add(ReadCurveFProperty(el) ?? VfxCurveF.Zero);
+            }
             return values;
         }
 
-        private static VfxCurveF? ReadCurveF(IReadOnlyDictionary<uint, BinTreeProperty> p, uint field)
+        private static VfxCurveF? ReadCurveF(
+            IReadOnlyDictionary<uint, BinTreeProperty> p,
+            uint field,
+            float structFallback = 0f)
         {
-            return p.TryGetValue(field, out var prop) ? ReadCurveFProperty(prop) : null;
+            return p.TryGetValue(field, out var prop) ? ReadCurveFProperty(prop, structFallback) : null;
         }
 
-        private static VfxCurveF? ReadCurveFProperty(BinTreeProperty prop)
+        private static VfxCurveF? ReadCurveFProperty(BinTreeProperty prop, float structFallback = 0f)
         {
             if (prop is BinTreeStruct v)
             {
-                float c = AsF32(Get(v.Properties, F_constantValue)) ?? 0f;
+                float c = AsF32(Get(v.Properties, F_constantValue)) ?? structFallback;
                 var (times, vals) = ReadDynamics(v.Properties, AsF32);
                 return new VfxCurveF(c, times, vals, ReadNestedProbTables(v.Properties));
             }
             return AsF32(prop) is { } scalar ? VfxCurveF.Const(scalar) : null;
         }
 
-        private static VfxCurve3? ReadCurve3(IReadOnlyDictionary<uint, BinTreeProperty> p, uint field)
+        private static VfxCurve3? ReadCurve3(
+            IReadOnlyDictionary<uint, BinTreeProperty> p,
+            uint field,
+            Vector3? structFallback = null)
         {
-            return p.TryGetValue(field, out var prop) ? ReadCurve3Property(prop) : null;
+            return p.TryGetValue(field, out var prop) ? ReadCurve3Property(prop, structFallback) : null;
         }
 
-        private static VfxCurve2? ReadCurve2(IReadOnlyDictionary<uint, BinTreeProperty> p, uint field)
+        private static VfxCurve2? ReadCurve2(
+            IReadOnlyDictionary<uint, BinTreeProperty> p,
+            uint field,
+            Vector2? structFallback = null)
         {
             if (!p.TryGetValue(field, out var prop)) return null;
             if (prop is BinTreeStruct value)
             {
-                var constant = AsVec2(Get(value.Properties, F_constantValue)) ?? Vector2.Zero;
+                var constant = AsVec2(Get(value.Properties, F_constantValue)) ?? structFallback ?? Vector2.Zero;
                 var (times, values) = ReadDynamics(value.Properties, AsVec2);
                 return new VfxCurve2(constant, times, values, ReadNestedProbTables(value.Properties));
             }
             return AsVec2(prop) is { } vector ? VfxCurve2.Const(vector) : null;
         }
 
-        private static VfxCurve3? ReadCurve3Property(BinTreeProperty prop)
+        private static VfxCurve3? ReadCurve3Property(BinTreeProperty prop, Vector3? structFallback = null)
         {
             if (prop is BinTreeStruct v)
             {
-                var c = AsVec3(Get(v.Properties, F_constantValue)) ?? Vector3.Zero;
+                var c = AsVec3(Get(v.Properties, F_constantValue)) ?? structFallback ?? Vector3.Zero;
                 var (times, vals) = ReadDynamics(v.Properties, AsVec3);
                 return new VfxCurve3(c, times, vals, ReadNestedProbTables(v.Properties));
             }
             return AsVec3(prop) is { } vector ? VfxCurve3.Const(vector) : null;
         }
 
-        private static VfxCurve4? ReadCurve4(IReadOnlyDictionary<uint, BinTreeProperty> p, uint field)
+        private static VfxCurve4? ReadCurve4(
+            IReadOnlyDictionary<uint, BinTreeProperty> p,
+            uint field,
+            Vector4? structFallback = null)
         {
             if (!p.TryGetValue(field, out var prop)) return null;
             if (prop is BinTreeStruct v)
             {
-                var c = AsVec4(Get(v.Properties, F_constantValue)) ?? Vector4.One;
+                var c = AsVec4(Get(v.Properties, F_constantValue)) ?? structFallback ?? Vector4.One;
                 var (times, vals) = ReadDynamics(v.Properties, AsVec4);
                 return new VfxCurve4(c, times, vals, ReadNestedProbTables(v.Properties));
             }
@@ -1522,16 +1593,34 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return fileName.StartsWith("doesnotexist.", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static bool IsSupportedSimpleMeshPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+            string extension = Path.GetExtension(path);
+            return extension.Equals(".scb", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".tmesh", StringComparison.OrdinalIgnoreCase) ||
+                   extension.Equals(".gmesh", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static byte NormalizeEnumByte(int? value, int maxInclusive, byte fallback)
+            => value is >= 0 && value <= maxInclusive ? (byte)value.Value : fallback;
+
         private static float? GetF32(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash) => AsF32(Get(p, hash));
 
         private static float? GetOptionalF32(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
             => Get(p, hash) is BinTreeOptional o ? AsF32(o.Value) : AsF32(Get(p, hash));
 
         private static int? GetU8(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
-            => Get(p, hash) is BinTreeU8 u ? u.Value : null;
+        {
+            long? value = AsInteger(Get(p, hash));
+            return value is >= byte.MinValue and <= byte.MaxValue ? (int)value.Value : null;
+        }
 
         private static int? GetU16(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
-            => Get(p, hash) is BinTreeU16 u ? u.Value : null;
+        {
+            long? value = AsInteger(Get(p, hash));
+            return value is >= ushort.MinValue and <= ushort.MaxValue ? (int)value.Value : null;
+        }
 
         private static Vector2? GetVec2(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
             => Get(p, hash) is BinTreeVector2 v ? v.Value : null;
@@ -1558,8 +1647,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static float? AsF32(BinTreeProperty p) => p switch
         {
             BinTreeF32 f => f.Value,
+            BinTreeI8 i => i.Value,
             BinTreeU8 u => u.Value,
+            BinTreeI16 i => i.Value,
             BinTreeU16 u => u.Value,
+            BinTreeI32 i => i.Value,
+            BinTreeU32 u => u.Value,
+            BinTreeI64 i => i.Value,
+            BinTreeU64 u => u.Value,
+            _ => null
+        };
+
+        private static long? AsInteger(BinTreeProperty p) => p switch
+        {
+            BinTreeI8 i => i.Value,
+            BinTreeU8 u => u.Value,
+            BinTreeI16 i => i.Value,
+            BinTreeU16 u => u.Value,
+            BinTreeI32 i => i.Value,
+            BinTreeU32 u => u.Value,
+            BinTreeI64 i => i.Value,
+            BinTreeU64 u when u.Value <= long.MaxValue => (long)u.Value,
             _ => null
         };
 
@@ -1597,10 +1705,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         };
 
         private static int? GetI16(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
-            => Get(p, hash) is BinTreeI16 value ? value.Value : null;
+        {
+            long? value = AsInteger(Get(p, hash));
+            return value is >= short.MinValue and <= short.MaxValue ? (int)value.Value : null;
+        }
 
         private static int? GetI32(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
-            => Get(p, hash) is BinTreeI32 value ? value.Value : null;
+        {
+            long? value = AsInteger(Get(p, hash));
+            return value is >= int.MinValue and <= int.MaxValue ? (int)value.Value : null;
+        }
 
     }
 }

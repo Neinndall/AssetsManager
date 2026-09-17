@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Hashing;
 
@@ -22,6 +23,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private readonly Dictionary<VfxPlaybackRuntime, int> _depth = new();
         private readonly Dictionary<VfxPlaybackRuntime, Matrix4x4> _localTransforms = new();
         private readonly Dictionary<VfxPlaybackRuntime, string> _paths = new();
+        private readonly Dictionary<(string Path, int SourceOrder), int> _renderRanks = new();
         private readonly Dictionary<(VfxPlaybackRuntime Parent, int SourceOrder, uint Serial), List<CarriedChildInfo>> _carriedChildren = new();
         private readonly int _initialSeed;
         private Matrix4x4 _rootTransform;
@@ -80,9 +82,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _initialSeed = seed;
             _rootTransform = rootTransform;
             _orientationRootTransform = rootTransform;
+            BuildRenderRanks(rootDefinition);
 
             Root = CreateRuntime(rootDefinition, Matrix4x4.Identity, 0, string.Empty, seed);
             _runtimes.Add(Root);
+            SyncRenderTimes();
         }
 
         public VfxPlaybackRuntime Root { get; }
@@ -197,6 +201,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             Root.ParticleUpdated += OnParticleUpdated;
             Root.Reset();
             Root.WarmUp();
+            SyncRenderTimes();
         }
 
         internal Snapshot CaptureSnapshot()
@@ -331,6 +336,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
                         emitter.IsVisible = false;
             }
+            SyncRenderTimes();
         }
 
         private VfxPlaybackRuntime RestoreRuntime(RuntimeSnapshot saved)
@@ -405,6 +411,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Forget(runtime);
                 _runtimes.RemoveAt(index);
             }
+
+            SyncRenderTimes();
+        }
+
+        private void SyncRenderTimes()
+        {
+            float now = Root?.CurrentTime ?? 0f;
+            foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
+                foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+                    emitter.RenderTime = now;
         }
 
         private VfxPlaybackRuntime CreateRuntime(
@@ -441,12 +457,60 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return runtime;
         }
 
+        private void BuildRenderRanks(VfxSystemDefinition rootDefinition)
+        {
+            _renderRanks.Clear();
+            int nextRank = 0;
+            CollectRenderRanks(rootDefinition, string.Empty, depth: 0, ref nextRank);
+        }
+
+        private void CollectRenderRanks(
+            VfxSystemDefinition definition,
+            string path,
+            int depth,
+            ref int nextRank)
+        {
+            if (definition is null || depth > MaximumGraphDepth) return;
+
+            int[] localOrder = Enumerable.Range(0, definition.Emitters.Count).ToArray();
+            Array.Sort(localOrder, (left, right) => VfxDrawOrderSemantics.Compare(
+                definition.Emitters[left],
+                left,
+                definition.Emitters[right],
+                right));
+            foreach (int sourceOrder in localOrder)
+                _renderRanks[(path ?? string.Empty, sourceOrder)] = nextRank++;
+
+            if (depth >= MaximumGraphDepth) return;
+            for (int sourceOrder = 0; sourceOrder < definition.Emitters.Count; sourceOrder++)
+            {
+                VfxEmitterDefinition emitter = definition.Emitters[sourceOrder];
+                VfxChildParticleSetDefinition childSet = emitter.ChildParticleSet;
+                if (emitter.Disabled || childSet is null || childSet.Children.Count == 0) continue;
+
+                for (int slot = 0; slot < childSet.Children.Count; slot++)
+                {
+                    VfxChildSystemReference child = childSet.Children[slot];
+                    VfxSystemDefinition childDefinition = ResolveSystem(child, _systems, _resourceMap);
+                    if (childDefinition is null) continue;
+
+                    string emitterPath = string.IsNullOrEmpty(path)
+                        ? sourceOrder.ToString()
+                        : $"{path}/{sourceOrder}";
+                    string childPath = $"{emitterPath}.{slot}";
+                    CollectRenderRanks(childDefinition, childPath, depth + 1, ref nextRank);
+                }
+            }
+        }
+
         private void AssignRenderIdentity(VfxPlaybackRuntime runtime, string path)
         {
+            string renderPath = path ?? string.Empty;
             foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
             {
                 emitter.RenderGraphKey = this;
-                emitter.RenderPath = path ?? string.Empty;
+                emitter.RenderPath = renderPath;
+                emitter.RenderRank = _renderRanks.GetValueOrDefault((renderPath, emitter.SourceOrder), int.MaxValue);
             }
         }
 
@@ -798,12 +862,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             double systemEnd = 0;
             foreach (VfxEmitterDefinition emitter in system.Emitters.Where(item => !item.Disabled))
             {
-                if (emitter.IsLoop)
-                {
-                    path.Remove(system);
-                    return double.PositiveInfinity;
-                }
-
                 double particleLifetime = GetMaximumParticleLifetime(emitter);
                 if (double.IsInfinity(particleLifetime))
                 {

@@ -596,80 +596,142 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         internal static string TryResolveTexturePath(string sknPath, string assetTexturePath)
         {
-            DirectoryInfo characterRoot = FindCharacterRoot(sknPath);
-            if (characterRoot == null || string.IsNullOrWhiteSpace(assetTexturePath))
+            if (string.IsNullOrWhiteSpace(sknPath) || string.IsNullOrWhiteSpace(assetTexturePath))
             {
                 return null;
             }
 
+            string fullSknPath = Path.GetFullPath(sknPath);
             string assetPath = PathUtils.NormalizeSeparators(assetTexturePath).TrimStart('/');
-            string characterPrefix = $"assets/characters/{characterRoot.Name}/";
-
-            string candidateRoot = null;
-            string relativePath = null;
-
-            if (assetPath.StartsWith(characterPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                candidateRoot = characterRoot.FullName;
-                relativePath = assetPath[characterPrefix.Length..];
-            }
-            else if (assetPath.StartsWith("assets/", StringComparison.OrdinalIgnoreCase) &&
-                     characterRoot.Parent?.Parent is DirectoryInfo assetsRoot &&
-                     assetsRoot.Name.Equals("assets", StringComparison.OrdinalIgnoreCase))
-            {
-                candidateRoot = assetsRoot.FullName;
-                relativePath = assetPath["assets/".Length..];
-            }
-
-            if (candidateRoot != null && relativePath != null)
-            {
-                string candidate = Path.GetFullPath(Path.Combine(candidateRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-                string rootedPrefix = Path.GetFullPath(candidateRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-
-                if (candidate.StartsWith(rootedPrefix, StringComparison.OrdinalIgnoreCase) &&
-                    candidate.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) &&
-                    File.Exists(candidate))
-                {
-                    return candidate;
-                }
-            }
-
             string fileName = Path.GetFileName(assetPath);
-            if (!string.IsNullOrEmpty(fileName))
-            {
-                string targetFile = fileName.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)
+            string targetFile = string.IsNullOrEmpty(fileName)
+                ? null
+                : fileName.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)
                     ? fileName
                     : fileName + ".tex";
 
-                string skinDir = Path.GetDirectoryName(Path.GetFullPath(sknPath));
-                if (!string.IsNullOrEmpty(skinDir))
+            // Flat WAD extractions may keep both the SKN and unresolved WadChunkLink textures
+            // directly at the root under their hash names. Check the model directory first.
+            string skinDir = Path.GetDirectoryName(fullSknPath);
+            if (!string.IsNullOrEmpty(skinDir) && !string.IsNullOrEmpty(targetFile))
+            {
+                string besideModel = Path.Combine(skinDir, targetFile);
+                if (File.Exists(besideModel))
                 {
-                    string candidate = Path.Combine(skinDir, targetFile);
-                    if (File.Exists(candidate))
+                    return besideModel;
+                }
+            }
+
+            DirectoryInfo characterRoot = FindCharacterRoot(fullSknPath);
+            if (characterRoot != null)
+            {
+                string characterPrefix = $"assets/characters/{characterRoot.Name}/";
+                string candidateRoot = null;
+                string relativePath = null;
+
+                if (assetPath.StartsWith(characterPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    candidateRoot = characterRoot.FullName;
+                    relativePath = assetPath[characterPrefix.Length..];
+                }
+                else if (assetPath.StartsWith("assets/", StringComparison.OrdinalIgnoreCase) &&
+                         characterRoot.Parent?.Parent is DirectoryInfo assetsRoot &&
+                         assetsRoot.Name.Equals("assets", StringComparison.OrdinalIgnoreCase))
+                {
+                    candidateRoot = assetsRoot.FullName;
+                    relativePath = assetPath["assets/".Length..];
+                }
+
+                if (candidateRoot != null && relativePath != null)
+                {
+                    string candidate = Path.GetFullPath(Path.Combine(candidateRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+                    string rootedPrefix = Path.GetFullPath(candidateRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+                    if (candidate.StartsWith(rootedPrefix, StringComparison.OrdinalIgnoreCase) &&
+                        candidate.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) &&
+                        File.Exists(candidate))
                     {
                         return candidate;
                     }
                 }
 
-                string characterCandidate = Path.Combine(characterRoot.FullName, targetFile);
-                if (File.Exists(characterCandidate))
+                if (!string.IsNullOrEmpty(targetFile))
                 {
-                    return characterCandidate;
+                    string characterCandidate = Path.Combine(characterRoot.FullName, targetFile);
+                    if (File.Exists(characterCandidate))
+                    {
+                        return characterCandidate;
+                    }
+                }
+            }
+
+            string wadRoot = FindWadRoot(fullSknPath);
+            if (!string.IsNullOrEmpty(wadRoot))
+            {
+                if (!string.IsNullOrEmpty(targetFile))
+                {
+                    string rootCandidate = Path.Combine(wadRoot, targetFile);
+                    if (File.Exists(rootCandidate))
+                    {
+                        return rootCandidate;
+                    }
                 }
 
-                if (characterRoot.Parent?.Parent is DirectoryInfo assetsDir &&
-                    assetsDir.Name.Equals("assets", StringComparison.OrdinalIgnoreCase) &&
-                    assetsDir.Parent != null)
+                // A hash may already be resolved to its authored virtual path while the extracted
+                // file on disk still keeps the xxHash64 name. Re-hash the virtual path in that case.
+                string virtualTexturePath = assetPath.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)
+                    ? assetPath
+                    : assetPath + ".tex";
+                if (!IsHexStem(Path.GetFileNameWithoutExtension(virtualTexturePath)))
                 {
-                    string wadRootCandidate = Path.Combine(assetsDir.Parent.FullName, targetFile);
-                    if (File.Exists(wadRootCandidate))
+                    string hashedFile = $"{XxHash64Ext.Hash(virtualTexturePath.ToLowerInvariant()):x16}.tex";
+                    string hashedCandidate = Path.Combine(wadRoot, hashedFile);
+                    if (File.Exists(hashedCandidate))
                     {
-                        return wadRootCandidate;
+                        return hashedCandidate;
                     }
                 }
             }
 
             return null;
+        }
+
+        private static string FindWadRoot(string assetPath)
+        {
+            string fullPath = Path.GetFullPath(assetPath)
+                .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            foreach (string markerName in new[] { "assets", "data" })
+            {
+                string marker = $"{Path.DirectorySeparatorChar}{markerName}{Path.DirectorySeparatorChar}";
+                int markerIndex = fullPath.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (markerIndex >= 0)
+                {
+                    return fullPath[..markerIndex];
+                }
+            }
+
+            for (DirectoryInfo directory = Directory.GetParent(fullPath);
+                 directory != null;
+                 directory = directory.Parent)
+            {
+                if (directory.Name.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) ||
+                    directory.Name.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
+                {
+                    return directory.FullName;
+                }
+            }
+
+            return Path.GetDirectoryName(fullPath);
+        }
+
+        private static bool IsHexStem(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length is not (8 or 16)) return false;
+            return ulong.TryParse(
+                value,
+                System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out _);
         }
 
         private static DirectoryInfo FindCharacterRoot(string sknPath)
