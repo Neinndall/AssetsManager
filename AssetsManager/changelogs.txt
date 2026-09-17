@@ -73,7 +73,7 @@ New Features
   - Hash Guessing Lab / GAME Custom now includes character `.tex` substitutions and deterministic basename word addition.
   - Viewer / Added configurable ground logo opacity in General settings.
   - Viewer / Added a configurable ground logo size in General settings.
-  - Viewer / Model submeshes containing VFX in their name now start hidden while remaining available in the mesh list.
+  - Viewer / Model submesh visibility now follows authored skin metadata instead of inferring hidden VFX parts from their names.
   - Viewer / Authored black material masks no longer become an unmasked white Fresnel overlay on champion models.
   - Viewer / Texture selectors now include primary textures resolved from shared or base skin paths.
   - Viewer / Added a transparent ground logo overlay that preserves the original image resolution.
@@ -106,6 +106,7 @@ New Features
 Improvements
   - Viewer / SKN materials now use one authored material pipeline with LTK-aligned sRGB texture/tint/output handling across model loads.
   - Viewer / SKN materials now honor authored blend, depth, culling, UV tiling/scroll, wrapping, alpha test, and premultiplied alpha across model loads.
+  - Viewer / SKN material effects now preserve simultaneous authored layers independently, including additive scroll, flow, Fresnel noise, transitions with a second state, emission/bloom, distortion, iridescence, channel masks, authored sampler wrapping, and supported vertex deformation.
   - 3D Mesh Analyzer / Mesh Parts now uses a compact HUD layout with clearer change states and quick Show All / Hide All controls.
   - 3D Mesh Analyzer / Mesh Parts now identifies per-part NEW-only and OLD-only triangle deltas with precise topology matching and ownership tooltips.
   - Hash Guessing Lab / Expanded Game Texture Build List learning coverage to capture all attested recurring skin and companion texture patterns.
@@ -591,3 +592,4 @@ Bug Fixes
   - Fixed 3D Mesh Analyzer camera reset leaving the Old Version viewport unsynchronized after switching camera views.
   - Viewer / Fixed greenish-blue silhouette edges on champion skins by resolving extracted WAD mask textures and honoring authored coverage.
   - Viewer / Supported procedural glass materials with transparency and fresnel highlights, preventing opaque white surfaces on untextured glass submeshes.
+  - Viewer / Expanded authored SKN material effects with independent distortion, layered masks, transitions, emission, flow and vertex deformation without dropping existing material behavior.

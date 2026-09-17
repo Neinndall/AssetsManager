@@ -27,17 +27,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
         }
 
         [Fact]
-        public void ModelPart_HidesVfxNamedPartsByDefault()
+        public void ModelPart_DoesNotInferVisibilityFromPartName()
         {
             var geometry = CreateGeometry();
             var part = new ModelPart("Pyke_VFX_Dagger", geometry);
 
-            Assert.False(part.IsVisible);
-            Assert.Null(part.Visual.Content);
-
-            part.IsVisible = true;
-
+            Assert.True(part.IsVisible);
             Assert.Same(geometry, part.Visual.Content);
+
+            part.IsVisible = false;
+            Assert.Null(part.Visual.Content);
         }
 
         [Fact]

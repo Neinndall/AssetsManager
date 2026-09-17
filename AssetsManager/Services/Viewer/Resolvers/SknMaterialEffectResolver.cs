@@ -49,22 +49,18 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IReadOnlyList<string> textureKeys,
             IEnumerable<string> submeshes)
         {
-            if (IsCompositeOnsenMaterial(material))
-            {
-                return ApplySpecializedBaseColor(ModelMaterialEffectDefinition.None, material);
-            }
-
-            ModelMaterialEffectDefinition effect = ResolveOverlay(
-                material,
-                submesh,
-                textureKeys,
-                submeshes);
+            ModelMaterialEffectDefinition effect = ModelMaterialEffectDefinition.None;
+            effect = ApplyOverlay(effect, material, submesh, textureKeys, submeshes);
             effect = ApplyGradientPulse(effect, material, textureKeys);
             effect = ApplyTransition(effect, material, textureKeys);
             effect = ApplyFresnel(effect, material, textureKeys);
+            effect = ApplyDistortion(effect, material, textureKeys);
             effect = ApplyEmission(effect, material, textureKeys);
             effect = ApplyIridescence(effect, material, textureKeys);
-            return ApplySpecializedBaseColor(ApplySimpleWave(effect, material), material);
+            effect = ApplyVertexDeformation(effect, material, textureKeys);
+            effect = ApplySimpleWave(effect, material);
+            effect = ApplySpecializedBaseColor(effect, material);
+            return ApplyTextureSampling(effect, material, textureKeys);
         }
 
         private static ModelMaterialEffectDefinition ApplySpecializedBaseColor(
@@ -108,7 +104,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
             };
         }
 
-        private static ModelMaterialEffectDefinition ResolveOverlay(
+        private static ModelMaterialEffectDefinition ApplyOverlay(
+            ModelMaterialEffectDefinition effect,
             SknMaterialDefinition material,
             string submesh,
             IReadOnlyList<string> textureKeys,
@@ -128,23 +125,24 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     "Panning_Scale",
                     "PanningScale"))
             {
-                return new ModelMaterialEffectDefinition(
-                    ModelMaterialEffectKind.AdditiveScroll,
-                    panningTexture,
-                    null,
-                    ReadVector2(
-                        material.Parameters,
-                        Vector2.Zero,
-                        "Panning_Speed",
-                        "PanningSpeed"),
-                    ReadVector2(
-                        material.Parameters,
-                        Vector2.One,
-                        "Panning_Scale",
-                        "PanningScale"),
-                    Vector4.One,
-                    1f,
-                    0f);
+                effect = effect with
+                {
+                    AdditiveScroll = new ModelTextureLayerDefinition(
+                        panningTexture,
+                        null,
+                        ReadVector2(
+                            material.Parameters,
+                            Vector2.Zero,
+                            "Panning_Speed",
+                            "PanningSpeed"),
+                        ReadVector2(
+                            material.Parameters,
+                            Vector2.One,
+                            "Panning_Scale",
+                            "PanningScale"),
+                        Vector4.One,
+                        1f)
+                };
             }
 
             string additiveTexture = FindSamplerKey(
@@ -163,9 +161,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             // Riot uses a white neutral source in some iridescent graphs.
             // Without authored scroll/tint controls it is not an additive layer.
             if (additiveMask != null && IsWhiteIridescentPlaceholder(material))
-            {
                 additiveTexture = null;
-            }
 
             float additiveStrength = ReadFloat(
                 material.Parameters,
@@ -173,7 +169,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "AdditiveStrength_R",
                 "ScrollStrength_R",
                 "ScrollStrength");
-            if (additiveTexture != null &&
+            if (effect.AdditiveScroll == null &&
+                additiveTexture != null &&
                 additiveMask != null &&
                 additiveStrength > Epsilon &&
                 HasAnyParameter(
@@ -186,33 +183,36 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     "ScrollTexTile") &&
                 IsEffectMaskApplicable(material.Samplers, submesh, submeshes))
             {
-                return new ModelMaterialEffectDefinition(
-                    ModelMaterialEffectKind.AdditiveScroll,
-                    additiveTexture,
-                    additiveMask,
-                    ReadVector2(
-                        material.Parameters,
-                        Vector2.Zero,
-                        "AdditiveTexScrollSpeed_R",
-                        "ScrollSpeed_R",
-                        "Scroll_Speed",
-                        "ScrollSpeed"),
-                    ReadVector2(
-                        material.Parameters,
-                        Vector2.One,
-                        "AdditiveTexTile",
-                        "ScrollTexTile",
-                        "UV_Scale"),
-                    ReadVector4(
-                        material.Parameters,
-                        Vector4.One,
-                        "AdditiveScroll_ColorTint_R",
-                        "AdditiveScroll_ColorTint",
-                        "Scroll_Color_Tint_R",
-                        "ScrollColor",
-                        "ScrollColorTint"),
-                    additiveStrength,
-                    0f);
+                effect = effect with
+                {
+                    AdditiveScroll = new ModelTextureLayerDefinition(
+                        additiveTexture,
+                        additiveMask,
+                        ReadVector2(
+                            material.Parameters,
+                            Vector2.Zero,
+                            "AdditiveTexScrollSpeed_R",
+                            "ScrollSpeed_R",
+                            "Scroll_Speed",
+                            "ScrollSpeed"),
+                        ReadVector2(
+                            material.Parameters,
+                            Vector2.One,
+                            "AdditiveTexTile",
+                            "ScrollTexTile",
+                            "UV_Scale"),
+                        ReadVector4(
+                            material.Parameters,
+                            Vector4.One,
+                            "AdditiveScroll_ColorTint_R",
+                            "AdditiveScroll_ColorTint",
+                            "Scroll_Color_Tint_R",
+                            "ScrollColor",
+                            "ScrollColorTint"),
+                        additiveStrength,
+                        0,
+                        ResolveSamplerChannel(material, additiveMask, 0))
+                };
             }
 
             string flowTexture = FindSamplerKey(
@@ -222,38 +222,48 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "FlowMap",
                 "Flow_Texture",
                 "Flowmap_Texture");
-            if (flowTexture == null)
+            if (flowTexture != null)
             {
-                return ModelMaterialEffectDefinition.None;
-            }
-
-            return new ModelMaterialEffectDefinition(
-                ModelMaterialEffectKind.FlowMap,
-                flowTexture,
-                FindSamplerKey(
+                string flowMask = FindSamplerKey(
                     material,
                     textureKeys,
                     "Mask",
                     "Mask_Texture_red",
+                    "Mask_Texture_green",
+                    "Mask_Texture_blue",
                     "Mask_Texture",
                     "FlowmapMask",
                     "Pattern_Mask",
-                    "Flow_Mask"),
-                ReadVector2(
-                    material.Parameters,
-                    new Vector2(0.1f),
-                    "FlowSpeed",
-                    "FlowmapSpeed",
-                    "Flow_Speed"),
-                Vector2.One,
-                Vector4.One,
-                1f,
-                ReadFloat(
-                    material.Parameters,
-                    0.1f,
-                    "FlowmapIntensity",
-                    "FlowIntensity",
-                    "Flow_Amount"));
+                    "Flow_Mask");
+                effect = effect with
+                {
+                    FlowMap = new ModelFlowMapDefinition(
+                        flowTexture,
+                        flowMask,
+                        ReadVector2(
+                            material.Parameters,
+                            new Vector2(0.1f),
+                            "FlowSpeed",
+                            "FlowmapSpeed",
+                            "Flow_Speed"),
+                        ReadVector2(
+                            material.Parameters,
+                            Vector2.One,
+                            "FlowTiling",
+                            "Flow_Tiling",
+                            "FlowmapTiling"),
+                        1f,
+                        ReadFloat(
+                            material.Parameters,
+                            0.1f,
+                            "FlowmapIntensity",
+                            "FlowIntensity",
+                            "Flow_Amount"),
+                        ResolveSamplerChannel(material, flowMask, 0))
+                };
+            }
+
+            return effect;
         }
 
         private static bool IsWhiteIridescentPlaceholder(SknMaterialDefinition material)
@@ -290,11 +300,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             SknMaterialDefinition material,
             IReadOnlyList<string> textureKeys)
         {
-            if (effect.Kind != ModelMaterialEffectKind.None)
-            {
-                return effect;
-            }
-
             string gradientTexture = FindSamplerKey(
                 material,
                 textureKeys,
@@ -312,49 +317,38 @@ namespace AssetsManager.Services.Viewer.Resolvers
                  HasAnyParameter(parameters, "Scrolling_Rate", "Scrolling_Scale"));
 
             if (gradientTexture == null || maskTexture == null || !hasGradientDriver)
-            {
                 return effect;
-            }
 
-            return new ModelMaterialEffectDefinition(
-                ModelMaterialEffectKind.GradientPulse,
-                gradientTexture,
-                maskTexture,
-                ReadVector2(
-                    parameters,
-                    Vector2.Zero,
-                    "Scrolling_Rate",
-                    "Scroll_Speed"),
-                ReadVector2(
-                    parameters,
-                    Vector2.One,
-                    "Scrolling_Scale",
-                    "UV_Scale"),
-                ReadVector4(
-                    parameters,
-                    Vector4.One,
-                    "Color",
-                    "Gradient_Color"),
-                ReadFloat(parameters, 1f, "Mask_Intensity"),
-                0f)
+            return effect with
             {
-                PulseRate = ReadFloat(parameters, 0f, "Pulse_Rate"),
-                PulseMax = ReadFloat(parameters, 0f, "Pulse_Max"),
-                PulseOffset = ReadFloat(parameters, 0f, "Pulse_Offset"),
-                GradientSharpness = ReadFloat(
-                    parameters,
-                    1f,
-                    "Gradient_Sharpness"),
-                BloomIntensity = ReadFloat(
-                    parameters,
-                    0f,
-                    "Bloom_Intensity"),
-                DissolveThreshold = ReadFloat(
-                    parameters,
-                    0f,
-                    "Dissolve_Bias",
-                    "DissolveBias"),
-                DissolveSoftness = ReadDissolveSoftness(parameters)
+                GradientPulse = new ModelGradientPulseDefinition(
+                    gradientTexture,
+                    maskTexture,
+                    ReadVector2(
+                        parameters,
+                        Vector2.Zero,
+                        "Scrolling_Rate",
+                        "Scroll_Speed"),
+                    ReadVector2(
+                        parameters,
+                        Vector2.One,
+                        "Scrolling_Scale",
+                        "UV_Scale"),
+                    ReadVector4(
+                        parameters,
+                        Vector4.One,
+                        "Color",
+                        "Gradient_Color"),
+                    ReadFloat(parameters, 1f, "Mask_Intensity"),
+                    ReadFloat(parameters, 0f, "Pulse_Rate"),
+                    ReadFloat(parameters, 0f, "Pulse_Max"),
+                    ReadFloat(parameters, 0f, "Pulse_Offset"),
+                    ReadFloat(parameters, 1f, "Gradient_Sharpness"),
+                    ReadFloat(parameters, 0f, "Bloom_Intensity"),
+                    ReadFloat(parameters, 0f, "Dissolve_Bias", "DissolveBias"),
+                    ReadDissolveSoftness(parameters),
+                    0,
+                    ResolveSamplerChannel(material, maskTexture, 0))
             };
         }
 
@@ -363,12 +357,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             SknMaterialDefinition material,
             IReadOnlyList<string> textureKeys)
         {
-            if (effect.Kind != ModelMaterialEffectKind.None)
-            {
-                return effect;
-            }
-
-            string texture = FindSamplerKey(
+            string patternTexture = FindSamplerKey(
                 material,
                 textureKeys,
                 "Transition_PatternTexture",
@@ -377,7 +366,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "Dissolve_Texture",
                 "Dissolve_Gradient_Texture",
                 "Noise_Texture");
-            if (texture == null || !HasAnyParameter(
+            if (patternTexture == null || !HasAnyParameter(
                     material.Parameters,
                     "Dissolve",
                     "DissolveAmount",
@@ -410,28 +399,35 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return effect;
             }
 
-            return new ModelMaterialEffectDefinition(
-                ModelMaterialEffectKind.Dissolve,
-                texture,
-                FindSamplerKey(
-                    material,
-                    textureKeys,
-                    "Transition_State2",
-                    "DissolveMask",
-                    "Mask"),
-                ReadVector2(
-                    material.Parameters,
-                    Vector2.Zero,
-                    "DissolveSpeed",
-                    "Transition_Speed",
-                    "NoiseSpeed"),
-                Vector2.One,
-                Vector4.One,
-                1f,
-                0f)
+            string stateTexture = FindSamplerKey(material, textureKeys, "Transition_State2");
+            string maskTexture = FindSamplerKey(
+                material,
+                textureKeys,
+                "DissolveMask",
+                "Transition_Mask",
+                "TransitionMask");
+            return effect with
             {
-                DissolveThreshold = dissolveThreshold,
-                DissolveSoftness = ReadDissolveSoftness(material.Parameters)
+                Dissolve = new ModelDissolveDefinition(
+                    patternTexture,
+                    stateTexture,
+                    maskTexture,
+                    ReadVector2(
+                        material.Parameters,
+                        Vector2.Zero,
+                        "DissolveSpeed",
+                        "Transition_Speed",
+                        "NoiseSpeed"),
+                    ReadVector2(
+                        material.Parameters,
+                        Vector2.One,
+                        "DissolveTiling",
+                        "Dissolve_Tiling",
+                        "Transition_Tiling"),
+                    dissolveThreshold,
+                    ReadDissolveSoftness(material.Parameters),
+                    ResolveSamplerChannel(material, patternTexture, 0),
+                    ResolveSamplerChannel(material, maskTexture, 0))
             };
         }
 
@@ -449,51 +445,62 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "Fresnel_Color_Intensity",
                 "Fresnel_Size_Outer");
             if (strength <= Epsilon)
-            {
                 return effect;
-            }
 
-            string maskTexture = FindMaterialMask(material, textureKeys);
-            if (effect.MaskTextureName == null &&
-                maskTexture == null &&
-                HasAuthoredBlackMaterialMask(material))
-            {
+            string maskTexture = FindSamplerKey(
+                material,
+                textureKeys,
+                "FresnelMask",
+                "Fresnel_Mask",
+                "FresnelMask_Texture") ?? FindMaterialMask(material, textureKeys);
+            string inheritedMask = effect.AdditiveScroll?.MaskTextureName ??
+                effect.FlowMap?.MaskTextureName ??
+                effect.GradientPulse?.MaskTextureName;
+            if (inheritedMask == null && maskTexture == null && HasAuthoredBlackMaterialMask(material))
                 return effect;
-            }
 
-            effect = effect with
-            {
-                Kind = effect.Kind | ModelMaterialEffectKind.Fresnel,
-                MaskTextureName = effect.MaskTextureName ?? maskTexture,
-                FresnelColor = ReadVector4(
-                    material.Parameters,
-                    Vector4.One,
-                    "Fresnel_Color",
-                    "FresnelColor",
-                    "Fresnel_ColorTint",
-                    "Glass_Color2",
-                    "GlassColor2"),
-                FresnelPower = ReadFloat(
-                    material.Parameters,
-                    2f,
-                    "FresnelPower",
-                    "Fresnel_Power",
-                    "FresnelExponent",
-                    "Fresnel_Size_Inner"),
-                FresnelStrength = strength
-            };
-
+            string noiseTexture = FindSamplerKey(
+                material,
+                textureKeys,
+                "FresnelNoise",
+                "Fresnel_Noise",
+                "FresnelNoise_Texture",
+                "Fresnel_Noise_Texture");
+            Vector2 noiseTiling = Vector2.One;
+            Vector2 noiseSpeed = Vector2.Zero;
             if (material.Parameters.TryGetValue("Fresnel_Noise_Tiling_Speed", out Vector4 noise))
             {
-                effect = effect with
-                {
-                    Kind = effect.Kind | ModelMaterialEffectKind.FresnelNoise,
-                    FresnelNoiseTiling = new Vector2(noise.X, noise.Y),
-                    FresnelNoiseSpeed = new Vector2(noise.Z, noise.W)
-                };
+                noiseTiling = new Vector2(noise.X, noise.Y);
+                noiseSpeed = new Vector2(noise.Z, noise.W);
             }
 
-            return effect;
+            string resolvedMask = maskTexture ?? inheritedMask;
+            return effect with
+            {
+                Fresnel = new ModelFresnelDefinition(
+                    resolvedMask,
+                    noiseTexture,
+                    ReadVector4(
+                        material.Parameters,
+                        Vector4.One,
+                        "Fresnel_Color",
+                        "FresnelColor",
+                        "Fresnel_ColorTint",
+                        "Glass_Color2",
+                        "GlassColor2"),
+                    ReadFloat(
+                        material.Parameters,
+                        2f,
+                        "FresnelPower",
+                        "Fresnel_Power",
+                        "FresnelExponent",
+                        "Fresnel_Size_Inner"),
+                    strength,
+                    noiseTiling,
+                    noiseSpeed,
+                    ResolveSamplerChannel(material, resolvedMask, 0),
+                    ResolveSamplerChannel(material, noiseTexture, 0))
+            };
         }
 
         private static ModelMaterialEffectDefinition ApplyIridescence(
@@ -538,7 +545,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
             return effect with
             {
-                Kind = effect.Kind | ModelMaterialEffectKind.Iridescence,
                 Iridescence = new ModelIridescenceDefinition(
                     iridescenceTexture,
                     iridescenceMask,
@@ -560,7 +566,84 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         "Diffuse_Fade_Mask_Value",
                         "DiffuseFadeMaskValue"),
                     usesPulse,
-                    usesLocalizedAlpha)
+                    usesLocalizedAlpha,
+                    ResolveSamplerChannel(material, iridescenceMask, 0))
+            };
+        }
+
+        private static ModelMaterialEffectDefinition ApplyDistortion(
+            ModelMaterialEffectDefinition effect,
+            SknMaterialDefinition material,
+            IReadOnlyList<string> textureKeys)
+        {
+            string distortionTexture = FindSamplerKey(
+                material,
+                textureKeys,
+                "Distortion_Texture",
+                "DistortionTex",
+                "DistortionMap",
+                "Distortion_Texture_Map");
+
+            bool compositeWaterDistortion =
+                distortionTexture == null &&
+                HasSampler(material, "NoiseDisturb") &&
+                HasSampler(material, "FlowmapTex") &&
+                HasSampler(material, "WaterShape");
+            if (compositeWaterDistortion)
+            {
+                distortionTexture = FindSamplerKey(material, textureKeys, "NoiseDisturb");
+            }
+
+            if (distortionTexture == null)
+                return effect;
+
+            string distortionMask = FindSamplerKey(
+                material,
+                textureKeys,
+                "DistortionMask",
+                "Distortion_Mask",
+                "Flow_Mask",
+                "Mask_Texture_red",
+                "Mask_Texture_green",
+                "Mask_Texture_blue",
+                "Mask_Texture",
+                "Mask");
+
+            float strength = ReadFloat(
+                material.Parameters,
+                compositeWaterDistortion ? 0.02f : 0.01f,
+                "DistortionStrength",
+                "Distortion_Strength",
+                "DistortionAmount",
+                "Distortion_Amount",
+                "RefractionStrength",
+                "Refraction_Strength");
+            if (!float.IsFinite(strength) || Math.Abs(strength) <= Epsilon)
+                return effect;
+
+            return effect with
+            {
+                Distortion = new ModelDistortionDefinition(
+                    distortionTexture,
+                    distortionMask,
+                    ReadVector2(
+                        material.Parameters,
+                        Vector2.Zero,
+                        "DistortionScrollSpeed",
+                        "Distortion_Scroll_Speed",
+                        "DistortionSpeed",
+                        "NoiseSpeed"),
+                    ReadVector2(
+                        material.Parameters,
+                        Vector2.One,
+                        "DistortionTiling",
+                        "Distortion_Tiling",
+                        "DistortionTile",
+                        "NoiseTiling"),
+                    Math.Clamp(strength, -0.25f, 0.25f),
+                    ResolveSamplerChannel(material, distortionTexture, 0),
+                    ResolveSecondaryDistortionChannel(material, distortionTexture),
+                    ResolveSamplerChannel(material, distortionMask, 0))
             };
         }
 
@@ -578,64 +661,98 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "Emissive_Texture");
             if (emissionTexture != null)
             {
-                bool emissionUsesRedChannel = material.Samplers.Any(sampler =>
-                {
-                    string normalized = SknMaterialTextureResolver.NormalizeToken(sampler.TextureName);
-                    return (normalized is "emissionrdistortiongtexture" or "emissionrtexture") &&
-                           SknMaterialTextureResolver.MatchTextureKey(sampler.TexturePath, textureKeys) == emissionTexture;
-                });
+                SknMaterialSampler emissionSampler = material.Samplers.FirstOrDefault(sampler =>
+                    SknMaterialTextureResolver.MatchTextureKey(sampler.TexturePath, textureKeys) == emissionTexture &&
+                    SknMaterialTextureResolver.NormalizeToken(sampler.TextureName) is
+                        "emissionrdistortiongtexture" or
+                        "emissionrtexture" or
+                        "emissiontexture" or
+                        "emissivetexture");
+                string normalizedEmissionName = SknMaterialTextureResolver.NormalizeToken(
+                    emissionSampler?.TextureName ?? string.Empty);
+                bool emissionUsesRedChannel =
+                    normalizedEmissionName is "emissionrdistortiongtexture" or "emissionrtexture";
+                bool containsPackedDistortion = normalizedEmissionName == "emissionrdistortiongtexture";
+                string emissionMask = FindSamplerKey(
+                    material,
+                    textureKeys,
+                    "EmissionMask",
+                    "EmissiveMask",
+                    "BloomMask",
+                    "BloomMask_Texture",
+                    "Outline_Bloom_Mask",
+                    "Mask_Texture_red",
+                    "Mask_Texture_green",
+                    "Mask_Texture_blue",
+                    "Mask_Texture",
+                    "Mask");
+                Vector2 scrollSpeed = ReadVector2(
+                    material.Parameters,
+                    Vector2.Zero,
+                    "VFX_ScrollTex_R_UV_Scroll_Speed",
+                    "EmissionScrollSpeed",
+                    "Emission_Scroll_Speed",
+                    "EmissionSpeed");
+                Vector2 tiling = ReadVector2(
+                    material.Parameters,
+                    Vector2.One,
+                    "VFX_ScrollTex_R_UV_Tile",
+                    "EmissionTexTile",
+                    "Emission_Tile",
+                    "EmissionTiling");
+
                 effect = effect with
                 {
-                    Kind = effect.Kind | ModelMaterialEffectKind.Emission,
-                    EmissionTextureName = emissionTexture,
-                    EmissionMaskTextureName = FindSamplerKey(
-                        material,
-                        textureKeys,
-                        "EmissionMask",
-                        "EmissiveMask",
-                        "BloomMask",
-                        "BloomMask_Texture",
-                        "Outline_Bloom_Mask",
-                        "Mask_Texture_red",
-                        "Mask_Texture_green",
-                        "Mask_Texture_blue",
-                        "Mask_Texture",
-                        "Mask"),
-                    EmissionScrollSpeed = ReadVector2(
-                        material.Parameters,
-                        Vector2.Zero,
-                        "VFX_ScrollTex_R_UV_Scroll_Speed",
-                        "EmissionScrollSpeed",
-                        "Emission_Scroll_Speed",
-                        "EmissionSpeed"),
-                    EmissionTiling = ReadVector2(
-                        material.Parameters,
-                        Vector2.One,
-                        "VFX_ScrollTex_R_UV_Tile",
-                        "EmissionTexTile",
-                        "Emission_Tile",
-                        "EmissionTiling"),
-                    EmissionColor = ReadVector4(
-                        material.Parameters,
-                        Vector4.One,
-                        "EmissionColor",
-                        "EmissiveColor",
-                        "VFX_ScrollTex_R_Tint",
-                        "Emission_Bloom_Color",
-                        "Bloom_Color",
-                        "BloomColor"),
-                    EmissionStrength = ReadFloat(
-                        material.Parameters,
-                        1f,
-                        "EmissionR_Strength",
-                        "EmissionStrength",
-                        "EmissiveStrength",
-                        "EmissionValue",
-                        "Emissive_Factor",
-                        "EmissiveFactor",
-                        "All_Additive_Strength"),
-                    EmissionChannel = emissionUsesRedChannel ? 0 : -1
+                    Emission = new ModelEmissionDefinition(
+                        emissionTexture,
+                        emissionMask,
+                        scrollSpeed,
+                        tiling,
+                        ReadVector4(
+                            material.Parameters,
+                            Vector4.One,
+                            "EmissionColor",
+                            "EmissiveColor",
+                            "VFX_ScrollTex_R_Tint",
+                            "Emission_Bloom_Color",
+                            "Bloom_Color",
+                            "BloomColor"),
+                        ReadFloat(
+                            material.Parameters,
+                            1f,
+                            "EmissionR_Strength",
+                            "EmissionStrength",
+                            "EmissiveStrength",
+                            "EmissionValue",
+                            "Emissive_Factor",
+                            "EmissiveFactor",
+                            "All_Additive_Strength"),
+                        emissionUsesRedChannel ? 0 : -1,
+                        ResolveSamplerChannel(material, emissionMask, 0))
                 };
+
+                if (containsPackedDistortion && effect.Distortion == null)
+                {
+                    effect = effect with
+                    {
+                        Distortion = new ModelDistortionDefinition(
+                            emissionTexture,
+                            emissionMask,
+                            scrollSpeed,
+                            tiling,
+                            Math.Clamp(ReadFloat(
+                                material.Parameters,
+                                0.02f,
+                                "DistortionG_Strength",
+                                "DistortionStrength",
+                                "Distortion_Strength",
+                                "DistortionAmount",
+                                "Distortion_Amount"), -0.25f, 0.25f),
+                            1,
+                            -1,
+                            ResolveSamplerChannel(material, emissionMask, 0))
+                    };
+                }
             }
 
             float intensity = ReadFloat(
@@ -658,16 +775,26 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     "EmissionValue");
             }
             // A BIN parameter called Bloom_Intensity is not enough to reproduce the
-            // authored shader. Aatrox's gradient/dissolve material, for example,
-            // exposes that parameter but has no generic bloom color; treating it as
-            // white emission is what washed out the wings and sword.
-            return intensity <= 0.01f || !HasSupportedEmissionSignal(material)
-                ? effect
-                : effect with
-                {
-                    Kind = effect.Kind | ModelMaterialEffectKind.Bloom,
-                    MaskTextureName = effect.MaskTextureName ?? FindMaterialMask(material, textureKeys),
-                    BloomColor = ReadVector4(
+            // authored shader. Require an authored color or bloom sampler before adding it.
+            if (intensity <= 0.01f || !HasSupportedEmissionSignal(material))
+                return effect;
+
+            string bloomMask = FindSamplerKey(
+                material,
+                textureKeys,
+                "BloomMask",
+                "BloomMask_Texture",
+                "Outline_Bloom_Mask",
+                "Mask_Texture_red",
+                "Mask_Texture_green",
+                "Mask_Texture_blue",
+                "Mask_Texture",
+                "Mask") ?? FindMaterialMask(material, textureKeys);
+            return effect with
+            {
+                Bloom = new ModelBloomDefinition(
+                    bloomMask,
+                    ReadVector4(
                         material.Parameters,
                         Vector4.One,
                         "Bloom_Color",
@@ -677,8 +804,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         "EmissiveColor",
                         "Bloom_TintColor",
                         "EdgeBloomColor_RGB"),
-                    BloomIntensity = intensity
-                };
+                    intensity,
+                    ResolveSamplerChannel(material, bloomMask, 0))
+            };
         }
 
         private static bool HasSupportedEmissionSignal(SknMaterialDefinition material) =>
@@ -722,6 +850,84 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return 0.05f;
         }
 
+        private static ModelMaterialEffectDefinition ApplyVertexDeformation(
+            ModelMaterialEffectDefinition effect,
+            SknMaterialDefinition material,
+            IReadOnlyList<string> textureKeys)
+        {
+            if (!HasComplexVertexDeformation(material))
+                return effect;
+
+            string noiseTexture = FindSamplerKey(
+                material,
+                textureKeys,
+                "DeformNoise",
+                "VertexDeformNoise",
+                "Vertex_Deform_Noise",
+                "DeformationNoise");
+            string maskTexture = FindSamplerKey(
+                material,
+                textureKeys,
+                "DeformMask",
+                "VertexDeformMask",
+                "Vertex_Deform_Mask",
+                "DeformationMask");
+            if (noiseTexture == null ||
+                (HasSampler(material, "DeformMask") && maskTexture == null))
+            {
+                return effect;
+            }
+
+            float intensity = ReadFloat(
+                material.Parameters,
+                0f,
+                "VertexDeformFeatureStrength",
+                "VertexDeformIntensity",
+                "DeformIntensity");
+            if (Math.Abs(intensity) <= Epsilon)
+                return effect;
+
+            Vector4 direction = ReadVector4(
+                material.Parameters,
+                new Vector4(0f, 1f, 0f, 0f),
+                "DeformDirection",
+                "VertexDeformDirection",
+                "Anim_Wave_Dir");
+            return effect with
+            {
+                VertexDeformation = new ModelVertexDeformationDefinition(
+                    noiseTexture,
+                    maskTexture,
+                    new Vector3(direction.X, direction.Y, direction.Z),
+                    ReadVector2(
+                        material.Parameters,
+                        Vector2.Zero,
+                        "DeformScrollSpeed",
+                        "Deform_Scroll_Speed",
+                        "VertexDeformScrollSpeed"),
+                    ReadVector2(
+                        material.Parameters,
+                        Vector2.One,
+                        "DeformTiling",
+                        "Deform_Tiling",
+                        "VertexDeformTiling"),
+                    ReadFloat(
+                        material.Parameters,
+                        ReadFloat(material.Parameters, 0f, "Anim_Wave_Speed"),
+                        "DeformSpeed",
+                        "VertexDeformSpeed"),
+                    ReadFloat(
+                        material.Parameters,
+                        ReadFloat(material.Parameters, 1f, "Anim_Wave_Frequency"),
+                        "DeformFrequency",
+                        "VertexDeformFrequency"),
+                    intensity,
+                    ReadFloat(material.Parameters, 0f, "DeformProtection"),
+                    ResolveSamplerChannel(material, noiseTexture, 0),
+                    ResolveSamplerChannel(material, maskTexture, 0))
+            };
+        }
+
         private static ModelMaterialEffectDefinition ApplySimpleWave(
             ModelMaterialEffectDefinition effect,
             SknMaterialDefinition material)
@@ -739,9 +945,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             float speed = ReadFloat(material.Parameters, 0f, "Anim_Wave_Speed");
             float intensity = ReadFloat(material.Parameters, 0f, "Anim_Wave_Dir_Intensity");
             if (Math.Abs(speed) <= Epsilon || Math.Abs(intensity) <= Epsilon)
-            {
                 return effect;
-            }
 
             Vector4 direction = ReadVector4(
                 material.Parameters,
@@ -749,11 +953,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "Anim_Wave_Dir");
             return effect with
             {
-                Kind = effect.Kind | ModelMaterialEffectKind.AnimatedWave,
-                WaveDirection = new Vector3(direction.X, direction.Y, direction.Z),
-                WaveSpeed = speed,
-                WaveFrequency = ReadFloat(material.Parameters, 1f, "Anim_Wave_Frequency"),
-                WaveIntensity = intensity
+                Wave = new ModelWaveDefinition(
+                    new Vector3(direction.X, direction.Y, direction.Z),
+                    speed,
+                    ReadFloat(material.Parameters, 1f, "Anim_Wave_Frequency"),
+                    intensity)
             };
         }
 
@@ -766,6 +970,34 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "DeformProtection") ||
             HasSampler(material, "DeformNoise") ||
             HasSampler(material, "DeformMask");
+
+        private static ModelMaterialEffectDefinition ApplyTextureSampling(
+            ModelMaterialEffectDefinition effect,
+            SknMaterialDefinition material,
+            IReadOnlyList<string> textureKeys)
+        {
+            var usedTextures = effect.EnumerateTextureNames()
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (usedTextures.Count == 0)
+                return effect;
+
+            var sampling = new Dictionary<string, ModelEffectTextureSamplingDefinition>(StringComparer.OrdinalIgnoreCase);
+            foreach (SknMaterialSampler sampler in material.Samplers ?? Array.Empty<SknMaterialSampler>())
+            {
+                string textureKey = SknMaterialTextureResolver.MatchTextureKey(sampler.TexturePath, textureKeys);
+                if (textureKey == null || !usedTextures.Contains(textureKey) || sampling.ContainsKey(textureKey))
+                    continue;
+
+                sampling[textureKey] = new ModelEffectTextureSamplingDefinition(
+                    sampler.WrapU,
+                    sampler.WrapV);
+            }
+
+            return sampling.Count == 0
+                ? effect
+                : effect with { TextureSampling = sampling };
+        }
 
         private static string FindMaterialMask(
             SknMaterialDefinition material,
@@ -825,12 +1057,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return scopedSubmesh == null || scopedSubmesh.Equals(submesh, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsCompositeOnsenMaterial(SknMaterialDefinition material) =>
-            HasSampler(material, "NoiseDisturb") &&
-            HasSampler(material, "FlowmapTex") &&
-            HasSampler(material, "WaterShape") &&
-            HasSampler(material, "Transition_State2");
-
         private static bool HasSampler(
             SknMaterialDefinition material,
             string samplerName)
@@ -852,13 +1078,84 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 {
                     string textureKey = SknMaterialTextureResolver.MatchTextureKey(sampler.TexturePath, textureKeys);
                     if (textureKey != null)
-                    {
                         return textureKey;
-                    }
                 }
             }
 
             return null;
+        }
+
+        private static int ResolveSamplerChannel(
+            SknMaterialDefinition material,
+            string textureKey,
+            int fallback)
+        {
+            if (string.IsNullOrWhiteSpace(textureKey))
+                return fallback;
+
+            foreach (SknMaterialSampler sampler in material.Samplers)
+            {
+                string matched = SknMaterialTextureResolver.MatchTextureKey(
+                    sampler.TexturePath,
+                    new[] { textureKey });
+                if (!string.Equals(matched, textureKey, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string name = SknMaterialTextureResolver.NormalizeToken(sampler.TextureName);
+                if (name.Contains("green", StringComparison.Ordinal) ||
+                    (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("g", StringComparison.Ordinal)) ||
+                    name.Contains("distortiong", StringComparison.Ordinal))
+                {
+                    return 1;
+                }
+                if (name.Contains("blue", StringComparison.Ordinal) ||
+                    (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("b", StringComparison.Ordinal)))
+                {
+                    return 2;
+                }
+                if (name.Contains("alpha", StringComparison.Ordinal) ||
+                    (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("a", StringComparison.Ordinal)))
+                {
+                    return 3;
+                }
+                if (name.Contains("red", StringComparison.Ordinal) ||
+                    name.Contains("emissionr", StringComparison.Ordinal) ||
+                    (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("r", StringComparison.Ordinal)))
+                {
+                    return 0;
+                }
+            }
+
+            return fallback;
+        }
+
+        private static int ResolveSecondaryDistortionChannel(
+            SknMaterialDefinition material,
+            string textureKey)
+        {
+            if (string.IsNullOrWhiteSpace(textureKey))
+                return -1;
+
+            foreach (SknMaterialSampler sampler in material.Samplers)
+            {
+                string matched = SknMaterialTextureResolver.MatchTextureKey(
+                    sampler.TexturePath,
+                    new[] { textureKey });
+                if (!string.Equals(matched, textureKey, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string name = SknMaterialTextureResolver.NormalizeToken(sampler.TextureName);
+                if (name.Contains("distortiong", StringComparison.Ordinal) ||
+                    name.Contains("distortionr", StringComparison.Ordinal) ||
+                    name.Contains("distortionb", StringComparison.Ordinal) ||
+                    name.Contains("distortiona", StringComparison.Ordinal))
+                {
+                    return -1;
+                }
+            }
+
+            // Standalone distortion maps conventionally carry a 2D vector in RG.
+            return 1;
         }
 
         private static bool HasAnyParameter(

@@ -186,6 +186,156 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_DoesNotGuessSkinTextureWhenBinNamesNone()
+        {
+            var metadata = new SknMaterialTextureMetadata(
+                null,
+                null,
+                new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase));
+
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(
+                metadata,
+                new[] { "tempting_body_tx_cm" });
+
+            Assert.Equal(ModelMaterialBindingKind.TextureOnly, resolution.DefaultMaterialDefinition.BindingKind);
+            Assert.Null(resolution.DefaultMaterialDefinition.BaseTextureName);
+        }
+
+        [Fact]
+        public void Resolve_DoesNotReplaceUnavailableAuthoredSkinTextureWithAnotherFile()
+        {
+            var metadata = new SknMaterialTextureMetadata(
+                "ASSETS/Characters/Test/Skins/Skin1/Missing_TX_CM.tex",
+                null,
+                new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase));
+
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(
+                metadata,
+                new[] { "different_body_tx_cm" });
+
+            Assert.Null(resolution.DefaultMaterialDefinition.BaseTextureName);
+        }
+
+        [Fact]
+        public void Resolve_EffectLayersConsumeShaderDefaultSamplersAndParameters()
+        {
+            const uint shaderHash = 0x12345678;
+            var material = new SknMaterialDefinition(
+                Array.Empty<SknMaterialSampler>(),
+                new Dictionary<string, Vector4>(StringComparer.Ordinal))
+            {
+                ShaderHash = shaderHash
+            };
+            var shader = new SknShaderDefinition(
+                "Shaders/SkinnedMesh/TestEmission",
+                new[]
+                {
+                    new SknMaterialSampler(
+                        "Emission_Texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Test_Emission.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.Ordinal)
+                {
+                    ["EmissionColor"] = new Vector4(1f, 0.5f, 0.25f, 1f),
+                    ["EmissionStrength"] = new Vector4(1.5f, 0f, 0f, 0f)
+                },
+                new Dictionary<string, bool>(StringComparer.Ordinal),
+                new Dictionary<string, string>(StringComparer.Ordinal));
+            var metadata = new SknMaterialTextureMetadata(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex",
+                material,
+                new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase))
+            {
+                HasDefaultMaterialLink = true,
+                ShaderDefinitions = new Dictionary<uint, SknShaderDefinition>
+                {
+                    [shaderHash] = shader
+                }
+            };
+
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(
+                metadata,
+                new[] { "test_tx_cm", "test_emission" });
+
+            Assert.True((resolution.DefaultMaterialDefinition.Effect.Kind & ModelMaterialEffectKind.Emission) != 0);
+            Assert.Equal("test_emission", resolution.DefaultMaterialDefinition.Effect.Emission.TextureName);
+            Assert.Equal(1.5f, resolution.DefaultMaterialDefinition.Effect.Emission.Strength);
+        }
+
+        [Fact]
+        public void ReadMetadata_DependencySkinPropertiesDoNotOverridePrimarySkinBindings()
+        {
+            BinTree primaryTree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex");
+            BinTree dependencyTree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin2/Dependency_TX_CM.tex",
+                CreateOverride(
+                    "Hat",
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin2/Dependency_Hat_TX_CM.tex")));
+
+            SknMaterialTextureMetadata metadata =
+                SknMaterialTextureResolver.ReadMetadata(new[] { primaryTree, dependencyTree });
+
+            Assert.Equal(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex",
+                metadata.DefaultTexturePath,
+                ignoreCase: true);
+            Assert.Empty(metadata.DirectOverrideTexturePaths);
+            Assert.Empty(metadata.OverrideMaterialLinkKeys);
+        }
+
+        [Fact]
+        public void Resolve_EmptyStaticMaterialExistsAndFallsBackToSkinTextureWhenOpaque()
+        {
+            const string materialPath = "Characters/Test/Skins/Skin1/Materials/Empty";
+            var emptyMaterial = new BinTreeObject(
+                materialPath,
+                "StaticMaterialDef",
+                Array.Empty<BinTreeProperty>());
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex",
+                material: emptyMaterial,
+                defaultMaterialPath: materialPath);
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "test_tx_cm" });
+
+            Assert.Equal(ModelMaterialBindingKind.Authored, resolution.DefaultMaterialDefinition.BindingKind);
+            Assert.Equal("test_tx_cm", resolution.DefaultMaterialDefinition.BaseTextureName);
+        }
+
+        [Fact]
+        public void Resolve_FirstNonEmptyDuplicateOverrideWinsLikeLtkBindingOf()
+        {
+            const string materialPath = "Characters/Test/Skins/Skin1/Materials/Hat";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex",
+                CreateOverride(
+                    "Hat",
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/First_Hat_TX_CM.tex")),
+                CreateMaterial(
+                    materialPath,
+                    CreateSampler(
+                        "Diffuse_Texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Second_Hat_TX_CM.tex")),
+                materialOverride2: CreateOverride(
+                    "hat",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "test_tx_cm", "first_hat_tx_cm", "second_hat_tx_cm" });
+            ModelMaterialDefinition hat = resolution.ResolveMaterialDefinition("hat");
+
+            Assert.Equal(ModelMaterialBindingKind.TextureOnly, hat.BindingKind);
+            Assert.Equal("first_hat_tx_cm", hat.BaseTextureName);
+        }
+        [Fact]
         public void Resolve_DoesNotSubstituteDefaultForMissingMaterialOverride()
         {
             const string defaultTexturePath =
@@ -338,7 +488,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             "PetStyleTwoAphelios_Alune_Face",
             "PetStyleTwoAphelios_Skin2_Alune_Face_TX",
             "alunehead")]
-        public void Resolve_UsesLayerTex01AndPreservesCompanionAuxiliaryMaterial(
+        public void Resolve_DoesNotPromoteLayerTex01AuxiliaryMaterialToBase(
             string submesh,
             string materialName,
             string textureName,
@@ -365,7 +515,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 new[] { textureName.ToLowerInvariant() });
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
 
-            Assert.Equal(textureName.ToLowerInvariant(), resolution.ResolveMaterialDefinition(expectedMaterialKey).BaseTextureName);
+            Assert.Null(resolution.ResolveMaterialDefinition(expectedMaterialKey).BaseTextureName);
             AssertContainsPath(texturePath, metadata.ReferencedTexturePaths);
             AssertContainsPath(
                 "ASSETS/Characters/Shared/Overlay.tex",
@@ -466,17 +616,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 resolution.ResolveMaterialDefinition("base").Effect.Kind);
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("hat").Effect;
             Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, effect.Kind);
-            Assert.Equal("aurora_base_mat_tile01", effect.TextureName);
-            Assert.Equal("aurora_base_mat_hatmask", effect.MaskTextureName);
-            Assert.Equal(new Vector2(-0.1f, 0.1f), effect.ScrollSpeed);
-            Assert.Equal(new Vector2(3f, 2f), effect.Tiling);
-            Assert.Equal(new Vector4(0.18f, 0.67f, 1f, 0f), effect.Color);
+            Assert.Equal("aurora_base_mat_tile01", effect.AdditiveScroll.TextureName);
+            Assert.Equal("aurora_base_mat_hatmask", effect.AdditiveScroll.MaskTextureName);
+            Assert.Equal(new Vector2(-0.1f, 0.1f), effect.AdditiveScroll.ScrollSpeed);
+            Assert.Equal(new Vector2(3f, 2f), effect.AdditiveScroll.Tiling);
+            Assert.Equal(new Vector4(0.18f, 0.67f, 1f, 0f), effect.AdditiveScroll.Color);
 
             ModelMaterialDefinition materialDefinition = resolution.ResolveMaterialDefinition("hat");
             Assert.Equal("aurora_base_tx_cm", materialDefinition.BaseTextureName);
             Assert.Equal(ModelMaterialBlendMode.Opaque, materialDefinition.RenderState.Blending);
             Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, materialDefinition.Effect.Kind);
-            Assert.Equal("aurora_base_mat_tile01", materialDefinition.Effect.TextureName);
+            Assert.Equal("aurora_base_mat_tile01", materialDefinition.Effect.AdditiveScroll.TextureName);
             AssertContainsPath(
                 "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_Mat_HatMask.tex",
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
@@ -719,7 +869,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
-            Assert.Equal(maskName, effect.MaskTextureName);
+            Assert.Equal(maskName, effect.Fresnel.MaskTextureName);
         }
 
         [Fact]
@@ -743,7 +893,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
-            Assert.Null(effect.MaskTextureName);
+            Assert.Null(effect.Fresnel.MaskTextureName);
         }
 
         [Fact]
@@ -778,7 +928,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
             Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
-            Assert.Equal("test_scroll_mask", effect.MaskTextureName);
+            Assert.Equal("test_scroll_mask", effect.Fresnel.MaskTextureName);
         }
 
         [Fact]
@@ -823,16 +973,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 ModelMaterialEffectKind.FresnelNoise |
                 ModelMaterialEffectKind.AnimatedWave,
                 effect.Kind);
-            Assert.Equal("brand_skin53_hairalpha_tx_cm", effect.MaskTextureName);
-            Assert.Equal(3f, effect.FresnelPower);
-            Assert.Equal(0.8f, effect.FresnelStrength);
-            Assert.Equal(new Vector4(1f, 0.2f, 0.05f, 1f), effect.BloomColor);
-            Assert.Equal(0.6f, effect.BloomIntensity);
-            Assert.Equal(new Vector3(50f, 40f, 30f), effect.WaveDirection);
-            Assert.Equal(0.8f, effect.WaveSpeed);
-            Assert.Equal(0.7f, effect.WaveFrequency);
-            Assert.Equal(0.15f, effect.WaveIntensity);
-            Assert.Equal(new Vector2(0.2f, -0.1f), effect.FresnelNoiseSpeed);
+            Assert.Equal("brand_skin53_hairalpha_tx_cm", effect.Fresnel.MaskTextureName);
+            Assert.Equal(3f, effect.Fresnel.Power);
+            Assert.Equal(0.8f, effect.Fresnel.Strength);
+            Assert.Equal(new Vector4(1f, 0.2f, 0.05f, 1f), effect.Bloom.Color);
+            Assert.Equal(0.6f, effect.Bloom.Intensity);
+            Assert.Equal(new Vector3(50f, 40f, 30f), effect.Wave.Direction);
+            Assert.Equal(0.8f, effect.Wave.Speed);
+            Assert.Equal(0.7f, effect.Wave.Frequency);
+            Assert.Equal(0.15f, effect.Wave.Intensity);
+            Assert.Equal(new Vector2(0.2f, -0.1f), effect.Fresnel.NoiseSpeed);
         }
 
         [Fact]
@@ -913,15 +1063,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.Equal(ModelMaterialEffectKind.GradientPulse, effect.Kind);
-            Assert.Equal("gradient_test_01", effect.TextureName);
-            Assert.Equal("aatrox_base_r_body_mask", effect.MaskTextureName);
-            Assert.Equal(3f, effect.PulseRate);
-            Assert.Equal(0.4f, effect.PulseMax);
-            Assert.Equal(0.3f, effect.PulseOffset);
-            Assert.Equal(0.5f, effect.GradientSharpness);
-            Assert.Equal(10f, effect.BloomIntensity);
-            Assert.Equal(-0.2f, effect.DissolveThreshold);
-            Assert.Equal(0.075f, effect.DissolveSoftness);
+            Assert.Equal("gradient_test_01", effect.GradientPulse.TextureName);
+            Assert.Equal("aatrox_base_r_body_mask", effect.GradientPulse.MaskTextureName);
+            Assert.Equal(3f, effect.GradientPulse.PulseRate);
+            Assert.Equal(0.4f, effect.GradientPulse.PulseMax);
+            Assert.Equal(0.3f, effect.GradientPulse.PulseOffset);
+            Assert.Equal(0.5f, effect.GradientPulse.Sharpness);
+            Assert.Equal(10f, effect.GradientPulse.BloomIntensity);
+            Assert.Equal(-0.2f, effect.GradientPulse.MaskThreshold);
+            Assert.Equal(0.075f, effect.GradientPulse.MaskSoftness);
             AssertContainsPath(gradientPath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
         }
 
@@ -962,9 +1112,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("wings").Effect;
             Assert.Equal(ModelMaterialEffectKind.GradientPulse, effect.Kind);
-            Assert.Equal(new Vector2(-0.5f, -0.5f), effect.ScrollSpeed);
-            Assert.Equal(0.785f, effect.DissolveThreshold);
-            Assert.Equal(0.25f, effect.DissolveSoftness);
+            Assert.Equal(new Vector2(-0.5f, -0.5f), effect.GradientPulse.ScrollSpeed);
+            Assert.Equal(0.785f, effect.GradientPulse.MaskThreshold);
+            Assert.Equal(0.25f, effect.GradientPulse.MaskSoftness);
         }
 
         [Fact]
@@ -1000,10 +1150,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, effect.Kind);
-            Assert.Equal("lux_scroll", effect.TextureName);
-            Assert.Equal("lux_scroll_mask", effect.MaskTextureName);
-            Assert.Equal(new Vector2(0.2f, -0.1f), effect.ScrollSpeed);
-            Assert.Equal(new Vector2(2f, 3f), effect.Tiling);
+            Assert.Equal("lux_scroll", effect.AdditiveScroll.TextureName);
+            Assert.Equal("lux_scroll_mask", effect.AdditiveScroll.MaskTextureName);
+            Assert.Equal(new Vector2(0.2f, -0.1f), effect.AdditiveScroll.ScrollSpeed);
+            Assert.Equal(new Vector2(2f, 3f), effect.AdditiveScroll.Tiling);
         }
 
         [Fact]
@@ -1036,10 +1186,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("wfins").Effect;
             Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, effect.Kind);
-            Assert.Equal("pyke_skin45_z_material_flames_03", effect.TextureName);
-            Assert.Null(effect.MaskTextureName);
-            Assert.Equal(new Vector2(0f, 0.7f), effect.ScrollSpeed);
-            Assert.Equal(Vector2.One, effect.Tiling);
+            Assert.Equal("pyke_skin45_z_material_flames_03", effect.AdditiveScroll.TextureName);
+            Assert.Null(effect.AdditiveScroll.MaskTextureName);
+            Assert.Equal(new Vector2(0f, 0.7f), effect.AdditiveScroll.ScrollSpeed);
+            Assert.Equal(Vector2.One, effect.AdditiveScroll.Tiling);
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
             Assert.Equal(
                 Fnv1a.HashLower("Shaders/SkinnedMesh/ScrollingMaskedDiffuseBloom"),
@@ -1099,9 +1249,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.Equal(ModelMaterialEffectKind.Dissolve, effect.Kind);
-            Assert.Equal("dissolve_texture", effect.TextureName);
-            Assert.Equal(0.35f, effect.DissolveThreshold);
-            Assert.Equal(0.2f, effect.DissolveSoftness);
+            Assert.Equal("dissolve_texture", effect.Dissolve.PatternTextureName);
+            Assert.Equal(0.35f, effect.Dissolve.Threshold);
+            Assert.Equal(0.2f, effect.Dissolve.Softness);
             AssertContainsPath(dissolvePath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
         }
 
@@ -1179,14 +1329,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("sword").Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.Emission) != 0);
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Distortion) != 0);
             Assert.False((effect.Kind & ModelMaterialEffectKind.Bloom) != 0);
-            Assert.Equal("aatrox_skin37_sword_distortion", effect.EmissionTextureName);
-            Assert.Equal("aatrox_skin37_sword_emissionmask", effect.EmissionMaskTextureName);
-            Assert.Equal(0, effect.EmissionChannel);
-            Assert.Equal(new Vector2(15f, 3f), effect.EmissionTiling);
-            Assert.Equal(new Vector2(0f, -2f), effect.EmissionScrollSpeed);
-            Assert.Equal(1.25f, effect.EmissionStrength);
-            Assert.Equal(new Vector4(1f, 0.63f, 0f, 1f), effect.EmissionColor);
+            Assert.Equal("aatrox_skin37_sword_distortion", effect.Emission.TextureName);
+            Assert.Equal("aatrox_skin37_sword_emissionmask", effect.Emission.MaskTextureName);
+            Assert.Equal(0, effect.Emission.TextureChannel);
+            Assert.Equal(new Vector2(15f, 3f), effect.Emission.Tiling);
+            Assert.Equal(new Vector2(0f, -2f), effect.Emission.ScrollSpeed);
+            Assert.Equal(1.25f, effect.Emission.Strength);
+            Assert.Equal(new Vector4(1f, 0.63f, 0f, 1f), effect.Emission.Color);
+            Assert.Equal("aatrox_skin37_sword_distortion", effect.Distortion.TextureName);
+            Assert.Equal(1, effect.Distortion.ChannelX);
             AssertContainsPath(emissionPath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
             AssertContainsPath(maskPath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
         }
@@ -1285,8 +1438,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("ult").Effect;
             Assert.Equal(ModelMaterialEffectKind.Bloom, effect.Kind);
-            Assert.Equal("belveth_skin29_ult_bloommask_tx_cm", effect.MaskTextureName);
-            Assert.Equal(5f, effect.BloomIntensity);
+            Assert.Equal("belveth_skin29_ult_bloommask_tx_cm", effect.Bloom.MaskTextureName);
+            Assert.Equal(5f, effect.Bloom.Intensity);
+            Assert.Equal(0, effect.Bloom.MaskChannel);
             AssertContainsPath(
                 "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_Ult_BloomMask_TX_CM.tex",
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
@@ -1324,11 +1478,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("armor").Effect;
             Assert.Equal(ModelMaterialEffectKind.Dissolve, effect.Kind);
-            Assert.Equal("belveth_transition_noise", effect.TextureName);
-            Assert.Equal("belveth_transition_state", effect.MaskTextureName);
-            Assert.Equal(new Vector2(0.1f, -0.2f), effect.ScrollSpeed);
-            Assert.Equal(0.35f, effect.DissolveThreshold);
-            Assert.Equal(0.08f, effect.DissolveSoftness);
+            Assert.Equal("belveth_transition_noise", effect.Dissolve.PatternTextureName);
+            Assert.Equal("belveth_transition_state", effect.Dissolve.StateTextureName);
+            Assert.Null(effect.Dissolve.MaskTextureName);
+            Assert.Equal(new Vector2(0.1f, -0.2f), effect.Dissolve.ScrollSpeed);
+            Assert.Equal(0.35f, effect.Dissolve.Threshold);
+            Assert.Equal(0.08f, effect.Dissolve.Softness);
             AssertContainsPath(
                 "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Transition_Noise.tex",
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
@@ -1362,12 +1517,198 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("hair").Effect;
             Assert.Equal(ModelMaterialEffectKind.FlowMap, effect.Kind);
-            Assert.Equal("cloudfm_tx_cm", effect.TextureName);
-            Assert.Equal(new Vector2(0.2f, -0.1f), effect.ScrollSpeed);
+            Assert.Equal("cloudfm_tx_cm", effect.FlowMap.TextureName);
+            Assert.Equal(new Vector2(0.2f, -0.1f), effect.FlowMap.ScrollSpeed);
         }
 
         [Fact]
-        public void Resolve_DoesNotApproximateCompositeOnsenMaterial()
+        public void Resolve_PreservesAuthoredAuxiliarySamplerWrapping()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler(
+                        "AdditiveScrollTex",
+                        "ASSETS/Test/scroll.tex",
+                        ModelMaterialWrapMode.Clamp,
+                        ModelMaterialWrapMode.Mirror),
+                    new SknMaterialSampler("AdditiveScroll_Mask", "ASSETS/Test/scroll_mask.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["AdditiveTexScrollSpeed_R"] = new(0.1f, 0f, 0f, 0f),
+                    ["AdditiveTexTile"] = Vector4.One,
+                    ["AdditiveStrength_R"] = Vector4.One
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "scroll", "scroll_mask" },
+                new[] { "Body" });
+
+            Assert.True(effect.TextureSampling.TryGetValue("scroll", out ModelEffectTextureSamplingDefinition sampling));
+            Assert.Equal(ModelMaterialWrapMode.Clamp, sampling.WrapU);
+            Assert.Equal(ModelMaterialWrapMode.Mirror, sampling.WrapV);
+        }
+
+        [Fact]
+        public void Resolve_PrefersDedicatedFresnelMaskOverAnotherLayerMask()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("AdditiveScrollTex", "ASSETS/Test/scroll.tex"),
+                    new SknMaterialSampler("AdditiveScroll_Mask", "ASSETS/Test/scroll_mask.tex"),
+                    new SknMaterialSampler("FresnelMask", "ASSETS/Test/fresnel_mask.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["AdditiveTexScrollSpeed_R"] = new(0.1f, 0f, 0f, 0f),
+                    ["AdditiveTexTile"] = Vector4.One,
+                    ["AdditiveStrength_R"] = Vector4.One,
+                    ["FresnelIntensity"] = Vector4.One
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "scroll", "scroll_mask", "fresnel_mask" },
+                new[] { "Body" });
+
+            Assert.Equal("scroll_mask", effect.AdditiveScroll.MaskTextureName);
+            Assert.Equal("fresnel_mask", effect.Fresnel.MaskTextureName);
+        }
+
+        [Fact]
+        public void Resolve_PrefersStandaloneDistortionOverPackedEmissionDistortion()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("Distortion_Texture", "ASSETS/Test/standalone_distortion.tex"),
+                    new SknMaterialSampler("EmissionR_DistortionG_Texture", "ASSETS/Test/packed_emission_distortion.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["DistortionStrength"] = new(0.08f, 0f, 0f, 0f),
+                    ["EmissionStrength"] = Vector4.One,
+                    ["EmissionColor"] = Vector4.One
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "standalone_distortion", "packed_emission_distortion" },
+                new[] { "Body" });
+
+            Assert.Equal("standalone_distortion", effect.Distortion.TextureName);
+            Assert.Equal("packed_emission_distortion", effect.Emission.TextureName);
+        }
+
+        [Fact]
+        public void Resolve_ComposesIndependentAuthoredEffectLayers()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("AdditiveScrollTex", "ASSETS/Test/scroll.tex"),
+                    new SknMaterialSampler("AdditiveScroll_Mask", "ASSETS/Test/scroll_mask.tex"),
+                    new SknMaterialSampler("FlowmapTex", "ASSETS/Test/flow.tex"),
+                    new SknMaterialSampler("FresnelNoise", "ASSETS/Test/fresnel_noise.tex"),
+                    new SknMaterialSampler("Emission_Texture", "ASSETS/Test/emission.tex"),
+                    new SknMaterialSampler("EmissionMask", "ASSETS/Test/emission_mask.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["AdditiveTexScrollSpeed_R"] = new(0.1f, 0.2f, 0f, 0f),
+                    ["AdditiveTexTile"] = new(2f, 2f, 0f, 0f),
+                    ["AdditiveStrength_R"] = Vector4.One,
+                    ["FlowSpeed"] = new(-0.15f, 0.05f, 0f, 0f),
+                    ["FlowmapIntensity"] = new(0.2f, 0f, 0f, 0f),
+                    ["FresnelIntensity"] = new(0.7f, 0f, 0f, 0f),
+                    ["Fresnel_Noise_Tiling_Speed"] = new(2f, 3f, 0.4f, -0.2f),
+                    ["EmissionStrength"] = new(1.4f, 0f, 0f, 0f),
+                    ["EmissionColor"] = new(1f, 0.5f, 0.2f, 1f)
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "scroll", "scroll_mask", "flow", "fresnel_noise", "emission", "emission_mask" },
+                new[] { "Body" });
+
+            Assert.True((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
+            Assert.True((effect.Kind & ModelMaterialEffectKind.FlowMap) != 0);
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
+            Assert.True((effect.Kind & ModelMaterialEffectKind.FresnelNoise) != 0);
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Emission) != 0);
+            Assert.Equal("scroll", effect.AdditiveScroll.TextureName);
+            Assert.Equal("flow", effect.FlowMap.TextureName);
+            Assert.Equal("fresnel_noise", effect.Fresnel.NoiseTextureName);
+            Assert.Equal("emission", effect.Emission.TextureName);
+        }
+
+        [Fact]
+        public void Resolve_PreservesAuthoredMaskChannel()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("Mask_Texture_blue", "ASSETS/Test/bloom_mask.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Bloom_Color"] = Vector4.One,
+                    ["Bloom_Intensity"] = new(2f, 0f, 0f, 0f)
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "bloom_mask" },
+                new[] { "Body" });
+
+            Assert.Equal(ModelMaterialEffectKind.Bloom, effect.Kind);
+            Assert.Equal("bloom_mask", effect.Bloom.MaskTextureName);
+            Assert.Equal(2, effect.Bloom.MaskChannel);
+        }
+
+        [Fact]
+        public void Resolve_UsesAuthoredNoiseForComplexVertexDeformation()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("DeformNoise", "ASSETS/Test/deform_noise.tex"),
+                    new SknMaterialSampler("DeformMask", "ASSETS/Test/deform_mask.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["VertexDeformFeatureStrength"] = new(0.8f, 0f, 0f, 0f),
+                    ["DeformProtection"] = new(1.5f, 0f, 0f, 0f),
+                    ["DeformDirection"] = new(0f, 1f, 0.2f, 0f),
+                    ["DeformScrollSpeed"] = new(0.1f, -0.2f, 0f, 0f),
+                    ["DeformTiling"] = new(3f, 2f, 0f, 0f),
+                    ["DeformSpeed"] = new(0.7f, 0f, 0f, 0f),
+                    ["DeformFrequency"] = new(1.3f, 0f, 0f, 0f)
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "deform_noise", "deform_mask" },
+                new[] { "Body" });
+
+            Assert.Equal(ModelMaterialEffectKind.VertexDeformation, effect.Kind);
+            Assert.Equal("deform_noise", effect.VertexDeformation.NoiseTextureName);
+            Assert.Equal("deform_mask", effect.VertexDeformation.MaskTextureName);
+            Assert.Equal(0.8f, effect.VertexDeformation.Intensity);
+            Assert.Equal(1.5f, effect.VertexDeformation.Protection);
+        }
+
+        [Fact]
+        public void Resolve_PreservesSupportedLayersFromCompositeOnsenMaterial()
         {
             const string materialPath = "Characters/Locke/Skins/Base/Materials/Onsen";
             BinTree tree = CreateSkinTree(
@@ -1392,14 +1733,58 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
                 tree,
-                new[] { "locke_base_main_tx_cm", "flowmap", "locke_additionalscrollcombo" });
+                new[]
+                {
+                    "locke_base_main_tx_cm",
+                    "locke_coat_mask",
+                    "flowmap",
+                    "locke_additionalscrollcombo"
+                });
 
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.Equal(
-                ModelMaterialEffectKind.None,
-                resolution.DefaultMaterialDefinition.Effect.Kind);
-            Assert.All(
-                resolution.MaterialDefinitions.Values,
-                material => Assert.Equal(ModelMaterialEffectKind.None, material.Effect.Kind));
+                ModelMaterialEffectKind.FlowMap |
+                ModelMaterialEffectKind.Fresnel |
+                ModelMaterialEffectKind.Distortion,
+                effect.Kind);
+            Assert.Equal("flowmap", effect.FlowMap.TextureName);
+            Assert.Equal(new Vector2(-0.2f, 0f), effect.FlowMap.ScrollSpeed);
+            Assert.Equal(1f, effect.Fresnel.Strength);
+            Assert.Equal("locke_coat_mask", effect.Distortion.TextureName);
+            Assert.Equal(0, effect.Distortion.ChannelX);
+            Assert.Equal(1, effect.Distortion.ChannelY);
+        }
+
+        [Fact]
+        public void Resolve_RecognizesStandaloneDistortionLayer()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("Distortion_Texture", "ASSETS/Test/distortion.tex"),
+                    new SknMaterialSampler("DistortionMask", "ASSETS/Test/distortion_mask.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["DistortionStrength"] = new(0.035f, 0f, 0f, 0f),
+                    ["DistortionScrollSpeed"] = new(0.2f, -0.1f, 0f, 0f),
+                    ["DistortionTiling"] = new(2f, 3f, 0f, 0f)
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "distortion", "distortion_mask" },
+                new[] { "Body" });
+
+            Assert.Equal(ModelMaterialEffectKind.Distortion, effect.Kind);
+            Assert.Equal("distortion", effect.Distortion.TextureName);
+            Assert.Equal("distortion_mask", effect.Distortion.MaskTextureName);
+            Assert.Equal(new Vector2(0.2f, -0.1f), effect.Distortion.ScrollSpeed);
+            Assert.Equal(new Vector2(2f, 3f), effect.Distortion.Tiling);
+            Assert.Equal(0.035f, effect.Distortion.Strength);
+            Assert.Equal(0, effect.Distortion.ChannelX);
+            Assert.Equal(1, effect.Distortion.ChannelY);
         }
 
         [Fact]
@@ -1664,23 +2049,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void FindBaseDiffuseTextureKey_SelectsBaseBodyTexture()
-        {
-            var availableKeys = new[]
-            {
-                "petchibizoe_base_face_tx_cm",
-                "petchibizoe_base_fresnel_tx_cm",
-                "petchibizoe_base_hair_tx_cm",
-                "petchibizoe_base_mask_tx_cm",
-                "petchibizoe_base_speedline_tx_cm",
-                "petchibizoe_base_tool_tx_cm",
-                "petchibizoe_base_tx_cm"
-            };
-
-            Assert.Equal("petchibizoe_base_tx_cm", SknResolver.FindBaseDiffuseTextureKey(availableKeys));
-        }
-
-        [Fact]
         public void ResolveTextureDirectory_UsesCompanionThemeParent()
         {
             string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-companion-textures-{Guid.NewGuid():N}");
@@ -1852,7 +2220,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
             Assert.True(material.Color.W < 0.1f);
             Assert.Equal(0.31f, material.Color.X, 2);
-            Assert.Equal(1f, effect.FresnelColor.X, 2);
+            Assert.Equal(1f, effect.Fresnel.Color.X, 2);
+            Assert.Equal(ModelMaterialBlendMode.Opaque, material.RenderState.Blending);
+            Assert.True(effect.RequiresAlphaBlend);
+            Assert.True(new ModelPart { MaterialDefinition = material }.IsAlphaBlended);
         }
 
         private static BinTree CreateSeraphineIridescentBodyTree(

@@ -182,12 +182,15 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 ModelMaterialEffectDefinition effect = material?.Effect ?? ModelMaterialEffectDefinition.None;
                 if (effect.Kind != ModelMaterialEffectKind.None)
                 {
+                    string textures = string.Join(
+                        ",",
+                        effect.EnumerateTextureNames()
+                            .Where(name => !string.IsNullOrWhiteSpace(name))
+                            .Distinct(StringComparer.OrdinalIgnoreCase));
                     Console.WriteLine(
                         $"    effect submesh={submesh} kind={effect.Kind} " +
-                        $"texture={effect.TextureName ?? "<none>"} mask={effect.MaskTextureName ?? "<none>"} " +
-                        $"emissionTexture={effect.EmissionTextureName ?? "<none>"} " +
-                        $"emissionMask={effect.EmissionMaskTextureName ?? "<none>"} " +
-                        $"emissionChannel={effect.EmissionChannel}");
+                        $"textures={(string.IsNullOrWhiteSpace(textures) ? "<none>" : textures)} " +
+                        $"emissionChannel={effect.Emission?.TextureChannel ?? -1}");
                 }
 
                 if (!string.IsNullOrWhiteSpace(material?.BaseTextureName))

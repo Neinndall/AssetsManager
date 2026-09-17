@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -25,27 +26,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal bool TextureResolved;
             internal string LoadedTextureKey;
             internal BitmapSource LoadedBitmap;
-            internal uint EffectTexture;
-            internal uint EffectMaskTexture;
-            internal bool EffectTexturesResolved;
-            internal string LoadedEffectTextureKey;
-            internal string LoadedEffectMaskTextureKey;
-            internal BitmapSource LoadedEffectBitmap;
-            internal BitmapSource LoadedEffectMaskBitmap;
-            internal uint EmissionTexture;
-            internal uint EmissionMaskTexture;
-            internal bool EmissionTexturesResolved;
-            internal string LoadedEmissionTextureKey;
-            internal string LoadedEmissionMaskTextureKey;
-            internal BitmapSource LoadedEmissionBitmap;
-            internal BitmapSource LoadedEmissionMaskBitmap;
-            internal uint IridescenceTexture;
-            internal uint IridescenceMaskTexture;
-            internal bool IridescenceTexturesResolved;
-            internal string LoadedIridescenceTextureKey;
-            internal string LoadedIridescenceMaskTextureKey;
-            internal BitmapSource LoadedIridescenceBitmap;
-            internal BitmapSource LoadedIridescenceMaskBitmap;
+            internal string AuxiliaryTextureSignature;
+            internal readonly Dictionary<string, uint> AuxiliaryTextures =
+                new(StringComparer.OrdinalIgnoreCase);
+            internal readonly Dictionary<string, BitmapSource> LoadedAuxiliaryBitmaps =
+                new(StringComparer.OrdinalIgnoreCase);
             internal uint LightmapTexture;
             internal bool LightmapTextureResolved;
             internal string LoadedLightmapTextureKey;
@@ -94,9 +79,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             }
 
             EnsureBaseTexture(part, resources);
-            EnsureEffectTextures(part, resources);
-            EnsureEmissionTextures(part, resources);
-            EnsureIridescenceTextures(part, resources);
+            EnsureAuxiliaryTextures(part, resources);
             EnsureLightmapTexture(part, resources);
             resources = EnsureMeshBuffers(part, resources);
             EnsureSkinningBuffers(model, resources, part);
@@ -321,136 +304,35 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 resources.LoadedLightmapBitmap,
                 () => UploadTexture(
                     resources.LoadedLightmapBitmap,
-                    premultiplyAlpha: false,
-                wrapMode: TextureWrapMode.ClampToEdge));
+                    wrapMode: TextureWrapMode.ClampToEdge));
         }
 
-        private void EnsureEffectTextures(ModelPart part, PartResources resources)
+        private void EnsureAuxiliaryTextures(ModelPart part, PartResources resources)
         {
             ModelMaterialEffectDefinition effect = ResolveMaterialEffect(part);
-            string effectTextureKey = effect.Kind == ModelMaterialEffectKind.None
-                ? null
-                : effect.TextureName;
-            string effectMaskTextureKey = effect.Kind == ModelMaterialEffectKind.None
-                ? null
-                : effect.MaskTextureName;
-
-            if (resources.EffectTexturesResolved &&
-                resources.LoadedEffectTextureKey == effectTextureKey &&
-                resources.LoadedEffectMaskTextureKey == effectMaskTextureKey)
-            {
+            string[] textureKeys = effect
+                .EnumerateTextureNames()
+                .Where(key => !string.IsNullOrWhiteSpace(key))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            string signature = string.Join("\n", textureKeys);
+            if (string.Equals(resources.AuxiliaryTextureSignature, signature, StringComparison.Ordinal))
                 return;
-            }
 
-            ReleaseEffectTextures(resources);
-            resources.EffectTexturesResolved = true;
-            resources.LoadedEffectTextureKey = effectTextureKey;
-            resources.LoadedEffectMaskTextureKey = effectMaskTextureKey;
-            resources.LoadedEffectBitmap = TextureUtils.ResolveTexture(part.AllTextures, effectTextureKey);
-            resources.LoadedEffectMaskBitmap = TextureUtils.ResolveTexture(part.AllTextures, effectMaskTextureKey);
-
-            if (resources.LoadedEffectBitmap != null)
+            ReleaseAuxiliaryTextures(resources);
+            resources.AuxiliaryTextureSignature = signature;
+            foreach (string textureKey in textureKeys)
             {
-                resources.EffectTexture = AcquireTexture(
+                BitmapSource bitmap = TextureUtils.ResolveTexture(part.AllTextures, textureKey);
+                if (bitmap == null)
+                    continue;
+
+                resources.LoadedAuxiliaryBitmaps[textureKey] = bitmap;
+                resources.AuxiliaryTextures[textureKey] = AcquireTexture(
                     _sharedTextures,
-                    resources.LoadedEffectBitmap,
-                    () => UploadTexture(resources.LoadedEffectBitmap));
-            }
-
-            if (resources.LoadedEffectMaskBitmap != null)
-            {
-                resources.EffectMaskTexture = AcquireTexture(
-                    _sharedTextures,
-                    resources.LoadedEffectMaskBitmap,
-                    () => UploadTexture(resources.LoadedEffectMaskBitmap));
-            }
-        }
-
-        private void EnsureEmissionTextures(ModelPart part, PartResources resources)
-        {
-            ModelMaterialEffectDefinition effect = ResolveMaterialEffect(part);
-            bool hasEmission = (effect.Kind & ModelMaterialEffectKind.Emission) != 0;
-            string emissionTextureKey = hasEmission ? effect.EmissionTextureName : null;
-            string emissionMaskTextureKey = hasEmission ? effect.EmissionMaskTextureName : null;
-
-            if (resources.EmissionTexturesResolved &&
-                resources.LoadedEmissionTextureKey == emissionTextureKey &&
-                resources.LoadedEmissionMaskTextureKey == emissionMaskTextureKey)
-            {
-                return;
-            }
-
-            ReleaseEmissionTextures(resources);
-            resources.EmissionTexturesResolved = true;
-            resources.LoadedEmissionTextureKey = emissionTextureKey;
-            resources.LoadedEmissionMaskTextureKey = emissionMaskTextureKey;
-            resources.LoadedEmissionBitmap = TextureUtils.ResolveTexture(
-                part.AllTextures,
-                emissionTextureKey);
-            resources.LoadedEmissionMaskBitmap = TextureUtils.ResolveTexture(
-                part.AllTextures,
-                emissionMaskTextureKey);
-
-            if (resources.LoadedEmissionBitmap != null)
-            {
-                resources.EmissionTexture = AcquireTexture(
-                    _sharedTextures,
-                    resources.LoadedEmissionBitmap,
-                    () => UploadTexture(resources.LoadedEmissionBitmap));
-            }
-
-            if (resources.LoadedEmissionMaskBitmap != null)
-            {
-                resources.EmissionMaskTexture = AcquireTexture(
-                    _sharedTextures,
-                    resources.LoadedEmissionMaskBitmap,
-                    () => UploadTexture(resources.LoadedEmissionMaskBitmap));
-            }
-        }
-
-        private void EnsureIridescenceTextures(ModelPart part, PartResources resources)
-        {
-            ModelMaterialEffectDefinition effect = ResolveMaterialEffect(part);
-            ModelIridescenceDefinition iridescence = effect.Iridescence;
-            string iridescenceTextureKey = iridescence?.LutTextureName;
-            string iridescenceMaskTextureKey = iridescence?.MaskTextureName;
-
-            if (resources.IridescenceTexturesResolved &&
-                resources.LoadedIridescenceTextureKey == iridescenceTextureKey &&
-                resources.LoadedIridescenceMaskTextureKey == iridescenceMaskTextureKey)
-            {
-                return;
-            }
-
-            ReleaseIridescenceTextures(resources);
-            resources.IridescenceTexturesResolved = true;
-            resources.LoadedIridescenceTextureKey = iridescenceTextureKey;
-            resources.LoadedIridescenceMaskTextureKey = iridescenceMaskTextureKey;
-            resources.LoadedIridescenceBitmap = TextureUtils.ResolveTexture(
-                part.AllTextures,
-                iridescenceTextureKey);
-            resources.LoadedIridescenceMaskBitmap = TextureUtils.ResolveTexture(
-                part.AllTextures,
-                iridescenceMaskTextureKey);
-
-            if (resources.LoadedIridescenceBitmap != null)
-            {
-                resources.IridescenceTexture = AcquireTexture(
-                    _sharedTextures,
-                    resources.LoadedIridescenceBitmap,
-                    () => UploadTexture(
-                        resources.LoadedIridescenceBitmap,
-                        premultiplyAlpha: false));
-            }
-
-            if (resources.LoadedIridescenceMaskBitmap != null)
-            {
-                resources.IridescenceMaskTexture = AcquireTexture(
-                    _sharedTextures,
-                    resources.LoadedIridescenceMaskBitmap,
-                    () => UploadTexture(
-                        resources.LoadedIridescenceMaskBitmap,
-                        premultiplyAlpha: false));
+                    bitmap,
+                    () => UploadTexture(bitmap));
             }
         }
 
@@ -458,16 +340,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         {
             // Specialized SKN layers are owned by the authored material definition.
             return part.MaterialDefinition?.Effect ?? ModelMaterialEffectDefinition.None;
-        }
-
-        private void ReleaseIridescenceTextures(PartResources resources)
-        {
-            ReleaseSharedTexture(_sharedTextures, resources.LoadedIridescenceBitmap);
-            ReleaseSharedTexture(_sharedTextures, resources.LoadedIridescenceMaskBitmap);
-            resources.IridescenceTexture = 0;
-            resources.IridescenceMaskTexture = 0;
-            resources.LoadedIridescenceBitmap = null;
-            resources.LoadedIridescenceMaskBitmap = null;
         }
 
         private static uint AcquireTexture(
@@ -490,9 +362,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             if (!_partResources.TryGetValue(part, out PartResources resources)) return;
 
             ReleaseBaseTexture(resources);
-            ReleaseEffectTextures(resources);
-            ReleaseEmissionTextures(resources);
-            ReleaseIridescenceTextures(resources);
+            ReleaseAuxiliaryTextures(resources);
             ReleaseLightmapTexture(resources);
             DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
             DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
@@ -524,24 +394,14 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             resources.LoadedLightmapBitmap = null;
         }
 
-        private void ReleaseEffectTextures(PartResources resources)
+        private void ReleaseAuxiliaryTextures(PartResources resources)
         {
-            ReleaseSharedTexture(_sharedTextures, resources.LoadedEffectBitmap);
-            ReleaseSharedTexture(_sharedTextures, resources.LoadedEffectMaskBitmap);
-            resources.EffectTexture = 0;
-            resources.EffectMaskTexture = 0;
-            resources.LoadedEffectBitmap = null;
-            resources.LoadedEffectMaskBitmap = null;
-        }
+            foreach (BitmapSource bitmap in resources.LoadedAuxiliaryBitmaps.Values)
+                ReleaseSharedTexture(_sharedTextures, bitmap);
 
-        private void ReleaseEmissionTextures(PartResources resources)
-        {
-            ReleaseSharedTexture(_sharedTextures, resources.LoadedEmissionBitmap);
-            ReleaseSharedTexture(_sharedTextures, resources.LoadedEmissionMaskBitmap);
-            resources.EmissionTexture = 0;
-            resources.EmissionMaskTexture = 0;
-            resources.LoadedEmissionBitmap = null;
-            resources.LoadedEmissionMaskBitmap = null;
+            resources.AuxiliaryTextures.Clear();
+            resources.LoadedAuxiliaryBitmaps.Clear();
+            resources.AuxiliaryTextureSignature = null;
         }
 
         private void ReleaseSharedTexture(
@@ -602,7 +462,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         private uint UploadTexture(
             BitmapSource bitmap,
-            bool premultiplyAlpha = true,
             TextureWrapMode wrapMode = TextureWrapMode.Repeat)
         {
             if (bitmap.Format != PixelFormats.Bgra32)
@@ -620,8 +479,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             int stride = width * 4;
             byte[] pixels = new byte[height * stride];
             bitmap.CopyPixels(pixels, stride, 0);
-            if (premultiplyAlpha)
-                PremultiplyBgra(pixels);
 
             uint texture = _gl.GenTexture();
             _gl.BindTexture(TextureTarget.Texture2D, texture);
@@ -642,17 +499,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)wrapMode);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
             return texture;
-        }
-
-        internal static void PremultiplyBgra(Span<byte> pixels)
-        {
-            for (int i = 0; i + 3 < pixels.Length; i += 4)
-            {
-                int alpha = pixels[i + 3];
-                pixels[i] = (byte)((pixels[i] * alpha + 127) / 255);
-                pixels[i + 1] = (byte)((pixels[i + 1] * alpha + 127) / 255);
-                pixels[i + 2] = (byte)((pixels[i + 2] * alpha + 127) / 255);
-            }
         }
 
         public void Dispose()
