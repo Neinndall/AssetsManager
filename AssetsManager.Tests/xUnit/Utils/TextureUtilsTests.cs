@@ -53,29 +53,6 @@ namespace AssetsManager.Tests.xUnit.Utils
         }
 
         [Fact]
-        public void CreateViewerTextureBrush_UsesUvRelativeViewportAndAuthoredWrapMode()
-        {
-            BitmapSource bitmap = BitmapSource.Create(
-                1,
-                1,
-                96,
-                96,
-                PixelFormats.Bgra32,
-                null,
-                new byte[] { 0, 0, 0, 255 },
-                4);
-            bitmap.Freeze();
-
-            ImageBrush tiled = TextureUtils.CreateViewerTextureBrush(bitmap, true);
-            ImageBrush clamped = TextureUtils.CreateViewerTextureBrush(bitmap, false);
-
-            Assert.Equal(BrushMappingMode.RelativeToBoundingBox, tiled.ViewportUnits);
-            Assert.Equal(BrushMappingMode.RelativeToBoundingBox, tiled.ViewboxUnits);
-            Assert.Equal(TileMode.Tile, tiled.TileMode);
-            Assert.Equal(TileMode.None, clamped.TileMode);
-        }
-
-        [Fact]
         public void ModelPart_DoesNotInferTransparencyFromColorTextureAlpha()
         {
             BitmapSource bitmap = BitmapSource.Create(

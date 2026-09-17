@@ -31,14 +31,7 @@ namespace AssetsManager.Views.Models.Viewer
         public string Name
         {
             get => _name;
-            set
-            {
-                _name = value;
-                if (value?.IndexOf("VFX", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    IsVisible = false;
-                }
-            }
+            set => _name = value;
         }
 
         private bool _isVisible = true;
@@ -113,7 +106,6 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 if (_selectedTextureName == value) return;
                 _selectedTextureName = value;
-                TextureUtils.UpdateMaterial(this);
                 OnPropertyChanged();
             }
         }

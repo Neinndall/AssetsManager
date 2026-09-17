@@ -148,10 +148,10 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IReadOnlyDictionary<string, string> macros = MergeMacros(material, shader);
             string shaderPath = shader?.Path ?? material.ShaderPath;
             bool switchedShader = material.ShaderHash == SwitchedShaderHash ||
-                string.Equals(
-                    shaderPath,
-                    "Shaders/SkinnedMesh/AlphaBlend_Additive_Scroll_Packed",
-                    StringComparison.OrdinalIgnoreCase);
+                (!string.IsNullOrWhiteSpace(shaderPath) &&
+                 shaderPath.EndsWith(
+                     "Shaders/SkinnedMesh/AlphaBlend_Additive_Scroll_Packed",
+                     StringComparison.OrdinalIgnoreCase));
 
             (SknMaterialSampler baseSampler, ModelMaterialBaseRule baseRule) =
                 SelectBaseSampler(samplers, switches, switchedShader);
@@ -193,6 +193,28 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 material.IsAnimated,
                 shaderPath,
                 effect ?? ModelMaterialEffectDefinition.None);
+        }
+
+        internal static SknMaterialDefinition CreateEffectiveEffectMaterial(
+            SknMaterialDefinition material,
+            SknShaderDefinition shader)
+        {
+            if (material == null)
+                return null;
+
+            IReadOnlyDictionary<string, bool> switchStates = MergeSwitches(material, shader);
+            return material with
+            {
+                Samplers = MergeSamplers(material, shader),
+                Parameters = MergeParameters(material, shader),
+                SwitchStates = switchStates,
+                Switches = switchStates
+                    .Where(pair => pair.Value)
+                    .Select(pair => SknMaterialTextureResolver.NormalizeToken(pair.Key))
+                    .ToHashSet(StringComparer.Ordinal),
+                ShaderMacros = MergeMacros(material, shader),
+                ShaderPath = shader?.Path ?? material.ShaderPath
+            };
         }
 
         private static IReadOnlyList<SknMaterialSampler> MergeSamplers(
@@ -446,13 +468,17 @@ namespace AssetsManager.Services.Viewer.Resolvers
             bool blendEnabled = pass?.BlendEnabled ?? false;
             uint destinationBlendFactor = pass?.DestinationColorBlendFactor ?? 0;
 
-            ModelMaterialBlendMode blending = !blendEnabled
-                ? ModelMaterialBlendMode.Opaque
-                : destinationBlendFactor == DestinationBlendFactorOne ||
-                  IsMacroEnabled(macros, "SKINNED_MATERIAL_ADDITIVE") ||
-                  (!switchedShader && !string.IsNullOrWhiteSpace(shaderPath) && AdditiveShader.IsMatch(shaderPath))
-                    ? ModelMaterialBlendMode.Additive
-                    : ModelMaterialBlendMode.Normal;
+            bool additive =
+                (blendEnabled && destinationBlendFactor == DestinationBlendFactorOne) ||
+                IsMacroEnabled(macros, "SKINNED_MATERIAL_ADDITIVE") ||
+                (blendEnabled && !switchedShader &&
+                 !string.IsNullOrWhiteSpace(shaderPath) &&
+                 AdditiveShader.IsMatch(shaderPath));
+            ModelMaterialBlendMode blending = additive
+                ? ModelMaterialBlendMode.Additive
+                : blendEnabled
+                    ? ModelMaterialBlendMode.Normal
+                    : ModelMaterialBlendMode.Opaque;
 
             if (switchedShader && blending == ModelMaterialBlendMode.Normal &&
                 IsEnabled(switches, "ADDITIVEALPHA_ON"))

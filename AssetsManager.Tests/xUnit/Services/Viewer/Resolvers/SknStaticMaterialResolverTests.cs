@@ -99,6 +99,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void ModelPart_VfxNameDoesNotImplicitlyHideAuthoredSubmesh()
+        {
+            var part = new ModelPart
+            {
+                Name = "Body_VFX"
+            };
+
+            Assert.True(part.IsVisible);
+        }
+
+        [Fact]
         public void ModelPart_RuntimeOpacityCanBlendAnAuthoredOpaqueMaterial()
         {
             var part = new ModelPart
@@ -266,6 +277,21 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_AdditiveMacroOverridesDisabledBlendLikeLtk()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                macros: new Dictionary<string, string>
+                {
+                    ["SKINNED_MATERIAL_ADDITIVE"] = "1"
+                },
+                pass: Pass(blendEnabled: false));
+
+            ModelMaterialDefinition resolved = Resolve(material, Array.Empty<string>());
+
+            Assert.Equal(ModelMaterialBlendMode.Additive, resolved.RenderState.Blending);
+        }
+
+        [Fact]
         public void Resolve_SwitchedShaderUsesMainTextureAndAdditiveSwitch()
         {
             uint shaderHash = Fnv1a.HashLower(SwitchedShaderPath);
@@ -287,6 +313,35 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             Assert.Equal("test_tx_cm", resolved.BaseTextureName);
             Assert.Equal(ModelMaterialBlendMode.Additive, resolved.RenderState.Blending);
+        }
+
+        [Fact]
+        public void Resolve_SwitchedShaderPathSuffixUsesMainTextureLikeLtk()
+        {
+            SknShaderDefinition shader = new(
+                $"Resolved/Prefix/{SwitchedShaderPath}",
+                Array.Empty<SknMaterialSampler>(),
+                new Dictionary<string, Vector4>(),
+                new Dictionary<string, bool>(),
+                new Dictionary<string, string>());
+            SknMaterialDefinition material = CreateMaterial(
+                samplers: new[]
+                {
+                    Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Diffuse_TX_CM.tex"),
+                    Sampler("Main_Texture", "ASSETS/Characters/Test/Main_TX_CM.tex")
+                },
+                switches: new Dictionary<string, bool>
+                {
+                    ["MAINTEX_ON"] = true
+                });
+
+            ModelMaterialDefinition resolved = Resolve(
+                material,
+                new[] { "diffuse_tx_cm", "main_tx_cm" },
+                shader: shader);
+
+            Assert.Equal("main_tx_cm", resolved.BaseTextureName);
+            Assert.Equal(ModelMaterialBaseRule.SwitchOverride, resolved.BaseRule);
         }
 
         [Fact]

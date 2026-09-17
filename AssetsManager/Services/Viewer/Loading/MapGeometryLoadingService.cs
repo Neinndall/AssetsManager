@@ -478,14 +478,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 if (mesh.CanFreeze) mesh.Freeze();
 
                 string textureKey = ResolveTextureKey(data, result);
-                var fallbackBrush = new SolidColorBrush(ToMediaColor(data.TintColor));
-                if (fallbackBrush.CanFreeze) fallbackBrush.Freeze();
-                var fallbackMaterial = new DiffuseMaterial(fallbackBrush);
-                if (fallbackMaterial.CanFreeze) fallbackMaterial.Freeze();
-                var geometryModel = new GeometryModel3D(mesh, fallbackMaterial)
-                {
-                    BackMaterial = data.IsDoubleSided ? fallbackMaterial : null
-                };
+                var geometryModel = new GeometryModel3D(mesh, null);
 
                 var modelPart = new ModelPart(
                     meshName,
@@ -504,7 +497,6 @@ namespace AssetsManager.Services.Viewer.Loading
                     Lightmap = CreateLightmapBinding(data, result)
                 };
 
-                TextureUtils.UpdateMaterial(modelPart);
                 parts.Add(modelPart);
             }
 
@@ -544,18 +536,6 @@ namespace AssetsManager.Services.Viewer.Loading
             return string.IsNullOrEmpty(textureKey)
                 ? null
                 : new MapLightmapBinding(textureKey, data.LightmapUvCoordinates);
-        }
-
-        private static Color ToMediaColor(System.Numerics.Vector4? value)
-        {
-            if (value == null)
-                return Colors.Magenta;
-
-            static byte ToByte(float component) =>
-                (byte)Math.Round(Math.Clamp(component, 0f, 1f) * byte.MaxValue);
-
-            System.Numerics.Vector4 color = value.Value;
-            return Color.FromArgb(ToByte(color.W), ToByte(color.X), ToByte(color.Y), ToByte(color.Z));
         }
 
         private static byte[] SliceVertexColors(

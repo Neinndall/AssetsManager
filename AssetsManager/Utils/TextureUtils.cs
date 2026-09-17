@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Media.Media3D;
 using BCnEncoder.Shared;
 using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Toolkit;
@@ -14,7 +13,6 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using AssetsManager.Services.Core;
-using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Utils
@@ -29,45 +27,6 @@ namespace AssetsManager.Utils
             allTextures.TryGetValue(selectedTextureName, out BitmapSource texture);
             return texture;
         }
-
-        public static void UpdateMaterial(ModelPart modelPart)
-        {
-            if (modelPart.Geometry == null || string.IsNullOrEmpty(modelPart.SelectedTextureName))
-                return;
-
-            BitmapSource texture = ResolveTexture(modelPart.AllTextures, modelPart.SelectedTextureName);
-
-            if (texture != null)
-            {
-                var materialGroup = new MaterialGroup();
-                var imageBrush = CreateViewerTextureBrush(texture, modelPart.IsTextureTiled);
-                materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
-
-                modelPart.Geometry.Material = materialGroup;
-                modelPart.Geometry.BackMaterial = modelPart.IsDoubleSided ? materialGroup : null;
-            }
-        }
-
-        internal static ImageBrush CreateViewerTextureBrush(BitmapSource texture, bool isTiled)
-        {
-            var imageBrush = new ImageBrush(texture)
-            {
-                Viewport = new System.Windows.Rect(0, 0, 1, 1),
-                ViewportUnits = BrushMappingMode.RelativeToBoundingBox,
-                Viewbox = new System.Windows.Rect(0, 0, 1, 1),
-                ViewboxUnits = BrushMappingMode.RelativeToBoundingBox,
-                TileMode = isTiled ? TileMode.Tile : TileMode.None,
-                Stretch = Stretch.Fill
-            };
-
-            RenderOptions.SetBitmapScalingMode(imageBrush, BitmapScalingMode.HighQuality);
-            RenderOptions.SetCachingHint(imageBrush, CachingHint.Cache);
-            RenderOptions.SetEdgeMode(imageBrush, EdgeMode.Unspecified);
-
-            if (imageBrush.CanFreeze) imageBrush.Freeze();
-            return imageBrush;
-        }
-
 
         public static BitmapSource LoadTexture(byte[] data, string extension, int? maxWidth = null, int? maxHeight = null)
         {

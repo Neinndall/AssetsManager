@@ -202,9 +202,9 @@ namespace AssetsManager.Services.Viewer.Loading
         {
             var availableTextureNames = new ObservableRangeCollection<string>(
                 SknMaterialTextureResolver.GetSelectableTextureCandidates(selectableTextureKeys, materialTextures));
-            string defaultTextureKey = materialTextures != null
-                ? materialTextures.DefaultMaterialDefinition.BaseTextureName
-                : SknMaterialTextureResolver.FindBaseDiffuseTextureKey(loadedTextures.Keys.ToList());
+            // A missing BIN leaves the SKN unbound instead of guessing an albedo from filenames.
+            // Available textures remain selectable manually in the Viewer.
+            string defaultTextureKey = materialTextures?.DefaultMaterialDefinition.BaseTextureName;
 
             var dataList = new List<SubmeshData>();
             var vertexAccessor = skinnedMesh.VerticesView.GetAccessor(VertexElement.POSITION.Name);
@@ -318,7 +318,7 @@ namespace AssetsManager.Services.Viewer.Loading
                         TextureCoordinates = texCoordsCol
                     };
 
-                    var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
+                    var geometryModel = new GeometryModel3D(meshGeometry, null);
 
                     var modelPart = new ModelPart(
                         string.IsNullOrEmpty(data.MaterialName) ? "Default" : data.MaterialName,
@@ -331,7 +331,6 @@ namespace AssetsManager.Services.Viewer.Loading
                         MaterialDefinition = data.MaterialDefinition
                     };
 
-                    TextureUtils.UpdateMaterial(modelPart);
                     if (initiallyHiddenSubmeshes.Contains(modelPart.Name))
                         modelPart.IsVisible = false;
 

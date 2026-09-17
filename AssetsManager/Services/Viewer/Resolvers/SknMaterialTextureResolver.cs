@@ -234,92 +234,93 @@ namespace AssetsManager.Services.Viewer.Resolvers
             var overrideMaterials = new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
             var overrideMaterialLinkKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var directOverrideTexturePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var seenOverrideSubmeshes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             IReadOnlyList<string> initialHiddenSubmeshes = Array.Empty<string>();
             bool readInitialHiddenSubmeshes = false;
             bool hasDefaultMaterialLink = false;
             string defaultTexturePath = null;
             SknMaterialDefinition defaultMaterial = null;
 
-            foreach (BinTree tree in trees)
+            // LTK resolves skinMeshProperties only from the selected skin object. Dependency
+            // BINs are walked solely to fill material links that the primary skin leaves missing.
+            foreach (BinTreeObject obj in primaryTree.Objects.Values)
             {
-                foreach (BinTreeObject obj in tree.Objects.Values)
+                if (obj.ClassHash != SkinPropertiesClass ||
+                    !obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
+                    meshProperty is not BinTreeStruct meshProperties)
                 {
-                    if (obj.ClassHash != SkinPropertiesClass ||
-                        !obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
-                        meshProperty is not BinTreeStruct meshProperties)
+                    continue;
+                }
+
+                if (!readInitialHiddenSubmeshes)
+                {
+                    readInitialHiddenSubmeshes = true;
+                    if (TryGetString(meshProperties, InitialSubmeshToHide, out string hiddenSubmeshes))
+                        initialHiddenSubmeshes = SplitSubmeshNames(hiddenSubmeshes);
+                }
+
+                if (defaultTexturePath == null &&
+                    TryGetTexturePath(meshProperties, Texture, wadChunkPathResolver, out string texturePath))
+                {
+                    defaultTexturePath = texturePath;
+                }
+
+                if (meshProperties.Properties.TryGetValue(Material, out BinTreeProperty materialProperty) &&
+                    materialProperty is BinTreeObjectLink defaultMaterialLink)
+                {
+                    hasDefaultMaterialLink = true;
+                    if (defaultMaterial == null &&
+                        materialDefinitions.TryGetValue(defaultMaterialLink.Value, out SknMaterialDefinition linkedMaterial))
                     {
-                        continue;
-                    }
-
-                    if (!readInitialHiddenSubmeshes && ReferenceEquals(tree, primaryTree))
-                    {
-                        readInitialHiddenSubmeshes = true;
-                        if (TryGetString(meshProperties, InitialSubmeshToHide, out string hiddenSubmeshes))
-                            initialHiddenSubmeshes = SplitSubmeshNames(hiddenSubmeshes);
-                    }
-
-                    if (defaultTexturePath == null &&
-                        TryGetTexturePath(meshProperties, Texture, wadChunkPathResolver, out string texturePath))
-                    {
-                        defaultTexturePath = texturePath;
-                    }
-
-                    if (meshProperties.Properties.TryGetValue(Material, out BinTreeProperty materialProperty) &&
-                        materialProperty is BinTreeObjectLink defaultMaterialLink)
-                    {
-                        hasDefaultMaterialLink = true;
-                        if (defaultMaterial == null &&
-                            materialDefinitions.TryGetValue(defaultMaterialLink.Value, out SknMaterialDefinition linkedMaterial))
-                        {
-                            defaultMaterial = linkedMaterial;
-                        }
-                    }
-
-                    if (!meshProperties.Properties.TryGetValue(MaterialOverride, out BinTreeProperty overrideProperty) ||
-                        overrideProperty is not BinTreeContainer materialOverrides)
-                    {
-                        continue;
-                    }
-
-                    foreach (BinTreeProperty element in materialOverrides.Elements)
-                    {
-                        if (element is not BinTreeStruct entry ||
-                            !TryGetString(entry, Submesh, out string submeshName))
-                        {
-                            continue;
-                        }
-
-                        string normalizedSubmesh = NormalizeMaterialKey(submeshName);
-                        if (string.IsNullOrEmpty(normalizedSubmesh))
-                        {
-                            continue;
-                        }
-
-                        if (entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
-                            linkProperty is BinTreeObjectLink materialLink)
-                        {
-                            overrideMaterialLinkKeys.Add(normalizedSubmesh);
-                            if (materialDefinitions.TryGetValue(
-                                    materialLink.Value,
-                                    out SknMaterialDefinition materialDefinition) &&
-                                (materialDefinition.Samplers.Count > 0 ||
-                                 materialDefinition.Parameters.Count > 0 ||
-                                 materialDefinition.Switches.Count > 0 ||
-                                 materialDefinition.Pass != null ||
-                                 materialDefinition.IsAnimated))
-                            {
-                                overrideMaterials[normalizedSubmesh] = materialDefinition;
-                            }
-                        }
-
-                        if (TryGetTexturePath(entry, Texture, wadChunkPathResolver, out string directTexturePath))
-                        {
-                            directOverrideTexturePaths[normalizedSubmesh] = directTexturePath;
-                        }
+                        defaultMaterial = linkedMaterial;
                     }
                 }
-            }
 
+                if (!meshProperties.Properties.TryGetValue(MaterialOverride, out BinTreeProperty overrideProperty) ||
+                    overrideProperty is not BinTreeContainer materialOverrides)
+                {
+                    continue;
+                }
+
+                foreach (BinTreeProperty element in materialOverrides.Elements)
+                {
+                    if (element is not BinTreeStruct entry ||
+                        !TryGetString(entry, Submesh, out string submeshName))
+                    {
+                        continue;
+                    }
+
+                    string normalizedSubmesh = NormalizeMaterialKey(submeshName);
+                    if (string.IsNullOrEmpty(normalizedSubmesh))
+                        continue;
+
+                    bool hasMaterialLink =
+                        entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
+                        linkProperty is BinTreeObjectLink;
+                    bool hasDirectTexture =
+                        TryGetTexturePath(entry, Texture, wadChunkPathResolver, out string directTexturePath);
+
+                    // resolve_skin drops empty overrides, while bindingOf uses the first remaining
+                    // override for a submesh. A later duplicate must not change that binding.
+                    if ((!hasMaterialLink && !hasDirectTexture) || !seenOverrideSubmeshes.Add(normalizedSubmesh))
+                        continue;
+
+                    if (hasMaterialLink)
+                    {
+                        var materialLink = (BinTreeObjectLink)linkProperty;
+                        overrideMaterialLinkKeys.Add(normalizedSubmesh);
+                        if (materialDefinitions.TryGetValue(
+                                materialLink.Value,
+                                out SknMaterialDefinition materialDefinition))
+                        {
+                            overrideMaterials[normalizedSubmesh] = materialDefinition;
+                        }
+                    }
+
+                    if (hasDirectTexture)
+                        directOverrideTexturePaths[normalizedSubmesh] = directTexturePath;
+                }
+            }
             return new SknMaterialTextureMetadata(
                 defaultTexturePath,
                 defaultMaterial,
@@ -338,9 +339,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IEnumerable<string> availableTextureKeys)
         {
             var textureKeys = availableTextureKeys?.ToList() ?? new List<string>();
-            string skinTextureKey =
-                MatchTextureKey(metadata.DefaultTexturePath, textureKeys) ??
-                FindBaseDiffuseTextureKey(textureKeys);
+            // Once a skin BIN is available, only its authored texture participates. LTK does not
+            // guess another colour map when the authored asset is absent or unresolved.
+            string skinTextureKey = MatchTextureKey(metadata.DefaultTexturePath, textureKeys);
 
             var directOverrideTextureKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach ((string submesh, string texturePath) in metadata.DirectOverrideTexturePaths)
@@ -354,10 +355,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .Concat(metadata.DirectOverrideTexturePaths.Keys)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            ModelMaterialEffectDefinition defaultEffect = metadata.DefaultMaterial == null
+            SknShaderDefinition defaultShader = ResolveShaderDefinition(metadata, metadata.DefaultMaterial);
+            SknMaterialDefinition defaultEffectMaterial =
+                SknStaticMaterialResolver.CreateEffectiveEffectMaterial(metadata.DefaultMaterial, defaultShader);
+            ModelMaterialEffectDefinition defaultEffect = defaultEffectMaterial == null
                 ? ModelMaterialEffectDefinition.None
                 : SknMaterialEffectResolver.Resolve(
-                    metadata.DefaultMaterial,
+                    defaultEffectMaterial,
                     string.Empty,
                     textureKeys,
                     overrideSubmeshKeys);
@@ -369,7 +373,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     ? ModelMaterialDefinition.Missing
                     : SknStaticMaterialResolver.Resolve(
                         metadata.DefaultMaterial,
-                        ResolveShaderDefinition(metadata, metadata.DefaultMaterial),
+                        defaultShader,
                         textureKeys,
                         skinTextureKey,
                         defaultEffect);
@@ -396,14 +400,17 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         continue;
                     }
 
+                    SknShaderDefinition shader = ResolveShaderDefinition(metadata, material);
+                    SknMaterialDefinition effectMaterial =
+                        SknStaticMaterialResolver.CreateEffectiveEffectMaterial(material, shader);
                     ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
-                        material,
+                        effectMaterial,
                         submesh,
                         textureKeys,
                         overrideSubmeshKeys);
                     materialDefinitions[submesh] = SknStaticMaterialResolver.Resolve(
                         material,
-                        ResolveShaderDefinition(metadata, material),
+                        shader,
                         textureKeys,
                         textureFallback,
                         effect);
@@ -1007,12 +1014,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         .ToHashSet(StringComparer.Ordinal);
                     Dictionary<string, string> shaderMacros = ReadStringMap(obj.Properties, ShaderMacros);
                     SknMaterialPassDefinition pass = ReadMaterialPass(obj.Properties);
-                    if (samplers.Count > 0 ||
-                        parameters.Count > 0 ||
-                        switchStates.Count > 0 ||
-                        pass != null ||
-                        obj.Properties.ContainsKey(DynamicMaterial))
-                    {
+                    // An empty StaticMaterialDef still exists. LTK treats only an unresolved
+                    // object link as missing; an empty material keeps default render state and may
+                    // fall back to the skin texture when opaque.
                         result[pathHash] = new SknMaterialDefinition(samplers, parameters)
                         {
                             Switches = switches,
@@ -1024,7 +1028,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                             ShaderHash = pass?.ShaderHash ?? 0,
                             ShaderPath = ResolveBinEntryName(pass?.ShaderHash ?? 0, binEntryResolver)
                         };
-                    }
                 }
             }
 
@@ -1400,40 +1403,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return null;
         }
 
-        internal static string FindBaseDiffuseTextureKey(IReadOnlyList<string> availableKeys)
-        {
-            if (availableKeys == null || availableKeys.Count == 0) return null;
-
-            var filtered = availableKeys
-                .Where(k => !IsPresentationTexture(k))
-                .Where(k =>
-                {
-                    string nt = NormalizeToken(k);
-                    return !IsNonColorTextureToken(nt) &&
-                           !nt.Contains("face") &&
-                           !nt.Contains("hair") &&
-                           !nt.Contains("tool") &&
-                           !nt.Contains("speedline");
-                })
-                .ToList();
-
-            if (filtered.Count > 0)
-            {
-                return filtered.FirstOrDefault(k => NormalizeToken(k).EndsWith("txcm")) ?? filtered[0];
-            }
-
-            return availableKeys.FirstOrDefault(k => !IsPresentationTexture(k) && !IsNonColorTextureToken(NormalizeToken(k)));
-        }
-
-        private static bool IsNonColorTextureToken(string normalizedToken) =>
-            normalizedToken.Contains("mask") ||
-            normalizedToken.Contains("fresnel") ||
-            normalizedToken.Contains("noise") ||
-            normalizedToken.Contains("normal") ||
-            normalizedToken.Contains("discolor") ||
-            normalizedToken.Contains("rough") ||
-            normalizedToken.Contains("metal") ||
-            normalizedToken.Contains("matcap");
 
         private static string GetSkinBinName(string skinFolder)
         {
