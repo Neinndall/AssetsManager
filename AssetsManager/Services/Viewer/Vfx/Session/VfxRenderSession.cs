@@ -8,6 +8,7 @@ using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
@@ -180,6 +181,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _lastRigOrigin = null;
             _boneTransformProvider = null;
             _boneTransformSampler = null;
+            if (_ready)
+            {
+                _renderer.SetOwnerSkinningMatrices(null);
+                _renderer.SetOwnerHiddenSubmeshes(_ownerSceneContext?.InitialHiddenSubmeshHashes);
+            }
             if (system != null)
             {
                 system.CurrentTime = 0;
@@ -240,6 +246,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             resourceMap ??= new Dictionary<uint, uint>();
             _isPlaying = false;
             _ownerSceneContext = ownerSceneContext;
+            if (_ready)
+            {
+                _renderer.SetOwnerSkinningMatrices(null);
+                _renderer.SetOwnerHiddenSubmeshes(_ownerSceneContext?.InitialHiddenSubmeshHashes);
+            }
             _graph = null;
             _graphs.Clear();
             _graphPlacements.Clear();
@@ -661,6 +672,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _boneTransformSampler = sampler;
         }
 
+        /// <summary>
+        /// Supplies the owner character's final skinning palette to AttachedMesh emitters.
+        /// The same matrices are used by the champion renderer, matching LTK's detached
+        /// SkinnedMesh path where particles reuse the live character skeleton.
+        /// </summary>
+        public void SetOwnerSkinningMatrices(Matrix4x4[] matrices)
+        {
+            if (!_ready) return;
+            _renderer.SetOwnerSkinningMatrices(matrices);
+        }
+
+        /// <summary>
+        /// Supplies the owner character's currently hidden submeshes. AttachedMesh emitters
+        /// consume this live set so Animation Clip visibility events match LTK's CharacterSkinContext.
+        /// </summary>
+        public void SetOwnerHiddenSubmeshes(IEnumerable<uint> hashes)
+        {
+            if (!_ready) return;
+            _renderer.SetOwnerHiddenSubmeshes(hashes);
+        }
+
         private void AdvanceTo(double target)
         {
             if (!double.IsFinite(target)) return;
@@ -878,7 +910,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     });
                     UploadTexture(ref emitter.PendingDistortionTexture, texture => emitter.DistortionTexture = texture);
                     UploadTexture(ref emitter.PendingErosionTexture, texture => emitter.ErosionTexture = texture);
-                    UploadTexture(ref emitter.PendingReflectionTexture, texture => emitter.ReflectionTexture = texture);
+                    UploadCubeMap(ref emitter.PendingReflectionTexture, texture => emitter.ReflectionTexture = texture);
                     UploadTexture(ref emitter.PendingColorGradient, texture =>
                         emitter.ColorGradientTexture = texture);
                     UploadTexture(ref emitter.PendingPaletteTexture, texture =>
@@ -886,7 +918,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
                     if (emitter.PendingMesh is { } mesh)
                     {
-                        _renderer.UploadEmitterMesh(emitter, mesh.Positions, mesh.Uvs, mesh.Colors, mesh.Indices);
+                        emitter.MeshOwnerScale = float.IsFinite(mesh.OwnerScale) && mesh.OwnerScale > 0f
+                            ? mesh.OwnerScale
+                            : 1f;
+                        emitter.MeshRanges = mesh.Ranges ?? Array.Empty<VfxMeshRangeData>();
+                        _renderer.UploadEmitterMesh(
+                            emitter,
+                            mesh.Positions,
+                            mesh.Normals,
+                            mesh.Uvs,
+                            mesh.Colors,
+                            mesh.Indices,
+                            mesh.BoneIndices,
+                            mesh.BoneWeights);
                         emitter.PendingMesh = null;
                     }
                 }
@@ -902,6 +946,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 _textureCache[bitmap] = texture;
             }
             assign(texture);
+            pending = null;
+        }
+
+        private void UploadCubeMap(ref object pending, Action<uint> assign)
+        {
+            if (pending is not VfxCubeMapData cube) return;
+            uint texture = _renderer.UploadCubeMap(cube);
+            if (texture != 0)
+                assign(texture);
             pending = null;
         }
 

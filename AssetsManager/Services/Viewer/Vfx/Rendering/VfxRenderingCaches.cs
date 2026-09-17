@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
@@ -41,6 +42,38 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
+            _ownedTextures.Add(texture);
+            return texture;
+        }
+
+        internal uint UploadCube(VfxCubeMapData cube)
+        {
+            if (cube?.IsValid != true) return 0;
+
+            uint texture = _gl.GenTexture();
+            _gl.BindTexture(TextureTarget.TextureCubeMap, texture);
+            for (int face = 0; face < 6; face++)
+            {
+                TextureTarget target = (TextureTarget)((int)TextureTarget.TextureCubeMapPositiveX + face);
+                _gl.TexImage2D(
+                    target,
+                    0,
+                    InternalFormat.Rgba8,
+                    (uint)cube.Width,
+                    (uint)cube.Height,
+                    0,
+                    PixelFormat.Rgba,
+                    PixelType.UnsignedByte,
+                    new ReadOnlySpan<byte>(cube.Faces[face]));
+            }
+
+            // LTK uploads the six DDS faces in file order, without mipmaps or a face flip.
+            _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapR, (int)TextureWrapMode.ClampToEdge);
+            _gl.BindTexture(TextureTarget.TextureCubeMap, 0);
             _ownedTextures.Add(texture);
             return texture;
         }
@@ -90,10 +123,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
     internal sealed class VfxMeshResourceCache : IDisposable
     {
-        internal const int VertexStride = 9;
+        internal const int VertexStride = 20;
 
         private const int UvOffset = 3;
         private const int ColorOffset = 5;
+        private const int NormalOffset = 9;
+        private const int BoneIndexOffset = 12;
+        private const int BoneWeightOffset = 16;
 
         private readonly GL _gl;
         private readonly Dictionary<float[], MeshGpuResource> _meshes =
@@ -107,9 +143,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal void Upload(
             VfxPlaybackRuntime.EmitterState emitter,
             float[] positions,
+            float[] normals,
             float[] uvs,
             float[] colors,
-            uint[] indices)
+            uint[] indices,
+            float[] boneIndices = null,
+            float[] boneWeights = null)
         {
             if (_meshes.TryGetValue(positions, out MeshGpuResource cached))
             {
@@ -118,7 +157,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             }
 
             int vertexCount = positions.Length / 3;
-            float[] interleaved = BuildInterleaved(positions, uvs, colors);
+            bool hasSkinning =
+                boneIndices is { Length: > 0 } &&
+                boneWeights is { Length: > 0 } &&
+                boneIndices.Length == vertexCount * 4 &&
+                boneWeights.Length == vertexCount * 4;
+            float[] interleaved = BuildInterleaved(positions, normals, uvs, colors, boneIndices, boneWeights);
             uint vao = _gl.GenVertexArray();
             uint vbo = _gl.GenBuffer();
             _gl.BindVertexArray(vao);
@@ -128,6 +172,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             ConfigureAttribute(0, 3, IntPtr.Zero);
             ConfigureAttribute(1, 2, new IntPtr(UvOffset * sizeof(float)));
             ConfigureAttribute(2, 4, new IntPtr(ColorOffset * sizeof(float)));
+            ConfigureAttribute(3, 3, new IntPtr(NormalOffset * sizeof(float)));
+            ConfigureAttribute(4, 4, new IntPtr(BoneIndexOffset * sizeof(float)));
+            ConfigureAttribute(5, 4, new IntPtr(BoneWeightOffset * sizeof(float)));
 
             uint ebo = 0;
             if (indices is { Length: > 0 })
@@ -138,7 +185,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             }
 
             _gl.BindVertexArray(0);
-            MeshGpuResource resource = new(vao, vbo, ebo, vertexCount, indices?.Length ?? 0, interleaved);
+            MeshGpuResource resource = new(
+                vao,
+                vbo,
+                ebo,
+                vertexCount,
+                indices?.Length ?? 0,
+                interleaved,
+                hasSkinning);
             _meshes[positions] = resource;
             Assign(emitter, resource);
         }
@@ -177,11 +231,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _meshes.Clear();
         }
 
-        internal static float[] BuildInterleaved(float[] positions, float[] uvs, float[] colors)
+        internal static float[] BuildInterleaved(
+            float[] positions,
+            float[] normals,
+            float[] uvs,
+            float[] colors,
+            float[] boneIndices = null,
+            float[] boneWeights = null)
         {
             ArgumentNullException.ThrowIfNull(positions);
+            normals ??= Array.Empty<float>();
             uvs ??= Array.Empty<float>();
             colors ??= Array.Empty<float>();
+            boneIndices ??= Array.Empty<float>();
+            boneWeights ??= Array.Empty<float>();
 
             int vertexCount = positions.Length / 3;
             float[] interleaved = new float[vertexCount * VertexStride];
@@ -189,6 +252,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             {
                 int target = vertex * VertexStride;
                 int position = vertex * 3;
+                int normal = vertex * 3;
                 int uv = vertex * 2;
                 int color = vertex * 4;
                 interleaved[target] = positions[position];
@@ -200,6 +264,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     interleaved[target + ColorOffset + channel] =
                         color + channel < colors.Length ? colors[color + channel] : 1f;
+                }
+                interleaved[target + NormalOffset] = normal < normals.Length ? normals[normal] : 0f;
+                interleaved[target + NormalOffset + 1] = normal + 1 < normals.Length ? normals[normal + 1] : 0f;
+                interleaved[target + NormalOffset + 2] = normal + 2 < normals.Length ? normals[normal + 2] : 1f;
+                int skin = vertex * 4;
+                for (int influence = 0; influence < 4; influence++)
+                {
+                    interleaved[target + BoneIndexOffset + influence] =
+                        skin + influence < boneIndices.Length ? boneIndices[skin + influence] : 0f;
+                    interleaved[target + BoneWeightOffset + influence] =
+                        skin + influence < boneWeights.Length ? boneWeights[skin + influence] : 0f;
                 }
             }
 
@@ -216,6 +291,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             emitter.MeshVertexCount = resource.VertexCount;
             emitter.MeshIndexCount = resource.IndexCount;
             emitter.MeshInterleaved = resource.Interleaved;
+            emitter.MeshHasSkinning = resource.HasSkinning;
         }
 
         private void ConfigureAttribute(uint location, int componentCount, IntPtr offset)
@@ -236,7 +312,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             uint Ebo,
             int VertexCount,
             int IndexCount,
-            float[] Interleaved);
+            float[] Interleaved,
+            bool HasSkinning);
     }
 
     internal sealed class VfxSceneCapture : IDisposable

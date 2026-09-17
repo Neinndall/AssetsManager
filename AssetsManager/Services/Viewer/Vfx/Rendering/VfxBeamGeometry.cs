@@ -17,7 +17,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal int Build(VfxPlaybackRuntime.EmitterState state, Vector3 cameraPosition)
         {
             VfxBeamDefinition beam = state.Def.Beam;
-            if (beam is null || state.InstanceCount == 0) return 0;
+            // LTK's draw-kind contract suppresses the beam ribbon when mMesh is authored.
+            // The same primitive does not fall through to mesh rendering, so this is intentionally blank.
+            if (beam is null || state.Def.SuppressesBeamRibbon || state.InstanceCount == 0) return 0;
 
             int vertexCount = state.InstanceCount * 6;
             int needed = vertexCount * VertexStride;
@@ -27,7 +29,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector3 target = state.SystemTarget + beam.TargetOffset;
             Vector3 delta = target - source;
             float length = delta.Length();
-            Vector3 axis = length > 1e-8f ? delta / length : Vector3.UnitX;
+            float colorDistance = (state.SystemTarget - state.SystemOrigin).Length();
+            Vector3 axis = length > 1e-8f ? delta / length : Vector3.Zero;
 
             int written = 0;
             for (int particle = 0; particle < state.InstanceCount; particle++)
@@ -38,8 +41,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 float fromTarget = state.Instances[instance + 18];
 
                 Vector3 wide = beam.Mode == 1
-                    ? ArbitraryWidth(state, instance, source, delta, axis)
-                    : CameraWidth(cameraPosition, source, delta, axis);
+                    ? ArbitraryWidth(state, instance, source, axis)
+                    : CameraWidth(cameraPosition, source, delta);
 
                 Vector3 start = source + delta * fromSource;
                 Vector3 end = target - delta * fromTarget;
@@ -51,7 +54,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 float along = tilingV > 0f ? length / tilingV : 1f;
 
                 Vector4 distanceColor = beam.ColorBoundToDistance
-                    ? beam.ColorByDistance.Sample(length)
+                    ? beam.ColorByDistance.Sample(colorDistance)
                     : Vector4.One;
 
                 Write(state, instance, ref written, end - half, 0f, 0f, distanceColor);
@@ -65,15 +68,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return written;
         }
 
-        private static Vector3 CameraWidth(Vector3 eye, Vector3 source, Vector3 delta, Vector3 axis)
+        private static Vector3 CameraWidth(Vector3 eye, Vector3 source, Vector3 delta)
         {
-            Vector3 wide = Vector3.Cross(eye - source, delta);
+            Vector3 toEye = eye - source;
+            Vector3 wide = Vector3.Cross(toEye, delta);
             if (wide.LengthSquared() > 1e-10f) return Vector3.Normalize(wide);
 
-            Vector3 least = MathF.Abs(axis.X) <= MathF.Abs(axis.Y) && MathF.Abs(axis.X) <= MathF.Abs(axis.Z)
+            // LTK sideOf() chooses the world axis least aligned with the eye vector.
+            Vector3 least = MathF.Abs(toEye.X) <= MathF.Abs(toEye.Y) && MathF.Abs(toEye.X) <= MathF.Abs(toEye.Z)
                 ? Vector3.UnitX
-                : MathF.Abs(axis.Y) <= MathF.Abs(axis.Z) ? Vector3.UnitY : Vector3.UnitZ;
-            wide = Vector3.Cross(eye - source, least);
+                : MathF.Abs(toEye.Y) <= MathF.Abs(toEye.Z) ? Vector3.UnitY : Vector3.UnitZ;
+            wide = Vector3.Cross(toEye, least);
             return wide.LengthSquared() > 1e-10f ? Vector3.Normalize(wide) : least;
         }
 
@@ -81,7 +86,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             VfxPlaybackRuntime.EmitterState state,
             int instance,
             Vector3 source,
-            Vector3 delta,
             Vector3 axis)
         {
             Vector3 wide = new(-axis.Z, 0f, axis.X);
@@ -97,9 +101,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 state.Instances[instance],
                 state.Instances[instance + 1],
                 state.Instances[instance + 2]) - source;
+            // LTK intentionally leaves this unnormalised and allows degenerate arbitrary beams.
             wide += local;
-            if (wide.LengthSquared() <= 1e-10f)
-                wide = Vector3.Cross(delta, Vector3.UnitY);
             return wide;
         }
 
@@ -113,12 +116,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector4 distanceColor)
         {
             int target = vertex * VertexStride;
-            Vertices[target] = u;
-            Vertices[target + 1] = v;
             Array.Copy(state.Instances, instance, Vertices, target + 2, VfxPlaybackRuntime.InstanceStride);
             Vertices[target + 2] = position.X;
             Vertices[target + 3] = position.Y;
             Vertices[target + 4] = position.Z;
+            VfxRibbonVertexSemantics.Pack(state, instance, Vertices, target, u, v, transpose: true);
             Vertices[target + 7] *= distanceColor.X;
             Vertices[target + 8] *= distanceColor.Y;
             Vertices[target + 9] *= distanceColor.Z;

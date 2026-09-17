@@ -35,8 +35,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         public void TextureMultiplierSharesTheBaseFlipbookFrame()
         {
             Assert.DoesNotContain("uTextureMultFrame", VfxShaderSource.MeshVertex);
-            Assert.Contains("float multFrame = floor(uFrame + 0.0001);", VfxShaderSource.MeshVertex);
-            Assert.Contains("float multFrame = floor(aRotFrame.y + 0.0001);", VfxShaderSource.ParticleVertex);
+            Assert.Contains("float frame = floor(uFrame + 0.0001);", VfxShaderSource.MeshVertex);
+            Assert.Contains("float multFrame = mod(mod(frame, multDiv.x * multDiv.y)", VfxShaderSource.MeshVertex);
+            Assert.Contains("float frame = floor(aRotFrame.y + 0.0001);", VfxShaderSource.ParticleVertex);
+            Assert.Contains("float multFrame = mod(mod(frame, multDiv.x * multDiv.y)", VfxShaderSource.ParticleVertex);
         }
 
         [Fact]
@@ -69,9 +71,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         {
             Assert.Contains("vec2 quadUv = uArbitraryQuad != 0", VfxShaderSource.ParticleVertex);
             Assert.Contains("? vec2(aCorner.y + 0.5, aCorner.x + 0.5)", VfxShaderSource.ParticleVertex);
-            Assert.Contains("vec2 localUv = trailPrimitive", VfxShaderSource.ParticleVertex);
-            Assert.Contains("vec2 multUv = trailPrimitive", VfxShaderSource.ParticleVertex);
-            Assert.Equal(2, Regex.Matches(VfxShaderSource.ParticleVertex, @"\s:\squadUv;").Count);
+            Assert.Contains("vec2 localUv = quadUv;", VfxShaderSource.ParticleVertex);
+            Assert.Contains("vec2 multUv = quadUv;", VfxShaderSource.ParticleVertex);
+            Assert.Contains("if (trailPrimitive)", VfxShaderSource.ParticleVertex);
+            Assert.Contains("vCornerUv = aRotFrame;", VfxShaderSource.ParticleVertex);
         }
 
         [Fact]
@@ -88,12 +91,67 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void MeshDepthPushPullMatchesParticleEyeRaySemantics()
+        public void MeshReflectionUsesRealNormalsAndLtkCubeFacingTerms()
         {
-            Assert.Contains("uniform vec3 uCamPos;", VfxShaderSource.MeshVertex);
-            Assert.Contains("uniform float uDepthPushPull;", VfxShaderSource.MeshVertex);
-            Assert.Contains("vec3 eyeRay = p - uCamPos;", VfxShaderSource.MeshVertex);
-            Assert.Contains("p += normalize(eyeRay) * uDepthPushPull;", VfxShaderSource.MeshVertex);
+            Assert.Contains("layout(location=3) in vec3 aNormal;", VfxShaderSource.MeshVertex);
+            Assert.Contains("vec3 ray = normalize(p - uCamPos);", VfxShaderSource.MeshVertex);
+            Assert.Contains("vRim = (1.0 - pow(facing, uFresnel.w)) * uFresnel.rgb;", VfxShaderSource.MeshVertex);
+            Assert.Contains("reflect(ray, normal) * vec3(-1.0, 1.0, 1.0)", VfxShaderSource.MeshVertex);
+            Assert.DoesNotContain("uDepthPushPull", VfxShaderSource.MeshVertex);
+            Assert.Contains("uniform samplerCube uReflectionTex;", VfxShaderSource.MeshFragment);
+            Assert.Contains("texture(uReflectionTex, vReflect.xyz)", VfxShaderSource.MeshFragment);
+            Assert.DoesNotContain("length(vLocalUv - vec2(0.5))", VfxShaderSource.MeshFragment);
+        }
+
+        [Fact]
+        public void AttachedMeshUsesOwnerSkinningAndParticleTintLikeLtk()
+        {
+            Assert.Contains("layout(location=4) in vec4 aBoneIndices;", VfxShaderSource.MeshVertex);
+            Assert.Contains("layout(location=5) in vec4 aBoneWeights;", VfxShaderSource.MeshVertex);
+            Assert.Contains("layout(std140) uniform VfxBoneTransforms", VfxShaderSource.MeshVertex);
+            Assert.Contains("if (uUseOwnerSkinning != 0)", VfxShaderSource.MeshVertex);
+            Assert.Contains("sourcePosition = (skinMatrix * vec4(aPos, 1.0)).xyz;", VfxShaderSource.MeshVertex);
+            Assert.Contains("vec3 scaled = sourcePosition * uScale;", VfxShaderSource.MeshVertex);
+            Assert.Contains("if (uAttachedMesh != 0)", VfxShaderSource.MeshVertex);
+            Assert.Contains("uColor * (uAttachedMesh != 0 ? vec4(1.0) : vMeshColor)", VfxShaderSource.MeshFragment);
+        }
+
+        [Fact]
+        public void LockAlphaUsesTheLtkCoordinateForMeshesAndRibbons()
+        {
+            Assert.Contains("vec2 alphaUv = baseUv * uUvScale;", VfxShaderSource.MeshVertex);
+            Assert.Contains("vCornerUv = alphaUv;", VfxShaderSource.MeshVertex);
+            Assert.Contains("sampleAddressed(uTex, vCornerUv, uAddressMode).a", VfxShaderSource.MeshFragment);
+            Assert.Contains("vCornerUv = aRotFrame;", VfxShaderSource.ParticleVertex);
+            Assert.Contains("sampleAddressed(uTex, vCornerUv, uAddressMode).a", VfxShaderSource.ParticleFragment);
+        }
+
+        [Fact]
+        public void RampAndErosionUseUnfoldedAtlasCoordinatesLikeLtk()
+        {
+            const string rampAtMult = "colorUv = atlasUvRaw(vLocalUvMult, vCellMult, uTexDivMult);";
+            const string erosionAtBase = "atlasUvRaw(vLocalUv, vCell, uTexDiv)";
+
+            Assert.Contains(rampAtMult, VfxShaderSource.MeshFragment);
+            Assert.Contains(rampAtMult, VfxShaderSource.ParticleFragment);
+            Assert.Contains(erosionAtBase, VfxShaderSource.MeshFragment);
+            Assert.Contains(erosionAtBase, VfxShaderSource.ParticleFragment);
+        }
+
+        [Fact]
+        public void GroundLayerFlattensFinalWorldPositionAtZeroLikeLtk()
+        {
+            Assert.Contains("if (uIsGroundLayer != 0) world.y = 0.0;", VfxShaderSource.ParticleVertex);
+            Assert.Contains("if (uIsGroundLayer != 0) p.y = 0.0;", VfxShaderSource.MeshVertex);
+            Assert.DoesNotContain("groundForward", VfxShaderSource.ParticleVertex);
+            Assert.DoesNotContain("0.02", VfxShaderSource.ParticleVertex);
+        }
+
+        [Fact]
+        public void ZeroStrengthDistortionKeepsTheLitParticlePath()
+        {
+            Assert.Contains("uIsDistortion != 0 && uDistortionStrength != 0.0", VfxShaderSource.MeshFragment);
+            Assert.Contains("uIsDistortion != 0 && uDistortionStrength != 0.0", VfxShaderSource.ParticleFragment);
         }
     }
 }

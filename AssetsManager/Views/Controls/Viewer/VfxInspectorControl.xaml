@@ -101,16 +101,8 @@
                     <TextBlock Text="Browse skins, effects and animations" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
                 </StackPanel>
 
-                <!-- Right: Studio exit and asset folder selection -->
+                <!-- Right: asset folder selection -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Button Click="ExitStudio_Click"
-                            Style="{StaticResource TransparentIconButton}"
-                            Width="26" Height="26"
-                            Margin="0,0,8,0"
-                            ToolTip="Exit VFX Studio">
-                        <materialIcons:MaterialIcon Kind="ExitToApp" Width="14" Height="14"/>
-                    </Button>
-
                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,4"
                             BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <WrapPanel VerticalAlignment="Center">
@@ -153,15 +145,25 @@
                     <Grid Grid.Row="0" Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <materialIcons:MaterialIcon Grid.Column="0" Kind="LayersOutline" Width="14" Height="14"
+                        <Button Grid.Column="0"
+                                Click="ExitStudio_Click"
+                                Style="{StaticResource TransparentIconButton}"
+                                Width="24" Height="24"
+                                Padding="0"
+                                Margin="0,0,6,0"
+                                ToolTip="Exit VFX Studio">
+                            <materialIcons:MaterialIcon Kind="ArrowLeft" Width="15" Height="15"/>
+                        </Button>
+                        <materialIcons:MaterialIcon Grid.Column="1" Kind="LayersOutline" Width="14" Height="14"
                                                     Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"
                                                     VerticalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="ASSETS" FontSize="13" FontWeight="SemiBold"
+                        <TextBlock Grid.Column="2" Text="ASSETS" FontSize="13" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                        <Border Grid.Column="2" Background="#0FFFFFFF" BorderBrush="{StaticResource BorderColor}"
+                        <Border Grid.Column="3" Background="#0FFFFFFF" BorderBrush="{StaticResource BorderColor}"
                                 BorderThickness="1" CornerRadius="5" Padding="7,2" VerticalAlignment="Center">
                             <TextBlock Text="{Binding DetectedSkins.Count, StringFormat='{}{0} BINs'}"
                                        FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}"/>

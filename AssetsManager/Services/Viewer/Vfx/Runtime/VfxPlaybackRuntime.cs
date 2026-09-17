@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Resources;
@@ -19,6 +19,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             public required VfxEmitterDefinition Def { get; init; }
             public int SourceOrder { get; init; }
+            /// <summary>
+            /// Render identity of the authored emitter path. LTK groups every live source of the
+            /// same graph/path/emitter into one draw component (not one draw component per runtime).
+            /// </summary>
+            internal object RenderGraphKey { get; set; }
+            internal string RenderPath { get; set; } = string.Empty;
             public bool IsVisible { get; set; } = true;
             public Vector3 BasePos;                 // world spawn origin (placement + emitterPosition)
             public Vector3 SystemOrigin, SystemTarget;
@@ -37,8 +43,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public object PendingErosionTexture;
             public object PendingReflectionTexture;
             public object PendingPaletteTexture;
-            /// <summary>Pending mesh data for deferred GL upload of .scb/.sco mesh primitives.</summary>
-            public (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? PendingMesh;
+            /// <summary>Pending mesh data for deferred GL upload of authored VFX mesh primitives.</summary>
+            public VfxMeshData? PendingMesh;
             internal VfxAnimatedMesh MeshAnimation;
             /// <summary>GPU handle for particleColorTexture (0 = unavailable).</summary>
             public uint ColorGradientTexture;
@@ -65,6 +71,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public uint MeshVao, MeshVbo, MeshEbo;
             public int MeshVertexCount, MeshIndexCount;
             public float[] MeshInterleaved;
+            /// <summary>True when the uploaded owner mesh carries direct joint indices/weights.</summary>
+            public bool MeshHasSkinning;
+            /// <summary>Owner skinScale, applied after skeleton skinning for AttachedMesh.</summary>
+            public float MeshOwnerScale = 1f;
+            /// <summary>Owner SKN draw groups retained so clip visibility can change AttachedMesh live.</summary>
+            public VfxMeshRangeData[] MeshRanges = Array.Empty<VfxMeshRangeData>();
             /// <summary>Emitter age in seconds; drives UV scroll and mesh animation time.</summary>
             public float EmitterAge => Age;
         }
@@ -395,23 +407,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         public void ApplyRenderOrder()
         {
-            _emitters.Sort((left, right) =>
-            {
-                VfxEmitterRenderState leftState = left.Def.RenderState ?? VfxEmitterRenderState.Default;
-                VfxEmitterRenderState rightState = right.Def.RenderState ?? VfxEmitterRenderState.Default;
-                int phaseOrder = leftState.RenderPhase.CompareTo(rightState.RenderPhase);
-                if (phaseOrder != 0) return phaseOrder;
-
-                int leftPass = leftState.RenderPass;
-                int rightPass = rightState.RenderPass;
-                int passOrder = leftPass.CompareTo(rightPass);
-                if (passOrder != 0) return passOrder;
-
-                int importanceOrder = left.Def.Importance.CompareTo(right.Def.Importance);
-                return importanceOrder != 0
-                    ? importanceOrder
-                    : left.SourceOrder.CompareTo(right.SourceOrder);
-            });
+            _emitters.Sort((left, right) => VfxDrawOrderSemantics.Compare(
+                left.Def,
+                left.SourceOrder,
+                right.Def,
+                right.SourceOrder));
         }
 
         private static Vector3 SafeNormal(Vector3 value, Vector3 fallback)
@@ -1076,14 +1076,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     : VfxColorSemantics.ResolveParticle(p.BirthColor, d.ColorOverLife, t);
                 col = VfxColorSemantics.PremultiplyForAddOrSubtract(col, d.BlendMode, d.Distortion != null);
 
-                float frame = Math.Clamp(d.StartFrame, 0f, Math.Max(0, d.NumFrames - 1));
-                if (d.NumFrames > 1)
-                {
-                    float played = PositiveModulo(p.StartFrame + p.Age * p.FrameRate, d.NumFrames);
-                    int cells = Math.Max(1, (int)MathF.Round(MathF.Max(1f, d.TexDiv.X)) *
-                        (int)MathF.Round(MathF.Max(1f, d.TexDiv.Y)));
-                    frame = PositiveModulo(MathF.Floor(d.StartFrame + played), cells);
-                }
+                // League keeps one logical flipbook counter for both texture layers. Each
+                // sampler wraps that counter against its own texDiv grid at draw time, so do
+                // not collapse it to the base grid here (texDivMult may be different).
+                int authoredFrames = Math.Max(1, d.NumFrames);
+                float playedFrame = PositiveModulo(p.StartFrame + p.Age * p.FrameRate, authoredFrames);
+                float frame = MathF.Floor(d.StartFrame + playedFrame);
 
                 Vector3 position = p.Pos;
                 Vector3 orbitalAngles = p.BirthOrbitalVelocity * p.Age;
@@ -1146,10 +1144,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 }
                 float sizeZ = p.BirthSize.Z * scaleMul.Z;
                 buf[k++] = sizeZ;
-                Vector2 uvRamp = p.BirthUvOffset + p.BirthUvScrollRate * p.Age;
-                if (d.RenderState?.ClampUvScroll == true)
-                    uvRamp = Vector2.Clamp(uvRamp, new Vector2(-1f), Vector2.One);
-                Vector2 uvOffset = uvRamp + p.IntegratedUvOffset;
+                VfxEmitterRenderState renderState = d.RenderState ?? VfxEmitterRenderState.Default;
+                Vector2 uvRamp = VfxUvSemantics.BirthRamp(
+                    p.BirthUvOffset + p.BirthUvScrollRate * p.Age,
+                    renderState.ClampUvScroll);
+                Vector2 uvOffset = VfxUvSemantics.Periodic(
+                    uvRamp + p.IntegratedUvOffset,
+                    renderState.TextureAddressMode);
                 Vector2 uvScale = d.UvScale?.Sample(t) ?? Vector2.One;
                 float uvRotationDegrees = (d.UvRotation?.Sample(t) ?? 0f) + p.BirthUvRotateRate * p.Age
                     + p.IntegratedUvRotation;
@@ -1164,10 +1165,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector4 erosionMixer = d.AlphaErosion?.ChannelMixer?.Sample(0f) ?? new Vector4(0f, 0f, 0f, 1f);
                 buf[k++] = erosionMixer.X; buf[k++] = erosionMixer.Y;
                 buf[k++] = erosionMixer.Z; buf[k++] = erosionMixer.W;
-                Vector2 textureMultRamp = p.TextureMultBirthUvOffset + p.TextureMultBirthUvScrollRate * p.Age;
-                if (d.TextureMultClampUvScroll)
-                    textureMultRamp = Vector2.Clamp(textureMultRamp, new Vector2(-1f), Vector2.One);
-                Vector2 textureMultUvOffset = textureMultRamp + p.IntegratedTextureMultUvOffset;
+                Vector2 textureMultRamp = VfxUvSemantics.BirthRamp(
+                    p.TextureMultBirthUvOffset + p.TextureMultBirthUvScrollRate * p.Age,
+                    d.TextureMultClampUvScroll);
+                Vector2 textureMultUvOffset = VfxUvSemantics.Periodic(
+                    textureMultRamp + p.IntegratedTextureMultUvOffset,
+                    d.TextureMultAddressMode);
                 Vector2 textureMultUvScale = d.TextureMultUvScale?.Sample(t) ?? Vector2.One;
 
                 float textureMultUvRotationDegrees = (d.TextureMultUvRotation?.Sample(t) ?? 0f)
