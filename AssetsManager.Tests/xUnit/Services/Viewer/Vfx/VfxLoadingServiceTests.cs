@@ -42,6 +42,118 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void NamedAssetDoesNotBorrowSameBasenameFromAnotherDirectory()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxStrictAssets", Guid.NewGuid().ToString("N"));
+            string existingDirectory = Path.Combine(root, "assets", "characters", "hero", "skins", "skin0", "particles");
+            Directory.CreateDirectory(existingDirectory);
+            try
+            {
+                File.WriteAllBytes(Path.Combine(existingDirectory, "shared.tex"), new byte[] { 1 });
+                var index = VfxResourceIndex.Build(root);
+
+                string resolved = index.Resolve(
+                    "assets/characters/hero/skins/skin1/particles/shared.tex",
+                    new[] { ".tex" });
+
+                Assert.Null(resolved);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void BundleKeepsPrimaryResolverScopeOnLinkedDocuments()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxResolverScope", Guid.NewGuid().ToString("N"));
+            string championDirectory = Path.Combine(root, "data", "characters", "hero");
+            string skinsDirectory = Path.Combine(championDirectory, "skins");
+            Directory.CreateDirectory(skinsDirectory);
+            try
+            {
+                const uint key = 0x12345678;
+                const uint unrelatedKey = 0x87654321;
+                const string primarySystemPath = "Effects/Primary";
+                const string linkedSystemPath = "Effects/Linked";
+                const string dependency = "data/characters/hero/particles.bin";
+                string skin = Path.Combine(skinsDirectory, "skin0.bin");
+                string linked = Path.Combine(championDirectory, "particles.bin");
+                uint primaryHash = Fnv1a.HashLower(primarySystemPath);
+                uint linkedHash = Fnv1a.HashLower(linkedSystemPath);
+
+                WriteBin(
+                    skin,
+                    new[]
+                    {
+                        CreateSystem(primarySystemPath, "Primary"),
+                        CreateResolver("Resolvers/Primary", key, primaryHash),
+                        CreateResolver("Resolvers/Other", unrelatedKey, linkedHash),
+                        CreateSkin("SkinData", Fnv1a.HashLower("Resolvers/Primary"))
+                    },
+                    new[] { dependency });
+                WriteBin(
+                    linked,
+                    new[]
+                    {
+                        CreateSystem(linkedSystemPath, "Linked"),
+                        CreateResolver("Resolvers/Linked", key, linkedHash)
+                    },
+                    Array.Empty<string>());
+
+                using var service = new VfxLoadingService();
+                VfxLoadingService.Bundle bundle = service.Load(skin, null);
+
+                Assert.Equal(primaryHash, bundle.ResourceMap[key]);
+                Assert.False(bundle.ResourceMap.ContainsKey(unrelatedKey));
+                Assert.Equal(primaryHash, bundle.Systems[primaryHash].ResourceMap[key]);
+                Assert.Equal(linkedHash, bundle.Systems[primaryHash].ResourceMap[unrelatedKey]);
+                Assert.Equal(linkedHash, bundle.Systems[linkedHash].ResourceMap[key]);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void LinkedBinTraversalStopsAfterTheFirstThirtyTwoFilesLikeLtk()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxLinkedCap", Guid.NewGuid().ToString("N"));
+            string championDirectory = Path.Combine(root, "data", "characters", "hero");
+            string skinsDirectory = Path.Combine(championDirectory, "skins");
+            Directory.CreateDirectory(skinsDirectory);
+            try
+            {
+                string skin = Path.Combine(skinsDirectory, "skin0.bin");
+                var dependencies = new List<string>();
+                for (int index = 0; index < 33; index++)
+                {
+                    string dependency = $"data/characters/hero/linked{index:D2}.bin";
+                    dependencies.Add(dependency);
+                    WriteBin(
+                        Path.Combine(championDirectory, $"linked{index:D2}.bin"),
+                        new[] { CreateSystem($"Effects/Linked{index:D2}", $"Linked{index:D2}") },
+                        Array.Empty<string>());
+                }
+                WriteBin(skin, Array.Empty<BinTreeObject>(), dependencies.ToArray());
+
+                using var service = new VfxLoadingService();
+                VfxLoadingService.Bundle bundle = service.Load(skin, null);
+
+                Assert.Equal(33, bundle.LoadedBins.Count); // primary + 32 linked documents
+                Assert.Equal(32, bundle.Systems.Count);
+                Assert.True(bundle.Systems.ContainsKey(Fnv1a.HashLower("Effects/Linked31")));
+                Assert.False(bundle.Systems.ContainsKey(Fnv1a.HashLower("Effects/Linked32")));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void LoadsDependencyStoredUnderItsWadHash()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxHashed", Guid.NewGuid().ToString("N"));
@@ -239,6 +351,83 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
                 Assert.Empty(bundle.Systems);
                 Assert.Empty(bundle.MissingDependencies);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void MeshAvailabilityUsesSimpleFallbackAndRestoresMissingBeamRibbon()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxMeshAvailability", Guid.NewGuid().ToString("N"));
+            string searchDirectory = Path.Combine(root, "data", "characters", "hero", "skins");
+            string assetDirectory = Path.Combine(root, "assets", "effects");
+            Directory.CreateDirectory(searchDirectory);
+            Directory.CreateDirectory(assetDirectory);
+            File.WriteAllBytes(Path.Combine(assetDirectory, "fallback.scb"), Array.Empty<byte>());
+
+            try
+            {
+                VfxEmitterDefinition mesh = CreateEmitter(VfxPrimitiveKind.Mesh) with
+                {
+                    IsMeshPrimitive = true,
+                    MeshPath = "assets/effects/missing.skn",
+                    MeshSkeletonPath = "assets/effects/missing.skl",
+                    MeshIsSkinned = true,
+                    MeshFallbackPath = "assets/effects/fallback.scb"
+                };
+                VfxEmitterDefinition beam = CreateEmitter(VfxPrimitiveKind.Beam) with
+                {
+                    IsMeshPrimitive = false,
+                    MeshPath = "assets/effects/missing.scb",
+                    Beam = new VfxBeamDefinition(
+                        0,
+                        0,
+                        0,
+                        VfxCurve3.Const(Vector3.Zero),
+                        VfxCurve4.Const(Vector4.One),
+                        false,
+                        Vector3.Zero,
+                        Vector3.Zero)
+                };
+                var definition = new VfxSystemDefinition(1, "availability", "availability", new[] { mesh, beam });
+
+                using var service = new VfxLoadingService();
+                VfxSystemDefinition resolved = service.ResolveMeshAvailability(definition, searchDirectory);
+
+                Assert.Equal("assets/effects/fallback.scb", resolved.Emitters[0].MeshPath);
+                Assert.False(resolved.Emitters[0].MeshIsSkinned);
+                Assert.Null(resolved.Emitters[0].MeshSkeletonPath);
+                Assert.Null(resolved.Emitters[1].MeshPath);
+                Assert.False(resolved.Emitters[1].SuppressesBeamRibbon);
+                Assert.True(resolved.Emitters[1].DrawsAsBeam);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void ResourceIndexLocatesLtkSimpleMeshExtensions()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxMeshExtensions", Guid.NewGuid().ToString("N"));
+            string searchDirectory = Path.Combine(root, "data", "characters", "hero", "skins");
+            string assetDirectory = Path.Combine(root, "assets", "effects");
+            Directory.CreateDirectory(searchDirectory);
+            Directory.CreateDirectory(assetDirectory);
+            string tmesh = Path.Combine(assetDirectory, "first.tmesh");
+            string gmesh = Path.Combine(assetDirectory, "second.gmesh");
+            File.WriteAllBytes(tmesh, Array.Empty<byte>());
+            File.WriteAllBytes(gmesh, Array.Empty<byte>());
+
+            try
+            {
+                using var service = new VfxLoadingService();
+                Assert.Equal(tmesh, service.ResolveAssetPath("assets/effects/first.tmesh", searchDirectory, ".tmesh"));
+                Assert.Equal(gmesh, service.ResolveAssetPath("assets/effects/second.gmesh", searchDirectory, ".gmesh"));
             }
             finally
             {
@@ -490,6 +679,32 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             tree.Write(stream);
         }
 
+        private static VfxEmitterDefinition CreateEmitter(VfxPrimitiveKind primitiveKind)
+            => new(
+                Name: "mesh",
+                Rate: VfxCurveF.Const(1f),
+                ParticleLifetime: VfxCurveF.Const(1f),
+                EmitterLifetime: null,
+                ParticleLinger: 0f,
+                TimeBeforeFirstEmission: 0f,
+                IsSingleParticle: true,
+                Disabled: false,
+                BlendMode: 1,
+                BirthScale: VfxCurve3.Const(Vector3.One),
+                ScaleOverLife: null,
+                BirthColor: VfxCurve4.Const(Vector4.One),
+                ColorOverLife: null,
+                BirthVelocity: null,
+                Acceleration: null,
+                BirthRotationalVelocity: null,
+                EmitterPosition: VfxCurve3.Const(Vector3.Zero),
+                TexturePath: string.Empty,
+                TexDiv: Vector2.One,
+                NumFrames: 1,
+                RandomStartFrame: false,
+                IsMeshPrimitive: primitiveKind == VfxPrimitiveKind.Mesh,
+                PrimitiveKind: primitiveKind);
+
         private static BinTreeObject CreateSystem(string path, string name)
             => new(
                 path,
@@ -498,6 +713,33 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 {
                     new BinTreeString(Fnv1a.HashLower("particleName"), name),
                     new BinTreeString(Fnv1a.HashLower("particlePath"), path)
+                });
+
+        private static BinTreeObject CreateResolver(string path, uint key, uint target)
+            => new(
+                path,
+                "ResourceResolver",
+                new BinTreeProperty[]
+                {
+                    new BinTreeMap(
+                        Fnv1a.HashLower("resourceMap"),
+                        BinPropertyType.Hash,
+                        BinPropertyType.ObjectLink,
+                        new[]
+                        {
+                            new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                                new BinTreeHash(0, key),
+                                new BinTreeObjectLink(0, target))
+                        })
+                });
+
+        private static BinTreeObject CreateSkin(string path, uint resolverHash)
+            => new(
+                path,
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[]
+                {
+                    new BinTreeObjectLink(Fnv1a.HashLower("mResourceResolver"), resolverHash)
                 });
 
         private static void WriteBin(string path, BinTreeObject[] objects, string[] dependencies)

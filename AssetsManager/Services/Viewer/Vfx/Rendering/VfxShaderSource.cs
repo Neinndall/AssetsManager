@@ -425,7 +425,6 @@ uniform vec4 uColor;
 uniform float uAlphaCutoff;
 uniform int uAlphaTest;
 uniform float uEmissiveStrength;
-uniform int uIsMultiply;
 uniform sampler2D uColorMap;
 uniform int uHasColor;
 uniform int uRampAtMult;
@@ -438,8 +437,6 @@ uniform int uPaletteAddressMode;
 uniform float uPaletteSelector;
 uniform vec4 uPaletteMixMask;
 uniform vec2 uPaletteScroll;
-uniform int uIsAdditive;
-uniform vec4 uModulationFactor;
 uniform int uColorLookUpTypeX;
 uniform int uColorLookUpTypeY;
 uniform vec2 uColorLookUpScales;
@@ -519,7 +516,7 @@ void main(){
         float lower = clamp((uErosionDrive - erosion) / featherOut, 0.0, 1.0);
         texel.a *= clamp(upper - lower, 0.0, 1.0);
     }
-    vec4 authoredColor = uColor * (uAttachedMesh != 0 ? vec4(1.0) : vMeshColor) * uModulationFactor;
+    vec4 authoredColor = uColor * (uAttachedMesh != 0 ? vec4(1.0) : vMeshColor);
     vec4 lit = texel * authoredColor;
     if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;
 
@@ -562,8 +559,6 @@ void main(){
         return;
     }
     fragColor = lit;
-    if (uIsAdditive == 1 || uIsMultiply != 0)
-        fragColor.rgb *= authoredColor.a;
     fragColor.rgb *= uEmissiveStrength;
 }";
 
@@ -594,7 +589,6 @@ uniform float uDistortionStrength;
 uniform float uAlphaCutoff;
 uniform int uAlphaTest;
 uniform float uEmissiveStrength;
-uniform int uIsMultiply;
 uniform sampler2D uColorMap;
 uniform int uHasColor;
 uniform int uRampAtMult;
@@ -606,8 +600,6 @@ uniform int uPaletteCount;
 uniform int uPaletteAddressMode;
 uniform vec4 uPaletteMixMask;
 uniform vec2 uPaletteScroll;
-uniform int uIsAdditive;
-uniform vec4 uModulationFactor;
 uniform int uColorLookUpTypeX;
 uniform int uColorLookUpTypeY;
 uniform vec2 uColorLookUpScales;
@@ -691,7 +683,7 @@ void main(){
         float lower = clamp((vErosionDrive - erosion) / featherOut, 0.0, 1.0);
         t.a *= clamp(upper - lower, 0.0, 1.0);
     }
-    vec4 authoredColor = vColor * uModulationFactor;
+    vec4 authoredColor = vColor;
     vec4 lit = t * authoredColor;
     if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;
     if (uHasSoftParticle != 0) {
@@ -721,8 +713,6 @@ void main(){
         return;
     }
     fragColor = lit;
-    if (uIsAdditive == 1 || uIsMultiply != 0)
-        fragColor.rgb *= authoredColor.a;
     fragColor.rgb *= uEmissiveStrength;
 }        ";
     }

@@ -44,6 +44,58 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ResourceResolverKeepsFirstNullMappingAndScopesItToParsedSystems()
+        {
+            const uint key = 0x11223344;
+            uint target = Fnv1a.HashLower("Effects/Target");
+            BinTreeObject Resolver(string path, uint value) => new(
+                path,
+                "ResourceResolver",
+                new BinTreeProperty[]
+                {
+                    new BinTreeMap(
+                        Fnv1a.HashLower("resourceMap"),
+                        BinPropertyType.Hash,
+                        BinPropertyType.ObjectLink,
+                        new[]
+                        {
+                            new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                                new BinTreeHash(0, key),
+                                new BinTreeObjectLink(0, value))
+                        })
+                });
+            var system = new BinTreeObject(
+                "Effects/Target",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("particleName"), "Target")
+                });
+            string firstResolverPath = "Resolvers/A";
+            string secondResolverPath = "Resolvers/B";
+            if (Fnv1a.HashLower(firstResolverPath) > Fnv1a.HashLower(secondResolverPath))
+                (firstResolverPath, secondResolverPath) = (secondResolverPath, firstResolverPath);
+
+            using var stream = new MemoryStream();
+            new BinTree(
+                new[]
+                {
+                    Resolver(firstResolverPath, 0),
+                    Resolver(secondResolverPath, target),
+                    system
+                },
+                System.Array.Empty<string>()).Write(stream);
+
+            VfxBinDocument document = VfxGraphParser.ParseDocument(stream.ToArray());
+
+            Assert.True(document.ResourceMap.ContainsKey(key));
+            Assert.Equal(0u, document.ResourceMap[key]);
+            VfxSystemDefinition parsed = Assert.Single(document.Systems).Value;
+            Assert.Same(document.ResourceMap, parsed.ResourceMap);
+            Assert.Equal(0u, parsed.ResourceMap[key]);
+        }
+
+        [Fact]
         public void AppliesRiotEmitterDefaultsWhenOptionalBinFieldsAreAbsent()
         {
             uint textureMultHash = Fnv1a.HashLower("textureMult");
@@ -279,6 +331,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxEmitterDefinition parsed = Assert.Single(Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
             Assert.Equal("Effects/Skinned.skn", parsed.MeshPath);
             Assert.Equal("Effects/Skinned.skl", parsed.MeshSkeletonPath);
+            Assert.Equal("Effects/Simple.scb", parsed.MeshFallbackPath);
             Assert.True(parsed.MeshIsSkinned);
             Assert.True(parsed.MeshAlignPitchToCamera);
             Assert.True(parsed.MeshAlignYawToCamera);

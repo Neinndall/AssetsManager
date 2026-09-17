@@ -152,16 +152,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         // Carried child systems need the parent's current drawn bearing every step, not only
         // its birth/death notifications. Keep this internal to the graph runtime pipeline.
         internal event Action<VfxPlaybackRuntime, VfxEmitterDefinition, ParticleLifecycleInfo> ParticleUpdated;
-        // LTK uses one shared 32K particle pool for the whole system rather than a
-        // per-emitter cap. The runtime keeps per-emitter lists, but enforces the same
-        // system-wide live-particle budget when admitting newborns.
-        private const int MaxParticlesPerSystem = 32_768;
+        // LTK gives the opened/root system a shared 32K particle pool. Child systems use
+        // smaller lineage pools chosen from their authored peak demand (16..4096).
+        private const int RootParticleCapacity = 32_768;
+        private int _particleCapacity = RootParticleCapacity;
         private const float MaximumSimulationStep = 0.1f;
 
         internal Matrix4x4 WorldTransform => _worldTransform;
         internal VfxSystemDefinition Definition => _definition;
         internal int Seed => _seed;
         internal uint InitialRandomState => _initialRandomState;
+        internal int ParticleCapacity => _particleCapacity;
 
         internal sealed record EmitterSnapshot(
             Vector3 BasePos,
@@ -367,6 +368,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _initialRandomState = state == 0 ? new VfxLtkRandom(_seed).State : state;
             _rng.State = _initialRandomState;
         }
+
+        /// <summary>
+        /// Sets the shared particle capacity for this runtime. The root keeps 32768 while
+        /// LTK child systems receive a smaller lineage capacity before their build-up runs.
+        /// </summary>
+        internal void SetParticleCapacity(int capacity)
+            => _particleCapacity = Math.Clamp(capacity, 1, RootParticleCapacity);
+
+        /// <summary>
+        /// Child systems in LTK start empty and receive their first simulation step on the
+        /// frame after their birth; buildUpTime is a root-driver pre-roll only.
+        /// </summary>
+        internal void SuppressBuildUp()
+            => _needsBuildUp = false;
 
         /// <summary>Configure from a system placed at worldPos.</summary>
         public void SetSystem(VfxSystemDefinition system, Vector3 worldPos)
@@ -934,9 +949,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             foreach (EmitterState emitter in _emitters)
             {
                 live += emitter.Particles.Count;
-                if (live >= MaxParticlesPerSystem) return 0;
+                if (live >= _particleCapacity) return 0;
             }
-            return MaxParticlesPerSystem - live;
+            return _particleCapacity - live;
         }
 
         private static void ApplyAnalyticDrag(ref Particle particle, ref Vector3 moving, Vector3 drag, float dt)

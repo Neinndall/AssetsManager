@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -20,6 +21,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
     /// </summary>
     public sealed class VfxLoadingService : IDisposable
     {
+        // LTK bounds every breadth-first linked BIN search to 32 files beyond the primary document.
+        private const int MaximumLinkedBins = 32;
+        private static readonly string[] SkinnedMeshExtensions = { ".skn" };
+        private static readonly string[] SimpleMeshExtensions = { ".scb", ".tmesh", ".gmesh" };
         private readonly VfxResourceResolver _resources = new();
         private readonly SemaphoreSlim _catalogGate = new(1, 1);
         private int _disposeState;
@@ -96,11 +101,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 }
 
                 Enqueue(skinBinPath);
+                int openedLinkedBins = 0;
 
                 while (queue.Count > 0)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string currentBinPath = queue.Dequeue();
+                    bool isPrimary = string.Equals(
+                        Path.GetFullPath(currentBinPath),
+                        bundle.PrimaryBinPath,
+                        StringComparison.OrdinalIgnoreCase);
+                    if (!isPrimary)
+                    {
+                        if (openedLinkedBins >= MaximumLinkedBins) break;
+                        openedLinkedBins++;
+                    }
                     try
                     {
                         if (!File.Exists(currentBinPath)) continue;
@@ -115,8 +130,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                                 bundle.SystemSources[kv.Key] = Path.GetFullPath(currentBinPath);
                             }
                         }
-                        foreach (var kv in document.ResourceMap)
-                            bundle.ResourceMap.TryAdd(kv.Key, kv.Value);
+                        // Skin/clip effect keys resolve through SkinCharacterDataProperties.mResourceResolver
+                        // in the primary document. Linked systems keep their own document resolver scope.
+                        if (string.Equals(
+                                Path.GetFullPath(currentBinPath),
+                                bundle.PrimaryBinPath,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            foreach (var kv in document.SkinResourceMap)
+                                bundle.ResourceMap.TryAdd(kv.Key, kv.Value);
+                        }
                         foreach (AnimationClipDefinition sequence in document.EventSequences)
                         {
                             bundle.EventSequences.TryAdd(sequence.OwnerPathHash, sequence);
@@ -202,6 +225,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             bool applyDefinitionTransform)
         {
             ArgumentNullException.ThrowIfNull(definition);
+            definition = ResolveMeshAvailability(definition, searchDirectory);
             var runtime = new VfxPlaybackRuntime(seed);
             Matrix4x4 resolvedTransform = applyDefinitionTransform
                 ? definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * transform
@@ -282,6 +306,68 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             return runtime;
         }
 
+        /// <summary>
+        /// LTK only exposes a mesh model when the backend located its geometry. Keep the
+        /// authored paths in the parsed model, but lower them to the assets available in this
+        /// extraction before draw-kind selection and runtime creation.
+        /// </summary>
+        internal VfxSystemDefinition ResolveMeshAvailability(
+            VfxSystemDefinition definition,
+            string searchDirectory)
+        {
+            if (definition is null || string.IsNullOrWhiteSpace(searchDirectory) || definition.Emitters.Count == 0)
+                return definition;
+
+            VfxEmitterDefinition[] emitters = null;
+            for (int index = 0; index < definition.Emitters.Count; index++)
+            {
+                VfxEmitterDefinition emitter = definition.Emitters[index];
+                if (emitter.PrimitiveKind == VfxPrimitiveKind.AttachedMesh ||
+                    string.IsNullOrWhiteSpace(emitter.MeshPath))
+                {
+                    continue;
+                }
+
+                bool meshAvailable;
+                VfxEmitterDefinition resolved = emitter;
+                if (emitter.MeshIsSkinned)
+                {
+                    meshAvailable = _resources.ResolvePath(
+                        emitter.MeshPath,
+                        searchDirectory,
+                        SkinnedMeshExtensions) is not null;
+                    if (!meshAvailable)
+                    {
+                        string fallback = emitter.MeshFallbackPath;
+                        bool fallbackAvailable = !string.IsNullOrWhiteSpace(fallback) &&
+                            _resources.ResolvePath(fallback, searchDirectory, SimpleMeshExtensions) is not null;
+                        resolved = emitter with
+                        {
+                            MeshPath = fallbackAvailable ? fallback : null,
+                            MeshSkeletonPath = null,
+                            MeshAnimationPath = null,
+                            MeshIsSkinned = false
+                        };
+                    }
+                }
+                else
+                {
+                    meshAvailable = _resources.ResolvePath(
+                        emitter.MeshPath,
+                        searchDirectory,
+                        SimpleMeshExtensions) is not null;
+                    if (!meshAvailable)
+                        resolved = emitter with { MeshPath = null };
+                }
+
+                if (ReferenceEquals(resolved, emitter)) continue;
+                emitters ??= definition.Emitters.ToArray();
+                emitters[index] = resolved;
+            }
+
+            return emitters is null ? definition : definition with { Emitters = emitters };
+        }
+
         public VfxPlaybackGraphRuntime PreparePlaybackGraph(
             VfxSystemDefinition definition,
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
@@ -292,11 +378,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             LogService log,
             VfxOwnerSceneContext ownerSceneContext = null)
         {
+            var resolvedSystems = new Dictionary<uint, VfxSystemDefinition>();
+            if (systems is not null)
+            {
+                foreach (KeyValuePair<uint, VfxSystemDefinition> pair in systems)
+                    resolvedSystems[pair.Key] = ResolveMeshAvailability(pair.Value, searchDirectory);
+            }
+
+            VfxSystemDefinition resolvedDefinition = ResolveMeshAvailability(definition, searchDirectory);
+            if (resolvedSystems.TryGetValue(definition.PathHash, out VfxSystemDefinition catalogDefinition))
+                resolvedDefinition = catalogDefinition;
+            else
+                resolvedSystems[resolvedDefinition.PathHash] = resolvedDefinition;
+
             return new VfxPlaybackGraphRuntime(
-                definition,
+                resolvedDefinition,
                 transform,
                 seed,
-                systems,
+                resolvedSystems,
                 resourceMap,
                 (childDefinition, childTransform, childSeed) => PreparePlaybackCore(
                     childDefinition,

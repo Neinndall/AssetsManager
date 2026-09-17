@@ -36,6 +36,26 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void NullResolverMappingSuppressesDirectAndNameFallbacks()
+        {
+            var direct = new VfxSystemDefinition(10, "Effects/Named", "direct", new VfxEmitterDefinition[0]);
+            VfxParticleEventDefinition particleEvent = Event(1, 0f, 10) with
+            {
+                EffectName = "Effects/Named",
+                IsKillEvent = false
+            };
+            var sequence = new AnimationClipDefinition(10, 20, 1f / 30f, 0f, 30f, new[] { particleEvent });
+
+            VfxAbilityComposition composition = VfxAbilityCompositionBuilder.Build(
+                sequence,
+                new Dictionary<uint, VfxSystemDefinition> { [10] = direct },
+                new Dictionary<uint, uint> { [10] = 0 });
+
+            Assert.Equal(0, composition.ResolvedCount);
+            Assert.Null(Assert.Single(composition.Events).System);
+        }
+
+        [Fact]
         public void SelectsEnemyEffectWithoutChangingTheAuthoredEvent()
         {
             var ally = new VfxSystemDefinition(100, "Ally", "ally", new VfxEmitterDefinition[0]);
