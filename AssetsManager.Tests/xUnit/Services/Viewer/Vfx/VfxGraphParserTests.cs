@@ -166,6 +166,125 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ProbabilityTablesHonorSingleValueAndMismatchedKeyListsLikeLtk()
+        {
+            var singleTable = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxProbabilityTableData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeF32(Fnv1a.HashLower("singleValue"), 0.25f)
+                });
+            var mismatchedTable = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxProbabilityTableData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("keyTimes"),
+                        BinPropertyType.F32,
+                        new BinTreeProperty[] { new BinTreeF32(0, 0f), new BinTreeF32(0, 1f) }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("keyValues"),
+                        BinPropertyType.F32,
+                        new BinTreeProperty[] { new BinTreeF32(0, 2f) }),
+                    new BinTreeF32(Fnv1a.HashLower("singleValue"), 0.75f)
+                });
+            var dynamics = new BinTreeStruct(
+                Fnv1a.HashLower("dynamics"),
+                Fnv1a.HashLower("VfxProbabilityTables"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("probabilityTables"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { singleTable, mismatchedTable })
+                });
+            var birthScale = new BinTreeStruct(
+                Fnv1a.HashLower("birthScale0"),
+                Fnv1a.HashLower("ValueVector3"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeVector3(Fnv1a.HashLower("constantValue"), new Vector3(2f, 3f, 4f)),
+                    dynamics
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { birthScale });
+            var system = new BinTreeObject(
+                "Effects/Probability",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+            Assert.NotNull(parsed.BirthScale.Prob);
+            Assert.False(parsed.BirthScale.Prob[0].IsEmpty);
+            Assert.Equal(0.25f, parsed.BirthScale.Prob[0].Single);
+            Assert.False(parsed.BirthScale.Prob[1].IsEmpty);
+            Assert.Equal(0f, parsed.BirthScale.Prob[1].Single);
+
+            Vector3 drawn = parsed.BirthScale.SampleBirth(0f, new System.Random(1), sharedRoll: 0.5f);
+            Assert.Equal(0.5f, drawn.X);
+            Assert.Equal(0f, drawn.Y);
+            Assert.Equal(4f, drawn.Z);
+        }
+
+        [Fact]
+        public void MeshPrimitivePrefersSkinnedPairAndKeepsCameraAlignmentFlags()
+        {
+            var meshDefinition = new BinTreeStruct(
+                0x0d89732d,
+                Fnv1a.HashLower("VfxMeshDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mSimpleMeshName"), "Effects/Simple.scb"),
+                    new BinTreeString(Fnv1a.HashLower("mMeshName"), "Effects/Skinned.skn"),
+                    new BinTreeString(0x90595a15, "Effects/Skinned.skl")
+                });
+            var primitive = new BinTreeStruct(
+                Fnv1a.HashLower("primitive"),
+                Fnv1a.HashLower("VfxPrimitiveMesh"),
+                new BinTreeProperty[]
+                {
+                    meshDefinition,
+                    new BinTreeBool(Fnv1a.HashLower("AlignPitchToCamera"), true),
+                    new BinTreeBool(Fnv1a.HashLower("AlignYawToCamera"), true)
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { primitive });
+            var system = new BinTreeObject(
+                "Effects/Mesh",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+            Assert.Equal("Effects/Skinned.skn", parsed.MeshPath);
+            Assert.Equal("Effects/Skinned.skl", parsed.MeshSkeletonPath);
+            Assert.True(parsed.MeshIsSkinned);
+            Assert.True(parsed.MeshAlignPitchToCamera);
+            Assert.True(parsed.MeshAlignYawToCamera);
+        }
+
+        [Fact]
         public void LeavesModulationFactorNeutralWhenBinOmitsIt()
         {
             var emitter = new BinTreeStruct(
@@ -349,6 +468,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                             new BinTreeString(Fnv1a.HashLower("simpleSkin"), "Characters/Test/Test.skn"),
                             new BinTreeString(Fnv1a.HashLower("skeleton"), "Characters/Test/Test.skl"),
                             new BinTreeF32(Fnv1a.HashLower("skinScale"), 1.25f)
+                        }),
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("skinAnimationProperties"),
+                        Fnv1a.HashLower("SkinAnimationProperties"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeObjectLink(Fnv1a.HashLower("animationGraphData"), 0x12345678u)
                         })
                 });
             using var stream = new MemoryStream();
@@ -359,6 +485,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal("Characters/Test/Test.skn", document.OwnerSceneContext.MeshPath);
             Assert.Equal("Characters/Test/Test.skl", document.OwnerSceneContext.SkeletonPath);
             Assert.Equal(1.25f, document.OwnerSceneContext.SkinScale);
+            Assert.Equal(0x12345678u, document.OwnerSceneContext.AnimationGraphPathHash);
             VfxEmitterDefinition parsed = Assert.Single(Assert.Single(document.Systems).Value.Emitters);
             Assert.Equal(new uint[] { 11, 22, 33 }, parsed.AttachedSubmeshHashes);
         }

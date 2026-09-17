@@ -181,10 +181,30 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             int seed,
             LogService log,
             VfxOwnerSceneContext ownerSceneContext = null)
+            => PreparePlaybackCore(
+                definition,
+                searchDirectory,
+                transform,
+                seed,
+                log,
+                ownerSceneContext,
+                applyDefinitionTransform: true);
+
+        private VfxPlaybackRuntime PreparePlaybackCore(
+            VfxSystemDefinition definition,
+            string searchDirectory,
+            Matrix4x4 transform,
+            int seed,
+            LogService log,
+            VfxOwnerSceneContext ownerSceneContext,
+            bool applyDefinitionTransform)
         {
             ArgumentNullException.ThrowIfNull(definition);
             var runtime = new VfxPlaybackRuntime(seed);
-            runtime.SetSystem(definition, definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * transform);
+            Matrix4x4 resolvedTransform = applyDefinitionTransform
+                ? definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * transform
+                : transform;
+            runtime.SetSystem(definition, resolvedTransform);
 
             foreach (var emitter in runtime.Emitters)
             {
@@ -269,13 +289,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 seed,
                 systems,
                 resourceMap,
-                (childDefinition, childTransform, childSeed) => PreparePlayback(
+                (childDefinition, childTransform, childSeed) => PreparePlaybackCore(
                     childDefinition,
                     searchDirectory,
                     childTransform,
                     childSeed,
                     log,
-                    ownerSceneContext));
+                    ownerSceneContext,
+                    applyDefinitionTransform: false));
         }
 
         internal BitmapSource ResolveTexture(string authoredPath, string searchDirectory)

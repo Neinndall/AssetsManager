@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -23,6 +23,7 @@ using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Hashing;
 using Microsoft.Win32;
 
 namespace AssetsManager.Views.Controls.Viewer
@@ -49,6 +50,9 @@ namespace AssetsManager.Views.Controls.Viewer
         private SceneModel _championModel;
         private AnimationService _championAnimationService;
         private VfxClipCatalog _clipCatalog;
+        private AnimationClipCatalogItem _activeAnimationClip;
+        private readonly Dictionary<ModelPart, bool> _animationBasePartVisibility = new();
+        private readonly HashSet<uint> _animationBaseHiddenSubmeshes = new();
         private VfxLoadingService.Bundle _championBundle;
         private int _championLoadGeneration;
         private System.Threading.CancellationTokenSource _scanCancellation;
@@ -330,6 +334,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void RequestSystemInspection(VfxSystemDiagnosticItem systemItem)
         {
             if (_isCleanedUp) return;
+            if (systemItem != null) ClearAnimationClipCues();
             if (ReferenceEquals(_pendingSystem, systemItem)) return;
             if (ReferenceEquals(_model.SelectedSystem, systemItem) && HasSelectedSystemReady()) return;
 
@@ -483,6 +488,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             if (_championModel != null && _championAnimationService != null)
             {
+                ApplyAnimationClipCues(_model.CurrentTime);
                 if (_championModel.CurrentAnimation != null && _championModel.Skeleton != null)
                 {
                     _championAnimationService.Update(
@@ -610,6 +616,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _vfxRenderer?.Pause();
             _pendingSystem = null;
             _inspectedSystem = null;
+            ClearAnimationClipCues();
 
             if (_championModel != null)
             {
@@ -765,6 +772,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _pendingSystem = null;
             _activeBundle = null;
             _championLoadGeneration++;
+            ClearAnimationClipCues();
             _model.SelectedAnimation = null;
             _model.DetectedAnimations.Clear();
             _vfxRenderer?.SetSystem(null);
@@ -1025,6 +1033,11 @@ namespace AssetsManager.Views.Controls.Viewer
                         var oldModel = _championModel;
                         _championModel = loaded;
                         _championBundle = bundle;
+                        // LTK draws the owner mesh and builds joint anchors in skinScale space.
+                        // Keep the champion visual in the same space as Animation Clip/idle VFX bones.
+                        _championModel.Scale = _activeBundle?.OwnerSceneContext is { SkinScale: > 0f } owner
+                            ? owner.SkinScale
+                            : 1f;
                         if (oldModel != null)
                         {
                             _championMeshRenderer?.QueueRelease(oldModel);
@@ -1062,6 +1075,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ScanAndBindAnimations(string sknPath, string searchDir)
         {
+            ClearAnimationClipCues();
             _model.SelectedAnimation = null;
             _model.DetectedAnimations.Clear();
             if (_championModel != null) _championModel.CurrentAnimation = null;
@@ -1073,7 +1087,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.DetectedAnimations.Add(item);
             _model.LogMessages.Add($"[ANIMATIONS] Loaded {_model.DetectedAnimations.Count} authored clips.");
             if (_model.IsAnimationMode)
-                _model.SelectedAnimation = _model.DetectedAnimations.FirstOrDefault();
+            {
+                // LTK opens the first playable clip whose graph-key name starts with idle.
+                // If the graph has no idle clip, leave the picker unselected instead of
+                // silently choosing a different authored action.
+                _model.SelectedAnimation = _model.DetectedAnimations.FirstOrDefault(item =>
+                    item.Name?.StartsWith("idle", StringComparison.OrdinalIgnoreCase) == true);
+            }
         }
 
         private string ResolveSklPath(string authoredPath, string sknPath, string searchDir)
@@ -1104,6 +1124,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             EnsureVfxRenderSession();
+            ConfigureAnimationClipCues(animItem);
             if (_vfxRenderer != null && _activeBundle != null)
             {
                 _championAnimationService?.Update(0, animItem.AnimationAsset, _championModel.Skeleton,
@@ -1130,6 +1151,57 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.LogMessages.Add($"[PLAY ANIMATION] {animItem.DisplayName} ({dur:F2}s) with {(animItem.Composition?.ResolvedCount ?? 0)} VFX events & {(_activeBundle?.IdleEffects.Count ?? 0)} idle auras.");
             UpdateTimelineTrackMetrics();
             UpdatePlayheadPosition();
+        }
+
+        private void ConfigureAnimationClipCues(AnimationClipCatalogItem clip)
+        {
+            ClearAnimationClipCues();
+            if (clip == null || _championModel == null) return;
+
+            _activeAnimationClip = clip;
+            foreach (ModelPart part in _championModel.Parts)
+            {
+                _animationBasePartVisibility[part] = part.IsVisible;
+                if (!part.IsVisible && !string.IsNullOrWhiteSpace(part.Name))
+                    _animationBaseHiddenSubmeshes.Add(Fnv1a.HashLower(part.Name));
+            }
+
+            _championAnimationService?.SetJointSnapCues(
+                clip.TimedCues.OfType<AnimationJointSnapCue>().ToArray());
+            ApplyAnimationClipCues(0d);
+        }
+
+        private void ApplyAnimationClipCues(double time)
+        {
+            if (_activeAnimationClip == null || _championModel == null) return;
+
+            IReadOnlySet<uint> hidden = VfxClipCueEvaluator.HiddenSubmeshesAt(
+                _activeAnimationClip.TimedCues,
+                _animationBaseHiddenSubmeshes,
+                time);
+            foreach (ModelPart part in _championModel.Parts)
+            {
+                if (string.IsNullOrWhiteSpace(part.Name)) continue;
+                bool visible = !hidden.Contains(Fnv1a.HashLower(part.Name));
+                if (part.IsVisible != visible) part.IsVisible = visible;
+            }
+        }
+
+        private void ClearAnimationClipCues()
+        {
+            if (_championModel != null)
+            {
+                foreach (var (part, visible) in _animationBasePartVisibility)
+                {
+                    if (_championModel.Parts.Contains(part) && part.IsVisible != visible)
+                        part.IsVisible = visible;
+                }
+            }
+
+            _activeAnimationClip = null;
+            _animationBasePartVisibility.Clear();
+            _animationBaseHiddenSubmeshes.Clear();
+            _championAnimationService?.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
         }
 
         private string ResolveSknPath(string authoredPath, string searchDir)
