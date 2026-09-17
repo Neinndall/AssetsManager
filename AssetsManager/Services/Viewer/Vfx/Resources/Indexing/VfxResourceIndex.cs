@@ -10,7 +10,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 {
     /// <summary>
     /// Immutable file index shared by every effect in an extracted WAD tree.
-    /// Exact authored paths always win; basename fallback is deterministic.
+    /// Named assets resolve by their authored virtual path or WAD hash; BIN-only truncated
+    /// extraction names are handled separately without falling back to unrelated basenames.
     /// </summary>
     internal sealed class VfxResourceIndex
     {
@@ -18,7 +19,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
         private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".tex", ".dds", ".png", ".tga", ".scb", ".sco", ".skn", ".skl", ".anm", ".bin"
+            ".tex", ".dds", ".png", ".tga", ".scb", ".sco", ".tmesh", ".gmesh", ".skn", ".skl", ".anm", ".bin"
         };
 
         private readonly string _root;
@@ -112,27 +113,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             IReadOnlyList<string> truncated = ResolveTruncated(normalized, extensions);
             if (truncated.Count > 0) return truncated;
 
-            string authoredDirectory = Normalize(Path.GetDirectoryName(normalized) ?? string.Empty);
-            foreach (string extension in extensions)
-            {
-                string fileName = Path.GetFileNameWithoutExtension(normalized) + extension;
-                if (!_byFileName.TryGetValue(fileName, out string[] candidates)) continue;
-
-                int bestScore = candidates.Max(path => SharedSuffixLength(
-                    authoredDirectory,
-                    Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)));
-                return candidates
-                    .Where(path => SharedSuffixLength(
-                        authoredDirectory,
-                        Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)) == bestScore)
-                    .OrderByDescending(path => SharedSuffixLength(
-                        authoredDirectory,
-                        Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)))
-                    .ThenBy(path => path.Length)
-                    .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
-            }
-
+            // LTK's NamedAsset lookup is exact: a missing authored virtual path remains
+            // unresolved instead of borrowing a same-named file from another directory.
             return Array.Empty<string>();
         }
 
@@ -229,17 +211,5 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             return PathUtils.NormalizeSeparators(path).TrimStart('/');
         }
 
-        private static int SharedSuffixLength(string left, string right)
-        {
-            string[] leftParts = left.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            string[] rightParts = right.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            int score = 0;
-            while (score < leftParts.Length && score < rightParts.Length &&
-                   string.Equals(leftParts[^(1 + score)], rightParts[^(1 + score)], StringComparison.OrdinalIgnoreCase))
-            {
-                score++;
-            }
-            return score;
-        }
     }
 }

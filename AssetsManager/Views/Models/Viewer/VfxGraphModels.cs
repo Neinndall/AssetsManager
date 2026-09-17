@@ -29,6 +29,7 @@ namespace AssetsManager.Views.Models.Viewer
     internal sealed record VfxBinDocument(
         IReadOnlyDictionary<uint, VfxSystemDefinition> Systems,
         IReadOnlyDictionary<uint, uint> ResourceMap,
+        IReadOnlyDictionary<uint, uint> SkinResourceMap,
         IReadOnlyList<string> Dependencies,
         IReadOnlyList<AnimationClipDefinition> EventSequences,
         VfxOwnerSceneContext OwnerSceneContext,
@@ -46,7 +47,8 @@ namespace AssetsManager.Views.Models.Viewer
         Matrix4x4? Transform = null,
         VfxSystemAuthoredFeatures AuthoredFeatures = null,
         VfxDragMotion DragMotion = VfxDragMotion.Stepped,
-        float BuildUpTime = 0f);
+        float BuildUpTime = 0f,
+        IReadOnlyDictionary<uint, uint> ResourceMap = null);
 
     /// <summary>One emitter inside a system. Curves are absolute-valued (sampled over normalised particle age 0..1).</summary>
     public sealed record VfxEmitterDefinition(
@@ -71,12 +73,13 @@ namespace AssetsManager.Views.Models.Viewer
         Vector2 TexDiv,                 // flipbook grid (cols, rows); (1,1) = single frame
         int NumFrames,
         bool RandomStartFrame,
-        bool IsMeshPrimitive,           // primitive is a mesh (billboarded only when the mesh can't load)
-        string MeshPath = null,        // VfxPrimitiveMesh -> VfxMeshDefinitionData.mSimpleMeshName (.scb/.sco)
+        bool IsMeshPrimitive,           // primitive is a mesh; effective draw kind is finalized after asset resolution
+        string MeshPath = null,         // resolved authored mesh path (.skn or simple .scb/.tmesh/.gmesh)
         Vector2 UvScrollRate = default, // birthUvScrollRate — mesh particles FLOW by scrolling UVs (waterfalls)
         string MeshSkeletonPath = null, // skinned mesh primitive (.skl)
         string MeshAnimationPath = null, // idle animation (.anm)
         bool MeshIsSkinned = false,
+        string MeshFallbackPath = null, // authored mSimpleMeshName used when a skinned mesh asset is unavailable
         bool MeshAlignPitchToCamera = false,
         bool MeshAlignYawToCamera = false,
         VfxSpawnShape SpawnShape = null,

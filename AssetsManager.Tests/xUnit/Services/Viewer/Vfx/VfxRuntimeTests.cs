@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
@@ -625,6 +626,174 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ChildResolutionUsesTheParentSystemsDocumentResolverScope()
+        {
+            const uint effectKey = 77;
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f,
+                ParticleLifetime = VfxCurveF.Const(1f)
+            };
+            VfxSystemDefinition globalTarget = new(2, "global", "global", new[] { childEmitter });
+            VfxSystemDefinition localTarget = new(3, "local", "local", new[] { childEmitter });
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference(string.Empty, 0, effectKey) },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            VfxSystemDefinition parent = new(
+                1,
+                "parent",
+                "parent",
+                new[] { parentEmitter },
+                ResourceMap: new Dictionary<uint, uint> { [effectKey] = localTarget.PathHash });
+            var systems = new Dictionary<uint, VfxSystemDefinition>
+            {
+                [parent.PathHash] = parent,
+                [globalTarget.PathHash] = globalTarget,
+                [localTarget.PathHash] = localTarget
+            };
+            var graph = new VfxPlaybackGraphRuntime(
+                parent,
+                Matrix4x4.Identity,
+                7,
+                systems,
+                new Dictionary<uint, uint> { [effectKey] = globalTarget.PathHash },
+                (definition, transform, seed) =>
+                {
+                    var runtime = new VfxPlaybackRuntime(seed);
+                    runtime.SetSystem(definition, transform);
+                    return runtime;
+                });
+
+            graph.Update(0.02f);
+
+            Assert.Equal(2, graph.Runtimes.Count);
+            Assert.Same(localTarget, graph.Runtimes[1].Definition);
+        }
+
+        [Fact]
+        public void ChildPoolCapacityMatchesLtkPeakDemandBuckets()
+        {
+            VfxEmitterDefinition regular = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = new VfxCurveF(1f, new[] { 0f, 1f }, new[] { 1f, 20f }),
+                ParticleLifetime = VfxCurveF.Const(1f)
+            };
+            var regularSystem = new VfxSystemDefinition(2, "regular", "regular", new[] { regular });
+            Assert.Equal(64, VfxPlaybackGraphRuntime.ChildCapacityOf(regularSystem));
+
+            VfxEmitterDefinition burst = regular with
+            {
+                IsSingleParticle = true,
+                Rate = VfxCurveF.Const(70_000f)
+            };
+            var burstSystem = new VfxSystemDefinition(3, "burst", "burst", new[] { burst });
+            Assert.Equal(4096, VfxPlaybackGraphRuntime.ChildCapacityOf(burstSystem));
+
+            VfxEmitterDefinition tiny = burst with { Rate = VfxCurveF.Const(1f) };
+            var tinySystem = new VfxSystemDefinition(4, "tiny", "tiny", new[] { tiny });
+            Assert.Equal(16, VfxPlaybackGraphRuntime.ChildCapacityOf(tinySystem));
+        }
+
+        [Fact]
+        public void ChildStartsEmptyWithoutApplyingRootBuildUpTime()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter }, BuildUpTime: 0.2f);
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) }, false,
+                    VfxCurveF.Zero, VfxCurve3.Const(Vector3.Zero), 0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            var graph = CreateGraph(parent, child);
+
+            graph.Update(0.02f);
+
+            Assert.Equal(2, graph.Runtimes.Count);
+            VfxPlaybackRuntime childRuntime = graph.Runtimes[1];
+            Assert.Equal(0f, childRuntime.CurrentTime);
+            Assert.Equal(0f, Assert.Single(childRuntime.Emitters).EmitterAge);
+            Assert.Equal(0, childRuntime.LiveParticleCount);
+        }
+
+        [Fact]
+        public void ChildLineageEnforcesLtkCapacityBudgetAndLiveChildLimit()
+        {
+            VfxPlaybackGraphRuntime CreateFor(VfxSystemDefinition child, int births)
+            {
+                VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+                {
+                    Rate = VfxCurveF.Const(births),
+                    IsSingleParticle = true,
+                    ParticleLifetime = VfxCurveF.Const(10f),
+                    ChildParticleSet = new VfxChildParticleSetDefinition(
+                        new[] { new VfxChildSystemReference("child", 2, 0) }, false,
+                        VfxCurveF.Zero, VfxCurve3.Const(Vector3.Zero), 0)
+                };
+                var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+                return CreateGraph(parent, child);
+            }
+
+            VfxEmitterDefinition largeChildEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(5000f)
+            };
+            var largeChild = new VfxSystemDefinition(2, "child", "child", new[] { largeChildEmitter });
+            VfxPlaybackGraphRuntime budgeted = CreateFor(largeChild, 100);
+            budgeted.Update(0.02f);
+            Assert.Equal(32, budgeted.LiveChildSystemCount);
+            Assert.Equal(131_072, budgeted.HeldChildParticleCapacity);
+            Assert.All(budgeted.Runtimes.Skip(1), runtime => Assert.Equal(4096, runtime.ParticleCapacity));
+
+            VfxEmitterDefinition smallChildEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var smallChild = new VfxSystemDefinition(2, "child", "child", new[] { smallChildEmitter });
+            VfxPlaybackGraphRuntime capped = CreateFor(smallChild, 600);
+            capped.Update(0.02f);
+            Assert.Equal(512, capped.LiveChildSystemCount);
+            Assert.Equal(512 * 16, capped.HeldChildParticleCapacity);
+        }
+
+        [Fact]
+        public void DeathSpawnedChildSoftStopsAfterItsSystemSpan()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Zero,
+                EmitterLifetime = null
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ParticleLifetime = VfxCurveF.Const(0.05f),
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) }, true,
+                    VfxCurveF.Zero, VfxCurve3.Const(Vector3.Zero), 0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            var graph = CreateGraph(parent, child);
+
+            graph.Update(0.1f);
+            graph.Update(0.1f);
+            Assert.Equal(2, graph.Runtimes.Count);
+            float stopAfter = (float)VfxDurationCalculator.SystemSpan(child);
+            Assert.Equal(6f, stopAfter);
+            graph.Update(stopAfter + 0.2f);
+
+            Assert.Single(graph.Runtimes);
+            Assert.Equal(0, graph.HeldChildParticleCapacity);
+        }
+
+        [Fact]
         public void CarriedChildFollowsItsParentParticleAndStopsWhenItDies()
         {
             VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -706,6 +875,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             graph.Update(0.10f);
             Assert.Equal(2, graph.Runtimes.Count);
+            int checkpointCapacity = graph.Runtimes[1].ParticleCapacity;
+            int checkpointHeld = graph.HeldChildParticleCapacity;
             VfxPlaybackGraphRuntime.Snapshot checkpoint = graph.CaptureSnapshot();
 
             graph.Update(0.08f);
@@ -716,6 +887,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             graph.RestoreSnapshot(checkpoint);
             Assert.Equal(2, graph.Runtimes.Count);
+            Assert.Equal(checkpointCapacity, graph.Runtimes[1].ParticleCapacity);
+            Assert.Equal(checkpointHeld, graph.HeldChildParticleCapacity);
             Assert.False(graph.Runtimes[1].IsStopped);
             graph.Update(0.08f);
 
@@ -1019,6 +1192,49 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             runtime.Update(0.25f);
 
             Assert.Equal(0.25f, runtime.Emitters[0].EmitterAge, precision: 4);
+        }
+
+        [Fact]
+        public void LtkRandomZeroSeedAndCloneMatchDriverContracts()
+        {
+            var zero = new VfxLtkRandom(0);
+            var seen = new HashSet<float>();
+            for (int index = 0; index < 8; index++)
+            {
+                float value = zero.NextUnitFloat();
+                Assert.InRange(value, 0f, MathF.BitDecrement(1f));
+                Assert.True(seen.Add(value));
+            }
+
+            var original = new VfxLtkRandom(42);
+            original.NextUnitFloat();
+            original.NextUnitFloat();
+            VfxLtkRandom clone = original.Clone();
+            for (int index = 0; index < 8; index++)
+                Assert.Equal(original.NextUnitFloat(), clone.NextUnitFloat());
+        }
+
+        [Fact]
+        public void ParticleSerialKeepsCountingAfterRetirement()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(10f),
+                ParticleLifetime = VfxCurveF.Const(0.05f),
+                EmitterLifetime = 1f
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "serial", "serial", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.1f);
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            uint first = Assert.Single(state.Particles).Serial;
+
+            runtime.Update(0.1f);
+            uint second = Assert.Single(state.Particles).Serial;
+
+            Assert.Equal(first + 1u, second);
         }
 
         [Fact]
@@ -2621,6 +2837,24 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 state.Particles.Add(new VfxPlaybackRuntime.Particle { TrailTiling = Vector3.One, TrailBirthDistance = i });
             }
             return state;
+        }
+
+        private static VfxPlaybackGraphRuntime CreateGraph(
+            VfxSystemDefinition parent,
+            VfxSystemDefinition child)
+        {
+            return new VfxPlaybackGraphRuntime(
+                parent,
+                Matrix4x4.Identity,
+                7,
+                new Dictionary<uint, VfxSystemDefinition> { [parent.PathHash] = parent, [child.PathHash] = child },
+                new Dictionary<uint, uint>(),
+                (definition, transform, seed) =>
+                {
+                    var runtime = new VfxPlaybackRuntime(seed);
+                    runtime.SetSystem(definition, transform);
+                    return runtime;
+                });
         }
 
         private static VfxEmitterDefinition CreateEmitter(Vector3 birthScale, VfxEmitterRenderState renderState)

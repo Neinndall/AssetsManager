@@ -278,11 +278,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 foreach (VfxIdleEffectDefinition idle in idleEffects)
                 {
                     VfxSystemDefinition idleDef = null;
-                    if (idle.EffectKey != 0 && systems.TryGetValue(idle.EffectKey, out var sys))
+                    uint mappedHash = 0u;
+                    bool resolverHit = idle.EffectKey != 0 && resourceMap.TryGetValue(idle.EffectKey, out mappedHash);
+                    if (resolverHit)
                     {
-                        idleDef = sys;
+                        if (mappedHash != 0 && systems.TryGetValue(mappedHash, out var mappedSystem))
+                            idleDef = mappedSystem;
                     }
-                    else if (resourceMap.TryGetValue(idle.EffectKey, out uint mappedHash) && systems.TryGetValue(mappedHash, out sys))
+                    else if (idle.EffectKey != 0 && systems.TryGetValue(idle.EffectKey, out var sys))
                     {
                         idleDef = sys;
                     }

@@ -319,6 +319,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint ResolverClass = HashAlgorithms.Fnv1a("ResourceResolver");
         private static readonly uint F_resourceMap = HashAlgorithms.Fnv1a("resourceMap");
         private static readonly uint F_mResourceMap = HashAlgorithms.Fnv1a("mResourceMap");
+        private static readonly uint F_mResourceResolver = HashAlgorithms.Fnv1a("mResourceResolver");
 
         // AnimationGraph clip event fields
         private static readonly uint SubmeshVisibilityEventClass = 0xbcf56e70;
@@ -382,9 +383,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static VfxBinDocument ParseDocument(byte[] data)
         {
             BinTree tree = ParseTree(data);
+            IReadOnlyDictionary<uint, uint> resourceMap = ExtractResourceMap(tree);
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems = ExtractAll(tree)
+                .ToDictionary(
+                    static pair => pair.Key,
+                    pair => pair.Value with { ResourceMap = resourceMap });
             return new VfxBinDocument(
-                ExtractAll(tree),
-                ExtractResourceMap(tree),
+                systems,
+                resourceMap,
+                ExtractSkinResourceMap(tree),
                 tree.Dependencies.ToArray(),
                 ExtractEventSequences(tree),
                 ExtractOwnerSceneContext(tree),
@@ -661,20 +668,54 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static IReadOnlyDictionary<uint, uint> ExtractResourceMap(BinTree tree)
         {
             var map = new Dictionary<uint, uint>();
-            foreach (var o in tree.Objects.Values)
+            foreach (BinTreeObject resolver in tree.Objects.Values)
             {
-                if (o.ClassHash != ResolverClass) continue;
-                if (!o.Properties.TryGetValue(F_resourceMap, out var prop)
-                    && !o.Properties.TryGetValue(F_mResourceMap, out prop)) continue;
-                if (prop is not BinTreeMap entries) continue;
-                foreach (var kv in entries)
-                {
-                    uint key = AsU32(kv.Key) ?? 0u;
-                    uint value = AsU32(kv.Value) ?? 0u;
-                    if (key != 0 && value != 0) map.TryAdd(key, value);
-                }
+                if (resolver.ClassHash == ResolverClass)
+                    AppendResolverEntries(resolver, map);
             }
             return map;
+        }
+
+        private static IReadOnlyDictionary<uint, uint> ExtractSkinResourceMap(BinTree tree)
+        {
+            foreach (BinTreeObject skin in tree.Objects.Values)
+            {
+                if (skin.ClassHash != SkinCharacterDataPropertiesClass) continue;
+                uint resolverHash = AsU32(Get(skin.Properties, F_mResourceResolver)) ?? 0u;
+                if (resolverHash == 0 ||
+                    !tree.Objects.TryGetValue(resolverHash, out BinTreeObject resolver) ||
+                    resolver.ClassHash != ResolverClass)
+                {
+                    continue;
+                }
+
+                var map = new Dictionary<uint, uint>();
+                AppendResolverEntries(resolver, map);
+                return map;
+            }
+            return new Dictionary<uint, uint>();
+        }
+
+        private static void AppendResolverEntries(
+            BinTreeObject resolver,
+            Dictionary<uint, uint> map)
+        {
+            if (!resolver.Properties.TryGetValue(F_resourceMap, out BinTreeProperty prop) &&
+                !resolver.Properties.TryGetValue(F_mResourceMap, out prop))
+            {
+                return;
+            }
+            if (prop is not BinTreeMap entries) return;
+
+            foreach (KeyValuePair<BinTreeProperty, BinTreeProperty> entry in entries)
+            {
+                uint key = AsU32(entry.Key) ?? 0u;
+                uint value = AsU32(entry.Value) ?? 0u;
+                // A null resolver link is still an authored hit in LTK. Keep key -> 0 so
+                // the first resolver can suppress the effect instead of letting a later
+                // resolver or direct-hash fallback answer the same key.
+                if (key != 0) map.TryAdd(key, value);
+            }
         }
 
 
@@ -782,7 +823,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             VfxPrimitiveKind primitiveKind = GetPrimitiveKind(primitiveClass);
             bool isMesh = primitiveKind is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
             bool isArbitraryQuad = prim is BinTreeStruct aq && aq.ClassHash == PrimArbitraryQuad;
-            string meshPath = null, meshSkl = null, meshAnm = null;
+            string meshPath = null, meshSkl = null, meshAnm = null, meshFallbackPath = null;
             bool meshIsSkinned = false;
             bool meshAlignPitch = false;
             bool meshAlignYaw = false;
@@ -798,17 +839,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 // pair wins. mSimpleMeshName is only the fallback when that pair is absent.
                 string skinnedMesh = ReadAsset(md.Properties, F_meshName, ".skn");
                 string skeleton = ReadAsset(md.Properties, F_meshSkeleton, ".skl");
+                string simpleMesh = ReadAsset(md.Properties, F_simpleMesh, ".scb");
+                if (!IsNoMeshPath(simpleMesh) && IsSupportedSimpleMeshPath(simpleMesh))
+                    meshFallbackPath = simpleMesh;
+
                 if (!IsNoMeshPath(skinnedMesh) && !IsNoMeshPath(skeleton))
                 {
                     meshPath = skinnedMesh;
                     meshSkl = skeleton;
                     meshIsSkinned = true;
                 }
-                else
+                else if (!string.IsNullOrWhiteSpace(meshFallbackPath))
                 {
-                    string simpleMesh = ReadAsset(md.Properties, F_simpleMesh, ".scb");
-                    if (!IsNoMeshPath(simpleMesh) && IsSupportedSimpleMeshPath(simpleMesh))
-                        meshPath = simpleMesh;
+                    meshPath = meshFallbackPath;
                 }
 
                 meshAnm = ReadAsset(md.Properties, F_meshAnim, ".anm");
@@ -1016,6 +1059,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 MeshSkeletonPath: meshSkl,
                 MeshAnimationPath: meshAnm,
                 MeshIsSkinned: meshIsSkinned,
+                MeshFallbackPath: meshFallbackPath,
                 MeshAlignPitchToCamera: meshAlignPitch,
                 MeshAlignYawToCamera: meshAlignYaw,
                 SpawnShape: ReadSpawnShape(p),

@@ -104,14 +104,32 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
             IReadOnlyDictionary<string, KeyValuePair<uint, VfxSystemDefinition>> systemsByName,
             bool allowEffectNameFallback)
         {
-            if (TryResolveHash(effectKey, systems, resourceMap, out uint systemHash, out VfxSystemDefinition system))
+            if (TryResolveHash(
+                    effectKey,
+                    systems,
+                    resourceMap,
+                    out uint systemHash,
+                    out VfxSystemDefinition system,
+                    out bool resolverHit))
+            {
                 return (systemHash, system);
+            }
+            if (resolverHit) return (0u, null);
 
             if (allowEffectNameFallback && !string.IsNullOrWhiteSpace(effectName))
             {
                 uint nameHash = Fnv1a.HashLower(effectName);
-                if (TryResolveHash(nameHash, systems, resourceMap, out systemHash, out system))
+                if (TryResolveHash(
+                        nameHash,
+                        systems,
+                        resourceMap,
+                        out systemHash,
+                        out system,
+                        out resolverHit))
+                {
                     return (systemHash, system);
+                }
+                if (resolverHit) return (0u, null);
                 if (systemsByName.TryGetValue(effectName, out KeyValuePair<uint, VfxSystemDefinition> namedSystem))
                     return (namedSystem.Key, namedSystem.Value);
             }
@@ -124,13 +142,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
             IReadOnlyDictionary<uint, uint> resourceMap,
             out uint systemHash,
-            out VfxSystemDefinition system)
+            out VfxSystemDefinition system,
+            out bool resolverHit)
         {
-            if (candidate != 0 && resourceMap.TryGetValue(candidate, out uint mappedHash) &&
-                systems.TryGetValue(mappedHash, out system))
+            resolverHit = false;
+            if (candidate != 0 && resourceMap.TryGetValue(candidate, out uint mappedHash))
             {
-                systemHash = mappedHash;
-                return true;
+                resolverHit = true;
+                if (mappedHash != 0 && systems.TryGetValue(mappedHash, out system))
+                {
+                    systemHash = mappedHash;
+                    return true;
+                }
+                systemHash = 0u;
+                system = null;
+                return false;
             }
             if (candidate != 0 && systems.TryGetValue(candidate, out system))
             {

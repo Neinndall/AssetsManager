@@ -54,17 +54,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void OnlyAddAndSubtractPremultiplyAuthoredAlpha()
+        public void FragmentShadersKeepPremultiplicationInTheRuntimeLikeLtk()
         {
-            const string coverageExpression =
-                "if (uIsAdditive == 1 || uIsMultiply != 0)";
+            // LTK premultiplies ADD/SUBTRACT tint before it enters the draw buffers. Keeping
+            // a second shader-side multiply would incorrectly affect a zero-warp distortion,
+            // whose authored alpha must remain the distortion mask/fallback coverage.
+            Assert.DoesNotContain("uIsMultiply", VfxShaderSource.ParticleFragment);
+            Assert.DoesNotContain("uIsAdditive", VfxShaderSource.ParticleFragment);
+            Assert.DoesNotContain("fragColor.rgb *= authoredColor.a", VfxShaderSource.ParticleFragment);
+            Assert.DoesNotContain("uIsMultiply", VfxShaderSource.MeshFragment);
+            Assert.DoesNotContain("uIsAdditive", VfxShaderSource.MeshFragment);
+            Assert.DoesNotContain("fragColor.rgb *= authoredColor.a", VfxShaderSource.MeshFragment);
+        }
 
-            Assert.Contains("uniform int uIsMultiply;", VfxShaderSource.ParticleFragment);
-            Assert.Contains(coverageExpression, VfxShaderSource.ParticleFragment);
-            Assert.Contains("uniform int uIsMultiply;", VfxShaderSource.MeshFragment);
-            Assert.Contains(coverageExpression, VfxShaderSource.MeshFragment);
-            Assert.DoesNotContain("mix(vec3(1.0), fragColor.rgb", VfxShaderSource.ParticleFragment);
-            Assert.DoesNotContain("mix(vec3(1.0), fragColor.rgb", VfxShaderSource.MeshFragment);
+        [Fact]
+        public void InspectorOnlyModulationFactorDoesNotAlterLtkMaterials()
+        {
+            Assert.DoesNotContain("uModulationFactor", VfxShaderSource.ParticleFragment);
+            Assert.DoesNotContain("uModulationFactor", VfxShaderSource.MeshFragment);
+            Assert.Contains("vec4 authoredColor = vColor;", VfxShaderSource.ParticleFragment);
+            Assert.Contains(
+                "vec4 authoredColor = uColor * (uAttachedMesh != 0 ? vec4(1.0) : vMeshColor);",
+                VfxShaderSource.MeshFragment);
         }
         [Fact]
         public void ArbitraryQuadUsesAuthoredLtkUvOrientationForBothLayers()

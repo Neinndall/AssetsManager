@@ -11,9 +11,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
     /// <summary>Executes one complete VFX graph, including particle-authored child systems.</summary>
     public sealed class VfxPlaybackGraphRuntime
     {
-        // LTK bounds recursive particle children at four levels and 512 live systems.
+        // LTK bounds recursive particle children at four levels and 512 live child systems.
+        // Child pools reserve a power-of-two capacity from 16..4096 against one 128K lineage budget.
         private const int MaximumGraphDepth = 4;
         private const int MaximumActiveChildSystems = 512;
+        private const int MinimumChildParticleCapacity = 16;
+        private const int MaximumChildParticleCapacity = 4096;
+        private const int MaximumChildParticleCapacityBudget = 1 << 17;
 
         private readonly IReadOnlyDictionary<uint, VfxSystemDefinition> _systems;
         private readonly IReadOnlyDictionary<uint, uint> _resourceMap;
@@ -23,9 +27,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private readonly Dictionary<VfxPlaybackRuntime, int> _depth = new();
         private readonly Dictionary<VfxPlaybackRuntime, Matrix4x4> _localTransforms = new();
         private readonly Dictionary<VfxPlaybackRuntime, string> _paths = new();
+        private readonly Dictionary<VfxPlaybackRuntime, int> _childCapacities = new();
+        private readonly Dictionary<VfxPlaybackRuntime, float> _looseChildStopAfter = new();
         private readonly Dictionary<(string Path, int SourceOrder), int> _renderRanks = new();
         private readonly Dictionary<(VfxPlaybackRuntime Parent, int SourceOrder, uint Serial), List<CarriedChildInfo>> _carriedChildren = new();
         private readonly int _initialSeed;
+        private int _heldChildParticleCapacity;
         private Matrix4x4 _rootTransform;
         private Matrix4x4 _orientationRootTransform;
         private Func<string, Matrix4x4?> _jointTransformProvider;
@@ -47,6 +54,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             string Path,
             int Seed,
             uint InitialRandomState,
+            int ParticleCapacity,
+            float? LooseStopAfterSeconds,
             bool Pending,
             VfxPlaybackRuntime.Snapshot State);
 
@@ -92,6 +101,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         public VfxPlaybackRuntime Root { get; }
         public IReadOnlyList<VfxPlaybackRuntime> Runtimes => _runtimes;
         internal int InitialSeed => _initialSeed;
+        internal int LiveChildSystemCount => Math.Max(0, _runtimes.Count - 1) + _pendingChildren.Count;
+        internal int HeldChildParticleCapacity => _heldChildParticleCapacity;
         public bool IsComplete => _pendingChildren.Count == 0 && _runtimes.Count == 1 && Root.IsComplete;
         public object UserTag
         {
@@ -226,6 +237,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     _paths.GetValueOrDefault(runtime, string.Empty),
                     runtime.Seed,
                     runtime.InitialRandomState,
+                    runtime.ParticleCapacity,
+                    _looseChildStopAfter.TryGetValue(runtime, out float stopAfter) ? stopAfter : null,
                     pending,
                     state);
                 bytes += 256L + state.Bytes;
@@ -276,6 +289,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _depth.Clear();
             _localTransforms.Clear();
             _paths.Clear();
+            _childCapacities.Clear();
+            _looseChildStopAfter.Clear();
+            _heldChildParticleCapacity = 0;
             _carriedChildren.Clear();
             _rootTransform = snapshot.RootTransform;
             _orientationRootTransform = snapshot.OrientationRootTransform;
@@ -349,12 +365,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 saved.LocalTransform * _rootTransform,
                 saved.LocalTransform * _orientationRootTransform);
             runtime.SetInitialRandomState(saved.InitialRandomState);
+            runtime.SetParticleCapacity(saved.ParticleCapacity);
             runtime.ParticleLifecycle += OnParticleLifecycle;
             runtime.ParticleUpdated += OnParticleUpdated;
             _depth[runtime] = saved.Depth;
             _localTransforms[runtime] = saved.LocalTransform;
             _paths[runtime] = saved.Path;
             AssignRenderIdentity(runtime, saved.Path);
+            RegisterChildCapacity(runtime, saved.ParticleCapacity);
+            if (saved.LooseStopAfterSeconds.HasValue)
+                _looseChildStopAfter[runtime] = saved.LooseStopAfterSeconds.Value;
             runtime.RestoreSnapshot(saved.State);
             return runtime;
         }
@@ -364,6 +384,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _depth.Remove(runtime);
             _localTransforms.Remove(runtime);
             _paths.Remove(runtime);
+            _looseChildStopAfter.Remove(runtime);
+            if (_childCapacities.Remove(runtime, out int capacity))
+                _heldChildParticleCapacity = Math.Max(0, _heldChildParticleCapacity - capacity);
 
             foreach (var key in _carriedChildren.Keys.ToArray())
             {
@@ -394,7 +417,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             int runtimeCount = _runtimes.Count;
             for (int index = 0; index < runtimeCount; index++)
-                _runtimes[index].Update(deltaTime);
+            {
+                VfxPlaybackRuntime runtime = _runtimes[index];
+                if (_looseChildStopAfter.TryGetValue(runtime, out float stopAfter) &&
+                    runtime.CurrentTime + deltaTime >= stopAfter)
+                {
+                    runtime.IsStopped = true;
+                }
+                runtime.Update(deltaTime);
+            }
 
             if (_pendingChildren.Count > 0)
             {
@@ -429,7 +460,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             int depth,
             string path,
             int seed,
-            uint? initialRandomState = null)
+            uint? initialRandomState = null,
+            int? particleCapacity = null)
         {
             Matrix4x4 effectiveLocalTransform =
                 definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * localTransform;
@@ -440,6 +472,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             runtime.SetTransform(
                 effectiveLocalTransform * _rootTransform,
                 effectiveLocalTransform * _orientationRootTransform);
+            if (particleCapacity.HasValue)
+                runtime.SetParticleCapacity(particleCapacity.Value);
             if (initialRandomState.HasValue)
                 runtime.SetInitialRandomState(initialRandomState.Value);
             runtime.ParticleLifecycle += OnParticleLifecycle;
@@ -448,7 +482,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _localTransforms[runtime] = effectiveLocalTransform;
             _paths[runtime] = path;
             AssignRenderIdentity(runtime, path);
-            runtime.WarmUp();
+            if (depth == 0) runtime.WarmUp();
+            else runtime.SuppressBuildUp();
             if (!_allEmittersVisible)
             {
                 foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
@@ -491,7 +526,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 for (int slot = 0; slot < childSet.Children.Count; slot++)
                 {
                     VfxChildSystemReference child = childSet.Children[slot];
-                    VfxSystemDefinition childDefinition = ResolveSystem(child, _systems, _resourceMap);
+                    VfxSystemDefinition childDefinition = ResolveSystem(
+                        child,
+                        _systems,
+                        definition.ResourceMap ?? _resourceMap);
                     if (childDefinition is null) continue;
 
                     string emitterPath = string.IsNullOrEmpty(path)
@@ -593,7 +631,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 if (bones.Count < childSet.Children.Count || _jointTransformProvider is null) return;
                 for (int slot = 0; slot < childSet.Children.Count; slot++)
                 {
-                    if (_runtimes.Count + _pendingChildren.Count >= MaximumActiveChildSystems) break;
+                    if (LiveChildSystemCount >= MaximumActiveChildSystems) break;
                     string bone = bones[slot];
                     Matrix4x4? joint = _jointTransformProvider(bone);
                     if (!joint.HasValue) continue;
@@ -605,7 +643,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 return;
             }
 
-            if (_runtimes.Count + _pendingChildren.Count >= MaximumActiveChildSystems) return;
+            if (LiveChildSystemCount >= MaximumActiveChildSystems) return;
 
             // A normal child uses one lineage stream both to select its probability slot and
             // to seed the child itself. Keep the post-selection RNG state for exact replay.
@@ -643,8 +681,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             if ((uint)slot >= (uint)childSet.Children.Count) return;
             VfxChildSystemReference child = childSet.Children[slot];
-            VfxSystemDefinition definition = ResolveSystem(child, _systems, _resourceMap);
+            VfxSystemDefinition definition = ResolveSystem(
+                child,
+                _systems,
+                parentRuntime.Definition.ResourceMap ?? _resourceMap);
             if (definition is null) return;
+
+            int particleCapacity = ChildCapacityOf(definition);
+            if (LiveChildSystemCount >= MaximumActiveChildSystems ||
+                _heldChildParticleCapacity + particleCapacity > MaximumChildParticleCapacityBudget)
+            {
+                return;
+            }
 
             Matrix4x4 childLocalTransform = childWorldTransform;
             if (Matrix4x4.Invert(_rootTransform, out Matrix4x4 inverseRoot))
@@ -657,10 +705,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 parentDepth + 1,
                 childPath,
                 childSeed,
-                initialRandomState);
+                initialRandomState,
+                particleCapacity);
+            RegisterChildCapacity(runtime, particleCapacity);
             _pendingChildren.Add(runtime);
 
-            if (!carried) return;
+            if (!carried)
+            {
+                _looseChildStopAfter[runtime] = (float)VfxDurationCalculator.SystemSpan(definition);
+                return;
+            }
             var key = (Parent: parentRuntime, particle.SourceOrder, particle.Serial);
             if (!_carriedChildren.TryGetValue(key, out List<CarriedChildInfo> tracked))
             {
@@ -675,6 +729,55 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Slot = slot,
                 BoneName = boneName
             });
+        }
+
+        private void RegisterChildCapacity(VfxPlaybackRuntime runtime, int capacity)
+        {
+            if (_childCapacities.ContainsKey(runtime)) return;
+            int held = Math.Clamp(capacity, MinimumChildParticleCapacity, MaximumChildParticleCapacity);
+            _childCapacities[runtime] = held;
+            _heldChildParticleCapacity += held;
+        }
+
+        /// <summary>
+        /// Matches LTK childPool.capacityOf: estimate the child's peak simultaneous demand,
+        /// then reserve the next power-of-two pool between 16 and 4096 particles.
+        /// </summary>
+        internal static int ChildCapacityOf(VfxSystemDefinition system)
+        {
+            if (system is null) return MinimumChildParticleCapacity;
+
+            double wanted = 0d;
+            foreach (VfxEmitterDefinition emitter in system.Emitters)
+            {
+                if (emitter.Disabled) continue;
+                double rate = Peak(emitter.Rate);
+                if (emitter.IsSingleParticle)
+                {
+                    int burst = (int)(Math.Truncate(rate) % (ushort.MaxValue + 1d));
+                    wanted += Math.Max(burst, 1);
+                }
+                else
+                {
+                    double lifetime = Peak(emitter.ParticleLifetime);
+                    wanted += Math.Ceiling(rate * (lifetime + VfxPlaybackRuntime.LingerSeconds(emitter))) +
+                              Math.Ceiling(rate) + 1d;
+                }
+            }
+
+            int capacity = MinimumChildParticleCapacity;
+            while (capacity < wanted && capacity < MaximumChildParticleCapacity)
+                capacity *= 2;
+            return capacity;
+        }
+
+        private static double Peak(VfxCurveF curve)
+        {
+            double most = Math.Max(curve.Constant, 0f);
+            if (curve.Values is not { Length: > 0 }) return most;
+            foreach (float value in curve.Values)
+                most = Math.Max(most, value);
+            return most;
         }
 
         private static Matrix4x4 ChildBearing(
@@ -757,8 +860,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 return definition;
             if (reference.EffectKey != 0)
             {
-                if (resourceMap.TryGetValue(reference.EffectKey, out uint mappedHash) &&
-                    systems.TryGetValue(mappedHash, out definition)) return definition;
+                if (resourceMap.TryGetValue(reference.EffectKey, out uint mappedHash))
+                {
+                    // A resolver hit is authoritative even when it maps to null or to an
+                    // unavailable object. LTK does not continue into a later fallback.
+                    return mappedHash != 0 && systems.TryGetValue(mappedHash, out definition)
+                        ? definition
+                        : null;
+                }
                 if (systems.TryGetValue(reference.EffectKey, out definition)) return definition;
             }
             if (!string.IsNullOrWhiteSpace(reference.Name) &&
@@ -879,7 +988,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     double childDuration = 0;
                     foreach (VfxChildSystemReference child in childSet.Children)
                     {
-                        VfxSystemDefinition childSystem = VfxPlaybackGraphRuntime.ResolveSystem(child, systems, resourceMap);
+                        VfxSystemDefinition childSystem = VfxPlaybackGraphRuntime.ResolveSystem(
+                            child,
+                            systems,
+                            system.ResourceMap ?? resourceMap);
                         if (childSystem is null) continue;
                         childDuration = Math.Max(
                             childDuration,

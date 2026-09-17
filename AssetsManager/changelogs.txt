@@ -603,3 +603,6 @@ Bug Fixes
   - Viewer / Expanded authored SKN material effects with independent distortion, layered masks, transitions, emission, flow and vertex deformation without dropping existing material behavior.
   - VFX Studio / Aligned particle emission, integration, curve sampling, linger rotation and global particle pool behavior with LTK.
   - VFX Studio / Aligned skin animation idle effects with LTK deterministic seeds and missing-bone attachment offsets.
+  - VFX Studio / Aligned child-system pool budgets, lifecycle timing, deterministic lineage and checkpoint restoration with LTK.
+  - VFX Studio / Aligned linked BIN resolver scope, named asset lookup and mesh fallback resolution with LTK.
+  - VFX Studio / Aligned shader premultiplication, texture filtering and distortion fallbacks with LTK.

@@ -26,8 +26,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _uSceneDepthTex, _uHasSoftParticle, _uSoftParticleParams, _uSoftParticleControl, _uDepthProjection;
         private int _uDirectionOriented, _uArbitraryQuad, _uLegacyOrientation, _uPivotUp;
         private int _uPrimitiveKind;
-        private int _uAlphaCutoff, _uAlphaTest, _uEmissiveStrength, _uIsMultiply, _uFlipU, _uFlipV, _uClampUv;
-        private int _uColorMap, _uHasColor, _uRampAtMult, _uUvMode, _uColorRenderFlags, _uIsAdditive, _uModulationFactor;
+        private int _uAlphaCutoff, _uAlphaTest, _uEmissiveStrength, _uFlipU, _uFlipV, _uClampUv;
+        private int _uColorMap, _uHasColor, _uRampAtMult, _uUvMode, _uColorRenderFlags;
         private int _uPaletteMap, _uHasPalette, _uPaletteCount, _uPaletteAddressMode, _uPaletteMixMask, _uPaletteScroll;
         private int _uColorLookUpTypeX, _uColorLookUpTypeY, _uColorLookUpScales, _uColorLookUpOffsets;
         private int _uErosionTex, _uHasErosion, _uHasErosionMap, _uErosionAddressMode, _uErosionDefault;
@@ -105,14 +105,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uAlphaCutoff = gl.GetUniformLocation(_program, "uAlphaCutoff");
             _uAlphaTest = gl.GetUniformLocation(_program, "uAlphaTest");
             _uEmissiveStrength = gl.GetUniformLocation(_program, "uEmissiveStrength");
-            _uIsMultiply = gl.GetUniformLocation(_program, "uIsMultiply");
             _uColorMap = gl.GetUniformLocation(_program, "uColorMap");
             _uHasColor = gl.GetUniformLocation(_program, "uHasColor");
             _uRampAtMult = gl.GetUniformLocation(_program, "uRampAtMult");
             _uUvMode = gl.GetUniformLocation(_program, "uUvMode");
             _uColorRenderFlags = gl.GetUniformLocation(_program, "uColorRenderFlags");
-            _uIsAdditive = gl.GetUniformLocation(_program, "uIsAdditive");
-            _uModulationFactor = gl.GetUniformLocation(_program, "uModulationFactor");
             _uPaletteMap = gl.GetUniformLocation(_program, "uPaletteMap");
             _uHasPalette = gl.GetUniformLocation(_program, "uHasPalette");
             _uPaletteCount = gl.GetUniformLocation(_program, "uPaletteCount");
@@ -380,7 +377,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (!es.Def.IsVisual) continue;
                 bool isDistortion = es.Def.Distortion is not null;
                 bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
-                if (warpsFrame && (es.DistortionTexture == 0 || _capture.ColorTexture == 0)) continue;
+                if (warpsFrame && _capture.ColorTexture == 0) continue;
 
                 _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _instVbo);
                 if (floats > _instCapFloats)
@@ -438,16 +435,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     _uAlphaTest,
                     VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0);
                 _gl.Uniform1(_uEmissiveStrength, VfxBlendModes.ResolveEmissiveStrength(es.Def.BlendMode));
-                _gl.Uniform1(
-                    _uIsMultiply,
-                    !isDistortion && VfxBlendModes.GetDescriptor(es.Def.BlendMode).NeutralizeTransparentRgb ? 1 : 0);
-                Vector4 modulationFactor = es.Def.ModulationFactor ?? Vector4.One;
-                _gl.Uniform4(
-                    _uModulationFactor,
-                    modulationFactor.X,
-                    modulationFactor.Y,
-                    modulationFactor.Z,
-                    modulationFactor.W);
                 bool hasMultLayer = !string.IsNullOrWhiteSpace(es.Def.TextureMultPath);
                 bool useColorRamp = ShouldUseColorRamp(es.Def, es.ColorGradientTexture != 0);
                 _gl.Uniform1(_uHasColor, useColorRamp ? 1 : 0);
@@ -469,7 +456,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     palette?.ScrollU?.Sample(sharedPalettePhase) ?? 0f,
                     palette?.ScrollV?.Sample(sharedPalettePhase) ?? 0f);
                 _gl.Uniform2(_uPaletteScroll, paletteScroll.X, paletteScroll.Y);
-                _gl.Uniform1(_uIsAdditive, es.Def.BlendMode == 0 ? 1 : VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 2 : 0);
                 _gl.Uniform1(_uColorLookUpTypeX, es.Def.ColorLookUpTypeX ?? 0);
                 _gl.Uniform1(_uColorLookUpTypeY, es.Def.ColorLookUpTypeY ?? 0);
                 Vector2 colorLookUpScales = es.Def.ColorLookUpScales;
@@ -508,7 +494,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
                 _gl.Uniform1(_uHasTex, ShouldSampleBaseTexture(es.Def, es.Texture) ? 1 : 0);
                 ApplyAddressMode(2);
-                ApplyTextureSampling(es.Def.IsTexturePixelated);
+                ApplyTextureSampling();
                 if (es.TextureMult != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture1);
@@ -522,11 +508,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     _gl.BindTexture(TextureTarget.Texture2D, _capture.ColorTexture);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
-                if (es.DistortionTexture != 0)
+                if (isDistortion)
                 {
+                    // LTK keeps a distorting draw alive when its normal map is missing. Its
+                    // fallback has alpha zero, so this transparent texture produces the same
+                    // zero warp while preserving alpha-test/stencil side effects.
                     _gl.ActiveTexture(TextureUnit.Texture3);
-                    _gl.BindTexture(TextureTarget.Texture2D, es.DistortionTexture);
+                    _gl.BindTexture(
+                        TextureTarget.Texture2D,
+                        es.DistortionTexture != 0 ? es.DistortionTexture : _textures.FallbackTransparentTexture);
                     ApplyAddressMode(2);
+                    ApplyTextureSampling();
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (es.ErosionTexture != 0)
@@ -547,13 +539,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     ? es.ColorGradientTexture
                     : _textures.FallbackTransparentTexture);
                 ApplyAddressMode(2);
-                ApplyTextureSampling(false);
+                ApplyTextureSampling();
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + 8));
                 _gl.BindTexture(TextureTarget.Texture2D, es.PaletteTexture != 0
                     ? es.PaletteTexture
                     : _textures.FallbackTransparentTexture);
                 ApplyAddressMode(2);
-                ApplyTextureSampling(false);
+                ApplyTextureSampling();
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 if (es.Def.PrimitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail)
                 {
@@ -691,16 +683,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _instanceOrder = new int[Math.Max(instanceCount, 64)];
         }
 
-        private void ApplyTextureSampling(bool pixelated)
+        private void ApplyTextureSampling()
         {
+            // LTK's VFX texture loader always uses linear filtering. isTexturePixelated is
+            // inspector metadata in 1.19.4 and does not change the particle material sampler.
             _gl.TexParameter(
                 TextureTarget.Texture2D,
                 TextureParameterName.TextureMinFilter,
-                (int)(pixelated ? TextureMinFilter.Nearest : TextureMinFilter.Linear));
+                (int)TextureMinFilter.Linear);
             _gl.TexParameter(
                 TextureTarget.Texture2D,
                 TextureParameterName.TextureMagFilter,
-                (int)(pixelated ? TextureMagFilter.Nearest : TextureMagFilter.Linear));
+                (int)TextureMagFilter.Linear);
         }
 
         private void ApplyBlendMode(int blendMode, bool distortion = false)
@@ -846,7 +840,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _muEmitterUvOffsetMult, _muFlipUMult, _muFlipVMult;
         private int _muAddressModeMult, _muClampUvMult, _muUvTransformCenterMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
-        private int _muAlphaCutoff, _muAlphaTest, _muEmissiveStrength, _muIsMultiply, _muColorMap, _muHasColor, _muRampAtMult, _muUvMode, _muColorRenderFlags, _muIsAdditive, _muModulationFactor, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
+        private int _muAlphaCutoff, _muAlphaTest, _muEmissiveStrength, _muColorMap, _muHasColor, _muRampAtMult, _muUvMode, _muColorRenderFlags, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
         private int _muPaletteMap, _muHasPalette, _muPaletteCount, _muPaletteAddressMode, _muPaletteSelector, _muPaletteMixMask, _muPaletteScroll;
         private int _muBirthUvOffset, _muUvScale, _muUvRotation;
         private int _muErosionTex, _muHasErosion, _muHasErosionMap, _muErosionAddressMode, _muErosionDefault;
@@ -903,14 +897,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muAlphaCutoff = _gl.GetUniformLocation(_meshProgram, "uAlphaCutoff");
                 _muAlphaTest = _gl.GetUniformLocation(_meshProgram, "uAlphaTest");
                 _muEmissiveStrength = _gl.GetUniformLocation(_meshProgram, "uEmissiveStrength");
-                _muIsMultiply = _gl.GetUniformLocation(_meshProgram, "uIsMultiply");
                 _muColorMap = _gl.GetUniformLocation(_meshProgram, "uColorMap");
                 _muHasColor = _gl.GetUniformLocation(_meshProgram, "uHasColor");
                 _muRampAtMult = _gl.GetUniformLocation(_meshProgram, "uRampAtMult");
                 _muUvMode = _gl.GetUniformLocation(_meshProgram, "uUvMode");
                 _muColorRenderFlags = _gl.GetUniformLocation(_meshProgram, "uColorRenderFlags");
-                _muIsAdditive = _gl.GetUniformLocation(_meshProgram, "uIsAdditive");
-                _muModulationFactor = _gl.GetUniformLocation(_meshProgram, "uModulationFactor");
                 _muPaletteMap = _gl.GetUniformLocation(_meshProgram, "uPaletteMap");
                 _muHasPalette = _gl.GetUniformLocation(_meshProgram, "uHasPalette");
                 _muPaletteCount = _gl.GetUniformLocation(_meshProgram, "uPaletteCount");
@@ -1024,7 +1015,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
             bool isDistortion = es.Def.Distortion != null;
             bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
-            if (warpsFrame && (es.DistortionTexture == 0 || _capture.ColorTexture == 0)) return;
+            if (warpsFrame && _capture.ColorTexture == 0) return;
             if (es.MeshAnimation != null)
                 UpdateEmitterMeshPositions(es, es.MeshAnimation.Evaluate(es.EmitterAge));
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
@@ -1105,16 +1096,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muAlphaTest,
                 VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0);
             _gl.Uniform1(_muEmissiveStrength, VfxBlendModes.ResolveEmissiveStrength(es.Def.BlendMode));
-            _gl.Uniform1(
-                _muIsMultiply,
-                VfxBlendModes.GetDescriptor(es.Def.BlendMode).NeutralizeTransparentRgb ? 1 : 0);
-            Vector4 meshModulationFactor = es.Def.ModulationFactor ?? Vector4.One;
-            _gl.Uniform4(
-                _muModulationFactor,
-                meshModulationFactor.X,
-                meshModulationFactor.Y,
-                meshModulationFactor.Z,
-                meshModulationFactor.W);
             _gl.Uniform1(_muIsDistortion, isDistortion ? 1 : 0);
             _gl.Uniform1(_muDistortionStrength, es.Def.Distortion?.Strength ?? 0f);
             _gl.Uniform1(_muDistortionTex, 2);
@@ -1122,8 +1103,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (warpsFrame)
             {
                 _gl.ActiveTexture(TextureUnit.Texture2);
-                _gl.BindTexture(TextureTarget.Texture2D, es.DistortionTexture);
+                _gl.BindTexture(
+                    TextureTarget.Texture2D,
+                    es.DistortionTexture != 0 ? es.DistortionTexture : _textures.FallbackTransparentTexture);
                 ApplyAddressMode(2);
+                ApplyTextureSampling();
                 _gl.ActiveTexture(TextureUnit.Texture3);
                 _gl.BindTexture(TextureTarget.Texture2D, _capture.ColorTexture);
                 _gl.ActiveTexture(TextureUnit.Texture0);
@@ -1147,7 +1131,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 meshPalette?.ScrollU?.Sample(sharedPalettePhase) ?? 0f,
                 meshPalette?.ScrollV?.Sample(sharedPalettePhase) ?? 0f);
             _gl.Uniform2(_muPaletteScroll, meshPaletteScroll.X, meshPaletteScroll.Y);
-            _gl.Uniform1(_muIsAdditive, es.Def.BlendMode == 0 ? 1 : VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 2 : 0);
             _gl.Uniform1(_muColorLookUpTypeX, es.Def.ColorLookUpTypeX ?? 0);
             _gl.Uniform1(_muColorLookUpTypeY, es.Def.ColorLookUpTypeY ?? 0);
             Vector2 meshColorLookUpScales = es.Def.ColorLookUpScales;
@@ -1157,7 +1140,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_muFlipV, renderState.FlipV ? 1 : 0);
             _gl.Uniform1(_muAddressMode, renderState.TextureAddressMode);
             _gl.Uniform1(_muClampUv, renderState.ClampUvScroll ? 1 : 0);
-            ApplyTextureSampling(es.Def.IsTexturePixelated);
+            ApplyTextureSampling();
             if (es.TextureMult != 0)
             {
                 _gl.ActiveTexture(TextureUnit.Texture1);
@@ -1222,13 +1205,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 ? es.ColorGradientTexture
                 : _textures.FallbackTransparentTexture);
             ApplyAddressMode(2);
-            ApplyTextureSampling(false);
+            ApplyTextureSampling();
             _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + 8));
             _gl.BindTexture(TextureTarget.Texture2D, es.PaletteTexture != 0
                 ? es.PaletteTexture
                 : _textures.FallbackTransparentTexture);
             ApplyAddressMode(2);
-            ApplyTextureSampling(false);
+            ApplyTextureSampling();
             _gl.ActiveTexture(TextureUnit.Texture0);
             // LTK/Riot cull mesh backfaces by default. disableBackfaceCull explicitly asks
             // for a double-sided draw; do not make every particle mesh double-sided.
