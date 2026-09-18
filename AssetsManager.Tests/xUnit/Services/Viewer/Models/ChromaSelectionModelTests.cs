@@ -6,6 +6,41 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Models
     public sealed class ChromaSelectionModelTests
     {
         [Fact]
+        public void ReferenceSourceUpdatesSourceStateAndStatus()
+        {
+            var family = new ChromaFamilyModel { Name = "SKIN01" };
+            family.Chromas.Add(new ChromaSkinModel { Name = "SKIN02" });
+
+            var model = new ChromaSelectionModel();
+            model.SetScanningState("skins", @"C:\current\skins");
+            model.SetFamilies(new[] { family });
+            model.SetReferenceSource(@"C:\old\skins");
+            model.SetSuccessState();
+
+            Assert.True(model.HasReference);
+            Assert.Equal(2, model.SourceCount);
+            Assert.Equal("2 sources · 1 skin family · 1 chroma detected", model.StatusText);
+
+            model.ClearReferenceSource();
+
+            Assert.False(model.HasReference);
+            Assert.Equal(1, model.SourceCount);
+        }
+
+        [Fact]
+        public void ChromaSourceKindMarksReferenceEntries()
+        {
+            var chroma = new ChromaSkinModel
+            {
+                SourceKind = ChromaSourceKind.Reference,
+                SourceRoot = @"C:\old\skins"
+            };
+
+            Assert.True(chroma.IsReference);
+            Assert.Equal("REFERENCE", chroma.SourceLabel);
+            Assert.Equal(@"C:\old\skins", chroma.SourceRoot);
+        }
+        [Fact]
         public void SelectionMetricsFollowChromasAcrossFamilies()
         {
             var firstChroma = new ChromaSkinModel { Name = "SKIN02" };

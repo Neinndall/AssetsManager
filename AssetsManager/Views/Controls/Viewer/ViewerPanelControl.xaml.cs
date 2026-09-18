@@ -579,7 +579,10 @@ namespace AssetsManager.Views.Controls.Viewer
             if (!string.IsNullOrEmpty(skin.ModelPath))
             {
                 // Cargamos primero el modelo en segundo plano
+                SceneModel previousModel = _viewModel.SelectedModel;
                 await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
+                if (!ReferenceEquals(previousModel, _viewModel.SelectedModel))
+                    LabelReferenceModel(skin);
 
                 // Una vez cargado y con el viewport listo, ocultamos la galería
                 ViewModel.IsChromaGalleryVisible = false;
@@ -603,7 +606,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 // Mantenemos la galería abierta durante la carga para mostrar el estado
                 foreach (var skin in skinsWithModels)
                 {
+                    SceneModel previousModel = _viewModel.SelectedModel;
                     await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
+                    if (!ReferenceEquals(previousModel, _viewModel.SelectedModel))
+                        LabelReferenceModel(skin);
                 }
 
                 // Cerramos solo cuando todo está cargado
@@ -614,6 +620,16 @@ namespace AssetsManager.Views.Controls.Viewer
                 ViewModel.IsChromaGalleryVisible = false;
                 CustomMessageBoxService.ShowWarning("Models Not Found", "Could not automatically find the .skn models for the selected skins.", Window.GetWindow(this));
             }
+        }
+
+        private void LabelReferenceModel(ChromaSkinModel skin)
+        {
+            if (skin?.IsReference != true || _viewModel.SelectedModel == null)
+                return;
+
+            const string referenceSuffix = " [REFERENCE]";
+            if (!_viewModel.SelectedModel.Name.EndsWith(referenceSuffix, StringComparison.OrdinalIgnoreCase))
+                _viewModel.SelectedModel.Name += referenceSuffix;
         }
 
         public async Task LoadInitialModel(string filePath)

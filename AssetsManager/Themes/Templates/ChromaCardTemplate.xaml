@@ -74,6 +74,23 @@
                         CornerRadius="12"
                         IsHitTestVisible="False"/>
 
+                <Border Padding="6,3"
+                        Margin="7,7,0,0"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Background="{StaticResource CardBackground}"
+                        BorderBrush="{StaticResource AccentBrush}"
+                        BorderThickness="1"
+                        CornerRadius="5"
+                        ToolTip="{Binding SourceRoot}"
+                        Visibility="{Binding IsReference, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        IsHitTestVisible="False">
+                    <TextBlock Text="REFERENCE"
+                               FontSize="8"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource AccentBrush}"/>
+                </Border>
+
                 <Border x:Name="SelectedBadge"
                         Width="24"
                         Height="24"

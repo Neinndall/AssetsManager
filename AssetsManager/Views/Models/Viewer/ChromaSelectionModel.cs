@@ -7,6 +7,12 @@ using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Viewer
 {
+    public enum ChromaSourceKind
+    {
+        Current,
+        Reference
+    }
+
     public class ChromaSkinModel : INotifyPropertyChanged
     {
         private bool _isSelected;
@@ -14,6 +20,8 @@ namespace AssetsManager.Views.Models.Viewer
         private string _texturePath;
         private string _previewTextureName;
         private string _modelPath;
+        private string _sourceRoot;
+        private ChromaSourceKind _sourceKind;
         private Color _swatchColor = Colors.Transparent;
         private ImageSource _previewImage;
 
@@ -40,6 +48,28 @@ namespace AssetsManager.Views.Models.Viewer
             get => _modelPath;
             set { if (_modelPath != value) { _modelPath = value; OnPropertyChanged(); } }
         }
+
+        public string SourceRoot
+        {
+            get => _sourceRoot;
+            set { if (_sourceRoot != value) { _sourceRoot = value; OnPropertyChanged(); } }
+        }
+
+        public ChromaSourceKind SourceKind
+        {
+            get => _sourceKind;
+            set
+            {
+                if (_sourceKind == value) return;
+                _sourceKind = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsReference));
+                OnPropertyChanged(nameof(SourceLabel));
+            }
+        }
+
+        public bool IsReference => SourceKind == ChromaSourceKind.Reference;
+        public string SourceLabel => IsReference ? "REFERENCE" : "CURRENT";
 
         public Color SwatchColor
         {
@@ -85,6 +115,8 @@ namespace AssetsManager.Views.Models.Viewer
     {
         private bool _isLoading;
         private string _statusText = "Ready to scan.";
+        private string _currentSourcePath;
+        private string _referenceSourcePath;
         private ChromaFamilyModel _selectedFamily;
 
         public ObservableRangeCollection<ChromaFamilyModel> AvailableFamilies { get; } = new();
@@ -101,6 +133,31 @@ namespace AssetsManager.Views.Models.Viewer
             private set { if (_statusText != value) { _statusText = value; OnPropertyChanged(); } }
         }
 
+        public string CurrentSourcePath
+        {
+            get => _currentSourcePath;
+            private set
+            {
+                if (_currentSourcePath == value) return;
+                _currentSourcePath = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SourceCount));
+            }
+        }
+
+        public string ReferenceSourcePath
+        {
+            get => _referenceSourcePath;
+            private set
+            {
+                if (_referenceSourcePath == value) return;
+                _referenceSourcePath = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasReference));
+                OnPropertyChanged(nameof(SourceCount));
+            }
+        }
+
         public ChromaFamilyModel SelectedFamily
         {
             get => _selectedFamily;
@@ -112,6 +169,10 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
+        public bool HasReference => !string.IsNullOrWhiteSpace(ReferenceSourcePath);
+        public int SourceCount => string.IsNullOrWhiteSpace(CurrentSourcePath)
+            ? 0
+            : HasReference ? 2 : 1;
         public int FamilyCount => AvailableFamilies.Count;
         public int ChromaCount => AvailableFamilies.Sum(family => family.ChromaCount);
         public int SelectedCount => AvailableFamilies.Sum(
@@ -141,13 +202,31 @@ namespace AssetsManager.Views.Models.Viewer
             OnPropertyChanged(nameof(SelectionText));
         }
 
-        public void SetScanningState(string folderName)
+        public void SetScanningState(string folderName, string sourcePath)
         {
             IsLoading = true;
             ClearFamilies();
             SelectedFamily = null;
+            CurrentSourcePath = sourcePath;
+            ReferenceSourcePath = null;
             RefreshCounts();
             StatusText = $"Scanning chromas in: {folderName.ToUpperInvariant()}";
+        }
+
+        public void SetReferenceScanningState()
+        {
+            IsLoading = true;
+            StatusText = "Scanning reference chromas...";
+        }
+
+        public void SetReferenceSource(string sourcePath)
+        {
+            ReferenceSourcePath = sourcePath;
+        }
+
+        public void ClearReferenceSource()
+        {
+            ReferenceSourcePath = null;
         }
 
         public void SetEmptyState()
@@ -159,7 +238,12 @@ namespace AssetsManager.Views.Models.Viewer
         public void SetSuccessState()
         {
             IsLoading = false;
-            StatusText = $"{FamilyCount} source skins · {ChromaCount} chromas detected";
+            string familyText = FamilyCount == 1 ? "1 skin family" : $"{FamilyCount} skin families";
+            string sourceSkinText = FamilyCount == 1 ? "1 source skin" : $"{FamilyCount} source skins";
+            string chromaText = ChromaCount == 1 ? "1 chroma" : $"{ChromaCount} chromas";
+            StatusText = SourceCount > 1
+                ? $"{SourceCount} sources · {familyText} · {chromaText} detected"
+                : $"{sourceSkinText} · {chromaText} detected";
         }
 
         public void SetErrorState(string message)
@@ -172,6 +256,8 @@ namespace AssetsManager.Views.Models.Viewer
         {
             ClearFamilies();
             SelectedFamily = null;
+            CurrentSourcePath = null;
+            ReferenceSourcePath = null;
             StatusText = "Ready to scan.";
             IsLoading = false;
             RefreshCounts();
