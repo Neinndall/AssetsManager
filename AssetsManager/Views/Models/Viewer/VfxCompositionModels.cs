@@ -142,7 +142,8 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<AnimationGraphKeyReference> ChildReferences = null,
         IReadOnlyList<string> InterruptionGroups = null,
         uint Flags = 0,
-        IReadOnlyList<float?> ParametricValues = null)
+        IReadOnlyList<float?> ParametricValues = null,
+        string ClassName = null)
     {
         public IEnumerable<VfxParticleEventDefinition> ParticleEvents
             => (Events ?? Array.Empty<AnimationClipEventDefinition>()).OfType<VfxParticleEventDefinition>();

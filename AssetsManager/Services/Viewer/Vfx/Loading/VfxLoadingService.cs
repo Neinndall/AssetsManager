@@ -131,7 +131,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         byte[] fileBytes = File.ReadAllBytes(currentBinPath);
                         VfxBinDocument document = VfxGraphParser.ParseDocument(
                             fileBytes,
-                            ResolveGraphHashName);
+                            ResolveGraphHashName,
+                            ResolveGraphClassName);
                         bundle.LoadedBins.Add(Path.GetFullPath(currentBinPath));
 
                         foreach (var kv in document.Systems)
@@ -442,6 +443,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             // AnimationGraph Hash values use the BIN value-name table. Do not fall through
             // to entry/field/type catalogs because an equal hash there names a different domain.
             string resolved = _hashResolverService.ResolveBinHash(hash);
+            return string.IsNullOrWhiteSpace(resolved) ||
+                   resolved.Equals(hash.ToString("x8"), StringComparison.OrdinalIgnoreCase)
+                ? null
+                : resolved;
+        }
+
+        private string ResolveGraphClassName(uint hash)
+        {
+            if (_hashResolverService == null || hash == 0u) return null;
+
+            // Clip class hashes belong to the BIN type-name table, independently from map keys.
+            string resolved = _hashResolverService.ResolveBinType(hash);
             return string.IsNullOrWhiteSpace(resolved) ||
                    resolved.Equals(hash.ToString("x8"), StringComparison.OrdinalIgnoreCase)
                 ? null

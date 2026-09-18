@@ -105,6 +105,7 @@ New Features
   - Image Comparison / Timeline Mode: OLD/NEW badges identify which image belongs to each side of the transition, both on the viewport and baked into the exported GIF.
   - Core / Centralized the GIF sequence export pipeline (frame sampling, sequence mapping and encoding) under ImageExportUtils.
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
+  - VFX Studio / Added AnimationGraph inspection for clips, tracks, masks, sync groups, events, child clips, rates, and joint weights.
 
 Improvements
   - VFX Studio / Camera framing now follows authored system spawn bounds and preview rig motion, keeping large, offset, missile, and trail effects in view consistently.

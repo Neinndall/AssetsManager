@@ -150,6 +150,16 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 RebuildAnimationsForParameter(_model.AnimationParameter.Value);
             }
+            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedAnimationGraphClip))
+            {
+                AnimationClipCatalogItem playable = _model.SelectedAnimationGraphClip?.CatalogItem;
+                if (playable != null && !ReferenceEquals(_model.SelectedAnimation, playable))
+                    _model.SelectedAnimation = playable;
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedAnimationGraphMask))
+            {
+                UpdateAnimationGraphMaskJoints();
+            }
         }
 
         private void OnControlLoaded(object sender, RoutedEventArgs e)
@@ -876,6 +886,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.SelectedAnimation = null;
             _model.SelectedSystem = null;
             _model.SelectedSkin = null;
+            _model.ClearAnimationGraphInspector();
             _model.DetectedAnimations.Clear();
             _model.Systems.Clear();
             _model.Emitters.Clear();
@@ -1012,6 +1023,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _championLoadGeneration++;
             ClearAnimationClipCues();
             _model.SelectedAnimation = null;
+            _model.ClearAnimationGraphInspector();
             _model.DetectedAnimations.Clear();
             _vfxRenderer?.SetSystem(null);
             if (_championModel != null)
@@ -1403,6 +1415,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_activeBundle == null || VfxLoadingService == null) return;
             foreach (AnimationClipCatalogItem item in BuildAnimationCatalog(null))
                 _model.DetectedAnimations.Add(item);
+            BindAnimationGraphInspector();
             _model.LogMessages.Add($"[ANIMATIONS] Loaded {_model.DetectedAnimations.Count} authored clips.");
             if (_model.IsAnimationMode)
             {
@@ -1412,6 +1425,98 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.SelectedAnimation = _model.DetectedAnimations.FirstOrDefault(item =>
                     item.Name?.StartsWith("idle", StringComparison.OrdinalIgnoreCase) == true);
             }
+        }
+
+        private void BindAnimationGraphInspector()
+        {
+            AnimationGraphDefinition graph = ResolveAnimationGraphForInspector();
+            if (graph == null)
+            {
+                _model.ClearAnimationGraphInspector();
+                return;
+            }
+
+            IReadOnlyList<AnimationGraphClipInspectorItem> clips =
+                AnimationGraphInspectorBuilder.BuildClips(graph, _model.DetectedAnimations);
+            IReadOnlyList<AnimationMaskInspectorItem> masks =
+                AnimationGraphInspectorBuilder.BuildMasks(graph);
+            _model.SetAnimationGraphInspector(graph, clips, masks);
+        }
+
+        private AnimationGraphDefinition ResolveAnimationGraphForInspector()
+        {
+            IReadOnlyList<AnimationGraphDefinition> graphs = _activeBundle?.AnimationGraphs;
+            if (graphs == null || graphs.Count == 0) return null;
+
+            uint authoredGraph = _activeBundle?.OwnerSceneContext?.AnimationGraphPathHash ?? 0u;
+            if (authoredGraph != 0u)
+                return graphs.FirstOrDefault(graph => graph.PathHash == authoredGraph);
+
+            uint catalogGraph = _model.DetectedAnimations
+                .Select(item => item.Clip?.GraphPathHash ?? 0u)
+                .FirstOrDefault(hash => hash != 0u);
+            return catalogGraph != 0u
+                ? graphs.FirstOrDefault(graph => graph.PathHash == catalogGraph)
+                : graphs.Count == 1 ? graphs[0] : null;
+        }
+
+        private void UpdateAnimationGraphMaskJoints()
+        {
+            AnimationMaskDefinition mask = _model.SelectedAnimationGraphMask?.Definition;
+            if (mask == null)
+            {
+                _model.SetAnimationGraphMaskJoints(Array.Empty<AnimationMaskJointInspectorItem>());
+                return;
+            }
+
+            IReadOnlyList<string> jointNames = _championModel?.Skeleton?.Joints?
+                .Select(joint => joint.Name ?? string.Empty)
+                .ToArray() ?? Array.Empty<string>();
+            _model.SetAnimationGraphMaskJoints(
+                AnimationGraphInspectorBuilder.BuildMaskJoints(mask, jointNames));
+        }
+
+        private void AnimationGraphChild_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { DataContext: AnimationGraphChildInspectorItem child })
+                return;
+
+            AnimationGraphClipInspectorItem target = _model.FindAnimationGraphClip(child.Hash);
+            if (target != null)
+                _model.SelectedAnimationGraphClip = target;
+        }
+
+        private void AnimationGraphTrack_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: AnimationGraphKeyReference reference })
+                return;
+
+            _model.AnimationGraphInspectorTab = AnimationGraphInspectorTab.Tracks;
+            _model.SelectedAnimationGraphTrack = reference.Declared
+                ? _model.FindAnimationGraphTrack(reference.Hash)
+                : null;
+        }
+
+        private void AnimationGraphMask_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: AnimationGraphKeyReference reference })
+                return;
+
+            _model.AnimationGraphInspectorTab = AnimationGraphInspectorTab.Masks;
+            _model.SelectedAnimationGraphMask = reference.Declared
+                ? _model.FindAnimationGraphMask(reference.Hash)
+                : null;
+        }
+
+        private void AnimationGraphSyncGroup_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: AnimationGraphKeyReference reference })
+                return;
+
+            _model.AnimationGraphInspectorTab = AnimationGraphInspectorTab.SyncGroups;
+            _model.SelectedAnimationGraphSyncGroup = reference.Declared
+                ? _model.FindAnimationGraphSyncGroup(reference.Hash)
+                : null;
         }
 
         private IReadOnlyList<AnimationClipCatalogItem> BuildAnimationCatalog(float? parameter)
@@ -1458,11 +1563,16 @@ namespace AssetsManager.Views.Controls.Viewer
             foreach (AnimationClipCatalogItem item in rebuilt)
                 _model.DetectedAnimations.Add(item);
 
+            BindAnimationGraphInspector();
+
             AnimationClipCatalogItem replacement = rebuilt.FirstOrDefault(item =>
                 item.Clip?.GraphPathHash == selectedGraph &&
                 item.Clip?.OwnerPathHash == selectedClip);
             if (replacement != null)
+            {
                 _model.SelectedAnimation = replacement;
+                _model.SelectedAnimationGraphClip = _model.FindAnimationGraphClip(selectedClip);
+            }
         }
 
         private string ResolveSklPath(string authoredPath, string sknPath, string searchDir)

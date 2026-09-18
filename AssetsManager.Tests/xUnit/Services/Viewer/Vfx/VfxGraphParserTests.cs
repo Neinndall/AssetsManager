@@ -1439,8 +1439,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 600 => "Movement",
                 _ => null
             };
+            string ResolveClass(uint hash) => hash switch
+            {
+                var value when value == Fnv1a.HashLower("ParametricClipData") => "ParametricClipData",
+                var value when value == Fnv1a.HashLower("AtomicClipData") => "AtomicClipData",
+                _ => null
+            };
 
-            VfxBinDocument document = VfxGraphParser.ParseDocument(stream.ToArray(), ResolveName);
+            VfxBinDocument document = VfxGraphParser.ParseDocument(
+                stream.ToArray(),
+                ResolveName,
+                ResolveClass);
 
             AnimationGraphDefinition parsedGraph = Assert.Single(document.AnimationGraphs);
             Assert.Equal(Fnv1a.HashLower("Animations/TestGraph"), parsedGraph.PathHash);
@@ -1461,6 +1470,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             Assert.Equal(new[] { "Idle", "Idle_A" }, parsedGraph.Clips.Select(item => item.ClipName));
             AnimationClipDefinition parsedParent = parsedGraph.Clips[0];
+            Assert.Equal("ParametricClipData", parsedParent.ClassName);
+            Assert.Equal("AtomicClipData", parsedGraph.Clips[1].ClassName);
             Assert.Equal("BaseTrack", parsedParent.Track.Name);
             Assert.True(parsedParent.Track.Declared);
             Assert.Equal("UpperBody", parsedParent.Mask.Name);

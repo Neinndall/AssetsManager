@@ -395,7 +395,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 
         internal static VfxBinDocument ParseDocument(
             byte[] data,
-            Func<uint, string> graphHashNameResolver = null)
+            Func<uint, string> graphHashNameResolver = null,
+            Func<uint, string> graphClassNameResolver = null)
         {
             BinTree tree = ParseTree(data);
             IReadOnlyDictionary<uint, uint> resourceMap = ExtractResourceMap(tree);
@@ -404,7 +405,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     static pair => pair.Key,
                     pair => pair.Value with { ResourceMap = resourceMap });
             IReadOnlyList<AnimationGraphDefinition> animationGraphs =
-                ExtractAnimationGraphs(tree, graphHashNameResolver);
+                ExtractAnimationGraphs(tree, graphHashNameResolver, graphClassNameResolver);
             return new VfxBinDocument(
                 systems,
                 resourceMap,
@@ -476,7 +477,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 
         private static IReadOnlyList<AnimationGraphDefinition> ExtractAnimationGraphs(
             BinTree tree,
-            Func<uint, string> graphHashNameResolver)
+            Func<uint, string> graphHashNameResolver,
+            Func<uint, string> graphClassNameResolver)
         {
             var graphs = new List<AnimationGraphDefinition>();
             foreach (BinTreeObject owner in tree.Objects.Values)
@@ -560,6 +562,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                             graphHashNameResolver),
                         ReadUnsigned(Get(clip.Properties, F_clipFlags)),
                         parametricValues,
+                        ResolveGraphClassName(clip.ClassHash, graphClassNameResolver),
                         includeEmpty: true);
                     if (definition != null) clips.Add(definition);
                 }
@@ -708,6 +711,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 : resolved;
         }
 
+        private static string ResolveGraphClassName(
+            uint hash,
+            Func<uint, string> graphClassNameResolver)
+        {
+            if (hash == 0u) return string.Empty;
+            string resolved = graphClassNameResolver?.Invoke(hash);
+            return string.IsNullOrWhiteSpace(resolved)
+                ? $"0x{hash:x8}"
+                : resolved;
+        }
+
         private static uint ReadUnsigned(BinTreeProperty property)
         {
             long? value = AsInteger(property);
@@ -771,6 +785,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             IReadOnlyList<string> interruptionGroups = null,
             uint flags = 0,
             IReadOnlyList<float?> parametricValues = null,
+            string className = null,
             bool includeEmpty = false)
         {
             var events = new List<AnimationClipEventDefinition>();
@@ -802,7 +817,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 childReferences,
                 interruptionGroups,
                 flags,
-                parametricValues);
+                parametricValues,
+                className);
         }
 
         private static IReadOnlyList<uint> ReadClipChildren(IReadOnlyDictionary<uint, BinTreeProperty> properties)

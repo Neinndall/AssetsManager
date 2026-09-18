@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Utils.Framework;
 namespace AssetsManager.Views.Models.Viewer
 {
     /// <summary>
@@ -500,6 +502,15 @@ namespace AssetsManager.Views.Models.Viewer
         private VfxSystemDiagnosticItem _selectedSystem;
         private AnimationClipCatalogItem _selectedAnimation;
         private float? _animationParameter;
+        private AnimationGraphDeckView _animationGraphDeckView = AnimationGraphDeckView.Timeline;
+        private AnimationGraphInspectorTab _animationGraphInspectorTab = AnimationGraphInspectorTab.Clips;
+        private string _animationGraphFilter = string.Empty;
+        private AnimationGraphDefinition _activeAnimationGraph;
+        private AnimationGraphClipInspectorItem _selectedAnimationGraphClip;
+        private AnimationTrackDefinition _selectedAnimationGraphTrack;
+        private AnimationMaskInspectorItem _selectedAnimationGraphMask;
+        private AnimationSyncGroupDefinition _selectedAnimationGraphSyncGroup;
+        private IReadOnlyList<AnimationGraphClipInspectorItem> _allAnimationGraphClips = Array.Empty<AnimationGraphClipInspectorItem>();
         private bool _isAnimationMode = true;
         private bool _isPlaying;
         private bool _isReplayState;
@@ -562,6 +573,11 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<VfxSkinItem> DetectedSkins { get; } = new();
         public ObservableCollection<AnimationClipCatalogItem> DetectedAnimations { get; } = new();
         public ObservableCollection<float> AnimationParameterValues { get; } = new();
+        public ObservableRangeCollection<AnimationGraphClipInspectorItem> AnimationGraphClips { get; } = new();
+        public ObservableRangeCollection<AnimationTrackDefinition> AnimationGraphTracks { get; } = new();
+        public ObservableRangeCollection<AnimationMaskInspectorItem> AnimationGraphMasks { get; } = new();
+        public ObservableRangeCollection<AnimationSyncGroupDefinition> AnimationGraphSyncGroups { get; } = new();
+        public ObservableRangeCollection<AnimationMaskJointInspectorItem> AnimationGraphMaskJoints { get; } = new();
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxTextureDiagnosticItem> Textures { get; } = new();
@@ -608,6 +624,215 @@ namespace AssetsManager.Views.Models.Viewer
                 AnimationParameterValues.Add(value);
             OnPropertyChanged(nameof(HasAnimationParameters));
             AnimationParameter = selected;
+        }
+
+        public AnimationGraphDeckView AnimationGraphDeckView
+        {
+            get => _animationGraphDeckView;
+            set
+            {
+                if (_animationGraphDeckView == value) return;
+                _animationGraphDeckView = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsTimelineDeckView));
+                OnPropertyChanged(nameof(IsAnimationGraphDeckView));
+            }
+        }
+
+        public bool IsTimelineDeckView
+        {
+            get => _animationGraphDeckView == AnimationGraphDeckView.Timeline;
+            set { if (value) AnimationGraphDeckView = AnimationGraphDeckView.Timeline; }
+        }
+
+        public bool IsAnimationGraphDeckView
+        {
+            get => _animationGraphDeckView == AnimationGraphDeckView.Graph;
+            set { if (value) AnimationGraphDeckView = AnimationGraphDeckView.Graph; }
+        }
+
+        public AnimationGraphInspectorTab AnimationGraphInspectorTab
+        {
+            get => _animationGraphInspectorTab;
+            set
+            {
+                if (_animationGraphInspectorTab == value) return;
+                _animationGraphInspectorTab = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsGraphClipsTab));
+                OnPropertyChanged(nameof(IsGraphTracksTab));
+                OnPropertyChanged(nameof(IsGraphMasksTab));
+                OnPropertyChanged(nameof(IsGraphSyncGroupsTab));
+            }
+        }
+
+        public bool IsGraphClipsTab
+        {
+            get => _animationGraphInspectorTab == AnimationGraphInspectorTab.Clips;
+            set { if (value) AnimationGraphInspectorTab = AnimationGraphInspectorTab.Clips; }
+        }
+
+        public bool IsGraphTracksTab
+        {
+            get => _animationGraphInspectorTab == AnimationGraphInspectorTab.Tracks;
+            set { if (value) AnimationGraphInspectorTab = AnimationGraphInspectorTab.Tracks; }
+        }
+
+        public bool IsGraphMasksTab
+        {
+            get => _animationGraphInspectorTab == AnimationGraphInspectorTab.Masks;
+            set { if (value) AnimationGraphInspectorTab = AnimationGraphInspectorTab.Masks; }
+        }
+
+        public bool IsGraphSyncGroupsTab
+        {
+            get => _animationGraphInspectorTab == AnimationGraphInspectorTab.SyncGroups;
+            set { if (value) AnimationGraphInspectorTab = AnimationGraphInspectorTab.SyncGroups; }
+        }
+
+        public string AnimationGraphFilter
+        {
+            get => _animationGraphFilter;
+            set
+            {
+                string normalized = value ?? string.Empty;
+                if (_animationGraphFilter == normalized) return;
+                _animationGraphFilter = normalized;
+                OnPropertyChanged();
+                RefreshAnimationGraphFilter();
+            }
+        }
+
+        public AnimationGraphDefinition ActiveAnimationGraph
+        {
+            get => _activeAnimationGraph;
+            private set
+            {
+                if (ReferenceEquals(_activeAnimationGraph, value)) return;
+                _activeAnimationGraph = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasAnimationGraph));
+                OnPropertyChanged(nameof(AnimationGraphSummary));
+            }
+        }
+
+        public bool HasAnimationGraph => ActiveAnimationGraph != null;
+
+        public string AnimationGraphSummary => ActiveAnimationGraph == null
+            ? "No AnimationGraph"
+            : $"{ActiveAnimationGraph.Clips?.Count ?? 0} clips · {ActiveAnimationGraph.Tracks?.Count ?? 0} tracks · {ActiveAnimationGraph.Masks?.Count ?? 0} masks · {ActiveAnimationGraph.SyncGroups?.Count ?? 0} sync";
+
+        public AnimationGraphClipInspectorItem SelectedAnimationGraphClip
+        {
+            get => _selectedAnimationGraphClip;
+            set
+            {
+                if (ReferenceEquals(_selectedAnimationGraphClip, value)) return;
+                _selectedAnimationGraphClip = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasSelectedAnimationGraphClip));
+            }
+        }
+
+        public bool HasSelectedAnimationGraphClip => SelectedAnimationGraphClip != null;
+
+        public AnimationTrackDefinition SelectedAnimationGraphTrack
+        {
+            get => _selectedAnimationGraphTrack;
+            set
+            {
+                if (ReferenceEquals(_selectedAnimationGraphTrack, value)) return;
+                _selectedAnimationGraphTrack = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public AnimationMaskInspectorItem SelectedAnimationGraphMask
+        {
+            get => _selectedAnimationGraphMask;
+            set
+            {
+                if (ReferenceEquals(_selectedAnimationGraphMask, value)) return;
+                _selectedAnimationGraphMask = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasSelectedAnimationGraphMask));
+            }
+        }
+
+        public bool HasSelectedAnimationGraphMask => SelectedAnimationGraphMask != null;
+
+        public AnimationSyncGroupDefinition SelectedAnimationGraphSyncGroup
+        {
+            get => _selectedAnimationGraphSyncGroup;
+            set
+            {
+                if (ReferenceEquals(_selectedAnimationGraphSyncGroup, value)) return;
+                _selectedAnimationGraphSyncGroup = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public void SetAnimationGraphInspector(
+            AnimationGraphDefinition graph,
+            IReadOnlyList<AnimationGraphClipInspectorItem> clips,
+            IReadOnlyList<AnimationMaskInspectorItem> masks)
+        {
+            ActiveAnimationGraph = graph;
+            _allAnimationGraphClips = clips ?? Array.Empty<AnimationGraphClipInspectorItem>();
+            AnimationGraphTracks.ReplaceRange(graph?.Tracks ?? Array.Empty<AnimationTrackDefinition>());
+            AnimationGraphMasks.ReplaceRange(masks ?? Array.Empty<AnimationMaskInspectorItem>());
+            AnimationGraphSyncGroups.ReplaceRange(graph?.SyncGroups ?? Array.Empty<AnimationSyncGroupDefinition>());
+            SelectedAnimationGraphClip = null;
+            SelectedAnimationGraphTrack = null;
+            SelectedAnimationGraphMask = null;
+            SelectedAnimationGraphSyncGroup = null;
+            AnimationGraphMaskJoints.Clear();
+            RefreshAnimationGraphFilter();
+        }
+
+        public void ClearAnimationGraphInspector()
+        {
+            ActiveAnimationGraph = null;
+            _allAnimationGraphClips = Array.Empty<AnimationGraphClipInspectorItem>();
+            AnimationGraphClips.Clear();
+            AnimationGraphTracks.Clear();
+            AnimationGraphMasks.Clear();
+            AnimationGraphSyncGroups.Clear();
+            AnimationGraphMaskJoints.Clear();
+            SelectedAnimationGraphClip = null;
+            SelectedAnimationGraphTrack = null;
+            SelectedAnimationGraphMask = null;
+            SelectedAnimationGraphSyncGroup = null;
+            AnimationGraphFilter = string.Empty;
+            AnimationGraphDeckView = AnimationGraphDeckView.Timeline;
+            AnimationGraphInspectorTab = AnimationGraphInspectorTab.Clips;
+        }
+
+        public void SetAnimationGraphMaskJoints(IReadOnlyList<AnimationMaskJointInspectorItem> joints)
+            => AnimationGraphMaskJoints.ReplaceRange(joints ?? Array.Empty<AnimationMaskJointInspectorItem>());
+
+        public AnimationGraphClipInspectorItem FindAnimationGraphClip(uint hash)
+            => _allAnimationGraphClips.FirstOrDefault(item => item.Hash == hash);
+
+        public AnimationTrackDefinition FindAnimationGraphTrack(uint hash)
+            => AnimationGraphTracks.FirstOrDefault(item => item.Hash == hash);
+
+        public AnimationMaskInspectorItem FindAnimationGraphMask(uint hash)
+            => AnimationGraphMasks.FirstOrDefault(item => item.Hash == hash);
+
+        public AnimationSyncGroupDefinition FindAnimationGraphSyncGroup(uint hash)
+            => AnimationGraphSyncGroups.FirstOrDefault(item => item.Hash == hash);
+
+        private void RefreshAnimationGraphFilter()
+        {
+            string wanted = _animationGraphFilter?.Trim() ?? string.Empty;
+            IEnumerable<AnimationGraphClipInspectorItem> filtered = _allAnimationGraphClips;
+            if (!string.IsNullOrEmpty(wanted))
+            {
+                filtered = filtered.Where(item =>
+                    item.Name.Contains(wanted, StringComparison.OrdinalIgnoreCase));
+            }
+            AnimationGraphClips.ReplaceRange(filtered);
         }
 
         public bool HasAnySolo
