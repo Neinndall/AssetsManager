@@ -436,6 +436,71 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void UnsupportedSimpleMeshFailsLocallyLikeLtk()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxUnsupportedMesh", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string meshPath = Path.Combine(root, "unsupported.gmesh");
+            File.WriteAllBytes(meshPath, new byte[] { (byte)'G', (byte)'M', (byte)'S', (byte)'H', 1, 0, 0, 0 });
+
+            try
+            {
+                using var resolver = new VfxResourceResolver();
+
+                Assert.Null(resolver.ResolveMesh("unsupported.gmesh", root));
+                // The failed decode is cached just like an unresolved asset, so repeated draws
+                // cannot repeatedly throw or reparse the same unsupported resource.
+                Assert.Null(resolver.ResolveMesh("unsupported.gmesh", root));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void CorruptTextureFailsLocallyLikeLtk()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxCorruptTexture", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string texturePath = Path.Combine(root, "broken.png");
+            File.WriteAllBytes(texturePath, new byte[] { 1, 2, 3, 4, 5, 6 });
+
+            try
+            {
+                using var resolver = new VfxResourceResolver();
+
+                Assert.Null(resolver.ResolveTexture("broken.png", root));
+                Assert.Null(resolver.ResolveTexture("broken.png", root));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void CorruptAttachedMeshFailsLocallyLikeLtk()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxCorruptAttachedMesh", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string meshPath = Path.Combine(root, "broken.skn");
+            File.WriteAllBytes(meshPath, new byte[] { 1, 2, 3, 4, 5, 6 });
+
+            try
+            {
+                using var resolver = new VfxResourceResolver();
+
+                Assert.Null(resolver.ResolveAttachedMesh("broken.skn", Array.Empty<uint>(), root));
+                Assert.Null(resolver.ResolveAttachedMesh("broken.skn", Array.Empty<uint>(), root));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void AttachedMeshWithoutPathDoesNotLoadASecondChampionBody()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerAttachedMesh", Guid.NewGuid().ToString("N"));

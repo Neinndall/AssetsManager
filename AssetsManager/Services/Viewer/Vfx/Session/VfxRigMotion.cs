@@ -105,7 +105,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 case VfxRigPreset.Trail:
                 {
                     float totalSpan = (float)Math.Max(runSpan, orbitPeriod);
-                    float phase = orbitPeriod > 0f ? (float)(time % orbitPeriod) : (float)time;
+                    // LTK's trail preview has life:"once": its clock phase keeps advancing
+                    // even though the orbit position itself repeats every OrbitPeriod.
+                    float phase = (float)Math.Max(0d, time);
                     float turn = orbitPeriod > 0f ? (phase / orbitPeriod) * MathF.PI * 2f : 0f;
 
                     float x = MathF.Cos(turn) * orbitRadius;

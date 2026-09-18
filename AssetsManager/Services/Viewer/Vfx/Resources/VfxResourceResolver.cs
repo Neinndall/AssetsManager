@@ -35,7 +35,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             if (_missingTextures.Contains(key)) return null;
 
             string resolvedPath = ResolvePath(authoredPath, searchDirectory, TextureExtensions);
-            BitmapSource texture = resolvedPath == null ? null : TextureUtils.LoadTextureFromFile(resolvedPath);
+            BitmapSource texture = null;
+            if (resolvedPath != null)
+            {
+                try
+                {
+                    texture = TextureUtils.LoadTextureFromFile(resolvedPath);
+                }
+                catch
+                {
+                    // LTK treats a texture decode failure as one missing sampler. Keep the
+                    // rest of the effect alive and remember the failed lookup for this resolver.
+                    texture = null;
+                }
+            }
             if (texture == null)
             {
                 _missingTextures.Add(key);
@@ -87,9 +100,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             if (_meshes.TryGetValue(key, out var cached)) return cached;
 
             string resolvedPath = ResolvePath(authoredPath, searchDirectory, MeshExtensions);
-            var mesh = resolvedPath == null
-                ? null
-                : VfxMeshDecoder.DecodeMesh(resolvedPath, submeshesToDraw, submeshesToDrawAlways);
+            VfxMeshData? mesh = null;
+            if (resolvedPath != null)
+            {
+                try
+                {
+                    mesh = VfxMeshDecoder.DecodeMesh(resolvedPath, submeshesToDraw, submeshesToDrawAlways);
+                }
+                catch
+                {
+                    // LTK reports unsupported/corrupt geometry as a failed asset load instead
+                    // of aborting the VFX system. This also covers authored .tmesh/.gmesh files,
+                    // which LTK 1.19.4 recognizes but does not decode.
+                    mesh = null;
+                }
+            }
             _meshes[key] = mesh;
             return mesh;
         }
@@ -152,15 +177,26 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             string resolvedSkeleton = string.IsNullOrWhiteSpace(skeletonPath)
                 ? null
                 : ResolvePath(skeletonPath, searchDirectory, SkeletonExtensions);
-            var mesh = resolvedPath == null
-                ? null
-                : VfxMeshDecoder.DecodeAttachedSkinnedMesh(
-                    resolvedPath,
-                    submeshesToDraw,
-                    submeshesToDrawAlways,
-                    hiddenSubmeshes,
-                    resolvedScale,
-                    resolvedSkeleton);
+            VfxMeshData? mesh = null;
+            if (resolvedPath != null)
+            {
+                try
+                {
+                    mesh = VfxMeshDecoder.DecodeAttachedSkinnedMesh(
+                        resolvedPath,
+                        submeshesToDraw,
+                        submeshesToDrawAlways,
+                        hiddenSubmeshes,
+                        resolvedScale,
+                        resolvedSkeleton);
+                }
+                catch
+                {
+                    // A broken owner mesh is local to the attached-mesh resource. LTK keeps
+                    // the remaining particle system running when that geometry cannot decode.
+                    mesh = null;
+                }
+            }
             _meshes[key] = mesh;
             return mesh;
         }

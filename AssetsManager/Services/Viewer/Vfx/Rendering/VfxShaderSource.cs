@@ -516,7 +516,9 @@ void main(){
         float lower = clamp((uErosionDrive - erosion) / featherOut, 0.0, 1.0);
         texel.a *= clamp(upper - lower, 0.0, 1.0);
     }
-    vec4 authoredColor = uColor * (uAttachedMesh != 0 ? vec4(1.0) : vMeshColor);
+    // LTK's VFX geometry buffer carries no vertex-color lane. Both particle meshes
+    // and attached meshes are tinted only by the particle/attachment material color.
+    vec4 authoredColor = uColor;
     vec4 lit = texel * authoredColor;
     if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;
 

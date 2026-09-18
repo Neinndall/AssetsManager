@@ -606,3 +606,5 @@ Bug Fixes
   - VFX Studio / Aligned child-system pool budgets, lifecycle timing, deterministic lineage and checkpoint restoration with LTK.
   - VFX Studio / Aligned linked BIN resolver scope, named asset lookup and mesh fallback resolution with LTK.
   - VFX Studio / Aligned shader premultiplication, texture filtering and distortion fallbacks with LTK.
+  - VFX Studio / Aligned mesh and texture resource failures and VFX mesh tinting with LTK.
+  - VFX Studio / Aligned rig clocks, animation pose looping, bone anchors, hierarchy and world-space transforms with LTK.

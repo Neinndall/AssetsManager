@@ -89,8 +89,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _resourceMap = resourceMap ?? throw new ArgumentNullException(nameof(resourceMap));
             _runtimeFactory = runtimeFactory ?? throw new ArgumentNullException(nameof(runtimeFactory));
             _initialSeed = seed;
-            _rootTransform = rootTransform;
-            _orientationRootTransform = rootTransform;
+            // The root definition transform is the outermost authored VFX factor in LTK.
+            // The constructor receives the scene/world transform that follows it.
+            Matrix4x4 rootDefinitionTransform =
+                rootDefinition.Transform.GetValueOrDefault(Matrix4x4.Identity);
+            _rootTransform = rootDefinitionTransform * rootTransform;
+            _orientationRootTransform = _rootTransform;
             BuildRenderRanks(rootDefinition);
 
             Root = CreateRuntime(rootDefinition, Matrix4x4.Identity, 0, string.Empty, seed);
@@ -463,8 +467,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             uint? initialRandomState = null,
             int? particleCapacity = null)
         {
-            Matrix4x4 effectiveLocalTransform =
-                definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * localTransform;
+            Matrix4x4 effectiveLocalTransform = depth == 0
+                ? Matrix4x4.Identity
+                : definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * localTransform;
             VfxPlaybackRuntime runtime = _runtimeFactory(
                 definition,
                 effectiveLocalTransform * _rootTransform,
