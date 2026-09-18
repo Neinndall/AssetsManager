@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
@@ -22,6 +23,8 @@ namespace AssetsManager.Services.Viewer.Animation
         private Matrix4x4[] _finalBoneTransforms;
         private uint[] _jointHashes;
         private uint[] _jointFnvHashes;
+        private int[] _hierarchyOrder;
+        private int[] _hierarchyParents;
         private IReadOnlyList<AnimationJointSnapCue> _jointSnapCues = Array.Empty<AnimationJointSnapCue>();
         private GpuSkinningData _gpuSkinningData;
         private IAnimationAsset _lastAnimation;
@@ -60,6 +63,8 @@ namespace AssetsManager.Services.Viewer.Animation
             _evaluatedAnimation = null;
             _evaluatedSkeleton = null;
             _gpuSkinningData = null;
+            _hierarchyOrder = null;
+            _hierarchyParents = null;
             _jointSnapCues = Array.Empty<AnimationJointSnapCue>();
             _currentPose.Clear();
         }
@@ -90,6 +95,9 @@ namespace AssetsManager.Services.Viewer.Animation
                     _jointHashes[i] = Elf.HashLower(jointName);
                     _jointFnvHashes[i] = Fnv1a.HashLower(jointName);
                 }
+
+                (_hierarchyOrder, _hierarchyParents) = BuildHierarchy(
+                    skeleton.Joints.Select(static joint => (int)joint.ParentId).ToArray());
             }
 
             if (_lastModelName != modelName ||
@@ -180,15 +188,16 @@ namespace AssetsManager.Services.Viewer.Animation
             _evaluatedSkeleton = skeleton;
             _evaluatedTime = totalSeconds;
             _currentPose.Clear();
-            float currentTime = animation.Duration > 0f
-                ? Math.Clamp(totalSeconds, 0f, animation.Duration)
-                : 0f;
+            // LTK samples a clip as a looping pose. Fold the scene clock into one pass
+            // before handing it to LeagueToolkit, whose animation evaluator itself clamps.
+            float currentTime = FoldAnimationTime(totalSeconds, animation.Duration);
             animation.Evaluate(currentTime, _currentPose);
 
             // Build the base local/world pose first. LTK resolves joint-snap targets and
             // parents against this unmodified pose, then rewrites the snapped local joint.
-            for (int i = 0; i < skeleton.Joints.Count; i++)
+            for (int orderIndex = 0; orderIndex < _hierarchyOrder.Length; orderIndex++)
             {
+                int i = _hierarchyOrder[orderIndex];
                 var joint = skeleton.Joints[i];
                 Matrix4x4 localTransform = joint.LocalTransform;
                 if (_currentPose.TryGetValue(_jointHashes[i], out var pose))
@@ -199,8 +208,9 @@ namespace AssetsManager.Services.Viewer.Animation
                 }
 
                 _localTransforms[i] = localTransform;
-                _baseBoneTransforms[i] = joint.ParentId > -1
-                    ? localTransform * _baseBoneTransforms[joint.ParentId]
+                int parentIndex = _hierarchyParents[i];
+                _baseBoneTransforms[i] = parentIndex > -1
+                    ? localTransform * _baseBoneTransforms[parentIndex]
                     : localTransform;
             }
 
@@ -225,7 +235,7 @@ namespace AssetsManager.Services.Viewer.Animation
 
                     Matrix4x4 snappedLocal =
                         Matrix4x4.CreateTranslation(snap.Offset) * _baseBoneTransforms[targetIndex];
-                    int parentIndex = skeleton.Joints[jointIndex].ParentId;
+                    int parentIndex = _hierarchyParents[jointIndex];
                     if (parentIndex >= 0 &&
                         Matrix4x4.Invert(_baseBoneTransforms[parentIndex], out Matrix4x4 inverseParent))
                     {
@@ -250,9 +260,10 @@ namespace AssetsManager.Services.Viewer.Animation
 
             // Recompose from the (possibly snapped) locals so descendants and VFX
             // attachments follow the same pose that GPU skinning draws.
-            for (int i = 0; i < skeleton.Joints.Count; i++)
+            for (int orderIndex = 0; orderIndex < _hierarchyOrder.Length; orderIndex++)
             {
-                int parentIndex = skeleton.Joints[i].ParentId;
+                int i = _hierarchyOrder[orderIndex];
+                int parentIndex = _hierarchyParents[i];
                 _boneTransforms[i] = parentIndex > -1
                     ? _localTransforms[i] * _boneTransforms[parentIndex]
                     : _localTransforms[i];
@@ -271,6 +282,67 @@ namespace AssetsManager.Services.Viewer.Animation
                 }
             }
             return -1;
+        }
+
+        internal static float FoldAnimationTime(float time, float duration)
+        {
+            if (!(duration > 0f) || !float.IsFinite(duration) || !float.IsFinite(time))
+                return 0f;
+            return (float)PositiveModulo(time, duration);
+        }
+
+        internal static (int[] Order, int[] Parents) BuildHierarchy(IReadOnlyList<int> sourceParents)
+        {
+            int count = sourceParents?.Count ?? 0;
+            var parents = new int[count];
+            var children = new List<int>[count];
+            for (int i = 0; i < count; i++)
+            {
+                children[i] = new List<int>();
+                int parent = sourceParents[i];
+                parents[i] = parent >= 0 && parent < count && parent != i ? parent : -1;
+            }
+
+            for (int child = 0; child < count; child++)
+            {
+                int parent = parents[child];
+                if (parent >= 0) children[parent].Add(child);
+            }
+
+            var order = new List<int>(count);
+            var placed = new bool[count];
+
+            void Walk(int root)
+            {
+                var stack = new Stack<int>();
+                stack.Push(root);
+                while (stack.Count > 0)
+                {
+                    int slot = stack.Pop();
+                    if (placed[slot]) continue;
+                    placed[slot] = true;
+                    order.Add(slot);
+                    foreach (int child in children[slot])
+                    {
+                        if (!placed[child]) stack.Push(child);
+                    }
+                }
+            }
+
+            for (int slot = 0; slot < count; slot++)
+            {
+                if (parents[slot] < 0) Walk(slot);
+            }
+
+            // Match LTK: any remaining cycle is broken at its first unplaced slot.
+            for (int slot = 0; slot < count; slot++)
+            {
+                if (placed[slot]) continue;
+                parents[slot] = -1;
+                Walk(slot);
+            }
+
+            return (order.ToArray(), parents);
         }
 
         private static double PositiveModulo(double value, double span)

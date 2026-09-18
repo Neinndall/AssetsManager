@@ -73,9 +73,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.DoesNotContain("uModulationFactor", VfxShaderSource.ParticleFragment);
             Assert.DoesNotContain("uModulationFactor", VfxShaderSource.MeshFragment);
             Assert.Contains("vec4 authoredColor = vColor;", VfxShaderSource.ParticleFragment);
-            Assert.Contains(
-                "vec4 authoredColor = uColor * (uAttachedMesh != 0 ? vec4(1.0) : vMeshColor);",
-                VfxShaderSource.MeshFragment);
+            Assert.Contains("vec4 authoredColor = uColor;", VfxShaderSource.MeshFragment);
         }
         [Fact]
         public void ArbitraryQuadUsesAuthoredLtkUvOrientationForBothLayers()
@@ -124,7 +122,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Contains("sourcePosition = (skinMatrix * vec4(aPos, 1.0)).xyz;", VfxShaderSource.MeshVertex);
             Assert.Contains("vec3 scaled = sourcePosition * uScale;", VfxShaderSource.MeshVertex);
             Assert.Contains("if (uAttachedMesh != 0)", VfxShaderSource.MeshVertex);
-            Assert.Contains("uColor * (uAttachedMesh != 0 ? vec4(1.0) : vMeshColor)", VfxShaderSource.MeshFragment);
+            Assert.Contains("vec4 authoredColor = uColor;", VfxShaderSource.MeshFragment);
+            Assert.DoesNotContain("uColor * vMeshColor", VfxShaderSource.MeshFragment);
         }
 
         [Fact]

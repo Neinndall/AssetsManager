@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Resources;
@@ -17,6 +18,55 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 {
     public sealed class VfxRuntimeTests
     {
+        [Theory]
+        [InlineData(0f, 1f, 0f)]
+        [InlineData(0.25f, 1f, 0.25f)]
+        [InlineData(1f, 1f, 0f)]
+        [InlineData(1.25f, 1f, 0.25f)]
+        [InlineData(-0.25f, 1f, 0.75f)]
+        public void AnimationPoseTimeLoopsLikeLtk(float time, float duration, float expected)
+        {
+            Assert.Equal(expected, AnimationService.FoldAnimationTime(time, duration), precision: 5);
+        }
+
+        [Theory]
+        [InlineData(1f, 0f)]
+        [InlineData(float.NaN, 1f)]
+        [InlineData(1f, float.PositiveInfinity)]
+        public void AnimationPoseTimeFallsBackToZeroForInvalidClocks(float time, float duration)
+        {
+            Assert.Equal(0f, AnimationService.FoldAnimationTime(time, duration));
+        }
+
+        [Theory]
+        [InlineData(-1d, 0d)]
+        [InlineData(0d, 0d)]
+        [InlineData(0.62d, 37d / 60d)]
+        [InlineData(0.625d, 38d / 60d)]
+        [InlineData(61d, 60d)]
+        public void VfxSeekQuantizesToTheNearestLtkFrame(double time, double expected)
+        {
+            Assert.Equal(expected, VfxRenderSession.QuantizeLtkSeek(time), precision: 10);
+        }
+
+        [Fact]
+        public void AnimationHierarchyPlacesParentsBeforeChildren()
+        {
+            (int[] order, int[] parents) = AnimationService.BuildHierarchy(new[] { 1, -1, 1 });
+
+            Assert.Equal(new[] { 1, 2, 0 }, order);
+            Assert.Equal(new[] { 1, -1, 1 }, parents);
+        }
+
+        [Fact]
+        public void AnimationHierarchyBreaksCyclesAtFirstUnplacedJointLikeLtk()
+        {
+            (int[] order, int[] parents) = AnimationService.BuildHierarchy(new[] { 1, 0 });
+
+            Assert.Equal(new[] { 0, 1 }, order);
+            Assert.Equal(new[] { -1, 0 }, parents);
+        }
+
         [Fact]
         public void MeshInstancesPreserveAuthoredNonUniformScale()
         {
@@ -2036,6 +2086,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void BoneAnchorCarriesOffsetThroughJointScaleBeforeSkinScale()
+        {
+            Matrix4x4 joint =
+                Matrix4x4.CreateScale(2f) *
+                Matrix4x4.CreateRotationY(MathF.PI * 0.5f) *
+                Matrix4x4.CreateTranslation(1f, 2f, 3f);
+
+            Matrix4x4 result = VfxRenderSession.PrepareBoneAnchorTransform(
+                joint,
+                new Vector3(1f, 0f, 0f),
+                skinScale: 2f);
+
+            Assert.Equal(2f, result.M41, precision: 5);
+            Assert.Equal(4f, result.M42, precision: 5);
+            Assert.Equal(2f, result.M43, precision: 5);
+            Assert.Equal(1f, new Vector3(result.M11, result.M12, result.M13).Length(), precision: 5);
+            Assert.Equal(1f, new Vector3(result.M21, result.M22, result.M23).Length(), precision: 5);
+            Assert.Equal(1f, new Vector3(result.M31, result.M32, result.M33).Length(), precision: 5);
+        }
+
+        [Fact]
         public void SessionSeekRestoresNearestLtkCheckpointAndMatchesReplayFromZero()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -2082,6 +2153,30 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxPlaybackRuntime restoredRoot = Assert.Single(throughCheckpoint.Graphs).Root;
             Assert.Equal(expectedTime, restoredRoot.CurrentTime);
             Assert.Equal(expectedInstances, restoredRoot.Emitters[0].Instances);
+        }
+
+        [Fact]
+        public void AnimationClockSynchronizationKeepsExactSceneTimeAcrossBackwardSeek()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var definition = new VfxSystemDefinition(1, "animation-clock", "animation-clock", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "animation-clock",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [1] = definition },
+                ResourceMap = new Dictionary<uint, uint>(),
+                SearchDirectory = Path.GetTempPath(),
+                TotalDuration = 2d
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.SynchronizeTo(0.62d);
+            Assert.Equal(0.62d, model.CurrentTime, precision: 10);
+
+            session.SynchronizeTo(0.31d);
+            Assert.Equal(0.31d, model.CurrentTime, precision: 10);
         }
 
         [Fact]

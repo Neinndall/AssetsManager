@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
@@ -59,6 +60,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void TrailRig_KeepsOnceLifecyclePhaseAcrossOrbitWrap()
+        {
+            var afterOneOrbit = VfxRigMotion.Evaluate(
+                VfxRigPreset.Trail,
+                VfxRigMotion.OrbitPeriod + 0.25,
+                5.0,
+                new Vector3(
+                    MathF.Cos((VfxRigMotion.OrbitPeriod - 0.01f) / VfxRigMotion.OrbitPeriod * MathF.PI * 2f) * VfxRigMotion.OrbitRadius,
+                    VfxRigMotion.StandHeight,
+                    MathF.Sin((VfxRigMotion.OrbitPeriod - 0.01f) / VfxRigMotion.OrbitPeriod * MathF.PI * 2f) * VfxRigMotion.OrbitRadius));
+
+            Assert.Equal(VfxRigMotion.OrbitPeriod + 0.25f, afterOneOrbit.Phase, precision: 4);
+            Assert.NotEqual(Vector3.Zero, afterOneOrbit.Moved);
+        }
+
+        [Fact]
         public void BurstAndStillRigs_PositionAtOriginHeight()
         {
             var burst = VfxRigMotion.Evaluate(VfxRigPreset.Burst, 1.2, 5.0);
@@ -103,6 +120,32 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(1d, VfxRigMotion.RunLength(VfxRigPreset.Still, system), precision: 4);
             Assert.Equal(1d, VfxRigMotion.RunLength(VfxRigPreset.Burst, system), precision: 4);
             Assert.Equal(3d, VfxRigMotion.RunLength(VfxRigPreset.Trail, system), precision: 4);
+        }
+
+        [Fact]
+        public void RootSystemTransformWrapsRigOriginAndTargetLikeLtk()
+        {
+            var session = new VfxRenderSession();
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One);
+            var definition = new VfxSystemDefinition(
+                0x12345678,
+                "scaled",
+                "scaled",
+                new[] { emitter },
+                Transform: Matrix4x4.CreateScale(2f));
+            var model = new VfxSystemModel
+            {
+                Name = "scaled",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [definition.PathHash] = definition },
+                ResourceMap = new Dictionary<uint, uint>()
+            };
+
+            session.SetSystem(model);
+
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            Assert.Equal(new Vector3(0f, 200f, 0f), root.WorldTransform.Translation);
+            Assert.Equal(new Vector3(1200f, 200f, 0f), Assert.Single(root.Emitters).SystemTarget);
         }
 
         [Fact]

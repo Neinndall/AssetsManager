@@ -63,6 +63,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         // LTK decision 2.46: one checkpoint mark per quarter second, at most 60 seconds,
         // bounded so heavy particle systems automatically keep a wider stride.
+        private const double SeekStep = 1d / 60d;
+        private const double MaximumSeekTime = 60d;
         private const double CheckpointInterval = 0.25d;
         private const int MaximumCheckpointMarks = 240;
         private const long CheckpointBudgetBytes = 256L * 1024L * 1024L;
@@ -149,9 +151,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             foreach (var graph in _graphs)
             {
                 _graphPlacements[graph] = step.Transform;
-                Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(step.Origin) * _worldTransform;
-                graph.SetTransform(step.Transform * _worldTransform, orientationRoot);
-                graph.SetTarget(Vector3.Transform(step.Target, _worldTransform));
+                Matrix4x4 authoredWorld = RootAuthoredWorld(graph);
+                Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(step.Origin) * authoredWorld;
+                graph.SetTransform(step.Transform * authoredWorld, orientationRoot);
+                graph.SetTarget(Vector3.Transform(step.Target, authoredWorld));
                 graph.IsStopped = step.IsStopped;
             }
         }
@@ -451,7 +454,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
                     if (boneMatrix.HasValue)
                     {
-                        Matrix4x4 boneTransform = PrepareBoneTransform(boneMatrix.Value);
+                        Matrix4x4 boneTransform = PrepareBoneAnchorTransform(
+                            boneMatrix.Value,
+                            attachment.LocalOffset,
+                            CurrentSkinScale);
                         if (attachment.IsDetachable && attachment.HasBoneTransform)
                             boneTransform = attachment.BoneTransform;
                         else if (attachment.TargetBoneHash != 0 &&
@@ -472,15 +478,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                             attachment.BoneTransform = boneTransform;
                             attachment.HasBoneTransform = true;
                         }
-                        if (attachment.LocalOffset != Vector3.Zero)
-                        {
-                            Vector3 scaledOffset = attachment.LocalOffset * CurrentSkinScale;
-                            boneTransform = Matrix4x4.CreateTranslation(scaledOffset) * boneTransform;
-                        }
+                        Matrix4x4 authoredWorld = RootAuthoredWorld(graph);
                         Matrix4x4 orientationRoot =
-                            attachment.BaseTransform * Matrix4x4.CreateTranslation(boneTransform.Translation) * _worldTransform;
+                            attachment.BaseTransform * Matrix4x4.CreateTranslation(boneTransform.Translation) * authoredWorld;
                         graph.SetTransform(
-                            attachment.BaseTransform * boneTransform * _worldTransform,
+                            attachment.BaseTransform * boneTransform * authoredWorld,
                             orientationRoot);
                         continue;
                     }
@@ -490,20 +492,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 {
                     // LTK keeps an idle effect at the skeleton origin when its authored bone
                     // cannot be resolved, while still applying the authored local position.
-                    Matrix4x4 fallback = IdleFallbackTransform(
+                    Matrix4x4 fallbackPlacement = IdleFallbackTransform(
                         attachment.BaseTransform,
                         attachment.LocalOffset,
                         CurrentSkinScale,
-                        _worldTransform);
-                    Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(fallback.Translation) * _worldTransform;
-                    graph.SetTransform(fallback, orientationRoot);
+                        Matrix4x4.Identity);
+                    Matrix4x4 authoredWorld = RootAuthoredWorld(graph);
+                    Matrix4x4 orientationRoot =
+                        Matrix4x4.CreateTranslation(fallbackPlacement.Translation) * authoredWorld;
+                    graph.SetTransform(fallbackPlacement * authoredWorld, orientationRoot);
                     continue;
                 }
 
                 if (_graphPlacements.TryGetValue(graph, out var basePlacement))
                 {
-                    Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(basePlacement.Translation) * _worldTransform;
-                    graph.SetTransform(basePlacement * _worldTransform, orientationRoot);
+                    Matrix4x4 authoredWorld = RootAuthoredWorld(graph);
+                    Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(basePlacement.Translation) * authoredWorld;
+                    graph.SetTransform(basePlacement * authoredWorld, orientationRoot);
                 }
             }
         }
@@ -512,6 +517,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             => _ownerSceneContext is { SkinScale: > 0f } context && float.IsFinite(context.SkinScale)
                 ? context.SkinScale
                 : 1f;
+
+        private Matrix4x4 RootAuthoredWorld(VfxPlaybackGraphRuntime graph)
+            => graph.Root.Definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * _worldTransform;
 
         internal static Matrix4x4 IdleFallbackTransform(
             Matrix4x4 baseTransform,
@@ -524,14 +532,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         private Matrix4x4 PrepareBoneTransform(Matrix4x4 transform)
+            => PrepareBoneAnchorTransform(transform, Vector3.Zero, CurrentSkinScale);
+
+        internal static Matrix4x4 PrepareBoneAnchorTransform(
+            Matrix4x4 transform,
+            Vector3 localOffset,
+            float skinScale)
         {
             static Vector3 Normal(Vector3 value, Vector3 fallback)
                 => value.LengthSquared() > 1e-8f ? Vector3.Normalize(value) : fallback;
 
+            float scale = skinScale > 0f && float.IsFinite(skinScale) ? skinScale : 1f;
             Vector3 right = Normal(Vector3.TransformNormal(Vector3.UnitX, transform), Vector3.UnitX);
             Vector3 up = Normal(Vector3.TransformNormal(Vector3.UnitY, transform), Vector3.UnitY);
             Vector3 forward = Normal(Vector3.TransformNormal(Vector3.UnitZ, transform), Vector3.UnitZ);
-            Vector3 translation = transform.Translation * CurrentSkinScale;
+            // LTK's jointAnchor transforms the authored offset by the joint's complete
+            // posed frame, then applies the character skin scale to the resulting origin.
+            Vector3 translation = Vector3.Transform(localOffset, transform) * scale;
             return new Matrix4x4(
                 right.X, right.Y, right.Z, 0f,
                 up.X, up.Y, up.Z, 0f,
@@ -599,8 +616,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     if (!_graphAttachments.ContainsKey(graph))
                     {
                         Matrix4x4 placement = _graphPlacements.GetValueOrDefault(graph, Matrix4x4.Identity);
-                        Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(placement.Translation) * _worldTransform;
-                        graph.SetTransform(placement * _worldTransform, orientationRoot);
+                        Matrix4x4 authoredWorld = RootAuthoredWorld(graph);
+                        Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(placement.Translation) * authoredWorld;
+                        graph.SetTransform(placement * authoredWorld, orientationRoot);
                     }
                 }
             }
@@ -647,9 +665,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public void Seek(double seconds)
         {
-            if (_activeSystem == null) return;
-            double maxDuration = HasFinitePlaybackDuration ? RigDuration : 10.0;
-            double target = Math.Clamp(seconds, 0, maxDuration);
+            if (_activeSystem == null || !double.IsFinite(seconds)) return;
+            SeekExact(QuantizeLtkSeek(seconds));
+        }
+
+        internal static double QuantizeLtkSeek(double seconds)
+        {
+            if (!double.IsFinite(seconds)) return 0d;
+            double wanted = Math.Clamp(seconds, 0d, MaximumSeekTime);
+            // JavaScript Math.round is half-up for the non-negative seek domain.
+            double steps = Math.Floor((wanted / SeekStep) + 0.5d);
+            return steps * SeekStep;
+        }
+
+        private void SeekExact(double target)
+        {
+            if (_activeSystem == null || !double.IsFinite(target)) return;
+            target = Math.Max(0d, target);
 
             if (target + 1e-9 >= _activeSystem.CurrentTime)
             {
@@ -687,7 +719,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             double target = Math.Max(0d, seconds);
             if (target + 1e-9 < _activeSystem.CurrentTime)
             {
-                Seek(target);
+                // Animation-follow seeks use the scene clock itself rather than the VFX
+                // transport's 60 Hz scrub quantization.
+                SeekExact(target);
                 return;
             }
             AdvanceTo(target);
@@ -726,7 +760,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             while (_activeSystem.CurrentTime < target)
             {
                 double previous = _activeSystem.CurrentTime;
-                double next = Math.Min(target, previous + 1d / 60d);
+                double next = Math.Min(target, previous + SeekStep);
                 foreach (var kill in _scheduledEffectKills)
                     if (kill.Time > previous && kill.Time < next) next = kill.Time;
                 foreach (double stopTime in _graphStopTimes.Values)
