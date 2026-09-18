@@ -257,8 +257,93 @@
                                                     <materialIcons:MaterialIcon Kind="RotateRight" Width="14" Height="14" Foreground="{StaticResource AccentPurple}"/>
                                                 </MenuItem.Icon>
                                             </MenuItem>
+
+                                            <Separator/>
+
+                                            <MenuItem StaysOpenOnClick="True">
+                                                <MenuItem.Header>
+                                                    <StackPanel Width="250" Margin="2">
+                                                        <Grid Margin="0,0,0,3">
+                                                            <TextBlock Text="Height" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                            <TextBlock x:Name="RigHeightValueText" Text="100 u" HorizontalAlignment="Right"
+                                                                       FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                        </Grid>
+                                                        <Slider x:Name="RigHeightSlider" Minimum="0" Maximum="600" TickFrequency="10"
+                                                                IsSnapToTickEnabled="True" Value="100"
+                                                                ValueChanged="RigHeightSlider_ValueChanged"/>
+
+                                                        <StackPanel x:Name="RigDistancePanel" Margin="0,7,0,0">
+                                                            <Grid Margin="0,0,0,3">
+                                                                <TextBlock Text="Distance" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                                <TextBlock x:Name="RigDistanceValueText" Text="1200 u" HorizontalAlignment="Right"
+                                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                            </Grid>
+                                                            <Slider x:Name="RigDistanceSlider" Minimum="200" Maximum="4000" TickFrequency="50"
+                                                                    IsSnapToTickEnabled="True" Value="1200"
+                                                                    ValueChanged="RigDistanceSlider_ValueChanged"/>
+                                                            <Grid Margin="0,5,0,3">
+                                                                <TextBlock Text="Speed" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                                <TextBlock x:Name="RigSpeedValueText" Text="1600 u/s" HorizontalAlignment="Right"
+                                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                            </Grid>
+                                                            <Slider x:Name="RigSpeedSlider" Minimum="100" Maximum="5000" TickFrequency="50"
+                                                                    IsSnapToTickEnabled="True" Value="1600"
+                                                                    ValueChanged="RigSpeedSlider_ValueChanged"/>
+                                                        </StackPanel>
+
+                                                        <StackPanel x:Name="RigOrbitPanel" Margin="0,7,0,0">
+                                                            <Grid Margin="0,0,0,3">
+                                                                <TextBlock Text="Radius" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                                <TextBlock x:Name="RigRadiusValueText" Text="300 u" HorizontalAlignment="Right"
+                                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                            </Grid>
+                                                            <Slider x:Name="RigRadiusSlider" Minimum="50" Maximum="1600" TickFrequency="25"
+                                                                    IsSnapToTickEnabled="True" Value="300"
+                                                                    ValueChanged="RigRadiusSlider_ValueChanged"/>
+                                                            <Grid Margin="0,5,0,3">
+                                                                <TextBlock Text="Period" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                                <TextBlock x:Name="RigPeriodValueText" Text="3.00 s" HorizontalAlignment="Right"
+                                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                            </Grid>
+                                                            <Slider x:Name="RigPeriodSlider" Minimum="0.25" Maximum="12" TickFrequency="0.25"
+                                                                    IsSnapToTickEnabled="True" Value="3"
+                                                                    ValueChanged="RigPeriodSlider_ValueChanged"/>
+                                                        </StackPanel>
+
+                                                        <CheckBox x:Name="RigLifeLoopCheckBox" Content="Loop lifecycle" Margin="0,8,0,0"
+                                                                  Checked="RigLifeLoopCheckBox_Changed"
+                                                                  Unchecked="RigLifeLoopCheckBox_Changed"
+                                                                  Foreground="{StaticResource TextSecondary}"/>
+                                                        <CheckBox x:Name="RigStopCheckBox" Content="Soft stop" Margin="0,5,0,0"
+                                                                  Checked="RigStopCheckBox_Changed"
+                                                                  Unchecked="RigStopCheckBox_Changed"
+                                                                  Foreground="{StaticResource TextSecondary}"/>
+                                                        <StackPanel x:Name="RigStopPanel" Margin="0,5,0,0">
+                                                            <Grid Margin="0,0,0,3">
+                                                                <TextBlock Text="Stop after" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                                <TextBlock x:Name="RigStopValueText" Text="2.00 s" HorizontalAlignment="Right"
+                                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                            </Grid>
+                                                            <Slider x:Name="RigStopSlider" Minimum="0.25" Maximum="30" TickFrequency="0.25"
+                                                                    IsSnapToTickEnabled="True" Value="2"
+                                                                    ValueChanged="RigStopSlider_ValueChanged"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </MenuItem.Header>
+                                            </MenuItem>
                                         </ContextMenu>
                                     </Button.ContextMenu>
+                                </Button>
+
+                                <Button Click="RerollSeed_Click" Style="{StaticResource TransparentIconButton}"
+                                        Height="26" Padding="6,0" Margin="0,0,4,0"
+                                        ToolTip="Reroll deterministic playback seed">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="DiceMultipleOutline" Width="13" Height="13"
+                                                                    Foreground="{StaticResource TextSecondary}" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding PlaybackSeed}" FontSize="10" FontFamily="Consolas"
+                                                   Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                    </StackPanel>
                                 </Button>
 
                                 <!-- Champion Mesh Toggle -->
@@ -370,7 +455,7 @@
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <!-- Step Back Button (|<) -->
                                 <Button Click="StepBack_Click" Style="{StaticResource TimelineTransportButtonStyle}"
-                                        Margin="0,0,2,0" ToolTip="Step Back / Rewind to 0.00s">
+                                        Margin="0,0,2,0" ToolTip="Step Back (-1 frame)">
                                     <materialIcons:MaterialIcon Kind="SkipPrevious" Width="18" Height="18"/>
                                 </Button>
 
@@ -421,7 +506,9 @@
 
                                 <!-- Speed Control -->
                                 <materialIcons:MaterialIcon Kind="Speedometer" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="76" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="2" Margin="0,0,8,0">
+                                <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="76" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="4" Margin="0,0,8,0">
+                                    <ComboBoxItem Content="0.05x" Tag="0.05"/>
+                                    <ComboBoxItem Content="0.1x" Tag="0.1"/>
                                     <ComboBoxItem Content="0.25x" Tag="0.25"/>
                                     <ComboBoxItem Content="0.5x" Tag="0.5"/>
                                     <ComboBoxItem Content="1.0x" Tag="1.0"/>

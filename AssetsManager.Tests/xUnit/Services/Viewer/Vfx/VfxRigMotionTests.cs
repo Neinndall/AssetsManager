@@ -123,6 +123,97 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void RigSettingsDefaultsMatchPresetLifecycle()
+        {
+            VfxRigSettings still = VfxRigSettings.ForPreset(VfxRigPreset.Still);
+            VfxRigSettings burst = VfxRigSettings.ForPreset(VfxRigPreset.Burst);
+            VfxRigSettings missile = VfxRigSettings.ForPreset(VfxRigPreset.Missile);
+            VfxRigSettings trail = VfxRigSettings.ForPreset(VfxRigPreset.Trail);
+
+            Assert.Equal(VfxRigMotionKind.Still, still.MotionKind);
+            Assert.False(still.IsLooping);
+            Assert.True(burst.IsLooping);
+            Assert.Equal(VfxRigMotionKind.Path, missile.MotionKind);
+            Assert.True(missile.IsLooping);
+            Assert.Equal(VfxRigMotion.FlightRange, missile.FlightRange);
+            Assert.Equal(VfxRigMotion.FlightSpeed, missile.FlightSpeed);
+            Assert.Equal(VfxRigMotionKind.Orbit, trail.MotionKind);
+            Assert.False(trail.IsLooping);
+            Assert.Equal(VfxRigMotion.OrbitRadius, trail.OrbitRadius);
+            Assert.Equal(VfxRigMotion.OrbitPeriod, trail.OrbitPeriod);
+            Assert.Equal(VfxRigMotion.StandHeight, trail.Height);
+        }
+
+        [Fact]
+        public void TunedPathUsesHeightDistanceSpeedAndSoftStop()
+        {
+            VfxRigSettings settings = VfxRigSettings.ForPreset(VfxRigPreset.Missile) with
+            {
+                Height = 250f,
+                FlightRange = 2000f,
+                FlightSpeed = 1000f,
+                IsLooping = false,
+                StopAt = 0.5f
+            };
+
+            VfxRigStep step = VfxRigMotion.Evaluate(settings, 0.5d, 4d);
+
+            Assert.Equal(-500f, step.Origin.X, tolerance: 0.1f);
+            Assert.Equal(250f, step.Origin.Y, tolerance: 0.1f);
+            Assert.Equal(1000f, step.Target.X, tolerance: 0.1f);
+            Assert.Equal(250f, step.Target.Y, tolerance: 0.1f);
+            Assert.True(step.IsStopped);
+        }
+
+        [Fact]
+        public void TunedOrbitCanUseLoopLifecycle()
+        {
+            VfxRigSettings settings = VfxRigSettings.ForPreset(VfxRigPreset.Trail) with
+            {
+                OrbitPeriod = 2f,
+                IsLooping = true
+            };
+
+            VfxRigStep step = VfxRigMotion.Evaluate(settings, 3.25d, 3d);
+
+            Assert.Equal(0.25f, step.Phase, precision: 4);
+            Assert.False(step.IsStopped);
+        }
+
+        [Fact]
+        public void StandaloneLoopingRigKeepsPlayingAcrossItsRunBoundary()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
+            {
+                EmitterLifetime = 0.2f,
+                ParticleLifetime = VfxCurveF.Const(0.1f)
+            };
+            var definition = new VfxSystemDefinition(7, "loop", "loop", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "loop",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [7] = definition },
+                ResourceMap = new Dictionary<uint, uint>()
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.RigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Burst);
+            session.Play();
+
+            for (int frame = 0; frame < 11; frame++) session.Update(0.1f);
+
+            Assert.True(session.ActiveSystem.CurrentTime > session.RigDuration);
+            Assert.InRange(session.PlaybackTime, 0d, session.RigDuration);
+            double before = session.ActiveSystem.CurrentTime;
+
+            session.Update(0.1f);
+
+            Assert.True(session.ActiveSystem.CurrentTime > before);
+        }
+
+        [Fact]
         public void RootSystemTransformWrapsRigOriginAndTargetLikeLtk()
         {
             var session = new VfxRenderSession();

@@ -194,6 +194,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         public void Reset()
         {
+            ClearChildRuns();
+            RebindRootCallbacks();
+            Root.Reset();
+            Root.WarmUp();
+            SyncRenderTimes();
+        }
+
+        internal void ReplayLoop()
+        {
+            ClearChildRuns();
+            RebindRootCallbacks();
+            Root.ReplayLoop();
+            Root.WarmUp();
+            SyncRenderTimes();
+        }
+
+        private void ClearChildRuns()
+        {
             for (int index = _runtimes.Count - 1; index > 0; index--)
             {
                 VfxPlaybackRuntime runtime = _runtimes[index];
@@ -210,13 +228,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
             _pendingChildren.Clear();
             _carriedChildren.Clear();
+        }
+
+        private void RebindRootCallbacks()
+        {
             Root.ParticleLifecycle -= OnParticleLifecycle;
             Root.ParticleLifecycle += OnParticleLifecycle;
             Root.ParticleUpdated -= OnParticleUpdated;
             Root.ParticleUpdated += OnParticleUpdated;
-            Root.Reset();
-            Root.WarmUp();
-            SyncRenderTimes();
         }
 
         internal Snapshot CaptureSnapshot()

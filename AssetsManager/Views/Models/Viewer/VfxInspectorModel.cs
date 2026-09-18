@@ -514,6 +514,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isAllMuted;
         private bool _showChampionMesh = true;
         private bool _hasChampionMesh;
+        private int _playbackSeed = 1337;
         private VfxRigPreset _rigPreset = VfxRigPreset.Still;
 
         public VfxRigPreset RigPreset
@@ -605,6 +606,20 @@ namespace AssetsManager.Views.Models.Viewer
             get => _hasChampionMesh;
             set { _hasChampionMesh = value; OnPropertyChanged(); }
         }
+
+        public int PlaybackSeed
+        {
+            get => _playbackSeed;
+            set
+            {
+                if (_playbackSeed == value) return;
+                _playbackSeed = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PlaybackSeedText));
+            }
+        }
+
+        public string PlaybackSeedText => $"Seed {_playbackSeed}";
 
         public double ActiveLoopDuration
         {

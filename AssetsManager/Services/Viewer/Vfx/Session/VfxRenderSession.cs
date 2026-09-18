@@ -80,12 +80,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private readonly Dictionary<VfxPlaybackGraphRuntime, double> _graphStopTimes = new();
         private readonly Dictionary<VfxPlaybackGraphRuntime, GraphAttachmentInfo> _graphAttachments = new();
         private VfxSystemModel _activeSystem;
-        private VfxRigPreset _rigPreset = VfxRigPreset.Still;
+        private VfxRigSettings _rigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Still);
         private double _rigDuration;
         private Vector3? _lastRigOrigin;
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private VfxOwnerSceneContext _ownerSceneContext;
         private bool _isPlaying;
+        private bool _usesStandaloneRig;
         private bool _ready;
         private bool _disposed;
         private uint _viewportWidth;
@@ -120,19 +121,49 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public IReadOnlyList<VfxPlaybackGraphRuntime> Graphs => _graphs;
         public double CurrentTime => _activeSystem?.CurrentTime ?? 0d;
         public double RigDuration => _activeSystem?.Definition is null ? _activeSystem?.TotalDuration ?? 0d : _rigDuration;
+
+        public double PlaybackTime
+        {
+            get
+            {
+                double time = _activeSystem?.CurrentTime ?? 0d;
+                if (!_usesStandaloneRig ||
+                    !_rigSettings.IsLooping ||
+                    !(RigDuration > 0d) ||
+                    !double.IsFinite(RigDuration))
+                {
+                    return time;
+                }
+
+                double phase = time % RigDuration;
+                return phase < 0d ? phase + RigDuration : phase;
+            }
+        }
+
         private bool HasFinitePlaybackDuration => double.IsFinite(RigDuration) && RigDuration > 0d;
 
         public VfxRigPreset RigPreset
         {
-            get => _rigPreset;
+            get => _rigSettings.Preset;
+            set => RigSettings = VfxRigSettings.ForPreset(value);
+        }
+
+        public VfxRigSettings RigSettings
+        {
+            get => _rigSettings;
             set
             {
-                _rigPreset = value;
+                bool motionChanged = value.MotionKind != _rigSettings.MotionKind;
+                _rigSettings = value;
                 ClearCheckpoints();
                 if (_activeSystem?.Definition is { } definition)
                     _rigDuration = VfxRigMotion.RunLength(value, definition);
                 _lastRigOrigin = null;
-                ApplyRigTransform();
+
+                if (motionChanged && _activeSystem != null)
+                    ResetSimulationToStart();
+                else
+                    ApplyRigTransform();
             }
         }
 
@@ -141,7 +172,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (_graphs.Count == 0 || _graphAttachments.Count > 0 || _activeSystem == null) return;
 
             var step = VfxRigMotion.Evaluate(
-                _rigPreset,
+                _rigSettings,
                 _activeSystem.CurrentTime,
                 RigDuration,
                 _lastRigOrigin);
@@ -171,10 +202,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         {
             ClearCheckpoints();
             _isPlaying = false;
+            _usesStandaloneRig = system != null;
             _activeSystem = system;
             _ownerSceneContext = system?.OwnerSceneContext;
             _rigDuration = system?.Definition is { } definition
-                ? VfxRigMotion.RunLength(_rigPreset, definition)
+                ? VfxRigMotion.RunLength(_rigSettings, definition)
                 : system?.TotalDuration ?? 0d;
             _graph = null;
             _graphs.Clear();
@@ -249,6 +281,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             systems ??= new Dictionary<uint, VfxSystemDefinition>();
             resourceMap ??= new Dictionary<uint, uint>();
             _isPlaying = false;
+            _usesStandaloneRig = false;
             _ownerSceneContext = ownerSceneContext;
             if (_ready)
             {
@@ -637,10 +670,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void Update(float deltaTime)
         {
             if (!_isPlaying || _activeSystem == null) return;
-            float speed = (float)Math.Clamp(_activeSystem.Speed, 0.25, 2.0);
-            float elapsed = deltaTime * speed;
+            float frameTime = NormalizeFrameTime(deltaTime);
+            if (frameTime <= 0f) return;
+
+            float speed = NormalizePlaybackSpeed(_activeSystem.Speed);
+            float elapsed = frameTime * speed;
 
             AdvanceTo(_activeSystem.CurrentTime + elapsed);
+
+            if (_usesStandaloneRig && _rigSettings.IsLooping)
+                return;
 
             if (ShouldFinishPlayback(
                     HasFinitePlaybackDuration,
@@ -662,6 +701,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             => hasFiniteDuration
                 ? currentTime >= totalDuration
                 : graphIsComplete;
+
+        internal static float NormalizeFrameTime(float deltaTime)
+        {
+            if (!float.IsFinite(deltaTime) || deltaTime <= 0f) return 0f;
+            return Math.Min(deltaTime, 0.1f);
+        }
+
+        internal static float NormalizePlaybackSpeed(double speed)
+        {
+            if (!double.IsFinite(speed)) return 1f;
+            return (float)Math.Clamp(speed, 0.05d, 2d);
+        }
 
         public void Seek(double seconds)
         {
@@ -768,6 +819,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 foreach (GraphAttachmentInfo attachment in _graphAttachments.Values)
                     if (attachment.StartTime > previous && attachment.StartTime < next) next = attachment.StartTime;
 
+                // A looping rig replays its particle graph on the rig's own span. This is
+                // independent from an optional transport loop range.
+                double rigBoundary = NextRigLoopBoundary(previous);
+                if (rigBoundary > previous + 1e-9 && rigBoundary < next - 1e-9)
+                    next = rigBoundary;
+
                 // Land exactly on quarter-second marks so a checkpoint never captures a state
                 // from just before/after the time it represents.
                 double checkpointBoundary = NextCheckpointBoundary(previous);
@@ -775,7 +832,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     next = checkpointBoundary;
 
                 KillGraphsAt(previous);
+                bool rigWrapped =
+                    double.IsFinite(rigBoundary) &&
+                    Math.Abs(next - rigBoundary) <= 1e-8;
                 _activeSystem.CurrentTime = next;
+                if (rigWrapped)
+                {
+                    foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.ReplayLoop();
+                    _lastRigOrigin = null;
+                }
                 ApplyRigTransform();
                 if (_boneTransformSampler != null)
                     UpdateBoneTransforms((name, hash) => _boneTransformSampler(next, name, hash));
@@ -785,6 +850,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 KillGraphsAt(next);
                 TryCaptureCheckpoint(next);
             }
+        }
+
+        private double NextRigLoopBoundary(double previous)
+        {
+            if (!_usesStandaloneRig ||
+                !_rigSettings.IsLooping ||
+                !(RigDuration > 0d) ||
+                !double.IsFinite(RigDuration))
+            {
+                return double.PositiveInfinity;
+            }
+
+            double cycle = Math.Floor(previous / RigDuration + 1e-9) + 1d;
+            return cycle * RigDuration;
         }
 
         private double NextCheckpointBoundary(double previous)

@@ -1308,6 +1308,37 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void RigLoopReplayPreservesRandomStreamAndParticleSerial()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(20f),
+                ParticleLifetime = VfxCurveF.Const(1f),
+                NumFrames = 4,
+                RandomStartFrame = true
+            };
+            var runtime = new VfxPlaybackRuntime(17);
+            runtime.SetSystem(new VfxSystemDefinition(1, "loop-stream", "loop-stream", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.2f);
+
+            VfxPlaybackRuntime.Snapshot before = runtime.CaptureSnapshot();
+            Assert.True(before.ParticleSerial > 0);
+
+            runtime.ReplayLoop();
+            VfxPlaybackRuntime.Snapshot replayed = runtime.CaptureSnapshot();
+
+            Assert.Equal(before.RandomState, replayed.RandomState);
+            Assert.Equal(before.ParticleSerial, replayed.ParticleSerial);
+            Assert.Equal(0f, replayed.CurrentTime);
+
+            runtime.Reset();
+            VfxPlaybackRuntime.Snapshot reset = runtime.CaptureSnapshot();
+            Assert.Equal(reset.InitialRandomState, reset.RandomState);
+            Assert.Equal(0u, reset.ParticleSerial);
+        }
+
+        [Fact]
         public void RuntimeSnapshotRestoreReplaysTheSameDeterministicState()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -1808,6 +1839,87 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 graphIsComplete: true));
         }
 
+        [Theory]
+        [InlineData(0f, 0f)]
+        [InlineData(-1f, 0f)]
+        [InlineData(float.NaN, 0f)]
+        [InlineData(1f / 60f, 1f / 60f)]
+        [InlineData(0.1f, 0.1f)]
+        [InlineData(0.25f, 0.1f)]
+        public void PlaybackFrameTimeMatchesTheRunClockCap(float deltaTime, float expected)
+        {
+            Assert.Equal(expected, VfxRenderSession.NormalizeFrameTime(deltaTime), precision: 6);
+        }
+
+        [Theory]
+        [InlineData(0.01d, 0.05f)]
+        [InlineData(0.05d, 0.05f)]
+        [InlineData(1d, 1f)]
+        [InlineData(2d, 2f)]
+        [InlineData(5d, 2f)]
+        [InlineData(double.NaN, 1f)]
+        public void PlaybackSpeedUsesTheFullTransportRange(double speed, float expected)
+        {
+            Assert.Equal(expected, VfxRenderSession.NormalizePlaybackSpeed(speed), precision: 6);
+        }
+
+        [Theory]
+        [InlineData(1d, -1, 2d, 59d / 60d)]
+        [InlineData(1d, 1, 2d, 61d / 60d)]
+        [InlineData(0d, -1, 2d, 0d)]
+        [InlineData(2d, 1, 2d, 2d)]
+        [InlineData(1d, 6, 2d, 1.1d)]
+        [InlineData(1d, -6, 2d, 0.9d)]
+        public void TransportStepMovesWholeSixtyHertzFrames(
+            double currentTime,
+            int frames,
+            double span,
+            double expected)
+        {
+            Assert.Equal(
+                expected,
+                VfxInspectorControl.PlaybackStepTarget(currentTime, frames, span),
+                precision: 10);
+        }
+
+        [Theory]
+        [InlineData(1d, -1, 0.5d)]
+        [InlineData(1d, 1, 1.5d)]
+        [InlineData(0.05d, -1, 0.05d)]
+        [InlineData(2d, 1, 2d)]
+        [InlineData(0.6d, -1, 0.5d)]
+        [InlineData(0.6d, 1, 1d)]
+        public void TransportSpeedDetentsMatchThePlaybackShortcuts(
+            double speed,
+            int direction,
+            double expected)
+        {
+            Assert.Equal(expected, VfxInspectorControl.PlaybackSpeedDetent(speed, direction), precision: 6);
+        }
+
+        [Fact]
+        public void StandaloneRunStartsFromTheDeterministicSeed()
+        {
+            Assert.Equal(1337, VfxInspectorControl.StandalonePlaybackSeed);
+            Assert.Equal(1338, VfxInspectorControl.NextPlaybackSeed(1337));
+        }
+
+        [Theory]
+        [InlineData(-1d, 5d, 0d)]
+        [InlineData(2d, 5d, 2d)]
+        [InlineData(7d, 5d, 5d)]
+        [InlineData(double.NaN, 5d, 0d)]
+        public void RememberedRunPlayheadStaysInsideTheCurrentSpan(
+            double playhead,
+            double span,
+            double expected)
+        {
+            Assert.Equal(
+                expected,
+                VfxInspectorControl.RememberedPlayhead(playhead, span),
+                precision: 6);
+        }
+
         [Fact]
         public void PreviewLoopDoesNotRestartGraphUnlessExplicitlyEnabled()
         {
@@ -1987,10 +2099,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Path.GetTempPath(),
                 seed: 7));
             session.Play();
-            session.Update(0.5f);
+            for (int frame = 0; frame < 5; frame++) session.Update(0.1f);
             Assert.Equal(0, session.LiveParticleCount);
 
-            session.Update(0.6f);
+            for (int frame = 0; frame < 6; frame++) session.Update(0.1f);
             Assert.True(session.LiveParticleCount > 0);
         }
 

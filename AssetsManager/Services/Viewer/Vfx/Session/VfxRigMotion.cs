@@ -13,6 +13,42 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         Trail
     }
 
+    public enum VfxRigMotionKind
+    {
+        Still,
+        Path,
+        Orbit
+    }
+
+    public readonly record struct VfxRigSettings(
+        VfxRigPreset Preset,
+        float Height,
+        float FlightRange,
+        float FlightSpeed,
+        float OrbitRadius,
+        float OrbitPeriod,
+        bool IsLooping,
+        float? StopAt)
+    {
+        public static VfxRigSettings ForPreset(VfxRigPreset preset)
+            => new(
+                preset,
+                VfxRigMotion.StandHeight,
+                VfxRigMotion.FlightRange,
+                VfxRigMotion.FlightSpeed,
+                VfxRigMotion.OrbitRadius,
+                VfxRigMotion.OrbitPeriod,
+                preset is VfxRigPreset.Burst or VfxRigPreset.Missile,
+                null);
+
+        public VfxRigMotionKind MotionKind => Preset switch
+        {
+            VfxRigPreset.Missile => VfxRigMotionKind.Path,
+            VfxRigPreset.Trail => VfxRigMotionKind.Orbit,
+            _ => VfxRigMotionKind.Still
+        };
+    }
+
     public readonly record struct VfxRigStep(
         Matrix4x4 Transform,
         Vector3 Origin,
@@ -46,13 +82,31 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             float flightSpeed = FlightSpeed,
             float orbitPeriod = OrbitPeriod)
         {
-            double span = VfxDurationCalculator.SystemSpan(system);
-            if (preset == VfxRigPreset.Missile)
+            VfxRigSettings settings = VfxRigSettings.ForPreset(preset) with
             {
-                double flight = flightSpeed > 0f ? flightRange / flightSpeed : 0d;
-                return flight > 0d ? flight + VfxDurationCalculator.LingerTail(system, flight) : span;
+                FlightRange = flightRange,
+                FlightSpeed = flightSpeed,
+                OrbitPeriod = orbitPeriod
+            };
+            return RunLength(settings, system);
+        }
+
+        public static double RunLength(VfxRigSettings settings, VfxSystemDefinition system)
+        {
+            double span = VfxDurationCalculator.SystemSpan(system);
+            if (settings.MotionKind == VfxRigMotionKind.Path)
+            {
+                double flight = settings.FlightSpeed > 0f
+                    ? settings.FlightRange / settings.FlightSpeed
+                    : 0d;
+                return flight > 0d
+                    ? flight + VfxDurationCalculator.LingerTail(system, flight)
+                    : span;
             }
-            return preset == VfxRigPreset.Trail ? Math.Max(orbitPeriod, span) : span;
+
+            return settings.MotionKind == VfxRigMotionKind.Orbit
+                ? Math.Max(settings.OrbitPeriod, span)
+                : span;
         }
 
         /// <summary>
@@ -69,18 +123,45 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             float orbitRadius = OrbitRadius,
             float orbitPeriod = OrbitPeriod)
         {
-            switch (preset)
+            VfxRigSettings settings = VfxRigSettings.ForPreset(preset) with
             {
-                case VfxRigPreset.Missile:
-                {
-                    float flightTime = flightSpeed > 0f ? flightRange / flightSpeed : 0f;
-                    float totalSpan = (float)Math.Max(runSpan, flightTime);
-                    float phase = totalSpan > 0f ? (float)(time % totalSpan) : (float)time;
-                    float progress = flightTime > 0f ? Math.Clamp(phase / flightTime, 0f, 1f) : 1f;
-                    bool isStopped = flightTime > 0f && phase >= flightTime;
+                Height = standHeight,
+                FlightRange = flightRange,
+                FlightSpeed = flightSpeed,
+                OrbitRadius = orbitRadius,
+                OrbitPeriod = orbitPeriod
+            };
+            return Evaluate(settings, time, runSpan, lastOrigin);
+        }
 
-                    Vector3 from = new(-flightRange * 0.5f, standHeight, 0f);
-                    Vector3 to = new(flightRange * 0.5f, standHeight, 0f);
+        public static VfxRigStep Evaluate(
+            VfxRigSettings settings,
+            double time,
+            double runSpan,
+            Vector3? lastOrigin = null)
+        {
+            float totalSpan = (float)Math.Max(runSpan, 0d);
+            float phase = settings.IsLooping && totalSpan > 0f
+                ? (float)(time % totalSpan)
+                : (float)Math.Max(0d, time);
+            switch (settings.MotionKind)
+            {
+                case VfxRigMotionKind.Path:
+                {
+                    float flightTime = settings.FlightSpeed > 0f
+                        ? settings.FlightRange / settings.FlightSpeed
+                        : 0f;
+                    totalSpan = Math.Max(totalSpan, flightTime);
+                    phase = settings.IsLooping && totalSpan > 0f
+                        ? (float)(time % totalSpan)
+                        : (float)Math.Max(0d, time);
+                    float progress = flightTime > 0f ? Math.Clamp(phase / flightTime, 0f, 1f) : 1f;
+                    bool isStopped =
+                        (settings.StopAt is { } stopAt && phase >= stopAt) ||
+                        (flightTime > 0f && phase >= flightTime);
+
+                    Vector3 from = new(-settings.FlightRange * 0.5f, settings.Height, 0f);
+                    Vector3 to = new(settings.FlightRange * 0.5f, settings.Height, 0f);
                     Vector3 origin = Vector3.Lerp(from, to, progress);
 
                     // Missile-attached VFX author travel on local +Y. The rig therefore
@@ -92,7 +173,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         0f,  0f,  0f, 1f
                     );
                     Matrix4x4 transform = flightBasis * Matrix4x4.CreateTranslation(origin);
-                    Vector3 moved = lastOrigin.HasValue && phase >= 0.001f && phase < totalSpan - 0.05f
+                    Vector3 moved = lastOrigin.HasValue &&
+                                    phase >= 0.001f &&
+                                    (!settings.IsLooping || phase < totalSpan - 0.05f)
                         ? origin - lastOrigin.Value
                         : Vector3.Zero;
 
@@ -102,26 +185,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     };
                 }
 
-                case VfxRigPreset.Trail:
+                case VfxRigMotionKind.Orbit:
                 {
-                    float totalSpan = (float)Math.Max(runSpan, orbitPeriod);
-                    // LTK's trail preview has life:"once": its clock phase keeps advancing
-                    // even though the orbit position itself repeats every OrbitPeriod.
-                    float phase = (float)Math.Max(0d, time);
-                    float turn = orbitPeriod > 0f ? (phase / orbitPeriod) * MathF.PI * 2f : 0f;
+                    totalSpan = Math.Max(totalSpan, settings.OrbitPeriod);
+                    phase = settings.IsLooping && totalSpan > 0f
+                        ? (float)(time % totalSpan)
+                        : (float)Math.Max(0d, time);
+                    float turn = settings.OrbitPeriod > 0f
+                        ? (phase / settings.OrbitPeriod) * MathF.PI * 2f
+                        : 0f;
 
-                    float x = MathF.Cos(turn) * orbitRadius;
-                    float z = MathF.Sin(turn) * orbitRadius;
-                    Vector3 origin = new(x, standHeight, z);
-
-                    // Tangent vector: (-sin(turn), 0, cos(turn))
+                    float x = MathF.Cos(turn) * settings.OrbitRadius;
+                    float z = MathF.Sin(turn) * settings.OrbitRadius;
+                    Vector3 origin = new(x, settings.Height, z);
                     float dirX = -MathF.Sin(turn);
                     float dirZ = MathF.Cos(turn);
 
-                    // Yaw basis:
-                    // Row 0:  dirZ, 0, -dirX, 0
-                    // Row 1:     0, 1,     0, 0
-                    // Row 2:  dirX, 0,  dirZ, 0
                     Matrix4x4 yawBasis = new(
                         dirZ, 0f, -dirX, 0f,
                         0f,   1f,  0f,   0f,
@@ -129,35 +208,26 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         0f,   0f,  0f,   1f
                     );
                     Matrix4x4 transform = yawBasis * Matrix4x4.CreateTranslation(origin);
-                    Vector3 moved = lastOrigin.HasValue && phase >= 0.001f
+                    Vector3 moved = lastOrigin.HasValue &&
+                                    phase >= 0.001f &&
+                                    (!settings.IsLooping || phase < totalSpan - 0.05f)
                         ? origin - lastOrigin.Value
                         : Vector3.Zero;
 
-                    return new VfxRigStep(transform, origin, moved, false, phase, totalSpan)
+                    bool isStopped = settings.StopAt is { } stopAt && phase >= stopAt;
+                    return new VfxRigStep(transform, origin, moved, isStopped, phase, totalSpan)
                     {
-                        Target = new Vector3(0f, standHeight, 0f)
+                        Target = new Vector3(0f, settings.Height, 0f)
                     };
                 }
 
-                case VfxRigPreset.Burst:
-                {
-                    float totalSpan = (float)runSpan;
-                    float phase = totalSpan > 0f ? (float)(time % totalSpan) : (float)time;
-                    Vector3 origin = new(0f, standHeight, 0f);
-                    Matrix4x4 transform = Matrix4x4.CreateTranslation(origin);
-                    return new VfxRigStep(transform, origin, Vector3.Zero, false, phase, totalSpan)
-                    {
-                        Target = origin + new Vector3(TargetReach, 0f, 0f)
-                    };
-                }
-
-                case VfxRigPreset.Still:
+                case VfxRigMotionKind.Still:
                 default:
                 {
-                    float totalSpan = (float)runSpan;
-                    Vector3 origin = new(0f, standHeight, 0f);
+                    Vector3 origin = new(0f, settings.Height, 0f);
                     Matrix4x4 transform = Matrix4x4.CreateTranslation(origin);
-                    return new VfxRigStep(transform, origin, Vector3.Zero, false, (float)time, totalSpan)
+                    bool isStopped = settings.StopAt is { } stopAt && phase >= stopAt;
+                    return new VfxRigStep(transform, origin, Vector3.Zero, isStopped, phase, totalSpan)
                     {
                         Target = origin + new Vector3(TargetReach, 0f, 0f)
                     };

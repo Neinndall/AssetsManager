@@ -6,6 +6,7 @@ using System.Linq;
 using System.Numerics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -45,6 +46,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isGlStarted;
         private bool _isExitPending;
         private bool _isBulkEmitterStateChange;
+        private bool _isUpdatingRigControls;
         private VfxSystemDiagnosticItem _pendingSystem;
         private VfxSystemDiagnosticItem _inspectedSystem;
         private GlMeshRenderer _championMeshRenderer;
@@ -58,6 +60,23 @@ namespace AssetsManager.Views.Controls.Viewer
         private int _championLoadGeneration;
         private System.Threading.CancellationTokenSource _scanCancellation;
         private System.Threading.CancellationTokenSource _binCancellation;
+
+        private sealed record StandaloneRunMemory(
+            int Seed,
+            double Playhead,
+            float Speed,
+            VfxRigSettings RigSettings,
+            bool LoopEnabled,
+            double LoopBoundary,
+            int[] Muted,
+            int[] Soloed);
+
+        private readonly Dictionary<string, StandaloneRunMemory> _standaloneRunMemory =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        internal const int StandalonePlaybackSeed = 1337;
+        private static readonly double[] PlaybackSpeedDetents =
+            { 0.05d, 0.1d, 0.25d, 0.5d, 1d, 1.5d, 2d };
 
         /// <summary>Injected by the host (ViewerWindow) following the peer-controls pattern.</summary>
         public LogService LogService { get; set; }
@@ -99,6 +118,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             Loaded += OnControlLoaded;
             Unloaded += OnControlUnloaded;
+            PreviewKeyDown += RunKeys_PreviewKeyDown;
         }
 
         private VfxSkinItem _browserSkin;
@@ -173,8 +193,8 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _isActive = false;
             _pendingSystem = null;
-            _model.IsPlaying = false;
-            _vfxRenderer?.Pause();
+            // Keep the logical transport state while hidden. The render callback is already
+            // gated by _isActive, so no simulation time advances until the viewport returns.
         }
 
         private void EnsureOpenGlStarted()
@@ -342,6 +362,9 @@ namespace AssetsManager.Views.Controls.Viewer
             if (ReferenceEquals(_pendingSystem, systemItem)) return;
             if (ReferenceEquals(_model.SelectedSystem, systemItem) && HasSelectedSystemReady()) return;
 
+            if (_inspectedSystem != null && !ReferenceEquals(_inspectedSystem, systemItem))
+                RememberStandaloneRun(_inspectedSystem);
+
             _inspectedSystem = null;
             _pendingSystem = systemItem;
         }
@@ -431,8 +454,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (!_isActive || !IsVisible) return;
 
-            float dt = (float)delta.TotalSeconds;
-            if (dt <= 0 || dt > 0.5f) dt = 1f / 60f;
+            float dt = (float)Math.Max(0d, delta.TotalSeconds);
 
             // Update background clear color matching main viewer (Dark Studio)
             switch (_model.BgMode)
@@ -482,7 +504,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _vfxRenderer.ActiveSystem.Speed = _model.Speed;
                 _vfxRenderer.Update(dt);
-                _model.CurrentTime = _vfxRenderer.ActiveSystem.CurrentTime;
+                _model.CurrentTime = _vfxRenderer.PlaybackTime;
                 if (ShouldRestartPreview(_model.IsPreviewLoopEnabled, _model.CurrentTime, _model.ActiveLoopDuration))
                 {
                     _vfxRenderer.Seek(0);
@@ -614,32 +636,184 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (sender is Button btn && btn.ContextMenu != null)
             {
+                UpdateRigControlValues();
                 btn.ContextMenu.PlacementTarget = btn;
                 btn.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
                 btn.ContextMenu.IsOpen = true;
             }
         }
 
+        private void RerollSeed_Click(object sender, RoutedEventArgs e)
+        {
+            if (_inspectedSystem == null) return;
+
+            RememberStandaloneRun(_inspectedSystem);
+            string key = StandaloneRunKey(_inspectedSystem);
+            if (_standaloneRunMemory.TryGetValue(key, out StandaloneRunMemory memory))
+                _standaloneRunMemory[key] = memory with { Seed = NextPlaybackSeed(memory.Seed) };
+
+            InspectSystem(_inspectedSystem);
+        }
+
         private void SetRigPreset_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is MenuItem item && item.Tag is string tagStr && Enum.TryParse<VfxRigPreset>(tagStr, out var preset))
+            if (sender is not MenuItem item ||
+                item.Tag is not string tagStr ||
+                !Enum.TryParse(tagStr, out VfxRigPreset preset))
             {
-                _model.RigPreset = preset;
-                if (_vfxRenderer != null)
-                {
-                    _vfxRenderer.RigPreset = preset;
-                    double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
-                    _model.ActiveLoopDuration = duration;
-                    _model.TotalDuration = duration;
-                    _model.IsPreviewLoopEnabled = preset is VfxRigPreset.Burst or VfxRigPreset.Missile;
-                    _vfxRenderer.Seek(0);
-                    _vfxRenderer.Play();
-                    _model.IsPlaying = true;
-                    _model.CurrentTime = 0;
-                    if (!_model.IsAnimationMode && _model.SelectedSystem?.Definition is { } definition)
-                        FitCameraToSystem(definition, preset);
-                }
+                return;
             }
+
+            VfxRigSettings settings = VfxRigSettings.ForPreset(preset);
+            _model.RigPreset = preset;
+            if (_vfxRenderer != null)
+            {
+                _vfxRenderer.RigSettings = settings;
+                double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
+                    _model.ActiveLoopDuration = Math.Min(
+                        Math.Max(_model.ActiveLoopDuration, 0.05d),
+                        duration);
+                    _model.TotalDuration = duration;
+                    _model.CurrentTime = _vfxRenderer.PlaybackTime;
+                _vfxRenderer.Play();
+                _model.IsPlaying = true;
+                if (!_model.IsAnimationMode && _model.SelectedSystem?.Definition is { } definition)
+                    FitCameraToSystem(definition, preset);
+            }
+            UpdateRigControlValues();
+        }
+
+        private void ApplyRigTuning(VfxRigSettings settings)
+        {
+            if (_isUpdatingRigControls || _vfxRenderer == null) return;
+
+            _vfxRenderer.RigSettings = settings;
+            _model.RigPreset = settings.Preset;
+
+            double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
+            _model.TotalDuration = duration;
+            _model.ActiveLoopDuration = Math.Min(
+                Math.Max(_model.ActiveLoopDuration, 0.05d),
+                duration);
+
+            _model.CurrentTime = _vfxRenderer.PlaybackTime;
+            UpdateRigControlValues();
+            UpdateTimelineTrackMetrics();
+            UpdatePlayheadPosition();
+        }
+
+        private void UpdateRigControlValues()
+        {
+            if (_vfxRenderer == null ||
+                RigHeightSlider == null ||
+                RigDistancePanel == null ||
+                RigOrbitPanel == null)
+            {
+                return;
+            }
+
+            VfxRigSettings settings = _vfxRenderer.RigSettings;
+            try
+            {
+                _isUpdatingRigControls = true;
+                RigHeightSlider.Value = settings.Height;
+                RigHeightValueText.Text = $"{Math.Round(settings.Height)} u";
+
+                RigDistancePanel.Visibility = settings.MotionKind == VfxRigMotionKind.Path
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                RigDistanceSlider.Value = settings.FlightRange;
+                RigDistanceValueText.Text = $"{Math.Round(settings.FlightRange)} u";
+                RigSpeedSlider.Value = settings.FlightSpeed;
+                RigSpeedValueText.Text = $"{Math.Round(settings.FlightSpeed)} u/s";
+
+                RigOrbitPanel.Visibility = settings.MotionKind == VfxRigMotionKind.Orbit
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                RigRadiusSlider.Value = settings.OrbitRadius;
+                RigRadiusValueText.Text = $"{Math.Round(settings.OrbitRadius)} u";
+                RigPeriodSlider.Value = settings.OrbitPeriod;
+                RigPeriodValueText.Text = $"{settings.OrbitPeriod:F2} s";
+
+                RigLifeLoopCheckBox.IsChecked = settings.IsLooping;
+                RigStopCheckBox.IsChecked = settings.StopAt.HasValue;
+                RigStopPanel.Visibility = settings.StopAt.HasValue
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                RigStopSlider.Value = settings.StopAt ?? 2f;
+                RigStopValueText.Text = $"{(settings.StopAt ?? 2f):F2} s";
+            }
+            finally
+            {
+                _isUpdatingRigControls = false;
+            }
+        }
+
+        private void RigHeightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingRigControls || _vfxRenderer == null) return;
+            ApplyRigTuning(_vfxRenderer.RigSettings with { Height = (float)e.NewValue });
+        }
+
+        private void RigDistanceSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingRigControls || _vfxRenderer == null) return;
+            ApplyRigTuning(_vfxRenderer.RigSettings with { FlightRange = (float)e.NewValue });
+        }
+
+        private void RigSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingRigControls || _vfxRenderer == null) return;
+            ApplyRigTuning(_vfxRenderer.RigSettings with { FlightSpeed = (float)e.NewValue });
+        }
+
+        private void RigRadiusSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingRigControls || _vfxRenderer == null) return;
+            ApplyRigTuning(_vfxRenderer.RigSettings with { OrbitRadius = (float)e.NewValue });
+        }
+
+        private void RigPeriodSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingRigControls || _vfxRenderer == null) return;
+            ApplyRigTuning(_vfxRenderer.RigSettings with { OrbitPeriod = (float)e.NewValue });
+        }
+
+        private void RigLifeLoopCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingRigControls || _vfxRenderer == null ||
+                sender is not CheckBox checkBox)
+            {
+                return;
+            }
+
+            ApplyRigTuning(
+                _vfxRenderer.RigSettings with { IsLooping = checkBox.IsChecked == true });
+        }
+
+        private void RigStopCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingRigControls || _vfxRenderer == null ||
+                sender is not CheckBox checkBox)
+            {
+                return;
+            }
+
+            float? stopAt = checkBox.IsChecked == true
+                ? _vfxRenderer.RigSettings.StopAt ?? 2f
+                : null;
+            ApplyRigTuning(_vfxRenderer.RigSettings with { StopAt = stopAt });
+        }
+
+        private void RigStopSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingRigControls || _vfxRenderer == null ||
+                !_vfxRenderer.RigSettings.StopAt.HasValue)
+            {
+                return;
+            }
+
+            ApplyRigTuning(_vfxRenderer.RigSettings with { StopAt = (float)e.NewValue });
         }
 
         #endregion
@@ -919,10 +1093,54 @@ namespace AssetsManager.Views.Controls.Viewer
 
         #region System & Emitter Diagnostics
 
+        private string StandaloneRunKey(VfxSystemDiagnosticItem systemItem)
+        {
+            string document = _activeBundle?.PrimaryBinPath ?? _model.RootPath ?? string.Empty;
+            return $"{document}|{systemItem?.PathHash ?? 0:X8}";
+        }
+
+        private void RememberStandaloneRun(VfxSystemDiagnosticItem systemItem)
+        {
+            if (systemItem == null) return;
+
+            _standaloneRunMemory[StandaloneRunKey(systemItem)] = new StandaloneRunMemory(
+                Seed: _model.PlaybackSeed,
+                Playhead: _model.CurrentTime,
+                Speed: _model.Speed,
+                RigSettings: _vfxRenderer?.RigSettings ?? VfxRigSettings.ForPreset(_model.RigPreset),
+                LoopEnabled: _model.IsPreviewLoopEnabled,
+                LoopBoundary: _model.ActiveLoopDuration,
+                Muted: _model.Emitters.Where(emitter => emitter.IsMuted).Select(emitter => emitter.SourceOrder).ToArray(),
+                Soloed: _model.Emitters.Where(emitter => emitter.IsSolo).Select(emitter => emitter.SourceOrder).ToArray());
+        }
+
+        private StandaloneRunMemory RecallStandaloneRun(VfxSystemDiagnosticItem systemItem)
+            => systemItem != null &&
+               _standaloneRunMemory.TryGetValue(StandaloneRunKey(systemItem), out StandaloneRunMemory memory)
+                ? memory
+                : null;
+
+        internal static double RememberedPlayhead(double playhead, double span)
+        {
+            double safe = double.IsFinite(playhead) ? Math.Max(0d, playhead) : 0d;
+            return span > 0d && double.IsFinite(span) ? Math.Min(safe, span) : safe;
+        }
+
+        internal static int NextPlaybackSeed(int seed) => unchecked(seed + 1);
+
         private void InspectSystem(VfxSystemDiagnosticItem systemItem)
         {
             var def = systemItem.Definition;
             if (def == null) return;
+
+            StandaloneRunMemory remembered = RecallStandaloneRun(systemItem);
+            int playbackSeed = remembered?.Seed ?? StandalonePlaybackSeed;
+            float playbackSpeed = remembered?.Speed ?? 1f;
+            VfxRigSettings rigSettings =
+                remembered?.RigSettings ?? VfxRigSettings.ForPreset(VfxRigPreset.Still);
+            VfxRigPreset rigPreset = rigSettings.Preset;
+            HashSet<int> muted = remembered?.Muted?.ToHashSet() ?? new HashSet<int>();
+            HashSet<int> soloed = remembered?.Soloed?.ToHashSet() ?? new HashSet<int>();
 
             _model.Emitters.Clear();
             _model.Textures.Clear();
@@ -935,8 +1153,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 searchDir = Path.GetDirectoryName(searchDir) ?? searchDir;
             }
 
-            int playbackSeed = HashCode.Combine(def.PathHash, systemItem.Name);
-
             // 1. Prepare playback in OpenGL Viewport
             var systemModel = new VfxSystemModel
             {
@@ -948,22 +1164,32 @@ namespace AssetsManager.Views.Controls.Viewer
                 OwnerSceneContext = _activeBundle?.OwnerSceneContext,
                 PlaybackSeed = playbackSeed,
                 TotalDuration = VfxDurationCalculator.SystemSpan(def),
-                Speed = _model.Speed
+                Speed = playbackSpeed
             };
 
             _model.CurrentTime = 0;
+            _model.PlaybackSeed = playbackSeed;
             string playbackContext = "standalone system";
             _vfxRenderer?.SetVfxSystem(systemModel);
-            if (_vfxRenderer != null) _model.RigPreset = _vfxRenderer.RigPreset;
+            if (_vfxRenderer != null)
+            {
+                _vfxRenderer.RigSettings = rigSettings;
+                _model.RigPreset = rigPreset;
+            }
+            else
+            {
+                _model.RigPreset = rigPreset;
+            }
+            SetPlaybackSpeed(playbackSpeed);
             FitCameraToSystem(def, _model.RigPreset);
 
             double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(_model.RigPreset, def);
             double timelineMax = ResolveTimelineDuration(rigDuration);
-            _model.ActiveLoopDuration = timelineMax;
             _model.TotalDuration = timelineMax;
-            // System selection must not overwrite the user's transport loop preference.
-            _vfxRenderer?.Play();
-            _model.IsPlaying = true;
+            _model.ActiveLoopDuration = remembered == null
+                ? timelineMax
+                : Math.Clamp(remembered.LoopBoundary, Math.Min(0.05d, timelineMax), timelineMax);
+            _model.IsPreviewLoopEnabled = remembered?.LoopEnabled ?? false;
 
             // 2. Audit Emitters
             for (int emitterIndex = 0; emitterIndex < def.Emitters.Count; emitterIndex++)
@@ -990,8 +1216,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     Name = string.IsNullOrWhiteSpace(emitter.Name) ? "Emitter" : emitter.Name,
                     SourceOrder = emitterIndex,
                     IsEnabled = true,
-                    IsSolo = false,
-                    IsMuted = false,
+                    IsSolo = soloed.Contains(emitterIndex),
+                    IsMuted = muted.Contains(emitterIndex),
                     PrimitiveKindName = primKind,
                     EmitterDef = emitter,
                     ImagePreview = tex,
@@ -1054,6 +1280,18 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             UpdateEmittersVisibility();
+
+            double restoredTime = remembered == null
+                ? 0d
+                : RememberedPlayhead(remembered.Playhead, timelineMax);
+            _vfxRenderer?.Seek(restoredTime);
+            if (_vfxRenderer?.ActiveSystem != null)
+                _model.CurrentTime = _vfxRenderer.PlaybackTime;
+            else
+                _model.CurrentTime = restoredTime;
+            _vfxRenderer?.Play();
+            _model.IsPlaying = true;
+
             TryLoadChampionModelAsync(searchDir);
 
             UpdateTimelineTrackMetrics();
@@ -1579,20 +1817,87 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         private void StepBack_Click(object sender, RoutedEventArgs e)
+            => StepPlayback(-1);
+
+        private void StepForward_Click(object sender, RoutedEventArgs e)
+            => StepPlayback(1);
+
+        private void StepPlayback(int frames)
         {
-            if (_model == null) return;
-            _model.CurrentTime = 0;
-            _vfxRenderer?.Seek(0);
+            if (_model == null || frames == 0) return;
+
+            _vfxRenderer?.Pause();
+            _model.IsPlaying = false;
+
+            double newTime = PlaybackStepTarget(
+                _model.CurrentTime,
+                frames,
+                _model.TotalDuration);
+            _model.CurrentTime = newTime;
+            _vfxRenderer?.Seek(newTime);
             UpdatePlayheadPosition();
         }
 
-        private void StepForward_Click(object sender, RoutedEventArgs e)
+        internal static double PlaybackStepTarget(double currentTime, int frames, double span)
+        {
+            const double frame = 1d / 60d;
+            double target = Math.Max(0d, currentTime + frames * frame);
+            return span > 0d && double.IsFinite(span)
+                ? Math.Min(target, span)
+                : target;
+        }
+
+        private void RunKeys_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (ShouldIgnoreRunHotkey(Keyboard.FocusedElement as DependencyObject)) return;
+
+            ModifierKeys modifiers = Keyboard.Modifiers;
+            if ((modifiers & (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Windows)) != 0) return;
+            bool shift = (modifiers & ModifierKeys.Shift) != 0;
+
+            bool handled = true;
+            switch (e.Key)
+            {
+                case Key.Space:
+                    PlayPauseToggle_Click(this, new RoutedEventArgs());
+                    break;
+                case Key.Left:
+                    StepPlayback(shift ? -6 : -1);
+                    break;
+                case Key.Right:
+                    StepPlayback(shift ? 6 : 1);
+                    break;
+                case Key.Home:
+                    RestartPlayback();
+                    break;
+                case Key.F:
+                    ResetCamera();
+                    break;
+                case Key.OemOpenBrackets:
+                    SetPlaybackSpeed(PlaybackSpeedDetent(_model.Speed, -1));
+                    break;
+                case Key.OemCloseBrackets:
+                    SetPlaybackSpeed(PlaybackSpeedDetent(_model.Speed, 1));
+                    break;
+                default:
+                    handled = false;
+                    break;
+            }
+
+            if (handled) e.Handled = true;
+        }
+
+        private static bool ShouldIgnoreRunHotkey(DependencyObject focused)
+            => focused is TextBoxBase or PasswordBox or ComboBox or Slider or ButtonBase or
+               Selector or TreeView or MenuItem;
+
+        private void RestartPlayback()
         {
             if (_model == null) return;
-            double step = 1.0 / 30.0;
-            double newTime = Math.Min(_model.TotalDuration, _model.CurrentTime + step);
-            _model.CurrentTime = newTime;
-            _vfxRenderer?.Seek(newTime);
+            bool wasPlaying = _model.IsPlaying;
+            _vfxRenderer?.Seek(0d);
+            _model.CurrentTime = 0d;
+            if (wasPlaying) _vfxRenderer?.Play();
             UpdatePlayheadPosition();
         }
 
@@ -1878,7 +2183,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     {
                         RequestSystemInspection(_model.SelectedSystem);
                     }
-                    else if (_vfxRenderer.ActiveSystem.CurrentTime >= _model.TotalDuration)
+                    else if (_vfxRenderer.PlaybackTime >= _model.TotalDuration)
                     {
                         _vfxRenderer.Stop();
                         _vfxRenderer.Play();
@@ -1920,12 +2225,50 @@ namespace AssetsManager.Views.Controls.Viewer
             if (SpeedComboBox?.SelectedItem is ComboBoxItem item &&
                 float.TryParse(item.Tag?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out float speed))
             {
-                _model.Speed = speed;
-                if (_vfxRenderer?.ActiveSystem != null)
+                SetPlaybackSpeed(speed, updateControl: false);
+            }
+        }
+
+        private void SetPlaybackSpeed(double speed, bool updateControl = true)
+        {
+            float normalized = VfxRenderSession.NormalizePlaybackSpeed(speed);
+            _model.Speed = normalized;
+            if (_vfxRenderer?.ActiveSystem != null)
+                _vfxRenderer.ActiveSystem.Speed = normalized;
+
+            if (!updateControl || SpeedComboBox == null) return;
+            for (int index = 0; index < SpeedComboBox.Items.Count; index++)
+            {
+                if (SpeedComboBox.Items[index] is not ComboBoxItem item ||
+                    !double.TryParse(
+                        item.Tag?.ToString(),
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out double candidate))
                 {
-                    _vfxRenderer.ActiveSystem.Speed = speed;
+                    continue;
+                }
+
+                if (Math.Abs(candidate - normalized) <= 1e-6)
+                {
+                    SpeedComboBox.SelectedIndex = index;
+                    break;
                 }
             }
+        }
+
+        internal static double PlaybackSpeedDetent(double speed, int direction)
+        {
+            if (direction >= 0)
+            {
+                foreach (double detent in PlaybackSpeedDetents)
+                    if (detent > speed + 1e-6) return detent;
+                return PlaybackSpeedDetents[^1];
+            }
+
+            for (int index = PlaybackSpeedDetents.Length - 1; index >= 0; index--)
+                if (PlaybackSpeedDetents[index] < speed - 1e-6) return PlaybackSpeedDetents[index];
+            return PlaybackSpeedDetents[0];
         }
 
         private void BgMode_SelectionChanged(object sender, SelectionChangedEventArgs e)

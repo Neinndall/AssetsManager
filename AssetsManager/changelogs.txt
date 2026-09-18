@@ -608,3 +608,4 @@ Bug Fixes
   - VFX Studio / Aligned shader premultiplication, texture filtering and distortion fallbacks with LTK.
   - VFX Studio / Aligned mesh and texture resource failures and VFX mesh tinting with LTK.
   - VFX Studio / Aligned rig clocks, animation pose looping, bone anchors, hierarchy and world-space transforms with LTK.
+  - VFX Studio / Improved playback transport, rig tuning, deterministic seeds and per-system run state.

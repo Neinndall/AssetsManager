@@ -590,6 +590,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             _rng = new VfxLtkRandom(_initialRandomState);
             _particleSerial = 0;
+            ResetRunState();
+        }
+
+        internal void ReplayLoop()
+        {
+            // A rig loop starts another pass on the same random stream. Preserve both
+            // RNG state and the particle serial so child lineage remains deterministic.
+            ResetRunState();
+        }
+
+        private void ResetRunState()
+        {
             _isKilled = false;
             IsStopped = false;
             CurrentTime = 0f;
