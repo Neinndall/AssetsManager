@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -498,6 +499,7 @@ namespace AssetsManager.Views.Models.Viewer
         private string _searchQuery;
         private VfxSystemDiagnosticItem _selectedSystem;
         private AnimationClipCatalogItem _selectedAnimation;
+        private float? _animationParameter;
         private bool _isAnimationMode = true;
         private bool _isPlaying;
         private bool _isReplayState;
@@ -559,6 +561,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         public ObservableCollection<VfxSkinItem> DetectedSkins { get; } = new();
         public ObservableCollection<AnimationClipCatalogItem> DetectedAnimations { get; } = new();
+        public ObservableCollection<float> AnimationParameterValues { get; } = new();
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxTextureDiagnosticItem> Textures { get; } = new();
@@ -581,6 +584,30 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _selectedAnimation;
             set { _selectedAnimation = value; OnPropertyChanged(); }
+        }
+
+        public float? AnimationParameter
+        {
+            get => _animationParameter;
+            set
+            {
+                if (_animationParameter == value) return;
+                _animationParameter = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool HasAnimationParameters => AnimationParameterValues.Count > 1;
+
+        public void SetAnimationParameterOptions(
+            IReadOnlyList<float> values,
+            float? selected)
+        {
+            AnimationParameterValues.Clear();
+            foreach (float value in values ?? Array.Empty<float>())
+                AnimationParameterValues.Add(value);
+            OnPropertyChanged(nameof(HasAnimationParameters));
+            AnimationParameter = selected;
         }
 
         public bool HasAnySolo

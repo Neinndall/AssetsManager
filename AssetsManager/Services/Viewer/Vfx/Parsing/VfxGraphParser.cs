@@ -328,6 +328,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint ConformToPathEventClass = 0x82377a1d;
         private static readonly uint F_eventDataMap = HashAlgorithms.Fnv1a("mEventDataMap");
         private static readonly uint F_clipDataMap = HashAlgorithms.Fnv1a("mClipDataMap");
+        private static readonly uint F_trackDataMap = HashAlgorithms.Fnv1a("mTrackDataMap");
+        private static readonly uint F_maskDataMap = HashAlgorithms.Fnv1a("mMaskDataMap");
+        private static readonly uint F_syncGroupDataMap = HashAlgorithms.Fnv1a("mSyncGroupDataMap");
         private static readonly uint F_clipTickDuration = HashAlgorithms.Fnv1a("mTickDuration");
         private static readonly uint F_clipStartFrame = HashAlgorithms.Fnv1a("startFrame");
         private static readonly uint F_clipEndFrame = HashAlgorithms.Fnv1a("EndFrame");
@@ -371,7 +374,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_animationResourceData = 0xb49f754e;
         private static readonly uint F_animationFilePath = 0x0329f1d7;
         private static readonly uint F_clipName = HashAlgorithms.Fnv1a("mClipName");
-        private static readonly uint F_trackDataName = HashAlgorithms.Fnv1a("mTrackDataName");
+        private static readonly uint F_trackDataName = 0xd39243c4;
+        private static readonly uint F_clipMaskDataName = 0x0359739b;
+        private static readonly uint F_syncGroupDataName = 0xa09d0561;
+        private static readonly uint F_interruptionGroups = 0x89d34040;
+        private static readonly uint F_clipFlags = 0x8d80922b;
+        private static readonly uint F_trackPriority = 0x0f717330;
+        private static readonly uint F_trackBlendMode = 0x9ae6020c;
+        private static readonly uint F_trackBlendWeight = 0xf4018e7f;
+        private static readonly uint F_maskId = 0xc38f3be5;
+        private static readonly uint F_maskWeights = 0xa3c80380;
+        private static readonly uint F_syncGroupType = 0x87edaeb0;
         private static BinTree ParseTree(byte[] data)
         {
             ArgumentNullException.ThrowIfNull(data);
@@ -380,7 +393,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         }
 
 
-        internal static VfxBinDocument ParseDocument(byte[] data)
+        internal static VfxBinDocument ParseDocument(
+            byte[] data,
+            Func<uint, string> graphHashNameResolver = null)
         {
             BinTree tree = ParseTree(data);
             IReadOnlyDictionary<uint, uint> resourceMap = ExtractResourceMap(tree);
@@ -388,14 +403,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 .ToDictionary(
                     static pair => pair.Key,
                     pair => pair.Value with { ResourceMap = resourceMap });
+            IReadOnlyList<AnimationGraphDefinition> animationGraphs =
+                ExtractAnimationGraphs(tree, graphHashNameResolver);
             return new VfxBinDocument(
                 systems,
                 resourceMap,
                 ExtractSkinResourceMap(tree),
                 tree.Dependencies.ToArray(),
-                ExtractEventSequences(tree),
+                ExtractEventSequences(tree, animationGraphs),
                 ExtractOwnerSceneContext(tree),
-                ExtractIdleEffects(tree));
+                ExtractIdleEffects(tree),
+                animationGraphs);
         }
 
         private static IReadOnlyList<VfxIdleEffectDefinition> ExtractIdleEffects(BinTree tree)
@@ -456,46 +474,259 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return null;
         }
 
-        private static IReadOnlyList<AnimationClipDefinition> ExtractEventSequences(BinTree tree)
+        private static IReadOnlyList<AnimationGraphDefinition> ExtractAnimationGraphs(
+            BinTree tree,
+            Func<uint, string> graphHashNameResolver)
         {
-            var sequences = new List<AnimationClipDefinition>();
+            var graphs = new List<AnimationGraphDefinition>();
             foreach (BinTreeObject owner in tree.Objects.Values)
             {
-                AddEventSequence(sequences, owner.PathHash, owner.ClassHash, owner.Properties);
-                if (Get(owner.Properties, F_clipDataMap) is not BinTreeMap clipMap) continue;
+                if (Get(owner.Properties, F_clipDataMap) is not BinTreeMap clipMap)
+                    continue;
+
+                IReadOnlyList<AnimationTrackDefinition> tracks =
+                    ReadAnimationTracks(owner.Properties, graphHashNameResolver);
+                IReadOnlyList<AnimationMaskDefinition> masks =
+                    ReadAnimationMasks(owner.Properties, graphHashNameResolver);
+                IReadOnlyList<AnimationSyncGroupDefinition> syncGroups =
+                    ReadAnimationSyncGroups(owner.Properties, graphHashNameResolver);
+
+                var clipNames = new Dictionary<uint, string>();
+                foreach (var pair in clipMap)
+                {
+                    (uint hash, string name) = ReadGraphMapKey(pair.Key, graphHashNameResolver);
+                    if (hash != 0u) clipNames.TryAdd(hash, name);
+                }
+
+                IReadOnlyDictionary<uint, string> trackNames = tracks
+                    .GroupBy(item => item.Hash)
+                    .ToDictionary(group => group.Key, group => group.First().Name);
+                IReadOnlyDictionary<uint, string> maskNames = masks
+                    .GroupBy(item => item.Hash)
+                    .ToDictionary(group => group.Key, group => group.First().Name);
+                IReadOnlyDictionary<uint, string> syncGroupNames = syncGroups
+                    .GroupBy(item => item.Hash)
+                    .ToDictionary(group => group.Key, group => group.First().Name);
+
+                var clips = new List<AnimationClipDefinition>();
                 foreach (var clipPair in clipMap)
                 {
                     if (clipPair.Value is not BinTreeStruct clip) continue;
 
-                    uint clipHash = AsU32(clipPair.Key) ?? 0u;
-                    // LTK identifies a clip by the mClipDataMap key. If the hash table cannot
-                    // spell that key, the clip stays a hex hash; the .anm filename is not its identity.
-                    string clipName = clipPair.Key switch
-                    {
-                        BinTreeString s when !string.IsNullOrWhiteSpace(s.Value) => s.Value,
-                        _ when clipHash != 0u => $"0x{clipHash:x8}",
-                        _ => string.Empty
-                    };
+                    (uint clipHash, string clipName) =
+                        ReadGraphMapKey(clipPair.Key, graphHashNameResolver);
+                    if (clipHash == 0u) continue;
 
-                    string animFilePath = null;
-                    if (Get(clip.Properties, F_animationResourceData) is BinTreeStruct animResource)
+                    string animationFilePath = null;
+                    if (Get(clip.Properties, F_animationResourceData) is BinTreeStruct animationResource)
                     {
-                        animFilePath = ReadAsset(animResource.Properties, F_animationFilePath, ".anm");
+                        animationFilePath = ReadAsset(
+                            animationResource.Properties,
+                            F_animationFilePath,
+                            ".anm");
                     }
 
-                    AddEventSequence(
-                        sequences,
+                    IReadOnlyList<uint> childHashes = ReadClipChildren(clip.Properties);
+                    IReadOnlyList<float?> parametricValues = ReadClipParameterValues(clip.Properties);
+                    AnimationClipDefinition definition = CreateAnimationClipDefinition(
                         clipHash,
                         clip.ClassHash,
                         clip.Properties,
                         clipName,
-                        animFilePath,
+                        animationFilePath,
                         owner.PathHash,
-                        ReadClipChildren(clip.Properties),
-                        ReadClipParameters(clip.Properties),
+                        childHashes,
+                        parametricValues.Select(value => value ?? 0f).ToArray(),
+                        CreateGraphKeyReference(
+                            Get(clip.Properties, F_trackDataName),
+                            trackNames,
+                            graphHashNameResolver),
+                        CreateGraphKeyReference(
+                            Get(clip.Properties, F_clipMaskDataName),
+                            maskNames,
+                            graphHashNameResolver),
+                        CreateGraphKeyReference(
+                            Get(clip.Properties, F_syncGroupDataName),
+                            syncGroupNames,
+                            graphHashNameResolver),
+                        childHashes
+                            .Select(hash => CreateGraphKeyReference(
+                                hash,
+                                clipNames,
+                                graphHashNameResolver))
+                            .ToArray(),
+                        ReadNamedHashList(
+                            Get(clip.Properties, F_interruptionGroups),
+                            graphHashNameResolver),
+                        ReadUnsigned(Get(clip.Properties, F_clipFlags)),
+                        parametricValues,
                         includeEmpty: true);
+                    if (definition != null) clips.Add(definition);
                 }
+
+                graphs.Add(new AnimationGraphDefinition(
+                    owner.PathHash,
+                    clips,
+                    tracks,
+                    masks,
+                    syncGroups));
             }
+            return graphs;
+        }
+
+        private static IReadOnlyList<AnimationTrackDefinition> ReadAnimationTracks(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            Func<uint, string> graphHashNameResolver)
+        {
+            if (Get(properties, F_trackDataMap) is not BinTreeMap map)
+                return Array.Empty<AnimationTrackDefinition>();
+
+            var result = new List<AnimationTrackDefinition>();
+            foreach (var pair in map)
+            {
+                if (pair.Value is not BinTreeStruct track) continue;
+                (uint hash, string name) = ReadGraphMapKey(pair.Key, graphHashNameResolver);
+                if (hash == 0u) continue;
+                result.Add(new AnimationTrackDefinition(
+                    hash,
+                    name,
+                    (byte)(GetU8(track.Properties, F_trackPriority) ?? 0),
+                    (byte)(GetU8(track.Properties, F_trackBlendMode) ?? 0),
+                    GetF32(track.Properties, F_trackBlendWeight) ?? 0f));
+            }
+            return result;
+        }
+
+        private static IReadOnlyList<AnimationMaskDefinition> ReadAnimationMasks(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            Func<uint, string> graphHashNameResolver)
+        {
+            if (Get(properties, F_maskDataMap) is not BinTreeMap map)
+                return Array.Empty<AnimationMaskDefinition>();
+
+            var result = new List<AnimationMaskDefinition>();
+            foreach (var pair in map)
+            {
+                if (pair.Value is not BinTreeStruct mask) continue;
+                (uint hash, string name) = ReadGraphMapKey(pair.Key, graphHashNameResolver);
+                if (hash == 0u) continue;
+
+                float[] weights = Get(mask.Properties, F_maskWeights) is BinTreeContainer weightList
+                    ? weightList.Elements.Select(item => AsF32(item) ?? 0f).ToArray()
+                    : Array.Empty<float>();
+                result.Add(new AnimationMaskDefinition(
+                    hash,
+                    name,
+                    ReadUnsigned(Get(mask.Properties, F_maskId)),
+                    weights));
+            }
+            return result;
+        }
+
+        private static IReadOnlyList<AnimationSyncGroupDefinition> ReadAnimationSyncGroups(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            Func<uint, string> graphHashNameResolver)
+        {
+            if (Get(properties, F_syncGroupDataMap) is not BinTreeMap map)
+                return Array.Empty<AnimationSyncGroupDefinition>();
+
+            var result = new List<AnimationSyncGroupDefinition>();
+            foreach (var pair in map)
+            {
+                if (pair.Value is not BinTreeStruct syncGroup) continue;
+                (uint hash, string name) = ReadGraphMapKey(pair.Key, graphHashNameResolver);
+                if (hash == 0u) continue;
+                result.Add(new AnimationSyncGroupDefinition(
+                    hash,
+                    name,
+                    ReadUnsigned(Get(syncGroup.Properties, F_syncGroupType))));
+            }
+            return result;
+        }
+
+        private static (uint Hash, string Name) ReadGraphMapKey(
+            BinTreeProperty key,
+            Func<uint, string> graphHashNameResolver)
+        {
+            uint hash = AsU32(key) ?? 0u;
+            if (key is BinTreeString text && !string.IsNullOrWhiteSpace(text.Value))
+                return (hash, text.Value);
+            return (hash, ResolveGraphHashName(hash, graphHashNameResolver));
+        }
+
+        private static AnimationGraphKeyReference CreateGraphKeyReference(
+            BinTreeProperty property,
+            IReadOnlyDictionary<uint, string> declaredNames,
+            Func<uint, string> graphHashNameResolver)
+        {
+            uint hash = AsU32(property) ?? 0u;
+            return hash == 0u
+                ? null
+                : CreateGraphKeyReference(hash, declaredNames, graphHashNameResolver);
+        }
+
+        private static AnimationGraphKeyReference CreateGraphKeyReference(
+            uint hash,
+            IReadOnlyDictionary<uint, string> declaredNames,
+            Func<uint, string> graphHashNameResolver)
+        {
+            string declaredName = null;
+            bool declared = declaredNames != null && declaredNames.TryGetValue(hash, out declaredName);
+            return new AnimationGraphKeyReference(
+                hash,
+                declared ? declaredName : ResolveGraphHashName(hash, graphHashNameResolver),
+                declared);
+        }
+
+        private static IReadOnlyList<string> ReadNamedHashList(
+            BinTreeProperty property,
+            Func<uint, string> graphHashNameResolver)
+        {
+            if (property is not BinTreeContainer container)
+                return Array.Empty<string>();
+
+            var result = new List<string>(container.Elements.Count);
+            foreach (BinTreeProperty item in container.Elements)
+            {
+                uint hash = AsU32(item) ?? 0u;
+                if (hash == 0u) continue;
+                result.Add(item is BinTreeString text && !string.IsNullOrWhiteSpace(text.Value)
+                    ? text.Value
+                    : ResolveGraphHashName(hash, graphHashNameResolver));
+            }
+            return result;
+        }
+
+        private static string ResolveGraphHashName(
+            uint hash,
+            Func<uint, string> graphHashNameResolver)
+        {
+            if (hash == 0u) return string.Empty;
+            string resolved = graphHashNameResolver?.Invoke(hash);
+            return string.IsNullOrWhiteSpace(resolved)
+                ? $"0x{hash:x8}"
+                : resolved;
+        }
+
+        private static uint ReadUnsigned(BinTreeProperty property)
+        {
+            long? value = AsInteger(property);
+            return value is >= uint.MinValue and <= uint.MaxValue
+                ? (uint)value.Value
+                : 0u;
+        }
+
+        private static IReadOnlyList<AnimationClipDefinition> ExtractEventSequences(
+            BinTree tree,
+            IReadOnlyList<AnimationGraphDefinition> animationGraphs)
+        {
+            var sequences = new List<AnimationClipDefinition>();
+            foreach (BinTreeObject owner in tree.Objects.Values)
+                AddEventSequence(sequences, owner.PathHash, owner.ClassHash, owner.Properties);
+
+            foreach (AnimationGraphDefinition graph in animationGraphs ?? Array.Empty<AnimationGraphDefinition>())
+                sequences.AddRange(graph.Clips);
+
             return sequences;
         }
 
@@ -511,6 +742,37 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             IReadOnlyList<float> childParameters = null,
             bool includeEmpty = false)
         {
+            AnimationClipDefinition clip = CreateAnimationClipDefinition(
+                ownerPathHash,
+                ownerClassHash,
+                properties,
+                clipName,
+                animationFilePath,
+                graphPathHash,
+                childClipHashes,
+                childParameters,
+                includeEmpty: includeEmpty);
+            if (clip != null) sequences.Add(clip);
+        }
+
+        private static AnimationClipDefinition CreateAnimationClipDefinition(
+            uint ownerPathHash,
+            uint ownerClassHash,
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            string clipName = null,
+            string animationFilePath = null,
+            uint graphPathHash = 0,
+            IReadOnlyList<uint> childClipHashes = null,
+            IReadOnlyList<float> childParameters = null,
+            AnimationGraphKeyReference track = null,
+            AnimationGraphKeyReference mask = null,
+            AnimationGraphKeyReference syncGroup = null,
+            IReadOnlyList<AnimationGraphKeyReference> childReferences = null,
+            IReadOnlyList<string> interruptionGroups = null,
+            uint flags = 0,
+            IReadOnlyList<float?> parametricValues = null,
+            bool includeEmpty = false)
+        {
             var events = new List<AnimationClipEventDefinition>();
             if (Get(properties, F_eventDataMap) is BinTreeMap eventMap)
             {
@@ -520,8 +782,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     events.Add(ParseClipEvent(AsU32(pair.Key) ?? 0u, eventData));
                 }
             }
-            if (events.Count == 0 && !includeEmpty) return;
-            sequences.Add(new AnimationClipDefinition(
+            if (events.Count == 0 && !includeEmpty) return null;
+
+            return new AnimationClipDefinition(
                 ownerPathHash,
                 ownerClassHash,
                 GetF32(properties, F_clipTickDuration) is { } tick && float.IsFinite(tick) && tick > 0 ? tick : 0,
@@ -532,7 +795,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 animationFilePath,
                 graphPathHash,
                 childClipHashes,
-                childParameters));
+                childParameters,
+                track,
+                mask,
+                syncGroup,
+                childReferences,
+                interruptionGroups,
+                flags,
+                parametricValues);
         }
 
         private static IReadOnlyList<uint> ReadClipChildren(IReadOnlyDictionary<uint, BinTreeProperty> properties)
@@ -561,14 +831,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return children;
         }
 
-        private static IReadOnlyList<float> ReadClipParameters(IReadOnlyDictionary<uint, BinTreeProperty> properties)
+        private static IReadOnlyList<float?> ReadClipParameterValues(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties)
         {
             if (Get(properties, F_parametricPairs) is not BinTreeContainer pairs)
-                return Array.Empty<float>();
+                return Array.Empty<float?>();
 
-            var values = new List<float>(pairs.Elements.Count);
+            var values = new List<float?>(pairs.Elements.Count);
             foreach (BinTreeStruct pair in pairs.Elements.OfType<BinTreeStruct>())
-                values.Add(GetF32(pair.Properties, F_parametricPairValue) ?? 0f);
+                values.Add(GetF32(pair.Properties, F_parametricPairValue));
             return values;
         }
 

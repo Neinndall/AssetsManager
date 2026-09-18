@@ -1302,6 +1302,218 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ParsesAnimationGraphMetadataAndResolvesHashKeysLikeTheReference()
+        {
+            var track = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("TrackData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeU8(Fnv1a.HashLower("mPriority"), 7),
+                    new BinTreeU8(Fnv1a.HashLower("mBlendMode"), 2),
+                    new BinTreeF32(Fnv1a.HashLower("mBlendWeight"), 0.75f)
+                });
+            var trackMap = new BinTreeMap(
+                Fnv1a.HashLower("mTrackDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, 300),
+                        track)
+                });
+
+            var mask = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("MaskData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeU32(Fnv1a.HashLower("mId"), 12),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("mWeightList"),
+                        BinPropertyType.F32,
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeF32(0, 1f),
+                            new BinTreeF32(0, 0.5f),
+                            new BinTreeF32(0, 0f)
+                        })
+                });
+            var maskMap = new BinTreeMap(
+                Fnv1a.HashLower("mMaskDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, 400),
+                        mask)
+                });
+
+            var syncGroup = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("SyncGroupData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeU32(Fnv1a.HashLower("mType"), 3)
+                });
+            var syncGroupMap = new BinTreeMap(
+                Fnv1a.HashLower("mSyncGroupDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, 500),
+                        syncGroup)
+                });
+
+            var pair = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("ParametricPairData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeHash(Fnv1a.HashLower("mClipName"), 200),
+                    new BinTreeF32(Fnv1a.HashLower("mValue"), 0.75f)
+                });
+            var parentClip = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("ParametricClipData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeHash(Fnv1a.HashLower("mTrackDataName"), 300),
+                    new BinTreeHash(Fnv1a.HashLower("mMaskDataName"), 400),
+                    new BinTreeHash(Fnv1a.HashLower("mSyncGroupDataName"), 500),
+                    new BinTreeU32(Fnv1a.HashLower("mFlags"), 0x1234),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("mAnimationInterruptionGroupNames"),
+                        BinPropertyType.Hash,
+                        new BinTreeProperty[] { new BinTreeHash(0, 600) }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("mParametricPairDataList"),
+                        BinPropertyType.Embedded,
+                        new BinTreeProperty[] { pair })
+                });
+            var childClip = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("AtomicClipData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeHash(Fnv1a.HashLower("mMaskDataName"), 777)
+                });
+            var clipMap = new BinTreeMap(
+                Fnv1a.HashLower("mClipDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, 100),
+                        parentClip),
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, 200),
+                        childClip)
+                });
+
+            var graph = new BinTreeObject(
+                "Animations/TestGraph",
+                "AnimationGraphData",
+                new BinTreeProperty[]
+                {
+                    clipMap,
+                    trackMap,
+                    maskMap,
+                    syncGroupMap
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { graph }, System.Array.Empty<string>()).Write(stream);
+
+            string ResolveName(uint hash) => hash switch
+            {
+                100 => "Idle",
+                200 => "Idle_A",
+                300 => "BaseTrack",
+                400 => "UpperBody",
+                500 => "DefaultSync",
+                600 => "Movement",
+                _ => null
+            };
+
+            VfxBinDocument document = VfxGraphParser.ParseDocument(stream.ToArray(), ResolveName);
+
+            AnimationGraphDefinition parsedGraph = Assert.Single(document.AnimationGraphs);
+            Assert.Equal(Fnv1a.HashLower("Animations/TestGraph"), parsedGraph.PathHash);
+            AnimationTrackDefinition parsedTrack = Assert.Single(parsedGraph.Tracks);
+            Assert.Equal("BaseTrack", parsedTrack.Name);
+            Assert.Equal((byte)7, parsedTrack.Priority);
+            Assert.Equal((byte)2, parsedTrack.BlendMode);
+            Assert.Equal(0.75f, parsedTrack.BlendWeight);
+
+            AnimationMaskDefinition parsedMask = Assert.Single(parsedGraph.Masks);
+            Assert.Equal("UpperBody", parsedMask.Name);
+            Assert.Equal(12u, parsedMask.Id);
+            Assert.Equal(new[] { 1f, 0.5f, 0f }, parsedMask.Weights);
+
+            AnimationSyncGroupDefinition parsedSync = Assert.Single(parsedGraph.SyncGroups);
+            Assert.Equal("DefaultSync", parsedSync.Name);
+            Assert.Equal(3u, parsedSync.Kind);
+
+            Assert.Equal(new[] { "Idle", "Idle_A" }, parsedGraph.Clips.Select(item => item.ClipName));
+            AnimationClipDefinition parsedParent = parsedGraph.Clips[0];
+            Assert.Equal("BaseTrack", parsedParent.Track.Name);
+            Assert.True(parsedParent.Track.Declared);
+            Assert.Equal("UpperBody", parsedParent.Mask.Name);
+            Assert.True(parsedParent.Mask.Declared);
+            Assert.Equal("DefaultSync", parsedParent.SyncGroup.Name);
+            Assert.True(parsedParent.SyncGroup.Declared);
+            Assert.Equal(0x1234u, parsedParent.Flags);
+            Assert.Equal(new[] { "Movement" }, parsedParent.InterruptionGroups);
+            Assert.Equal(new uint[] { 200 }, parsedParent.ChildClipHashes);
+            Assert.Equal(new[] { 0.75f }, parsedParent.ChildParameters);
+            AnimationGraphKeyReference child = Assert.Single(parsedParent.ChildReferences);
+            Assert.Equal("Idle_A", child.Name);
+            Assert.True(child.Declared);
+
+            AnimationClipDefinition parsedChild = parsedGraph.Clips[1];
+            Assert.Equal(777u, parsedChild.Mask.Hash);
+            Assert.Equal("0x00000309", parsedChild.Mask.Name);
+            Assert.False(parsedChild.Mask.Declared);
+
+            Assert.Equal(new[] { "Idle", "Idle_A" }, document.EventSequences.Select(item => item.ClipName));
+        }
+
+        [Fact]
+        public void AnimationGraphHashKeysFallBackToHexWithoutAResolvedName()
+        {
+            var clip = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("AtomicClipData"),
+                System.Array.Empty<BinTreeProperty>());
+            var clipMap = new BinTreeMap(
+                Fnv1a.HashLower("mClipDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, 0x12345678),
+                        clip)
+                });
+            var graph = new BinTreeObject(
+                "Animations/HexGraph",
+                "AnimationGraphData",
+                new BinTreeProperty[] { clipMap });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { graph }, System.Array.Empty<string>()).Write(stream);
+
+            AnimationClipDefinition parsed = Assert.Single(
+                VfxGraphParser.ParseDocument(stream.ToArray()).AnimationGraphs.Single().Clips);
+
+            Assert.Equal("0x12345678", parsed.ClipName);
+        }
+
+        [Fact]
         public void ParsesHashBasedAssetReferencesIntoExtensionPaths()
         {
             var meshStruct = new BinTreeStruct(

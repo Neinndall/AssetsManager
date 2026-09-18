@@ -33,7 +33,8 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<string> Dependencies,
         IReadOnlyList<AnimationClipDefinition> EventSequences,
         VfxOwnerSceneContext OwnerSceneContext,
-        IReadOnlyList<VfxIdleEffectDefinition> IdleEffects = null);
+        IReadOnlyList<VfxIdleEffectDefinition> IdleEffects = null,
+        IReadOnlyList<AnimationGraphDefinition> AnimationGraphs = null);
 
     /// <summary>
     /// Domain graph for a League VFX system and its emitter nodes.

@@ -47,6 +47,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isExitPending;
         private bool _isBulkEmitterStateChange;
         private bool _isUpdatingRigControls;
+        private bool _isUpdatingAnimationParameter;
         private VfxSystemDiagnosticItem _pendingSystem;
         private VfxSystemDiagnosticItem _inspectedSystem;
         private GlMeshRenderer _championMeshRenderer;
@@ -57,6 +58,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly Dictionary<ModelPart, bool> _animationBasePartVisibility = new();
         private readonly HashSet<uint> _animationBaseHiddenSubmeshes = new();
         private VfxLoadingService.Bundle _championBundle;
+        private string _animationSearchDirectory;
         private int _championLoadGeneration;
         private System.Threading.CancellationTokenSource _scanCancellation;
         private System.Threading.CancellationTokenSource _binCancellation;
@@ -137,8 +139,16 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (_model.SelectedAnimation != null)
                 {
+                    ConfigureAnimationParameterOptions(_model.SelectedAnimation);
                     PlaySelectedAnimation(_model.SelectedAnimation);
                 }
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.AnimationParameter) &&
+                     !_isUpdatingAnimationParameter &&
+                     _model.SelectedAnimation != null &&
+                     _model.AnimationParameter.HasValue)
+            {
+                RebuildAnimationsForParameter(_model.AnimationParameter.Value);
             }
         }
 
@@ -1376,12 +1386,22 @@ namespace AssetsManager.Views.Controls.Viewer
             ClearAnimationClipCues();
             _model.SelectedAnimation = null;
             _model.DetectedAnimations.Clear();
+            _animationSearchDirectory = searchDir;
+            _isUpdatingAnimationParameter = true;
+            try
+            {
+                _model.SetAnimationParameterOptions(Array.Empty<float>(), null);
+            }
+            finally
+            {
+                _isUpdatingAnimationParameter = false;
+            }
+
             if (_championModel != null) _championModel.CurrentAnimation = null;
             _clipCatalog?.Dispose();
             _clipCatalog = new VfxClipCatalog();
             if (_activeBundle == null || VfxLoadingService == null) return;
-            foreach (var item in _clipCatalog.Build(_activeBundle,
-                path => VfxLoadingService.ResolveAssetPath(path, searchDir, ".anm"), LogService))
+            foreach (AnimationClipCatalogItem item in BuildAnimationCatalog(null))
                 _model.DetectedAnimations.Add(item);
             _model.LogMessages.Add($"[ANIMATIONS] Loaded {_model.DetectedAnimations.Count} authored clips.");
             if (_model.IsAnimationMode)
@@ -1392,6 +1412,57 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.SelectedAnimation = _model.DetectedAnimations.FirstOrDefault(item =>
                     item.Name?.StartsWith("idle", StringComparison.OrdinalIgnoreCase) == true);
             }
+        }
+
+        private IReadOnlyList<AnimationClipCatalogItem> BuildAnimationCatalog(float? parameter)
+        {
+            if (_clipCatalog == null || _activeBundle == null || VfxLoadingService == null)
+                return Array.Empty<AnimationClipCatalogItem>();
+
+            return _clipCatalog.Build(
+                _activeBundle,
+                path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
+                LogService,
+                parameter);
+        }
+
+        private void ConfigureAnimationParameterOptions(AnimationClipCatalogItem item)
+        {
+            _isUpdatingAnimationParameter = true;
+            try
+            {
+                IReadOnlyList<float> values = item?.ParameterValues ?? Array.Empty<float>();
+                _model.SetAnimationParameterOptions(
+                    values,
+                    values.Count > 1 ? item?.ParameterValue : _model.AnimationParameter);
+            }
+            finally
+            {
+                _isUpdatingAnimationParameter = false;
+            }
+        }
+
+        private void RebuildAnimationsForParameter(float parameter)
+        {
+            AnimationClipCatalogItem selected = _model.SelectedAnimation;
+            if (selected?.Clip == null) return;
+
+            uint selectedGraph = selected.Clip.GraphPathHash;
+            uint selectedClip = selected.Clip.OwnerPathHash;
+            IReadOnlyList<AnimationClipCatalogItem> rebuilt = BuildAnimationCatalog(parameter);
+            if (rebuilt.Count == 0) return;
+
+            foreach (AnimationClipCatalogItem oldItem in _model.DetectedAnimations)
+                oldItem.AnimationAsset?.Dispose();
+            _model.DetectedAnimations.Clear();
+            foreach (AnimationClipCatalogItem item in rebuilt)
+                _model.DetectedAnimations.Add(item);
+
+            AnimationClipCatalogItem replacement = rebuilt.FirstOrDefault(item =>
+                item.Clip?.GraphPathHash == selectedGraph &&
+                item.Clip?.OwnerPathHash == selectedClip);
+            if (replacement != null)
+                _model.SelectedAnimation = replacement;
         }
 
         private string ResolveSklPath(string authoredPath, string sknPath, string searchDir)

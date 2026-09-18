@@ -43,7 +43,7 @@
             </StackPanel>
         </DataTemplate>
         <DataTemplate DataType="{x:Type models:AnimationClipCatalogItem}">
-            <StackPanel Orientation="Horizontal" Margin="2,4" ToolTip="{Binding VfxSummary}">
+            <StackPanel Orientation="Horizontal" Margin="2,4" ToolTip="{Binding TooltipSummary}">
                 <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,7,0"/>
                 <TextBlock Text="{Binding Name}" FontSize="11" MaxWidth="225" TextTrimming="CharacterEllipsis"/>
                 <TextBlock Text="{Binding Duration, StringFormat='{}{0:F2}s'}" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="8,1,0,0"/>
@@ -503,6 +503,17 @@
 
                                 <!-- Separator -->
                                 <Border Width="1" Height="18" Background="{StaticResource BorderColor}" Margin="0,0,10,0" VerticalAlignment="Center" Opacity="0.6"/>
+
+                                <!-- Parametric AnimationGraph clips choose one authored mValue at a time. -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0"
+                                            Visibility="{Binding HasAnimationParameters, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Text="PARAM:" Foreground="{StaticResource TextMuted}" FontSize="10.5"
+                                               FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                    <ComboBox Style="{StaticResource ModernComboBox}" Width="72" Height="26"
+                                              ItemsSource="{Binding AnimationParameterValues}"
+                                              SelectedItem="{Binding AnimationParameter, Mode=TwoWay}"
+                                              ItemStringFormat="{}{0:0.###}"/>
+                                </StackPanel>
 
                                 <!-- Speed Control -->
                                 <materialIcons:MaterialIcon Kind="Speedometer" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>

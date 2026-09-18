@@ -8,6 +8,7 @@ using System.Windows.Media.Imaging;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
@@ -26,8 +27,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         private static readonly string[] SkinnedMeshExtensions = { ".skn" };
         private static readonly string[] SimpleMeshExtensions = { ".scb", ".tmesh", ".gmesh" };
         private readonly VfxResourceResolver _resources = new();
+        private readonly HashResolverService _hashResolverService;
         private readonly SemaphoreSlim _catalogGate = new(1, 1);
         private int _disposeState;
+
+        public VfxLoadingService(HashResolverService hashResolverService = null)
+        {
+            _hashResolverService = hashResolverService;
+        }
 
         public sealed class Bundle
         {
@@ -37,6 +44,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             public Dictionary<uint, string> SystemSources { get; } = new();
             public Dictionary<uint, AnimationClipDefinition> EventSequences { get; } = new();
             public List<AnimationClipDefinition> Clips { get; } = new();
+            public List<AnimationGraphDefinition> AnimationGraphs { get; } = new();
             public List<VfxIdleEffectDefinition> IdleEffects { get; } = new();
             public VfxOwnerSceneContext OwnerSceneContext { get; set; }
             public List<string> LoadedBins { get; } = new();
@@ -92,6 +100,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
 
                 var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var clipKeys = new HashSet<(uint Graph, uint Clip)>();
+                var graphKeys = new HashSet<uint>();
                 var queue = new Queue<string>();
 
                 void Enqueue(string p)
@@ -120,7 +129,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     {
                         if (!File.Exists(currentBinPath)) continue;
                         byte[] fileBytes = File.ReadAllBytes(currentBinPath);
-                        VfxBinDocument document = VfxGraphParser.ParseDocument(fileBytes);
+                        VfxBinDocument document = VfxGraphParser.ParseDocument(
+                            fileBytes,
+                            ResolveGraphHashName);
                         bundle.LoadedBins.Add(Path.GetFullPath(currentBinPath));
 
                         foreach (var kv in document.Systems)
@@ -145,6 +156,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                             bundle.EventSequences.TryAdd(sequence.OwnerPathHash, sequence);
                             if (clipKeys.Add((sequence.GraphPathHash, sequence.OwnerPathHash)))
                                 bundle.Clips.Add(sequence);
+                        }
+                        foreach (AnimationGraphDefinition graph in
+                                 document.AnimationGraphs ?? Array.Empty<AnimationGraphDefinition>())
+                        {
+                            if (graphKeys.Add(graph.PathHash))
+                                bundle.AnimationGraphs.Add(graph);
                         }
                         if (document.IdleEffects != null &&
                             string.Equals(Path.GetFullPath(currentBinPath), Path.GetFullPath(skinBinPath), StringComparison.OrdinalIgnoreCase))
@@ -417,6 +434,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             string authoredPath,
             string searchDirectory)
             => _resources.ResolveMesh(authoredPath, searchDirectory);
+
+        private string ResolveGraphHashName(uint hash)
+        {
+            if (_hashResolverService == null || hash == 0u) return null;
+
+            // AnimationGraph Hash values use the BIN value-name table. Do not fall through
+            // to entry/field/type catalogs because an equal hash there names a different domain.
+            string resolved = _hashResolverService.ResolveBinHash(hash);
+            return string.IsNullOrWhiteSpace(resolved) ||
+                   resolved.Equals(hash.ToString("x8"), StringComparison.OrdinalIgnoreCase)
+                ? null
+                : resolved;
+        }
 
         public void Dispose()
         {

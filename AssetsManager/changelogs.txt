@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Completed AnimationGraph skin tooling with resolved clip names, track/mask/sync metadata, composite playlists, and authored parametric clip selection.
   - VFX Studio / Added full Animation Clip playback from each skin's authored AnimationGraphData, preserving mClipDataMap clip identity/order and spawning ParticleEventData VFX systems with authored timing, skeleton attachments, visibility, joint snap, and idle effects.
   - VFX Studio / Added an Exit action that releases the active VFX project and returns to the main Viewer while keeping the studio reusable.
   - Viewer / Browse VFX systems and animations in a skin and BIN tree with on-demand loading.

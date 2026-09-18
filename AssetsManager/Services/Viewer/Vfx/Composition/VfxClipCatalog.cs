@@ -24,7 +24,8 @@ internal sealed class VfxClipCatalog : IDisposable
     internal IReadOnlyList<AnimationClipCatalogItem> Build(
         VfxLoadingService.Bundle bundle,
         Func<string, string> resolve,
-        LogService log)
+        LogService log,
+        float? parameter = null)
     {
         var items = new List<AnimationClipCatalogItem>();
         IReadOnlyList<AnimationClipDefinition> graphClips = SelectGraphClips(
@@ -36,7 +37,16 @@ internal sealed class VfxClipCatalog : IDisposable
         // not additional clip tables to merge into the picker.
         foreach (AnimationClipDefinition clip in graphClips)
         {
-            IReadOnlyList<AnimationClipDefinition> playlist = ResolvePlaylist(clip, graphClips);
+            IReadOnlyList<float> parameterValues = ParameterValues(clip);
+            float? effectiveParameter = parameterValues.Count > 1
+                ? NearestParameter(
+                    parameterValues,
+                    parameter ??
+                    clip.ParametricValues?.FirstOrDefault() ??
+                    parameterValues[0])
+                : null;
+            IReadOnlyList<AnimationClipDefinition> playlist =
+                ResolvePlaylist(clip, graphClips, effectiveParameter);
             if (playlist.Count == 0) continue;
 
             var steps = new List<IAnimationAsset>();
@@ -177,7 +187,9 @@ internal sealed class VfxClipCatalog : IDisposable
                 timedCues.OrderBy(cue => cue.AtSeconds).ToArray(),
                 eventCount,
                 resolvedVfx > 0 || bundle.IdleEffects.Count > 0,
-                $"{resolvedVfx} VFX · {eventCount} events"));
+                $"{resolvedVfx} VFX · {eventCount} events",
+                parameterValues,
+                effectiveParameter));
         }
 
         // LTK preserves mClipDataMap order in the preview picker. Filtering playable clips
@@ -197,6 +209,40 @@ internal sealed class VfxClipCatalog : IDisposable
         => !string.IsNullOrWhiteSpace(clip?.ClipName)
             ? clip.ClipName
             : $"0x{clip?.OwnerPathHash ?? 0u:x8}";
+
+    internal static IReadOnlyList<float> ParameterValues(AnimationClipDefinition clip)
+    {
+        if (clip?.OwnerClassHash != ParametricClipClass)
+            return Array.Empty<float>();
+
+        IEnumerable<float?> authored = clip.ParametricValues ??
+            (clip.ChildParameters ?? Array.Empty<float>()).Select(value => (float?)value);
+        float[] values = authored
+            .Where(value => value.HasValue && float.IsFinite(value.Value))
+            .Select(value => value.Value)
+            .Distinct()
+            .OrderBy(value => value)
+            .ToArray();
+        return values.Length > 1 ? values : Array.Empty<float>();
+    }
+
+    internal static float NearestParameter(IReadOnlyList<float> values, float value)
+    {
+        if (values == null || values.Count == 0) return value;
+
+        float best = values[0];
+        float bestDistance = MathF.Abs(best - value);
+        for (int index = 1; index < values.Count; index++)
+        {
+            float distance = MathF.Abs(values[index] - value);
+            if (distance < bestDistance)
+            {
+                best = values[index];
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
 
     internal static IReadOnlyList<AnimationClipDefinition> ResolvePlaylist(
         AnimationClipDefinition clip,
@@ -227,10 +273,14 @@ internal sealed class VfxClipCatalog : IDisposable
                     children.Count > 0 &&
                     parameter.HasValue)
                 {
-                    IReadOnlyList<float> values = current.ChildParameters ?? Array.Empty<float>();
+                    IReadOnlyList<float?> values = current.ParametricValues ??
+                        (current.ChildParameters ?? Array.Empty<float>())
+                            .Select(value => (float?)value)
+                            .ToArray();
                     float selected = parameter.Value;
                     order = order
-                        .OrderBy(index => MathF.Abs((index < values.Count ? values[index] : 0f) - selected))
+                        .OrderBy(index => MathF.Abs(
+                            ((index < values.Count ? values[index] : null) ?? 0f) - selected))
                         .ThenBy(index => index);
                 }
 
