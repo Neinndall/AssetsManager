@@ -611,3 +611,4 @@ Bug Fixes
   - VFX Studio / Improved playback transport, rig tuning, deterministic seeds and per-system run state.
   - Viewer / Fixed opaque SKN color-map alpha creating transparent holes in champion models.
   - VFX Studio / Fixed loading crashes for particle lifetimes using single-value probability tables.
+  - Viewer / Fixed authored SKN face culling so champion materials render their outward-facing geometry.

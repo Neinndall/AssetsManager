@@ -783,11 +783,14 @@ namespace AssetsManager.Services.Viewer.Rendering
             else
             {
                 _gl.Enable(EnableCap.CullFace);
-                // LTK mirrors X before Three.js, which reverses winding. AssetsManager keeps
-                // SKN coordinates unchanged, so Riot's default CCW cull maps to OpenGL Front.
-                _gl.CullFace(state.Inverted ? TriangleFace.Back : TriangleFace.Front);
+                // Front-facing authored geometry stays visible by default. An inverted pass
+                // deliberately flips that contract and keeps the back-facing side instead.
+                _gl.CullFace(MaterialCullFace(state));
             }
         }
+
+        internal static TriangleFace MaterialCullFace(ModelMaterialRenderState state)
+            => state.Inverted ? TriangleFace.Front : TriangleFace.Back;
 
         private void ApplyUnboundPartRenderState(ModelPart part)
         {

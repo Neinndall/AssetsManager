@@ -1,11 +1,24 @@
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Rendering.Core;
+using AssetsManager.Views.Models.Viewer;
+using Silk.NET.OpenGL;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
 {
     public sealed class GlMeshShaderSourceTests
     {
+        [Fact]
+        public void AuthoredMaterialCullingKeepsTheExpectedFace()
+        {
+            Assert.Equal(
+                TriangleFace.Back,
+                GlMeshRenderer.MaterialCullFace(ModelMaterialRenderState.Default));
+            Assert.Equal(
+                TriangleFace.Front,
+                GlMeshRenderer.MaterialCullFace(ModelMaterialRenderState.Default with { Inverted = true }));
+        }
+
         [Fact]
         public void Fragment_UsesSrgbCharacterMaterialPath()
         {
