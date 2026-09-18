@@ -254,6 +254,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform int uMaterialUnlit;
                     uniform int uMaterialPremultipliedAlpha;
                     uniform int uMaterialSrgb;
+                    uniform int uMaterialUsesTextureAlpha;
                     uniform int uUsesBakedDiffuse;
                     uniform vec3 uLightDir;
                     uniform vec3 uLightColor;
@@ -338,11 +339,14 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             }
 
                             vec4 texColor = readBaseTexture(materialUv);
-                            if (texColor.a * vColor.a * uColorTint.a < uAlphaCutoff) discard;
+                            float coverageAlpha = uMaterialUsesTextureAlpha != 0 ? texColor.a : 1.0;
+                            coverageAlpha *= vColor.a * uColorTint.a;
+                            if (uAlphaCutoff > 0.0 && coverageAlpha < uAlphaCutoff) discard;
                             vec3 tintRgb = uMaterialSrgb != 0
                                 ? srgbToLinear(uColorTint.rgb)
                                 : uColorTint.rgb;
-                            texColor *= vec4(vColor.rgb * tintRgb, vColor.a * uColorTint.a);
+                            texColor.rgb *= vColor.rgb * tintRgb;
+                            texColor.a = coverageAlpha;
                             float diff1 = max(dot(vNormal, uLightDir), 0.0);
                             float diff2 = max(dot(vNormal, uLightDir2), 0.0);
                             vec3 finalLight = clamp(uAmbient + diff1 * uLightColor + diff2 * uLightColor2, 0.0, 1.0);
@@ -538,10 +542,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                                     clamp(uIridescenceAlphaMinMax.x, 0.0, 1.0),
                                     clamp(uIridescenceAlphaMinMax.y, 0.0, 1.0),
                                     angular);
-                                texColor.a *= mix(1.0, fresnelAlpha, fadeMask);
+                                if (uMaterialUsesTextureAlpha != 0)
+                                    texColor.a *= mix(1.0, fresnelAlpha, fadeMask);
                             }
 
-                            if (texColor.a < uAlphaCutoff || texColor.a <= 0.0001) discard;
+                            if (uAlphaCutoff > 0.0 && texColor.a < uAlphaCutoff) discard;
                             if (uMaterialPremultipliedAlpha != 0)
                                 finalColor *= texColor.a;
                             if (uMaterialSrgb != 0)

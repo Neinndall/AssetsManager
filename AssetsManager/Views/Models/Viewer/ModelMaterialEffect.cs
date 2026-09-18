@@ -191,9 +191,9 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        public bool RequiresAlphaBlend =>
-            MaterialTint.W < 0.999f ||
-            Iridescence?.RequiresAlphaBlend == true;
+        // Only whole-material opacity may promote an authored opaque submesh to
+        // the transparent pass. Localized iridescence alpha stays effect-local.
+        public bool RequiresAlphaBlend => MaterialTint.W < 0.999f;
 
         public IEnumerable<string> EnumerateTextureNames()
         {

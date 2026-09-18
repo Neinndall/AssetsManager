@@ -1441,6 +1441,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void DurationHandlesSingleValueProbabilityTablesWithoutKeys()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ParticleLifetime = new VfxCurveF(
+                    2f,
+                    null,
+                    null,
+                    new[] { new VfxProbTable(null, null, 0.5f, true) })
+            };
+
+            Assert.Equal(1d, VfxDurationCalculator.GetMaximumParticleLifetime(emitter), precision: 5);
+
+            emitter = emitter with
+            {
+                ParticleLifetime = new VfxCurveF(
+                    2f,
+                    null,
+                    null,
+                    new[] { new VfxProbTable(null, new[] { 0.5f, 2f }, 1f, true) })
+            };
+            Assert.Equal(4d, VfxDurationCalculator.GetMaximumParticleLifetime(emitter), precision: 5);
+
+            emitter = emitter with { ParticleLifetime = VfxCurveF.Const(2f) };
+            Assert.Equal(2d, VfxDurationCalculator.GetMaximumParticleLifetime(emitter), precision: 5);
+        }
+
+        [Fact]
         public void SystemSpanUsesAuthoredEmissionAndParticleWindows()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with

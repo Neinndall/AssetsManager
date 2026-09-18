@@ -24,6 +24,12 @@ namespace AssetsManager.Views.Models.Viewer
             BindingKind != ModelMaterialBindingKind.Missing &&
             RenderState.Blending != ModelMaterialBlendMode.Additive;
 
+        // Character color maps frequently store masks/data in alpha. Match the material
+        // preview contract: texture alpha is coverage only for authored blending or alpha test.
+        public bool UsesTextureAlpha =>
+            RenderState.Blending != ModelMaterialBlendMode.Opaque ||
+            AlphaCutoff > 0f;
+
         public static ModelMaterialDefinition Default { get; } = TextureOnly(null);
 
         public static ModelMaterialDefinition TextureOnly(

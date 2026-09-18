@@ -929,10 +929,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             float[] authoredValues = emitter.ParticleLifetime.Values is { Length: > 0 } values
                 ? values.Append(emitter.ParticleLifetime.Constant).ToArray()
                 : new[] { emitter.ParticleLifetime.Constant };
-            float[] probabilityValues = emitter.ParticleLifetime.Prob is { Length: > 0 } probabilityTables &&
-                                        !probabilityTables[0].IsEmpty
-                ? probabilityTables[0].Values
-                : new[] { 1f };
+            float[] probabilityValues = ProbabilityValues(emitter.ParticleLifetime.Prob);
             double[] possibleLifetimes = authoredValues
                 .SelectMany(value => probabilityValues.Select(probability => (double)value * probability))
                 .ToArray();
@@ -942,6 +939,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
             double maximum = possibleLifetimes.Max();
             return Math.Max(0.05, maximum);
+        }
+
+        private static float[] ProbabilityValues(VfxProbTable[] tables)
+        {
+            if (tables is not { Length: > 0 } || tables[0].IsEmpty)
+                return new[] { 1f };
+
+            VfxProbTable table = tables[0];
+            return table.Values is { Length: > 0 }
+                ? table.Values
+                : new[] { table.Single };
         }
 
         public static double SystemSpan(VfxSystemDefinition system)

@@ -137,6 +137,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uMaterialUnlit;
         private int _uMaterialPremultipliedAlpha;
         private int _uMaterialSrgb;
+        private int _uMaterialUsesTextureAlpha;
         private int _uUsesBakedDiffuse;
         private int _uHasVertexColor;
         private bool _ready;
@@ -394,6 +395,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uMaterialUnlit = gl.GetUniformLocation(_program, "uMaterialUnlit");
             _uMaterialPremultipliedAlpha = gl.GetUniformLocation(_program, "uMaterialPremultipliedAlpha");
             _uMaterialSrgb = gl.GetUniformLocation(_program, "uMaterialSrgb");
+            _uMaterialUsesTextureAlpha = gl.GetUniformLocation(_program, "uMaterialUsesTextureAlpha");
             _uUsesBakedDiffuse = gl.GetUniformLocation(_program, "uUsesBakedDiffuse");
             _uHasVertexColor = gl.GetUniformLocation(_program, "uHasVertexColor");
         }
@@ -482,6 +484,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                     material?.RenderState.PremultipliedAlpha == true ? 1 : 0);
                 // Character textures and authored tint follow LTK's sRGB working/output semantics.
                 _gl.Uniform1(_uMaterialSrgb, material != null ? 1 : 0);
+                bool usesTextureAlpha = material?.UsesTextureAlpha ?? part.AlphaCutoff > 0f;
+                _gl.Uniform1(_uMaterialUsesTextureAlpha, usesTextureAlpha ? 1 : 0);
                 _gl.Uniform1(_uUsesBakedDiffuse, part.UsesBakedDiffuse ? 1 : 0);
                 _gl.Uniform1(_uHasVertexColor, resources.ColorVbo != 0 ? 1 : 0);
                 UploadMaterialEffects(effect, resources);
@@ -735,10 +739,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
 
             ModelMaterialRenderState state = material.RenderState;
-            ModelMaterialEffectDefinition effect = material.Effect ?? ModelMaterialEffectDefinition.None;
             bool runtimeForcesBlend =
                 state.Blending == ModelMaterialBlendMode.Opaque &&
-                (effect.RequiresAlphaBlend || part.ColorTint.W < 0.999f);
+                (material.Color.W < 0.999f || part.ColorTint.W < 0.999f);
             ModelMaterialBlendMode blending = runtimeForcesBlend
                 ? ModelMaterialBlendMode.Normal
                 : state.Blending;
@@ -769,7 +772,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             else
                 _gl.Disable(EnableCap.DepthTest);
 
-            // Runtime opacity and specialized alpha layers use the transparent pass without overriding authored depth state otherwise.
+            // Runtime opacity may make an authored opaque material transparent. Shader-specific
+            // masks do not promote the whole submesh; authored render state remains authoritative.
             _gl.DepthMask(runtimeForcesBlend ? false : state.DepthWrite);
 
             if (state.DoubleSided)

@@ -17,6 +17,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
+        public void Fragment_OnlyUsesCharacterTextureAlphaWhenMaterialReadsCoverage()
+        {
+            Assert.Contains("uniform int uMaterialUsesTextureAlpha;", GlMeshShaderSource.Fragment);
+            Assert.Contains(
+                "float coverageAlpha = uMaterialUsesTextureAlpha != 0 ? texColor.a : 1.0;",
+                GlMeshShaderSource.Fragment);
+            Assert.Contains("if (uMaterialUsesTextureAlpha != 0)", GlMeshShaderSource.Fragment);
+            Assert.Contains("texColor.a *= mix(1.0, fresnelAlpha, fadeMask);", GlMeshShaderSource.Fragment);
+            Assert.DoesNotContain("texColor.a <= 0.0001", GlMeshShaderSource.Fragment);
+        }
+
+        [Fact]
         public void Fragment_ReusesDecodedBaseTextureForFlowSampling()
         {
             Assert.Contains("vec3 flowColor = readBaseTexture(flowUv).rgb", GlMeshShaderSource.Fragment);

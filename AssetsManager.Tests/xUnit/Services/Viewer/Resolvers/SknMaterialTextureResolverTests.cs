@@ -575,6 +575,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal(ModelMaterialEffectKind.None, material.Effect.Kind);
             Assert.Equal(new Vector4(0.65f, 0.8f, 0.9f, 1f), material.Color);
             Assert.Equal(Vector4.One, material.Effect.MaterialTint);
+            Assert.Equal(ModelMaterialBlendMode.Opaque, material.RenderState.Blending);
+            Assert.False(material.UsesTextureAlpha);
+            Assert.False(new ModelPart { MaterialDefinition = material }.IsAlphaBlended);
         }
 
         [Fact]
@@ -715,7 +718,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal(new Vector2(0f, 1f), effect.Iridescence.FresnelAlphaMinMax);
             Assert.True(effect.Iridescence.UsesPulse);
             Assert.True(effect.Iridescence.UsesLocalizedAlpha);
-            Assert.True(effect.RequiresAlphaBlend);
+            Assert.True(effect.Iridescence.RequiresAlphaBlend);
+            Assert.False(effect.RequiresAlphaBlend);
+            ModelMaterialDefinition body = resolution.ResolveMaterialDefinition("body");
+            Assert.Equal(ModelMaterialBlendMode.Opaque, body.RenderState.Blending);
+            Assert.False(body.UsesTextureAlpha);
+            Assert.False(new ModelPart { MaterialDefinition = body }.IsAlphaBlended);
         }
 
         [Fact]
@@ -2291,6 +2299,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal(0.31f, material.Color.X, 2);
             Assert.Equal(1f, effect.Fresnel.Color.X, 2);
             Assert.Equal(ModelMaterialBlendMode.Opaque, material.RenderState.Blending);
+            Assert.False(material.UsesTextureAlpha);
             Assert.True(effect.RequiresAlphaBlend);
             Assert.True(new ModelPart { MaterialDefinition = material }.IsAlphaBlended);
         }
