@@ -697,7 +697,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 ActivateAnimation(_activeSceneModel, animationModel.AnimationData);
             }
 
-            Panel?.SetAnimationPlayingState(animationModel, true);
+            Panel?.SetAnimationPlayingState(animationModel, true, true);
         }
 
         private static AnimationData FindMatchingAnimation(SceneModel model, AnimationData source)
@@ -728,7 +728,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     ActivateAnimation(_activeSceneModel, animationModel.AnimationData);
                     _activeSceneModel.IsAnimationPaused = true;
                 }
-                Panel?.SetAnimationPlayingState(animationModel, false);
+                Panel?.SetAnimationPlayingState(animationModel, false, true);
             }
 
             SeekAnimation(time);
@@ -762,7 +762,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _activeSceneModel.IsAnimationPaused = newPausedState;
             }
 
-            Panel?.SetAnimationPlayingState(_activeAnimationModel, !newPausedState);
+            Panel?.SetAnimationPlayingState(_activeAnimationModel, !newPausedState, true);
         }
 
         public void SeekAnimation(TimeSpan time)
@@ -792,7 +792,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public void StopAnimation()
         {
             if (_activeAnimationModel != null)
-                Panel?.SetAnimationPlayingState(_activeAnimationModel, false);
+                Panel?.SetAnimationPlayingState(_activeAnimationModel, false, false);
 
             if (Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true)
             {

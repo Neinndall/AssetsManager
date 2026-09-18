@@ -519,30 +519,19 @@ namespace AssetsManager.Views.Controls.Viewer
             if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
 
             if (_currentlyPlayingAnimation != null && _currentlyPlayingAnimation != animationModel)
-                _currentlyPlayingAnimation.IsPlaying = false;
+                SetAnimationPlayingState(_currentlyPlayingAnimation, false, false);
 
             _currentlyPlayingAnimation = animationModel;
             if (Viewport?.IsAnimationActive(animationModel) == true)
             {
-                // Resume/pause the existing clock. Do not rebuild the clip and lose seek state.
+                // Keep a single transport button: PLAY starts the clip, STOP pauses it,
+                // and RESUME continues from the current playhead without resetting time.
                 Viewport.TogglePauseResume(animationModel);
             }
             else
             {
-                // A stopped or different clip starts a fresh pass at zero.
                 Viewport?.SetAnimation(animationModel);
             }
-        }
-
-        private void StopButton_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
-            if (Viewport?.IsAnimationActive(animationModel) == true)
-                Viewport.StopAnimation();
-            animationModel.IsPlaying = false;
-            animationModel.CurrentTime = 0d;
-            if (ReferenceEquals(_currentlyPlayingAnimation, animationModel))
-                _currentlyPlayingAnimation = null;
         }
 
         private void CloseAnimationPlayer_Click(object sender, RoutedEventArgs e)
@@ -551,7 +540,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (Viewport?.IsAnimationActive(animationModel) == true)
                 Viewport.StopAnimation();
-            animationModel.IsPlaying = false;
+            SetAnimationPlayingState(animationModel, false, false);
             animationModel.CurrentTime = 0d;
             if (ReferenceEquals(_currentlyPlayingAnimation, animationModel))
                 _currentlyPlayingAnimation = null;
@@ -837,12 +826,11 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        public void SetAnimationPlayingState(AnimationModel animationModel, bool isPlaying)
+        public void SetAnimationPlayingState(AnimationModel animationModel, bool isPlaying, bool isPlaybackActive)
         {
-            if (animationModel != null)
-            {
-                animationModel.IsPlaying = isPlaying;
-            }
+            if (animationModel == null) return;
+            animationModel.IsPlaybackActive = isPlaybackActive;
+            animationModel.IsPlaying = isPlaying;
         }
 
         public void UpdateAnimationProgress(double currentTime)

@@ -945,102 +945,201 @@
             <!-- ============================================ -->
             <!-- ANIMATION PLAYER (sticky above Bottom Dock)  -->
             <!-- ============================================ -->
-            <Border Grid.Row="2" x:Name="AnimationControlsPanel" 
-                    Background="{StaticResource CardBackground}" 
-                    BorderBrush="{StaticResource BorderColor}" 
-                    BorderThickness="0,1,0,1" 
-                    Padding="14,12" 
+            <Border Grid.Row="2" x:Name="AnimationControlsPanel"
+                    Background="{StaticResource CardBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1"
+                    Padding="12"
                     Margin="14,8,14,10"
                     CornerRadius="12"
-                    DataContext="{Binding SelectedItem, ElementName=AnimationsListBox}" 
+                    DataContext="{Binding SelectedItem, ElementName=AnimationsListBox}"
                     Visibility="{Binding SelectedItem, ElementName=AnimationsListBox, Converter={StaticResource NullToVisibilityConverter}}">
                 <StackPanel>
-                    <!-- Animation name header -->
-                    <DockPanel LastChildFill="True" Margin="0,0,0,10">
-                        <Button DockPanel.Dock="Right" 
-                                Click="CloseAnimationPlayer_Click" 
-                                Style="{StaticResource SmallCloseButtonStyle}" 
-                                Width="24" Height="24"
-                                ToolTip="Close player"/>
-                        <materialIcons:MaterialIcon DockPanel.Dock="Left" Kind="AnimationPlayOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                    </DockPanel>
-
-                    <!-- Timeline & Time Labels -->
+                    <!-- Compact identity header -->
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Slider x:Name="AnimationSlider" Grid.Column="0" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Height="14" Style="{StaticResource HUDSliderStyle}"/>
-                        <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="10" FontWeight="Bold">
-                            <Run Text="{Binding CurrentTime, Mode=OneWay, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
-                            <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
-                            <Run Text="{Binding TotalDuration, Mode=OneWay, StringFormat={}{0:F1}s}" Foreground="{StaticResource TextMuted}"/>
-                        </TextBlock>
+
+                        <Border Grid.Column="0"
+                                Width="30"
+                                Height="30"
+                                Margin="0,0,9,0"
+                                Background="{StaticResource SidebarBackground}"
+                                BorderBrush="{StaticResource BorderColor}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <materialIcons:MaterialIcon Kind="AnimationPlayOutline"
+                                                        Width="15"
+                                                        Height="15"
+                                                        Foreground="{StaticResource AccentGreen}"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="ANIMATION PLAYER"
+                                       FontSize="8.5"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="{Binding Name}"
+                                       Margin="0,1,0,0"
+                                       FontSize="11.5"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource TextPrimary}"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+
+                        <Button Grid.Column="2"
+                                Click="CloseAnimationPlayer_Click"
+                                Style="{StaticResource SmallCloseButtonStyle}"
+                                Width="24"
+                                Height="24"
+                                VerticalAlignment="Center"
+                                ToolTip="Close player"/>
                     </Grid>
 
-                    <!-- Transport row: Play/Pause | Stop | Speed slider+value -->
+                    <!-- Timeline surface -->
+                    <Border Margin="0,0,0,10"
+                            Padding="10,8"
+                            Background="{StaticResource SidebarBackground}"
+                            BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,5">
+                                <TextBlock Text="TIMELINE"
+                                           FontSize="8.5"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource TextMuted}"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           FontSize="9.5"
+                                           FontWeight="SemiBold">
+                                    <Run Text="{Binding CurrentTime, Mode=OneWay, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
+                                    <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
+                                    <Run Text="{Binding TotalDuration, Mode=OneWay, StringFormat={}{0:F1}s}" Foreground="{StaticResource TextSecondary}"/>
+                                </TextBlock>
+                            </Grid>
+
+                            <Slider x:Name="AnimationSlider"
+                                    Maximum="{Binding TotalDuration}"
+                                    Value="{Binding CurrentTime, Mode=TwoWay}"
+                                    Thumb.DragStarted="AnimationSlider_DragStarted"
+                                    Thumb.DragCompleted="AnimationSlider_DragCompleted"
+                                    ValueChanged="AnimationSlider_ValueChanged"
+                                    Height="14"
+                                    Style="{StaticResource HUDSliderStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Transport & speed -->
                     <Grid VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Button Grid.Column="0" Click="PlayPauseButton_Click"
-                                Width="32" Height="32" Margin="0,0,6,0"
-                                Background="{StaticResource AccentBrush}" BorderThickness="0" Cursor="Hand"
-                                ToolTip="Play / Pause" VerticalAlignment="Center">
+                        <Button Grid.Column="0"
+                                Click="PlayPauseButton_Click"
+                                Width="34"
+                                Height="34"
+                                Margin="0,0,8,0"
+                                Background="{StaticResource AccentBrush}"
+                                BorderThickness="0"
+                                Cursor="Hand"
+                                ToolTip="{Binding TransportTooltip}"
+                                VerticalAlignment="Center">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
-                                    <Border x:Name="Circle" CornerRadius="16" Background="{TemplateBinding Background}">
+                                    <Border x:Name="TransportSurface"
+                                            Width="34"
+                                            Height="34"
+                                            CornerRadius="17"
+                                            Background="{TemplateBinding Background}">
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                            <Setter TargetName="TransportSurface" Property="Background" Value="{StaticResource AccentRed}"/>
+                                        </DataTrigger>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsPlaybackActive}" Value="True"/>
+                                                <Condition Binding="{Binding IsPlaying}" Value="False"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter TargetName="TransportSurface" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                        </MultiDataTrigger>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Circle" Property="Opacity" Value="0.85"/>
+                                            <Setter TargetName="TransportSurface" Property="Opacity" Value="0.88"/>
                                         </Trigger>
                                         <Trigger Property="IsPressed" Value="True">
-                                            <Setter TargetName="Circle" Property="Opacity" Value="0.7"/>
+                                            <Setter TargetName="TransportSurface" Property="Opacity" Value="0.72"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
                             </Button.Template>
-                            <materialIcons:MaterialIcon Kind="Play" Width="16" Height="16" Foreground="White"/>
+                            <materialIcons:MaterialIcon Kind="{Binding TransportIcon}"
+                                                        Width="16"
+                                                        Height="16"
+                                                        Foreground="White"/>
                         </Button>
 
-                        <Button Grid.Column="1" Click="StopButton_Click"
-                                Width="32" Height="32" Margin="0,0,12,0"
-                                ToolTip="Pause / Resume" VerticalAlignment="Center" Cursor="Hand">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="Square" CornerRadius="4" Background="#E53935">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Square" Property="Opacity" Value="0.88"/>
-                                        </Trigger>
-                                        <Trigger Property="IsPressed" Value="True">
-                                            <Setter TargetName="Square" Property="Opacity" Value="0.75"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                            <materialIcons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Stop,Pause'}" Width="14" Height="14" Foreground="White"/>
-                        </Button>
+                        <StackPanel Grid.Column="1"
+                                    MinWidth="50"
+                                    Margin="0,0,10,0"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="PLAYBACK"
+                                       FontSize="8"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="{Binding TransportLabel}"
+                                       Margin="0,1,0,0"
+                                       FontSize="9.5"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource TextPrimary}"/>
+                        </StackPanel>
 
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Speed" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <Slider Minimum="0.25" Maximum="2"
+                        <Border Grid.Column="2"
+                                Width="1"
+                                Height="28"
+                                Margin="0,0,10,0"
+                                Background="{StaticResource BorderColor}"/>
+
+                        <Grid Grid.Column="3" VerticalAlignment="Center">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="0,0,0,3">
+                                <TextBlock Text="SPEED"
+                                           FontSize="8"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="{Binding Speed, StringFormat={}{0:F2}x}"
+                                           HorizontalAlignment="Right"
+                                           FontSize="9.5"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource AccentBrush}"/>
+                            </Grid>
+
+                            <Slider Grid.Row="1"
+                                    Minimum="0.25"
+                                    Maximum="2"
                                     Value="{Binding Speed, Mode=TwoWay}"
-                                    IsMoveToPointEnabled="True" IsSnapToTickEnabled="False"
-                                    VerticalAlignment="Center" Height="12" MinWidth="80"
+                                    IsMoveToPointEnabled="True"
+                                    IsSnapToTickEnabled="False"
+                                    Height="12"
+                                    MinWidth="78"
                                     ToolTip="Playback speed"
                                     Style="{StaticResource HUDSliderStyle}"/>
-                            <TextBlock Text="{Binding Speed, StringFormat={}{0:F2}x}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="38" TextAlignment="Right"/>
-                        </StackPanel>
+                        </Grid>
                     </Grid>
                 </StackPanel>
             </Border>

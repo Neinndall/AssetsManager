@@ -108,6 +108,7 @@ New Features
   - VFX Studio / Added AnimationGraph inspection for clips, tracks, masks, sync groups, events, child clips, rates, and joint weights.
 
 Improvements
+  - Viewer / Animation player now uses a cleaner grouped timeline, dynamic Play/Stop/Resume control, and compact speed controls while preserving the current playhead.
   - VFX Studio / Camera framing now follows authored system spawn bounds and preview rig motion, keeping large, offset, missile, and trail effects in view consistently.
   - VFX Studio / Playback now matches the audited LTK behavior more closely with deterministic xorshift32 random streams, Animation Clip cue seed 7331, probability-table singleValue semantics, carried/death child systems, boneToSpawnAt lineage, and deterministic child RNG state.
   - VFX Studio / Timeline seeking now restores bounded quarter-second simulation checkpoints instead of always replaying from zero, preserving particles, RNG, noise, transforms, child lineage, attachments, stop/kill state, and emitter timing while respecting a capped memory budget.

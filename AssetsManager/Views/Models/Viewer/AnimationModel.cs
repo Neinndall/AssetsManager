@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
+using Material.Icons;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -14,8 +15,27 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsPlaying
         {
             get => _isPlaying;
-            set => SetField(ref _isPlaying, value);
+            set
+            {
+                if (SetField(ref _isPlaying, value))
+                    RefreshTransportState();
+            }
         }
+
+        private bool _isPlaybackActive;
+        public bool IsPlaybackActive
+        {
+            get => _isPlaybackActive;
+            set
+            {
+                if (SetField(ref _isPlaybackActive, value))
+                    RefreshTransportState();
+            }
+        }
+
+        public string TransportLabel => !IsPlaybackActive ? "PLAY" : IsPlaying ? "STOP" : "RESUME";
+        public string TransportTooltip => !IsPlaybackActive ? "Play animation" : IsPlaying ? "Stop playback" : "Resume playback";
+        public MaterialIconKind TransportIcon => !IsPlaybackActive ? MaterialIconKind.Play : IsPlaying ? MaterialIconKind.Stop : MaterialIconKind.Play;
 
         private double _currentTime;
         public double CurrentTime
@@ -111,6 +131,13 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+
+        private void RefreshTransportState()
+        {
+            OnPropertyChanged(nameof(TransportLabel));
+            OnPropertyChanged(nameof(TransportTooltip));
+            OnPropertyChanged(nameof(TransportIcon));
+        }
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
