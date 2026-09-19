@@ -396,6 +396,12 @@ Changes
 Bug Fixes
   - VFX Studio / Fixed unresolved child identifiers incorrectly synthesizing or falling back to effect keys from unrelated hashes or names.
   - VFX Studio / Fixed null primitive defaults and invalid curve key pairs to match League VFX parsing semantics.
+  - VFX Studio / Matched LTK birth probability tables by using one shared random chance across every populated value channel.
+  - VFX Studio / Preserved authored VFX color channels outside the display range until shader and blend evaluation instead of clamping them during curve sampling.
+  - VFX Studio / Corrected LegacySimple birth rotation to use its authored Z axis and whole-degree wrapped particle spin.
+  - VFX Studio / Synchronized trail and beam emitter UV scrolling to the source playback clock so child ribbons no longer drift from other primitives.
+  - VFX Studio / Matched LTK spawn placement with emission-only trail distance tracking, exact shape fallbacks, and authored multi-axis rotation order.
+  - VFX Studio / Preserved tiny nonzero direction and spawn axes and applied LegacySimple lifetime scale across all three particle axes.
   - VFX Studio / Rig remains visible in the preview toolbar while standalone motion tuning stays disabled for skeleton-driven Animation Clips.
   - VFX Studio / Parametric clip changes no longer invalidate cached animation assets while rebuilding AnimationGraph playback.
   - VFX Studio / Skin selection now loads its model, Systems, and Animation Clips without auto-playing a System or Animation Clip; playback starts only after explicit selection.

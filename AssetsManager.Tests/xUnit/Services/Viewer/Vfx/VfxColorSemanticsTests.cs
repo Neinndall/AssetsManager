@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
@@ -57,6 +58,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(128f / 255f, result.Y, 4);
             Assert.Equal(0f, result.Z);
             Assert.Equal(1f, result.W);
+        }
+
+        [Fact]
+        public void SampledColorsKeepAuthoredOutOfRangeChannelsLikeLtk()
+        {
+            var birth = VfxCurve4.Const(new Vector4(-0.5f, 2f, 3f, 1.5f));
+            Vector4 born = VfxColorSemantics.ResolveBirth(birth, 0f, new VfxLtkRandom(7));
+            Vector4 drawn = VfxColorSemantics.ResolveParticle(
+                born,
+                VfxCurve4.Const(new Vector4(2f, -0.25f, 0.5f, 2f)),
+                0.5f);
+
+            Assert.Equal(new Vector4(-0.5f, 2f, 3f, 1.5f), born);
+            Assert.Equal(new Vector4(-1f, -0.5f, 1.5f, 3f), drawn);
         }
 
         [Fact]

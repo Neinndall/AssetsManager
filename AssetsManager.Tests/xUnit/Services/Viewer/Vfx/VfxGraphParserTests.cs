@@ -645,6 +645,88 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void LegacySimpleRotationUsesTheAuthoredZAxisLikeLtk()
+        {
+            static BinTreeStruct ValueFloat(string field, float value) => new(
+                Fnv1a.HashLower(field),
+                Fnv1a.HashLower("ValueFloat"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeF32(Fnv1a.HashLower("constantValue"), value)
+                });
+
+            var legacy = new BinTreeStruct(
+                Fnv1a.HashLower("LegacySimple"),
+                Fnv1a.HashLower("VfxEmitterLegacySimple"),
+                new BinTreeProperty[]
+                {
+                    ValueFloat("birthRotation", -30.7f),
+                    ValueFloat("birthRotationalVelocity", 40f)
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { legacy });
+            var system = new BinTreeObject(
+                "Effects/LegacyRotation",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal(new Vector3(0f, 0f, -30.7f), parsed.BirthRotation.Value.Constant);
+            Assert.Equal(new Vector3(0f, 0f, 40f), parsed.BirthRotationalVelocity.Value.Constant);
+        }
+
+        [Fact]
+        public void LegacySimpleScaleExpandsAcrossAllThreeAxesLikeLtk()
+        {
+            var legacy = new BinTreeStruct(
+                Fnv1a.HashLower("LegacySimple"),
+                Fnv1a.HashLower("VfxEmitterLegacySimple"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("scale"),
+                        Fnv1a.HashLower("ValueFloat"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeF32(Fnv1a.HashLower("constantValue"), 2f)
+                        })
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { legacy });
+            var system = new BinTreeObject(
+                "Effects/LegacyScale",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal(new Vector3(2f, 2f, 2f), parsed.ScaleOverLife.Value.Constant);
+        }
+
+        [Fact]
         public void InvalidEnumBytesFallBackLikeLtkAndPaletteCountKeepsAuthoredZero()
         {
             var legacy = new BinTreeStruct(
@@ -1084,6 +1166,47 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(2, parsed.RotationAxes.Count);
             Assert.Equal(2, parsed.RotationAngles.Count);
             Assert.All(parsed.RotationAngles, angle => Assert.Equal(0f, angle.Constant));
+        }
+
+        [Fact]
+        public void PointShapeKeepsItsVectorWhileUnknownShapeFallsBackToOriginLikeLtk()
+        {
+            static BinTreeStruct EmitterWithShape(string shapeClass) => new(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("SpawnShape"),
+                        Fnv1a.HashLower(shapeClass),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeVector3(Fnv1a.HashLower("emitOffset"), new Vector3(1f, 2f, 3f))
+                        })
+                });
+
+            var system = new BinTreeObject(
+                "Effects/ShapeFallback",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[]
+                        {
+                            EmitterWithShape("VfxShapePointDoNotUse"),
+                            EmitterWithShape("VfxShapeUnsupported")
+                        })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            IReadOnlyList<VfxEmitterDefinition> emitters = Assert.Single(
+                VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters;
+
+            Assert.Equal(new Vector3(1f, 2f, 3f), emitters[0].SpawnShape.EmitOffset.Constant);
+            Assert.Equal(Vector3.Zero, emitters[1].SpawnShape.EmitOffset.Constant);
         }
 
         [Fact]

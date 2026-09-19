@@ -67,6 +67,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public float[] Instances = System.Array.Empty<float>();
             public int InstanceCount;
             internal float TrailDistance;
+            internal Vector3? TrailSpawnedAt;
             internal float[] NoiseLast = Array.Empty<float>();
             internal int[] NoiseFired = Array.Empty<int>();
 
@@ -180,6 +181,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             bool BurstDone,
             bool InitialEmissionDone,
             float TrailDistance,
+            Vector3? TrailSpawnedAt,
             int InstanceBufferLength,
             float[] NoiseLast,
             int[] NoiseFired,
@@ -227,6 +229,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     state.BurstDone,
                     state.InitialEmissionDone,
                     state.TrailDistance,
+                    state.TrailSpawnedAt,
                     state.Instances.Length,
                     noiseLast,
                     noiseFired,
@@ -294,6 +297,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 state.BurstDone = saved.BurstDone;
                 state.InitialEmissionDone = saved.InitialEmissionDone;
                 state.TrailDistance = saved.TrailDistance;
+                state.TrailSpawnedAt = saved.TrailSpawnedAt;
                 state.NoiseLast = (float[])saved.NoiseLast.Clone();
                 state.NoiseFired = (int[])saved.NoiseFired.Clone();
                 state.Particles.Clear();
@@ -337,7 +341,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Matrix4x4 placement = EmitterPlacement(es.Def);
                 es.PlacementTransform = placement;
                 Vector3 nextBasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(EmitterTime(es)), placement);
-                es.TrailDistance += Vector3.Distance(es.BasePos, nextBasePos);
                 es.BasePos = nextBasePos;
                 es.SystemOrigin = nextOrigin;
                 es.SystemTarget = Vector3.Transform(new Vector3(600f, 0f, 0f), worldTransform);
@@ -470,7 +473,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             if (emitter.Def.IsDirectionOriented &&
                 emitter.Def.PrimitiveKind != VfxPrimitiveKind.Ray &&
-                direction.LengthSquared() > 1e-8f)
+                direction.LengthSquared() > 0f)
             {
                 Vector3 up = Vector3.Normalize(direction);
                 Vector3 axis = MathF.Abs(up.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX;
@@ -588,6 +591,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Matrix4x4.CreateRotationY(rotation.Y) * world;
         }
 
+        private Vector3 EmitterOdometerPosition(VfxEmitterDefinition definition, float emitterT)
+        {
+            Vector3 rotation = definition.RotationOverride.GetValueOrDefault() * (MathF.PI / 180f);
+            Matrix4x4 world = definition.IsLocalOrientation ? _worldTransform : _orientationRootTransform;
+            Matrix4x4 spawnFrame = Matrix4x4.CreateScale(definition.ScaleOverride ?? Vector3.One) *
+                Matrix4x4.CreateRotationZ(rotation.Z) * Matrix4x4.CreateRotationX(rotation.X) *
+                Matrix4x4.CreateRotationY(rotation.Y) * world;
+            return Vector3.Transform(definition.EmitterPosition.Sample(emitterT), spawnFrame);
+        }
+
+        private void AdvanceTrailOdometer(EmitterState state, float emitterT)
+        {
+            Vector3 spawnedAt = EmitterOdometerPosition(state.Def, emitterT);
+            if (state.TrailSpawnedAt is Vector3 previous)
+                state.TrailDistance += Vector3.Distance(previous, spawnedAt);
+            state.TrailSpawnedAt = spawnedAt;
+        }
+
         public void Reset()
         {
             _rng = new VfxLtkRandom(_initialRandomState);
@@ -614,6 +635,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             {
                 s.Particles.Clear();
                 s.TrailDistance = 0f;
+                s.TrailSpawnedAt = null;
                 s.NoiseLast = Array.Empty<float>();
                 s.NoiseFired = Array.Empty<int>();
                 s.BasePos = Vector3.Transform(s.Def.EmitterPosition.Sample(0f), EmitterPlacement(s.Def));
@@ -793,7 +815,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             s.PlacementTransform = placement;
             s.BasePos = Vector3.Transform(d.EmitterPosition.Sample(emitterT), placement);
             Vector3 emitterDelta = s.BasePos - previousBasePos;
-            s.TrailDistance += emitterDelta.Length();
 
             PreparedNoiseField[] preparedNoise = PrepareNoiseFields(d.Fields, s, emitterT, CurrentTime, fieldOrigin);
 
@@ -925,6 +946,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 if (d.Trail?.MaxAddedPerFrame is > 0)
                     requestedCount = Math.Min(requestedCount, d.Trail.MaxAddedPerFrame);
                 if (requestedCount <= 0) return -1;
+
+                // LTK advances a trail odometer only when an emission batch is actually due,
+                // before attempting the shared-pool spawn. TranslationOverride and shape offset
+                // do not participate; only EmitterPosition stood on the spawn frame does.
+                AdvanceTrailOdometer(s, emitterT);
 
                 // LTK advances the emitter by the requested batch even if its shared pool
                 // fills partway through. Preserve that debt semantics instead of retrying
@@ -1237,7 +1263,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     d.PrimitiveKind != VfxPrimitiveKind.Ray &&
                     d.AuthoredFeatures?.HasLegacySimple != true &&
                     (d.DrawsAsQuad || d.PrimitiveKind == VfxPrimitiveKind.Mesh) &&
-                    direction.LengthSquared() > 1e-8f;
+                    direction.LengthSquared() > 0f;
                 if (canDirectionStretch)
                 {
                     float stretch = MathF.Max(d.DirectionVelocityMinScale, direction.Length() * d.DirectionVelocityScale);
@@ -1254,11 +1280,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 buf[k++] = t;
                 buf[k++] = direction.X; buf[k++] = direction.Y; buf[k++] = direction.Z;
                 Vector3 currentRotation = p.BirthRotation;
-                float legacyRoll = d.LegacyRotation?.Sample(t) * (MathF.PI / 180f) ?? 0f;
-                buf[rotationSlot] = currentRotation.X + legacyRoll;
+                float legacyRollDegrees = d.LegacyRotation?.Sample(t) ?? 0f;
+                float legacyRoll = legacyRollDegrees * (MathF.PI / 180f);
+                if (d.AuthoredFeatures?.HasLegacySimple == true)
+                {
+                    float spinDegrees = currentRotation.Z * (180f / MathF.PI) + legacyRollDegrees;
+                    spinDegrees = ((MathF.Truncate(spinDegrees) % 360f) + 360f) % 360f;
+                    buf[rotationSlot] = spinDegrees * (MathF.PI / 180f);
+                }
+                else
+                {
+                    buf[rotationSlot] = currentRotation.X;
+                }
                 bool authoredPlane = d.IsArbitraryQuad || d.PrimitiveKind is
                     VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.PlanarProjection;
-                if (d.IsDirectionOriented && !authoredPlane && direction.LengthSquared() > 1e-6f)
+                if (d.IsDirectionOriented && !authoredPlane && direction.LengthSquared() > 0f)
                 {
                     Vector3 dir = Vector3.Normalize(direction);
                     float yaw = MathF.Atan2(dir.X, dir.Z);

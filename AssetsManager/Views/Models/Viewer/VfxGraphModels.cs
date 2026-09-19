@@ -404,13 +404,19 @@ namespace AssetsManager.Views.Models.Viewer
                 for (int i = 0; i < count; i++)
                 {
                     Vector3 axis = RotationAxes[i];
-                    if (axis.LengthSquared() <= 1e-8f) continue;
+                    double axisLength = Math.Sqrt(
+                        (double)axis.X * axis.X +
+                        (double)axis.Y * axis.Y +
+                        (double)axis.Z * axis.Z);
+                    if (axisLength == 0d) continue;
                     float radians = RotationAngles[i].SampleBirth(t, rng, birthChance) * (MathF.PI / 180f);
-                    Matrix4x4 step = Matrix4x4.CreateFromAxisAngle(Vector3.Normalize(axis), radians);
-                    offset = Vector3.Transform(offset, step);
-                    rotation *= step;
+                    Vector3 normalizedAxis = axis / (float)axisLength;
+                    Matrix4x4 step = Matrix4x4.CreateFromAxisAngle(normalizedAxis, radians);
+                    // LTK stores column-vector turns as current * step. System.Numerics
+                    // transforms row vectors, so the equivalent matrix composes in reverse.
+                    rotation = step * rotation;
                 }
-                return offset;
+                return Vector3.Transform(offset, rotation);
             }
 
             if (Kind == VfxSpawnShapeKind.Box)
@@ -420,8 +426,8 @@ namespace AssetsManager.Views.Models.Viewer
                 {
                     Matrix4x4 yTurn = Matrix4x4.CreateRotationY(rng.Next(4) * (MathF.PI * 0.5f));
                     Matrix4x4 zTurn = Matrix4x4.CreateRotationZ(rng.Next(2) * (MathF.PI * 0.5f));
-                    offset = Vector3.Transform(Vector3.Transform(offset, yTurn), zTurn);
-                    rotation = yTurn * zTurn;
+                    rotation = zTurn * yTurn;
+                    offset = Vector3.Transform(offset, rotation);
                 }
                 return offset;
             }
@@ -450,7 +456,9 @@ namespace AssetsManager.Views.Models.Viewer
             float r = (volume ? (float)rng.NextDouble() : 1f) * radius;
             float angleY = (float)(rng.NextDouble() * Math.Tau);
             float angleZ = (float)(rng.NextDouble() * Math.Tau);
-            rotation = Matrix4x4.CreateRotationY(angleY) * Matrix4x4.CreateRotationZ(angleZ);
+            // LTK composes Y then Z in column-vector space; transpose that product for
+            // System.Numerics' row-vector convention.
+            rotation = Matrix4x4.CreateRotationZ(angleZ) * Matrix4x4.CreateRotationY(angleY);
             return Vector3.Transform(new Vector3(r, 0, 0), rotation);
         }
 
@@ -520,12 +528,11 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector2 SampleBirth(float t, Random rng, float? sharedRoll = null)
         {
             var value = Sample(t);
-            if (Prob is not { Length: > 0 }) return value;
-            float roll0 = sharedRoll ?? (float)rng.NextDouble();
-            float roll1 = sharedRoll ?? (float)rng.NextDouble();
+            if (Prob is not { Length: > 0 } || !Prob.Any(static table => !table.IsEmpty)) return value;
+            float roll = sharedRoll ?? (float)rng.NextDouble();
             return new Vector2(
-                Prob.Length > 0 && !Prob[0].IsEmpty ? value.X * Prob[0].Sample(roll0) : value.X,
-                Prob.Length > 1 && !Prob[1].IsEmpty ? value.Y * Prob[1].Sample(roll1) : value.Y);
+                Prob.Length > 0 && !Prob[0].IsEmpty ? value.X * Prob[0].Sample(roll) : value.X,
+                Prob.Length > 1 && !Prob[1].IsEmpty ? value.Y * Prob[1].Sample(roll) : value.Y);
         }
 
         public static VfxCurve2 Const(Vector2 value) => new(value, null, null);
@@ -539,21 +546,19 @@ namespace AssetsManager.Views.Models.Viewer
             if (Times is null || Values is null || Times.Length == 0) return Constant;
             return VfxCurve.Interp(Times, Values, t, static (a, b, f) => Vector3.Lerp(a, b, f));
         }
-        /// <summary>Birth-time value with per-component probability tables (independent rolls, Riot-style).</summary>
+        /// <summary>Birth-time value with every probability-table channel sampled at one shared chance.</summary>
         public Vector3 SampleBirth(Random rng)
             => SampleBirth(0f, rng);
 
         public Vector3 SampleBirth(float t, Random rng, float? sharedRoll = null)
         {
             var v = Sample(t);
-            if (Prob is not { Length: > 0 }) return v;
-            float roll0 = sharedRoll ?? (float)rng.NextDouble();
-            float roll1 = sharedRoll ?? (float)rng.NextDouble();
-            float roll2 = sharedRoll ?? (float)rng.NextDouble();
+            if (Prob is not { Length: > 0 } || !Prob.Any(static table => !table.IsEmpty)) return v;
+            float roll = sharedRoll ?? (float)rng.NextDouble();
             return new Vector3(
-                Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample(roll0) : v.X,
-                Prob.Length > 1 && !Prob[1].IsEmpty ? v.Y * Prob[1].Sample(roll1) : v.Y,
-                Prob.Length > 2 && !Prob[2].IsEmpty ? v.Z * Prob[2].Sample(roll2) : v.Z);
+                Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample(roll) : v.X,
+                Prob.Length > 1 && !Prob[1].IsEmpty ? v.Y * Prob[1].Sample(roll) : v.Y,
+                Prob.Length > 2 && !Prob[2].IsEmpty ? v.Z * Prob[2].Sample(roll) : v.Z);
         }
         public bool HasProb => Prob is { Length: > 0 } && Prob.Any(static p => !p.IsEmpty);
         public static VfxCurve3 Const(Vector3 v) => new(v, null, null);
@@ -573,16 +578,13 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector4 SampleBirth(float t, Random rng, float? sharedRoll = null)
         {
             var v = Sample(t);
-            if (Prob is not { Length: > 0 }) return v;
-            float roll0 = sharedRoll ?? (float)rng.NextDouble();
-            float roll1 = sharedRoll ?? (float)rng.NextDouble();
-            float roll2 = sharedRoll ?? (float)rng.NextDouble();
-            float roll3 = sharedRoll ?? (float)rng.NextDouble();
+            if (Prob is not { Length: > 0 } || !Prob.Any(static table => !table.IsEmpty)) return v;
+            float roll = sharedRoll ?? (float)rng.NextDouble();
             return new Vector4(
-                Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample(roll0) : v.X,
-                Prob.Length > 1 && !Prob[1].IsEmpty ? v.Y * Prob[1].Sample(roll1) : v.Y,
-                Prob.Length > 2 && !Prob[2].IsEmpty ? v.Z * Prob[2].Sample(roll2) : v.Z,
-                Prob.Length > 3 && !Prob[3].IsEmpty ? v.W * Prob[3].Sample(roll3) : v.W);
+                Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample(roll) : v.X,
+                Prob.Length > 1 && !Prob[1].IsEmpty ? v.Y * Prob[1].Sample(roll) : v.Y,
+                Prob.Length > 2 && !Prob[2].IsEmpty ? v.Z * Prob[2].Sample(roll) : v.Z,
+                Prob.Length > 3 && !Prob[3].IsEmpty ? v.W * Prob[3].Sample(roll) : v.W);
         }
         public static VfxCurve4 Const(Vector4 v) => new(v, null, null);
     }

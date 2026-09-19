@@ -377,6 +377,31 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void BirthProbabilityTablesShareOneChanceAcrossAllChannelsLikeLtk()
+        {
+            var curve = new VfxCurve3(
+                Vector3.One,
+                null,
+                null,
+                new[]
+                {
+                    new VfxProbTable(new[] { 0f, 1f }, new[] { 0f, 1f }),
+                    new VfxProbTable(new[] { 0f, 1f }, new[] { 0f, 2f }),
+                    new VfxProbTable(new[] { 0f, 1f }, new[] { 0f, 4f })
+                });
+            var rng = new VfxLtkRandom(42);
+            VfxLtkRandom expected = rng.Clone();
+            float chance = expected.NextUnitFloat();
+
+            Vector3 drawn = curve.SampleBirth(rng);
+
+            Assert.Equal(chance, drawn.X, precision: 6);
+            Assert.Equal(chance * 2f, drawn.Y, precision: 6);
+            Assert.Equal(chance * 4f, drawn.Z, precision: 6);
+            Assert.Equal(expected.State, rng.State);
+        }
+
+        [Fact]
         public void CameraTrailPreservesPointWidthsAndBuildsConnectedGeometry()
         {
             var emitter = CreateEmitter(new Vector3(2f, 9f, 1f), VfxEmitterRenderState.Default) with
@@ -795,6 +820,43 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(0f, childRuntime.CurrentTime);
             Assert.Equal(0f, Assert.Single(childRuntime.Emitters).EmitterAge);
             Assert.Equal(0, childRuntime.LiveParticleCount);
+        }
+
+        [Fact]
+        public void ChildProbabilityConsumesLineageDrawBeforeChildStarts()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            var probability = new VfxCurveF(
+                1f,
+                null,
+                null,
+                new[] { new VfxProbTable(null, null, 0f, IsPresent: true) });
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[]
+                    {
+                        new VfxChildSystemReference("child", 2, 0),
+                        new VfxChildSystemReference("child", 2, 0)
+                    },
+                    false,
+                    probability,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            const int seed = 7;
+            VfxPlaybackGraphRuntime graph = CreateGraph(parent, child, seed);
+
+            graph.Update(0.02f);
+
+            VfxPlaybackRuntime childRuntime = Assert.Single(graph.Runtimes.Skip(1));
+            uint lineage = unchecked(1u * 0x9e3779b1u);
+            int lineageSeed = unchecked(seed ^ (int)Fnv1a.HashLower("0") ^ (int)lineage);
+            var expected = new VfxLtkRandom(unchecked((uint)lineageSeed));
+            _ = expected.NextUnitFloat();
+            Assert.Equal(expected.State, childRuntime.InitialRandomState);
         }
 
         [Fact]
@@ -1285,6 +1347,26 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxLtkRandom clone = original.Clone();
             for (int index = 0; index < 8; index++)
                 Assert.Equal(original.NextUnitFloat(), clone.NextUnitFloat());
+        }
+
+        [Fact]
+        public void LtkRandomMatchesGoldenXorshift32Sequence()
+        {
+            var rng = new VfxLtkRandom(7);
+            float[] expected =
+            {
+                0.0004405975341796875f,
+                0.10952103137969971f,
+                0.9038963913917542f,
+                0.7147876024246216f,
+                0.6646947264671326f,
+                0.48851478099823f,
+                0.060258567333221436f,
+                0.1849934458732605f
+            };
+
+            foreach (float value in expected)
+                Assert.Equal(value, rng.NextUnitFloat());
         }
 
         [Fact]
@@ -2892,6 +2974,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void DirectionStretchTreatsAnyNonZeroTravelAsOrientedLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+                IsDirectionOriented = true,
+                BirthVelocity = VfxCurve3.Const(new Vector3(0.00001f, 0f, 0f)),
+                DirectionVelocityScale = 2f,
+                DirectionVelocityMinScale = 8f
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "slow", "slow", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.Equal(24f, state.Instances[4], precision: 4);
+        }
+
+        [Fact]
         public void DirectionOrientedMeshStretchesItsLocalZAxis()
         {
             VfxEmitterDefinition emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
@@ -3073,6 +3177,35 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void RibbonEmitterScrollUsesSourceRenderTimeInsteadOfEmitterAge()
+        {
+            VfxEmitterDefinition definition = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.CameraTrail,
+                Trail = new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 1, 30, 0),
+                EmitterUvScrollRate = new Vector2(0.25f, 0f),
+                TextureMultEmitterUvScrollRate = new Vector2(0.125f, 0f)
+            };
+            var state = new VfxPlaybackRuntime.EmitterState
+            {
+                Def = definition,
+                Instances = new float[VfxPlaybackRuntime.InstanceStride],
+                InstanceCount = 1,
+                RenderTime = 3f,
+                Age = 1f
+            };
+            state.Instances[21] = state.Instances[22] = 1f;
+            state.Instances[31] = state.Instances[32] = 1f;
+            var vertex = new float[VfxTrailGeometry.VertexStride];
+
+            VfxRibbonVertexSemantics.Pack(state, 0, vertex, 0, 0f, 0f, transpose: false);
+
+            Assert.Equal(0.75f, vertex[0], precision: 5);
+            Assert.Equal(0.375f, vertex[17], precision: 5);
+        }
+
+        [Fact]
         public void ArbitraryTrailUsesParticleSideInsteadOfFacingCamera()
         {
             var original = TrailState(0f);
@@ -3116,12 +3249,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
         private static VfxPlaybackGraphRuntime CreateGraph(
             VfxSystemDefinition parent,
-            VfxSystemDefinition child)
+            VfxSystemDefinition child,
+            int seed = 7)
         {
             return new VfxPlaybackGraphRuntime(
                 parent,
                 Matrix4x4.Identity,
-                7,
+                seed,
                 new Dictionary<uint, VfxSystemDefinition> { [parent.PathHash] = parent, [child.PathHash] = child },
                 new Dictionary<uint, uint>(),
                 (definition, transform, seed) =>
