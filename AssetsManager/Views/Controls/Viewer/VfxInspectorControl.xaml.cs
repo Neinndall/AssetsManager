@@ -1751,6 +1751,15 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (animItem == null || _championModel == null) return;
 
+            // Animation Clip playback can trigger several VFX systems over time, so the
+            // standalone emitter audit from a previously selected System is not meaningful here.
+            _model.SelectedEmitter = null;
+            _model.Emitters.Clear();
+            _model.Textures.Clear();
+            _model.Meshes.Clear();
+            _model.HasAnySolo = false;
+            _model.IsAllMuted = false;
+
             _championModel.CurrentAnimation = animItem.AnimationAsset;
             _championModel.AnimationTime = 0;
             _model.CurrentTime = 0;

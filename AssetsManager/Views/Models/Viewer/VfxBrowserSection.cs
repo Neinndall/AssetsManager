@@ -16,7 +16,7 @@ namespace AssetsManager.Views.Models.Viewer
         public VfxSkinItem Owner { get; }
         public string Title { get; }
         public bool IsAnimation { get; }
-        private bool _isExpanded = true;
+        private bool _isExpanded;
         public bool IsExpanded
         {
             get => _isExpanded;

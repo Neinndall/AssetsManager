@@ -111,6 +111,7 @@ Improvements
   - VFX Studio / Added shared Viewer Grid/Ground preferences plus Shaded/Wire/Overlay, camera reset, and standalone system motion controls directly in the viewport toolbar.
   - VFX Studio / Unified standalone lifecycle looping and its editable timeline range under the transport Loop control.
   - VFX Studio / Removed the manual Soft stop controls from the rig menu while preserving engine stop behavior internally.
+  - VFX Studio / Skin browser sections now start collapsed and Animation Clip playback clears stale standalone System emitter diagnostics.
   - VFX Studio / Removed the duplicate preview stats overlay so live particle status stays in the existing viewport header.
   - VFX Studio / Camera framing now follows authored system spawn bounds and preview rig motion, keeping large, offset, missile, and trail effects in view consistently.
   - VFX Studio / Playback now matches the audited LTK behavior more closely with deterministic xorshift32 random streams, Animation Clip cue seed 7331, probability-table singleValue semantics, carried/death child systems, boneToSpawnAt lineage, and deterministic child RNG state.
