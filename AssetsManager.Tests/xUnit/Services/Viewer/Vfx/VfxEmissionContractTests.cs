@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
@@ -225,6 +226,49 @@ public sealed class VfxEmissionContractTests
     }
 
     [Fact]
+    public void TrailOdometerStartsAtZeroEvenIfSystemMovedBeforeFirstEmission()
+    {
+        var runtime = Create(Emitter() with
+        {
+            IsSingleParticle = false,
+            Rate = VfxCurveF.Const(4f),
+            ParticleLifetime = VfxCurveF.Const(10f),
+            TimeBeforeFirstEmission = 0.5f,
+            Trail = new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 1, 0, 0f)
+        });
+
+        runtime.SetTransform(Matrix4x4.CreateTranslation(10f, 0f, 0f));
+        runtime.Update(0.25f);
+        runtime.SetTransform(Matrix4x4.CreateTranslation(20f, 0f, 0f));
+        runtime.Update(0.25f);
+
+        VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+        Assert.Equal(0f, particle.TrailBirthDistance, precision: 5);
+    }
+
+    [Fact]
+    public void TrailOdometerExcludesTranslationOverrideLikeLtk()
+    {
+        var runtime = Create(Emitter() with
+        {
+            IsSingleParticle = false,
+            Rate = VfxCurveF.Const(4f),
+            ParticleLifetime = VfxCurveF.Const(10f),
+            TranslationOverride = new Vector3(10f, 0f, 0f),
+            EmitterPosition = VfxCurve3.Const(Vector3.Zero),
+            Trail = new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 1, 0, 0f)
+        });
+
+        runtime.Update(0.25f);
+        runtime.SetTransform(Matrix4x4.CreateRotationY(MathF.PI * 0.5f));
+        runtime.Update(0.25f);
+
+        VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+        Assert.Equal(2, state.Particles.Count);
+        Assert.All(state.Particles, particle => Assert.Equal(0f, particle.TrailBirthDistance, precision: 5));
+    }
+
+    [Fact]
     public void BuildUpUsesLtkPrerollClockAndKeepsVisibleTimelineAtZero()
     {
         VfxEmitterDefinition emitter = Emitter() with
@@ -276,6 +320,95 @@ public sealed class VfxEmissionContractTests
 
         VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
         Assert.Equal(20f, particle.Pos.X, precision: 4);
+    }
+
+    [Fact]
+    public void SurfaceBoxComposesItsQuarterTurnsInLtkOrder()
+    {
+        var shape = new VfxSpawnShape(
+            VfxSpawnShapeKind.Box,
+            VfxCurve3.Const(Vector3.Zero),
+            Array.Empty<Vector3>(),
+            Array.Empty<VfxCurveF>(),
+            Size: Vector3.One,
+            Flags: 0);
+        var rng = new VfxLtkRandom(7);
+
+        Vector3 offset = shape.SampleOffset(rng, 0f, null, out _);
+
+        Assert.Equal(-1f, offset.X, precision: 5);
+        Assert.Equal(-0.9991188f, offset.Y, precision: 5);
+        Assert.Equal(0.78095794f, offset.Z, precision: 5);
+    }
+
+    [Fact]
+    public void SphereComposesItsRandomTurnsInLtkOrder()
+    {
+        var shape = new VfxSpawnShape(
+            VfxSpawnShapeKind.Sphere,
+            VfxCurve3.Const(Vector3.Zero),
+            Array.Empty<Vector3>(),
+            Array.Empty<VfxCurveF>(),
+            Radius: 1f,
+            Flags: 0);
+        var rng = new VfxLtkRandom(7);
+
+        Vector3 offset = shape.SampleOffset(rng, 0f, null, out _);
+
+        Assert.Equal(0.7724251f, offset.X, precision: 5);
+        Assert.Equal(0.6351023f, offset.Y, precision: 5);
+        Assert.Equal(-0.00213835f, offset.Z, precision: 5);
+    }
+
+    [Fact]
+    public void LegacyShapeComposesMultipleAuthoredAxesInLtkOrder()
+    {
+        var shape = new VfxSpawnShape(
+            VfxSpawnShapeKind.Legacy,
+            VfxCurve3.Const(Vector3.UnitX),
+            new[] { Vector3.UnitY, Vector3.UnitZ },
+            new[] { VfxCurveF.Const(90f), VfxCurveF.Const(90f) });
+
+        Vector3 offset = shape.SampleOffset(new VfxLtkRandom(7), 0f, 0.5f, out Matrix4x4 turn);
+        Vector3 velocity = Vector3.TransformNormal(Vector3.UnitX, turn);
+
+        Assert.Equal(0f, offset.X, precision: 5);
+        Assert.Equal(1f, offset.Y, precision: 5);
+        Assert.Equal(0f, offset.Z, precision: 5);
+        Assert.Equal(offset, velocity);
+    }
+
+    [Fact]
+    public void LegacyShapeNormalizesAnyNonZeroAuthoredAxisLikeLtk()
+    {
+        var shape = new VfxSpawnShape(
+            VfxSpawnShapeKind.Legacy,
+            VfxCurve3.Const(Vector3.UnitY),
+            new[] { new Vector3(0.00001f, 0f, 0f) },
+            new[] { VfxCurveF.Const(90f) });
+
+        Vector3 offset = shape.SampleOffset(new VfxLtkRandom(7), 0f, 0.5f, out _);
+
+        Assert.Equal(0f, offset.X, precision: 5);
+        Assert.Equal(0f, offset.Y, precision: 5);
+        Assert.Equal(1f, offset.Z, precision: 5);
+    }
+
+    [Fact]
+    public void LegacySimpleSpinUsesWholeWrappedZDegreesLikeLtk()
+    {
+        var runtime = Create(Emitter() with
+        {
+            BirthRotation = VfxCurve3.Const(new Vector3(0f, 0f, -30.7f)),
+            LegacyRotation = VfxCurveF.Const(400.5f),
+            AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasLegacySimple: true)
+        });
+
+        runtime.Update(0.01f);
+
+        VfxPlaybackRuntime.EmitterState emitter = Assert.Single(runtime.Emitters);
+        Assert.Equal(1, emitter.InstanceCount);
+        Assert.Equal(9f * (MathF.PI / 180f), emitter.Instances[9], precision: 5);
     }
 
     [Fact]

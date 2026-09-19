@@ -25,14 +25,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
             => new(left.X * right.X, left.Y * right.Y, left.Z * right.Z, left.W * right.W);
 
         public static Vector4 ResolveBirth(VfxCurve4 birthColor, float emitterTime, Random random, float? sharedRoll = null)
-            => Normalize(birthColor.SampleBirth(emitterTime, random, sharedRoll));
+            => birthColor.SampleBirth(emitterTime, random, sharedRoll);
 
         public static Vector4 ResolveParticle(Vector4 birthColor, VfxCurve4? colorOverLife, float normalizedAge)
         {
-            Vector4 color = colorOverLife is { } curve
-                ? Normalize(curve.Sample(normalizedAge))
-                : Vector4.One;
-            return Multiply(Normalize(birthColor), color);
+            // LTK forwards ValueColor channels verbatim. Clamping here would change authored
+            // HDR/negative values before alpha testing and blend-state math see them.
+            Vector4 color = colorOverLife is { } curve ? curve.Sample(normalizedAge) : Vector4.One;
+            return Multiply(birthColor, color);
         }
 
         public static Vector4 PremultiplyForAddOrSubtract(Vector4 color, int blendMode, bool isDistortion = false)

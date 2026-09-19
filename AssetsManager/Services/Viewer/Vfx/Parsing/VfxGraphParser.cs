@@ -312,6 +312,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint PrimPlanarProjection = HashAlgorithms.Fnv1a("VfxPrimitivePlanarProjection");
         private static readonly uint ShapeLegacy = HashAlgorithms.Fnv1a("VfxShapeLegacy");
         private static readonly uint ShapeOld = HashAlgorithms.Fnv1a("VfxShape");
+        private static readonly uint ShapePoint = HashAlgorithms.Fnv1a("VfxShapePointDoNotUse");
         private static readonly uint ShapeBox = HashAlgorithms.Fnv1a("VfxShapeBox");
         private static readonly uint ShapeSphere = HashAlgorithms.Fnv1a("VfxShapeSphere");
         private static readonly uint ShapeCylinder = HashAlgorithms.Fnv1a("VfxShapeCylinder");
@@ -1699,7 +1700,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         {
             if ((Get(emitterProps, F_spawnShape) ?? Get(emitterProps, F_shape)) is not BinTreeStruct shape) return null;
 
-            var offset = ReadCurve3Property(Get(shape.Properties, F_emitOffset)) ?? VfxCurve3.Const(Vector3.Zero);
+            VfxCurve3 offset = shape.ClassHash switch
+            {
+                var value when value == ShapeLegacy || value == ShapeOld =>
+                    ReadCurve3Property(Get(shape.Properties, F_emitOffset)) ?? VfxCurve3.Const(Vector3.Zero),
+                var value when value == ShapePoint =>
+                    VfxCurve3.Const(AsVec3(Get(shape.Properties, F_emitOffset)) ?? Vector3.Zero),
+                _ => VfxCurve3.Const(Vector3.Zero)
+            };
             var axes = ReadVector3Container(Get(shape.Properties, F_emitRotAxes));
             var angles = ReadCurveFContainer(Get(shape.Properties, F_emitRotAngles));
             VfxSpawnShapeKind kind = shape.ClassHash switch
@@ -1727,12 +1735,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             curve.Values?.Select(static v => new Vector3(v, v, 0f)).ToArray());
 
         private static VfxCurve3 ScalarScaleCurve(VfxCurveF curve) => new(
-            new Vector3(curve.Constant, curve.Constant, 1f), curve.Times,
-            curve.Values?.Select(static v => new Vector3(v, v, 1f)).ToArray());
+            new Vector3(curve.Constant, curve.Constant, curve.Constant), curve.Times,
+            curve.Values?.Select(static v => new Vector3(v, v, v)).ToArray());
 
         private static VfxCurve3 ScalarRotationCurve(VfxCurveF curve) => new(
-            new Vector3(curve.Constant, 0f, 0f), curve.Times,
-            curve.Values?.Select(static v => new Vector3(v, 0f, 0f)).ToArray());
+            new Vector3(0f, 0f, curve.Constant), curve.Times,
+            curve.Values?.Select(static v => new Vector3(0f, 0f, v)).ToArray());
 
         private static IReadOnlyList<Vector3> ReadVector3Container(BinTreeProperty prop)
         {
