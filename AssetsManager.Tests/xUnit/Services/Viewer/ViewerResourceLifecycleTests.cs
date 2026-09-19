@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Viewer.Rendering;
@@ -113,6 +116,39 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
             Assert.Equal(120, constrained.X);
             Assert.Equal(CustomCameraController.MapGroundHeight, constrained.Y);
             Assert.Equal(-340, constrained.Z);
+        }
+
+        [Fact]
+        public void CameraControllerCanAttachAndDisposeTheInitialViewportCamera()
+        {
+            Exception failure = null;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    var viewport = new Viewport3D
+                    {
+                        Camera = new PerspectiveCamera(
+                            new Point3D(0, 0, 10),
+                            new Vector3D(0, 0, -10),
+                            new Vector3D(0, 1, 0),
+                            45)
+                    };
+                    var inputSurface = new Grid();
+
+                    using var controller = new CustomCameraController(viewport, inputSurface);
+                }
+                catch (Exception ex)
+                {
+                    failure = ex;
+                }
+            });
+
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+
+            Assert.Null(failure);
         }
 
         [Theory]

@@ -181,6 +181,65 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void StandaloneSoftStopStopsNewEmissionAtTheConfiguredTime()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
+            {
+                Rate = VfxCurveF.Const(20f),
+                ParticleLifetime = VfxCurveF.Const(5f),
+                EmitterLinger = 10f,
+                ParticleLinger = 10f
+            };
+            var definition = new VfxSystemDefinition(0x50F7u, "soft_stop", "soft_stop", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "soft_stop",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [definition.PathHash] = definition },
+                ResourceMap = new Dictionary<uint, uint>()
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.RigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Still) with { StopAt = 0.25f };
+            session.Play();
+            for (int frame = 0; frame < 3; frame++) session.Update(0.1f);
+
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            Assert.True(root.IsStopped);
+            int particlesAtStop = Assert.Single(root.Emitters).Particles.Count;
+            Assert.True(particlesAtStop > 0);
+
+            session.Update(0.3f);
+
+            Assert.Equal(particlesAtStop, Assert.Single(root.Emitters).Particles.Count);
+        }
+
+        [Fact]
+        public void ChangingStandaloneRigSettingsRepositionsTheLoadedGraphImmediately()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One);
+            var definition = new VfxSystemDefinition(0xA11CEu, "tuned", "tuned", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "tuned",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [definition.PathHash] = definition },
+                ResourceMap = new Dictionary<uint, uint>()
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            Assert.Equal(VfxRigMotion.StandHeight, root.WorldTransform.Translation.Y, precision: 4);
+
+            session.RigSettings = session.RigSettings with { Height = 275f };
+
+            Assert.Equal(275f, root.WorldTransform.Translation.Y, precision: 4);
+            Assert.Equal(275f, Assert.Single(root.Emitters).SystemTarget.Y, precision: 4);
+        }
+
+        [Fact]
         public void StandaloneLoopingRigKeepsPlayingAcrossItsRunBoundary()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
@@ -211,6 +270,41 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             session.Update(0.1f);
 
             Assert.True(session.ActiveSystem.CurrentTime > before);
+        }
+
+        [Fact]
+        public void LoopLifecycleReplaysAfterSoftStop()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
+            {
+                Rate = VfxCurveF.Const(20f),
+                EmitterLifetime = 0.2f,
+                ParticleLifetime = VfxCurveF.Const(0.1f),
+                EmitterLinger = 10f,
+                ParticleLinger = 10f
+            };
+            var definition = new VfxSystemDefinition(8, "loop_soft_stop", "loop_soft_stop", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "loop_soft_stop",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [8] = definition },
+                ResourceMap = new Dictionary<uint, uint>()
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.RigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Burst) with { StopAt = 0.15f };
+            session.Play();
+
+            for (int frame = 0; frame < 4; frame++) session.Update(0.05f);
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            Assert.True(root.IsStopped);
+
+            for (int frame = 0; frame < 17; frame++) session.Update(0.05f);
+
+            Assert.False(root.IsStopped);
+            Assert.InRange(session.PlaybackTime, 0.04d, 0.06d);
         }
 
         [Fact]

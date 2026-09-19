@@ -7,8 +7,10 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils.Framework;
+
 namespace AssetsManager.Views.Models.Viewer
 {
     /// <summary>
@@ -73,6 +75,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isEnabled = true;
         private bool _isSolo = false;
         private bool _isMuted = false;
+        private bool _isSelected;
         private string _name;
         private VfxEmitterDefinition _emitterDef;
         private string _texturePath;
@@ -133,6 +136,17 @@ namespace AssetsManager.Views.Models.Viewer
                     OnPropertyChanged();
                     OnVisibilityStateChanged?.Invoke(this);
                 }
+            }
+        }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value) return;
+                _isSelected = value;
+                OnPropertyChanged();
             }
         }
 
@@ -502,26 +516,22 @@ namespace AssetsManager.Views.Models.Viewer
         private VfxSystemDiagnosticItem _selectedSystem;
         private AnimationClipCatalogItem _selectedAnimation;
         private float? _animationParameter;
-        private AnimationGraphDeckView _animationGraphDeckView = AnimationGraphDeckView.Timeline;
-        private AnimationGraphInspectorTab _animationGraphInspectorTab = AnimationGraphInspectorTab.Clips;
-        private string _animationGraphFilter = string.Empty;
-        private AnimationGraphDefinition _activeAnimationGraph;
-        private AnimationGraphClipInspectorItem _selectedAnimationGraphClip;
-        private AnimationTrackDefinition _selectedAnimationGraphTrack;
-        private AnimationMaskInspectorItem _selectedAnimationGraphMask;
-        private AnimationSyncGroupDefinition _selectedAnimationGraphSyncGroup;
-        private IReadOnlyList<AnimationGraphClipInspectorItem> _allAnimationGraphClips = Array.Empty<AnimationGraphClipInspectorItem>();
         private bool _isAnimationMode = true;
         private bool _isPlaying;
         private bool _isReplayState;
         private double _currentTime;
         private double _totalDuration = 5.0;
+        private double _activeLoopStart;
         private double _activeLoopDuration = 0.0;
         private bool _isPreviewLoopEnabled;
         private float _speed = 1.0f;
         private int _liveParticleCount;
         private string _bgMode = "Dark";
-        private bool _isWireframe;
+        private bool _showPreviewGrid = true;
+        private bool _showPreviewGround;
+        private VfxPreviewWireframeMode _previewWireframeMode = VfxPreviewWireframeMode.Off;
+        private VfxPreviewCameraPreset _previewCameraPreset = VfxPreviewCameraPreset.Game;
+        private VfxEmitterDiagnosticItem _selectedEmitter;
         private string _statusText = "Ready";
         private bool _hasAnySolo;
         private bool _isAllMuted;
@@ -573,11 +583,6 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<VfxSkinItem> DetectedSkins { get; } = new();
         public ObservableCollection<AnimationClipCatalogItem> DetectedAnimations { get; } = new();
         public ObservableCollection<float> AnimationParameterValues { get; } = new();
-        public ObservableRangeCollection<AnimationGraphClipInspectorItem> AnimationGraphClips { get; } = new();
-        public ObservableRangeCollection<AnimationTrackDefinition> AnimationGraphTracks { get; } = new();
-        public ObservableRangeCollection<AnimationMaskInspectorItem> AnimationGraphMasks { get; } = new();
-        public ObservableRangeCollection<AnimationSyncGroupDefinition> AnimationGraphSyncGroups { get; } = new();
-        public ObservableRangeCollection<AnimationMaskJointInspectorItem> AnimationGraphMaskJoints { get; } = new();
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxTextureDiagnosticItem> Textures { get; } = new();
@@ -587,7 +592,13 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsAnimationMode
         {
             get => _isAnimationMode;
-            set { _isAnimationMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsRawSystemsMode)); }
+            set
+            {
+                _isAnimationMode = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsRawSystemsMode));
+                OnPropertyChanged(nameof(HasStandaloneSystem));
+            }
         }
 
         public bool IsRawSystemsMode
@@ -599,7 +610,11 @@ namespace AssetsManager.Views.Models.Viewer
         public AnimationClipCatalogItem SelectedAnimation
         {
             get => _selectedAnimation;
-            set { _selectedAnimation = value; OnPropertyChanged(); }
+            set
+            {
+                _selectedAnimation = value;
+                OnPropertyChanged();
+            }
         }
 
         public float? AnimationParameter
@@ -624,215 +639,6 @@ namespace AssetsManager.Views.Models.Viewer
                 AnimationParameterValues.Add(value);
             OnPropertyChanged(nameof(HasAnimationParameters));
             AnimationParameter = selected;
-        }
-
-        public AnimationGraphDeckView AnimationGraphDeckView
-        {
-            get => _animationGraphDeckView;
-            set
-            {
-                if (_animationGraphDeckView == value) return;
-                _animationGraphDeckView = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(IsTimelineDeckView));
-                OnPropertyChanged(nameof(IsAnimationGraphDeckView));
-            }
-        }
-
-        public bool IsTimelineDeckView
-        {
-            get => _animationGraphDeckView == AnimationGraphDeckView.Timeline;
-            set { if (value) AnimationGraphDeckView = AnimationGraphDeckView.Timeline; }
-        }
-
-        public bool IsAnimationGraphDeckView
-        {
-            get => _animationGraphDeckView == AnimationGraphDeckView.Graph;
-            set { if (value) AnimationGraphDeckView = AnimationGraphDeckView.Graph; }
-        }
-
-        public AnimationGraphInspectorTab AnimationGraphInspectorTab
-        {
-            get => _animationGraphInspectorTab;
-            set
-            {
-                if (_animationGraphInspectorTab == value) return;
-                _animationGraphInspectorTab = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(IsGraphClipsTab));
-                OnPropertyChanged(nameof(IsGraphTracksTab));
-                OnPropertyChanged(nameof(IsGraphMasksTab));
-                OnPropertyChanged(nameof(IsGraphSyncGroupsTab));
-            }
-        }
-
-        public bool IsGraphClipsTab
-        {
-            get => _animationGraphInspectorTab == AnimationGraphInspectorTab.Clips;
-            set { if (value) AnimationGraphInspectorTab = AnimationGraphInspectorTab.Clips; }
-        }
-
-        public bool IsGraphTracksTab
-        {
-            get => _animationGraphInspectorTab == AnimationGraphInspectorTab.Tracks;
-            set { if (value) AnimationGraphInspectorTab = AnimationGraphInspectorTab.Tracks; }
-        }
-
-        public bool IsGraphMasksTab
-        {
-            get => _animationGraphInspectorTab == AnimationGraphInspectorTab.Masks;
-            set { if (value) AnimationGraphInspectorTab = AnimationGraphInspectorTab.Masks; }
-        }
-
-        public bool IsGraphSyncGroupsTab
-        {
-            get => _animationGraphInspectorTab == AnimationGraphInspectorTab.SyncGroups;
-            set { if (value) AnimationGraphInspectorTab = AnimationGraphInspectorTab.SyncGroups; }
-        }
-
-        public string AnimationGraphFilter
-        {
-            get => _animationGraphFilter;
-            set
-            {
-                string normalized = value ?? string.Empty;
-                if (_animationGraphFilter == normalized) return;
-                _animationGraphFilter = normalized;
-                OnPropertyChanged();
-                RefreshAnimationGraphFilter();
-            }
-        }
-
-        public AnimationGraphDefinition ActiveAnimationGraph
-        {
-            get => _activeAnimationGraph;
-            private set
-            {
-                if (ReferenceEquals(_activeAnimationGraph, value)) return;
-                _activeAnimationGraph = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(HasAnimationGraph));
-                OnPropertyChanged(nameof(AnimationGraphSummary));
-            }
-        }
-
-        public bool HasAnimationGraph => ActiveAnimationGraph != null;
-
-        public string AnimationGraphSummary => ActiveAnimationGraph == null
-            ? "No AnimationGraph"
-            : $"{ActiveAnimationGraph.Clips?.Count ?? 0} clips · {ActiveAnimationGraph.Tracks?.Count ?? 0} tracks · {ActiveAnimationGraph.Masks?.Count ?? 0} masks · {ActiveAnimationGraph.SyncGroups?.Count ?? 0} sync";
-
-        public AnimationGraphClipInspectorItem SelectedAnimationGraphClip
-        {
-            get => _selectedAnimationGraphClip;
-            set
-            {
-                if (ReferenceEquals(_selectedAnimationGraphClip, value)) return;
-                _selectedAnimationGraphClip = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(HasSelectedAnimationGraphClip));
-            }
-        }
-
-        public bool HasSelectedAnimationGraphClip => SelectedAnimationGraphClip != null;
-
-        public AnimationTrackDefinition SelectedAnimationGraphTrack
-        {
-            get => _selectedAnimationGraphTrack;
-            set
-            {
-                if (ReferenceEquals(_selectedAnimationGraphTrack, value)) return;
-                _selectedAnimationGraphTrack = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public AnimationMaskInspectorItem SelectedAnimationGraphMask
-        {
-            get => _selectedAnimationGraphMask;
-            set
-            {
-                if (ReferenceEquals(_selectedAnimationGraphMask, value)) return;
-                _selectedAnimationGraphMask = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(HasSelectedAnimationGraphMask));
-            }
-        }
-
-        public bool HasSelectedAnimationGraphMask => SelectedAnimationGraphMask != null;
-
-        public AnimationSyncGroupDefinition SelectedAnimationGraphSyncGroup
-        {
-            get => _selectedAnimationGraphSyncGroup;
-            set
-            {
-                if (ReferenceEquals(_selectedAnimationGraphSyncGroup, value)) return;
-                _selectedAnimationGraphSyncGroup = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public void SetAnimationGraphInspector(
-            AnimationGraphDefinition graph,
-            IReadOnlyList<AnimationGraphClipInspectorItem> clips,
-            IReadOnlyList<AnimationMaskInspectorItem> masks)
-        {
-            ActiveAnimationGraph = graph;
-            _allAnimationGraphClips = clips ?? Array.Empty<AnimationGraphClipInspectorItem>();
-            AnimationGraphTracks.ReplaceRange(graph?.Tracks ?? Array.Empty<AnimationTrackDefinition>());
-            AnimationGraphMasks.ReplaceRange(masks ?? Array.Empty<AnimationMaskInspectorItem>());
-            AnimationGraphSyncGroups.ReplaceRange(graph?.SyncGroups ?? Array.Empty<AnimationSyncGroupDefinition>());
-            SelectedAnimationGraphClip = null;
-            SelectedAnimationGraphTrack = null;
-            SelectedAnimationGraphMask = null;
-            SelectedAnimationGraphSyncGroup = null;
-            AnimationGraphMaskJoints.Clear();
-            RefreshAnimationGraphFilter();
-        }
-
-        public void ClearAnimationGraphInspector()
-        {
-            ActiveAnimationGraph = null;
-            _allAnimationGraphClips = Array.Empty<AnimationGraphClipInspectorItem>();
-            AnimationGraphClips.Clear();
-            AnimationGraphTracks.Clear();
-            AnimationGraphMasks.Clear();
-            AnimationGraphSyncGroups.Clear();
-            AnimationGraphMaskJoints.Clear();
-            SelectedAnimationGraphClip = null;
-            SelectedAnimationGraphTrack = null;
-            SelectedAnimationGraphMask = null;
-            SelectedAnimationGraphSyncGroup = null;
-            AnimationGraphFilter = string.Empty;
-            AnimationGraphDeckView = AnimationGraphDeckView.Timeline;
-            AnimationGraphInspectorTab = AnimationGraphInspectorTab.Clips;
-        }
-
-        public void SetAnimationGraphMaskJoints(IReadOnlyList<AnimationMaskJointInspectorItem> joints)
-            => AnimationGraphMaskJoints.ReplaceRange(joints ?? Array.Empty<AnimationMaskJointInspectorItem>());
-
-        public AnimationGraphClipInspectorItem FindAnimationGraphClip(uint hash)
-            => _allAnimationGraphClips.FirstOrDefault(item => item.Hash == hash);
-
-        public AnimationTrackDefinition FindAnimationGraphTrack(uint hash)
-            => AnimationGraphTracks.FirstOrDefault(item => item.Hash == hash);
-
-        public AnimationMaskInspectorItem FindAnimationGraphMask(uint hash)
-            => AnimationGraphMasks.FirstOrDefault(item => item.Hash == hash);
-
-        public AnimationSyncGroupDefinition FindAnimationGraphSyncGroup(uint hash)
-            => AnimationGraphSyncGroups.FirstOrDefault(item => item.Hash == hash);
-
-        private void RefreshAnimationGraphFilter()
-        {
-            string wanted = _animationGraphFilter?.Trim() ?? string.Empty;
-            IEnumerable<AnimationGraphClipInspectorItem> filtered = _allAnimationGraphClips;
-            if (!string.IsNullOrEmpty(wanted))
-            {
-                filtered = filtered.Where(item =>
-                    item.Name.Contains(wanted, StringComparison.OrdinalIgnoreCase));
-            }
-            AnimationGraphClips.ReplaceRange(filtered);
         }
 
         public bool HasAnySolo
@@ -867,16 +673,31 @@ namespace AssetsManager.Views.Models.Viewer
                 if (_playbackSeed == value) return;
                 _playbackSeed = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(PlaybackSeedText));
             }
         }
 
-        public string PlaybackSeedText => $"Seed {_playbackSeed}";
+        public double ActiveLoopStart
+        {
+            get => _activeLoopStart;
+            set
+            {
+                if (Math.Abs(_activeLoopStart - value) <= 0.0001) return;
+                _activeLoopStart = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ActiveLoopDurationText));
+            }
+        }
 
         public double ActiveLoopDuration
         {
             get => _activeLoopDuration;
-            set { _activeLoopDuration = value; OnPropertyChanged(); OnPropertyChanged(nameof(ActiveLoopDurationText)); }
+            set
+            {
+                if (Math.Abs(_activeLoopDuration - value) <= 0.0001) return;
+                _activeLoopDuration = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ActiveLoopDurationText));
+            }
         }
 
         public bool IsPreviewLoopEnabled
@@ -890,8 +711,8 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        public string ActiveLoopDurationText => _isPreviewLoopEnabled && _activeLoopDuration > 0
-            ? $" · PREVIEW ↺ {_activeLoopDuration:F2}s"
+        public string ActiveLoopDurationText => _isPreviewLoopEnabled && _activeLoopDuration > _activeLoopStart
+            ? $" · PREVIEW ↺ {_activeLoopStart:F2}–{_activeLoopDuration:F2}s"
             : string.Empty;
 
         public string RootPath
@@ -932,8 +753,15 @@ namespace AssetsManager.Views.Models.Viewer
         public VfxSystemDiagnosticItem SelectedSystem
         {
             get => _selectedSystem;
-            set { _selectedSystem = value; OnPropertyChanged(); }
+            set
+            {
+                _selectedSystem = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasStandaloneSystem));
+            }
         }
+
+        public bool HasStandaloneSystem => IsRawSystemsMode && SelectedSystem != null;
 
         public bool IsPlaying
         {
@@ -1025,11 +853,138 @@ namespace AssetsManager.Views.Models.Viewer
             set { _bgMode = value; OnPropertyChanged(); }
         }
 
-        public bool IsWireframe
+        public bool ShowPreviewGrid
         {
-            get => _isWireframe;
-            set { _isWireframe = value; OnPropertyChanged(); }
+            get => _showPreviewGrid;
+            set
+            {
+                if (_showPreviewGrid == value) return;
+                _showPreviewGrid = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PreviewDisplayCount));
+            }
         }
+
+        public bool ShowPreviewGround
+        {
+            get => _showPreviewGround;
+            set
+            {
+                if (_showPreviewGround == value) return;
+                _showPreviewGround = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PreviewDisplayCount));
+            }
+        }
+
+        public int PreviewDisplayCount =>
+            (_showPreviewGrid ? 1 : 0) +
+            (_showPreviewGround ? 1 : 0);
+
+        public VfxPreviewWireframeMode PreviewWireframeMode
+        {
+            get => _previewWireframeMode;
+            set
+            {
+                if (_previewWireframeMode == value) return;
+                _previewWireframeMode = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PreviewWireframeText));
+                OnPropertyChanged(nameof(IsPreviewWireframeOff));
+                OnPropertyChanged(nameof(IsPreviewWireframeOnly));
+                OnPropertyChanged(nameof(IsPreviewWireframeOverlay));
+            }
+        }
+
+        public string PreviewWireframeText => _previewWireframeMode switch
+        {
+            VfxPreviewWireframeMode.Only => "Wire",
+            VfxPreviewWireframeMode.Overlay => "Overlay",
+            _ => "Shaded"
+        };
+
+        public bool IsPreviewWireframeOff
+        {
+            get => _previewWireframeMode == VfxPreviewWireframeMode.Off;
+            set { if (value) PreviewWireframeMode = VfxPreviewWireframeMode.Off; }
+        }
+
+        public bool IsPreviewWireframeOnly
+        {
+            get => _previewWireframeMode == VfxPreviewWireframeMode.Only;
+            set { if (value) PreviewWireframeMode = VfxPreviewWireframeMode.Only; }
+        }
+
+        public bool IsPreviewWireframeOverlay
+        {
+            get => _previewWireframeMode == VfxPreviewWireframeMode.Overlay;
+            set { if (value) PreviewWireframeMode = VfxPreviewWireframeMode.Overlay; }
+        }
+
+        public VfxPreviewCameraPreset PreviewCameraPreset
+        {
+            get => _previewCameraPreset;
+            set
+            {
+                if (_previewCameraPreset == value) return;
+                _previewCameraPreset = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PreviewCameraText));
+                OnPropertyChanged(nameof(IsPreviewCameraGame));
+                OnPropertyChanged(nameof(IsPreviewCameraOrbit));
+                OnPropertyChanged(nameof(IsPreviewCameraTop));
+                OnPropertyChanged(nameof(IsPreviewCameraFront));
+                OnPropertyChanged(nameof(IsPreviewCameraSide));
+            }
+        }
+
+        public string PreviewCameraText => _previewCameraPreset.ToString();
+
+        public bool IsPreviewCameraGame
+        {
+            get => _previewCameraPreset == VfxPreviewCameraPreset.Game;
+            set { if (value) PreviewCameraPreset = VfxPreviewCameraPreset.Game; }
+        }
+
+        public bool IsPreviewCameraOrbit
+        {
+            get => _previewCameraPreset == VfxPreviewCameraPreset.Orbit;
+            set { if (value) PreviewCameraPreset = VfxPreviewCameraPreset.Orbit; }
+        }
+
+        public bool IsPreviewCameraTop
+        {
+            get => _previewCameraPreset == VfxPreviewCameraPreset.Top;
+            set { if (value) PreviewCameraPreset = VfxPreviewCameraPreset.Top; }
+        }
+
+        public bool IsPreviewCameraFront
+        {
+            get => _previewCameraPreset == VfxPreviewCameraPreset.Front;
+            set { if (value) PreviewCameraPreset = VfxPreviewCameraPreset.Front; }
+        }
+
+        public bool IsPreviewCameraSide
+        {
+            get => _previewCameraPreset == VfxPreviewCameraPreset.Side;
+            set { if (value) PreviewCameraPreset = VfxPreviewCameraPreset.Side; }
+        }
+
+        public VfxEmitterDiagnosticItem SelectedEmitter
+        {
+            get => _selectedEmitter;
+            set
+            {
+                if (ReferenceEquals(_selectedEmitter, value)) return;
+                if (_selectedEmitter != null) _selectedEmitter.IsSelected = false;
+                _selectedEmitter = value;
+                if (_selectedEmitter != null) _selectedEmitter.IsSelected = true;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasSelectedEmitter));
+            }
+        }
+
+        public bool HasSelectedEmitter => _selectedEmitter != null;
 
         public string StatusText
         {

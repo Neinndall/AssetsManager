@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -62,13 +63,21 @@ namespace AssetsManager.Views.Controls.Viewer
         private int _championLoadGeneration;
         private System.Threading.CancellationTokenSource _scanCancellation;
         private System.Threading.CancellationTokenSource _binCancellation;
+        private GridRenderer _gridRenderer;
+        private VfxPreviewGroundRenderer _previewGroundRenderer;
+        private PerspectiveCamera _previewPerspectiveCamera;
+        private OrthographicCamera _previewOrthographicCamera;
+        private bool _previewPreferencesLoaded;
+        private bool _isLoadingPreviewPreferences;
+        private bool _suppressCameraPresetFit;
+        private bool _deferOrbitProjectionSwap;
 
         private sealed record StandaloneRunMemory(
             int Seed,
             double Playhead,
             float Speed,
             VfxRigSettings RigSettings,
-            bool LoopEnabled,
+            double LoopStart,
             double LoopBoundary,
             int[] Muted,
             int[] Soloed);
@@ -77,6 +86,7 @@ namespace AssetsManager.Views.Controls.Viewer
             new(StringComparer.OrdinalIgnoreCase);
 
         internal const int StandalonePlaybackSeed = 1337;
+        internal const double PreviewLoopMinimumSpan = 1d / 60d;
         private static readonly double[] PlaybackSpeedDetents =
             { 0.05d, 0.1d, 0.25d, 0.5d, 1d, 1.5d, 2d };
 
@@ -89,9 +99,11 @@ namespace AssetsManager.Views.Controls.Viewer
         /// <summary>Injected by the host and owned by ViewerWindow.</summary>
         public VfxLoadingService VfxLoadingService { get; set; }
 
+        /// <summary>Injected by the host; VFX preview display preferences persist here.</summary>
+        public AppSettings AppSettings { get; set; }
+
         public event EventHandler ExitRequested;
 
-        // VFX Studio dedicated camera framing (elevated 3/4 perspective looking down at origin Y=0)
         private static readonly Point3D VfxCameraPosition = new(0, 320, 500);
         private static readonly Point3D VfxCameraTarget = new(0, 0, 0);
         private static readonly Vector3D VfxCameraUpDirection = new(0, 1, 0);
@@ -114,6 +126,12 @@ namespace AssetsManager.Views.Controls.Viewer
         public VfxInspectorControl()
         {
             _model = new VfxInspectorModel();
+            _previewPerspectiveCamera = (PerspectiveCamera)_dummyViewport.Camera;
+            _previewOrthographicCamera = new OrthographicCamera(
+                VfxCameraPosition,
+                VfxCameraTarget - VfxCameraPosition,
+                VfxCameraUpDirection,
+                VfxRigMotion.ChampionHeight * 4.0);
             InitializeComponent();
             DataContext = _model;
             _model.PropertyChanged += OnModelPropertyChanged;
@@ -150,24 +168,79 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 RebuildAnimationsForParameter(_model.AnimationParameter.Value);
             }
-            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedAnimationGraphClip))
+            else if (e.PropertyName == nameof(VfxInspectorModel.PreviewCameraPreset))
             {
-                AnimationClipCatalogItem playable = _model.SelectedAnimationGraphClip?.CatalogItem;
-                if (playable != null && !ReferenceEquals(_model.SelectedAnimation, playable))
-                    _model.SelectedAnimation = playable;
+                if (!_suppressCameraPresetFit)
+                    ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
+                SavePreviewDisplayPreferences();
             }
-            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedAnimationGraphMask))
+            else if (e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGrid) ||
+                     e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGround) ||
+                     e.PropertyName == nameof(VfxInspectorModel.PreviewWireframeMode))
             {
-                UpdateAnimationGraphMaskJoints();
+                SavePreviewDisplayPreferences();
             }
         }
 
         private void OnControlLoaded(object sender, RoutedEventArgs e)
         {
+            LoadPreviewDisplayPreferences();
             UpdateViewportClip();
             if (_isActive)
             {
                 EnsureOpenGlStarted();
+            }
+        }
+
+        private void LoadPreviewDisplayPreferences()
+        {
+            if (_previewPreferencesLoaded) return;
+            _previewPreferencesLoaded = true;
+
+            StudioParametersSettings viewerSettings = AppSettings?.StudioParameters;
+            VfxStudioSettings vfxSettings = AppSettings?.VfxStudio;
+            if (viewerSettings == null || vfxSettings == null) return;
+
+            _isLoadingPreviewPreferences = true;
+            try
+            {
+                _model.ShowPreviewGrid = viewerSettings.GridVisible;
+                _model.ShowPreviewGround = viewerSettings.GroundVisible;
+
+                if (Enum.TryParse(vfxSettings.CameraPreset, ignoreCase: true, out VfxPreviewCameraPreset cameraPreset))
+                    _model.PreviewCameraPreset = cameraPreset;
+                if (Enum.TryParse(vfxSettings.WireframeMode, ignoreCase: true, out VfxPreviewWireframeMode wireframeMode))
+                    _model.PreviewWireframeMode = wireframeMode;
+            }
+            finally
+            {
+                _isLoadingPreviewPreferences = false;
+            }
+        }
+
+        private void SavePreviewDisplayPreferences()
+        {
+            if (_isLoadingPreviewPreferences || AppSettings == null) return;
+
+            AppSettings.StudioParameters ??= new StudioParametersSettings();
+            AppSettings.VfxStudio ??= new VfxStudioSettings();
+
+            AppSettings.StudioParameters.GridVisible = _model.ShowPreviewGrid;
+            AppSettings.StudioParameters.GroundVisible = _model.ShowPreviewGround;
+            AppSettings.VfxStudio.CameraPreset = _model.PreviewCameraPreset.ToString();
+            AppSettings.VfxStudio.WireframeMode = _model.PreviewWireframeMode.ToString();
+            _ = SavePreviewDisplayPreferencesAsync();
+        }
+
+        private async Task SavePreviewDisplayPreferencesAsync()
+        {
+            try
+            {
+                await AppSettings.SaveAsync();
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to save VFX preview display preferences.");
             }
         }
 
@@ -263,6 +336,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
             var cameraController = _cameraController;
             _cameraController = null;
+            if (cameraController != null)
+            {
+                cameraController.RotationStarted -= CameraController_RotationStarted;
+                cameraController.RotationEnded -= CameraController_RotationEnded;
+            }
             RunReleaseStep(nameof(CustomCameraController), () => cameraController?.Dispose());
 
             var vfxRenderer = _vfxRenderer;
@@ -272,6 +350,10 @@ namespace AssetsManager.Views.Controls.Viewer
             var gridRenderer = _gridRenderer;
             _gridRenderer = null;
             RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
+
+            var previewGroundRenderer = _previewGroundRenderer;
+            _previewGroundRenderer = null;
+            RunReleaseStep(nameof(VfxPreviewGroundRenderer), () => previewGroundRenderer?.Dispose(), gpuBound: true);
 
             var championMeshRenderer = _championMeshRenderer;
             _championMeshRenderer = null;
@@ -356,8 +438,6 @@ namespace AssetsManager.Views.Controls.Viewer
             return addr;
         }
 
-        private GridRenderer _gridRenderer;
-
         private void EnsureVfxRenderSession()
         {
             if (_vfxRenderer != null || _gl == null || !_isActive || _isCleanedUp) return;
@@ -427,6 +507,13 @@ namespace AssetsManager.Views.Controls.Viewer
                     _gridRenderer.Initialize(_gl, false);
                 }
 
+                if (_previewGroundRenderer == null)
+                {
+                    BitmapSource groundTexture = SceneElements.LoadSceneTexture(SceneElements.GroundTexturePath, LogService);
+                    _previewGroundRenderer = new VfxPreviewGroundRenderer();
+                    _previewGroundRenderer.Initialize(_gl, groundTexture);
+                }
+
                 if (_championMeshRenderer == null)
                 {
                     _championMeshRenderer = new GlMeshRenderer();
@@ -438,10 +525,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_cameraController == null)
                 {
                     _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
-                    ResetCamera();
+                    _cameraController.RotationStarted += CameraController_RotationStarted;
+                    _cameraController.RotationEnded += CameraController_RotationEnded;
+                    ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
                 }
 
-                _model.LogMessages.Add("[GL] OpenGL viewport, camera controller & 3D grid initialized successfully.");
+                _model.LogMessages.Add("[GL] OpenGL viewport, preview ground and camera controller initialized successfully.");
                 _model.LogMessages.Add(
                     $"[GL] Vendor={_gl.GetStringS(Silk.NET.OpenGL.StringName.Vendor)} | " +
                     $"Renderer={_gl.GetStringS(Silk.NET.OpenGL.StringName.Renderer)} | " +
@@ -497,9 +586,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit |
                 Silk.NET.OpenGL.ClearBufferMask.StencilBufferBit);
 
-            // Build View/Projection matrices directly from CustomCameraController's PerspectiveCamera
-            var camera = _dummyViewport.Camera as PerspectiveCamera;
-            if (camera == null) return;
+            // Build view/projection matrices from the active preview camera. Orthographic presets
+            // use the same camera controller but require their own projection matrix.
+            if (_dummyViewport.Camera is not ProjectionCamera camera) return;
 
             var eye = new Vector3((float)camera.Position.X, (float)camera.Position.Y, (float)camera.Position.Z);
             var lookDir = new Vector3((float)camera.LookDirection.X, (float)camera.LookDirection.Y, (float)camera.LookDirection.Z);
@@ -507,17 +596,32 @@ namespace AssetsManager.Views.Controls.Viewer
             var up = new Vector3((float)camera.UpDirection.X, (float)camera.UpDirection.Y, (float)camera.UpDirection.Z);
             var view = Matrix4x4.CreateLookAt(eye, target, up);
 
-            float fovRadians = (float)(camera.FieldOfView * (Math.PI / 180.0));
             float aspect = (float)Math.Max(1, OpenTkControl.ActualWidth) / (float)Math.Max(1, OpenTkControl.ActualHeight);
-            var proj = Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, aspect, 1f, 10000f);
+            Matrix4x4 proj = camera switch
+            {
+                PerspectiveCamera perspective => Matrix4x4.CreatePerspectiveFieldOfView(
+                    (float)(perspective.FieldOfView * (Math.PI / 180.0)),
+                    aspect,
+                    VfxPreviewCamera.NearPlane,
+                    VfxPreviewCamera.FarPlane),
+                OrthographicCamera orthographic => Matrix4x4.CreateOrthographic(
+                    (float)Math.Max(1d, orthographic.Width),
+                    (float)Math.Max(1d, orthographic.Width / Math.Max(0.001f, aspect)),
+                    VfxPreviewCamera.NearPlane,
+                    VfxPreviewCamera.FarPlane),
+                _ => Matrix4x4.Identity
+            };
             var viewProj = view * proj;
 
             // OpenTK has the current context here, so deferred session creation and resource
             // preparation are safe even when WPF selected the system before the GL control was ready.
             TryInspectPendingSystem();
 
-            // Render 3D Ground Grid (matching main viewer)
-            _gridRenderer?.Render(viewProj);
+            // Grid and Ground are independent viewport aids, matching the main Viewer controls.
+            if (_model.ShowPreviewGround)
+                _previewGroundRenderer?.Render(viewProj);
+            if (_model.ShowPreviewGrid)
+                _gridRenderer?.Render(viewProj);
 
             // Update Champion Animation & Bone Transforms for attached VFX
             if (_model.IsPlaying && !_isUserSeeking && _vfxRenderer?.ActiveSystem != null)
@@ -527,9 +631,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.CurrentTime = _vfxRenderer.PlaybackTime;
                 if (ShouldRestartPreview(_model.IsPreviewLoopEnabled, _model.CurrentTime, _model.ActiveLoopDuration))
                 {
-                    _vfxRenderer.Seek(0);
+                    double loopStart = ResolvePreviewLoopRestart(
+                        _model.ActiveLoopStart,
+                        _model.ActiveLoopDuration,
+                        _model.TotalDuration);
+                    _vfxRenderer.Seek(loopStart);
                     _vfxRenderer.Play();
-                    _model.CurrentTime = 0;
+                    _model.CurrentTime = loopStart;
                 }
                 else if (_model.CurrentTime >= _model.TotalDuration) _model.IsPlaying = false;
             }
@@ -581,7 +689,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
-            _vfxRenderer.Render(viewProj, view);
+            _vfxRenderer.Render(viewProj, view, _model.PreviewWireframeMode);
 
             _model.LiveParticleCount = _vfxRenderer.LiveParticleCount;
 
@@ -600,56 +708,195 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void ResetCamera()
         {
-            if (!_model.IsAnimationMode && _model.SelectedSystem?.Definition is { } definition &&
-                FitCameraToSystem(definition, _model.RigPreset))
+            ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
+        }
+
+        private void CameraController_RotationStarted(object sender, EventArgs e)
+        {
+            if (_model.PreviewCameraPreset == VfxPreviewCameraPreset.Orbit) return;
+
+            // The reference keeps the projection that started the drag. Mark the camera as
+            // free Orbit immediately, but defer an orthographic-to-perspective swap until release.
+            _deferOrbitProjectionSwap = _dummyViewport.Camera is OrthographicCamera;
+            _suppressCameraPresetFit = true;
+            try
             {
+                _model.PreviewCameraPreset = VfxPreviewCameraPreset.Orbit;
+                VfxCameraStand orbit = VfxPreviewCamera.Stand(VfxPreviewCameraPreset.Orbit);
+                _cameraController.PerspectiveMinDistance = orbit.Nearest ?? 0d;
+                _cameraController.PerspectiveMaxDistance = orbit.Farthest ?? double.PositiveInfinity;
+            }
+            finally
+            {
+                _suppressCameraPresetFit = false;
+            }
+        }
+
+        private void CameraController_RotationEnded(object sender, EventArgs e)
+        {
+            if (!_deferOrbitProjectionSwap ||
+                _cameraController == null ||
+                _dummyViewport.Camera is not OrthographicCamera orthographic)
+            {
+                _deferOrbitProjectionSwap = false;
                 return;
             }
 
-            _cameraController?.FlyTo(
-                VfxCameraPosition,
-                VfxCameraTarget - VfxCameraPosition,
-                VfxCameraUpDirection);
+            _deferOrbitProjectionSwap = false;
+            Point3D target = orthographic.Position + orthographic.LookDirection;
+            Vector3D fromTarget = orthographic.Position - target;
+            if (fromTarget.Length > 0.001d)
+                fromTarget.Normalize();
+            else
+                fromTarget = new Vector3D(0d, 0d, 1d);
+
+            float aspect = OpenTkControl.ActualHeight > 0d
+                ? (float)Math.Max(1d, OpenTkControl.ActualWidth) / (float)OpenTkControl.ActualHeight
+                : 1f;
+            double reach = VfxPreviewCamera.ReachOfOrthographicWidth(
+                (float)Math.Max(1d, orthographic.Width),
+                aspect);
+            Point3D position = target + fromTarget * reach;
+
+            // Carry the exact target, orientation and visible span into the perspective camera.
+            _previewPerspectiveCamera.FieldOfView = VfxPreviewCamera.OrbitFieldOfView;
+            _previewPerspectiveCamera.Position = position;
+            _previewPerspectiveCamera.LookDirection = target - position;
+            _previewPerspectiveCamera.UpDirection = orthographic.UpDirection;
+            _cameraController.SetCamera(_previewPerspectiveCamera);
         }
 
-        private bool FitCameraToSystem(VfxSystemDefinition definition, VfxRigPreset preset)
+        private void ApplyCameraPreset(VfxPreviewCameraPreset preset, bool refit)
         {
-            if (_cameraController == null || definition == null ||
-                _dummyViewport.Camera is not PerspectiveCamera camera)
+            if (_cameraController == null) return;
+
+            VfxCameraStand stand = VfxPreviewCamera.Stand(preset);
+            _cameraController.PerspectiveMinDistance = stand.Nearest ?? 0d;
+            _cameraController.PerspectiveMaxDistance = stand.Farthest ?? double.PositiveInfinity;
+
+            ProjectionCamera camera;
+            if (stand.Orthographic)
             {
-                return false;
+                camera = _previewOrthographicCamera;
+            }
+            else
+            {
+                _previewPerspectiveCamera.FieldOfView = stand.FieldOfView;
+                camera = _previewPerspectiveCamera;
             }
 
-            VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(definition, preset);
-            var currentLook = camera.LookDirection;
-            var direction = new Vector3(
-                -(float)currentLook.X,
-                -(float)currentLook.Y,
-                -(float)currentLook.Z);
-            if (direction.LengthSquared() <= 1e-8f)
+            _cameraController.SetCamera(camera);
+            if (refit)
+                FrameCurrentPreview(stand);
+        }
+
+        private void FrameCurrentPreview(VfxCameraStand stand)
+        {
+            if (_cameraController == null) return;
+
+            if (stand.Farthest is float gameReach)
             {
-                direction = new Vector3(
-                    (float)(VfxCameraPosition.X - VfxCameraTarget.X),
-                    (float)(VfxCameraPosition.Y - VfxCameraTarget.Y),
-                    (float)(VfxCameraPosition.Z - VfxCameraTarget.Z));
+                Vector3 target = CurrentPreviewGround();
+                Vector3 position = target + stand.Direction * gameReach;
+                _cameraController.SnapTo(
+                    new Point3D(position.X, position.Y, position.Z),
+                    new Vector3D(target.X - position.X, target.Y - position.Y, target.Z - position.Z),
+                    new Vector3D(stand.Up.X, stand.Up.Y, stand.Up.Z));
+                return;
+            }
+
+            FramePreviewBounds(CurrentPreviewBounds(), stand);
+        }
+
+        private VfxDefinitionBounds CurrentPreviewBounds()
+        {
+            if (_model.IsRawSystemsMode && _model.SelectedSystem?.Definition is { } definition)
+            {
+                VfxRigSettings settings = _vfxRenderer?.RigSettings ??
+                    VfxRigSettings.ForPreset(_model.RigPreset);
+                return VfxSystemBounds.Calculate(definition, settings);
+            }
+
+            return DefaultPreviewBounds();
+        }
+
+        private Vector3 CurrentPreviewGround()
+        {
+            if (_model.IsRawSystemsMode && _model.SelectedSystem?.Definition is { } definition)
+            {
+                VfxRigSettings settings = _vfxRenderer?.RigSettings ??
+                    VfxRigSettings.ForPreset(_model.RigPreset);
+                return VfxSystemBounds.Ground(definition, settings);
+            }
+
+            return Vector3.Zero;
+        }
+
+        private void FramePreviewBounds(VfxDefinitionBounds bounds, VfxCameraStand stand)
+        {
+            if (_cameraController == null) return;
+
+            var up = new Vector3D(stand.Up.X, stand.Up.Y, stand.Up.Z);
+            if (stand.Orthographic)
+            {
+                VfxOrthographicFrame frame = VfxSystemBounds.FrameOrthographic(
+                    bounds,
+                    (float)Math.Max(1d, OpenTkControl.ActualWidth),
+                    (float)Math.Max(1d, OpenTkControl.ActualHeight),
+                    stand.Direction);
+                _previewOrthographicCamera.Width = Math.Max(1d, frame.Width);
+                var position = new Point3D(frame.Position.X, frame.Position.Y, frame.Position.Z);
+                var target = new Point3D(frame.Target.X, frame.Target.Y, frame.Target.Z);
+                _cameraController.SnapTo(position, target - position, up);
+                return;
             }
 
             float aspect = OpenTkControl.ActualHeight > 0
                 ? (float)Math.Max(1d, OpenTkControl.ActualWidth) / (float)OpenTkControl.ActualHeight
                 : 1f;
-            VfxCameraFrame frame = VfxSystemBounds.FramePerspective(
+            VfxCameraFrame perspectiveFrame = VfxSystemBounds.FramePerspective(
                 bounds,
-                (float)camera.FieldOfView,
+                stand.FieldOfView,
                 aspect,
-                direction);
+                stand.Direction);
+            var perspectivePosition = new Point3D(
+                perspectiveFrame.Position.X,
+                perspectiveFrame.Position.Y,
+                perspectiveFrame.Position.Z);
+            var perspectiveTarget = new Point3D(
+                perspectiveFrame.Target.X,
+                perspectiveFrame.Target.Y,
+                perspectiveFrame.Target.Z);
+            _cameraController.SnapTo(
+                perspectivePosition,
+                perspectiveTarget - perspectivePosition,
+                up);
+        }
 
-            var position = new Point3D(frame.Position.X, frame.Position.Y, frame.Position.Z);
-            var target = new Point3D(frame.Target.X, frame.Target.Y, frame.Target.Z);
-            Vector3D up = camera.UpDirection.LengthSquared > 1e-8
-                ? camera.UpDirection
-                : VfxCameraUpDirection;
-            _cameraController.FlyTo(position, target - position, up);
-            return true;
+        private static VfxDefinitionBounds DefaultPreviewBounds()
+        {
+            float reach = VfxSystemBounds.StandingReach;
+            return new VfxDefinitionBounds(
+                new Vector3(-reach, 0f, -reach),
+                new Vector3(reach, VfxRigMotion.ChampionHeight, reach));
+        }
+
+        private void PreviewShow_Click(object sender, RoutedEventArgs e)
+        {
+            if (PreviewShowPopup != null)
+                PreviewShowPopup.IsOpen = !PreviewShowPopup.IsOpen;
+        }
+
+        private void PreviewWireframe_Click(object sender, RoutedEventArgs e)
+        {
+            if (PreviewWireframePopup != null)
+                PreviewWireframePopup.IsOpen = !PreviewWireframePopup.IsOpen;
+        }
+
+        private void PreviewCamera_Click(object sender, RoutedEventArgs e)
+        {
+            if (PreviewCameraPopup != null)
+                PreviewCameraPopup.IsOpen = !PreviewCameraPopup.IsOpen;
         }
 
         private void RigPreset_Click(object sender, RoutedEventArgs e)
@@ -662,6 +909,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 btn.ContextMenu.IsOpen = true;
             }
         }
+
+
 
         private void RerollSeed_Click(object sender, RoutedEventArgs e)
         {
@@ -677,8 +926,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void SetRigPreset_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not MenuItem item ||
-                item.Tag is not string tagStr ||
+            if (!_model.IsRawSystemsMode) return;
+            if (sender is not FrameworkElement { Tag: string tagStr } ||
                 !Enum.TryParse(tagStr, out VfxRigPreset preset))
             {
                 return;
@@ -690,22 +939,26 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _vfxRenderer.RigSettings = settings;
                 double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
-                    _model.ActiveLoopDuration = Math.Min(
-                        Math.Max(_model.ActiveLoopDuration, 0.05d),
-                        duration);
-                    _model.TotalDuration = duration;
-                    _model.CurrentTime = _vfxRenderer.PlaybackTime;
+                _model.ActiveLoopDuration = Math.Min(
+                    Math.Max(_model.ActiveLoopDuration, PreviewLoopMinimumSpan),
+                    duration);
+                _model.ActiveLoopStart = Math.Clamp(
+                    _model.ActiveLoopStart,
+                    0d,
+                    Math.Max(0d, _model.ActiveLoopDuration - PreviewLoopMinimumSpan));
+                _model.TotalDuration = duration;
+                _model.IsPreviewLoopEnabled = settings.IsLooping;
+                _model.CurrentTime = _vfxRenderer.PlaybackTime;
                 _vfxRenderer.Play();
                 _model.IsPlaying = true;
-                if (!_model.IsAnimationMode && _model.SelectedSystem?.Definition is { } definition)
-                    FitCameraToSystem(definition, preset);
             }
             UpdateRigControlValues();
+            ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
         }
 
         private void ApplyRigTuning(VfxRigSettings settings)
         {
-            if (_isUpdatingRigControls || _vfxRenderer == null) return;
+            if (_isUpdatingRigControls || _vfxRenderer == null || !_model.IsRawSystemsMode) return;
 
             _vfxRenderer.RigSettings = settings;
             _model.RigPreset = settings.Preset;
@@ -713,32 +966,38 @@ namespace AssetsManager.Views.Controls.Viewer
             double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
             _model.TotalDuration = duration;
             _model.ActiveLoopDuration = Math.Min(
-                Math.Max(_model.ActiveLoopDuration, 0.05d),
+                Math.Max(_model.ActiveLoopDuration, PreviewLoopMinimumSpan),
                 duration);
+            _model.ActiveLoopStart = Math.Clamp(
+                _model.ActiveLoopStart,
+                0d,
+                Math.Max(0d, _model.ActiveLoopDuration - PreviewLoopMinimumSpan));
+            _model.IsPreviewLoopEnabled = settings.IsLooping;
 
             _model.CurrentTime = _vfxRenderer.PlaybackTime;
             UpdateRigControlValues();
             UpdateTimelineTrackMetrics();
             UpdatePlayheadPosition();
+            ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
         }
 
         private void UpdateRigControlValues()
         {
-            if (_vfxRenderer == null ||
-                RigHeightSlider == null ||
+            if (RigHeightSlider == null ||
                 RigDistancePanel == null ||
                 RigOrbitPanel == null)
             {
                 return;
             }
 
-            VfxRigSettings settings = _vfxRenderer.RigSettings;
+            VfxRigSettings settings = _vfxRenderer?.RigSettings ?? VfxRigSettings.ForPreset(_model.RigPreset);
             try
             {
                 _isUpdatingRigControls = true;
                 RigHeightSlider.Value = settings.Height;
                 RigHeightValueText.Text = $"{Math.Round(settings.Height)} u";
 
+                // Show only the tuning controls used by the selected motion preset.
                 RigDistancePanel.Visibility = settings.MotionKind == VfxRigMotionKind.Path
                     ? Visibility.Visible
                     : Visibility.Collapsed;
@@ -755,13 +1014,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 RigPeriodSlider.Value = settings.OrbitPeriod;
                 RigPeriodValueText.Text = $"{settings.OrbitPeriod:F2} s";
 
-                RigLifeLoopCheckBox.IsChecked = settings.IsLooping;
-                RigStopCheckBox.IsChecked = settings.StopAt.HasValue;
-                RigStopPanel.Visibility = settings.StopAt.HasValue
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-                RigStopSlider.Value = settings.StopAt ?? 2f;
-                RigStopValueText.Text = $"{(settings.StopAt ?? 2f):F2} s";
+                if (RigLoopToggleButton != null)
+                    RigLoopToggleButton.IsChecked = settings.IsLooping;
             }
             finally
             {
@@ -799,41 +1053,16 @@ namespace AssetsManager.Views.Controls.Viewer
             ApplyRigTuning(_vfxRenderer.RigSettings with { OrbitPeriod = (float)e.NewValue });
         }
 
-        private void RigLifeLoopCheckBox_Changed(object sender, RoutedEventArgs e)
+        private void RigLoopToggleButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_isUpdatingRigControls || _vfxRenderer == null ||
-                sender is not CheckBox checkBox)
+            if (_isUpdatingRigControls || _vfxRenderer == null || !_model.IsRawSystemsMode ||
+                sender is not ToggleButton toggleButton)
             {
                 return;
             }
 
             ApplyRigTuning(
-                _vfxRenderer.RigSettings with { IsLooping = checkBox.IsChecked == true });
-        }
-
-        private void RigStopCheckBox_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_isUpdatingRigControls || _vfxRenderer == null ||
-                sender is not CheckBox checkBox)
-            {
-                return;
-            }
-
-            float? stopAt = checkBox.IsChecked == true
-                ? _vfxRenderer.RigSettings.StopAt ?? 2f
-                : null;
-            ApplyRigTuning(_vfxRenderer.RigSettings with { StopAt = stopAt });
-        }
-
-        private void RigStopSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (_isUpdatingRigControls || _vfxRenderer == null ||
-                !_vfxRenderer.RigSettings.StopAt.HasValue)
-            {
-                return;
-            }
-
-            ApplyRigTuning(_vfxRenderer.RigSettings with { StopAt = (float)e.NewValue });
+                _vfxRenderer.RigSettings with { IsLooping = toggleButton.IsChecked == true });
         }
 
         #endregion
@@ -886,9 +1115,9 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.SelectedAnimation = null;
             _model.SelectedSystem = null;
             _model.SelectedSkin = null;
-            _model.ClearAnimationGraphInspector();
             _model.DetectedAnimations.Clear();
             _model.Systems.Clear();
+            _model.SelectedEmitter = null;
             _model.Emitters.Clear();
             _model.Textures.Clear();
             _model.Meshes.Clear();
@@ -899,6 +1128,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.EmitterFilterText = string.Empty;
             _model.CurrentTime = 0;
             _model.TotalDuration = 5.0;
+            _model.ActiveLoopStart = 0;
             _model.ActiveLoopDuration = 0;
             _model.LiveParticleCount = 0;
             _model.HasChampionMesh = false;
@@ -939,21 +1169,26 @@ namespace AssetsManager.Views.Controls.Viewer
             _scanCancellation?.Cancel();
             _scanCancellation = new System.Threading.CancellationTokenSource();
             var operation = _scanCancellation;
-            _model.IsPlaying = false;
-            _vfxRenderer?.Pause();
+
+            // A folder scan is discovery-only. Drop any previously loaded skin/model before
+            // populating the new catalog so the project opens in a neutral, collapsed state.
+            ClearLoadedSkinState();
+            _model.SelectedSkin = null;
+            _model.DetectedSkins.Clear();
             _model.StatusText = "Reading BIN catalog...";
             try
             {
                 var entries = await System.Threading.Tasks.Task.Run(
                     () => VfxFolderCatalog.Scan(rootFolder, operation.Token, LogService), operation.Token);
                 if (operation.IsCancellationRequested || _isCleanedUp) return;
-                _model.SelectedSkin = null;
                 _model.DetectedSkins.Clear();
-                _model.Systems.Clear();
-                _abilityCompositions = Array.Empty<VfxAbilityComposition>();
-                foreach (var entry in entries) _model.DetectedSkins.Add(entry);
+                foreach (VfxSkinItem entry in entries)
+                {
+                    // Never carry expansion state into a freshly discovered project tree.
+                    entry.IsExpanded = false;
+                    _model.DetectedSkins.Add(entry);
+                }
                 _model.StatusText = $"Found {entries.Count} BIN entries.";
-                _model.SelectedSkin = _model.DetectedSkins.FirstOrDefault();
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { LogService?.LogError(ex, "Failed to scan VFX folder."); }
@@ -1010,46 +1245,75 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private async void LoadBinFile(string binFilePath)
+        private void ClearLoadedSkinState()
         {
-            if (!File.Exists(binFilePath)) return;
             _binCancellation?.Cancel();
-            _binCancellation = new System.Threading.CancellationTokenSource();
-            var operation = _binCancellation;
             _model.IsPlaying = false;
             _vfxRenderer?.Pause();
+            if (_inspectedSystem != null)
+                RememberStandaloneRun(_inspectedSystem);
             _pendingSystem = null;
+            _inspectedSystem = null;
             _activeBundle = null;
             _championLoadGeneration++;
             ClearAnimationClipCues();
             _model.SelectedAnimation = null;
-            _model.ClearAnimationGraphInspector();
+            _model.SetAnimationParameterOptions(Array.Empty<float>(), null);
             _model.DetectedAnimations.Clear();
             _vfxRenderer?.SetSystem(null);
+
             if (_championModel != null)
             {
-                var championModel = _championModel;
+                SceneModel championModel = _championModel;
                 _championModel = null;
                 _championMeshRenderer?.QueueRelease(championModel);
                 RunReleaseStep("Champion SceneModel", championModel.Dispose);
             }
+
             _championBundle = null;
             _model.HasChampionMesh = false;
             RunReleaseStep("Champion animation cache", () => _championAnimationService?.ClearCache());
-            var clipCatalog = _clipCatalog;
+
+            VfxClipCatalog clipCatalog = _clipCatalog;
             _clipCatalog = null;
             RunReleaseStep(nameof(VfxClipCatalog), () => clipCatalog?.Dispose());
 
+            _model.SelectedSystem = null;
+            _model.Systems.Clear();
+            _model.SelectedEmitter = null;
+            _model.Emitters.Clear();
+            _model.Textures.Clear();
+            _model.Meshes.Clear();
+            _model.HasAnySolo = false;
+            _model.IsAllMuted = false;
+            _abilityCompositions = Array.Empty<VfxAbilityComposition>();
+            _model.CurrentTime = 0;
+            _model.TotalDuration = 5.0;
+            _model.ActiveLoopStart = 0;
+            _model.ActiveLoopDuration = 0;
+            _model.IsPreviewLoopEnabled = false;
+        }
+
+        private async void LoadBinFile(string binFilePath)
+        {
+            if (!File.Exists(binFilePath)) return;
+
+            ClearLoadedSkinState();
+            _binCancellation = new System.Threading.CancellationTokenSource();
+            var operation = _binCancellation;
+
             try
             {
-                _model.SelectedSystem = null;
-                _model.Systems.Clear();
-                _abilityCompositions = Array.Empty<VfxAbilityComposition>();
                 _model.LogMessages.Add($"[BIN] Loading BIN definitions from: {Path.GetFileName(binFilePath)}");
 
                 var bundle = await VfxLoadingService.LoadAsync(binFilePath, LogService, operation.Token);
                 if (operation.IsCancellationRequested || _isCleanedUp) return;
                 _activeBundle = bundle;
+
+                // AnimationGraph metadata and .anm headers are independent from the preview mesh.
+                // Load them as soon as the BIN is ready so missing SKN/SKL assets never hide
+                // otherwise valid graph rows or rate metadata.
+                BindAnimationCatalog(_model.RootPath);
 
                 foreach (var (hash, sysDef) in _activeBundle.Systems)
                 {
@@ -1087,11 +1351,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.LogMessages.Add($"[BIN SUCCESS] Extracted {_model.Systems.Count} VFX systems.");
                 _model.StatusText = $"Loaded {_model.Systems.Count} systems from {Path.GetFileName(binFilePath)}.";
 
-                if (_model.Systems.Count > 0)
-                {
-                    _model.SelectedSystem = _model.Systems.First();
-                }
-                else TryLoadChampionModelAsync(_model.RootPath);
+                // Selecting a skin loads its owner model and browser data only. A VFX system
+                // starts exclusively from an explicit System selection in the browser.
+                TryLoadChampionModelAsync(_model.RootPath);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
@@ -1130,7 +1392,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 Playhead: _model.CurrentTime,
                 Speed: _model.Speed,
                 RigSettings: _vfxRenderer?.RigSettings ?? VfxRigSettings.ForPreset(_model.RigPreset),
-                LoopEnabled: _model.IsPreviewLoopEnabled,
+                LoopStart: _model.ActiveLoopStart,
                 LoopBoundary: _model.ActiveLoopDuration,
                 Muted: _model.Emitters.Where(emitter => emitter.IsMuted).Select(emitter => emitter.SourceOrder).ToArray(),
                 Soloed: _model.Emitters.Where(emitter => emitter.IsSolo).Select(emitter => emitter.SourceOrder).ToArray());
@@ -1164,6 +1426,7 @@ namespace AssetsManager.Views.Controls.Viewer
             HashSet<int> muted = remembered?.Muted?.ToHashSet() ?? new HashSet<int>();
             HashSet<int> soloed = remembered?.Soloed?.ToHashSet() ?? new HashSet<int>();
 
+            _model.SelectedEmitter = null;
             _model.Emitters.Clear();
             _model.Textures.Clear();
             _model.Meshes.Clear();
@@ -1203,7 +1466,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.RigPreset = rigPreset;
             }
             SetPlaybackSpeed(playbackSpeed);
-            FitCameraToSystem(def, _model.RigPreset);
+            ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
 
             double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(_model.RigPreset, def);
             double timelineMax = ResolveTimelineDuration(rigDuration);
@@ -1211,7 +1474,10 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.ActiveLoopDuration = remembered == null
                 ? timelineMax
                 : Math.Clamp(remembered.LoopBoundary, Math.Min(0.05d, timelineMax), timelineMax);
-            _model.IsPreviewLoopEnabled = remembered?.LoopEnabled ?? false;
+            _model.ActiveLoopStart = remembered == null
+                ? 0d
+                : Math.Clamp(remembered.LoopStart, 0d, Math.Max(0d, _model.ActiveLoopDuration - PreviewLoopMinimumSpan));
+            _model.IsPreviewLoopEnabled = rigSettings.IsLooping;
 
             // 2. Audit Emitters
             for (int emitterIndex = 0; emitterIndex < def.Emitters.Count; emitterIndex++)
@@ -1379,8 +1645,11 @@ namespace AssetsManager.Views.Controls.Viewer
                         int boneCount = _championModel.Skeleton?.Joints?.Count ?? 0;
                         _model.LogMessages.Add($"[CHAMPION MESH] Model loaded for VFX studio: {Path.GetFileName(sknPath)} (Skeleton: {(boneCount > 0 ? $"{boneCount} bones" : "None")})");
 
-                        // Scan animations and link with authored VFX cues
-                        ScanAndBindAnimations(sknPath, searchDir);
+                        // The catalog may already be available from BIN load. Rebuild only when
+                        // no animation asset resolved earlier, but leave playback unselected until
+                        // the user explicitly chooses an Animation Clip in the browser.
+                        if (_model.DetectedAnimations.Count == 0)
+                            BindAnimationCatalog(searchDir);
                         return;
                     }
                 }
@@ -1393,7 +1662,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void ScanAndBindAnimations(string sknPath, string searchDir)
+        private void BindAnimationCatalog(string searchDir)
         {
             ClearAnimationClipCues();
             _model.SelectedAnimation = null;
@@ -1412,111 +1681,12 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_championModel != null) _championModel.CurrentAnimation = null;
             _clipCatalog?.Dispose();
             _clipCatalog = new VfxClipCatalog();
-            if (_activeBundle == null || VfxLoadingService == null) return;
+            if (_activeBundle == null || VfxLoadingService == null)
+                return;
+
             foreach (AnimationClipCatalogItem item in BuildAnimationCatalog(null))
                 _model.DetectedAnimations.Add(item);
-            BindAnimationGraphInspector();
             _model.LogMessages.Add($"[ANIMATIONS] Loaded {_model.DetectedAnimations.Count} authored clips.");
-            if (_model.IsAnimationMode)
-            {
-                // LTK opens the first playable clip whose graph-key name starts with idle.
-                // If the graph has no idle clip, leave the picker unselected instead of
-                // silently choosing a different authored action.
-                _model.SelectedAnimation = _model.DetectedAnimations.FirstOrDefault(item =>
-                    item.Name?.StartsWith("idle", StringComparison.OrdinalIgnoreCase) == true);
-            }
-        }
-
-        private void BindAnimationGraphInspector()
-        {
-            AnimationGraphDefinition graph = ResolveAnimationGraphForInspector();
-            if (graph == null)
-            {
-                _model.ClearAnimationGraphInspector();
-                return;
-            }
-
-            IReadOnlyList<AnimationGraphClipInspectorItem> clips =
-                AnimationGraphInspectorBuilder.BuildClips(graph, _model.DetectedAnimations);
-            IReadOnlyList<AnimationMaskInspectorItem> masks =
-                AnimationGraphInspectorBuilder.BuildMasks(graph);
-            _model.SetAnimationGraphInspector(graph, clips, masks);
-        }
-
-        private AnimationGraphDefinition ResolveAnimationGraphForInspector()
-        {
-            IReadOnlyList<AnimationGraphDefinition> graphs = _activeBundle?.AnimationGraphs;
-            if (graphs == null || graphs.Count == 0) return null;
-
-            uint authoredGraph = _activeBundle?.OwnerSceneContext?.AnimationGraphPathHash ?? 0u;
-            if (authoredGraph != 0u)
-                return graphs.FirstOrDefault(graph => graph.PathHash == authoredGraph);
-
-            uint catalogGraph = _model.DetectedAnimations
-                .Select(item => item.Clip?.GraphPathHash ?? 0u)
-                .FirstOrDefault(hash => hash != 0u);
-            return catalogGraph != 0u
-                ? graphs.FirstOrDefault(graph => graph.PathHash == catalogGraph)
-                : graphs.Count == 1 ? graphs[0] : null;
-        }
-
-        private void UpdateAnimationGraphMaskJoints()
-        {
-            AnimationMaskDefinition mask = _model.SelectedAnimationGraphMask?.Definition;
-            if (mask == null)
-            {
-                _model.SetAnimationGraphMaskJoints(Array.Empty<AnimationMaskJointInspectorItem>());
-                return;
-            }
-
-            IReadOnlyList<string> jointNames = _championModel?.Skeleton?.Joints?
-                .Select(joint => joint.Name ?? string.Empty)
-                .ToArray() ?? Array.Empty<string>();
-            _model.SetAnimationGraphMaskJoints(
-                AnimationGraphInspectorBuilder.BuildMaskJoints(mask, jointNames));
-        }
-
-        private void AnimationGraphChild_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement { DataContext: AnimationGraphChildInspectorItem child })
-                return;
-
-            AnimationGraphClipInspectorItem target = _model.FindAnimationGraphClip(child.Hash);
-            if (target != null)
-                _model.SelectedAnimationGraphClip = target;
-        }
-
-        private void AnimationGraphTrack_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement { Tag: AnimationGraphKeyReference reference })
-                return;
-
-            _model.AnimationGraphInspectorTab = AnimationGraphInspectorTab.Tracks;
-            _model.SelectedAnimationGraphTrack = reference.Declared
-                ? _model.FindAnimationGraphTrack(reference.Hash)
-                : null;
-        }
-
-        private void AnimationGraphMask_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement { Tag: AnimationGraphKeyReference reference })
-                return;
-
-            _model.AnimationGraphInspectorTab = AnimationGraphInspectorTab.Masks;
-            _model.SelectedAnimationGraphMask = reference.Declared
-                ? _model.FindAnimationGraphMask(reference.Hash)
-                : null;
-        }
-
-        private void AnimationGraphSyncGroup_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement { Tag: AnimationGraphKeyReference reference })
-                return;
-
-            _model.AnimationGraphInspectorTab = AnimationGraphInspectorTab.SyncGroups;
-            _model.SelectedAnimationGraphSyncGroup = reference.Declared
-                ? _model.FindAnimationGraphSyncGroup(reference.Hash)
-                : null;
         }
 
         private IReadOnlyList<AnimationClipCatalogItem> BuildAnimationCatalog(float? parameter)
@@ -1557,22 +1727,16 @@ namespace AssetsManager.Views.Controls.Viewer
             IReadOnlyList<AnimationClipCatalogItem> rebuilt = BuildAnimationCatalog(parameter);
             if (rebuilt.Count == 0) return;
 
-            foreach (AnimationClipCatalogItem oldItem in _model.DetectedAnimations)
-                oldItem.AnimationAsset?.Dispose();
+            // VfxClipCatalog owns and caches the animation assets reused by rebuilt entries.
             _model.DetectedAnimations.Clear();
             foreach (AnimationClipCatalogItem item in rebuilt)
                 _model.DetectedAnimations.Add(item);
-
-            BindAnimationGraphInspector();
 
             AnimationClipCatalogItem replacement = rebuilt.FirstOrDefault(item =>
                 item.Clip?.GraphPathHash == selectedGraph &&
                 item.Clip?.OwnerPathHash == selectedClip);
             if (replacement != null)
-            {
                 _model.SelectedAnimation = replacement;
-                _model.SelectedAnimationGraphClip = _model.FindAnimationGraphClip(selectedClip);
-            }
         }
 
         private string ResolveSklPath(string authoredPath, string sknPath, string searchDir)
@@ -1593,6 +1757,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             double dur = animItem.Duration > 0 ? animItem.Duration : 3.0;
             _model.TotalDuration = dur;
+            _model.ActiveLoopStart = 0d;
             _model.ActiveLoopDuration = dur;
             _model.IsPreviewLoopEnabled = true;
 
@@ -1697,22 +1862,37 @@ namespace AssetsManager.Views.Controls.Viewer
         private string ResolveSknPath(string authoredPath, string searchDir)
             => VfxLoadingService?.ResolveAssetPath(authoredPath, searchDir, ".skn");
 
+        private void EmitterLane_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not FrameworkElement { DataContext: VfxEmitterDiagnosticItem item }) return;
+            _model.SelectedEmitter = item;
+            Focus();
+        }
+
         private void EmitterSolo_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is FrameworkElement fe && fe.DataContext is VfxEmitterDiagnosticItem item)
-            {
-                _vfxRenderer?.SetAllEmittersVisibility(true);
-                item.IsSolo = !item.IsSolo;
-            }
+            if (sender is FrameworkElement { DataContext: VfxEmitterDiagnosticItem item })
+                ToggleEmitterSolo(item);
         }
 
         private void EmitterMute_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is FrameworkElement fe && fe.DataContext is VfxEmitterDiagnosticItem item)
-            {
-                _vfxRenderer?.SetAllEmittersVisibility(true);
-                item.IsMuted = !item.IsMuted;
-            }
+            if (sender is FrameworkElement { DataContext: VfxEmitterDiagnosticItem item })
+                ToggleEmitterMuted(item);
+        }
+
+        private void ToggleEmitterSolo(VfxEmitterDiagnosticItem item)
+        {
+            if (item == null) return;
+            _vfxRenderer?.SetAllEmittersVisibility(true);
+            item.IsSolo = !item.IsSolo;
+        }
+
+        private void ToggleEmitterMuted(VfxEmitterDiagnosticItem item)
+        {
+            if (item == null) return;
+            _vfxRenderer?.SetAllEmittersVisibility(true);
+            item.IsMuted = !item.IsMuted;
         }
 
         private void ToggleSoloAll_Click(object sender, RoutedEventArgs e)
@@ -1898,27 +2078,78 @@ namespace AssetsManager.Views.Controls.Viewer
             if (PlayheadHandle != null)
                 Canvas.SetLeft(PlayheadHandle, posX - 5);
 
-            if (LoopBoundaryLine != null && LoopBoundaryHandle != null)
+            if (LoopBoundaryLine != null && LoopBoundaryHandle != null &&
+                LoopStartLine != null && LoopStartHandle != null && LoopRangeBand != null)
             {
-                double loopDur = _model.ActiveLoopDuration > 0 ? _model.ActiveLoopDuration : totalDur;
-                double loopRatio = Math.Clamp(loopDur / totalDur, 0.0, 1.0);
-                double loopPosX = loopRatio * availableWidth;
+                (double from, double to) = ClampPreviewLoop(
+                    _model.ActiveLoopStart,
+                    _model.ActiveLoopDuration > 0 ? _model.ActiveLoopDuration : totalDur,
+                    totalDur);
+                double startPosX = from / totalDur * availableWidth;
+                double endPosX = to / totalDur * availableWidth;
 
-                LoopBoundaryLine.X1 = loopPosX;
-                LoopBoundaryLine.X2 = loopPosX;
-                Canvas.SetLeft(LoopBoundaryHandle, loopPosX - 7);
+                LoopStartLine.X1 = startPosX;
+                LoopStartLine.X2 = startPosX;
+                Canvas.SetLeft(LoopStartHandle, startPosX - 7);
+
+                LoopBoundaryLine.X1 = endPosX;
+                LoopBoundaryLine.X2 = endPosX;
+                Canvas.SetLeft(LoopBoundaryHandle, endPosX - 7);
+
+                Canvas.SetLeft(LoopRangeBand, startPosX);
+                LoopRangeBand.Width = Math.Max(0d, endPosX - startPosX);
             }
         }
 
         internal static bool ShouldRestartPreview(bool enabled, double currentTime, double boundary)
             => enabled && boundary > 0 && currentTime >= boundary;
 
+        internal static (double From, double To) ClampPreviewLoop(double from, double to, double span)
+        {
+            double safeSpan = double.IsFinite(span) ? Math.Max(PreviewLoopMinimumSpan, span) : PreviewLoopMinimumSpan;
+            double safeTo = Math.Clamp(double.IsFinite(to) ? to : safeSpan, PreviewLoopMinimumSpan, safeSpan);
+            double safeFrom = Math.Clamp(
+                double.IsFinite(from) ? from : 0d,
+                0d,
+                Math.Max(0d, safeTo - PreviewLoopMinimumSpan));
+            return (safeFrom, safeTo);
+        }
+
+        internal static double ResolvePreviewLoopRestart(double from, double to, double span)
+            => ClampPreviewLoop(from, to, span).From;
+
         internal static double ResolveTimelineDuration(double playbackDuration)
             => double.IsFinite(playbackDuration) && playbackDuration > 0
                 ? Math.Max(0.05, playbackDuration)
                 : 10.0;
 
+        private bool _isDraggingLoopStart;
         private bool _isDraggingLoopBoundary;
+
+        private void LoopStartHandle_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            _isDraggingLoopStart = true;
+            ((UIElement)sender).CaptureMouse();
+            UpdateLoopStartFromMouse(e.GetPosition(TracksCanvasContainer).X);
+            e.Handled = true;
+        }
+
+        private void LoopStartHandle_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDraggingLoopStart && e.LeftButton == MouseButtonState.Pressed)
+            {
+                UpdateLoopStartFromMouse(e.GetPosition(TracksCanvasContainer).X);
+                e.Handled = true;
+            }
+        }
+
+        private void LoopStartHandle_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (!_isDraggingLoopStart) return;
+            _isDraggingLoopStart = false;
+            ((UIElement)sender).ReleaseMouseCapture();
+            e.Handled = true;
+        }
 
         private void LoopBoundaryHandle_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -1947,6 +2178,25 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private void UpdateLoopStartFromMouse(double mouseX)
+        {
+            if (_model == null || TracksCanvasContainer == null) return;
+            double availableWidth = GetTimelineTrackWidth();
+            if (availableWidth <= 0) return;
+
+            double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
+            double requested = Math.Clamp(mouseX / availableWidth, 0d, 1d) * totalDur;
+            (double from, double to) = ClampPreviewLoop(
+                requested,
+                _model.ActiveLoopDuration > 0 ? _model.ActiveLoopDuration : totalDur,
+                totalDur);
+
+            _model.ActiveLoopStart = Math.Round(from, 3);
+            _model.ActiveLoopDuration = Math.Round(to, 3);
+            _model.IsPreviewLoopEnabled = true;
+            UpdatePlayheadPosition();
+        }
+
         private void UpdateLoopBoundaryFromMouse(double mouseX)
         {
             if (_model == null || TracksCanvasContainer == null) return;
@@ -1954,10 +2204,11 @@ namespace AssetsManager.Views.Controls.Viewer
             if (availableWidth <= 0) return;
 
             double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
-            double ratio = Math.Clamp(mouseX / availableWidth, 0.02, 1.0);
-            double newLoopDur = Math.Round(ratio * totalDur, 2);
+            double requested = Math.Clamp(mouseX / availableWidth, 0d, 1d) * totalDur;
+            (double from, double to) = ClampPreviewLoop(_model.ActiveLoopStart, requested, totalDur);
 
-            _model.ActiveLoopDuration = Math.Max(0.05, newLoopDur);
+            _model.ActiveLoopStart = Math.Round(from, 3);
+            _model.ActiveLoopDuration = Math.Round(to, 3);
             _model.IsPreviewLoopEnabled = true;
             UpdatePlayheadPosition();
         }
@@ -1966,8 +2217,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void TimelineGrid_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (_isDraggingLoopBoundary) return;
-            if (e.OriginalSource is FrameworkElement fe && (fe == LoopBoundaryHandle || fe == LoopBoundaryCanvas || fe == LoopBoundaryLine)) return;
+            if (_isDraggingLoopStart || _isDraggingLoopBoundary) return;
+            if (e.OriginalSource is FrameworkElement fe &&
+                (fe == LoopStartHandle || fe == LoopBoundaryHandle || fe == LoopBoundaryCanvas ||
+                 fe == LoopStartLine || fe == LoopBoundaryLine || fe == LoopRangeBand)) return;
             _isTimelineDragging = true;
             UpdateSeekFromTimeline(e.GetPosition(TracksCanvasContainer).X);
         }
@@ -2053,6 +2306,12 @@ namespace AssetsManager.Views.Controls.Viewer
                     break;
                 case Key.F:
                     ResetCamera();
+                    break;
+                case Key.S when _model.IsRawSystemsMode && _model.SelectedEmitter != null:
+                    ToggleEmitterSolo(_model.SelectedEmitter);
+                    break;
+                case Key.M when _model.IsRawSystemsMode && _model.SelectedEmitter != null:
+                    ToggleEmitterMuted(_model.SelectedEmitter);
                     break;
                 case Key.OemOpenBrackets:
                     SetPlaybackSpeed(PlaybackSpeedDetent(_model.Speed, -1));
@@ -2170,34 +2429,85 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private const double RulerLoopDragThreshold = 4d;
         private bool _isRulerDragging;
+        private bool _isRulerCreatingLoop;
+        private double _rulerPressX;
 
         private void Ruler_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (TracksCanvasContainer == null) return;
+            if (TracksCanvasContainer == null || _model == null) return;
+
+            double mouseX = e.GetPosition(TracksCanvasContainer).X;
+            _rulerPressX = mouseX;
             _isRulerDragging = true;
+            _isRulerCreatingLoop = false;
             ((UIElement)sender).CaptureMouse();
-            UpdateSeekFromTimeline(e.GetPosition(TracksCanvasContainer).X);
             e.Handled = true;
         }
 
         private void Ruler_PreviewMouseMove(object sender, MouseEventArgs e)
         {
-            if (_isRulerDragging && e.LeftButton == MouseButtonState.Pressed && TracksCanvasContainer != null)
+            if (!_isRulerDragging || e.LeftButton != MouseButtonState.Pressed || TracksCanvasContainer == null)
+                return;
+
+            double mouseX = e.GetPosition(TracksCanvasContainer).X;
+            if (!_isRulerCreatingLoop &&
+                _model.IsPreviewLoopEnabled &&
+                Math.Abs(mouseX - _rulerPressX) >= RulerLoopDragThreshold)
             {
-                UpdateSeekFromTimeline(e.GetPosition(TracksCanvasContainer).X);
-                e.Handled = true;
+                _isRulerCreatingLoop = true;
             }
+
+            if (_isRulerCreatingLoop)
+                UpdateLoopRangeFromRuler(_rulerPressX, mouseX);
+
+            e.Handled = true;
         }
 
         private void Ruler_PreviewMouseUp(object sender, MouseButtonEventArgs e)
         {
-            if (_isRulerDragging)
+            if (!_isRulerDragging || TracksCanvasContainer == null) return;
+
+            double mouseX = e.GetPosition(TracksCanvasContainer).X;
+            if (_isRulerCreatingLoop)
+                UpdateLoopRangeFromRuler(_rulerPressX, mouseX);
+            else
+                UpdateSeekFromTimeline(mouseX);
+
+            _isRulerDragging = false;
+            _isRulerCreatingLoop = false;
+            ((UIElement)sender).ReleaseMouseCapture();
+            e.Handled = true;
+        }
+
+        private double TimelineTimeFromX(double mouseX)
+        {
+            double availableWidth = GetTimelineTrackWidth();
+            if (availableWidth <= 0 || _model == null) return 0d;
+
+            double ratio = Math.Clamp(mouseX / availableWidth, 0d, 1d);
+            return ratio * _model.TotalDuration;
+        }
+
+        private void UpdateLoopRangeFromRuler(double anchorX, double currentX)
+        {
+            if (_model == null) return;
+
+            double totalDuration = Math.Max(PreviewLoopMinimumSpan, _model.TotalDuration);
+            double from = Math.Min(TimelineTimeFromX(anchorX), TimelineTimeFromX(currentX));
+            double to = Math.Max(TimelineTimeFromX(anchorX), TimelineTimeFromX(currentX));
+            if (to - from < PreviewLoopMinimumSpan)
             {
-                _isRulerDragging = false;
-                ((UIElement)sender).ReleaseMouseCapture();
-                e.Handled = true;
+                to = Math.Min(totalDuration, from + PreviewLoopMinimumSpan);
+                if (to - from < PreviewLoopMinimumSpan)
+                    from = Math.Max(0d, to - PreviewLoopMinimumSpan);
             }
+
+            _model.ActiveLoopStart = Math.Round(from, 3);
+            _model.ActiveLoopDuration = Math.Round(to, 3);
+            _model.IsPreviewLoopEnabled = true;
+            UpdatePlayheadPosition();
         }
 
         #endregion

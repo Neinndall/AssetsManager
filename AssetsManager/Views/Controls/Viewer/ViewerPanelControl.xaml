@@ -779,13 +779,15 @@
                                         <TextBlock Text="No BG" FontSize="10.5" FontWeight="SemiBold"/>
                                     </StackPanel>
                                 </ToggleButton>
-                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.IsGroundVisible, Mode=TwoWay}" Margin="0,0,4,0">
+                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.IsGroundVisible, Mode=TwoWay}" Margin="0,0,4,0"
+                                              Click="SharedViewerEnvironment_Click">
                                     <StackPanel>
                                         <materialIcons:MaterialIcon Kind="Grass" Width="22" Height="22" Margin="0,0,0,3"/>
                                         <TextBlock Text="Ground" FontSize="10.5" FontWeight="SemiBold"/>
                                     </StackPanel>
                                 </ToggleButton>
-                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.IsGridVisible, Mode=TwoWay}" Margin="0">
+                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.IsGridVisible, Mode=TwoWay}" Margin="0"
+                                              Click="SharedViewerEnvironment_Click">
                                     <StackPanel>
                                         <materialIcons:MaterialIcon Kind="Grid" Width="22" Height="22" Margin="0,0,0,3"/>
                                         <TextBlock Text="Grid" FontSize="10.5" FontWeight="SemiBold"/>

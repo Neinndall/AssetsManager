@@ -250,7 +250,7 @@
             <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
                 <StackPanel Orientation="Horizontal">
                     <materialIcons:MaterialIcon Kind="MonitorDashboard" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="STUDIO PARAMETERS" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,1,0,0"/>
+                    <TextBlock Text="VIEWER SETTINGS" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,1,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -258,8 +258,8 @@
                 <Grid Margin="0,0,0,24">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Ground on model load" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Show the ground automatically when loading a model" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Ground" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Use the ground across Viewer previews, including VFX Studio" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <CheckBox Grid.Column="1" IsChecked="{Binding Settings.StudioParameters.GroundVisible, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                 </Grid>
@@ -267,8 +267,8 @@
                 <Grid Margin="0,0,0,24">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Grid on model load" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Show the editor grid automatically when loading a model" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Grid" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Use the editor grid across Viewer previews, including VFX Studio" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <CheckBox Grid.Column="1" IsChecked="{Binding Settings.StudioParameters.GridVisible, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                 </Grid>

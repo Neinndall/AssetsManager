@@ -11,6 +11,7 @@ namespace AssetsManager.Views.Helpers
     {
         private Viewport3D _viewport;
         private FrameworkElement _inputSurface;
+        private ProjectionCamera _subscribedCamera;
         private bool _isRotating;
         private bool _isPanning;
         private System.Windows.Point _lastMousePosition;
@@ -26,6 +27,12 @@ namespace AssetsManager.Views.Helpers
 
         public double ZoomSensitivity { get; set; } = 80.0;
         public bool IsMapGroundCollisionEnabled { get; set; }
+        public double OrthographicMinWidth { get; set; } = 10.0;
+        public double OrthographicMaxWidth { get; set; } = 20000.0;
+        public double PerspectiveMinDistance { get; set; }
+        public double PerspectiveMaxDistance { get; set; } = double.PositiveInfinity;
+        public event EventHandler RotationStarted;
+        public event EventHandler RotationEnded;
 
         public CustomCameraController(Viewport3D viewport, FrameworkElement inputSurface = null)
         {
@@ -39,19 +46,34 @@ namespace AssetsManager.Views.Helpers
             // Start the smooth update loop
             CompositionTarget.Rendering += OnRendering;
             
-            // Initialize targets
+            // Initialize targets and track the active projection camera.
             if (_viewport.Camera is ProjectionCamera camera)
+                SetCamera(camera);
+        }
+
+        public void SetCamera(ProjectionCamera camera)
+        {
+            if (_viewport == null || camera == null) return;
+
+            if (camera.IsFrozen)
+                camera = (ProjectionCamera)camera.Clone();
+
+            // Track the exact camera instance whose Changed event we own. WPF Freezable
+            // throws if a handler is removed when it was never registered on that instance.
+            if (!ReferenceEquals(_subscribedCamera, camera))
             {
-                if (camera.IsFrozen)
-                {
-                    camera = (ProjectionCamera)camera.Clone();
-                    _viewport.Camera = camera;
-                }
-                _targetPosition = camera.Position;
-                _targetLookDirection = camera.LookDirection;
-                _targetUpDirection = camera.UpDirection;
-                camera.Changed += OnCameraChanged;
+                if (_subscribedCamera != null)
+                    _subscribedCamera.Changed -= OnCameraChanged;
+
+                _subscribedCamera = camera;
+                _subscribedCamera.Changed += OnCameraChanged;
             }
+
+            _viewport.Camera = camera;
+            _targetPosition = camera.Position;
+            _targetLookDirection = camera.LookDirection;
+            _targetUpDirection = camera.UpDirection;
+            _isTransitioning = false;
         }
 
         public void Dispose()
@@ -59,9 +81,10 @@ namespace AssetsManager.Views.Helpers
             if (_viewport != null)
             {
                 CompositionTarget.Rendering -= OnRendering;
-                if (_viewport.Camera != null)
+                if (_subscribedCamera != null)
                 {
-                    _viewport.Camera.Changed -= OnCameraChanged;
+                    _subscribedCamera.Changed -= OnCameraChanged;
+                    _subscribedCamera = null;
                 }
                 _inputSurface.PreviewMouseDown -= OnPreviewMouseDown;
                 _inputSurface.MouseUp -= OnMouseUp;
@@ -170,6 +193,7 @@ namespace AssetsManager.Views.Helpers
 
             if (e.LeftButton == MouseButtonState.Pressed)
             {
+                RotationStarted?.Invoke(this, EventArgs.Empty);
                 _isRotating = true;
                 _lastMousePosition = e.GetPosition(_inputSurface);
                 _inputSurface.Cursor = System.Windows.Input.Cursors.SizeAll;
@@ -193,6 +217,7 @@ namespace AssetsManager.Views.Helpers
                     _isRotating = false;
                     _inputSurface.Cursor = System.Windows.Input.Cursors.Arrow;
                     _inputSurface.ReleaseMouseCapture();
+                    RotationEnded?.Invoke(this, EventArgs.Empty);
                 }
             }
             if (e.RightButton == MouseButtonState.Released)
@@ -263,6 +288,18 @@ namespace AssetsManager.Views.Helpers
                 speedMultiplier = 0.2; // Precision Mode
             }
 
+            if (camera is OrthographicCamera orthographic)
+            {
+                double factor = Math.Pow(1.12, -delta * speedMultiplier);
+                orthographic.Width = Math.Clamp(
+                    orthographic.Width * factor,
+                    OrthographicMinWidth,
+                    OrthographicMaxWidth);
+                _isTransitioning = false;
+                e.Handled = true;
+                return;
+            }
+
             // If we weren't already transitioning, start from current
             if (!_isTransitioning)
             {
@@ -276,11 +313,28 @@ namespace AssetsManager.Views.Helpers
             double currentDistance = lookDir.Length;
             if (!double.IsFinite(currentDistance) || currentDistance <= 0.001) return;
 
+            Point3D heldTarget = _targetPosition + lookDir;
             lookDir.Normalize();
 
-            // Scale movement from the current camera distance.
+            // A bounded perspective preset behaves as a true dolly around its held target.
+            // The default unbounded path stays unchanged for the main Viewer camera.
             double baseStep = Math.Clamp(currentDistance * 0.08, 5.0, 120.0);
             double step = baseStep * speedMultiplier;
+            bool boundedPerspective = PerspectiveMinDistance > 0d || double.IsFinite(PerspectiveMaxDistance);
+            if (boundedPerspective)
+            {
+                double nearest = Math.Max(0.001d, PerspectiveMinDistance);
+                double farthest = double.IsFinite(PerspectiveMaxDistance)
+                    ? Math.Max(nearest, PerspectiveMaxDistance)
+                    : double.MaxValue;
+                double nextDistance = Math.Clamp(currentDistance - delta * step, nearest, farthest);
+                Vector3D nextLook = lookDir * nextDistance;
+                _targetPosition = ConstrainMapPosition(heldTarget - nextLook);
+                _targetLookDirection = nextLook;
+                e.Handled = true;
+                return;
+            }
+
             _targetPosition = ConstrainMapPosition(
                 _targetPosition + lookDir * (delta * step));
         }

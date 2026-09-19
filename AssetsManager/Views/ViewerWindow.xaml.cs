@@ -60,6 +60,7 @@ namespace AssetsManager.Views
             ChromaSelectionControl.ChromaLoadingService = chromaLoadingService;
 
             VfxInspectorControl.LogService = _logService;
+            VfxInspectorControl.AppSettings = appSettings;
             VfxInspectorControl.SknLoadingService = sknLoadingService;
             VfxInspectorControl.VfxLoadingService = _vfxLoadingService;
             VfxInspectorControl.ExitRequested += (_, _) => _viewModel.IsVfxStudioVisible = false;

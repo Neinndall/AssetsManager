@@ -14,6 +14,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     }
 
     internal readonly record struct VfxCameraFrame(Vector3 Position, Vector3 Target);
+    internal readonly record struct VfxOrthographicFrame(Vector3 Position, Vector3 Target, float Width);
 
     /// <summary>
     /// Mirrors LTK's definition-based framing: rig reach and authored root-emitter spawn geometry
@@ -29,6 +30,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal static VfxDefinitionBounds Calculate(
             VfxSystemDefinition system,
             VfxRigPreset rigPreset)
+            => Calculate(system, VfxRigSettings.ForPreset(rigPreset));
+
+        internal static VfxDefinitionBounds Calculate(
+            VfxSystemDefinition system,
+            VfxRigSettings rigSettings)
         {
             ArgumentNullException.ThrowIfNull(system);
 
@@ -40,16 +46,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector3 min = new(float.PositiveInfinity);
             Vector3 max = new(float.NegativeInfinity);
 
-            IReadOnlyList<Vector3> rigStops = RigStops(rigPreset);
+            IReadOnlyList<Vector3> rigStops = RigStops(rigSettings);
             foreach (Vector3 stop in rigStops)
             {
-                Vector3 stood = Vector3.Transform(stop + Vector3.UnitY * VfxRigMotion.StandHeight, world);
+                Vector3 stood = Vector3.Transform(stop + Vector3.UnitY * rigSettings.Height, world);
                 Grow(ref min, ref max, stood - new Vector3(StandingReach));
                 Grow(ref min, ref max, stood + new Vector3(StandingReach));
             }
 
             Vector3 rootOrigin = Vector3.Transform(
-                rigStops[0] + Vector3.UnitY * VfxRigMotion.StandHeight,
+                rigStops[0] + Vector3.UnitY * rigSettings.Height,
                 world);
             foreach (VfxEmitterDefinition emitter in system.Emitters)
             {
@@ -89,20 +95,48 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return new VfxCameraFrame(target + safeDirection * distance, target);
         }
 
-        private static IReadOnlyList<Vector3> RigStops(VfxRigPreset preset)
-            => preset switch
+        internal static Vector3 Ground(
+            VfxSystemDefinition system,
+            VfxRigSettings rigSettings)
+        {
+            ArgumentNullException.ThrowIfNull(system);
+            Matrix4x4 world = system.Transform.GetValueOrDefault(Matrix4x4.Identity);
+            Vector3 origin = RigStops(rigSettings)[0];
+            return Vector3.Transform(origin, world);
+        }
+
+        internal static VfxOrthographicFrame FrameOrthographic(
+            VfxDefinitionBounds bounds,
+            float viewportWidth,
+            float viewportHeight,
+            Vector3 direction)
+        {
+            Vector3 safeDirection = direction.LengthSquared() > 1e-8f && IsFinite(direction)
+                ? Vector3.Normalize(direction)
+                : Vector3.UnitZ;
+            float radius = bounds.Radius;
+            float across = MathF.Min(MathF.Max(0f, viewportWidth), MathF.Max(0f, viewportHeight));
+            float zoom = across > 0f ? across / (2f * radius * CameraMargin) : 1f;
+            float width = zoom > 0f ? MathF.Max(1f, viewportWidth) / zoom : radius * 2f * CameraMargin;
+            float distance = MathF.Min(radius * 4f, 10000f);
+            Vector3 target = bounds.Center;
+            return new VfxOrthographicFrame(target + safeDirection * distance, target, width);
+        }
+
+        private static IReadOnlyList<Vector3> RigStops(VfxRigSettings settings)
+            => settings.MotionKind switch
             {
-                VfxRigPreset.Missile => new[]
+                VfxRigMotionKind.Path => new[]
                 {
-                    new Vector3(-VfxRigMotion.FlightRange * 0.5f, 0f, 0f),
-                    new Vector3(VfxRigMotion.FlightRange * 0.5f, 0f, 0f)
+                    new Vector3(-settings.FlightRange * 0.5f, 0f, 0f),
+                    new Vector3(settings.FlightRange * 0.5f, 0f, 0f)
                 },
-                VfxRigPreset.Trail => new[]
+                VfxRigMotionKind.Orbit => new[]
                 {
-                    new Vector3(VfxRigMotion.OrbitRadius, 0f, 0f),
-                    new Vector3(-VfxRigMotion.OrbitRadius, 0f, 0f),
-                    new Vector3(0f, 0f, VfxRigMotion.OrbitRadius),
-                    new Vector3(0f, 0f, -VfxRigMotion.OrbitRadius)
+                    new Vector3(settings.OrbitRadius, 0f, 0f),
+                    new Vector3(-settings.OrbitRadius, 0f, 0f),
+                    new Vector3(0f, 0f, settings.OrbitRadius),
+                    new Vector3(0f, 0f, -settings.OrbitRadius)
                 },
                 _ => new[] { Vector3.Zero }
             };

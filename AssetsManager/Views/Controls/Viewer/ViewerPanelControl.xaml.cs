@@ -985,6 +985,26 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel.ViewportViewModel?.ResetStudioSettings();
         }
 
+        private async void SharedViewerEnvironment_Click(object sender, RoutedEventArgs e)
+        {
+            AppSettings settings = Viewport?.AppSettings;
+            ViewerViewportModel viewportModel = _viewModel.ViewportViewModel;
+            if (settings == null || viewportModel == null) return;
+
+            settings.StudioParameters ??= new StudioParametersSettings();
+            settings.StudioParameters.GroundVisible = viewportModel.IsGroundVisible;
+            settings.StudioParameters.GridVisible = viewportModel.IsGridVisible;
+
+            try
+            {
+                await settings.SaveAsync();
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to save shared Viewer Ground/Grid preferences.");
+            }
+        }
+
         // ===== Control Deck navigation handlers =====
 
         private void Close3DModels_Click(object sender, RoutedEventArgs e)

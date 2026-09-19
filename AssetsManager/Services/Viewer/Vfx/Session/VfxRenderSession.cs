@@ -117,6 +117,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             }
         }
 
+        internal int LiveChildSystemCount
+            => _graphs.Sum(static graph => graph.LiveChildSystemCount);
+
         public VfxSystemModel ActiveSystem => _activeSystem;
         public IReadOnlyList<VfxPlaybackGraphRuntime> Graphs => _graphs;
         public double CurrentTime => _activeSystem?.CurrentTime ?? 0d;
@@ -611,6 +614,26 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             return 0;
         }
 
+        internal bool TryGetRootEmitterState(
+            int sourceOrder,
+            out VfxPlaybackRuntime.EmitterState state)
+        {
+            if (_graph?.Root != null)
+            {
+                foreach (VfxPlaybackRuntime.EmitterState emitter in _graph.Root.Emitters)
+                {
+                    if (emitter.SourceOrder == sourceOrder)
+                    {
+                        state = emitter;
+                        return true;
+                    }
+                }
+            }
+
+            state = null;
+            return false;
+        }
+
         public void Play()
         {
             _isPlaying = true;
@@ -1000,7 +1023,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                             graph.Kill();
         }
 
-        public void Render(Matrix4x4 viewProjection, Matrix4x4 view)
+        public void Render(
+            Matrix4x4 viewProjection,
+            Matrix4x4 view,
+            VfxPreviewWireframeMode wireframeMode = VfxPreviewWireframeMode.Off)
         {
             if (!_ready || _graphs.Count == 0) return;
 
@@ -1015,14 +1041,49 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             IReadOnlyList<VfxRenderQueueEntry> renderQueue = VfxRenderQueue.Build(
                 _graphs.SelectMany(graph => graph.Runtimes).Select(runtime => runtime.Emitters),
                 view);
-            _renderer.Render(renderQueue.Where(entry => entry.Emitter.Def.Distortion == null).ToArray(), viewProjection, view, renderQueue);
-            var distortionQueue = renderQueue.Where(entry => entry.Emitter.Def.Distortion != null).ToArray();
-            if (distortionQueue.Length > 0)
+
+            bool supportsWireframe = _renderer.SupportsWireframe;
+            var previewPasses = ResolvePreviewPasses(wireframeMode, supportsWireframe);
+
+            if (previewPasses.Shaded)
             {
-                _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
-                _renderer.Render(distortionQueue, viewProjection, view, renderQueue);
+                _renderer.Render(
+                    renderQueue.Where(entry => entry.Emitter.Def.Distortion == null).ToArray(),
+                    viewProjection,
+                    view,
+                    renderQueue);
+                var distortionQueue = renderQueue.Where(entry => entry.Emitter.Def.Distortion != null).ToArray();
+                if (distortionQueue.Length > 0)
+                {
+                    _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
+                    _renderer.Render(distortionQueue, viewProjection, view, renderQueue);
+                }
+            }
+
+            if (previewPasses.Wireframe)
+            {
+                _renderer.Render(
+                    renderQueue,
+                    viewProjection,
+                    view,
+                    renderQueue,
+                    wireframePass: true,
+                    wireframeOpacity: previewPasses.WireOpacity);
             }
         }
+
+        internal static (bool Shaded, bool Wireframe, float WireOpacity) ResolvePreviewPasses(
+            VfxPreviewWireframeMode mode,
+            bool supportsWireframe)
+        {
+            bool shaded = mode != VfxPreviewWireframeMode.Only || !supportsWireframe;
+            bool wireframe = mode != VfxPreviewWireframeMode.Off && supportsWireframe;
+            float opacity = mode == VfxPreviewWireframeMode.Overlay ? 0.35f : 1f;
+            return (shaded, wireframe, opacity);
+        }
+
+        internal static float WireframeOpacity(VfxPreviewWireframeMode mode)
+            => ResolvePreviewPasses(mode, supportsWireframe: true).WireOpacity;
 
         private void UploadPendingResources()
         {

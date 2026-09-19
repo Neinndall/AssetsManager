@@ -368,6 +368,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_eventBlendIn = 0xdf2f42a9;
         private static readonly uint F_eventBlendOut = 0xa8c578b4;
         private static readonly uint F_parametricPairs = 0x2ec3ba66;
+        private static readonly uint F_parametricPairClip = 0xca2b847d;
         private static readonly uint F_parametricPairValue = 0x24f2ec89;
         private static readonly uint F_idleParticlesEffects = 0x84186f3c;
         private static readonly uint F_idlePosition = 0x934f4e0a;
@@ -855,7 +856,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 
             var values = new List<float?>(pairs.Elements.Count);
             foreach (BinTreeStruct pair in pairs.Elements.OfType<BinTreeStruct>())
-                values.Add(GetF32(pair.Properties, F_parametricPairValue));
+            {
+                // Keep the parameter list aligned with ReadClipChildren/LTK: a pair that does
+                // not name a real child is skipped, while a missing mValue is authored as zero.
+                uint childHash = AsU32(Get(pair.Properties, F_parametricPairClip)) ?? 0u;
+                if (childHash == 0u) continue;
+                values.Add(GetF32(pair.Properties, F_parametricPairValue) ?? 0f);
+            }
             return values;
         }
 

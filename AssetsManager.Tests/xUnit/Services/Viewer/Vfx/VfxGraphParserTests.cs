@@ -1369,6 +1369,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                         syncGroup)
                 });
 
+            var emptyPair = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("ParametricPairData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeHash(Fnv1a.HashLower("mClipName"), 0),
+                    new BinTreeF32(Fnv1a.HashLower("mValue"), 9f)
+                });
             var pair = new BinTreeEmbedded(
                 0,
                 Fnv1a.HashLower("ParametricPairData"),
@@ -1393,7 +1401,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     new BinTreeContainer(
                         Fnv1a.HashLower("mParametricPairDataList"),
                         BinPropertyType.Embedded,
-                        new BinTreeProperty[] { pair })
+                        new BinTreeProperty[] { emptyPair, pair })
                 });
             var childClip = new BinTreeStruct(
                 0,

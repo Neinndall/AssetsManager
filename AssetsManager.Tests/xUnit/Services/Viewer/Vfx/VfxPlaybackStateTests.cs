@@ -81,6 +81,31 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void InspectorEmitterSelectionMovesTheSelectedMarker()
+        {
+            var model = new VfxInspectorModel();
+            var first = new VfxEmitterDiagnosticItem { Name = "First" };
+            var second = new VfxEmitterDiagnosticItem { Name = "Second" };
+
+            model.SelectedEmitter = first;
+
+            Assert.True(first.IsSelected);
+            Assert.False(second.IsSelected);
+            Assert.Same(first, model.SelectedEmitter);
+
+            model.SelectedEmitter = second;
+
+            Assert.False(first.IsSelected);
+            Assert.True(second.IsSelected);
+            Assert.Same(second, model.SelectedEmitter);
+
+            model.SelectedEmitter = null;
+
+            Assert.False(second.IsSelected);
+            Assert.False(model.HasSelectedEmitter);
+        }
+
+        [Fact]
         public void InspectorModelEmitterFilterAndPreviewPropertiesNotifyBindings()
         {
             var model = new VfxInspectorModel();
@@ -93,6 +118,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.True(model.HasEmitterFilter);
             Assert.Contains(nameof(VfxInspectorModel.EmitterFilterText), changed);
             Assert.Contains(nameof(VfxInspectorModel.HasEmitterFilter), changed);
+
+            Assert.True(model.ShowPreviewGrid);
+            Assert.False(model.ShowPreviewGround);
+            Assert.Equal(1, model.PreviewDisplayCount);
+
+            model.ShowPreviewGround = true;
+            Assert.Equal(2, model.PreviewDisplayCount);
+            Assert.Contains(nameof(VfxInspectorModel.ShowPreviewGround), changed);
+
+            model.ShowPreviewGrid = false;
+            Assert.True(model.ShowPreviewGround);
+            Assert.Equal(1, model.PreviewDisplayCount);
+            Assert.Contains(nameof(VfxInspectorModel.ShowPreviewGrid), changed);
 
             var item = new VfxEmitterDiagnosticItem { Name = "TrailDark" };
             item.PropertyChanged += (_, e) => changed.Add(e.PropertyName);

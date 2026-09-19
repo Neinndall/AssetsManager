@@ -1966,6 +1966,23 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void PreviewLoopKeepsAnAuthoredRangeInsideTheCurrentSpan()
+        {
+            (double from, double to) = VfxInspectorControl.ClampPreviewLoop(0.5, 1.0, 2.0);
+            Assert.Equal(0.5, from, 6);
+            Assert.Equal(1.0, to, 6);
+            Assert.Equal(0.5, VfxInspectorControl.ResolvePreviewLoopRestart(from, to, 2.0), 6);
+
+            (from, to) = VfxInspectorControl.ClampPreviewLoop(1.0, 0.5, 2.0);
+            Assert.Equal(0.5 - VfxInspectorControl.PreviewLoopMinimumSpan, from, 6);
+            Assert.Equal(0.5, to, 6);
+
+            (from, to) = VfxInspectorControl.ClampPreviewLoop(-1.0, 5.0, 2.0);
+            Assert.Equal(0.0, from, 6);
+            Assert.Equal(2.0, to, 6);
+        }
+
+        [Fact]
         public void TimelineUsesTheRealPlaybackDurationInsteadOfAnArtificialMinimum()
         {
             Assert.Equal(0.30, VfxInspectorControl.ResolveTimelineDuration(0.30), 6);

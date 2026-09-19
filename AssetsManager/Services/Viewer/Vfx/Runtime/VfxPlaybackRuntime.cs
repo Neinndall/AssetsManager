@@ -31,6 +31,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public Vector3 BasePos;                 // world spawn origin (placement + emitterPosition)
             public Vector3 SystemOrigin, SystemTarget;
             public Vector3 PlacementRight, PlacementUp, PlacementForward;
+            internal Matrix4x4 PlacementTransform;
             public uint Texture;                    // GL handle for this emitter's sprite (0 = not uploaded/skip)
             public int TextureWidth, TextureHeight;
             public uint TextureMult;                // optional Riot multiplier/noise texture stage
@@ -334,6 +335,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     }
                 }
                 Matrix4x4 placement = EmitterPlacement(es.Def);
+                es.PlacementTransform = placement;
                 Vector3 nextBasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(EmitterTime(es)), placement);
                 es.TrailDistance += Vector3.Distance(es.BasePos, nextBasePos);
                 es.BasePos = nextBasePos;
@@ -542,7 +544,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return new ParticleLifecycleInfo(position, basis, frame, particle.Serial, state.SourceOrder, particleTime, emitterT, died);
         }
 
-        private static float EmitterTime(EmitterState state)
+        internal static float EmitterTime(EmitterState state)
         {
             VfxEmitterDefinition definition = state.Def;
             return definition.EmitterLifetime is > 0f
@@ -788,6 +790,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 ? previousBasePos - systemDelta
                 : s.SystemOrigin - systemDelta;
             Matrix4x4 placement = EmitterPlacement(d);
+            s.PlacementTransform = placement;
             s.BasePos = Vector3.Transform(d.EmitterPosition.Sample(emitterT), placement);
             Vector3 emitterDelta = s.BasePos - previousBasePos;
             s.TrailDistance += emitterDelta.Length();

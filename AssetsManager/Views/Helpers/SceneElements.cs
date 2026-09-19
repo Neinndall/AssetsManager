@@ -13,6 +13,7 @@ namespace AssetsManager.Views.Helpers
     public static class SceneElements
     {
         public const double GroundLevel = 1000;
+        public const string GroundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Floor/ground_rift.dds";
         private const double GroundLogoElevation = 2.0;
         public const int SceneTextureMaxSize = 2048;
 
@@ -203,8 +204,7 @@ namespace AssetsManager.Views.Helpers
                 new System.Windows.Point(0, 0)
             };
 
-            const string groundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Floor/ground_rift.dds";
-            BitmapSource groundTexture = LoadSceneTexture(groundTexturePath, logService);
+            BitmapSource groundTexture = LoadSceneTexture(GroundTexturePath, logService);
 
             Material3D groundMaterial;
             if (groundTexture != null)
@@ -215,7 +215,7 @@ namespace AssetsManager.Views.Helpers
             {
                 // Fallback to a solid color if texture loading fails
                 groundMaterial = new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Color.FromRgb(100, 120, 80))); // Earthy color
-                logService.LogError($"Failed to load ground texture from {groundTexturePath}. Using solid color fallback.");
+                logService.LogError($"Failed to load ground texture from {GroundTexturePath}. Using solid color fallback.");
             }
 
             GeometryModel3D groundModel = new GeometryModel3D(groundMesh, groundMaterial);

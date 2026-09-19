@@ -61,6 +61,9 @@
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="#122D6DF6"/>
                 </Trigger>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="Background" Value="#182D6DF6"/>
+                </DataTrigger>
                 <DataTrigger Binding="{Binding IsSolo}" Value="True">
                     <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                 </DataTrigger>
@@ -221,38 +224,157 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Viewport Quick Toolbar (Top-Right: Champion Mesh Toggle & Reset Camera) -->
+                        <!-- Viewport Quick Toolbar (Top-Right: preview, rig, mesh and camera controls) -->
                         <Border VerticalAlignment="Top" HorizontalAlignment="Right" Margin="12" 
                                 Background="#CC12131A" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
                                 CornerRadius="6" Padding="4,3">
                             <StackPanel Orientation="Horizontal">
+                                <!-- Preview display controls mirror the VFX reference viewer. -->
+                                <Button x:Name="PreviewShowButton"
+                                        Click="PreviewShow_Click"
+                                        Style="{StaticResource TransparentIconButton}"
+                                        Height="26" Padding="6,0" Margin="0,0,4,0"
+                                        ToolTip="Preview display options">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="EyeOutline" Width="13" Height="13"
+                                                                    Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0"/>
+                                        <TextBlock Text="Show" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimary}"/>
+                                        <TextBlock Text="{Binding PreviewDisplayCount, StringFormat=' {0}'}" FontSize="10"
+                                                   FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+                                                                    Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <Popup x:Name="PreviewShowPopup"
+                                       PlacementTarget="{Binding ElementName=PreviewShowButton}"
+                                       Placement="Bottom" HorizontalOffset="-70" VerticalOffset="6"
+                                       AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False"
+                                       DataContext="{Binding DataContext, ElementName=PreviewShowButton}">
+                                    <Border Width="190" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+                                            BorderThickness="1" CornerRadius="7" Padding="10">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.42"/>
+                                        </Border.Effect>
+                                        <StackPanel>
+                                            <TextBlock Text="SHOW" FontSize="10" FontWeight="Bold"
+                                                       Foreground="{StaticResource TextSecondary}" Margin="2,0,0,7"/>
+                                            <CheckBox Content="Grid" Style="{StaticResource ModernCheckBox}"
+                                                      IsChecked="{Binding ShowPreviewGrid, Mode=TwoWay}"/>
+                                            <CheckBox Content="Ground" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
+                                                      IsChecked="{Binding ShowPreviewGround, Mode=TwoWay}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+
+                                <Button x:Name="PreviewWireframeButton"
+                                        Click="PreviewWireframe_Click"
+                                        Style="{StaticResource TransparentIconButton}"
+                                        Height="26" Padding="6,0" Margin="0,0,4,0"
+                                        ToolTip="Preview wireframe mode">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="13" Height="13"
+                                                                    Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0"/>
+                                        <TextBlock Text="{Binding PreviewWireframeText}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimary}"/>
+                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+                                                                    Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <Popup x:Name="PreviewWireframePopup"
+                                       PlacementTarget="{Binding ElementName=PreviewWireframeButton}"
+                                       Placement="Bottom" HorizontalOffset="-58" VerticalOffset="6"
+                                       AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False"
+                                       DataContext="{Binding DataContext, ElementName=PreviewWireframeButton}">
+                                    <Border Width="176" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+                                            BorderThickness="1" CornerRadius="7" Padding="7">
+                                        <StackPanel>
+                                            <RadioButton GroupName="VfxPreviewWireframe" Content="Shaded"
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+                                                         IsChecked="{Binding IsPreviewWireframeOff, Mode=TwoWay}"/>
+                                            <RadioButton GroupName="VfxPreviewWireframe" Content="Wire"
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+                                                         IsChecked="{Binding IsPreviewWireframeOnly, Mode=TwoWay}"/>
+                                            <RadioButton GroupName="VfxPreviewWireframe" Content="Overlay"
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+                                                         IsChecked="{Binding IsPreviewWireframeOverlay, Mode=TwoWay}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+
+                                <Button x:Name="PreviewCameraButton"
+                                        Click="PreviewCamera_Click"
+                                        Style="{StaticResource TransparentIconButton}"
+                                        Height="26" Padding="6,0" Margin="0,0,4,0"
+                                        ToolTip="Preview camera preset">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="VideoOutline" Width="13" Height="13"
+                                                                    Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0"/>
+                                        <TextBlock Text="{Binding PreviewCameraText}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimary}"/>
+                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+                                                                    Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <Popup x:Name="PreviewCameraPopup"
+                                       PlacementTarget="{Binding ElementName=PreviewCameraButton}"
+                                       Placement="Bottom" HorizontalOffset="-48" VerticalOffset="6"
+                                       AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False"
+                                       DataContext="{Binding DataContext, ElementName=PreviewCameraButton}">
+                                    <Border Width="160" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+                                            BorderThickness="1" CornerRadius="7" Padding="7">
+                                        <StackPanel>
+                                            <RadioButton GroupName="VfxPreviewCamera" Content="Game"
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+                                                         IsChecked="{Binding IsPreviewCameraGame, Mode=TwoWay}"/>
+                                            <RadioButton GroupName="VfxPreviewCamera" Content="Orbit"
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+                                                         IsChecked="{Binding IsPreviewCameraOrbit, Mode=TwoWay}"/>
+                                            <RadioButton GroupName="VfxPreviewCamera" Content="Top"
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+                                                         IsChecked="{Binding IsPreviewCameraTop, Mode=TwoWay}"/>
+                                            <RadioButton GroupName="VfxPreviewCamera" Content="Front"
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+                                                         IsChecked="{Binding IsPreviewCameraFront, Mode=TwoWay}"/>
+                                            <RadioButton GroupName="VfxPreviewCamera" Content="Side"
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+                                                         IsChecked="{Binding IsPreviewCameraSide, Mode=TwoWay}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+
                                 <!-- Simulation Rig Motion Preset (LTK-Manager style: Still, Burst, Missile, Trail) -->
-                                <Button Click="RigPreset_Click" Style="{StaticResource TransparentIconButton}" 
-                                        Height="26" Padding="6,0" Margin="0,0,4,0" 
-                                        ToolTip="VFX Simulation Rig Motion (Still / Burst / Missile / Trail)">
+                                <Button Click="RigPreset_Click" Style="{StaticResource TransparentIconButton}"
+                                        Height="26" Padding="6,0" Margin="0,0,4,0"
+                                        Visibility="{Binding HasStandaloneSystem, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTip="Standalone system motion">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                         <materialIcons:MaterialIcon Kind="{Binding RigPresetIcon}" Width="13" Height="13" Foreground="{StaticResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{Binding RigPresetText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                         <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
                                     <Button.ContextMenu>
-                                        <ContextMenu Background="#FF161822" BorderBrush="{StaticResource BorderColor}" Foreground="White">
-                                            <MenuItem Header="Still (Stationary single run)" Tag="Still" Click="SetRigPreset_Click">
+                                        <ContextMenu Background="#FF161822" BorderBrush="{StaticResource BorderColor}" Foreground="White"
+                                                     DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                            <MenuItem Header="Still — Stationary, once" Tag="Still" Click="SetRigPreset_Click" StaysOpenOnClick="True">
                                                 <MenuItem.Icon>
                                                     <materialIcons:MaterialIcon Kind="CrosshairsGps" Width="14" Height="14" Foreground="{StaticResource TextSecondary}"/>
                                                 </MenuItem.Icon>
                                             </MenuItem>
-                                            <MenuItem Header="Burst (Stationary loop)" Tag="Burst" Click="SetRigPreset_Click">
+                                            <MenuItem Header="Burst — Stationary, loop" Tag="Burst" Click="SetRigPreset_Click" StaysOpenOnClick="True">
                                                 <MenuItem.Icon>
                                                     <materialIcons:MaterialIcon Kind="Sparkles" Width="14" Foreground="{StaticResource AccentGreen}"/>
                                                 </MenuItem.Icon>
                                             </MenuItem>
-                                            <MenuItem Header="Missile (Flight projectile path)" Tag="Missile" Click="SetRigPreset_Click">
+                                            <MenuItem Header="Missile — Moving path" Tag="Missile" Click="SetRigPreset_Click" StaysOpenOnClick="True">
                                                 <MenuItem.Icon>
                                                     <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}"/>
                                                 </MenuItem.Icon>
                                             </MenuItem>
-                                            <MenuItem Header="Trail (Orbit circuit path)" Tag="Trail" Click="SetRigPreset_Click">
+                                            <MenuItem Header="Trail — Orbiting path" Tag="Trail" Click="SetRigPreset_Click" StaysOpenOnClick="True">
                                                 <MenuItem.Icon>
                                                     <materialIcons:MaterialIcon Kind="RotateRight" Width="14" Height="14" Foreground="{StaticResource AccentPurple}"/>
                                                 </MenuItem.Icon>
@@ -269,7 +391,7 @@
                                                                        FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
                                                         </Grid>
                                                         <Slider x:Name="RigHeightSlider" Minimum="0" Maximum="600" TickFrequency="10"
-                                                                IsSnapToTickEnabled="True" Value="100"
+                                                                IsSnapToTickEnabled="True" Value="100" Style="{StaticResource HUDSliderStyle}"
                                                                 ValueChanged="RigHeightSlider_ValueChanged"/>
 
                                                         <StackPanel x:Name="RigDistancePanel" Margin="0,7,0,0">
@@ -279,7 +401,7 @@
                                                                            FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
                                                             </Grid>
                                                             <Slider x:Name="RigDistanceSlider" Minimum="200" Maximum="4000" TickFrequency="50"
-                                                                    IsSnapToTickEnabled="True" Value="1200"
+                                                                    IsSnapToTickEnabled="True" Value="1200" Style="{StaticResource HUDSliderStyle}"
                                                                     ValueChanged="RigDistanceSlider_ValueChanged"/>
                                                             <Grid Margin="0,5,0,3">
                                                                 <TextBlock Text="Speed" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
@@ -287,7 +409,7 @@
                                                                            FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
                                                             </Grid>
                                                             <Slider x:Name="RigSpeedSlider" Minimum="100" Maximum="5000" TickFrequency="50"
-                                                                    IsSnapToTickEnabled="True" Value="1600"
+                                                                    IsSnapToTickEnabled="True" Value="1600" Style="{StaticResource HUDSliderStyle}"
                                                                     ValueChanged="RigSpeedSlider_ValueChanged"/>
                                                         </StackPanel>
 
@@ -298,7 +420,7 @@
                                                                            FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
                                                             </Grid>
                                                             <Slider x:Name="RigRadiusSlider" Minimum="50" Maximum="1600" TickFrequency="25"
-                                                                    IsSnapToTickEnabled="True" Value="300"
+                                                                    IsSnapToTickEnabled="True" Value="300" Style="{StaticResource HUDSliderStyle}"
                                                                     ValueChanged="RigRadiusSlider_ValueChanged"/>
                                                             <Grid Margin="0,5,0,3">
                                                                 <TextBlock Text="Period" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
@@ -306,44 +428,29 @@
                                                                            FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
                                                             </Grid>
                                                             <Slider x:Name="RigPeriodSlider" Minimum="0.25" Maximum="12" TickFrequency="0.25"
-                                                                    IsSnapToTickEnabled="True" Value="3"
+                                                                    IsSnapToTickEnabled="True" Value="3" Style="{StaticResource HUDSliderStyle}"
                                                                     ValueChanged="RigPeriodSlider_ValueChanged"/>
                                                         </StackPanel>
 
-                                                        <CheckBox x:Name="RigLifeLoopCheckBox" Content="Loop lifecycle" Margin="0,8,0,0"
-                                                                  Checked="RigLifeLoopCheckBox_Changed"
-                                                                  Unchecked="RigLifeLoopCheckBox_Changed"
-                                                                  Foreground="{StaticResource TextSecondary}"/>
-                                                        <CheckBox x:Name="RigStopCheckBox" Content="Soft stop" Margin="0,5,0,0"
-                                                                  Checked="RigStopCheckBox_Changed"
-                                                                  Unchecked="RigStopCheckBox_Changed"
-                                                                  Foreground="{StaticResource TextSecondary}"/>
-                                                        <StackPanel x:Name="RigStopPanel" Margin="0,5,0,0">
-                                                            <Grid Margin="0,0,0,3">
-                                                                <TextBlock Text="Stop after" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
-                                                                <TextBlock x:Name="RigStopValueText" Text="2.00 s" HorizontalAlignment="Right"
-                                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
-                                                            </Grid>
-                                                            <Slider x:Name="RigStopSlider" Minimum="0.25" Maximum="30" TickFrequency="0.25"
-                                                                    IsSnapToTickEnabled="True" Value="2"
-                                                                    ValueChanged="RigStopSlider_ValueChanged"/>
-                                                        </StackPanel>
+                                                        <Grid Margin="0,9,0,0">
+                                                            <TextBlock Text="Seed" FontSize="10.5" Foreground="{StaticResource TextSecondary}"
+                                                                       VerticalAlignment="Center"/>
+                                                            <Button HorizontalAlignment="Right" Click="RerollSeed_Click"
+                                                                    Style="{StaticResource SmallTextButtonStyle}"
+                                                                    ToolTip="Generate another deterministic VFX variation">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <materialIcons:MaterialIcon Kind="DiceMultipleOutline" Width="13" Height="13"
+                                                                                                Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0"/>
+                                                                    <TextBlock Text="{Binding PlaybackSeed}" FontSize="10" FontFamily="Consolas"
+                                                                               Foreground="{StaticResource TextSecondary}"/>
+                                                                </StackPanel>
+                                                            </Button>
+                                                        </Grid>
                                                     </StackPanel>
                                                 </MenuItem.Header>
                                             </MenuItem>
                                         </ContextMenu>
                                     </Button.ContextMenu>
-                                </Button>
-
-                                <Button Click="RerollSeed_Click" Style="{StaticResource TransparentIconButton}"
-                                        Height="26" Padding="6,0" Margin="0,0,4,0"
-                                        ToolTip="Reroll deterministic playback seed">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="DiceMultipleOutline" Width="13" Height="13"
-                                                                    Foreground="{StaticResource TextSecondary}" Margin="0,0,4,0"/>
-                                        <TextBlock Text="{Binding PlaybackSeed}" FontSize="10" FontFamily="Consolas"
-                                                   Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                    </StackPanel>
                                 </Button>
 
                                 <!-- Champion Mesh Toggle -->
@@ -355,11 +462,14 @@
                                     <materialIcons:MaterialIcon Kind="AccountBoxOutline" Width="15" Height="15"/>
                                 </ToggleButton>
 
-                                <!-- Reset Camera / Focus (F) -->
-                                <Button Click="ResetCamera_Click" Style="{StaticResource TransparentIconButton}" 
-                                            Width="28" Height="26" ToolTip="Reset Camera View (F)">
-                                    <materialIcons:MaterialIcon Kind="CameraRetakeOutline" Width="15" Height="15" Foreground="{StaticResource TextSecondary}"/>
+                                <!-- Reset the active camera preset after free orbit, pan, or zoom. -->
+                                <Button Click="ResetCamera_Click"
+                                        Style="{StaticResource TransparentIconButton}"
+                                        Width="28" Height="26" Margin="0,0,4,0"
+                                        ToolTip="Reset Camera (F)">
+                                    <materialIcons:MaterialIcon Kind="Restore" Width="15" Height="15"/>
                                 </Button>
+
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -376,8 +486,7 @@
                 <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="10"
                         BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,8">
                     <Grid>
-                        <!-- Timeline remains the default transport surface. GRAPH is an additive inspector view. -->
-                        <Grid Visibility="{Binding IsTimelineDeckView, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/> <!-- 1. Top Transport Controls & Search Bar -->
                             <RowDefinition Height="Auto"/> <!-- 2. Separator -->
@@ -403,14 +512,8 @@
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,10,0">
                                     <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="14" Height="14"
                                                                 Foreground="{StaticResource AccentBrush}" Margin="0,0,5,0"/>
-                                    <RadioButton GroupName="VfxDeckModeTimelineHeader" Content="TIMELINE"
-                                                 Style="{StaticResource SegmentedRadioButtonStyle}"
-                                                 Padding="7,2" FontSize="9.5"
-                                                 IsChecked="{Binding IsTimelineDeckView, Mode=TwoWay}"/>
-                                    <RadioButton GroupName="VfxDeckModeTimelineHeader" Content="GRAPH"
-                                                 Style="{StaticResource SegmentedRadioButtonStyle}"
-                                                 Padding="7,2" FontSize="9.5"
-                                                 IsChecked="{Binding IsAnimationGraphDeckView, Mode=TwoWay}"/>
+                                    <TextBlock Text="TIMELINE" FontSize="9.5" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                     <Border Background="#10FFFFFF" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                                             CornerRadius="4" Padding="5,1" Margin="5,0,0,0" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Emitters.Count}" FontSize="9.5" FontWeight="SemiBold"
@@ -535,11 +638,13 @@
                                     <ComboBoxItem Content="2.0x" Tag="2.0"/>
                                 </ComboBox>
 
-                                <!-- Loop toggle: same visual language as the transport controls. -->
-                                <ToggleButton IsChecked="{Binding IsPreviewLoopEnabled, Mode=TwoWay}"
+                                <!-- One loop control owns the standalone lifecycle and exposes its editable timeline range. -->
+                                <ToggleButton x:Name="RigLoopToggleButton"
+                                              Click="RigLoopToggleButton_Click"
+                                              Visibility="{Binding IsRawSystemsMode, Converter={StaticResource BoolToVisibilityConverter}}"
                                               Style="{StaticResource TransparentIconToggleButton}"
                                               Width="30" Height="28" Padding="0"
-                                              Margin="0,0,8,0" ToolTip="Toggle Loop Boundary">
+                                              Margin="0,0,8,0" ToolTip="Loop VFX lifecycle and edit timeline range">
                                     <materialIcons:MaterialIcon Kind="RepeatVariant" Width="17" Height="17"/>
                                 </ToggleButton>
 
@@ -652,7 +757,8 @@
                                     <ItemsControl ItemsSource="{Binding Emitters}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Style="{StaticResource TimelineLaneRowStyle}">
+                                                <Border Style="{StaticResource TimelineLaneRowStyle}"
+                                                        MouseLeftButtonDown="EmitterLane_MouseLeftButtonDown">
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="22"/> <!-- Mute (Eye) -->
@@ -841,14 +947,28 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </Canvas.Style>
+                                        <Border x:Name="LoopRangeBand" Canvas.Top="0" Height="800" Width="0"
+                                                Background="#10FFD700" IsHitTestVisible="False"/>
+                                        <Line x:Name="LoopStartLine" X1="0" Y1="0" X2="0" Y2="800"
+                                              Stroke="#FFD700" StrokeThickness="1.5" IsHitTestVisible="False"/>
                                         <Line x:Name="LoopBoundaryLine" X1="0" Y1="0" X2="0" Y2="800" 
                                               Stroke="#FFD700" StrokeThickness="1.5" IsHitTestVisible="False"/>
+                                        <Ellipse x:Name="LoopStartHandle" Canvas.Left="-7" Canvas.Top="1" Cursor="SizeWE"
+                                                 Width="14" Height="14" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1.5"
+                                                 PreviewMouseDown="LoopStartHandle_PreviewMouseDown"
+                                                 PreviewMouseMove="LoopStartHandle_PreviewMouseMove"
+                                                 PreviewMouseUp="LoopStartHandle_PreviewMouseUp"
+                                                 ToolTip="Drag to adjust preview loop start">
+                                            <Ellipse.Effect>
+                                                <DropShadowEffect Color="#FFD700" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/>
+                                            </Ellipse.Effect>
+                                        </Ellipse>
                                         <Ellipse x:Name="LoopBoundaryHandle" Canvas.Left="-7" Canvas.Top="1" Cursor="SizeWE" 
                                                  Width="14" Height="14" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1.5" 
                                                  PreviewMouseDown="LoopBoundaryHandle_PreviewMouseDown" 
                                                  PreviewMouseMove="LoopBoundaryHandle_PreviewMouseMove" 
                                                  PreviewMouseUp="LoopBoundaryHandle_PreviewMouseUp" 
-                                                 ToolTip="Drag to adjust preview loop boundary">
+                                                 ToolTip="Drag to adjust preview loop end">
                                             <Ellipse.Effect>
                                                 <DropShadowEffect Color="#FFD700" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/>
                                             </Ellipse.Effect>
@@ -857,272 +977,7 @@
                                 </Grid>
                             </Grid>
                         </ScrollViewer>
-                        </Grid>
-
-                        <!-- AnimationGraph inspector. It consumes the graph parsed for playback but does not mutate it. -->
-                        <Grid Visibility="{Binding IsAnimationGraphDeckView, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-
-                            <Grid Grid.Row="0" Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <materialIcons:MaterialIcon Kind="GraphOutline" Width="14" Height="14"
-                                                                Foreground="{StaticResource AccentBrush}" Margin="2,0,5,0"/>
-                                    <RadioButton GroupName="VfxDeckModeGraphHeader" Content="TIMELINE"
-                                                 Style="{StaticResource SegmentedRadioButtonStyle}"
-                                                 Padding="7,2" FontSize="9.5"
-                                                 IsChecked="{Binding IsTimelineDeckView, Mode=TwoWay}"/>
-                                    <RadioButton GroupName="VfxDeckModeGraphHeader" Content="GRAPH"
-                                                 Style="{StaticResource SegmentedRadioButtonStyle}"
-                                                 Padding="7,2" FontSize="9.5"
-                                                 IsChecked="{Binding IsAnimationGraphDeckView, Mode=TwoWay}"/>
-                                    <TextBlock Text="{Binding AnimationGraphSummary}" Margin="8,0,0,0"
-                                               FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <RadioButton GroupName="AnimationGraphTabs" Content="CLIPS"
-                                                 Style="{StaticResource SegmentedRadioButtonStyle}" Padding="8,2" FontSize="9.5"
-                                                 IsChecked="{Binding IsGraphClipsTab, Mode=TwoWay}"/>
-                                    <RadioButton GroupName="AnimationGraphTabs" Content="TRACKS"
-                                                 Style="{StaticResource SegmentedRadioButtonStyle}" Padding="8,2" FontSize="9.5"
-                                                 IsChecked="{Binding IsGraphTracksTab, Mode=TwoWay}"/>
-                                    <RadioButton GroupName="AnimationGraphTabs" Content="MASKS"
-                                                 Style="{StaticResource SegmentedRadioButtonStyle}" Padding="8,2" FontSize="9.5"
-                                                 IsChecked="{Binding IsGraphMasksTab, Mode=TwoWay}"/>
-                                    <RadioButton GroupName="AnimationGraphTabs" Content="SYNC GROUPS"
-                                                 Style="{StaticResource SegmentedRadioButtonStyle}" Padding="8,2" FontSize="9.5"
-                                                 IsChecked="{Binding IsGraphSyncGroupsTab, Mode=TwoWay}"/>
-                                </StackPanel>
-
-                                <Border Grid.Column="2" Width="170" Height="28"
-                                        Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}"
-                                        BorderThickness="1" CornerRadius="5"
-                                        Visibility="{Binding IsGraphClipsTab, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="26"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FilterVariant" Width="13" Height="13"
-                                                                    Foreground="{StaticResource TextMuted}"
-                                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        <TextBox Grid.Column="1" Text="{Binding AnimationGraphFilter, UpdateSourceTrigger=PropertyChanged}"
-                                                 Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextPrimary}"
-                                                 CaretBrush="White" FontSize="10.5" VerticalContentAlignment="Center" Padding="0,0,5,0"
-                                                 ToolTip="Filter clips by graph-key name"/>
-                                    </Grid>
-                                </Border>
-                            </Grid>
-
-                            <Border Grid.Row="1" Height="1" Background="{StaticResource BorderColor}" Margin="0,2,0,6" Opacity="0.45"/>
-
-                            <!-- CLIPS -->
-                            <Grid Grid.Row="2" Visibility="{Binding IsGraphClipsTab, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <ListView Grid.Row="0" ItemsSource="{Binding AnimationGraphClips}"
-                                          SelectedItem="{Binding SelectedAnimationGraphClip, Mode=TwoWay}"
-                                          Style="{StaticResource ModernTableListView}"
-                                          VirtualizingStackPanel.IsVirtualizing="True"
-                                          VirtualizingStackPanel.VirtualizationMode="Recycling"
-                                          ScrollViewer.CanContentScroll="True">
-                                    <ListView.View>
-                                        <GridView>
-                                            <GridViewColumn Header="NAME" Width="220" DisplayMemberBinding="{Binding Name}"/>
-                                            <GridViewColumn Header="KIND" Width="105" DisplayMemberBinding="{Binding Kind}"/>
-                                            <GridViewColumn Header="RATE" Width="70" DisplayMemberBinding="{Binding RateText}"/>
-                                            <GridViewColumn Header="TRACK" Width="120" DisplayMemberBinding="{Binding TrackDisplay}"/>
-                                            <GridViewColumn Header="MASK" Width="120" DisplayMemberBinding="{Binding MaskDisplay}"/>
-                                            <GridViewColumn Header="SYNC" Width="120" DisplayMemberBinding="{Binding SyncGroupDisplay}"/>
-                                            <GridViewColumn Header="EVENTS" Width="60" DisplayMemberBinding="{Binding EventCount}"/>
-                                        </GridView>
-                                    </ListView.View>
-                                </ListView>
-
-                                <Border Grid.Row="1" Margin="0,6,0,0" Padding="8,6" CornerRadius="5"
-                                        Background="#08000000" BorderBrush="#18FFFFFF" BorderThickness="1"
-                                        Visibility="{Binding HasSelectedAnimationGraphClip, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <Grid DataContext="{Binding SelectedAnimationGraphClip}">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <Grid Grid.Row="0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"
-                                                       Foreground="{StaticResource TextPrimary}"/>
-                                            <Border Grid.Column="1" Margin="7,0,0,0" Padding="5,1" CornerRadius="3" Background="#10FFFFFF">
-                                                <TextBlock Text="{Binding Kind}" FontFamily="Consolas" FontSize="9.5" Foreground="{StaticResource TextMuted}"/>
-                                            </Border>
-                                            <TextBlock Grid.Column="2" Text="{Binding AnimationPath}" Margin="9,0,0,0"
-                                                       FontSize="9.5" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding HashText}" FontFamily="Consolas" FontSize="9.5"
-                                                       Foreground="{StaticResource TextMuted}"/>
-                                        </Grid>
-
-                                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,5,0,0">
-                                            <TextBlock Text="{Binding TimingText}" FontFamily="Consolas" FontSize="9.5" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                            <TextBlock Text="Flags " FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding FlagsText}" FontFamily="Consolas" FontSize="9.5" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,9,0"/>
-                                            <TextBlock Text="Interruptions " FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding InterruptionGroupsText}" FontSize="9.5" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,9,0"/>
-                                            <Button Content="{Binding TrackDisplay}" Tag="{Binding Definition.Track}"
-                                                    Visibility="{Binding Definition.Track, Converter={StaticResource NullToVisibilityConverter}}"
-                                                    Click="AnimationGraphTrack_Click" Style="{StaticResource SmallTextButtonStyle}" Margin="0,0,5,0"
-                                                    ToolTip="Open track entry"/>
-                                            <Button Content="{Binding MaskDisplay}" Tag="{Binding Definition.Mask}"
-                                                    Visibility="{Binding Definition.Mask, Converter={StaticResource NullToVisibilityConverter}}"
-                                                    Click="AnimationGraphMask_Click" Style="{StaticResource SmallTextButtonStyle}" Margin="0,0,5,0"
-                                                    ToolTip="Open mask entry"/>
-                                            <Button Content="{Binding SyncGroupDisplay}" Tag="{Binding Definition.SyncGroup}"
-                                                    Visibility="{Binding Definition.SyncGroup, Converter={StaticResource NullToVisibilityConverter}}"
-                                                    Click="AnimationGraphSyncGroup_Click" Style="{StaticResource SmallTextButtonStyle}"
-                                                    ToolTip="Open sync group entry"/>
-                                        </StackPanel>
-
-                                        <ItemsControl Grid.Row="2" ItemsSource="{Binding Children}" Margin="0,5,0,0"
-                                                      Visibility="{Binding HasChildren, Converter={StaticResource BoolToVisibilityConverter}}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel Orientation="Horizontal"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Button Content="{Binding DisplayText}" Click="AnimationGraphChild_Click"
-                                                            IsEnabled="{Binding Declared}" Style="{StaticResource SmallTextButtonStyle}"
-                                                            Margin="0,0,6,0" ToolTip="Open child clip"/>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-
-                                        <StackPanel Grid.Row="3" Margin="0,5,0,0"
-                                                    Visibility="{Binding HasEvents, Converter={StaticResource BoolToVisibilityConverter}}">
-                                            <TextBlock Text="EVENTS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,2"/>
-                                            <ItemsControl ItemsSource="{Binding Events}">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <WrapPanel Orientation="Horizontal"/>
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Border Background="#0AFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1"
-                                                                CornerRadius="3" Padding="5,2" Margin="0,0,5,3">
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <TextBlock Text="{Binding Kind}" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
-                                                                <TextBlock Text="{Binding FrameRange}" Margin="5,0,0,0" FontFamily="Consolas" FontSize="9" Foreground="{StaticResource TextMuted}"/>
-                                                                <TextBlock Text="{Binding Summary}" Margin="5,0,0,0" FontSize="9" Foreground="{StaticResource TextMuted}"/>
-                                                            </StackPanel>
-                                                        </Border>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </Grid>
-
-                            <!-- TRACKS -->
-                            <ListView Grid.Row="2" ItemsSource="{Binding AnimationGraphTracks}"
-                                      SelectedItem="{Binding SelectedAnimationGraphTrack, Mode=TwoWay}"
-                                      Style="{StaticResource ModernTableListView}"
-                                      VirtualizingStackPanel.IsVirtualizing="True"
-                                      VirtualizingStackPanel.VirtualizationMode="Recycling"
-                                      Visibility="{Binding IsGraphTracksTab, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="NAME" Width="260" DisplayMemberBinding="{Binding Name}"/>
-                                        <GridViewColumn Header="PRIORITY" Width="90" DisplayMemberBinding="{Binding Priority}"/>
-                                        <GridViewColumn Header="BLEND MODE" Width="120" DisplayMemberBinding="{Binding BlendMode}"/>
-                                        <GridViewColumn Header="BLEND WEIGHT" Width="120" DisplayMemberBinding="{Binding BlendWeight}"/>
-                                    </GridView>
-                                </ListView.View>
-                            </ListView>
-
-                            <!-- MASKS + joint weights -->
-                            <Grid Grid.Row="2" Visibility="{Binding IsGraphMasksTab, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="0.9*"/>
-                                    <ColumnDefinition Width="8"/>
-                                    <ColumnDefinition Width="1.1*"/>
-                                </Grid.ColumnDefinitions>
-                                <ListView Grid.Column="0" ItemsSource="{Binding AnimationGraphMasks}"
-                                          SelectedItem="{Binding SelectedAnimationGraphMask, Mode=TwoWay}"
-                                          Style="{StaticResource ModernTableListView}"
-                                          VirtualizingStackPanel.IsVirtualizing="True"
-                                          VirtualizingStackPanel.VirtualizationMode="Recycling">
-                                    <ListView.View>
-                                        <GridView>
-                                            <GridViewColumn Header="NAME" Width="220" DisplayMemberBinding="{Binding Name}"/>
-                                            <GridViewColumn Header="ID" Width="70" DisplayMemberBinding="{Binding Id}"/>
-                                            <GridViewColumn Header="JOINTS" Width="80" DisplayMemberBinding="{Binding JointCountText}"/>
-                                        </GridView>
-                                    </ListView.View>
-                                </ListView>
-                                <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="Transparent"/>
-                                <Grid Grid.Column="2">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-                                    <TextBlock Grid.Row="0" Margin="4,0,0,5" FontSize="10" Foreground="{StaticResource TextSecondary}">
-                                        <Run Text="MASK JOINTS" FontWeight="Bold"/>
-                                        <Run Text="  "/>
-                                        <Run Text="{Binding SelectedAnimationGraphMask.Name}" Foreground="{StaticResource TextMuted}"/>
-                                    </TextBlock>
-                                    <ListView Grid.Row="1" ItemsSource="{Binding AnimationGraphMaskJoints}"
-                                              Style="{StaticResource ModernTableListView}"
-                                              VirtualizingStackPanel.IsVirtualizing="True"
-                                              VirtualizingStackPanel.VirtualizationMode="Recycling">
-                                        <ListView.View>
-                                            <GridView>
-                                                <GridViewColumn Header="SLOT" Width="60" DisplayMemberBinding="{Binding Slot}"/>
-                                                <GridViewColumn Header="JOINT" Width="240" DisplayMemberBinding="{Binding JointName}"/>
-                                                <GridViewColumn Header="WEIGHT" Width="85" DisplayMemberBinding="{Binding WeightText}"/>
-                                            </GridView>
-                                        </ListView.View>
-                                    </ListView>
-                                </Grid>
-                            </Grid>
-
-                            <!-- SYNC GROUPS -->
-                            <ListView Grid.Row="2" ItemsSource="{Binding AnimationGraphSyncGroups}"
-                                      SelectedItem="{Binding SelectedAnimationGraphSyncGroup, Mode=TwoWay}"
-                                      Style="{StaticResource ModernTableListView}"
-                                      VirtualizingStackPanel.IsVirtualizing="True"
-                                      VirtualizingStackPanel.VirtualizationMode="Recycling"
-                                      Visibility="{Binding IsGraphSyncGroupsTab, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="NAME" Width="300" DisplayMemberBinding="{Binding Name}"/>
-                                        <GridViewColumn Header="TYPE" Width="100" DisplayMemberBinding="{Binding Kind}"/>
-                                    </GridView>
-                                </ListView.View>
-                            </ListView>
-                        </Grid>
+                    </Grid>
                     </Grid>
                 </Border>
             </Grid>

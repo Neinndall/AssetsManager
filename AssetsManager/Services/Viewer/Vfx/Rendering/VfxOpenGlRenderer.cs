@@ -33,6 +33,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _uErosionTex, _uHasErosion, _uHasErosionMap, _uErosionAddressMode, _uErosionDefault;
         private int _uErosionFeatherIn, _uErosionFeatherOut, _uErosionSliceWidth;
         private int _uPlacementRight, _uPlacementUp, _uPlacementForward, _uIsGroundLayer;
+        private int _uWireframePass, _uWireframeColor;
         private int _instCapFloats;
         private bool _ready;
         private VfxTextureResourceCache _textures = null!;
@@ -53,6 +54,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private const int MeshesPerEmitter = 512;
         private const int BeamsPerEmitter = 256;
         private const int AttachedMeshesPerEmitter = 8;
+        // LTK draws wireframe twins with the preview accent and a dedicated alpha.
+        private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
         private bool _gles;
         private Vector2 _depthProjectionValue;
         public void Initialize(GL gl)
@@ -135,6 +138,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uPlacementUp = gl.GetUniformLocation(_program, "uPlacementUp");
             _uPlacementForward = gl.GetUniformLocation(_program, "uPlacementForward");
             _uIsGroundLayer = gl.GetUniformLocation(_program, "uIsGroundLayer");
+            _uWireframePass = gl.GetUniformLocation(_program, "uWireframePass");
+            _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
             _vao = gl.GenVertexArray();
             gl.BindVertexArray(_vao);
             // static base quad (4 corners, drawn as a triangle fan)
@@ -213,10 +218,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         public void CaptureScene(uint width, uint height, bool captureColor, bool captureDepth)
             => _capture.Capture(width, height, captureColor, captureDepth);
 
+        internal bool SupportsWireframe => !_gles;
+
         public void Render(IReadOnlyList<VfxRenderQueueEntry> renderQueue, Matrix4x4 viewProj, Matrix4x4 view,
-            IReadOnlyList<VfxRenderQueueEntry> stencilQueue = null)
+            IReadOnlyList<VfxRenderQueueEntry> stencilQueue = null,
+            bool wireframePass = false,
+            float wireframeOpacity = 1f)
         {
             if (!_ready || renderQueue is null || renderQueue.Count == 0) return;
+            bool useWireframe = wireframePass && SupportsWireframe;
+            float wireOpacity = Math.Clamp(wireframeOpacity, 0f, 1f);
 
             Matrix4x4.Invert(view, out var inv);
             var camRight = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX, inv));
@@ -269,6 +280,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
             try
             {
+            if (useWireframe)
+                _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
+
             IReadOnlyDictionary<uint, byte> stencilReferences = BuildStencilReferenceMap(stencilQueue ?? renderQueue);
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
@@ -285,6 +299,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_uSceneDepthTex, 6);
             _gl.Uniform2(_uViewportSize, (float)_capture.Width, (float)_capture.Height);
             _gl.Uniform2(_uDepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y);
+            _gl.Uniform1(_uWireframePass, useWireframe ? 1 : 0);
+            _gl.Uniform4(
+                _uWireframeColor,
+                PreviewWireColor.X,
+                PreviewWireColor.Y,
+                PreviewWireColor.Z,
+                wireOpacity);
 
             _gl.BindVertexArray(_vao);
             _gl.ActiveTexture(TextureUnit.Texture0);
@@ -323,8 +344,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (es.InstanceCount == 0) continue;
                 if (!es.IsVisible) continue;
                 VfxEmitterRenderState emitterRenderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
-                ApplyColorWriteMask(emitterRenderState);
-                ApplyEmitterStencilState(emitterRenderState, stencilReferences);
+                if (useWireframe)
+                {
+                    // The wire twin is an independent double-sided transparent material: it
+                    // cannot inherit culling, alpha-only writes or the emitter's stencil contract.
+                    _gl.Disable(EnableCap.CullFace);
+                    _gl.ColorMask(true, true, true, true);
+                    _gl.Disable(EnableCap.StencilTest);
+                }
+                else
+                {
+                    ApplyColorWriteMask(emitterRenderState);
+                    ApplyEmitterStencilState(emitterRenderState, stencilReferences);
+                }
                 // Never synthesize an AttachedMesh proxy. Render only geometry that was
                 // resolved from the real owner scene and filtered by authored submesh masks.
                 if (es.Def.IsMeshPrimitive && es.MeshVao == 0)
@@ -369,13 +401,31 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
-                    ApplyEmitterDepthState(es.Def, isDistortion: es.Def.Distortion != null);
-                    ApplyBlendMode(es.Def.BlendMode, distortion: es.Def.Distortion != null);
-                    RenderMeshEmitter(es, viewProj, camPos, camUp, instancesSpan, renderInstanceCount, sharedPalettePhase);
+                    bool meshDistortion = es.Def.Distortion != null && !useWireframe;
+                    ApplyEmitterDepthState(es.Def, meshDistortion);
+                    if (useWireframe)
+                    {
+                        _gl.DepthMask(false);
+                        _gl.DepthFunc(DepthFunction.Lequal);
+                    }
+                    if (useWireframe)
+                        ApplyWireframeBlend();
+                    else
+                        ApplyBlendMode(es.Def.BlendMode, meshDistortion);
+                    RenderMeshEmitter(
+                        es,
+                        viewProj,
+                        camPos,
+                        camUp,
+                        instancesSpan,
+                        renderInstanceCount,
+                        sharedPalettePhase,
+                        useWireframe,
+                        wireOpacity);
                     continue;
                 }
                 if (!es.Def.IsVisual) continue;
-                bool isDistortion = es.Def.Distortion is not null;
+                bool isDistortion = es.Def.Distortion is not null && !useWireframe;
                 bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
                 if (warpsFrame && _capture.ColorTexture == 0) continue;
 
@@ -429,7 +479,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam;
                 _gl.Uniform1(_uDepthPushPull, ribbonPrimitive ? 0f : es.Def.DepthPushPull);
                 ApplyEmitterDepthState(es.Def, isDistortion);
-                ApplyBlendMode(es.Def.BlendMode, isDistortion);
+                if (useWireframe)
+                {
+                    _gl.DepthMask(false);
+                    _gl.DepthFunc(DepthFunction.Lequal);
+                }
+                if (useWireframe)
+                    ApplyWireframeBlend();
+                else
+                    ApplyBlendMode(es.Def.BlendMode, isDistortion);
                 _gl.Uniform1(_uAlphaCutoff, renderState.AlphaCutoff);
                 _gl.Uniform1(
                     _uAlphaTest,
@@ -583,6 +641,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             }
             finally
             {
+                if (useWireframe)
+                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
+
                 _gl.DepthMask(depthWrite != 0);
                 _gl.DepthFunc((DepthFunction)depthFunction);
                 _gl.BlendEquationSeparate((GLEnum)blendEquation, (GLEnum)blendEquationAlpha);
@@ -695,6 +756,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 TextureTarget.Texture2D,
                 TextureParameterName.TextureMagFilter,
                 (int)TextureMagFilter.Linear);
+        }
+
+        private void ApplyWireframeBlend()
+        {
+            _gl.Enable(EnableCap.Blend);
+            _gl.BlendEquationSeparate(GLEnum.FuncAdd, GLEnum.FuncAdd);
+            _gl.BlendFuncSeparate(
+                BlendingFactor.SrcAlpha,
+                BlendingFactor.OneMinusSrcAlpha,
+                BlendingFactor.One,
+                BlendingFactor.OneMinusSrcAlpha);
         }
 
         private void ApplyBlendMode(int blendMode, bool distortion = false)
@@ -847,6 +919,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionSliceWidth, _muErosionMixer;
         private int _muReflectionTex, _muHasReflection, _muFresnel, _muReflection, _muReflectionColor, _muAttachedMesh;
         private int _muSceneDepthTex, _muHasSoftParticle, _muSoftParticleParams, _muSoftParticleControl, _muDepthProjection, _muViewportSize;
+        private int _muWireframePass, _muWireframeColor;
 
         private void EnsureMeshProgram()
         {
@@ -940,6 +1013,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muSoftParticleControl = _gl.GetUniformLocation(_meshProgram, "uSoftParticleControl");
                 _muDepthProjection = _gl.GetUniformLocation(_meshProgram, "uDepthProjection");
                 _muViewportSize = _gl.GetUniformLocation(_meshProgram, "uViewportSize");
+                _muWireframePass = _gl.GetUniformLocation(_meshProgram, "uWireframePass");
+                _muWireframeColor = _gl.GetUniformLocation(_meshProgram, "uWireframeColor");
 
                 uint boneBlock = _gl.GetUniformBlockIndex(_meshProgram, "VfxBoneTransforms");
                 if (boneBlock != uint.MaxValue)
@@ -1010,10 +1085,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector3 camUp,
             ReadOnlySpan<float> instances,
             int instanceCount,
-            float sharedPalettePhase)
+            float sharedPalettePhase,
+            bool wireframePass,
+            float wireframeOpacity)
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
-            bool isDistortion = es.Def.Distortion != null;
+            bool isDistortion = es.Def.Distortion != null && !wireframePass;
             bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
             if (warpsFrame && _capture.ColorTexture == 0) return;
             if (es.MeshAnimation != null)
@@ -1021,6 +1098,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
             EnsureMeshProgram();
             _gl.UseProgram(_meshProgram);
+            _gl.Uniform1(_muWireframePass, wireframePass ? 1 : 0);
+            _gl.Uniform4(
+                _muWireframeColor,
+                PreviewWireColor.X,
+                PreviewWireColor.Y,
+                PreviewWireColor.Z,
+                Math.Clamp(wireframeOpacity, 0f, 1f));
             _gl.BindVertexArray(es.MeshVao);
             _gl.UniformMatrix4(_muViewProj, 1, false, in viewProj.M11);
             _gl.Uniform3(_muCamPos, camPos.X, camPos.Y, camPos.Z);
@@ -1213,13 +1297,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             ApplyAddressMode(2);
             ApplyTextureSampling();
             _gl.ActiveTexture(TextureUnit.Texture0);
-            // LTK/Riot cull mesh backfaces by default. disableBackfaceCull explicitly asks
-            // for a double-sided draw; do not make every particle mesh double-sided.
-            if (es.Def.RenderState?.DisableBackfaceCull == true)
+            if (wireframePass)
+            {
+                // LTK's wire twin is double-sided and alpha-blended independently from the
+                // authored material, so mesh edges cannot inherit culling or additive modes.
                 _gl.Disable(EnableCap.CullFace);
+                _gl.DepthMask(false);
+                _gl.DepthFunc(DepthFunction.Lequal);
+                ApplyWireframeBlend();
+            }
             else
-                _gl.Enable(EnableCap.CullFace);
-            ApplyBlendMode(es.Def.BlendMode, isDistortion);
+            {
+                // Riot meshes cull backfaces unless the authored material explicitly opts out.
+                if (es.Def.RenderState?.DisableBackfaceCull == true)
+                    _gl.Disable(EnableCap.CullFace);
+                else
+                    _gl.Enable(EnableCap.CullFace);
+                ApplyBlendMode(es.Def.BlendMode, isDistortion);
+            }
 
             Vector2 emitterUvOffset = VfxUvSemantics.Periodic(
                     es.Def.EmitterUvScrollRate * es.RenderTime,

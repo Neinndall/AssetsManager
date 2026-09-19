@@ -7,7 +7,7 @@ This hotfix separates the BIN diffing and WAD comparison work from the previous 
 
 New Features
   - Chroma Library / Added a removable reference skins source so current and archived chromas can be paired and loaded together for visual comparison.
-  - VFX Studio / Completed AnimationGraph skin tooling with resolved clip names, track/mask/sync metadata, composite playlists, and authored parametric clip selection.
+  - VFX Studio / Animation clips now use authored AnimationGraph identities, composite playlists, and parametric clip selection without duplicating the clip browser in the timeline deck.
   - VFX Studio / Added full Animation Clip playback from each skin's authored AnimationGraphData, preserving mClipDataMap clip identity/order and spawning ParticleEventData VFX systems with authored timing, skeleton attachments, visibility, joint snap, and idle effects.
   - VFX Studio / Added an Exit action that releases the active VFX project and returns to the main Viewer while keeping the studio reusable.
   - Viewer / Browse VFX systems and animations in a skin and BIN tree with on-demand loading.
@@ -105,10 +105,13 @@ New Features
   - Image Comparison / Timeline Mode: OLD/NEW badges identify which image belongs to each side of the transition, both on the viewport and baked into the exported GIF.
   - Core / Centralized the GIF sequence export pipeline (frame sampling, sequence mapping and encoding) under ImageExportUtils.
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
-  - VFX Studio / Added AnimationGraph inspection for clips, tracks, masks, sync groups, events, child clips, rates, and joint weights.
 
 Improvements
   - Viewer / Animation player now uses a cleaner grouped timeline, dynamic Play/Stop/Resume control, and compact speed controls while preserving the current playhead.
+  - VFX Studio / Added shared Viewer Grid/Ground preferences plus Shaded/Wire/Overlay, camera reset, and standalone system motion controls directly in the viewport toolbar.
+  - VFX Studio / Unified standalone lifecycle looping and its editable timeline range under the transport Loop control.
+  - VFX Studio / Removed the manual Soft stop controls from the rig menu while preserving engine stop behavior internally.
+  - VFX Studio / Removed the duplicate preview stats overlay so live particle status stays in the existing viewport header.
   - VFX Studio / Camera framing now follows authored system spawn bounds and preview rig motion, keeping large, offset, missile, and trail effects in view consistently.
   - VFX Studio / Playback now matches the audited LTK behavior more closely with deterministic xorshift32 random streams, Animation Clip cue seed 7331, probability-table singleValue semantics, carried/death child systems, boneToSpawnAt lineage, and deterministic child RNG state.
   - VFX Studio / Timeline seeking now restores bounded quarter-second simulation checkpoints instead of always replaying from zero, preserving particles, RNG, noise, transforms, child lineage, attachments, stop/kill state, and emitter timing while respecting a capped memory budget.
@@ -390,6 +393,10 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Rig remains visible in the preview toolbar while standalone motion tuning stays disabled for skeleton-driven Animation Clips.
+  - VFX Studio / Parametric clip changes no longer invalidate cached animation assets while rebuilding AnimationGraph playback.
+  - VFX Studio / Skin selection now loads its model, Systems, and Animation Clips without auto-playing a System or Animation Clip; playback starts only after explicit selection.
+  - VFX Studio / Axis camera views now enter Orbit without losing their target or visible scale.
   - VFX Studio / Fixed duplicate and misleading Animation Clip entries by scoping the browser to the active skin's AnimationGraphData, preserving unresolved clip hashes instead of replacing them with shared .anm filenames, keeping authored clip order, and preferring the first idle clip for preview startup.
   - VFX Studio / Fixed child VFX systems losing parent motion or lifecycle state by keeping carried children attached to their source particle, stopping them when the parent dies, preserving unresolved probability slots, and honoring boneToSpawnAt child anchors.
   - VFX Studio / Fixed Animation Clip playback mismatches caused by applying ParticleEventData scale as a global VFX scale, incorrect skin-scale handling on bones/offsets, and authored VFX system transforms being applied more than once.

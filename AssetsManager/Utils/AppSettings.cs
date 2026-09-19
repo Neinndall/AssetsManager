@@ -22,6 +22,7 @@ namespace AssetsManager.Utils
         public bool OrganizeExtractedAssets { get; set; }
         public ReportGenerationSettings ReportGeneration { get; set; } = new();
         public StudioParametersSettings StudioParameters { get; set; } = new();
+        public VfxStudioSettings VfxStudio { get; set; } = new();
         public bool AssetWatcherUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
         public bool SaveJsonHistory { get; set; }
@@ -205,24 +206,51 @@ namespace AssetsManager.Utils
 
                 bool needsResave = false;
 
-                // Migrate the short-lived flat Studio settings introduced before they were grouped.
-                if (jsonObject["StudioParameters"] == null &&
-                    (jsonObject["StudioGroundVisible"] != null ||
-                     jsonObject["StudioGridVisible"] != null ||
-                     jsonObject["StudioSkyboxVisible"] != null ||
-                     jsonObject["StudioTransparentBackground"] != null))
+                // Preserve Viewer environment preferences across older config layouts.
+                if (jsonObject["StudioParameters"] == null)
                 {
-                    settings.StudioParameters = new StudioParametersSettings
+                    if (jsonObject["ViewerEnvironment"] is JObject viewerEnvironmentJson)
                     {
-                        GroundVisible = jsonObject.Value<bool?>("StudioGroundVisible") ?? false,
-                        GridVisible = jsonObject.Value<bool?>("StudioGridVisible") ?? true,
-                        SkyboxVisible = jsonObject.Value<bool?>("StudioSkyboxVisible") ?? false,
-                        TransparentBackground = jsonObject.Value<bool?>("StudioTransparentBackground") ?? false
+                        settings.StudioParameters = new StudioParametersSettings
+                        {
+                            GroundVisible = viewerEnvironmentJson.Value<bool?>("GroundVisible") ?? false,
+                            GridVisible = viewerEnvironmentJson.Value<bool?>("GridVisible") ?? true,
+                            SkyboxVisible = viewerEnvironmentJson.Value<bool?>("SkyboxVisible") ?? false,
+                            TransparentBackground = viewerEnvironmentJson.Value<bool?>("TransparentBackground") ?? false
+                        };
+                        needsResave = true;
+                    }
+                    else if (jsonObject["StudioGroundVisible"] != null ||
+                             jsonObject["StudioGridVisible"] != null ||
+                             jsonObject["StudioSkyboxVisible"] != null ||
+                             jsonObject["StudioTransparentBackground"] != null)
+                    {
+                        settings.StudioParameters = new StudioParametersSettings
+                        {
+                            GroundVisible = jsonObject.Value<bool?>("StudioGroundVisible") ?? false,
+                            GridVisible = jsonObject.Value<bool?>("StudioGridVisible") ?? true,
+                            SkyboxVisible = jsonObject.Value<bool?>("StudioSkyboxVisible") ?? false,
+                            TransparentBackground = jsonObject.Value<bool?>("StudioTransparentBackground") ?? false
+                        };
+                        needsResave = true;
+                    }
+                }
+
+                // Ground and Grid are shared Viewer preferences. VFX-specific display state only
+                // retains controls that do not exist in the normal Viewer.
+                if (jsonObject["VfxStudio"] == null && jsonObject["StudioParameters"] is JObject studioJson &&
+                    (studioJson["VfxCameraPreset"] != null || studioJson["VfxWireframeMode"] != null))
+                {
+                    settings.VfxStudio = new VfxStudioSettings
+                    {
+                        CameraPreset = studioJson.Value<string>("VfxCameraPreset") ?? "Game",
+                        WireframeMode = studioJson.Value<string>("VfxWireframeMode") ?? "Off"
                     };
                     needsResave = true;
                 }
 
                 settings.StudioParameters ??= GetDefaultSettings().StudioParameters;
+                settings.VfxStudio ??= GetDefaultSettings().VfxStudio;
                 settings.MonitoredAssets ??= new SafeList<MonitoredAsset>();
                 settings.DiffHistory ??= new SafeList<HistoryEntry>();
                 settings.AssetTrackerUserRemovedIds ??= new ConcurrentDictionary<string, List<long>>();
@@ -296,6 +324,11 @@ namespace AssetsManager.Utils
                     SkyboxVisible = false,
                     TransparentBackground = false
                 },
+                VfxStudio = new VfxStudioSettings
+                {
+                    CameraPreset = "Game",
+                    WireframeMode = "Off"
+                },
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
                 DataExportFormat = DataExportFormat.Original,
@@ -346,6 +379,7 @@ namespace AssetsManager.Utils
             GroundLogoScale = defaultSettings.GroundLogoScale;
             GroundLogoOpacity = defaultSettings.GroundLogoOpacity;
             StudioParameters = defaultSettings.StudioParameters;
+            VfxStudio = defaultSettings.VfxStudio;
             AudioExportFormat = defaultSettings.AudioExportFormat;
             ImageExportFormat = defaultSettings.ImageExportFormat;
             SaveJsonHistory = defaultSettings.SaveJsonHistory;
@@ -381,6 +415,12 @@ namespace AssetsManager.Utils
         public bool GridVisible { get; set; } = true;
         public bool SkyboxVisible { get; set; }
         public bool TransparentBackground { get; set; }
+    }
+
+    public class VfxStudioSettings
+    {
+        public string CameraPreset { get; set; } = "Game";
+        public string WireframeMode { get; set; } = "Off";
     }
 
     public class ReportGenerationSettings

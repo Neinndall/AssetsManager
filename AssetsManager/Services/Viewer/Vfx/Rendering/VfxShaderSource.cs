@@ -461,6 +461,8 @@ uniform samplerCube uReflectionTex;
 uniform int uHasReflection;
 uniform int uAttachedMesh;
 uniform vec4 uReflectionColor;
+uniform int uWireframePass;
+uniform vec4 uWireframeColor;
 out vec4 fragColor;
 float colorLookUpDriver(int type){
     if (type == 1) return vColorDynamics.x;
@@ -481,6 +483,10 @@ vec4 applyParticleColor(vec4 texel){
 }
 
 void main(){
+    if (uWireframePass != 0) {
+        fragColor = uWireframeColor;
+        return;
+    }
     vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uAddressMode);
     vec2 vUvMult = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uAddressModeMult);
     vec4 texel = (uHasTex != 0)
@@ -619,6 +625,8 @@ uniform int uHasSoftParticle;
 uniform vec4 uSoftParticleParams;
 uniform vec4 uSoftParticleControl;
 uniform vec2 uDepthProjection;
+uniform int uWireframePass;
+uniform vec4 uWireframeColor;
 out vec4 fragColor;
 float colorLookUpDriver(int type){
     if (type == 1) return vColorDynamics.x;
@@ -644,6 +652,10 @@ vec4 applyParticleColor(vec4 tex){
 }
 
 void main(){
+    if (uWireframePass != 0) {
+        fragColor = uWireframeColor;
+        return;
+    }
     vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uAddressMode);
     vec2 vUvMult = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uAddressModeMult);
     vec4 t;
