@@ -104,34 +104,46 @@ public sealed class VfxEmissionContractTests
     [Fact]
     public void RateIsPeriodDoesNotReinterpretEmissionRateLikeLtk()
     {
-        var runtime = Create(Emitter() with
+        VfxEmitterDefinition authored = Emitter() with
         {
             IsSingleParticle = false,
             Rate = VfxCurveF.Const(2f),
-            ParticleLifetime = VfxCurveF.Const(10f),
-            RateIsPeriod = true
-        });
+            ParticleLifetime = VfxCurveF.Const(10f)
+        };
+        var plain = Create(authored);
+        var marked = Create(authored with { RateIsPeriod = true });
 
-        runtime.Update(1.01f);
+        for (int frame = 0; frame < 11; frame++)
+        {
+            plain.Update(0.1f);
+            marked.Update(0.1f);
+        }
 
-        Assert.Equal(2, runtime.LiveParticleCount);
+        Assert.Equal(2, plain.LiveParticleCount);
+        Assert.Equal(plain.LiveParticleCount, marked.LiveParticleCount);
     }
 
     [Fact]
     public void EmitterIsLoopFlagDoesNotRestartFiniteEmissionLikeLtk()
     {
-        var runtime = Create(Emitter() with
+        VfxEmitterDefinition authored = Emitter() with
         {
             IsSingleParticle = false,
             Rate = VfxCurveF.Const(10f),
             EmitterLifetime = 0.1f,
-            ParticleLifetime = VfxCurveF.Const(10f),
-            IsLoop = true
-        });
+            ParticleLifetime = VfxCurveF.Const(10f)
+        };
+        var plain = Create(authored);
+        var marked = Create(authored with { IsLoop = true });
 
-        runtime.Update(0.51f);
+        for (int frame = 0; frame < 10; frame++)
+        {
+            plain.Update(0.05f);
+            marked.Update(0.05f);
+        }
 
-        Assert.Equal(1, runtime.LiveParticleCount);
+        Assert.Equal(1, plain.LiveParticleCount);
+        Assert.Equal(plain.LiveParticleCount, marked.LiveParticleCount);
     }
 
     [Fact]
@@ -432,7 +444,8 @@ public sealed class VfxEmissionContractTests
         runtime.Update(0.01f);
         runtime.IsStopped = true;
 
-        runtime.Update(0.5f);
+        for (int frame = 0; frame < 5; frame++)
+            runtime.Update(0.1f);
 
         VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
         Assert.InRange(particle.BirthRotation.X, 0.075f, 0.082f);

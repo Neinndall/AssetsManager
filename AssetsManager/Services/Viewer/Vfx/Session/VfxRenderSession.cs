@@ -36,6 +36,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         {
             public string BoneName { get; set; }
             public uint BoneHash { get; set; }
+            public string TargetBoneName { get; set; }
             public uint TargetBoneHash { get; set; }
             public Vector3 LocalOffset { get; set; }
             public Matrix4x4 BaseTransform { get; set; } = Matrix4x4.Identity;
@@ -351,6 +352,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     {
                         BoneName = idle.BoneName,
                         BoneHash = idle.BoneNameHash,
+                        TargetBoneName = idle.TargetBoneName,
                         TargetBoneHash = idle.TargetBoneNameHash,
                         EffectKey = idle.EffectKey,
                         LocalOffset = idle.Position,
@@ -478,15 +480,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
                 if (_graphAttachments.TryGetValue(graph, out var attachment) && boneTransformProvider != null)
                 {
-                    Matrix4x4? boneMatrix = null;
-                    if (!string.IsNullOrEmpty(attachment.BoneName))
-                    {
-                        boneMatrix = boneTransformProvider(attachment.BoneName, attachment.BoneHash);
-                    }
-                    if (!boneMatrix.HasValue && attachment.BoneHash != 0)
-                    {
-                        boneMatrix = boneTransformProvider(null, attachment.BoneHash);
-                    }
+                    Matrix4x4? boneMatrix = ResolveAttachmentBone(
+                        boneTransformProvider,
+                        attachment.BoneName,
+                        attachment.BoneHash);
+                    Matrix4x4? targetBoneMatrix = ResolveAttachmentBone(
+                        boneTransformProvider,
+                        attachment.TargetBoneName,
+                        attachment.TargetBoneHash);
 
                     if (boneMatrix.HasValue)
                     {
@@ -496,32 +497,46 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                             CurrentSkinScale);
                         if (attachment.IsDetachable && attachment.HasBoneTransform)
                             boneTransform = attachment.BoneTransform;
-                        else if (attachment.TargetBoneHash != 0 &&
-                                 boneTransformProvider(null, attachment.TargetBoneHash) is { } rawTarget)
-                        {
-                            Matrix4x4 target = PrepareBoneTransform(rawTarget);
-                            Vector3 forward = target.Translation - boneTransform.Translation;
-                            if (forward.LengthSquared() > 1e-8f)
-                            {
-                                forward = Vector3.Normalize(forward);
-                                Vector3 up = Math.Abs(Vector3.Dot(forward, Vector3.UnitY)) > 0.999f
-                                    ? Vector3.UnitX : Vector3.UnitY;
-                                boneTransform = Matrix4x4.CreateWorld(boneTransform.Translation, -forward, up);
-                            }
-                        }
                         if (attachment.IsDetachable && _activeSystem?.CurrentTime >= attachment.StartTime)
                         {
                             attachment.BoneTransform = boneTransform;
                             attachment.HasBoneTransform = true;
                         }
+
                         Matrix4x4 authoredWorld = RootAuthoredWorld(graph);
                         Matrix4x4 orientationRoot =
                             attachment.BaseTransform * Matrix4x4.CreateTranslation(boneTransform.Translation) * authoredWorld;
                         graph.SetTransform(
                             attachment.BaseTransform * boneTransform * authoredWorld,
                             orientationRoot);
+
+                        Vector3 target = targetBoneMatrix.HasValue
+                            ? Vector3.Transform(PrepareBoneTransform(targetBoneMatrix.Value).Translation, authoredWorld)
+                            : Vector3.Transform(
+                                boneTransform.Translation + new Vector3(VfxRigMotion.TargetReach, 0f, 0f),
+                                authoredWorld);
+                        graph.SetTarget(target);
                         continue;
                     }
+
+                    // LTK's jointAnchor(slot=-1) is the skeleton origin with an identity basis.
+                    // A valid target joint still aims beams even when the source joint is missing.
+                    Matrix4x4 fallbackPlacement = IdleFallbackTransform(
+                        attachment.BaseTransform,
+                        attachment.LocalOffset,
+                        CurrentSkinScale,
+                        Matrix4x4.Identity);
+                    Matrix4x4 fallbackWorld = RootAuthoredWorld(graph);
+                    Matrix4x4 fallbackOrientationRoot =
+                        Matrix4x4.CreateTranslation(fallbackPlacement.Translation) * fallbackWorld;
+                    graph.SetTransform(fallbackPlacement * fallbackWorld, fallbackOrientationRoot);
+                    Vector3 fallbackTarget = targetBoneMatrix.HasValue
+                        ? Vector3.Transform(PrepareBoneTransform(targetBoneMatrix.Value).Translation, fallbackWorld)
+                        : Vector3.Transform(
+                            fallbackPlacement.Translation + new Vector3(VfxRigMotion.TargetReach, 0f, 0f),
+                            fallbackWorld);
+                    graph.SetTarget(fallbackTarget);
+                    continue;
                 }
 
                 if (_graphAttachments.TryGetValue(graph, out attachment) && attachment.IsIdleEffect)
@@ -547,6 +562,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     graph.SetTransform(basePlacement * authoredWorld, orientationRoot);
                 }
             }
+        }
+
+        private static Matrix4x4? ResolveAttachmentBone(
+            Func<string, uint, Matrix4x4?> provider,
+            string name,
+            uint hash)
+        {
+            if (provider == null) return null;
+            if (!string.IsNullOrEmpty(name) && provider(name, hash) is { } named)
+                return named;
+            return hash != 0 ? provider(null, hash) : null;
         }
 
         private float CurrentSkinScale
@@ -699,7 +725,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             float speed = NormalizePlaybackSpeed(_activeSystem.Speed);
             float elapsed = frameTime * speed;
 
-            AdvanceTo(_activeSystem.CurrentTime + elapsed);
+            AdvanceTo(_activeSystem.CurrentTime + elapsed, fixedSeekSteps: false);
 
             if (_usesStandaloneRig && _rigSettings.IsLooping)
                 return;
@@ -760,7 +786,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (target + 1e-9 >= _activeSystem.CurrentTime)
             {
                 LastSeekRestoreTime = _activeSystem.CurrentTime;
-                AdvanceTo(target);
+                AdvanceTo(target, fixedSeekSteps: true);
                 return;
             }
 
@@ -769,7 +795,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 LastSeekRestoreTime = 0d;
                 ResetSimulationToStart();
             }
-            AdvanceTo(target);
+            AdvanceTo(target, fixedSeekSteps: true);
         }
 
         private void ResetSimulationToStart()
@@ -798,7 +824,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 SeekExact(target);
                 return;
             }
-            AdvanceTo(target);
+            AdvanceTo(target, fixedSeekSteps: false);
         }
 
         public void SetBoneTransformSampler(Func<double, string, uint, Matrix4x4?> sampler)
@@ -828,13 +854,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _renderer.SetOwnerHiddenSubmeshes(hashes);
         }
 
-        private void AdvanceTo(double target)
+        private void AdvanceTo(double target, bool fixedSeekSteps)
         {
             if (!double.IsFinite(target)) return;
             while (_activeSystem.CurrentTime < target)
             {
                 double previous = _activeSystem.CurrentTime;
-                double next = Math.Min(target, previous + SeekStep);
+                // LTK plays one variable step per rendered frame. Only seek/replay advances in
+                // fixed 1/60 s slices; checkpoints themselves never subdivide the physics step.
+                double next = fixedSeekSteps
+                    ? Math.Min(target, previous + SeekStep)
+                    : target;
                 foreach (var kill in _scheduledEffectKills)
                     if (kill.Time > previous && kill.Time < next) next = kill.Time;
                 foreach (double stopTime in _graphStopTimes.Values)
@@ -842,28 +872,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 foreach (GraphAttachmentInfo attachment in _graphAttachments.Values)
                     if (attachment.StartTime > previous && attachment.StartTime < next) next = attachment.StartTime;
 
-                // A looping rig replays its particle graph on the rig's own span. This is
-                // independent from an optional transport loop range.
-                double rigBoundary = NextRigLoopBoundary(previous);
-                if (rigBoundary > previous + 1e-9 && rigBoundary < next - 1e-9)
-                    next = rigBoundary;
-
-                // Land exactly on quarter-second marks so a checkpoint never captures a state
-                // from just before/after the time it represents.
-                double checkpointBoundary = NextCheckpointBoundary(previous);
-                if (checkpointBoundary > previous + 1e-9 && checkpointBoundary < next - 1e-9)
-                    next = checkpointBoundary;
-
                 KillGraphsAt(previous);
-                bool rigWrapped =
-                    double.IsFinite(rigBoundary) &&
-                    Math.Abs(next - rigBoundary) <= 1e-8;
-                _activeSystem.CurrentTime = next;
+
+                // LTK does not split a variable frame at the rig boundary. It detects a wrap
+                // from the end phase, resets to phase zero, then runs this frame's whole dt on
+                // the new pass. This also applies during the fixed 1/60 seek replay.
+                bool rigWrapped = DidRigWrap(previous, next);
                 if (rigWrapped)
-                {
-                    foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.ReplayLoop();
-                    _lastRigOrigin = null;
-                }
+                    ReplayRigLoopAtStart();
+
+                _activeSystem.CurrentTime = next;
                 ApplyRigTransform();
                 if (_boneTransformSampler != null)
                     UpdateBoneTransforms((name, hash) => _boneTransformSampler(next, name, hash));
@@ -875,26 +893,36 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             }
         }
 
-        private double NextRigLoopBoundary(double previous)
+        private bool DidRigWrap(double previous, double next)
         {
             if (!_usesStandaloneRig ||
                 !_rigSettings.IsLooping ||
                 !(RigDuration > 0d) ||
                 !double.IsFinite(RigDuration))
             {
-                return double.PositiveInfinity;
+                return false;
             }
 
-            double cycle = Math.Floor(previous / RigDuration + 1e-9) + 1d;
-            return cycle * RigDuration;
+            float previousPhase = VfxRigMotion.Evaluate(_rigSettings, previous, RigDuration).Phase;
+            float nextPhase = VfxRigMotion.Evaluate(_rigSettings, next, RigDuration).Phase;
+            return nextPhase < previousPhase;
         }
 
-        private double NextCheckpointBoundary(double previous)
+        private void ReplayRigLoopAtStart()
         {
-            int nextMark = (int)Math.Floor(previous / CheckpointInterval + 1e-9) + 1;
-            return nextMark is >= 1 and <= MaximumCheckpointMarks
-                ? nextMark * CheckpointInterval
-                : double.PositiveInfinity;
+            VfxRigStep start = VfxRigMotion.Evaluate(_rigSettings, 0d, RigDuration);
+            _lastRigOrigin = start.Origin;
+
+            foreach (VfxPlaybackGraphRuntime graph in _graphs)
+            {
+                _graphPlacements[graph] = start.Transform;
+                Matrix4x4 authoredWorld = RootAuthoredWorld(graph);
+                Matrix4x4 startTransform = start.Transform * authoredWorld;
+                Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(start.Origin) * authoredWorld;
+                graph.ReplayLoop(startTransform, orientationRoot);
+                graph.SetTarget(Vector3.Transform(start.Target, authoredWorld));
+                graph.IsStopped = start.IsStopped;
+            }
         }
 
         private void ClearCheckpoints()
@@ -961,10 +989,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         private void TryCaptureCheckpoint(double time)
         {
-            int mark = (int)Math.Round(time / CheckpointInterval);
+            // LTK stores the first state that crosses each quarter-second mark; it does not
+            // force the simulation to land exactly on the mark just to make a checkpoint.
+            int mark = (int)Math.Floor(time / CheckpointInterval + 1e-9);
             if (mark < 1 || mark > MaximumCheckpointMarks || _checkpoints.ContainsKey(mark)) return;
-            double exact = mark * CheckpointInterval;
-            if (Math.Abs(time - exact) > 1e-8) return;
 
             SessionSnapshot state = CaptureSessionSnapshot();
             long size = state.Bytes;
@@ -1003,6 +1031,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             for (; mark >= 1; mark--)
             {
                 if (!_checkpoints.TryGetValue(mark, out Checkpoint checkpoint)) continue;
+                // A variable playback frame may have crossed this mark after the exact target.
+                // LTK also rejects checkpoints whose recorded seek step lies beyond the request.
+                if (checkpoint.Time > target + 1e-9) continue;
                 RestoreSessionSnapshot(checkpoint.State);
                 LastSeekRestoreTime = checkpoint.Time;
                 return true;

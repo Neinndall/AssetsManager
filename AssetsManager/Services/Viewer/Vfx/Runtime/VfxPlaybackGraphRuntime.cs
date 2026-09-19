@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -35,6 +35,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private int _heldChildParticleCapacity;
         private Matrix4x4 _rootTransform;
         private Matrix4x4 _orientationRootTransform;
+        private float _sourceTime;
         private Func<string, Matrix4x4?> _jointTransformProvider;
         private bool _allEmittersVisible = true;
 
@@ -72,6 +73,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         internal sealed record Snapshot(
             Matrix4x4 RootTransform,
             Matrix4x4 OrientationRootTransform,
+            float SourceTime,
             RuntimeSnapshot[] Runtimes,
             CarriedSnapshot[] CarriedChildren,
             long Bytes);
@@ -196,15 +198,26 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             ClearChildRuns();
             RebindRootCallbacks();
+            _sourceTime = 0f;
             Root.Reset();
             Root.WarmUp();
             SyncRenderTimes();
         }
 
         internal void ReplayLoop()
+            => ReplayLoop(_rootTransform, _orientationRootTransform);
+
+        internal void ReplayLoop(Matrix4x4 startTransform, Matrix4x4 startOrientationRootTransform)
         {
             ClearChildRuns();
             RebindRootCallbacks();
+
+            // LTK replays from phase zero before it runs the wrapping frame. Put the root on
+            // that start frame before resetting/warming so build-up and field origins do not
+            // inherit the transform from the end of the previous pass.
+            _rootTransform = startTransform;
+            _orientationRootTransform = startOrientationRootTransform;
+            Root.SetTransform(startTransform, startOrientationRootTransform);
             Root.ReplayLoop();
             Root.WarmUp();
             SyncRenderTimes();
@@ -290,6 +303,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return new Snapshot(
                 _rootTransform,
                 _orientationRootTransform,
+                _sourceTime,
                 saved,
                 carried.ToArray(),
                 bytes);
@@ -318,6 +332,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _carriedChildren.Clear();
             _rootTransform = snapshot.RootTransform;
             _orientationRootTransform = snapshot.OrientationRootTransform;
+            _sourceTime = snapshot.SourceTime;
 
             RuntimeSnapshot rootSaved = snapshot.Runtimes[0];
             if (!ReferenceEquals(rootSaved.Definition, Root.Definition) &&
@@ -428,12 +443,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         public void Update(float deltaTime)
         {
             if (deltaTime <= 0f || !float.IsFinite(deltaTime)) return;
-            while (deltaTime > 0f)
-            {
-                float step = MathF.Min(deltaTime, 0.1f);
-                UpdateStep(step);
-                deltaTime -= step;
-            }
+            // Source.time is the driver's global simulation clock and does not rewind at a
+            // rig-loop replay. The root runtime's CurrentTime is the local age of this pass.
+            _sourceTime += deltaTime;
+            // Match LTK's variable driver: one graph step per advance. Seek/replay supplies
+            // repeated 1/60 s advances from the session instead of being subdivided here.
+            UpdateStep(deltaTime);
         }
 
         private void UpdateStep(float deltaTime)
@@ -471,10 +486,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         private void SyncRenderTimes()
         {
-            float now = Root?.CurrentTime ?? 0f;
             foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
                 foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
-                    emitter.RenderTime = now;
+                    emitter.RenderTime = _sourceTime;
         }
 
         private VfxPlaybackRuntime CreateRuntime(
