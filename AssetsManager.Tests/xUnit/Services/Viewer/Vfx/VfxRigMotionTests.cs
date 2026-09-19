@@ -273,6 +273,42 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void LoopWrapReplaysTheWholeVariableFrameLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
+            {
+                EmitterLifetime = 0.2f,
+                ParticleLifetime = VfxCurveF.Const(0.1f)
+            };
+            var definition = new VfxSystemDefinition(0x70u, "loop_variable", "loop_variable", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "loop_variable",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [definition.PathHash] = definition },
+                ResourceMap = new Dictionary<uint, uint>()
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.RigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Burst);
+            Assert.True(session.RigDuration > 0.1d);
+
+            // Reach 50 ms before the boundary through the deterministic fixed-rate seek path.
+            session.Seek(session.RigDuration - 0.05d);
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            Assert.True(root.CurrentTime > 0.5f);
+
+            session.Play();
+            session.Update(0.1f);
+
+            // LTK detects the wrap from the end phase, replays at phase zero and then gives the
+            // new run this frame's complete 100 ms step. Splitting at the boundary would leave 50 ms.
+            Assert.Equal(0.1f, root.CurrentTime, precision: 4);
+            Assert.InRange(session.PlaybackTime, 0.049d, 0.051d);
+        }
+
+        [Fact]
         public void LoopLifecycleReplaysAfterSoftStop()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with

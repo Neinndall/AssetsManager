@@ -165,6 +165,147 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void EmitterSpacePositionDeltaUsesEachParticlesBirthFrameLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsEmitterSpace = true,
+                IsSingleParticle = true,
+                ParticleLifetime = VfxCurveF.Const(10f),
+                EmitterLifetime = 1f,
+                EmitterPosition = new VfxCurve3(
+                    Vector3.Zero,
+                    new[] { 0f, 1f },
+                    new[] { Vector3.Zero, new Vector3(10f, 0f, 0f) })
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "emitter-space-frame", "emitter-space-frame", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.1f);
+            Assert.Equal(1f, Assert.Single(Assert.Single(runtime.Emitters).Particles).Pos.X, precision: 5);
+
+            Matrix4x4 currentRig = Matrix4x4.CreateRotationY(MathF.PI * 0.5f);
+            runtime.SetTransform(currentRig, Matrix4x4.Identity);
+            runtime.Update(0.1f);
+
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+            Assert.Equal(2f, particle.Pos.X, precision: 5);
+            Assert.InRange(MathF.Abs(particle.Pos.Z), 0f, 1e-5f);
+        }
+
+        [Fact]
+        public void EmitterSpaceDoesNotCarryRootMotionWithoutBindWeightLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsEmitterSpace = true,
+                BindWeight = VfxCurveF.Const(0f),
+                ParticleLifetime = VfxCurveF.Const(10f),
+                EmitterPosition = VfxCurve3.Const(Vector3.Zero)
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "emitter-space-root", "emitter-space-root", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.02f);
+            Vector3 bornAt = Assert.Single(Assert.Single(runtime.Emitters).Particles).Pos;
+
+            runtime.SetTransform(Matrix4x4.CreateTranslation(100f, 0f, 0f));
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+            Assert.Equal(bornAt, particle.Pos);
+        }
+
+        [Fact]
+        public void BindWeightCarriesAnyNonZeroRootDeltaLikeLtk()
+        {
+            const float tiny = 1e-7f;
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                BindWeight = VfxCurveF.Const(1f),
+                ParticleLifetime = VfxCurveF.Const(10f)
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "tiny-bind", "tiny-bind", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.02f);
+
+            runtime.SetTransform(Matrix4x4.CreateTranslation(tiny, 0f, 0f));
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+            Assert.InRange(particle.Pos.X, tiny * 0.999f, tiny * 1.001f);
+        }
+
+        [Fact]
+        public void ForceFieldsReadThePreBindParticlePositionLikeLtk()
+        {
+            var attraction = new VfxAttractionField(
+                VfxCurveF.Const(10f),
+                VfxCurve3.Const(Vector3.Zero),
+                VfxCurveF.Const(100f));
+            var fields = new VfxFieldCollectionDefinition(
+                Array.Empty<VfxAccelerationField>(),
+                new[] { attraction },
+                Array.Empty<VfxDragField>(),
+                Array.Empty<VfxOrbitalField>(),
+                Array.Empty<VfxNoiseField>());
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                BindWeight = VfxCurveF.Const(1f),
+                ParticleLifetime = VfxCurveF.Const(10f),
+                Fields = fields
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "field-before-bind", "field-before-bind", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.02f);
+
+            runtime.SetTransform(Matrix4x4.CreateTranslation(10f, 0f, 0f));
+            runtime.Update(0.1f);
+
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+            Assert.Equal(10f, particle.Pos.X, precision: 5);
+            Assert.Equal(Vector3.Zero, particle.Vel);
+        }
+
+        [Fact]
+        public void ParticleLocalOrientationUsesCurrentRigFrameWithoutMovingParticleLikeLtk()
+        {
+            static VfxPlaybackRuntime.ParticleLifecycleInfo DeathFrame(bool localOrientation)
+            {
+                VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+                {
+                    IsSingleParticle = true,
+                    ParticleLifetime = VfxCurveF.Const(0.5f),
+                    ParticleIsLocalOrientation = localOrientation
+                };
+                var runtime = new VfxPlaybackRuntime(7);
+                VfxPlaybackRuntime.ParticleLifecycleInfo died = default;
+                bool sawDeath = false;
+                runtime.ParticleLifecycle += (_, _, particle) =>
+                {
+                    if (!particle.Died) return;
+                    died = particle;
+                    sawDeath = true;
+                };
+                runtime.SetSystem(new VfxSystemDefinition(1, "particle-local", "particle-local", new[] { emitter }), Vector3.Zero);
+                runtime.Update(0.01f);
+
+                Matrix4x4 current = Matrix4x4.CreateRotationY(MathF.PI * 0.5f);
+                runtime.SetTransform(current);
+                runtime.Update(0.5f);
+                Assert.True(sawDeath);
+                return died;
+            }
+
+            VfxPlaybackRuntime.ParticleLifecycleInfo local = DeathFrame(localOrientation: true);
+            VfxPlaybackRuntime.ParticleLifecycleInfo born = DeathFrame(localOrientation: false);
+
+            Vector3 expectedCurrent = Vector3.TransformNormal(Vector3.UnitZ, Matrix4x4.CreateRotationY(MathF.PI * 0.5f));
+            Vector3 localForward = Vector3.TransformNormal(Vector3.UnitZ, local.Frame);
+            Vector3 bornForward = Vector3.TransformNormal(Vector3.UnitZ, born.Frame);
+            Assert.True(Vector3.Distance(expectedCurrent, localForward) < 1e-5f);
+            Assert.True(Vector3.Distance(Vector3.UnitZ, bornForward) < 1e-5f);
+        }
+
+        [Fact]
         public void AttachedMeshIsNotStandaloneVisual()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -1315,18 +1456,58 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void RuntimeConsumesTheCompleteDeltaUsingStableSubsteps()
+        public void RuntimeConsumesTheCompleteVariableDriverStepLikeLtk()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
-                EmitterLifetime = 1f
+                EmitterLifetime = 1f,
+                ParticleLifetime = VfxCurveF.Const(10f),
+                AccelerationOverLife = VfxCurve3.Const(Vector3.UnitX)
             };
             var runtime = new VfxPlaybackRuntime(7);
             runtime.SetSystem(new VfxSystemDefinition(1, "timing", "timing", new[] { emitter }), Vector3.Zero);
 
-            runtime.Update(0.25f);
+            runtime.Update(0.01f); // birth step
+            runtime.Update(0.2f);  // one variable driver step, not two 0.1 s substeps
 
-            Assert.Equal(0.25f, runtime.Emitters[0].EmitterAge, precision: 4);
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+            Assert.Equal(0.21f, runtime.Emitters[0].EmitterAge, precision: 4);
+            Assert.Equal(0.2f, particle.Vel.X, precision: 5);
+            Assert.Equal(0.04f, particle.Pos.X, precision: 5);
+        }
+
+        [Fact]
+        public void SessionPlaybackKeepsOneVariableStepAfterSpeedLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f,
+                ParticleLifetime = VfxCurveF.Const(10f),
+                AccelerationOverLife = VfxCurve3.Const(Vector3.UnitX)
+            };
+            var definition = new VfxSystemDefinition(1, "timing-session", "timing-session", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "timing-session",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [1] = definition },
+                ResourceMap = new Dictionary<uint, uint>(),
+                SearchDirectory = Path.GetTempPath(),
+                TotalDuration = 10d
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.Play();
+            session.Update(0.01f); // birth step at 1x
+            model.Speed = 2d;
+            session.Update(0.1f);  // one 0.2 s driver step after speed
+
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(root.Emitters).Particles);
+            Assert.Equal(0.21d, model.CurrentTime, precision: 5);
+            Assert.Equal(0.2f, particle.Vel.X, precision: 5);
+            Assert.Equal(0.04f, particle.Pos.X, precision: 5);
         }
 
         [Fact]
@@ -2348,6 +2529,80 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void BoneRigKeepsSourceBasisAndUsesTargetBoneOnlyAsAimLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var system = new VfxSystemDefinition(100, "bone-rig", "bone-rig", new[] { emitter });
+            var idle = new VfxIdleEffectDefinition(
+                EffectKey: 100,
+                EffectName: "bone-rig",
+                BoneName: "source",
+                BoneNameHash: 1,
+                TargetBoneName: "target",
+                TargetBoneNameHash: 2,
+                Position: Vector3.Zero);
+            using var session = new VfxRenderSession();
+            Assert.True(session.SetAnimationSession(
+                composition: null,
+                idleEffects: new[] { idle },
+                systems: new Dictionary<uint, VfxSystemDefinition> { [100] = system },
+                resourceMap: new Dictionary<uint, uint>(),
+                searchDirectory: Path.GetTempPath(),
+                seed: 7,
+                animationDuration: 1d));
+
+            Matrix4x4 source =
+                Matrix4x4.CreateRotationY(MathF.PI * 0.5f) *
+                Matrix4x4.CreateTranslation(10f, 0f, 0f);
+            Matrix4x4 target = Matrix4x4.CreateTranslation(10f, 0f, 20f);
+            session.UpdateBoneTransforms((name, hash) =>
+            {
+                if (name == "source" || hash == 1) return source;
+                if (hash == 2) return target;
+                return null;
+            });
+
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            Vector3 expectedForward = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitZ, source));
+            Vector3 actualForward = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitZ, root.WorldTransform));
+            Assert.Equal(expectedForward.X, actualForward.X, precision: 5);
+            Assert.Equal(expectedForward.Y, actualForward.Y, precision: 5);
+            Assert.Equal(expectedForward.Z, actualForward.Z, precision: 5);
+            Assert.Equal(new Vector3(10f, 0f, 20f), Assert.Single(root.Emitters).SystemTarget);
+        }
+
+        [Fact]
+        public void BoneRigMissingSourceStillUsesTargetBoneLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var system = new VfxSystemDefinition(100, "bone-fallback", "bone-fallback", new[] { emitter });
+            var idle = new VfxIdleEffectDefinition(
+                EffectKey: 100,
+                EffectName: "bone-fallback",
+                BoneName: "missing",
+                BoneNameHash: 1,
+                TargetBoneName: "target",
+                TargetBoneNameHash: 2,
+                Position: new Vector3(3f, 4f, 5f));
+            using var session = new VfxRenderSession();
+            Assert.True(session.SetAnimationSession(
+                composition: null,
+                idleEffects: new[] { idle },
+                systems: new Dictionary<uint, VfxSystemDefinition> { [100] = system },
+                resourceMap: new Dictionary<uint, uint>(),
+                searchDirectory: Path.GetTempPath(),
+                seed: 7,
+                animationDuration: 1d));
+
+            Matrix4x4 target = Matrix4x4.CreateTranslation(20f, 30f, 40f);
+            session.UpdateBoneTransforms((name, hash) => hash == 2 ? target : null);
+
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            Assert.Equal(new Vector3(3f, 4f, 5f), root.WorldTransform.Translation);
+            Assert.Equal(new Vector3(20f, 30f, 40f), Assert.Single(root.Emitters).SystemTarget);
+        }
+
+        [Fact]
         public void BoneAnchorCarriesOffsetThroughJointScaleBeforeSkinScale()
         {
             Matrix4x4 joint =
@@ -2819,6 +3074,159 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
             Assert.True(particle.Vel.LengthSquared() > 0f);
+        }
+
+        [Fact]
+        public void EmitterSpaceForceFieldIgnoresTranslationOverrideLikeLtk()
+        {
+            var noise = new VfxNoiseField(
+                VfxCurveF.Zero,
+                VfxCurveF.Const(5f),
+                VfxCurve3.Const(Vector3.Zero),
+                VfxCurveF.Const(10f),
+                Vector3.One);
+            var fields = new VfxFieldCollectionDefinition(
+                Array.Empty<VfxAccelerationField>(),
+                Array.Empty<VfxAttractionField>(),
+                Array.Empty<VfxDragField>(),
+                Array.Empty<VfxOrbitalField>(),
+                new[] { noise });
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                IsEmitterSpace = true,
+                TranslationOverride = new Vector3(100f, 0f, 0f),
+                Fields = fields
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "field-origin", "field-origin", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+            Assert.Equal(Vector3.Zero, particle.Vel);
+        }
+
+        [Fact]
+        public void LocalSpaceForceFieldIgnoresAuthoredSystemTransformLikeLtk()
+        {
+            var fields = new VfxFieldCollectionDefinition(
+                new[] { new VfxAccelerationField(VfxCurve3.Const(Vector3.UnitX), LocalSpace: true) },
+                Array.Empty<VfxAttractionField>(),
+                Array.Empty<VfxDragField>(),
+                Array.Empty<VfxOrbitalField>(),
+                Array.Empty<VfxNoiseField>());
+            Matrix4x4 authored = Matrix4x4.CreateRotationY(MathF.PI * 0.5f);
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                IsLocalOrientation = true,
+                ParticleLifetime = VfxCurveF.Const(10f),
+                Fields = fields
+            };
+            VfxSystemDefinition system = new(1, "field-axis", "field-axis", new[] { emitter }, Transform: authored);
+            var graph = new VfxPlaybackGraphRuntime(
+                system,
+                Matrix4x4.Identity,
+                7,
+                new Dictionary<uint, VfxSystemDefinition> { [system.PathHash] = system },
+                new Dictionary<uint, uint>(),
+                (definition, transform, seed) =>
+                {
+                    var runtime = new VfxPlaybackRuntime(seed);
+                    runtime.SetSystem(definition, transform);
+                    return runtime;
+                });
+
+            graph.Update(0.02f);
+            graph.Update(0.1f);
+
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(graph.Root.Emitters).Particles);
+            Assert.True(particle.Vel.X > 0f);
+            Assert.InRange(MathF.Abs(particle.Vel.Z), 0f, 1e-5f);
+        }
+
+        [Fact]
+        public void BirthOrbitalVelocityTurnsDrawnPositionAboutSystemOriginInRadiansLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                TranslationOverride = new Vector3(2f, 0f, 0f),
+                ParticleLifetime = VfxCurveF.Const(10f),
+                BirthOrbitalVelocity = VfxCurve3.Const(new Vector3(0f, MathF.PI * 0.5f, 0f))
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "birth-orbit", "birth-orbit", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.01f);
+            runtime.Update(1f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            VfxPlaybackRuntime.Particle particle = Assert.Single(state.Particles);
+            Assert.Equal(new Vector3(2f, 0f, 0f), particle.Pos);
+            Assert.InRange(MathF.Abs(state.Instances[0]), 0f, 1e-5f);
+            Assert.Equal(-2f, state.Instances[2], precision: 5);
+        }
+
+        [Fact]
+        public void TinyNonZeroOrbitalFieldAxisStillActsLikeLtk()
+        {
+            var fields = new VfxFieldCollectionDefinition(
+                Array.Empty<VfxAccelerationField>(),
+                Array.Empty<VfxAttractionField>(),
+                Array.Empty<VfxDragField>(),
+                new[] { new VfxOrbitalField(VfxCurve3.Const(new Vector3(0f, 1e-8f, 0f)), LocalSpace: false) },
+                Array.Empty<VfxNoiseField>());
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                TranslationOverride = new Vector3(10f, 0f, 0f),
+                BirthVelocity = VfxCurve3.Const(Vector3.UnitX),
+                Fields = fields
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "tiny-orbit", "tiny-orbit", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+            Assert.InRange(MathF.Abs(particle.Vel.X), 0f, 1e-5f);
+            Assert.True(MathF.Abs(particle.Vel.Z) > 0.99f);
+        }
+
+        [Fact]
+        public void NoiseFieldFirstImpulseMatchesLtkHashDirection()
+        {
+            var noise = new VfxNoiseField(
+                VfxCurveF.Zero,
+                VfxCurveF.Const(1f),
+                VfxCurve3.Const(Vector3.Zero),
+                VfxCurveF.Const(1000f),
+                Vector3.One);
+            var fields = new VfxFieldCollectionDefinition(
+                Array.Empty<VfxAccelerationField>(),
+                Array.Empty<VfxAttractionField>(),
+                Array.Empty<VfxDragField>(),
+                Array.Empty<VfxOrbitalField>(),
+                new[] { noise });
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                ParticleLifetime = VfxCurveF.Const(10f),
+                Fields = fields
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "noise-golden", "noise-golden", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+
+            Vector3 velocity = Assert.Single(Assert.Single(runtime.Emitters).Particles).Vel;
+            Assert.Equal(0.5753422f, velocity.X, precision: 6);
+            Assert.Equal(0.004179446f, velocity.Y, precision: 6);
+            Assert.Equal(0.81790215f, velocity.Z, precision: 6);
         }
 
         [Fact]

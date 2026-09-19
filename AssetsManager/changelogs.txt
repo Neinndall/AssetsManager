@@ -402,6 +402,8 @@ Bug Fixes
   - VFX Studio / Synchronized trail and beam emitter UV scrolling to the source playback clock so child ribbons no longer drift from other primitives.
   - VFX Studio / Matched LTK spawn placement with emission-only trail distance tracking, exact shape fallbacks, and authored multi-axis rotation order.
   - VFX Studio / Preserved tiny nonzero direction and spawn axes and applied LegacySimple lifetime scale across all three particle axes.
+  - VFX Studio / Matched LTK emitter-space integration and force-field spaces, including bind motion, birth-frame offsets, local field orientation, and tiny orbital axes.
+  - VFX Studio / Matched LTK variable-step playback and rig-loop replay so playback speed, checkpoints, and loop boundaries no longer alter particle integration timing.
   - VFX Studio / Rig remains visible in the preview toolbar while standalone motion tuning stays disabled for skeleton-driven Animation Clips.
   - VFX Studio / Parametric clip changes no longer invalidate cached animation assets while rebuilding AnimationGraph playback.
   - VFX Studio / Skin selection now loads its model, Systems, and Animation Clips without auto-playing a System or Animation Clip; playback starts only after explicit selection.
