@@ -1113,7 +1113,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     : null);
 
             p.TryGetValue(F_primitive, out var prim);
-            uint primitiveClass = prim is BinTreeStruct primitive ? primitive.ClassHash : PrimCameraQuad;
+            // League reads a null Struct pointer exactly like an omitted primitive: CameraQuad.
+            uint authoredPrimitiveClass = prim is BinTreeStruct primitive && primitive.ClassHash != 0
+                ? primitive.ClassHash
+                : 0u;
+            uint primitiveClass = authoredPrimitiveClass != 0 ? authoredPrimitiveClass : PrimCameraQuad;
             VfxPrimitiveKind primitiveKind = GetPrimitiveKind(primitiveClass);
             bool isMesh = primitiveKind is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
             bool isArbitraryQuad = prim is BinTreeStruct aq && aq.ClassHash == PrimArbitraryQuad;
@@ -1475,7 +1479,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 SubmeshesToDrawAlways: submeshesToDrawAlways,
                 AttachedSubmeshHashes: attachedSubmeshHashes,
                 AuthoredFeatures: new VfxEmitterAuthoredFeatures(
-                    PrimitiveClassHash: primitiveClass,
+                    PrimitiveClassHash: authoredPrimitiveClass,
                     HasCustomMaterial: HasValue(p, F_customMaterial),
                     HasStencil: stencilMode != 0 ||
                         (AsU32(Get(p, F_stencilReferenceId)) ?? 0u) != 0,
@@ -1639,11 +1643,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                         continue;
                     }
 
-                    string name = GetString(identifier.Properties, F_effectName)
-                               ?? GetString(identifier.Properties, F_effectKey) ?? string.Empty;
+                    string name = GetString(identifier.Properties, F_effectName) ?? string.Empty;
                     uint systemHash = AsU32(Get(identifier.Properties, F_effect)) ?? 0u;
-                    uint effectKey = AsU32(Get(identifier.Properties, F_effectKey))
-                                  ?? (!string.IsNullOrEmpty(name) ? HashAlgorithms.Fnv1a(name) : 0u);
+                    uint effectKey = AsU32(Get(identifier.Properties, F_effectKey)) ?? 0u;
                     children.Add(!string.IsNullOrEmpty(name) || systemHash != 0 || effectKey != 0
                         ? new VfxChildSystemReference(name, systemHash, effectKey)
                         : null);
@@ -1847,15 +1849,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 }
 
                 int n = tc is not null && vc is not null ? Math.Min(tc.Elements.Count, vc.Elements.Count) : 0;
-                float[] times = n > 0 ? new float[n] : null;
-                float[] vals = n > 0 ? new float[n] : null;
+                var times = new List<float>(n);
+                var vals = new List<float>(n);
                 for (int i = 0; i < n; i++)
                 {
-                    times[i] = AsF32(tc.Elements[i]) ?? 0f;
-                    vals[i] = AsF32(vc.Elements[i]) ?? 0f;
+                    float? time = AsF32(tc.Elements[i]);
+                    float? value = AsF32(vc.Elements[i]);
+                    if (!time.HasValue || !value.HasValue) continue;
+                    times.Add(time.Value);
+                    vals.Add(value.Value);
                 }
 
-                tables[tableIndex] = new VfxProbTable(times, vals, single, IsPresent: true);
+                tables[tableIndex] = new VfxProbTable(
+                    times.Count > 0 ? times.ToArray() : null,
+                    vals.Count > 0 ? vals.ToArray() : null,
+                    single,
+                    IsPresent: true);
                 any = true;
             }
             return any ? tables : null;
@@ -1878,14 +1887,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 
             int n = Math.Min(tc.Elements.Count, vc.Elements.Count);
             if (n == 0) return (null, null);
-            var times = new float[n];
-            var vals = new T[n];
+            var times = new List<float>(n);
+            var vals = new List<T>(n);
             for (int i = 0; i < n; i++)
             {
-                times[i] = AsF32(tc.Elements[i]) ?? 0f;
-                vals[i] = conv(vc.Elements[i]) ?? default;
+                float? time = AsF32(tc.Elements[i]);
+                T? value = conv(vc.Elements[i]);
+                if (!time.HasValue || !value.HasValue) continue;
+                times.Add(time.Value);
+                vals.Add(value.Value);
             }
-            return (times, vals);
+            return times.Count > 0 ? (times.ToArray(), vals.ToArray()) : (null, null);
         }
 
         private static BinTreeProperty Get(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)

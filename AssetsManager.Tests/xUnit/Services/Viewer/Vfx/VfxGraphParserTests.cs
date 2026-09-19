@@ -242,6 +242,21 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                         new BinTreeProperty[] { new BinTreeF32(0, 2f) }),
                     new BinTreeF32(Fnv1a.HashLower("singleValue"), 0.75f)
                 });
+            var invalidPairTable = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxProbabilityTableData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("keyTimes"),
+                        BinPropertyType.String,
+                        new BinTreeProperty[] { new BinTreeString(0, "invalid") }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("keyValues"),
+                        BinPropertyType.F32,
+                        new BinTreeProperty[] { new BinTreeF32(0, 4f) }),
+                    new BinTreeF32(Fnv1a.HashLower("singleValue"), 0.5f)
+                });
             var dynamics = new BinTreeStruct(
                 Fnv1a.HashLower("dynamics"),
                 Fnv1a.HashLower("VfxProbabilityTables"),
@@ -250,7 +265,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     new BinTreeContainer(
                         Fnv1a.HashLower("probabilityTables"),
                         BinPropertyType.Struct,
-                        new BinTreeProperty[] { singleTable, mismatchedTable })
+                        new BinTreeProperty[] { singleTable, mismatchedTable, invalidPairTable })
                 });
             var birthScale = new BinTreeStruct(
                 Fnv1a.HashLower("birthScale0"),
@@ -283,11 +298,144 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(0.25f, parsed.BirthScale.Prob[0].Single);
             Assert.False(parsed.BirthScale.Prob[1].IsEmpty);
             Assert.Equal(0f, parsed.BirthScale.Prob[1].Single);
+            Assert.False(parsed.BirthScale.Prob[2].IsEmpty);
+            Assert.Equal(0.5f, parsed.BirthScale.Prob[2].Single);
+            Assert.Null(parsed.BirthScale.Prob[2].Times);
+            Assert.Null(parsed.BirthScale.Prob[2].Values);
 
             Vector3 drawn = parsed.BirthScale.SampleBirth(0f, new System.Random(1), sharedRoll: 0.5f);
             Assert.Equal(0.5f, drawn.X);
             Assert.Equal(0f, drawn.Y);
-            Assert.Equal(4f, drawn.Z);
+            Assert.Equal(2f, drawn.Z);
+        }
+
+        [Fact]
+        public void CurveDynamicsDropsInvalidPairsInsteadOfInventingZeroKeys()
+        {
+            var dynamics = new BinTreeStruct(
+                Fnv1a.HashLower("dynamics"),
+                Fnv1a.HashLower("VfxAnimatedFloatVariableData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("times"),
+                        BinPropertyType.String,
+                        new BinTreeProperty[] { new BinTreeString(0, "invalid") }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("values"),
+                        BinPropertyType.F32,
+                        new BinTreeProperty[] { new BinTreeF32(0, 9f) })
+                });
+            var rate = new BinTreeStruct(
+                Fnv1a.HashLower("rate"),
+                Fnv1a.HashLower("ValueFloat"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeF32(Fnv1a.HashLower("constantValue"), 4f),
+                    dynamics
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { rate });
+            var system = new BinTreeObject(
+                "Effects/InvalidCurvePair",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxCurveF parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters).Rate;
+
+            Assert.Null(parsed.Times);
+            Assert.Null(parsed.Values);
+            Assert.Equal(4f, parsed.Sample(0.5f));
+        }
+
+        [Fact]
+        public void NullPrimitivePointerUsesCameraQuadDefault()
+        {
+            var primitive = new BinTreeStruct(
+                Fnv1a.HashLower("primitive"),
+                0,
+                System.Array.Empty<BinTreeProperty>());
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { primitive });
+            var system = new BinTreeObject(
+                "Effects/NullPrimitive",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal(VfxPrimitiveKind.CameraQuad, parsed.PrimitiveKind);
+            Assert.Equal(0u, parsed.AuthoredFeatures.PrimitiveClassHash);
+        }
+
+        [Fact]
+        public void ChildEffectNameDoesNotSynthesizeAnEffectKey()
+        {
+            const string effectName = "Effects/NamedOnly";
+            var child = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxChildIdentifier"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("effectName"), effectName)
+                });
+            var childSet = new BinTreeStruct(
+                Fnv1a.HashLower("childParticleSetDefinition"),
+                Fnv1a.HashLower("VfxChildParticleSetDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("childrenIdentifiers"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { child })
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { childSet });
+            var system = new BinTreeObject(
+                "Effects/Parent",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxChildSystemReference parsed = Assert.Single(
+                Assert.Single(
+                    Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters)
+                    .ChildParticleSet.Children);
+
+            Assert.Equal(effectName, parsed.Name);
+            Assert.Equal(0u, parsed.SystemHash);
+            Assert.Equal(0u, parsed.EffectKey);
         }
 
         [Fact]

@@ -394,6 +394,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Fixed unresolved child identifiers incorrectly synthesizing or falling back to effect keys from unrelated hashes or names.
+  - VFX Studio / Fixed null primitive defaults and invalid curve key pairs to match League VFX parsing semantics.
   - VFX Studio / Rig remains visible in the preview toolbar while standalone motion tuning stays disabled for skeleton-driven Animation Clips.
   - VFX Studio / Parametric clip changes no longer invalidate cached animation assets while rebuilding AnimationGraph playback.
   - VFX Studio / Skin selection now loads its model, Systems, and Animation Clips without auto-playing a System or Animation Clip; playback starts only after explicit selection.
