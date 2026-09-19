@@ -727,6 +727,29 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void UnmappedEffectKeyDoesNotFallbackToSystemHashOrName()
+        {
+            const uint effectKey = 77;
+            const string namedPath = "Effects/NamedFallback";
+            var byKey = new VfxSystemDefinition(effectKey, "by-key", "by-key", Array.Empty<VfxEmitterDefinition>());
+            var byName = new VfxSystemDefinition(
+                Fnv1a.HashLower(namedPath),
+                "by-name",
+                namedPath,
+                Array.Empty<VfxEmitterDefinition>());
+            var systems = new Dictionary<uint, VfxSystemDefinition>
+            {
+                [byKey.PathHash] = byKey,
+                [byName.PathHash] = byName
+            };
+
+            Assert.Null(VfxPlaybackGraphRuntime.ResolveSystem(
+                new VfxChildSystemReference(namedPath, 0, effectKey),
+                systems,
+                new Dictionary<uint, uint>()));
+        }
+
+        [Fact]
         public void ChildPoolCapacityMatchesLtkPeakDemandBuckets()
         {
             VfxEmitterDefinition regular = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with

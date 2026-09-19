@@ -886,16 +886,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             {
                 if (resourceMap.TryGetValue(reference.EffectKey, out uint mappedHash))
                 {
-                    // A resolver hit is authoritative even when it maps to null or to an
-                    // unavailable object. LTK does not continue into a later fallback.
+                    // An effect key only names a child through its ResourceResolver scope.
+                    // A resolver hit is authoritative even when it maps to null or to an unavailable object.
                     return mappedHash != 0 && systems.TryGetValue(mappedHash, out definition)
                         ? definition
                         : null;
                 }
-                if (systems.TryGetValue(reference.EffectKey, out definition)) return definition;
             }
-            if (!string.IsNullOrWhiteSpace(reference.Name) &&
-                systems.TryGetValue(Fnv1a.HashLower(reference.Name), out definition)) return definition;
             return null;
         }
     }
