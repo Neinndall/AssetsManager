@@ -566,30 +566,32 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             if (count == PortableAuxiliaryTextureCount)
                 return source;
 
+            string newLine = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
             return source
                 .Replace(
-                    BuildAuxiliarySamplerDeclarations(PortableAuxiliaryTextureCount),
-                    BuildAuxiliarySamplerDeclarations(count),
+                    BuildAuxiliarySamplerDeclarations(PortableAuxiliaryTextureCount, newLine),
+                    BuildAuxiliarySamplerDeclarations(count, newLine),
                     StringComparison.Ordinal)
                 .Replace(
-                    BuildAuxiliarySampleCases(PortableAuxiliaryTextureCount),
-                    BuildAuxiliarySampleCases(count),
+                    BuildAuxiliarySampleCases(PortableAuxiliaryTextureCount, newLine),
+                    BuildAuxiliarySampleCases(count, newLine),
                     StringComparison.Ordinal);
         }
 
-        private static string BuildAuxiliarySamplerDeclarations(int count)
+        private static string BuildAuxiliarySamplerDeclarations(int count, string newLine)
         {
             var builder = new StringBuilder(count * 56);
             for (int i = 0; i < count; i++)
             {
                 builder.Append("                    uniform sampler2D uAuxTex")
                     .Append(i)
-                    .Append(";\n");
+                    .Append(';')
+                    .Append(newLine);
             }
             return builder.ToString();
         }
 
-        private static string BuildAuxiliarySampleCases(int count)
+        private static string BuildAuxiliarySampleCases(int count, string newLine)
         {
             var builder = new StringBuilder(count * 84);
             for (int i = 0; i < count; i++)
@@ -598,7 +600,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     .Append(i)
                     .Append(") return texture(uAuxTex")
                     .Append(i)
-                    .Append(", uv);\n");
+                    .Append(", uv);")
+                    .Append(newLine);
             }
             return builder.ToString();
         }

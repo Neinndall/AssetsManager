@@ -163,6 +163,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             Assert.Contains("if (index == 19) return texture(uAuxTex19, uv);", fragment);
         }
 
+        [Fact]
+        public void ShaderFactory_ShrinksAuxiliaryTextureSlotsForConstrainedHardware()
+        {
+            string vertex = GlMeshShaderSource.CreateVertex(4);
+            string fragment = GlMeshShaderSource.CreateFragment(4);
+
+            Assert.Contains("uniform sampler2D uAuxTex3;", vertex);
+            Assert.DoesNotContain("uniform sampler2D uAuxTex4;", vertex);
+            Assert.Contains("if (index == 3) return texture(uAuxTex3, uv);", vertex);
+            Assert.DoesNotContain("if (index == 4) return texture(uAuxTex4, uv);", vertex);
+            Assert.Contains("uniform sampler2D uAuxTex3;", fragment);
+            Assert.DoesNotContain("uniform sampler2D uAuxTex4;", fragment);
+        }
+
         [Theory]
         [InlineData(16, 16, 48, 14)]
         [InlineData(32, 32, 192, 20)]
