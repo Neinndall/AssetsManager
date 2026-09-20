@@ -1091,11 +1091,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.True(effect.Iridescence.UsesPulse);
             Assert.True(effect.Iridescence.UsesLocalizedAlpha);
             Assert.True(effect.Iridescence.RequiresAlphaBlend);
-            Assert.False(effect.RequiresAlphaBlend);
+            Assert.True(effect.RequiresAlphaBlend);
             ModelMaterialDefinition body = resolution.ResolveMaterialDefinition("body");
             Assert.Equal(ModelMaterialBlendMode.Opaque, body.RenderState.Blending);
             Assert.False(body.UsesTextureAlpha);
-            Assert.False(new ModelPart { MaterialDefinition = body }.IsAlphaBlended);
+            Assert.True(new ModelPart { MaterialDefinition = body }.IsAlphaBlended);
         }
 
         [Fact]

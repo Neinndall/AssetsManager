@@ -191,9 +191,11 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        // Only whole-material opacity may promote an authored opaque submesh to
-        // the transparent pass. Localized iridescence alpha stays effect-local.
-        public bool RequiresAlphaBlend => MaterialTint.W < 0.999f;
+        // Whole-material opacity and shader-authored localized alpha both require
+        // the transparent pass so sorting/depth state match the fragment coverage.
+        public bool RequiresAlphaBlend =>
+            MaterialTint.W < 0.999f ||
+            Iridescence?.RequiresAlphaBlend == true;
 
         public IEnumerable<string> EnumerateTextureNames()
         {

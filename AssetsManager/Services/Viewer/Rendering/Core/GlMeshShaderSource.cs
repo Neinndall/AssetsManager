@@ -539,8 +539,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                                     clamp(uIridescenceAlphaMinMax.x, 0.0, 1.0),
                                     clamp(uIridescenceAlphaMinMax.y, 0.0, 1.0),
                                     angular);
-                                if (uMaterialUsesTextureAlpha != 0)
-                                    texColor.a *= mix(1.0, fresnelAlpha, fadeMask);
+                                texColor.a *= mix(1.0, fresnelAlpha, fadeMask);
                             }
 
                             if (uAlphaCutoff > 0.0 && texColor.a < uAlphaCutoff) discard;

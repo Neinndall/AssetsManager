@@ -778,8 +778,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             else
                 _gl.Disable(EnableCap.DepthTest);
 
-            // Runtime opacity may make an authored opaque material transparent. Shader-specific
-            // masks do not promote the whole submesh; authored render state remains authoritative.
+            // Runtime opacity or an authored shader alpha layer may promote an opaque material
+            // to the transparent pass; in that case depth writes must stay disabled for sorting.
             _gl.DepthMask(runtimeForcesBlend ? false : state.DepthWrite);
 
             if (state.DoubleSided)
