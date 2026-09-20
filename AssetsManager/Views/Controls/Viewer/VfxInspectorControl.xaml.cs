@@ -463,7 +463,11 @@ namespace AssetsManager.Views.Controls.Viewer
         private void RequestSystemInspection(VfxSystemDiagnosticItem systemItem)
         {
             if (_isCleanedUp) return;
-            if (systemItem != null) ClearAnimationClipCues();
+            if (systemItem != null)
+            {
+                ClearAnimationClipCues();
+                ResetChampionAnimationForStandaloneSystem();
+            }
             if (ReferenceEquals(_pendingSystem, systemItem)) return;
             if (ReferenceEquals(_model.SelectedSystem, systemItem) && HasSelectedSystemReady()) return;
 
@@ -664,16 +668,22 @@ namespace AssetsManager.Views.Controls.Viewer
                     _championModel.SkinningMatrices = _championAnimationService.FinalBoneTransforms;
                     _championModel.GpuSkinningData = _championAnimationService.SkinningData;
                     _vfxRenderer?.SetOwnerSkinningMatrices(_championAnimationService.FinalBoneTransforms);
+                    _vfxRenderer?.UpdateBoneTransforms((boneName, boneHash) =>
+                    {
+                        if (!string.IsNullOrEmpty(boneName) && _championAnimationService.TryGetBoneTransform(boneName, out var m))
+                            return m;
+                        if (boneHash != 0 && _championAnimationService.TryGetBoneTransform(boneHash, out m))
+                            return m;
+                        return null;
+                    });
                 }
-
-                _vfxRenderer?.UpdateBoneTransforms((boneName, boneHash) =>
+                else
                 {
-                    if (!string.IsNullOrEmpty(boneName) && _championAnimationService.TryGetBoneTransform(boneName, out var m))
-                        return m;
-                    if (boneHash != 0 && _championAnimationService.TryGetBoneTransform(boneHash, out m))
-                        return m;
-                    return null;
-                });
+                    // A standalone System is its own preview in LTK. Do not keep feeding the
+                    // previously selected Clip pose into the champion or bone-attached VFX.
+                    _vfxRenderer?.SetOwnerSkinningMatrices(null);
+                    _vfxRenderer?.UpdateBoneTransforms(null);
+                }
             }
 
             // Render Champion Mesh under VFX if available and enabled
@@ -941,13 +951,16 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            VfxRigSettings settings = VfxRigSettings.ForPreset(preset);
+            VfxRigSettings settings = VfxRigSettings.ForPreset(preset) with
+            {
+                IsLooping = _model.IsPreviewLoopEnabled
+            };
             _model.RigPreset = preset;
             if (_vfxRenderer != null)
             {
                 _vfxRenderer.RigSettings = settings;
                 double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
-                UpdatePreviewLoopRangeForDuration(duration);`r`n            _model.IsPreviewLoopEnabled = settings.IsLooping;
+                UpdatePreviewLoopRangeForDuration(duration);
                 _model.CurrentTime = _vfxRenderer.PlaybackTime;
                 _vfxRenderer.Play();
                 _model.IsPlaying = true;
@@ -963,7 +976,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.RigPreset = settings.Preset;
 
             double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
-            UpdatePreviewLoopRangeForDuration(duration);`r`n            _model.IsPreviewLoopEnabled = settings.IsLooping;
+            UpdatePreviewLoopRangeForDuration(duration);
 
             _model.CurrentTime = _vfxRenderer.PlaybackTime;
             UpdateRigControlValues();
@@ -1461,7 +1474,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 Seed: _model.PlaybackSeed,
                 Playhead: _model.CurrentTime,
                 Speed: _model.Speed,
-                RigSettings: _vfxRenderer?.RigSettings ?? VfxRigSettings.ForPreset(_model.RigPreset),
+                RigSettings: (_vfxRenderer?.RigSettings ?? VfxRigSettings.ForPreset(_model.RigPreset)) with { IsLooping = false },
                 Muted: _model.Emitters.Where(emitter => emitter.IsMuted).Select(emitter => emitter.SourceOrder).ToArray(),
                 Soloed: _model.Emitters.Where(emitter => emitter.IsSolo).Select(emitter => emitter.SourceOrder).ToArray());
         }
@@ -1490,7 +1503,11 @@ namespace AssetsManager.Views.Controls.Viewer
             StandaloneRunMemory remembered = RecallStandaloneRun(systemItem);
             int playbackSeed = remembered?.Seed ?? StandalonePlaybackSeed;
             float playbackSpeed = remembered?.Speed ?? 1f;
-            VfxRigSettings rigSettings =`r`n                remembered?.RigSettings ?? VfxRigSettings.ForPreset(VfxRigPreset.Still);
+            VfxRigSettings rigSettings =
+                (remembered?.RigSettings ?? VfxRigSettings.ForPreset(VfxRigPreset.Still)) with
+                {
+                    IsLooping = _model.IsPreviewLoopEnabled
+                };
             VfxRigPreset rigPreset = rigSettings.Preset;
             HashSet<int> muted = remembered?.Muted?.ToHashSet() ?? new HashSet<int>();
             HashSet<int> soloed = remembered?.Soloed?.ToHashSet() ?? new HashSet<int>();
@@ -1538,7 +1555,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(_model.RigPreset, def);
             double timelineMax = ResolveTimelineDuration(rigDuration);
-            ResetPreviewLoopRange(timelineMax);`r`n            _model.IsPreviewLoopEnabled = rigSettings.IsLooping;
+            ResetPreviewLoopRange(timelineMax);
 
             // 2. Audit Emitters
             for (int emitterIndex = 0; emitterIndex < def.Emitters.Count; emitterIndex++)
@@ -2141,6 +2158,18 @@ namespace AssetsManager.Views.Controls.Viewer
             _championAnimationService?.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
             _vfxRenderer?.SetOwnerHiddenSubmeshes(
                 _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>());
+        }
+
+        private void ResetChampionAnimationForStandaloneSystem()
+        {
+            if (_championModel == null) return;
+
+            _championModel.CurrentAnimation = null;
+            _championModel.AnimationTime = 0d;
+            _championModel.IsAnimationPaused = true;
+            _championModel.SkinningMatrices = null;
+            _vfxRenderer?.SetOwnerSkinningMatrices(null);
+            _vfxRenderer?.UpdateBoneTransforms(null);
         }
 
         private string ResolveSknPath(string authoredPath, string searchDir)
