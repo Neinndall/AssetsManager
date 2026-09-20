@@ -51,7 +51,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public object PendingPaletteTexture;
             /// <summary>Pending mesh data for deferred GL upload of authored VFX mesh primitives.</summary>
             public VfxMeshData? PendingMesh;
-            internal VfxAnimatedMesh MeshAnimation;
             /// <summary>GPU handle for particleColorTexture (0 = unavailable).</summary>
             public uint ColorGradientTexture;
             public object PendingColorGradient;

@@ -313,15 +313,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                             emitter.Def.SubmeshesToDraw,
                             emitter.Def.SubmeshesToDrawAlways,
                             searchDirectory);
-                        if (emitter.PendingMesh != null && !string.IsNullOrWhiteSpace(emitter.Def.MeshAnimationPath))
-                        {
-                            emitter.MeshAnimation = _resources.ResolveMeshAnimation(
-                                emitter.Def.MeshPath,
-                                emitter.Def.MeshSkeletonPath,
-                                emitter.Def.MeshAnimationPath,
-                                searchDirectory,
-                                log);
-                        }
+                        // LTK 1.19.6 treats a VfxPrimitiveMesh SKN as static bind-pose geometry.
+                        // Its MeshModel keeps only the geometry asset, submesh masks, camera
+                        // alignment flags and the skinned/simple kind; .skl/.anm data never enters
+                        // the VFX renderer. Preserve parsed metadata for diagnostics, but do not
+                        // animate particle meshes here.
                     }
                 }
             }

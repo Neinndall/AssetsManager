@@ -750,7 +750,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private void ApplyTextureSampling()
         {
             // LTK's VFX texture loader always uses linear filtering. isTexturePixelated is
-            // inspector metadata in 1.19.4 and does not change the particle material sampler.
+            // inspector metadata in 1.19.6 and does not change the particle material sampler.
             _gl.TexParameter(
                 TextureTarget.Texture2D,
                 TextureParameterName.TextureMinFilter,
@@ -1075,12 +1075,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private void ReleaseMeshes()
             => _meshResources.Clear();
 
-        private void UpdateEmitterMeshPositions(VfxPlaybackRuntime.EmitterState es, float[] positions)
-        {
-            if (_ready)
-                _meshResources.UpdatePositions(es, positions);
-        }
-
         private void RenderMeshEmitter(
             VfxPlaybackRuntime.EmitterState es,
             Matrix4x4 viewProj,
@@ -1096,8 +1090,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             bool isDistortion = es.Def.Distortion != null && !wireframePass;
             bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
             if (warpsFrame && _capture.ColorTexture == 0) return;
-            if (es.MeshAnimation != null)
-                UpdateEmitterMeshPositions(es, es.MeshAnimation.Evaluate(es.EmitterAge));
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
             EnsureMeshProgram();
             _gl.UseProgram(_meshProgram);

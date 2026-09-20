@@ -27,7 +27,38 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 : LeagueToolkit.Core.Mesh.StaticMesh.ReadBinary(stream);
             if (source.Faces.Count == 0) return null;
 
-            int vertexCount = source.Faces.Count * 3;
+            // LTK groups interleaved SCB/SCO faces by material before exposing submesh ranges.
+            // The first occurrence of a material fixes that range's order, and the authored
+            // mSubmeshesToDraw / mSubmeshesToDrawAlways lists then filter those ranges.
+            var groupedFaces = new List<(string Material, List<StaticMeshFace> Faces)>();
+            var groupByMaterial = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (StaticMeshFace face in source.Faces)
+            {
+                string material = face.Material ?? string.Empty;
+                if (!groupByMaterial.TryGetValue(material, out int groupIndex))
+                {
+                    groupIndex = groupedFaces.Count;
+                    groupByMaterial.Add(material, groupIndex);
+                    groupedFaces.Add((material, new List<StaticMeshFace>()));
+                }
+                groupedFaces[groupIndex].Faces.Add(face);
+            }
+
+            uint[] rangeHashes = groupedFaces
+                .Select(group => Fnv1a.HashLower(group.Material.TrimEnd('\0')))
+                .ToArray();
+            bool[] selected = SelectMeshSubmeshRanges(
+                rangeHashes,
+                submeshesToDraw,
+                submeshesToDrawAlways);
+            int selectedFaceCount = 0;
+            for (int groupIndex = 0; groupIndex < groupedFaces.Count; groupIndex++)
+            {
+                if (selected[groupIndex]) selectedFaceCount += groupedFaces[groupIndex].Faces.Count;
+            }
+            if (selectedFaceCount == 0) return null;
+
+            int vertexCount = selectedFaceCount * 3;
             var positions = new float[vertexCount * 3];
             var uvs = new float[vertexCount * 2];
             var colors = new float[vertexCount * 4];
@@ -36,26 +67,30 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             int uvOffset = 0;
             int colorOffset = 0;
 
-            foreach (var face in source.Faces)
+            for (int groupIndex = 0; groupIndex < groupedFaces.Count; groupIndex++)
             {
-                int[] vertexIds = { face.VertexId0, face.VertexId1, face.VertexId2 };
-                System.Numerics.Vector2[] faceUvs = { face.UV0, face.UV1, face.UV2 };
-                for (int corner = 0; corner < 3; corner++)
+                if (!selected[groupIndex]) continue;
+                foreach (StaticMeshFace face in groupedFaces[groupIndex].Faces)
                 {
-                    var position = source.Vertices[vertexIds[corner]];
-                    positions[positionOffset++] = position.X;
-                    positions[positionOffset++] = position.Y;
-                    positions[positionOffset++] = position.Z;
-                    uvs[uvOffset++] = faceUvs[corner].X;
-                    uvs[uvOffset++] = faceUvs[corner].Y;
-                    var color = source.HasVertexColors && vertexIds[corner] < source.VertexColors.Count
-                        ? source.VertexColors[vertexIds[corner]]
-                        : LeagueToolkit.Core.Primitives.Color.One;
-                    colors[colorOffset++] = color.R;
-                    colors[colorOffset++] = color.G;
-                    colors[colorOffset++] = color.B;
-                    colors[colorOffset++] = color.A;
-                    indices[(positionOffset / 3) - 1] = (uint)((positionOffset / 3) - 1);
+                    int[] vertexIds = { face.VertexId0, face.VertexId1, face.VertexId2 };
+                    System.Numerics.Vector2[] faceUvs = { face.UV0, face.UV1, face.UV2 };
+                    for (int corner = 0; corner < 3; corner++)
+                    {
+                        var position = source.Vertices[vertexIds[corner]];
+                        positions[positionOffset++] = position.X;
+                        positions[positionOffset++] = position.Y;
+                        positions[positionOffset++] = position.Z;
+                        uvs[uvOffset++] = faceUvs[corner].X;
+                        uvs[uvOffset++] = faceUvs[corner].Y;
+                        var color = source.HasVertexColors && vertexIds[corner] < source.VertexColors.Count
+                            ? source.VertexColors[vertexIds[corner]]
+                            : LeagueToolkit.Core.Primitives.Color.One;
+                        colors[colorOffset++] = color.R;
+                        colors[colorOffset++] = color.G;
+                        colors[colorOffset++] = color.B;
+                        colors[colorOffset++] = color.A;
+                        indices[(positionOffset / 3) - 1] = (uint)((positionOffset / 3) - 1);
+                    }
                 }
             }
 
@@ -103,9 +138,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 rangeHashes,
                 submeshesToDraw,
                 submeshesToDrawAlways);
-            uint[] indices = selected.All(static value => value)
-                ? mesh.Indices.ToArray()
-                : FilterSkinnedMeshIndices(mesh, selected);
+            // SKN stores each range's indices relative to that range's StartVertex. LTK always
+            // flattens them to one absolute vertex list before the GPU sees the mesh, even when
+            // every submesh is drawn. Do not bypass this normalization for the unfiltered case.
+            uint[] indices = FilterSkinnedMeshIndices(mesh, selected);
             if (indices.Length == 0) return null;
             float[] normals = ReadSkinnedNormals(mesh, positions, indices);
             return new VfxMeshData(positions, normals, uvs, colors, indices);
@@ -155,31 +191,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         private static uint[] FilterSkinnedMeshIndices(SkinnedMesh mesh, IReadOnlyList<bool> selected)
         {
             var filtered = new List<uint>();
-            int rangeCount = Math.Min(mesh.Ranges.Count, selected?.Count ?? 0);
-            for (int rangeIndex = 0; rangeIndex < rangeCount; rangeIndex++)
+            if (selected is null || selected.Count != mesh.Ranges.Count)
+                throw new InvalidDataException("SKN submesh selection does not match the authored range count.");
+
+            for (int rangeIndex = 0; rangeIndex < mesh.Ranges.Count; rangeIndex++)
             {
-                if (!selected[rangeIndex]) continue;
-                var range = mesh.Ranges[rangeIndex];
-                if (range.StartIndex < 0 || range.IndexCount <= 0 ||
-                    range.StartIndex + range.IndexCount > mesh.Indices.Count)
-                {
-                    continue;
-                }
+                SkinnedMeshRange range = mesh.Ranges[rangeIndex];
+                ValidateSkinnedMeshRange(mesh, range);
+                if (!selected[rangeIndex] || range.IndexCount == 0) continue;
 
                 var subIndices = mesh.Indices.Slice(range.StartIndex, range.IndexCount);
-                bool usesGlobalIndices = true;
-                bool usesLocalIndices = range.StartVertex > 0;
                 for (int index = 0; index < range.IndexCount; index++)
                 {
-                    int value = (int)subIndices[index];
-                    usesGlobalIndices &= value >= range.StartVertex && value < range.StartVertex + range.VertexCount;
-                    usesLocalIndices &= value >= 0 && value < range.VertexCount;
+                    uint localIndex = subIndices[index];
+                    // Simple Skin stores indices relative to each range's StartVertex. LTK's
+                    // preview backend makes every one absolute before exposing the flat buffer.
+                    filtered.Add(checked((uint)range.StartVertex + localIndex));
                 }
-                if (!usesGlobalIndices && !usesLocalIndices) continue;
-
-                int vertexOffset = usesLocalIndices && !usesGlobalIndices ? range.StartVertex : 0;
-                for (int index = 0; index < range.IndexCount; index++)
-                    filtered.Add((uint)(subIndices[index] + vertexOffset));
             }
             return filtered.ToArray();
         }
@@ -189,38 +217,51 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             IReadOnlyList<uint> rangeHashes,
             out VfxMeshRangeData[] ranges)
         {
+            if (rangeHashes is null || rangeHashes.Count != mesh.Ranges.Count)
+                throw new InvalidDataException("SKN submesh hashes do not match the authored range count.");
+
             var flattened = new List<uint>();
             var builtRanges = new List<VfxMeshRangeData>();
-            int rangeCount = Math.Min(mesh.Ranges.Count, rangeHashes?.Count ?? 0);
-            for (int rangeIndex = 0; rangeIndex < rangeCount; rangeIndex++)
+            for (int rangeIndex = 0; rangeIndex < mesh.Ranges.Count; rangeIndex++)
             {
-                var range = mesh.Ranges[rangeIndex];
-                if (range.StartIndex < 0 || range.IndexCount <= 0 ||
-                    range.StartIndex + range.IndexCount > mesh.Indices.Count)
-                {
-                    continue;
-                }
-
-                var subIndices = mesh.Indices.Slice(range.StartIndex, range.IndexCount);
-                bool usesGlobalIndices = true;
-                bool usesLocalIndices = range.StartVertex > 0;
-                for (int index = 0; index < range.IndexCount; index++)
-                {
-                    int value = (int)subIndices[index];
-                    usesGlobalIndices &= value >= range.StartVertex && value < range.StartVertex + range.VertexCount;
-                    usesLocalIndices &= value >= 0 && value < range.VertexCount;
-                }
-                if (!usesGlobalIndices && !usesLocalIndices) continue;
-
-                int vertexOffset = usesLocalIndices && !usesGlobalIndices ? range.StartVertex : 0;
+                SkinnedMeshRange range = mesh.Ranges[rangeIndex];
+                ValidateSkinnedMeshRange(mesh, range);
                 int start = flattened.Count;
-                for (int index = 0; index < range.IndexCount; index++)
-                    flattened.Add((uint)(subIndices[index] + vertexOffset));
+                if (range.IndexCount > 0)
+                {
+                    var subIndices = mesh.Indices.Slice(range.StartIndex, range.IndexCount);
+                    for (int index = 0; index < range.IndexCount; index++)
+                        flattened.Add(checked((uint)range.StartVertex + subIndices[index]));
+                }
                 builtRanges.Add(new VfxMeshRangeData(rangeHashes[rangeIndex], start, range.IndexCount));
             }
 
             ranges = builtRanges.ToArray();
             return flattened.ToArray();
+        }
+
+        private static void ValidateSkinnedMeshRange(SkinnedMesh mesh, SkinnedMeshRange range)
+        {
+            int vertexCount = mesh.VerticesView.VertexCount;
+            if (range.StartVertex < 0 || range.VertexCount < 0 ||
+                (long)range.StartVertex + range.VertexCount > vertexCount ||
+                range.StartIndex < 0 || range.IndexCount < 0 ||
+                (long)range.StartIndex + range.IndexCount > mesh.Indices.Count)
+            {
+                throw new InvalidDataException("SKN range extends beyond the mesh buffers.");
+            }
+
+            if (range.IndexCount == 0) return;
+            var subIndices = mesh.Indices.Slice(range.StartIndex, range.IndexCount);
+            for (int index = 0; index < range.IndexCount; index++)
+            {
+                uint localIndex = subIndices[index];
+                if (localIndex >= range.VertexCount ||
+                    (long)range.StartVertex + localIndex >= vertexCount)
+                {
+                    throw new InvalidDataException("SKN range index extends beyond the range vertices.");
+                }
+            }
         }
 
         internal static VfxMeshData? DecodeAttachedSkinnedMesh(

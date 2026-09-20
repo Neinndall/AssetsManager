@@ -3,11 +3,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using CommunityToolkit.HighPerformance.Buffers;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Core.Memory;
+using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
@@ -464,15 +467,82 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxCorruptTexture", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
-            string texturePath = Path.Combine(root, "broken.png");
+            string texturePath = Path.Combine(root, "broken.dds");
             File.WriteAllBytes(texturePath, new byte[] { 1, 2, 3, 4, 5, 6 });
 
             try
             {
                 using var resolver = new VfxResourceResolver();
 
-                Assert.Null(resolver.ResolveTexture("broken.png", root));
-                Assert.Null(resolver.ResolveTexture("broken.png", root));
+                Assert.Null(resolver.ResolveTexture("broken.dds", root));
+                Assert.Null(resolver.ResolveTexture("broken.dds", root));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void PngIsNotAVfxTextureSamplerInLtk()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxPngSampler", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string texturePath = Path.Combine(root, "valid.png");
+            File.WriteAllBytes(
+                texturePath,
+                Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="));
+
+            try
+            {
+                using var resolver = new VfxResourceResolver();
+                Assert.Null(resolver.ResolveTexture("valid.png", root));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void ExplicitAssetPathDoesNotBorrowAnotherExtensionLikeLtk()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxExactAsset", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string sidecar = Path.Combine(root, "spark.png");
+            File.WriteAllBytes(sidecar, Array.Empty<byte>());
+
+            try
+            {
+                using var resolver = new VfxResourceResolver();
+                Assert.Null(resolver.ResolvePath(
+                    "spark.dds",
+                    root,
+                    new[] { ".tex", ".dds", ".png", ".tga" }));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void SyntheticHashAssetCanProbeCandidateExtensions()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxHashAsset", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string sidecar = Path.Combine(root, "0123456789abcdef.dds");
+            File.WriteAllBytes(sidecar, Array.Empty<byte>());
+
+            try
+            {
+                using var resolver = new VfxResourceResolver();
+                Assert.Equal(
+                    sidecar,
+                    resolver.ResolvePath(
+                        "0123456789abcdef.tex",
+                        root,
+                        new[] { ".tex", ".dds" }));
             }
             finally
             {
@@ -680,6 +750,99 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void StaticMeshDecodeGroupsInterleavedMaterialsAndAppliesSubmeshFiltersLikeLtk()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxStaticRanges", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string meshPath = Path.Combine(root, "interleaved.sco");
+            File.WriteAllLines(meshPath, new[]
+            {
+                "[ObjectBegin]",
+                "Name= interleaved",
+                "CentralPoint= 0 0 0",
+                "VertexColors= 0",
+                "Verts= 6",
+                "0 0 0",
+                "1 0 0",
+                "2 0 0",
+                "3 0 0",
+                "4 0 0",
+                "5 0 0",
+                "Faces= 3",
+                "3 0 1 2 glow 0 0 1 0 0 1",
+                "3 3 4 5 core 0 0 1 0 0 1",
+                "3 1 2 3 glow 0 0 1 0 0 1"
+            });
+
+            try
+            {
+                using var resolver = new VfxResourceResolver();
+                VfxMeshData whole = Assert.IsType<VfxMeshData>(resolver.ResolveMesh("interleaved.sco", root));
+                Assert.Equal(new uint[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 }, whole.Indices);
+                Assert.Equal(new[] { 0f, 1f, 2f, 1f, 2f, 3f, 3f, 4f, 5f },
+                    Enumerable.Range(0, whole.Positions.Length / 3).Select(i => whole.Positions[i * 3]).ToArray());
+
+                uint core = Fnv1a.HashLower("core");
+                VfxMeshData narrowed = Assert.IsType<VfxMeshData>(resolver.ResolveMesh(
+                    "interleaved.sco",
+                    new[] { core },
+                    Array.Empty<uint>(),
+                    root));
+                Assert.Equal(new uint[] { 0, 1, 2 }, narrowed.Indices);
+                Assert.Equal(new[] { 3f, 4f, 5f },
+                    Enumerable.Range(0, narrowed.Positions.Length / 3).Select(i => narrowed.Positions[i * 3]).ToArray());
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void SkinnedMeshDecodeMakesEveryRangeIndexAbsoluteLikeLtk()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxSknRanges", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string meshPath = Path.Combine(root, "two_ranges.skn");
+            try
+            {
+                WriteTwoRangeSkinnedMesh(meshPath);
+                using var resolver = new VfxResourceResolver();
+                VfxMeshData decoded = Assert.IsType<VfxMeshData>(resolver.ResolveMesh("two_ranges.skn", root));
+
+                Assert.Equal(new uint[] { 0, 1, 2, 3, 4, 5 }, decoded.Indices);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void SkinnedMeshDecodeRejectsAnInvalidRangeEvenWhenTheDrawListHidesIt()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxBadSknRange", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string meshPath = Path.Combine(root, "bad_range.skn");
+            try
+            {
+                WriteTwoRangeSkinnedMesh(meshPath, new ushort[] { 0, 1, 9 });
+                using var resolver = new VfxResourceResolver();
+                uint body = Fnv1a.HashLower("body");
+
+                Assert.Null(resolver.ResolveMesh(
+                    "bad_range.skn",
+                    new[] { body },
+                    Array.Empty<uint>(),
+                    root));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void ResourceIndexResolvesFileByItsXxHash64()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerXxHash", Guid.NewGuid().ToString("N"));
@@ -801,6 +964,46 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             {
                 if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
             }
+        }
+
+        private static void WriteTwoRangeSkinnedMesh(string path, ushort[] secondRangeIndices = null)
+        {
+            VertexBufferDescription description = SkinnedMeshVertex.BASIC;
+            var vertexOwner = VertexBuffer.AllocateForElements(description.Elements, 6);
+            Span<byte> vertices = vertexOwner.Span;
+            const int stride = 52;
+            for (int vertex = 0; vertex < 6; vertex++)
+            {
+                int at = vertex * stride;
+                BitConverter.TryWriteBytes(vertices.Slice(at, 4), (float)vertex);
+                BitConverter.TryWriteBytes(vertices.Slice(at + 4, 4), vertex * 2f);
+                BitConverter.TryWriteBytes(vertices.Slice(at + 8, 4), vertex * 3f);
+                vertices[at + 12] = 0;
+                BitConverter.TryWriteBytes(vertices.Slice(at + 16, 4), 1f);
+                BitConverter.TryWriteBytes(vertices.Slice(at + 36, 4), 1f);
+                BitConverter.TryWriteBytes(vertices.Slice(at + 44, 4), (float)vertex);
+                BitConverter.TryWriteBytes(vertices.Slice(at + 48, 4), -(float)vertex);
+            }
+
+            VertexBuffer vertexBuffer = VertexBuffer.Create(description.Usage, description.Elements, vertexOwner);
+            MemoryOwner<byte> indexOwner = MemoryOwner<byte>.Allocate(6 * sizeof(ushort));
+            Span<byte> indices = indexOwner.Span;
+            secondRangeIndices ??= new ushort[] { 0, 1, 2 };
+            Assert.Equal(3, secondRangeIndices.Length);
+            ushort[] local = { 0, 1, 2, secondRangeIndices[0], secondRangeIndices[1], secondRangeIndices[2] };
+            for (int index = 0; index < local.Length; index++)
+                BitConverter.TryWriteBytes(indices.Slice(index * sizeof(ushort), sizeof(ushort)), local[index]);
+            IndexBuffer indexBuffer = IndexBuffer.Create(IndexFormat.U16, indexOwner);
+
+            using var mesh = new SkinnedMesh(
+                new[]
+                {
+                    new SkinnedMeshRange("body", 0, 3, 0, 3),
+                    new SkinnedMeshRange("cape", 3, 3, 3, 3)
+                },
+                vertexBuffer,
+                indexBuffer);
+            mesh.WriteSimpleSkin(path);
         }
 
         private static void WriteSkinBin(string path, bool previewable = true)

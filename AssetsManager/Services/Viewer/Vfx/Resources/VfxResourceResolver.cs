@@ -11,7 +11,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
     /// <summary>Resolves and decodes resources referenced by an effect graph.</summary>
     internal sealed class VfxResourceResolver : IDisposable
     {
-        private static readonly string[] TextureExtensions = { ".tex", ".dds", ".png", ".tga" };
+        private static readonly string[] TextureExtensions = { ".tex", ".dds" };
         private static readonly string[] MeshExtensions = { ".scb", ".sco", ".skn" };
         private static readonly string[] SkeletonExtensions = { ".skl" };
         private static readonly string[] AnimationExtensions = { ".anm" };
@@ -111,7 +111,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 {
                     // LTK reports unsupported/corrupt geometry as a failed asset load instead
                     // of aborting the VFX system. This also covers authored .tmesh/.gmesh files,
-                    // which LTK 1.19.4 recognizes but does not decode.
+                    // which LTK 1.19.6 recognizes but does not decode.
                     mesh = null;
                 }
             }
@@ -326,11 +326,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         private static string[] OrderedExtensions(string authoredPath, IReadOnlyList<string> supported)
         {
             string authoredExtension = Path.GetExtension(authoredPath);
+            if (!string.IsNullOrWhiteSpace(authoredExtension) && !IsSyntheticHashAsset(authoredPath))
+            {
+                return supported.Contains(authoredExtension, StringComparer.OrdinalIgnoreCase)
+                    ? new[] { authoredExtension }
+                    : Array.Empty<string>();
+            }
+
             return supported
                 .Prepend(authoredExtension)
                 .Where(extension => !string.IsNullOrWhiteSpace(extension))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+        }
+
+        private static bool IsSyntheticHashAsset(string authoredPath)
+        {
+            string stem = Path.GetFileNameWithoutExtension(authoredPath ?? string.Empty);
+            if (stem.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) stem = stem[2..];
+            if (stem.Length is not (8 or 16)) return false;
+            return ulong.TryParse(stem, System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture, out _);
         }
 
         private static string CreateKey(string path, string directory)
