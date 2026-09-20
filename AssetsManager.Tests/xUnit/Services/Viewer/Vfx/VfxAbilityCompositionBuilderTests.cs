@@ -99,6 +99,23 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ResolverOnlyModeDoesNotTreatASystemHashAsAnEffectKey()
+        {
+            var direct = new VfxSystemDefinition(100, "Effects/Direct", "direct", new VfxEmitterDefinition[0]);
+            var sequence = new AnimationClipDefinition(10, 20, 1f / 30f, 0f, 30f, new[] { Event(1, 0f, 100) });
+
+            VfxAbilityComposition composition = VfxAbilityCompositionBuilder.Build(
+                sequence,
+                new Dictionary<uint, VfxSystemDefinition> { [100] = direct },
+                new Dictionary<uint, uint>(),
+                allowEffectNameFallback: false,
+                resolverOnly: true);
+
+            Assert.Equal(0, composition.ResolvedCount);
+            Assert.Null(Assert.Single(composition.Events).System);
+        }
+
+        [Fact]
         public void KeepsUnresolvedEventsVisibleForDiagnostics()
         {
             var sequence = new AnimationClipDefinition(10, 20, 1f / 30f, 0f, 30f, new[] { Event(1, 0f, 999) });

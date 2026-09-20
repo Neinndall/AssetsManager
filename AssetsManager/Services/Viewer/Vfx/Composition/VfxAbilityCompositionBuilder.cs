@@ -13,7 +13,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
             IReadOnlyDictionary<uint, uint> resourceMap,
             bool useEnemyEffects = false,
-            bool allowEffectNameFallback = true)
+            bool allowEffectNameFallback = true,
+            bool resolverOnly = false)
         {
             ArgumentNullException.ThrowIfNull(sequence);
             ArgumentNullException.ThrowIfNull(systems);
@@ -37,7 +38,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
                     systems,
                     resourceMap,
                     systemsByName,
-                    allowEffectNameFallback);
+                    allowEffectNameFallback,
+                    resolverOnly);
                 if (system is not null) resolvedCount++;
                 compositionEvents.Add(new VfxCompositionEvent(
                     particleEvent,
@@ -102,7 +104,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
             IReadOnlyDictionary<uint, uint> resourceMap,
             IReadOnlyDictionary<string, KeyValuePair<uint, VfxSystemDefinition>> systemsByName,
-            bool allowEffectNameFallback)
+            bool allowEffectNameFallback,
+            bool resolverOnly)
         {
             if (TryResolveHash(
                     effectKey,
@@ -110,11 +113,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
                     resourceMap,
                     out uint systemHash,
                     out VfxSystemDefinition system,
-                    out bool resolverHit))
+                    out bool resolverHit,
+                    allowDirectSystemHashFallback: !resolverOnly))
             {
                 return (systemHash, system);
             }
-            if (resolverHit) return (0u, null);
+            if (resolverHit || resolverOnly) return (0u, null);
 
             if (allowEffectNameFallback && !string.IsNullOrWhiteSpace(effectName))
             {
@@ -125,7 +129,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
                         resourceMap,
                         out systemHash,
                         out system,
-                        out resolverHit))
+                        out resolverHit,
+                        allowDirectSystemHashFallback: true))
                 {
                     return (systemHash, system);
                 }
@@ -143,7 +148,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
             IReadOnlyDictionary<uint, uint> resourceMap,
             out uint systemHash,
             out VfxSystemDefinition system,
-            out bool resolverHit)
+            out bool resolverHit,
+            bool allowDirectSystemHashFallback)
         {
             resolverHit = false;
             if (candidate != 0 && resourceMap.TryGetValue(candidate, out uint mappedHash))
@@ -158,7 +164,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
                 system = null;
                 return false;
             }
-            if (candidate != 0 && systems.TryGetValue(candidate, out system))
+            if (allowDirectSystemHashFallback && candidate != 0 && systems.TryGetValue(candidate, out system))
             {
                 systemHash = candidate;
                 return true;

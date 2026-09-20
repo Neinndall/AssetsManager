@@ -68,6 +68,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void JointSnapAllowsTheSourceToSnapToItselfLikeLtk()
+        {
+            Assert.True(AnimationService.CanApplyJointSnap(3, 3));
+            Assert.False(AnimationService.CanApplyJointSnap(-1, 3));
+            Assert.False(AnimationService.CanApplyJointSnap(3, -1));
+        }
+
+        [Fact]
         public void MeshInstancesPreserveAuthoredNonUniformScale()
         {
             var emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default);

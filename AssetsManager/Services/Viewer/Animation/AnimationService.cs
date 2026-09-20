@@ -243,7 +243,7 @@ namespace AssetsManager.Services.Viewer.Animation
 
                     int jointIndex = FindJointIndex(skeleton, snap.JointHash);
                     int targetIndex = FindJointIndex(skeleton, snap.SnapToHash);
-                    if (jointIndex < 0 || targetIndex < 0 || jointIndex == targetIndex)
+                    if (!CanApplyJointSnap(jointIndex, targetIndex))
                         continue;
 
                     Matrix4x4 snappedLocal =
@@ -303,6 +303,9 @@ namespace AssetsManager.Services.Viewer.Animation
                 return 0f;
             return (float)PositiveModulo(time, duration);
         }
+
+        internal static bool CanApplyJointSnap(int jointIndex, int targetIndex)
+            => jointIndex >= 0 && targetIndex >= 0;
 
         internal static bool TryGetBindBoneTransform(
             RigResource skeleton,

@@ -92,7 +92,8 @@ internal sealed class VfxClipCatalog : IDisposable
                     atomic,
                     bundle.Systems,
                     bundle.ResourceMap,
-                    allowEffectNameFallback: false);
+                    allowEffectNameFallback: false,
+                    resolverOnly: true);
                 foreach (VfxCompositionEvent cue in composition.Events)
                 {
                     // LTK's SkinViewport does not turn ParticleEventData kill records into
