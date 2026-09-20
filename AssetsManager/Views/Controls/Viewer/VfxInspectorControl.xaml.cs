@@ -1122,6 +1122,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.Textures.Clear();
             _model.Meshes.Clear();
             _model.DetectedSkins.Clear();
+            _model.BrowserRoots.Clear();
             _model.LogMessages.Clear();
             _model.RootPath = string.Empty;
             _model.SearchQuery = string.Empty;
@@ -1175,20 +1176,33 @@ namespace AssetsManager.Views.Controls.Viewer
             ClearLoadedSkinState();
             _model.SelectedSkin = null;
             _model.DetectedSkins.Clear();
+            _model.BrowserRoots.Clear();
             _model.StatusText = "Reading BIN catalog...";
+            Func<uint, string> resolveBinEntry = VfxLoadingService == null
+                ? null
+                : VfxLoadingService.ResolveBinEntryPath;
             try
             {
-                var entries = await System.Threading.Tasks.Task.Run(
-                    () => VfxFolderCatalog.Scan(rootFolder, operation.Token, LogService), operation.Token);
+                VfxFolderCatalog.BrowserCatalog catalog = await System.Threading.Tasks.Task.Run(
+                    () => VfxFolderCatalog.ScanBrowser(
+                        rootFolder,
+                        operation.Token,
+                        resolveBinEntry,
+                        LogService),
+                    operation.Token);
                 if (operation.IsCancellationRequested || _isCleanedUp) return;
                 _model.DetectedSkins.Clear();
-                foreach (VfxSkinItem entry in entries)
+                _model.BrowserRoots.Clear();
+                foreach (VfxSkinItem entry in catalog.Entries)
                 {
                     // Never carry expansion state into a freshly discovered project tree.
                     entry.IsExpanded = false;
                     _model.DetectedSkins.Add(entry);
                 }
-                _model.StatusText = $"Found {entries.Count} BIN entries.";
+                foreach (VfxBrowserFolder rootNode in catalog.Roots)
+                    _model.BrowserRoots.Add(rootNode);
+                int characterCount = catalog.Roots.FirstOrDefault()?.Children.OfType<VfxBrowserFolder>().Count() ?? 0;
+                _model.StatusText = $"Found {catalog.Entries.Count} VFX BIN entries across {characterCount} characters.";
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { LogService?.LogError(ex, "Failed to scan VFX folder."); }
@@ -1212,7 +1226,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _browserSkin.Sections[0].Items = CollectionViewSource.GetDefaultView(_model.Systems);
             _browserSkin.Sections[1].Items = CollectionViewSource.GetDefaultView(_model.DetectedAnimations);
             _model.IsRawSystemsMode = true;
-            _browserSkin.IsExpanded = true;
             LoadBinFile(_browserSkin.BinPath);
         }
 

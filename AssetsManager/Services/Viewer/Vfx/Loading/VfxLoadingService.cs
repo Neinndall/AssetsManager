@@ -36,6 +36,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             _hashResolverService = hashResolverService;
         }
 
+        /// <summary>
+        /// Resolves a BIN object path hash through the same catalog used by the generic BIN tools.
+        /// VFX Studio uses this only for semantic browser discovery (for example Character Spells).
+        /// </summary>
+        internal string ResolveBinEntryPath(uint pathHash)
+            => _hashResolverService?.ResolveBinEntry(pathHash);
+
         public sealed class Bundle
         {
             public string PrimaryBinPath { get; internal set; }

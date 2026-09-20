@@ -6,6 +6,7 @@ using System.Threading;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Viewer.Vfx.Loading;
@@ -13,12 +14,47 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading;
 /// <summary>Classifies extracted BINs by their object types, including files retaining WAD hash names.</summary>
 internal static class VfxFolderCatalog
 {
+    internal sealed record BrowserCatalog(
+        IReadOnlyList<VfxSkinItem> Entries,
+        IReadOnlyList<VfxBrowserFolder> Roots);
+
+    private sealed record SpellDiscovery(
+        string Character,
+        string Name,
+        string ObjectPath,
+        uint PathHash,
+        string BinPath);
+
+    private sealed record ScanResult(
+        IReadOnlyList<VfxSkinItem> Entries,
+        IReadOnlyList<SpellDiscovery> Spells);
+
     internal static IReadOnlyList<VfxSkinItem> Scan(string root, CancellationToken cancellationToken, LogService log = null)
+        => ScanCore(root, cancellationToken, null, log).Entries;
+
+    internal static BrowserCatalog ScanBrowser(
+        string root,
+        CancellationToken cancellationToken,
+        Func<uint, string> resolveBinEntry,
+        LogService log = null)
+    {
+        ScanResult scan = ScanCore(root, cancellationToken, resolveBinEntry, log);
+        return new BrowserCatalog(scan.Entries, BuildBrowserTree(root, scan.Entries, scan.Spells));
+    }
+
+    private static ScanResult ScanCore(
+        string root,
+        CancellationToken cancellationToken,
+        Func<uint, string> resolveBinEntry,
+        LogService log)
     {
         var skins = new List<VfxSkinItem>();
         var effects = new List<VfxSkinItem>();
+        var spells = new Dictionary<(string Character, uint Hash), SpellDiscovery>();
         uint skinClass = Fnv1a.HashLower("SkinCharacterDataProperties");
         uint systemClass = Fnv1a.HashLower("VfxSystemDefinitionData");
+        uint spellClass = Fnv1a.HashLower("SpellObject");
+
         foreach (string path in Directory.EnumerateFiles(root, "*.bin", SearchOption.AllDirectories))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -26,8 +62,23 @@ internal static class VfxFolderCatalog
             {
                 using var stream = File.OpenRead(path);
                 var tree = new BinTree(stream);
-                bool skin = tree.Objects.Values.Any(item => item.ClassHash == skinClass);
-                if (!skin && !tree.Objects.Values.Any(item => item.ClassHash == systemClass)) continue;
+                bool skin = tree.Objects.Values.Any(item =>
+                    item.ClassHash == skinClass && HasPreviewableSkin(item));
+                bool system = tree.Objects.Values.Any(item => item.ClassHash == systemClass);
+
+                if (resolveBinEntry != null)
+                {
+                    foreach (BinTreeObject spell in tree.Objects.Values.Where(item => item.ClassHash == spellClass))
+                    {
+                        string objectPath = resolveBinEntry(spell.PathHash);
+                        if (!TryParseSpellPath(objectPath, out string character, out string spellName)) continue;
+                        spells.TryAdd(
+                            (character.ToLowerInvariant(), spell.PathHash),
+                            new SpellDiscovery(character, spellName, objectPath, spell.PathHash, Path.GetFullPath(path)));
+                    }
+                }
+
+                if (!skin && !system) continue;
                 string stem = Path.GetFileNameWithoutExtension(path);
                 int index = stem.StartsWith("skin", StringComparison.OrdinalIgnoreCase) &&
                     int.TryParse(stem.AsSpan(4), out int id) ? id : int.MaxValue;
@@ -45,6 +96,7 @@ internal static class VfxFolderCatalog
                 log?.LogWarning($"Unable to classify VFX BIN '{path}': {ex.Message}");
             }
         }
+
         string rootName = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         string rootStem = rootName;
         if (rootStem.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
@@ -84,10 +136,250 @@ internal static class VfxFolderCatalog
             return score;
         }
 
-        return (skins.Count > 0 ? skins : effects)
+        VfxSkinItem[] entries = (skins.Count > 0 ? skins : effects)
             .OrderBy(CalculateScore)
             .ThenBy(item => item.SkinIndex)
             .ThenBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        return new ScanResult(entries, spells.Values.ToArray());
     }
+
+    private static bool HasPreviewableSkin(BinTreeObject skin)
+    {
+        uint meshPropertiesHash = Fnv1a.HashLower("skinMeshProperties");
+        uint simpleSkinHash = Fnv1a.HashLower("simpleSkin");
+        if (!skin.Properties.TryGetValue(meshPropertiesHash, out BinTreeProperty meshProperty) ||
+            meshProperty is not BinTreeStruct meshProperties ||
+            !meshProperties.Properties.TryGetValue(simpleSkinHash, out BinTreeProperty asset))
+        {
+            return false;
+        }
+
+        if (asset is BinTreeOptional optional)
+            asset = optional.Value;
+
+        // LTK's SkinViewport refuses a preview when no mesh asset is authored. Keep those
+        // root/base declarations out of VFX Studio's selectable Skins instead of loading an empty skin.
+        return asset switch
+        {
+            BinTreeString text => !string.IsNullOrWhiteSpace(text.Value),
+            BinTreeWadChunkLink link => link.Value != 0,
+            BinTreeU64 value => value.Value != 0,
+            BinTreeHash hash => hash.Value != 0,
+            BinTreeObjectLink link => link.Value != 0,
+            BinTreeU32 value => value.Value != 0,
+            _ => false
+        };
+    }
+
+    private static IReadOnlyList<VfxBrowserFolder> BuildBrowserTree(
+        string root,
+        IReadOnlyList<VfxSkinItem> entries,
+        IReadOnlyList<SpellDiscovery> spellDiscoveries)
+    {
+        string rootName = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        var charactersRoot = new VfxBrowserFolder("Characters", VfxBrowserFolderKind.Root)
+        {
+            IsExpanded = true
+        };
+        var characters = new Dictionary<string, VfxBrowserFolder>(StringComparer.OrdinalIgnoreCase);
+        var groups = new Dictionary<(string Character, string Group), VfxBrowserFolder>();
+        var themes = new Dictionary<(string Character, string Theme), VfxBrowserFolder>();
+        var spellGroups = new Dictionary<(string Character, string Group), VfxBrowserFolder>();
+
+        VfxBrowserFolder Character(string rawName)
+        {
+            string key = string.IsNullOrWhiteSpace(rawName) ? "Other" : rawName;
+            if (characters.TryGetValue(key, out VfxBrowserFolder held)) return held;
+            string kind = IsCompanion(key, rootName) ? "Companion" : "Character";
+            held = new VfxBrowserFolder(PrettyCharacterName(key), VfxBrowserFolderKind.Character, kind);
+            characters[key] = held;
+            return held;
+        }
+
+        VfxBrowserFolder Group(string character, string title)
+        {
+            var key = (character.ToLowerInvariant(), title);
+            if (groups.TryGetValue(key, out VfxBrowserFolder held)) return held;
+            held = new VfxBrowserFolder(title, VfxBrowserFolderKind.Group);
+            groups[key] = held;
+            Character(character).Children.Add(held);
+            return held;
+        }
+
+        foreach (VfxSkinItem entry in entries)
+        {
+            string[] segments = Split(entry.DisplayName);
+            int characterAt = IndexOf(segments, "characters");
+            string character = characterAt >= 0 && characterAt + 1 < segments.Length
+                ? segments[characterAt + 1]
+                : "Other";
+            int areaAt = characterAt >= 0 ? characterAt + 2 : -1;
+            string area = areaAt >= 0 && areaAt < segments.Length
+                ? segments[areaAt].ToLowerInvariant()
+                : string.Empty;
+
+            switch (area)
+            {
+                case "skins":
+                    entry.BrowserTitle = SkinTitle(entry);
+                    Group(character, "Skins").Children.Add(entry);
+                    break;
+                case "themes":
+                {
+                    string theme = areaAt + 1 < segments.Length ? segments[areaAt + 1] : "Other";
+                    VfxBrowserFolder themesGroup = Group(character, "Themes");
+                    var themeKey = (character.ToLowerInvariant(), theme.ToLowerInvariant());
+                    if (!themes.TryGetValue(themeKey, out VfxBrowserFolder themeFolder))
+                    {
+                        themeFolder = new VfxBrowserFolder(PrettySegment(theme), VfxBrowserFolderKind.Theme);
+                        themes[themeKey] = themeFolder;
+                        themesGroup.Children.Add(themeFolder);
+                    }
+                    entry.BrowserTitle = PrettySegment(Path.GetFileNameWithoutExtension(entry.BinPath));
+                    themeFolder.Children.Add(entry);
+                    break;
+                }
+                case "animations":
+                    entry.BrowserTitle = PrettySegment(Path.GetFileNameWithoutExtension(entry.BinPath));
+                    Group(character, "Animation Data").Children.Add(entry);
+                    break;
+                case "spells":
+                    entry.BrowserTitle = RelativeTitle(segments, areaAt + 1, entry.BinPath);
+                    Group(character, "Spell Data").Children.Add(entry);
+                    break;
+                default:
+                    entry.BrowserTitle = RelativeTitle(segments, Math.Max(0, areaAt), entry.BinPath);
+                    Group(character, "VFX Data").Children.Add(entry);
+                    break;
+            }
+        }
+
+        foreach (IGrouping<string, SpellDiscovery> owner in spellDiscoveries
+                     .GroupBy(spell => spell.Character, StringComparer.OrdinalIgnoreCase))
+        {
+            VfxBrowserFolder spellFolder = Group(owner.Key, "Spells");
+            foreach (SpellDiscovery spell in owner.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                string displayName = spell.Name;
+                VfxBrowserFolder parent = spellFolder;
+                int slash = spell.Name.IndexOf('/');
+                if (slash > 0 && slash + 1 < spell.Name.Length)
+                {
+                    string groupName = spell.Name[..slash];
+                    var groupKey = (owner.Key.ToLowerInvariant(), groupName.ToLowerInvariant());
+                    if (!spellGroups.TryGetValue(groupKey, out VfxBrowserFolder groupFolder))
+                    {
+                        groupFolder = new VfxBrowserFolder(groupName, VfxBrowserFolderKind.Group);
+                        spellGroups[groupKey] = groupFolder;
+                        spellFolder.Children.Add(groupFolder);
+                    }
+                    parent = groupFolder;
+                    displayName = spell.Name[(slash + 1)..];
+                }
+
+                parent.Children.Add(new VfxSpellBrowserItem
+                {
+                    Name = displayName,
+                    ObjectPath = spell.ObjectPath,
+                    PathHash = spell.PathHash,
+                    BinPath = spell.BinPath
+                });
+            }
+        }
+
+        foreach (VfxBrowserFolder character in characters.Values.OrderBy(item => item.Title, StringComparer.OrdinalIgnoreCase))
+        {
+            SortCharacterGroups(character);
+            charactersRoot.Children.Add(character);
+        }
+
+        return charactersRoot.Children.Count == 0
+            ? Array.Empty<VfxBrowserFolder>()
+            : new[] { charactersRoot };
+    }
+
+    private static void SortCharacterGroups(VfxBrowserFolder character)
+    {
+        static int Rank(string title) => title switch
+        {
+            "Skins" => 0,
+            "Themes" => 1,
+            "Spells" => 2,
+            "Animation Data" => 3,
+            "Spell Data" => 4,
+            _ => 5
+        };
+
+        object[] ordered = character.Children
+            .OrderBy(item => item is VfxBrowserFolder folder ? Rank(folder.Title) : int.MaxValue)
+            .ThenBy(item => item is VfxBrowserFolder folder ? folder.Title : string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        character.Children.Clear();
+        foreach (object item in ordered) character.Children.Add(item);
+    }
+
+    private static bool TryParseSpellPath(string objectPath, out string character, out string spellName)
+    {
+        character = null;
+        spellName = null;
+        if (string.IsNullOrWhiteSpace(objectPath)) return false;
+        string[] segments = Split(objectPath);
+        if (segments.Length < 4 ||
+            !segments[0].Equals("Characters", StringComparison.OrdinalIgnoreCase) ||
+            !segments[2].Equals("Spells", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        character = segments[1];
+        spellName = string.Join('/', segments.Skip(3));
+        return !string.IsNullOrWhiteSpace(character) && !string.IsNullOrWhiteSpace(spellName);
+    }
+
+    private static string[] Split(string path)
+        => (path ?? string.Empty).Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+    private static int IndexOf(IReadOnlyList<string> segments, string wanted)
+    {
+        for (int index = 0; index < segments.Count; index++)
+            if (segments[index].Equals(wanted, StringComparison.OrdinalIgnoreCase)) return index;
+        return -1;
+    }
+
+    private static string SkinTitle(VfxSkinItem entry)
+        => entry.SkinIndex != int.MaxValue
+            ? $"Skin {entry.SkinIndex}"
+            : PrettySegment(Path.GetFileNameWithoutExtension(entry.BinPath));
+
+    private static string RelativeTitle(string[] segments, int start, string fallbackPath)
+    {
+        if (start >= 0 && start < segments.Length)
+        {
+            string[] held = segments.Skip(start).ToArray();
+            held[^1] = Path.GetFileNameWithoutExtension(held[^1]);
+            return string.Join(" / ", held.Select(PrettySegment));
+        }
+        return PrettySegment(Path.GetFileNameWithoutExtension(fallbackPath));
+    }
+
+    private static bool IsCompanion(string character, string rootName)
+        => character.StartsWith("PetChibi", StringComparison.OrdinalIgnoreCase) ||
+           rootName.Contains("companion", StringComparison.OrdinalIgnoreCase);
+
+    private static string PrettyCharacterName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "Other";
+        if (value.StartsWith("petchibi", StringComparison.OrdinalIgnoreCase) && value.Length > 8)
+            return "PetChibi" + UpperFirst(value[8..]);
+        return UpperFirst(value);
+    }
+
+    private static string PrettySegment(string value)
+        => string.IsNullOrWhiteSpace(value) ? "Other" : UpperFirst(value.Replace('_', ' '));
+
+    private static string UpperFirst(string value)
+        => string.IsNullOrEmpty(value)
+            ? value
+            : char.ToUpperInvariant(value[0]) + value[1..];
 }

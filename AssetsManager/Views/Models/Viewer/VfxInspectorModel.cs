@@ -464,12 +464,15 @@ namespace AssetsManager.Views.Models.Viewer
         public VfxSkinItem()
         {
             Sections.Add(new VfxBrowserSection(this, "Systems", false));
-            Sections.Add(new VfxBrowserSection(this, "Animations", true));
+            Sections.Add(new VfxBrowserSection(this, "Clips", true));
         }
 
         public ObservableCollection<VfxBrowserSection> Sections { get; } = new();
-        public string Title => SkinIndex == int.MaxValue
-            ? System.IO.Path.GetFileName(BinPath) : $"Skin {SkinIndex}";
+        public string Title => !string.IsNullOrWhiteSpace(BrowserTitle)
+            ? BrowserTitle
+            : SkinIndex == int.MaxValue
+                ? System.IO.Path.GetFileName(BinPath)
+                : $"Skin {SkinIndex}";
         private bool _isExpanded;
         public bool IsExpanded
         {
@@ -478,6 +481,7 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         private string _displayName;
+        private string _browserTitle;
         private string _binPath;
         private int _skinIndex;
 
@@ -485,6 +489,18 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _displayName;
             set { _displayName = value; OnPropertyChanged(); }
+        }
+
+        public string BrowserTitle
+        {
+            get => _browserTitle;
+            set
+            {
+                if (_browserTitle == value) return;
+                _browserTitle = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Title));
+            }
         }
 
         public string BinPath
@@ -580,6 +596,7 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsMissileRig => _rigPreset == VfxRigPreset.Missile;
         public bool IsTrailRig => _rigPreset == VfxRigPreset.Trail;
 
+        public ObservableCollection<VfxBrowserFolder> BrowserRoots { get; } = new();
         public ObservableCollection<VfxSkinItem> DetectedSkins { get; } = new();
         public ObservableCollection<AnimationClipCatalogItem> DetectedAnimations { get; } = new();
         public ObservableCollection<float> AnimationParameterValues { get; } = new();

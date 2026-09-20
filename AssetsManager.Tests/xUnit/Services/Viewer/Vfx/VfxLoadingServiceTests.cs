@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Vfx.Loading;
@@ -736,9 +737,90 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             }
         }
 
-        private static void WriteSkinBin(string path)
+        [Fact]
+        public void FolderCatalogBuildsCharacterSkinThemeAndSpellHierarchyLikeLtk()
         {
-            var obj = new BinTreeObject("SkinData", "SkinCharacterDataProperties", Array.Empty<BinTreeProperty>());
+            string root = Path.Combine(Path.GetTempPath(), "Companions.wad.client");
+            string yunara = Path.Combine(root, "data", "characters", "petchibiyunara");
+            string zoe = Path.Combine(root, "data", "characters", "petchibizoe");
+            Directory.CreateDirectory(Path.Combine(yunara, "skins"));
+            Directory.CreateDirectory(Path.Combine(yunara, "themes", "spiritblossom"));
+            Directory.CreateDirectory(Path.Combine(yunara, "spells"));
+            Directory.CreateDirectory(Path.Combine(zoe, "skins"));
+
+            const string spellPath = "Characters/PetChibiYunara/Spells/Q/Missile";
+            uint spellHash = Fnv1a.HashLower(spellPath);
+            try
+            {
+                WriteSkinBin(Path.Combine(yunara, "skins", "root.bin"), previewable: false);
+                WriteSkinBin(Path.Combine(yunara, "skins", "skin1.bin"));
+                WriteSkinBin(Path.Combine(yunara, "themes", "spiritblossom", "tier1.bin"));
+                WriteSkinBin(Path.Combine(zoe, "skins", "skin2.bin"));
+                WriteBin(
+                    Path.Combine(yunara, "spells", "spells.bin"),
+                    new[] { new BinTreeObject(spellPath, "SpellObject", Array.Empty<BinTreeProperty>()) },
+                    Array.Empty<string>());
+
+                VfxFolderCatalog.BrowserCatalog catalog = VfxFolderCatalog.ScanBrowser(
+                    root,
+                    System.Threading.CancellationToken.None,
+                    hash => hash == spellHash ? spellPath : null);
+
+                VfxBrowserFolder characters = Assert.Single(catalog.Roots);
+                Assert.Equal("Characters", characters.Title);
+                Assert.True(characters.IsExpanded);
+                Assert.Equal(2, characters.Children.Count);
+
+                VfxBrowserFolder yunaraNode = Assert.IsType<VfxBrowserFolder>(characters.Children[0]);
+                Assert.Equal("PetChibiYunara", yunaraNode.Title);
+                Assert.Equal("Companion", yunaraNode.Subtitle);
+                Assert.Equal(new[] { "Skins", "Themes", "Spells" },
+                    yunaraNode.Children.Cast<VfxBrowserFolder>().Select(folder => folder.Title));
+
+                VfxBrowserFolder skins = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[0]);
+                VfxSkinItem skin = Assert.IsType<VfxSkinItem>(Assert.Single(skins.Children));
+                Assert.Equal("Skin 1", skin.Title);
+                Assert.Equal(new[] { "Systems", "Clips" }, skin.Sections.Select(section => section.Title));
+
+                VfxBrowserFolder themes = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[1]);
+                VfxBrowserFolder spiritBlossom = Assert.IsType<VfxBrowserFolder>(Assert.Single(themes.Children));
+                Assert.Equal("Spiritblossom", spiritBlossom.Title);
+                Assert.Equal("Tier1", Assert.IsType<VfxSkinItem>(Assert.Single(spiritBlossom.Children)).Title);
+
+                VfxBrowserFolder spells = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[2]);
+                VfxBrowserFolder spellGroup = Assert.IsType<VfxBrowserFolder>(Assert.Single(spells.Children));
+                Assert.Equal("Q", spellGroup.Title);
+                VfxSpellBrowserItem spell = Assert.IsType<VfxSpellBrowserItem>(Assert.Single(spellGroup.Children));
+                Assert.Equal("Missile", spell.Name);
+                Assert.Equal(spellPath, spell.ObjectPath);
+
+                VfxBrowserFolder zoeNode = Assert.IsType<VfxBrowserFolder>(characters.Children[1]);
+                Assert.Equal("PetChibiZoe", zoeNode.Title);
+            }
+            finally
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            }
+        }
+
+        private static void WriteSkinBin(string path, bool previewable = true)
+        {
+            BinTreeProperty[] properties = Array.Empty<BinTreeProperty>();
+            if (previewable)
+            {
+                properties = new BinTreeProperty[]
+                {
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("skinMeshProperties"),
+                        Fnv1a.HashLower("SkinMeshDataProperties"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("simpleSkin"), "ASSETS/Test/Test.skn")
+                        })
+                };
+            }
+
+            var obj = new BinTreeObject("SkinData", "SkinCharacterDataProperties", properties);
             var tree = new BinTree(new[] { obj }, Array.Empty<string>());
             using var stream = File.Create(path);
             tree.Write(stream);

@@ -19,6 +19,21 @@
         <Style x:Key="VfxBrowserBranchStyle" TargetType="TreeViewItem" BasedOn="{StaticResource VfxBrowserItemStyle}">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
         </Style>
+        <HierarchicalDataTemplate DataType="{x:Type models:VfxBrowserFolder}" ItemsSource="{Binding Children}" ItemContainerStyle="{StaticResource VfxBrowserBranchStyle}">
+            <Grid Margin="2,5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <materialIcons:MaterialIcon Kind="FolderOutline" Width="15" Height="15" Foreground="{StaticResource AccentBrush}" Margin="0,0,7,0" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="#4DB6AC" Margin="8,1,0,0"/>
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="{Binding Children.Count, StringFormat='{}{0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="8,1,2,0" VerticalAlignment="Center"/>
+            </Grid>
+        </HierarchicalDataTemplate>
         <HierarchicalDataTemplate DataType="{x:Type models:VfxSkinItem}" ItemsSource="{Binding Sections}" ItemContainerStyle="{StaticResource VfxBrowserBranchStyle}">
             <Grid Margin="2,5" ToolTip="{Binding DisplayName}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -47,6 +62,13 @@
                 <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,7,0"/>
                 <TextBlock Text="{Binding Name}" FontSize="11" MaxWidth="225" TextTrimming="CharacterEllipsis"/>
                 <TextBlock Text="{Binding Duration, StringFormat='{}{0:F2}s'}" FontSize="10" Foreground="{StaticResource TextMuted}" Margin="8,1,0,0"/>
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type models:VfxSpellBrowserItem}">
+            <StackPanel Orientation="Horizontal" Margin="2,4" ToolTip="{Binding ObjectPath}">
+                <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="14" Height="14" Foreground="#A78BFA" Margin="0,0,7,0"/>
+                <TextBlock Text="{Binding Name}" FontSize="11" MaxWidth="205" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="Spell" FontSize="9" Foreground="#A78BFA" Margin="8,1,0,0"/>
             </StackPanel>
         </DataTemplate>
 
@@ -182,7 +204,7 @@
                              Margin="0,0,0,8"
                              TextChanged="SearchQuery_TextChanged"/>
 
-                    <TreeView x:Name="VfxBrowser" Grid.Row="2" ItemsSource="{Binding DetectedSkins}"
+                    <TreeView x:Name="VfxBrowser" Grid.Row="2" ItemsSource="{Binding BrowserRoots}"
                               Style="{StaticResource ModernTreeView}" ItemContainerStyle="{StaticResource VfxBrowserBranchStyle}"
                               SelectedItemChanged="VfxBrowser_SelectedItemChanged" BorderThickness="0" Background="Transparent"
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
