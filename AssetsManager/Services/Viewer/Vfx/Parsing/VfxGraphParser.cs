@@ -1212,7 +1212,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             bool textureMultClampUv = false;
             Vector2 textureMultTransformCenter = new(0.5f, 0.5f);
             Vector2 textureMultEmitterUvScroll = Vector2.Zero;
-            if (Get(p, F_textureMult) is BinTreeStruct textureMult)
+            BinTreeStruct textureMult = Get(p, F_textureMult) as BinTreeStruct;
+            bool hasTextureMultLayer = textureMult is not null;
+            if (textureMult is not null)
             {
                 textureMultPath = ReadAsset(textureMult.Properties, F_textureMult, ".tex");
                 textureMultTexDiv = ReadValueVec2(Get(textureMult.Properties, F_texDivMult)) ?? Vector2.One;
@@ -1491,7 +1493,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     HasRotationOverride: HasValue(p, F_rotationOverride),
                     HasScaleOverride: HasValue(p, F_scaleOverride),
                     HasPeriodControl: HasValue(p, F_period) || HasValue(p, F_timeActiveDuringPeriod),
-                    HasLegacySimple: legacy is not null));
+                    HasLegacySimple: legacy is not null,
+                    HasTextureMultLayer: hasTextureMultLayer));
         }
 
         private static bool HasValue(IReadOnlyDictionary<uint, BinTreeProperty> properties, uint fieldHash)

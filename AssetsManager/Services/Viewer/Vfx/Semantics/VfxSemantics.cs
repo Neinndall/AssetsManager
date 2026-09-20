@@ -60,7 +60,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
         bool WritesStencil,
         bool WritesColor);
 
-    /// <summary>Translates authored particle stencil modes into backend-neutral operations.</summary>
+    /// <summary>
+    /// Decodes authored particle stencil metadata for diagnostics. The VFX preview deliberately
+    /// does not execute these operations because its scene has no gameplay stencil population.
+    /// </summary>
     public static class VfxStencilSemantics
     {
         private static readonly VfxStencilDescriptor Disabled = new(

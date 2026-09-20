@@ -2711,6 +2711,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 fixedAlpha with { UvMode = 0 },
                 hasColorRampTexture: true));
             Assert.False(VfxOpenGlRenderer.ShouldUseColorRamp(fixedAlpha, hasColorRampTexture: false));
+
+            VfxEmitterDefinition structuralMult = fixedAlpha with
+            {
+                TextureMultPath = null,
+                AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasTextureMultLayer: true)
+            };
+            Assert.True(VfxOpenGlRenderer.HasTextureMultLayer(structuralMult));
+            Assert.False(VfxOpenGlRenderer.ShouldUseColorRamp(
+                structuralMult,
+                hasColorRampTexture: true));
         }
 
         [Fact]
@@ -2728,7 +2738,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void DrawnQuadsUseAuthoredSoftParticleFadeButPlanarProjectionStaysUndrawn()
+        public void SoftParticleMaterialContractDoesNotSpecialCasePlanarProjection()
         {
             var soft = new VfxSoftParticleDefinition(0f, 80f, 0f, 0f);
             VfxEmitterDefinition regular = CreateEmitter(
@@ -2744,7 +2754,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: true));
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(ground, hasSceneDepth: true));
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(terrain, hasSceneDepth: true));
-            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(projection, hasSceneDepth: true));
+            Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(projection, hasSceneDepth: true));
             Assert.False(projection.IsVisual);
             Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: false));
 

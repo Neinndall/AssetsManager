@@ -43,8 +43,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private float[] _sortedInstances = Array.Empty<float>();
         private float[] _instanceDepths = Array.Empty<float>();
         private int[] _instanceOrder = Array.Empty<int>();
-        private readonly Dictionary<uint, byte> _stencilReferences = new();
-        private readonly bool[] _reservedStencilReferences = new bool[256];
         private readonly HashSet<uint> _ownerHiddenSubmeshes = new();
         [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
         private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
@@ -283,7 +281,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (useWireframe)
                 _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
 
-            IReadOnlyDictionary<uint, byte> stencilReferences = BuildStencilReferenceMap(stencilQueue ?? renderQueue);
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
             _gl.Uniform3(_uCamRight, camRight.X, camRight.Y, camRight.Z);
@@ -314,6 +311,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.DepthMask(false);
             _gl.Disable(EnableCap.CullFace);
             _gl.Disable(EnableCap.PolygonOffsetFill);
+            _gl.Disable(EnableCap.StencilTest);
+            _gl.ColorMask(true, true, true, true);
             _gl.Enable(EnableCap.Blend);
             _gl.BlendEquation(GLEnum.FuncAdd);
 
@@ -345,18 +344,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (!es.IsVisible) continue;
                 VfxEmitterRenderState emitterRenderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 if (useWireframe)
-                {
-                    // The wire twin is an independent double-sided transparent material: it
-                    // cannot inherit culling, alpha-only writes or the emitter's stencil contract.
                     _gl.Disable(EnableCap.CullFace);
-                    _gl.ColorMask(true, true, true, true);
-                    _gl.Disable(EnableCap.StencilTest);
-                }
-                else
-                {
-                    ApplyColorWriteMask(emitterRenderState);
-                    ApplyEmitterStencilState(emitterRenderState, stencilReferences);
-                }
+
+                // LTK keeps WriteAlphaOnly/stencil as inspector metadata. Its VFX preview has no
+                // gameplay stencil buffer, so applying either here would hide or recolor effects
+                // that LTK deliberately draws as ordinary RGBA.
+                _gl.ColorMask(true, true, true, true);
+                _gl.Disable(EnableCap.StencilTest);
                 // Never synthesize an AttachedMesh proxy. Render only geometry that was
                 // resolved from the real owner scene and filtered by authored submesh masks.
                 if (es.Def.IsMeshPrimitive && es.MeshVao == 0)
@@ -493,7 +487,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     _uAlphaTest,
                     VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0);
                 _gl.Uniform1(_uEmissiveStrength, VfxBlendModes.ResolveEmissiveStrength(es.Def.BlendMode));
-                bool hasMultLayer = !string.IsNullOrWhiteSpace(es.Def.TextureMultPath);
+                bool hasMultLayer = HasTextureMultLayer(es.Def);
                 bool useColorRamp = ShouldUseColorRamp(es.Def, es.ColorGradientTexture != 0);
                 _gl.Uniform1(_uHasColor, useColorRamp ? 1 : 0);
                 _gl.Uniform1(_uRampAtMult, useColorRamp && hasMultLayer ? 1 : 0);
@@ -568,9 +562,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 }
                 if (isDistortion)
                 {
-                    // LTK keeps a distorting draw alive when its normal map is missing. Its
-                    // fallback has alpha zero, so this transparent texture produces the same
-                    // zero warp while preserving alpha-test/stencil side effects.
+                    // A missing distortion map contributes zero coverage. The transparent
+                    // fallback therefore preserves the draw and alpha-test path without warping.
                     _gl.ActiveTexture(TextureUnit.Texture3);
                     _gl.BindTexture(
                         TextureTarget.Texture2D,
@@ -790,68 +783,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 ToOpenGl(descriptor.DestinationRgb),
                 ToOpenGl(descriptor.SourceAlpha),
                 ToOpenGl(descriptor.DestinationAlpha));
-        }
-
-        private void ApplyColorWriteMask(VfxEmitterRenderState renderState)
-        {
-            bool writeColor = !renderState.WriteAlphaOnly;
-            _gl.ColorMask(writeColor, writeColor, writeColor, true);
-        }
-
-        private void ApplyEmitterStencilState(
-            VfxEmitterRenderState renderState,
-            IReadOnlyDictionary<uint, byte> referenceIds)
-        {
-            if (!VfxStencilSemantics.TryGetDescriptor(renderState.StencilMode, out VfxStencilDescriptor descriptor) ||
-                descriptor.Operation == VfxStencilOperationKind.Disabled)
-            {
-                _gl.Disable(EnableCap.StencilTest);
-                _gl.StencilMask(0);
-                return;
-            }
-
-            int reference = VfxStencilSemantics.ResolveReference(renderState, referenceIds);
-            _gl.Enable(EnableCap.StencilTest);
-            _gl.StencilMask(descriptor.WritesStencil ? 0xFFu : 0u);
-            _gl.StencilOp(StencilOp.Keep, StencilOp.Keep,
-                descriptor.WritesStencil ? StencilOp.Replace : StencilOp.Keep);
-            _gl.StencilFunc(descriptor.Operation switch
-            {
-                VfxStencilOperationKind.WriteReference => StencilFunction.Always,
-                VfxStencilOperationKind.TestEqual => StencilFunction.Equal,
-                VfxStencilOperationKind.TestNotEqual => StencilFunction.Notequal,
-                _ => StencilFunction.Always
-            }, reference, 0xFFu);
-
-            if (!descriptor.WritesColor)
-                _gl.ColorMask(false, false, false, false);
-        }
-
-        private IReadOnlyDictionary<uint, byte> BuildStencilReferenceMap(
-            IReadOnlyList<VfxRenderQueueEntry> renderQueue)
-        {
-            _stencilReferences.Clear();
-            Array.Clear(_reservedStencilReferences, 0, _reservedStencilReferences.Length);
-            _reservedStencilReferences[0] = true;
-            foreach (VfxRenderQueueEntry entry in renderQueue)
-            {
-                byte authoredReference = (entry.Emitter.Def.RenderState ?? VfxEmitterRenderState.Default).StencilReference;
-                _reservedStencilReferences[authoredReference] = true;
-            }
-
-            byte candidate = 1;
-            foreach (VfxRenderQueueEntry entry in renderQueue)
-            {
-                uint id = (entry.Emitter.Def.RenderState ?? VfxEmitterRenderState.Default).StencilReferenceId;
-                if (id == 0 || _stencilReferences.ContainsKey(id)) continue;
-                while (candidate != 0 && _reservedStencilReferences[candidate]) candidate++;
-                if (candidate == 0)
-                    throw new InvalidOperationException("The VFX render queue exhausts the 8-bit stencil reference space.");
-                _stencilReferences.Add(id, candidate);
-                _reservedStencilReferences[candidate] = true;
-                candidate++;
-            }
-            return _stencilReferences;
         }
 
         private static BlendingFactor ToOpenGl(VfxBlendFactor factor) => factor switch
@@ -1491,17 +1422,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 : null;
         }
 
+        internal static bool HasTextureMultLayer(VfxEmitterDefinition definition)
+            => definition is not null &&
+               (definition.AuthoredFeatures?.HasTextureMultLayer == true ||
+                !string.IsNullOrWhiteSpace(definition.TextureMultPath));
+
         internal static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture)
         {
             if (!hasColorRampTexture || definition is null) return false;
 
-            // LTK's fixed-alpha quad/ribbon bundle drops ALPHA_EROSION. Once that pass is gone,
-            // the authored ramp is valid again unless LOCK_ALPHA is also occupying the mult pass.
+            // The second UV layer exists when textureMult is authored, even if its texture is
+            // unnamed or has not loaded. That structural layer still owns the ramp lookup lane.
             bool fixedAlphaUv = definition.UvMode == 2 &&
                 definition.PrimitiveKind != VfxPrimitiveKind.Mesh &&
                 definition.PrimitiveKind != VfxPrimitiveKind.AttachedMesh;
             bool erosionEnabled = definition.AlphaErosion is not null && !fixedAlphaUv;
-            bool hasMultLayer = !string.IsNullOrWhiteSpace(definition.TextureMultPath);
+            bool hasMultLayer = HasTextureMultLayer(definition);
             return !erosionEnabled && !(hasMultLayer && definition.UvMode == 2);
         }
 
@@ -1517,12 +1453,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
         {
             if (!hasSceneDepth || definition?.SoftParticle is null) return false;
-            if (definition.PrimitiveKind is VfxPrimitiveKind.AttachedMesh or VfxPrimitiveKind.PlanarProjection)
-                return false;
+            if (definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh) return false;
 
-            // LTK's fixed-alpha quad/ribbon shader compiles no SOFT_PARTICLES. Meshes keep
-            // their soft pass even when the emitter authors LOCK_ALPHA.
-            bool fixedAlphaUv = definition.UvMode == 2 && definition.PrimitiveKind != VfxPrimitiveKind.Mesh;
+            // The fixed-alpha quad/ribbon bundle compiles no soft fade. Meshes keep the normal
+            // particle material under LOCK_ALPHA, while AttachedMesh has no soft path at all.
+            bool fixedAlphaUv = definition.UvMode == 2 &&
+                definition.PrimitiveKind != VfxPrimitiveKind.Mesh &&
+                definition.PrimitiveKind != VfxPrimitiveKind.AttachedMesh;
             return !fixedAlphaUv;
         }
 

@@ -238,7 +238,8 @@ namespace AssetsManager.Views.Models.Viewer
         bool HasRotationOverride = false,
         bool HasScaleOverride = false,
         bool HasPeriodControl = false,
-        bool HasLegacySimple = false);
+        bool HasLegacySimple = false,
+        bool HasTextureMultLayer = false);
 
     public sealed record VfxEmitterRenderState(
         int RenderPass,
