@@ -79,8 +79,6 @@ namespace AssetsManager.Views.Controls.Viewer
             double Playhead,
             float Speed,
             VfxRigSettings RigSettings,
-            double LoopStart,
-            double LoopBoundary,
             int[] Muted,
             int[] Soloed);
 
@@ -949,15 +947,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _vfxRenderer.RigSettings = settings;
                 double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
-                _model.ActiveLoopDuration = Math.Min(
-                    Math.Max(_model.ActiveLoopDuration, PreviewLoopMinimumSpan),
-                    duration);
-                _model.ActiveLoopStart = Math.Clamp(
-                    _model.ActiveLoopStart,
-                    0d,
-                    Math.Max(0d, _model.ActiveLoopDuration - PreviewLoopMinimumSpan));
-                _model.TotalDuration = duration;
-                _model.IsPreviewLoopEnabled = settings.IsLooping;
+                UpdatePreviewLoopRangeForDuration(duration);`r`n            _model.IsPreviewLoopEnabled = settings.IsLooping;
                 _model.CurrentTime = _vfxRenderer.PlaybackTime;
                 _vfxRenderer.Play();
                 _model.IsPlaying = true;
@@ -973,15 +963,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.RigPreset = settings.Preset;
 
             double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
-            _model.TotalDuration = duration;
-            _model.ActiveLoopDuration = Math.Min(
-                Math.Max(_model.ActiveLoopDuration, PreviewLoopMinimumSpan),
-                duration);
-            _model.ActiveLoopStart = Math.Clamp(
-                _model.ActiveLoopStart,
-                0d,
-                Math.Max(0d, _model.ActiveLoopDuration - PreviewLoopMinimumSpan));
-            _model.IsPreviewLoopEnabled = settings.IsLooping;
+            UpdatePreviewLoopRangeForDuration(duration);`r`n            _model.IsPreviewLoopEnabled = settings.IsLooping;
 
             _model.CurrentTime = _vfxRenderer.PlaybackTime;
             UpdateRigControlValues();
@@ -1022,8 +1004,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 RigPeriodSlider.Value = settings.OrbitPeriod;
                 RigPeriodValueText.Text = $"{settings.OrbitPeriod:F2} s";
 
-                if (RigLoopToggleButton != null)
-                    RigLoopToggleButton.IsChecked = settings.IsLooping;
+                // TimelineLoopToggleButton binds directly to IsPreviewLoopEnabled so
+                // Systems, Clips, and Spells share one loop state.
             }
             finally
             {
@@ -1061,16 +1043,60 @@ namespace AssetsManager.Views.Controls.Viewer
             ApplyRigTuning(_vfxRenderer.RigSettings with { OrbitPeriod = (float)e.NewValue });
         }
 
-        private void RigLoopToggleButton_Click(object sender, RoutedEventArgs e)
+        private void TimelineLoopToggleButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_isUpdatingRigControls || _vfxRenderer == null || !_model.IsRawSystemsMode ||
-                sender is not ToggleButton toggleButton)
+            if (_isUpdatingRigControls || sender is not ToggleButton toggleButton) return;
+            SetPreviewLoopEnabled(toggleButton.IsChecked == true);
+        }
+
+        private void SetPreviewLoopEnabled(bool enabled)
+        {
+            if (enabled)
             {
+                double span = ResolveTimelineDuration(_model.TotalDuration);
+                _model.ActiveLoopStart = 0d;
+                _model.ActiveLoopDuration = span;
+            }
+
+            _model.IsPreviewLoopEnabled = enabled;
+
+            // Standalone Systems also use the rig lifecycle loop. Clips and Spells are
+            // replayed by the common timeline loop and do not need a separate engine path.
+            if (_model.IsRawSystemsMode && _vfxRenderer != null &&
+                _vfxRenderer.RigSettings.IsLooping != enabled)
+            {
+                _vfxRenderer.RigSettings = _vfxRenderer.RigSettings with { IsLooping = enabled };
+            }
+
+            UpdateTimelineTrackMetrics();
+            UpdatePlayheadPosition();
+        }
+
+        private void ResetPreviewLoopRange(double duration)
+        {
+            double span = ResolveTimelineDuration(duration);
+            _model.TotalDuration = span;
+            _model.ActiveLoopStart = 0d;
+            _model.ActiveLoopDuration = span;
+        }
+
+        private void UpdatePreviewLoopRangeForDuration(double duration)
+        {
+            double span = ResolveTimelineDuration(duration);
+            _model.TotalDuration = span;
+            if (!_model.IsPreviewLoopEnabled)
+            {
+                _model.ActiveLoopStart = 0d;
+                _model.ActiveLoopDuration = span;
                 return;
             }
 
-            ApplyRigTuning(
-                _vfxRenderer.RigSettings with { IsLooping = toggleButton.IsChecked == true });
+            (double from, double to) = ClampPreviewLoop(
+                _model.ActiveLoopStart,
+                _model.ActiveLoopDuration > 0d ? _model.ActiveLoopDuration : span,
+                span);
+            _model.ActiveLoopStart = from;
+            _model.ActiveLoopDuration = to;
         }
 
         #endregion
@@ -1336,7 +1362,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.TotalDuration = 5.0;
             _model.ActiveLoopStart = 0;
             _model.ActiveLoopDuration = 0;
-            _model.IsPreviewLoopEnabled = false;
         }
 
         private async void LoadBinFile(string binFilePath)
@@ -1437,8 +1462,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 Playhead: _model.CurrentTime,
                 Speed: _model.Speed,
                 RigSettings: _vfxRenderer?.RigSettings ?? VfxRigSettings.ForPreset(_model.RigPreset),
-                LoopStart: _model.ActiveLoopStart,
-                LoopBoundary: _model.ActiveLoopDuration,
                 Muted: _model.Emitters.Where(emitter => emitter.IsMuted).Select(emitter => emitter.SourceOrder).ToArray(),
                 Soloed: _model.Emitters.Where(emitter => emitter.IsSolo).Select(emitter => emitter.SourceOrder).ToArray());
         }
@@ -1467,8 +1490,7 @@ namespace AssetsManager.Views.Controls.Viewer
             StandaloneRunMemory remembered = RecallStandaloneRun(systemItem);
             int playbackSeed = remembered?.Seed ?? StandalonePlaybackSeed;
             float playbackSpeed = remembered?.Speed ?? 1f;
-            VfxRigSettings rigSettings =
-                remembered?.RigSettings ?? VfxRigSettings.ForPreset(VfxRigPreset.Still);
+            VfxRigSettings rigSettings =`r`n                remembered?.RigSettings ?? VfxRigSettings.ForPreset(VfxRigPreset.Still);
             VfxRigPreset rigPreset = rigSettings.Preset;
             HashSet<int> muted = remembered?.Muted?.ToHashSet() ?? new HashSet<int>();
             HashSet<int> soloed = remembered?.Soloed?.ToHashSet() ?? new HashSet<int>();
@@ -1516,14 +1538,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(_model.RigPreset, def);
             double timelineMax = ResolveTimelineDuration(rigDuration);
-            _model.TotalDuration = timelineMax;
-            _model.ActiveLoopDuration = remembered == null
-                ? timelineMax
-                : Math.Clamp(remembered.LoopBoundary, Math.Min(0.05d, timelineMax), timelineMax);
-            _model.ActiveLoopStart = remembered == null
-                ? 0d
-                : Math.Clamp(remembered.LoopStart, 0d, Math.Max(0d, _model.ActiveLoopDuration - PreviewLoopMinimumSpan));
-            _model.IsPreviewLoopEnabled = rigSettings.IsLooping;
+            ResetPreviewLoopRange(timelineMax);`r`n            _model.IsPreviewLoopEnabled = rigSettings.IsLooping;
 
             // 2. Audit Emitters
             for (int emitterIndex = 0; emitterIndex < def.Emitters.Count; emitterIndex++)
@@ -1813,10 +1828,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.CurrentTime = 0;
 
             double dur = animItem.Duration > 0 ? animItem.Duration : 3.0;
-            _model.TotalDuration = dur;
-            _model.ActiveLoopStart = 0d;
-            _model.ActiveLoopDuration = dur;
-            _model.IsPreviewLoopEnabled = true;
+            ResetPreviewLoopRange(dur);
 
             string searchDir = ResolvePreviewSearchDirectory();
 
@@ -1951,8 +1963,6 @@ namespace AssetsManager.Views.Controls.Viewer
             ClearAnimationClipCues();
             ClearCompositeDiagnostics();
             _model.CurrentTime = 0d;
-            _model.ActiveLoopStart = 0d;
-            _model.IsPreviewLoopEnabled = false;
 
             AnimationClipCatalogItem animation = plan.Animation;
             _championModel.CurrentAnimation = animation?.AnimationAsset;
@@ -1991,8 +2001,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             double duration = _vfxRenderer?.RigDuration ?? Math.Max(animation?.Duration ?? 0d, plan.Arrival + VfxSpellPreviewComposer.ImpactDuration);
-            _model.TotalDuration = ResolveTimelineDuration(duration);
-            _model.ActiveLoopDuration = _model.TotalDuration;
+            ResetPreviewLoopRange(duration);
             _model.IsPlaying = ready;
             _model.StatusText = $"{spell.Name} · {plan.Status} · release {plan.Release:F2}s / arrival {plan.Arrival:F2}s";
             _model.LogMessages.Add($"[PLAY SPELL] {spell.ObjectPath} · {plan.Status}.");
@@ -2627,7 +2636,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            if (TryPlaySelectedTimedPreview(restartWhenPlaying: false, rebuildWhenEnded: true))
+            if (TryPlaySelectedTimedPreview(restartWhenPlaying: false))
                 return;
 
             if (_model.SelectedSystem != null)
@@ -2883,30 +2892,31 @@ namespace AssetsManager.Views.Controls.Viewer
                _activeSpellPlan?.Availability == VfxSpellAvailability.Supported &&
                _vfxRenderer?.ActiveSystem != null;
 
-        private bool TryPlaySelectedTimedPreview(bool restartWhenPlaying, bool rebuildWhenEnded)
+        private bool HasSelectedAnimationReady()
+            => _model.IsAnimationMode &&
+               _model.SelectedAnimation != null &&
+               ReferenceEquals(_activeAnimationClip, _model.SelectedAnimation) &&
+               _vfxRenderer?.ActiveSystem != null;
+
+        private bool TryPlaySelectedTimedPreview(bool restartWhenPlaying)
         {
             bool ended = _model.CurrentTime >= _model.TotalDuration;
+            bool restart = ended || (restartWhenPlaying && _model.IsPlaying);
             if (_model.SelectedSpell != null)
             {
-                if (!HasSelectedSpellReady() ||
-                    (restartWhenPlaying && _model.IsPlaying) ||
-                    (rebuildWhenEnded && ended))
-                {
+                if (!HasSelectedSpellReady())
                     RequestSpellPreview(_model.SelectedSpell);
-                }
                 else
-                {
-                    ResumeTimedPreview(ended);
-                }
+                    ResumeTimedPreview(restart);
                 return true;
             }
 
             if (_model.IsAnimationMode && _model.SelectedAnimation != null)
             {
-                if ((restartWhenPlaying && _model.IsPlaying) || (rebuildWhenEnded && ended))
+                if (!HasSelectedAnimationReady())
                     PlaySelectedAnimation(_model.SelectedAnimation);
                 else
-                    ResumeTimedPreview(ended);
+                    ResumeTimedPreview(restart);
                 return true;
             }
 
@@ -2926,7 +2936,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void Play_Click(object sender, RoutedEventArgs e)
         {
-            if (TryPlaySelectedTimedPreview(restartWhenPlaying: true, rebuildWhenEnded: true))
+            if (TryPlaySelectedTimedPreview(restartWhenPlaying: true))
                 return;
 
             if (_model.SelectedSystem != null)
@@ -2955,7 +2965,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             else
             {
-                if (TryPlaySelectedTimedPreview(restartWhenPlaying: false, rebuildWhenEnded: false))
+                if (TryPlaySelectedTimedPreview(restartWhenPlaying: false))
                     return;
 
                 if (_model.SelectedSystem != null)

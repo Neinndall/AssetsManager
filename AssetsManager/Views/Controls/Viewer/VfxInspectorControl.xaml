@@ -667,14 +667,13 @@
                                     <ComboBoxItem Content="1.5x" Tag="1.5"/>
                                     <ComboBoxItem Content="2.0x" Tag="2.0"/>
                                 </ComboBox>
-
-                                <!-- One loop control owns the standalone lifecycle and exposes its editable timeline range. -->
-                                <ToggleButton x:Name="RigLoopToggleButton"
-                                              Click="RigLoopToggleButton_Click"
-                                              Visibility="{Binding IsRawSystemsMode, Converter={StaticResource BoolToVisibilityConverter}}"
+                                <!-- One timeline loop control is shared by Systems, Clips, and Spells. -->
+                                <ToggleButton x:Name="TimelineLoopToggleButton"
+                                              Click="TimelineLoopToggleButton_Click"
+                                              IsChecked="{Binding IsPreviewLoopEnabled, Mode=TwoWay}"
                                               Style="{StaticResource TransparentIconToggleButton}"
                                               Width="30" Height="28" Padding="0"
-                                              Margin="0,0,8,0" ToolTip="Loop VFX lifecycle and edit timeline range">
+                                              Margin="0,0,8,0" ToolTip="Loop preview and edit timeline range">
                                     <materialIcons:MaterialIcon Kind="RepeatVariant" Width="17" Height="17"/>
                                 </ToggleButton>
 

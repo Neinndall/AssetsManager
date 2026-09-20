@@ -109,7 +109,7 @@ New Features
 Improvements
   - Viewer / Animation player now uses a cleaner grouped timeline, dynamic Play/Stop/Resume control, and compact speed controls while preserving the current playhead.
   - VFX Studio / Added shared Viewer Grid/Ground preferences plus Shaded/Wire/Overlay, camera reset, and standalone system motion controls directly in the viewport toolbar.
-  - VFX Studio / Unified standalone lifecycle looping and its editable timeline range under the transport Loop control.
+  - VFX Studio / Timeline Loop now works across Systems, Clips, and Spells, stays enabled while switching previews, and starts each preview range at 0 through its full duration.
   - VFX Studio / Removed the manual Soft stop controls from the rig menu while preserving engine stop behavior internally.
   - VFX Studio / Skin browser sections now start collapsed and Animation Clip playback clears stale standalone System emitter diagnostics.
   - VFX Studio / Removed the duplicate preview stats overlay so live particle status stays in the existing viewport header.
