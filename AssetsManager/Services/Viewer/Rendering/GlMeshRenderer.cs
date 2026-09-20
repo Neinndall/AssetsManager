@@ -16,6 +16,10 @@ namespace AssetsManager.Services.Viewer.Rendering
     public sealed class GlMeshRenderer : IDisposable
     {
         private const float DefaultLightmapEmissionScale = 0.1f;
+        private static readonly Vector3 ReferenceCharacterLightDirection =
+            Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
+        private static readonly Vector3 ReferenceCharacterLightColor = new(0.4f, 0.4f, 0.4f);
+        private static readonly Vector3 ReferenceCharacterAmbientColor = new(0.6f, 0.6f, 0.6f);
 
         private GL _gl = null!;
         private GlMeshResourceCache _resources = null!;
@@ -793,6 +797,18 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         internal static TriangleFace MaterialCullFace(ModelMaterialRenderState state)
             => state.Inverted ? TriangleFace.Front : TriangleFace.Back;
+
+        internal static (
+            Vector3 LightDirection,
+            Vector3 LightColor,
+            Vector3 FillDirection,
+            Vector3 FillColor,
+            Vector3 AmbientColor) ReferenceCharacterLighting() => (
+                ReferenceCharacterLightDirection,
+                ReferenceCharacterLightColor,
+                Vector3.UnitY,
+                Vector3.Zero,
+                ReferenceCharacterAmbientColor);
 
         internal static (
             BlendingFactor SourceRgb,

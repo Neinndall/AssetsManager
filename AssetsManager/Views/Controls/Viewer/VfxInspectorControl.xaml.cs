@@ -686,18 +686,19 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             }
 
-            // Render Champion Mesh under VFX if available and enabled
+            // Render Champion Mesh under VFX if available and enabled.
             if (_model.ShowChampionMesh && _championModel != null && _championMeshRenderer != null)
             {
+                var lighting = GlMeshRenderer.ReferenceCharacterLighting();
                 _championMeshRenderer.Render(
                     _championModel,
                     viewProj,
                     eye,
-                    Vector3.Normalize(new Vector3(0.5f, 1f, 0.5f)),
-                    new Vector3(1f, 1f, 1f),
-                    Vector3.Normalize(new Vector3(-0.5f, 0.5f, -0.5f)),
-                    new Vector3(0.3f, 0.3f, 0.35f),
-                    new Vector3(0.4f, 0.4f, 0.45f));
+                    lighting.LightDirection,
+                    lighting.LightColor,
+                    lighting.FillDirection,
+                    lighting.FillColor,
+                    lighting.AmbientColor);
             }
 
             if (_vfxRenderer == null)

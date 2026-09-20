@@ -1,3 +1,4 @@
+using System.Numerics;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Views.Models.Viewer;
@@ -62,6 +63,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             Assert.Equal(destinationRgb, factors.DestinationRgb);
             Assert.Equal(sourceAlpha, factors.SourceAlpha);
             Assert.Equal(destinationAlpha, factors.DestinationAlpha);
+        }
+
+        [Fact]
+        public void ReferenceCharacterLightingUsesTheAuthoredSunSplit()
+        {
+            var lighting = GlMeshRenderer.ReferenceCharacterLighting();
+            Vector3 expectedDirection = Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
+
+            Assert.Equal(expectedDirection.X, lighting.LightDirection.X, 6);
+            Assert.Equal(expectedDirection.Y, lighting.LightDirection.Y, 6);
+            Assert.Equal(expectedDirection.Z, lighting.LightDirection.Z, 6);
+            Assert.Equal(new Vector3(0.4f), lighting.LightColor);
+            Assert.Equal(Vector3.Zero, lighting.FillColor);
+            Assert.Equal(new Vector3(0.6f), lighting.AmbientColor);
+        }
+
+        [Fact]
+        public void Fragment_AdvancesBaseUvFromModelLifetime()
+        {
+            Assert.Contains(
+                "vec2 materialUv = vUv * uMaterialUvRepeat + uMaterialUvScroll * uEffectTime;",
+                GlMeshShaderSource.Fragment);
         }
 
         [Fact]
