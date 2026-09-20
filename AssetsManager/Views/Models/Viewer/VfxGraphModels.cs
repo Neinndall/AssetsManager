@@ -213,14 +213,14 @@ namespace AssetsManager.Views.Models.Viewer
         /// </summary>
         public bool SuppressesBeamRibbon => Beam is not null && !DrawsAsBeam;
 
-        /// <summary>Does this emitter reach one of VFX Studio's drawable non-attached paths?</summary>
+        /// <summary>
+        /// Does this emitter reach one of LTK's drawable non-mesh paths?
+        /// Draw-kind classification is independent of texture availability: untextured quads
+        /// use the shader falloff and untextured ribbons use the neutral white sampler.
+        /// </summary>
         public bool IsVisual => !Disabled &&
             !SuppressesBeamRibbon &&
-            (DrawsAsQuad || DrawsAsTrail || DrawsAsBeam) &&
-            (!string.IsNullOrEmpty(TexturePath) ||
-             !string.IsNullOrEmpty(TextureMultPath) ||
-             !string.IsNullOrEmpty(MeshPath) ||
-             Distortion is { NormalMapTexturePath.Length: > 0 });
+            (DrawsAsQuad || DrawsAsTrail || DrawsAsBeam);
     }
 
     public sealed record VfxSystemAuthoredFeatures(

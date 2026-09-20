@@ -25,6 +25,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             /// </summary>
             internal object RenderGraphKey { get; set; }
             internal string RenderPath { get; set; } = string.Empty;
+            /// <summary>The opened/root emitter this definition descends from, matching LTK DrawnEmitter.root.</summary>
+            internal int RenderRootSourceOrder { get; set; }
             /// <summary>Stable definition-tree rank used by the renderer across all live sources of this path.</summary>
             internal int RenderRank { get; set; }
             public bool IsVisible { get; set; } = true;
@@ -148,6 +150,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             uint Serial,
             int SourceOrder,
             float ParticleTime,
+            float ParticleLifetime,
             float EmitterPhase,
             bool Died);
 
@@ -547,7 +550,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 frame = OrientationOnly(frame * orbitalTurn);
 
             float particleTime = died && float.IsFinite(particle.Life) ? particle.Life : particle.Age;
-            return new ParticleLifecycleInfo(position, basis, frame, particle.Serial, state.SourceOrder, particleTime, emitterT, died);
+            return new ParticleLifecycleInfo(
+                position,
+                basis,
+                frame,
+                particle.Serial,
+                state.SourceOrder,
+                particleTime,
+                particle.Life,
+                emitterT,
+                died);
         }
 
         internal static float EmitterTime(EmitterState state)
@@ -932,7 +944,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector3 displacement = p.Pos - positionBeforeStep;
                 p.Travel = dt > 0f ? displacement / dt : Vector3.Zero;
                 s.Particles[i] = p;
-                if (d.ChildParticleSet is { EmitOnDeath: false, Children.Count: > 0 })
+                if (d.ChildParticleSet is { Children.Count: > 0 })
                     ParticleUpdated?.Invoke(this, d, LifecycleInfo(s, p, died: false));
             }
 

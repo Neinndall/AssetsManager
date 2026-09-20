@@ -27,10 +27,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private readonly Dictionary<VfxPlaybackRuntime, int> _depth = new();
         private readonly Dictionary<VfxPlaybackRuntime, Matrix4x4> _localTransforms = new();
         private readonly Dictionary<VfxPlaybackRuntime, string> _paths = new();
+        private readonly Dictionary<VfxPlaybackRuntime, VfxPlaybackRuntime> _parents = new();
         private readonly Dictionary<VfxPlaybackRuntime, int> _childCapacities = new();
         private readonly Dictionary<VfxPlaybackRuntime, float> _looseChildStopAfter = new();
         private readonly Dictionary<(string Path, int SourceOrder), int> _renderRanks = new();
+        private readonly Dictionary<(string Path, int SourceOrder), int> _renderRoots = new();
+        private readonly Dictionary<int, bool> _rootVisibility = new();
         private readonly Dictionary<(VfxPlaybackRuntime Parent, int SourceOrder, uint Serial), List<CarriedChildInfo>> _carriedChildren = new();
+        private readonly Dictionary<(VfxPlaybackRuntime Parent, int SourceOrder, uint Serial), VfxPlaybackRuntime.ParticleLifecycleInfo> _deathSeen = new();
+        private readonly List<ChildSpawnRequest> _spawnRequests = new();
         private readonly int _initialSeed;
         private int _heldChildParticleCapacity;
         private Matrix4x4 _rootTransform;
@@ -48,11 +53,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public string BoneName { get; init; }
         }
 
+        private sealed record ChildSpawnRequest(
+            VfxPlaybackRuntime Parent,
+            VfxChildParticleSetDefinition Set,
+            VfxPlaybackRuntime.ParticleLifecycleInfo Particle,
+            bool Carried);
+
         internal sealed record RuntimeSnapshot(
             VfxSystemDefinition Definition,
             Matrix4x4 LocalTransform,
             int Depth,
             string Path,
+            int ParentIndex,
             int Seed,
             uint InitialRandomState,
             int ParticleCapacity,
@@ -70,12 +82,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             int Slot,
             string BoneName);
 
+        internal sealed record DeathSeenSnapshot(
+            int ParentIndex,
+            int SourceOrder,
+            uint Serial,
+            VfxPlaybackRuntime.ParticleLifecycleInfo State);
+
         internal sealed record Snapshot(
             Matrix4x4 RootTransform,
             Matrix4x4 OrientationRootTransform,
             float SourceTime,
             RuntimeSnapshot[] Runtimes,
             CarriedSnapshot[] CarriedChildren,
+            DeathSeenSnapshot[] DeathSeen,
             long Bytes);
 
         public VfxPlaybackGraphRuntime(
@@ -119,13 +138,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         public bool IsStopped
         {
             get => Root.IsStopped;
-            set
-            {
-                foreach (VfxPlaybackRuntime runtime in _runtimes)
-                {
-                    runtime.IsStopped = value;
-                }
-            }
+            set => Root.IsStopped = value;
         }
 
         public void SetTransform(Matrix4x4 transform)
@@ -156,19 +169,40 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         public void SetStartDelay(float seconds) => Root.SetStartDelay(seconds);
 
+        public bool SetEmitterVisibility(int rootSourceOrder, bool isVisible)
+        {
+            bool known = _renderRoots.Values.Contains(rootSourceOrder);
+            if (!known) return false;
+
+            _rootVisibility[rootSourceOrder] = isVisible;
+            foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
+            {
+                foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+                {
+                    if (emitter.RenderRootSourceOrder == rootSourceOrder)
+                        emitter.IsVisible = isVisible;
+                }
+            }
+            return true;
+        }
+
         public void SetAllEmittersVisible(bool isVisible)
         {
             _allEmittersVisible = isVisible;
-            foreach (VfxPlaybackRuntime runtime in _runtimes)
-            {
-                foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
-                    emitter.IsVisible = isVisible;
-            }
-            foreach (VfxPlaybackRuntime runtime in _pendingChildren)
-            {
-                foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
-                    emitter.IsVisible = isVisible;
-            }
+            _rootVisibility.Clear();
+            foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
+                ApplyVisibility(runtime);
+        }
+
+        private bool RootIsVisible(int rootSourceOrder)
+            => _rootVisibility.TryGetValue(rootSourceOrder, out bool visible)
+                ? visible
+                : _allEmittersVisible;
+
+        private void ApplyVisibility(VfxPlaybackRuntime runtime)
+        {
+            foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+                emitter.IsVisible = RootIsVisible(emitter.RenderRootSourceOrder);
         }
 
         public void Kill()
@@ -187,6 +221,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
             _pendingChildren.Clear();
             _carriedChildren.Clear();
+            _deathSeen.Clear();
+            _spawnRequests.Clear();
             for (int index = _runtimes.Count - 1; index > 0; index--)
             {
                 Forget(_runtimes[index]);
@@ -241,6 +277,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
             _pendingChildren.Clear();
             _carriedChildren.Clear();
+            _deathSeen.Clear();
+            _spawnRequests.Clear();
         }
 
         private void RebindRootCallbacks()
@@ -257,13 +295,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             all.AddRange(_runtimes);
             all.AddRange(_pendingChildren);
             var indices = new Dictionary<VfxPlaybackRuntime, int>(ReferenceEqualityComparer.Instance);
+            for (int index = 0; index < all.Count; index++)
+                indices[all[index]] = index;
+
             var saved = new RuntimeSnapshot[all.Count];
             long bytes = 256;
 
             for (int index = 0; index < all.Count; index++)
             {
                 VfxPlaybackRuntime runtime = all[index];
-                indices[runtime] = index;
                 VfxPlaybackRuntime.Snapshot state = runtime.CaptureSnapshot();
                 bool pending = index >= _runtimes.Count;
                 saved[index] = new RuntimeSnapshot(
@@ -271,6 +311,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     _localTransforms.GetValueOrDefault(runtime, Matrix4x4.Identity),
                     _depth.GetValueOrDefault(runtime, 0),
                     _paths.GetValueOrDefault(runtime, string.Empty),
+                    _parents.TryGetValue(runtime, out VfxPlaybackRuntime parent) && indices.TryGetValue(parent, out int parentIndex)
+                        ? parentIndex
+                        : -1,
                     runtime.Seed,
                     runtime.InitialRandomState,
                     runtime.ParticleCapacity,
@@ -300,12 +343,25 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
             bytes += carried.Count * 192L;
 
+            var deathSeen = new List<DeathSeenSnapshot>();
+            foreach (var (key, state) in _deathSeen)
+            {
+                if (!indices.TryGetValue(key.Parent, out int parentIndex)) continue;
+                deathSeen.Add(new DeathSeenSnapshot(
+                    parentIndex,
+                    key.SourceOrder,
+                    key.Serial,
+                    state));
+            }
+            bytes += deathSeen.Count * 160L;
+
             return new Snapshot(
                 _rootTransform,
                 _orientationRootTransform,
                 _sourceTime,
                 saved,
                 carried.ToArray(),
+                deathSeen.ToArray(),
                 bytes);
         }
 
@@ -326,10 +382,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _depth.Clear();
             _localTransforms.Clear();
             _paths.Clear();
+            _parents.Clear();
             _childCapacities.Clear();
             _looseChildStopAfter.Clear();
             _heldChildParticleCapacity = 0;
             _carriedChildren.Clear();
+            _deathSeen.Clear();
+            _spawnRequests.Clear();
             _rootTransform = snapshot.RootTransform;
             _orientationRootTransform = snapshot.OrientationRootTransform;
             _sourceTime = snapshot.SourceTime;
@@ -362,6 +421,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 else _runtimes.Add(runtime);
             }
 
+            for (int index = 1; index < snapshot.Runtimes.Length; index++)
+            {
+                int parentIndex = snapshot.Runtimes[index].ParentIndex;
+                if ((uint)parentIndex < (uint)restored.Length)
+                    _parents[restored[index]] = restored[parentIndex];
+            }
+
             foreach (CarriedSnapshot saved in snapshot.CarriedChildren)
             {
                 if ((uint)saved.ParentIndex >= (uint)restored.Length ||
@@ -382,14 +448,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 });
             }
 
-            // Preview visibility is UI state, not simulation state. A rewind must not undo
-            // the user's current global mute; restored child runtimes inherit the live setting.
-            if (!_allEmittersVisible)
+            foreach (DeathSeenSnapshot saved in snapshot.DeathSeen)
             {
-                foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
-                    foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
-                        emitter.IsVisible = false;
+                if ((uint)saved.ParentIndex >= (uint)restored.Length) continue;
+                _deathSeen[(restored[saved.ParentIndex], saved.SourceOrder, saved.Serial)] = saved.State;
             }
+
+            // Preview visibility is UI state, not simulation state. A rewind must not undo
+            // the user's current root mute/solo state; restored descendants inherit it live.
+            foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
+                ApplyVisibility(runtime);
             SyncRenderTimes();
         }
 
@@ -422,6 +490,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _depth.Remove(runtime);
             _localTransforms.Remove(runtime);
             _paths.Remove(runtime);
+            _parents.Remove(runtime);
             _looseChildStopAfter.Remove(runtime);
             if (_childCapacities.Remove(runtime, out int capacity))
                 _heldChildParticleCapacity = Math.Max(0, _heldChildParticleCapacity - capacity);
@@ -438,6 +507,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 children.RemoveAll(child => ReferenceEquals(child.Runtime, runtime));
                 if (children.Count == 0) _carriedChildren.Remove(key);
             }
+
+            foreach (var key in _deathSeen.Keys.ToArray())
+            {
+                if (ReferenceEquals(key.Parent, runtime))
+                    _deathSeen.Remove(key);
+            }
         }
 
         public void Update(float deltaTime)
@@ -453,17 +528,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         private void UpdateStep(float deltaTime)
         {
-            int runtimeCount = _runtimes.Count;
-            for (int index = 0; index < runtimeCount; index++)
-            {
-                VfxPlaybackRuntime runtime = _runtimes[index];
-                if (_looseChildStopAfter.TryGetValue(runtime, out float stopAfter) &&
-                    runtime.CurrentTime + deltaTime >= stopAfter)
-                {
-                    runtime.IsStopped = true;
-                }
-                runtime.Update(deltaTime);
-            }
+            // LTK steps the opened/root system first, then walks its child lineage recursively.
+            // Each child subtree is advanced and reaped before the parent consumes this step's
+            // child births, so the shared lineage budget is observed in the same depth-first order.
+            Root.Update(deltaTime);
+            StepChildrenOf(Root, deltaTime);
 
             if (_pendingChildren.Count > 0)
             {
@@ -471,18 +540,57 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 _pendingChildren.Clear();
             }
 
-            for (int index = _runtimes.Count - 1; index > 0; index--)
-            {
-                VfxPlaybackRuntime runtime = _runtimes[index];
-                if (!runtime.IsComplete) continue;
-                runtime.ParticleLifecycle -= OnParticleLifecycle;
-                runtime.ParticleUpdated -= OnParticleUpdated;
-                Forget(runtime);
-                _runtimes.RemoveAt(index);
-            }
-
             SyncRenderTimes();
         }
+
+        private void StepChildrenOf(VfxPlaybackRuntime parent, float deltaTime)
+        {
+            VfxPlaybackRuntime[] children = _runtimes
+                .Where(runtime => _parents.TryGetValue(runtime, out VfxPlaybackRuntime owner) &&
+                                  ReferenceEquals(owner, parent))
+                .ToArray();
+
+            foreach (VfxPlaybackRuntime child in children)
+            {
+                if (_looseChildStopAfter.TryGetValue(child, out float stopAfter) &&
+                    child.CurrentTime + deltaTime >= stopAfter)
+                {
+                    child.IsStopped = true;
+                }
+
+                child.Update(deltaTime);
+                StepChildrenOf(child, deltaTime);
+            }
+
+            for (int index = children.Length - 1; index >= 0; index--)
+            {
+                VfxPlaybackRuntime child = children[index];
+                if (!_runtimes.Contains(child) || !child.IsComplete || HasLiveChildren(child)) continue;
+                child.ParticleLifecycle -= OnParticleLifecycle;
+                child.ParticleUpdated -= OnParticleUpdated;
+                Forget(child);
+                _runtimes.Remove(child);
+            }
+
+            ProcessSpawnRequests(parent);
+        }
+
+        private void ProcessSpawnRequests(VfxPlaybackRuntime parent)
+        {
+            ChildSpawnRequest[] births = _spawnRequests
+                .Where(request => ReferenceEquals(request.Parent, parent))
+                .OrderBy(request => request.Carried ? 1 : 0)
+                .ThenBy(request => request.Particle.Serial)
+                .ToArray();
+            if (births.Length == 0) return;
+
+            _spawnRequests.RemoveAll(request => ReferenceEquals(request.Parent, parent));
+            foreach (ChildSpawnRequest birth in births)
+                SpawnChildren(birth.Parent, birth.Set, birth.Particle, birth.Carried);
+        }
+
+        private bool HasLiveChildren(VfxPlaybackRuntime runtime)
+            => _parents.Values.Any(parent => ReferenceEquals(parent, runtime));
 
         private void SyncRenderTimes()
         {
@@ -502,7 +610,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             Matrix4x4 effectiveLocalTransform = depth == 0
                 ? Matrix4x4.Identity
-                : definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * localTransform;
+                : ComposeChildTransform(definition.Transform.GetValueOrDefault(Matrix4x4.Identity), localTransform);
             VfxPlaybackRuntime runtime = _runtimeFactory(
                 definition,
                 effectiveLocalTransform * _rootTransform,
@@ -522,29 +630,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             AssignRenderIdentity(runtime, path);
             if (depth == 0) runtime.WarmUp();
             else runtime.SuppressBuildUp();
-            if (!_allEmittersVisible)
-            {
-                foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
-                    emitter.IsVisible = false;
-            }
             return runtime;
         }
 
         private void BuildRenderRanks(VfxSystemDefinition rootDefinition)
         {
             _renderRanks.Clear();
+            _renderRoots.Clear();
             int nextRank = 0;
-            CollectRenderRanks(rootDefinition, string.Empty, depth: 0, ref nextRank);
+            CollectRenderRanks(rootDefinition, string.Empty, 0, -1, ref nextRank);
         }
 
         private void CollectRenderRanks(
             VfxSystemDefinition definition,
             string path,
             int depth,
+            int rootSourceOrder,
             ref int nextRank)
         {
             if (definition is null || depth > MaximumGraphDepth) return;
 
+            string renderPath = path ?? string.Empty;
             int[] localOrder = Enumerable.Range(0, definition.Emitters.Count).ToArray();
             Array.Sort(localOrder, (left, right) => VfxDrawOrderSemantics.Compare(
                 definition.Emitters[left],
@@ -552,7 +658,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 definition.Emitters[right],
                 right));
             foreach (int sourceOrder in localOrder)
-                _renderRanks[(path ?? string.Empty, sourceOrder)] = nextRank++;
+            {
+                _renderRanks[(renderPath, sourceOrder)] = nextRank++;
+                _renderRoots[(renderPath, sourceOrder)] = depth == 0 ? sourceOrder : rootSourceOrder;
+            }
 
             if (depth >= MaximumGraphDepth) return;
             for (int sourceOrder = 0; sourceOrder < definition.Emitters.Count; sourceOrder++)
@@ -574,7 +683,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         ? sourceOrder.ToString()
                         : $"{path}/{sourceOrder}";
                     string childPath = $"{emitterPath}.{slot}";
-                    CollectRenderRanks(childDefinition, childPath, depth + 1, ref nextRank);
+                    int childRoot = depth == 0 ? sourceOrder : rootSourceOrder;
+                    CollectRenderRanks(childDefinition, childPath, depth + 1, childRoot, ref nextRank);
                 }
             }
         }
@@ -586,7 +696,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             {
                 emitter.RenderGraphKey = this;
                 emitter.RenderPath = renderPath;
+                emitter.RenderRootSourceOrder = _renderRoots.GetValueOrDefault(
+                    (renderPath, emitter.SourceOrder),
+                    emitter.SourceOrder);
                 emitter.RenderRank = _renderRanks.GetValueOrDefault((renderPath, emitter.SourceOrder), int.MaxValue);
+                emitter.IsVisible = RootIsVisible(emitter.RenderRootSourceOrder);
             }
         }
 
@@ -607,13 +721,41 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     return;
                 }
 
-                SpawnChildren(parentRuntime, childSet, particle, carried: false);
+                if (_deathSeen.Remove(key, out VfxPlaybackRuntime.ParticleLifecycleInfo lastSeen))
+                {
+                    // LTK spawns an on-death child from the last live Seen record: both its
+                    // bearing and its lifetime come from the last step where the particle was
+                    // still present. A linger settle may rewrite lifetime on the death step,
+                    // but that rewritten value was never observed by children.step.
+                    VfxPlaybackRuntime.ParticleLifecycleInfo deathBearing = lastSeen with
+                    {
+                        ParticleTime = lastSeen.ParticleLifetime,
+                        Died = true
+                    };
+                    QueueChildSpawn(parentRuntime, childSet, deathBearing, carried: false);
+                }
                 return;
             }
 
-            if (!childSet.EmitOnDeath)
-                SpawnChildren(parentRuntime, childSet, particle, carried: true);
+            if (childSet.EmitOnDeath)
+            {
+                _deathSeen[key] = particle;
+                return;
+            }
+
+            QueueChildSpawn(parentRuntime, childSet, particle, carried: true);
         }
+
+        private void QueueChildSpawn(
+            VfxPlaybackRuntime parentRuntime,
+            VfxChildParticleSetDefinition childSet,
+            VfxPlaybackRuntime.ParticleLifecycleInfo particle,
+            bool carried)
+            => _spawnRequests.Add(new ChildSpawnRequest(
+                parentRuntime,
+                childSet,
+                particle,
+                carried));
 
         private void OnParticleUpdated(
             VfxPlaybackRuntime parentRuntime,
@@ -621,9 +763,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             VfxPlaybackRuntime.ParticleLifecycleInfo particle)
         {
             VfxChildParticleSetDefinition childSet = emitter.ChildParticleSet;
-            if (childSet is null || childSet.EmitOnDeath || childSet.Children.Count == 0) return;
+            if (childSet is null || childSet.Children.Count == 0) return;
 
             var key = (Parent: parentRuntime, particle.SourceOrder, particle.Serial);
+            if (childSet.EmitOnDeath)
+            {
+                _deathSeen[key] = particle;
+                return;
+            }
             if (!_carriedChildren.TryGetValue(key, out List<CarriedChildInfo> children)) return;
 
             Matrix4x4 bearing = ChildBearing(childSet, particle);
@@ -746,6 +893,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 initialRandomState,
                 particleCapacity);
             RegisterChildCapacity(runtime, particleCapacity);
+            _parents[runtime] = parentRuntime;
             _pendingChildren.Add(runtime);
 
             if (!carried)
@@ -859,11 +1007,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             if (Matrix4x4.Invert(_rootTransform, out Matrix4x4 inverseRoot))
                 childLocalTransform = childWorldTransform * inverseRoot;
 
-            Matrix4x4 effectiveLocal = definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * childLocalTransform;
+            Matrix4x4 effectiveLocal = ComposeChildTransform(
+                definition.Transform.GetValueOrDefault(Matrix4x4.Identity),
+                childLocalTransform);
             _localTransforms[runtime] = effectiveLocal;
             runtime.SetTransform(
                 effectiveLocal * _rootTransform,
                 effectiveLocal * _orientationRootTransform);
+        }
+
+        private static Matrix4x4 ComposeChildTransform(Matrix4x4 authored, Matrix4x4 bearing)
+        {
+            Vector3 authoredOffset = authored.Translation;
+            authored.M41 = 0f;
+            authored.M42 = 0f;
+            authored.M43 = 0f;
+            Matrix4x4 result = authored * bearing;
+            Vector3 origin = bearing.Translation + authoredOffset;
+            result.M41 = origin.X;
+            result.M42 = origin.Y;
+            result.M43 = origin.Z;
+            return result;
         }
 
         private static Matrix4x4 OrientationOnly(Matrix4x4 transform)

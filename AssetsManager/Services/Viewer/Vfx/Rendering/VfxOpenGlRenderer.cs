@@ -607,7 +607,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 if (es.Def.PrimitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail)
                 {
-                    int vertices = _trailGeometry.Build(es, Vector3.Normalize(Vector3.Cross(camRight, camUp)));
+                    int vertices = _trailGeometry.Build(
+                        es,
+                        Vector3.Normalize(Vector3.Cross(camRight, camUp)),
+                        renderInstanceCount);
                     if (vertices > 0)
                     {
                         _gl.BindVertexArray(_trailVao);
@@ -1399,6 +1402,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             if (definition is null || instanceCount <= 0) return 0;
 
+            int used = Math.Max(0, alreadyUsed);
+            if (definition.DrawsAsTrail)
+            {
+                if (used >= VfxTrailGeometry.TrailPointsPerEmitter) return 0;
+                int perSource = VfxTrailGeometry.ResolvePointCount(instanceCount);
+                return Math.Min(perSource, VfxTrailGeometry.TrailPointsPerEmitter - used);
+            }
+
             int limit = definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh
                 ? AttachedMeshesPerEmitter
                 : definition.IsMeshPrimitive
@@ -1410,7 +1421,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                             : int.MaxValue;
 
             if (limit == int.MaxValue) return instanceCount;
-            int used = Math.Max(0, alreadyUsed);
             if (used >= limit) return 0;
             return Math.Min(instanceCount, limit - used);
         }

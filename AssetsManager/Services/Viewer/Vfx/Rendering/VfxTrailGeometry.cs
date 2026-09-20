@@ -9,15 +9,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     {
         internal const int VertexStride = VfxPlaybackRuntime.InstanceStride + 2;
         internal const int TrailPointsPerSource = 1024;
+        internal const int TrailPointsPerEmitter = TrailPointsPerSource * 4;
         internal float[] Vertices { get; private set; } = Array.Empty<float>();
         private float[] _points = Array.Empty<float>();
 
         internal static int ResolvePointCount(int instanceCount)
             => Math.Min(Math.Max(0, instanceCount), TrailPointsPerSource);
 
-        internal int Build(VfxPlaybackRuntime.EmitterState state, Vector3 viewDirection)
+        internal int Build(VfxPlaybackRuntime.EmitterState state, Vector3 viewDirection, int maxPoints = TrailPointsPerSource)
         {
-            int count = ResolvePointCount(state.InstanceCount);
+            int count = Math.Min(ResolvePointCount(state.InstanceCount), Math.Max(0, maxPoints));
             if (count < 2) return 0;
             int needed = count * 2 * VertexStride;
             if (_points.Length < needed) _points = new float[needed];

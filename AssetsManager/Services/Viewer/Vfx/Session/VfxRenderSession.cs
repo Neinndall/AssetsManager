@@ -619,7 +619,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         public bool SetEmitterVisibility(int sourceOrder, bool isVisible)
-            => _graph?.Root.SetEmitterVisibility(sourceOrder, isVisible) ?? false;
+            => _graph?.SetEmitterVisibility(sourceOrder, isVisible) ?? false;
 
         public void SetAllEmittersVisibility(bool isVisible)
         {
