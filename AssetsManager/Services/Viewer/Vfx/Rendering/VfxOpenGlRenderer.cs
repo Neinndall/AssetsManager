@@ -713,6 +713,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 definition.BlendMode,
                 renderState.AlphaReference);
             _gl.DepthMask(writeDepth);
+            // Three.js ShaderMaterial defaults to LessEqualDepth, and LTK never overrides it
+            // for VFX materials. Keep equal-depth fragments eligible instead of inheriting
+            // OpenGL's default LESS from the surrounding viewer.
+            _gl.DepthFunc(DepthFunction.Lequal);
             if (VfxBlendModes.ShouldTestDepth(definition.MiscRenderFlags)) _gl.Enable(EnableCap.DepthTest);
             else _gl.Disable(EnableCap.DepthTest);
 

@@ -2823,6 +2823,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void SoftParticlePackingMatchesLtkShaderContract()
+        {
+            Assert.Equal(
+                new Vector4(20f, 90f, 0.1f, 1f / 60f),
+                VfxOpenGlRenderer.ResolveSoftParticleParams(
+                    new VfxSoftParticleDefinition(20f, 10f, 60f, 60f)));
+            Assert.Equal(
+                new Vector4(-1e9f, 200f, 1f, 0f),
+                VfxOpenGlRenderer.ResolveSoftParticleParams(
+                    new VfxSoftParticleDefinition(100f, 0f, 100f, 0f)));
+
+            Assert.Equal(new Vector4(1f, 0f, 0f, 1f), VfxOpenGlRenderer.ResolveSoftParticleControl(1));
+            Assert.Equal(new Vector4(1f, 0f, 0f, 1f), VfxOpenGlRenderer.ResolveSoftParticleControl(4));
+            Assert.Equal(new Vector4(0f, 1f, 0f, 1f), VfxOpenGlRenderer.ResolveSoftParticleControl(5));
+            foreach (int mode in new[] { 0, 2, 3, 6, 7, 8 })
+                Assert.Equal(new Vector4(0f, 1f, 1f, 0f), VfxOpenGlRenderer.ResolveSoftParticleControl(mode));
+        }
+
+        [Fact]
         public void ParticleColorLookupWithoutBaseTextureStillUsesTheQuadFallbackLikeLtk()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with

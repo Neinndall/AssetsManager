@@ -177,6 +177,42 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void SoftParticleShadersUseTheLtkDepthGapAndSmoothFade()
+        {
+            const string gap = "vec2 through = clamp((here - scene - uSoftParticleParams.xy) * uSoftParticleParams.zw, 0.0, 1.0);";
+            const string easing = "vec2 eased = through * through * (3.0 - 2.0 * through);";
+            const string fade = "float fade = eased.x - eased.y;";
+            const string rgbControl = "lit.rgb *= uSoftParticleControl.x + fade * uSoftParticleControl.y;";
+            const string alphaControl = "lit.a *= uSoftParticleControl.z + fade * uSoftParticleControl.w;";
+
+            foreach (string shader in new[] { VfxShaderSource.MeshFragment, VfxShaderSource.ParticleFragment })
+            {
+                Assert.Contains(gap, shader);
+                Assert.Contains(easing, shader);
+                Assert.Contains(fade, shader);
+                Assert.Contains(rgbControl, shader);
+                Assert.Contains(alphaControl, shader);
+            }
+        }
+
+        [Fact]
+        public void DistortionShadersUseTheLtkCoverageAndAspectCorrectedWarp()
+        {
+            const string coverage = "float mask = normalSample.a * lit.a;";
+            const string direction = "vec2 normalOffset = normalSample.rg * 2.0 - vec2(1.0);";
+            const string aspect = "vec2(uViewportSize.y / max(uViewportSize.x, 1.0), 1.0)";
+            const string output = "fragColor = vec4(refracted.rgb, mask);";
+
+            foreach (string shader in new[] { VfxShaderSource.MeshFragment, VfxShaderSource.ParticleFragment })
+            {
+                Assert.Contains(coverage, shader);
+                Assert.Contains(direction, shader);
+                Assert.Contains(aspect, shader);
+                Assert.Contains(output, shader);
+            }
+        }
+
+        [Fact]
         public void ZeroStrengthDistortionKeepsTheLitParticlePath()
         {
             Assert.Contains("uIsDistortion != 0 && uDistortionStrength != 0.0", VfxShaderSource.MeshFragment);

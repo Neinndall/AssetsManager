@@ -1192,6 +1192,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             bool supportsWireframe = _renderer.SupportsWireframe;
             var previewPasses = ResolvePreviewPasses(wireframeMode, supportsWireframe);
 
+            VfxRenderQueueEntry[] distortionQueue = renderQueue
+                .Where(entry => entry.Emitter.Def.Distortion != null)
+                .ToArray();
+
             if (previewPasses.Shaded)
             {
                 _renderer.Render(
@@ -1199,14 +1203,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     viewProjection,
                     view,
                     renderQueue);
-                var distortionQueue = renderQueue.Where(entry => entry.Emitter.Def.Distortion != null).ToArray();
-                if (distortionQueue.Length > 0)
-                {
-                    _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
-                    _renderer.Render(distortionQueue, viewProjection, view, renderQueue);
-                }
             }
 
+            // LTK keeps every wire twin on the particle colour layer, including the twin of a
+            // distorting solid. Overlay wires therefore belong in the captured frame and the
+            // distortion layer is drawn over them afterwards.
             if (previewPasses.Wireframe)
             {
                 _renderer.Render(
@@ -1216,6 +1217,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     renderQueue,
                     wireframePass: true,
                     wireframeOpacity: previewPasses.WireOpacity);
+            }
+
+            if (previewPasses.Shaded && distortionQueue.Length > 0)
+            {
+                _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
+                _renderer.Render(distortionQueue, viewProjection, view, renderQueue);
             }
         }
 
