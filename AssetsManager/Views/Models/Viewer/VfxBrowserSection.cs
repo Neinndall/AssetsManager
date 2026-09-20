@@ -9,14 +9,13 @@ namespace AssetsManager.Views.Models.Viewer
     {
         Root,
         Character,
-        Group,
-        Theme
+        Group
     }
 
     /// <summary>
     /// A semantic branch in the VFX asset browser. Unlike the old flat BIN list, these folders
-    /// represent Riot ownership (Characters, one character, Skins/Themes/Spells) rather than a
-    /// physical directory that the renderer has to load.
+    /// represent Riot ownership (Characters, one character, Skins/Spells) rather than a physical
+    /// directory that the renderer has to load. Theme BINs remain catalog support data only.
     /// </summary>
     public sealed class VfxBrowserFolder : INotifyPropertyChanged
     {

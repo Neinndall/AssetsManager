@@ -901,7 +901,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void FolderCatalogBuildsCharacterSkinThemeAndSpellHierarchyLikeLtk()
+        public void FolderCatalogBuildsCharacterSkinAndSpellHierarchyWhileKeepingThemesAsSupportData()
         {
             string root = Path.Combine(Path.GetTempPath(), "Companions.wad.client");
             string yunara = Path.Combine(root, "data", "characters", "petchibiyunara");
@@ -913,11 +913,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             const string spellPath = "Characters/PetChibiYunara/Spells/Q/Missile";
             uint spellHash = Fnv1a.HashLower(spellPath);
+            string themeTier = Path.Combine(yunara, "themes", "spiritblossom", "tier1.bin");
             try
             {
                 WriteSkinBin(Path.Combine(yunara, "skins", "root.bin"), previewable: false);
                 WriteSkinBin(Path.Combine(yunara, "skins", "skin1.bin"));
-                WriteSkinBin(Path.Combine(yunara, "themes", "spiritblossom", "tier1.bin"));
+                WriteSkinBin(themeTier);
                 WriteSkinBin(Path.Combine(zoe, "skins", "skin2.bin"));
                 WriteBin(
                     Path.Combine(yunara, "spells", "spells.bin"),
@@ -929,6 +930,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     System.Threading.CancellationToken.None,
                     hash => hash == spellHash ? spellPath : null);
 
+                // Theme BINs stay indexed as support/resource data, but they are not duplicate
+                // preview choices beside the authored Skin entries.
+                Assert.Contains(catalog.Entries, entry => entry.BinPath == Path.GetFullPath(themeTier));
+
                 VfxBrowserFolder characters = Assert.Single(catalog.Roots);
                 Assert.Equal("Characters", characters.Title);
                 Assert.True(characters.IsExpanded);
@@ -937,7 +942,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 VfxBrowserFolder yunaraNode = Assert.IsType<VfxBrowserFolder>(characters.Children[0]);
                 Assert.Equal("PetChibiYunara", yunaraNode.Title);
                 Assert.Equal("Companion", yunaraNode.Subtitle);
-                Assert.Equal(new[] { "Skins", "Themes", "Spells" },
+                Assert.Equal(new[] { "Skins", "Spells" },
                     yunaraNode.Children.Cast<VfxBrowserFolder>().Select(folder => folder.Title));
 
                 VfxBrowserFolder skins = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[0]);
@@ -945,12 +950,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Assert.Equal("Skin 1", skin.Title);
                 Assert.Equal(new[] { "Systems", "Clips" }, skin.Sections.Select(section => section.Title));
 
-                VfxBrowserFolder themes = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[1]);
-                VfxBrowserFolder spiritBlossom = Assert.IsType<VfxBrowserFolder>(Assert.Single(themes.Children));
-                Assert.Equal("Spiritblossom", spiritBlossom.Title);
-                Assert.Equal("Tier1", Assert.IsType<VfxSkinItem>(Assert.Single(spiritBlossom.Children)).Title);
-
-                VfxBrowserFolder spells = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[2]);
+                VfxBrowserFolder spells = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[1]);
                 VfxBrowserFolder spellGroup = Assert.IsType<VfxBrowserFolder>(Assert.Single(spells.Children));
                 Assert.Equal("Q", spellGroup.Title);
                 VfxSpellBrowserItem spell = Assert.IsType<VfxSpellBrowserItem>(Assert.Single(spellGroup.Children));

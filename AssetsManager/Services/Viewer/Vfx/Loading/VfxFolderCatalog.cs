@@ -184,7 +184,6 @@ internal static class VfxFolderCatalog
         };
         var characters = new Dictionary<string, VfxBrowserFolder>(StringComparer.OrdinalIgnoreCase);
         var groups = new Dictionary<(string Character, string Group), VfxBrowserFolder>();
-        var themes = new Dictionary<(string Character, string Theme), VfxBrowserFolder>();
         var spellGroups = new Dictionary<(string Character, string Group), VfxBrowserFolder>();
 
         VfxBrowserFolder Character(string rawName)
@@ -226,20 +225,10 @@ internal static class VfxFolderCatalog
                     Group(character, "Skins").Children.Add(entry);
                     break;
                 case "themes":
-                {
-                    string theme = areaAt + 1 < segments.Length ? segments[areaAt + 1] : "Other";
-                    VfxBrowserFolder themesGroup = Group(character, "Themes");
-                    var themeKey = (character.ToLowerInvariant(), theme.ToLowerInvariant());
-                    if (!themes.TryGetValue(themeKey, out VfxBrowserFolder themeFolder))
-                    {
-                        themeFolder = new VfxBrowserFolder(PrettySegment(theme), VfxBrowserFolderKind.Theme);
-                        themes[themeKey] = themeFolder;
-                        themesGroup.Children.Add(themeFolder);
-                    }
-                    entry.BrowserTitle = PrettySegment(Path.GetFileNameWithoutExtension(entry.BinPath));
-                    themeFolder.Children.Add(entry);
+                    // Theme BINs are support/resource layers for the authored skins, not separate
+                    // preview choices. Keep them in the catalog so skin resolution can consume
+                    // their data, but do not duplicate the same model under a visible Themes tree.
                     break;
-                }
                 case "animations":
                     entry.BrowserTitle = PrettySegment(Path.GetFileNameWithoutExtension(entry.BinPath));
                     Group(character, "Animation Data").Children.Add(entry);
@@ -304,11 +293,10 @@ internal static class VfxFolderCatalog
         static int Rank(string title) => title switch
         {
             "Skins" => 0,
-            "Themes" => 1,
-            "Spells" => 2,
-            "Animation Data" => 3,
-            "Spell Data" => 4,
-            _ => 5
+            "Spells" => 1,
+            "Animation Data" => 2,
+            "Spell Data" => 3,
+            _ => 4
         };
 
         object[] ordered = character.Children
