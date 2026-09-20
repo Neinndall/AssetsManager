@@ -31,7 +31,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector3 delta = target - source;
             float length = delta.Length();
             float colorDistance = (state.SystemTarget - state.SystemOrigin).Length();
-            Vector3 axis = length > 1e-8f ? delta / length : Vector3.Zero;
+            Vector3 axis = length > 0f ? delta / length : Vector3.Zero;
 
             int written = 0;
             for (int particle = 0; particle < count; particle++)
@@ -42,7 +42,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 float fromTarget = state.Instances[instance + 18];
 
                 Vector3 wide = beam.Mode == 1
-                    ? ArbitraryWidth(state, instance, source, axis)
+                    ? ArbitraryWidth(state, particle, instance, axis)
                     : CameraWidth(cameraPosition, source, delta);
 
                 Vector3 start = source + delta * fromSource;
@@ -73,36 +73,32 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             Vector3 toEye = eye - source;
             Vector3 wide = Vector3.Cross(toEye, delta);
-            if (wide.LengthSquared() > 1e-10f) return Vector3.Normalize(wide);
+            if (wide.LengthSquared() > 0f) return Vector3.Normalize(wide);
 
-            // LTK sideOf() chooses the world axis least aligned with the eye vector.
+            // sideOf() chooses the world axis least aligned with the eye vector and only
+            // falls back when the cross product has exactly zero length.
             Vector3 least = MathF.Abs(toEye.X) <= MathF.Abs(toEye.Y) && MathF.Abs(toEye.X) <= MathF.Abs(toEye.Z)
                 ? Vector3.UnitX
                 : MathF.Abs(toEye.Y) <= MathF.Abs(toEye.Z) ? Vector3.UnitY : Vector3.UnitZ;
             wide = Vector3.Cross(toEye, least);
-            return wide.LengthSquared() > 1e-10f ? Vector3.Normalize(wide) : least;
+            return wide.LengthSquared() > 0f ? Vector3.Normalize(wide) : least;
         }
 
         private static Vector3 ArbitraryWidth(
             VfxPlaybackRuntime.EmitterState state,
+            int particle,
             int instance,
-            Vector3 source,
             Vector3 axis)
         {
             Vector3 wide = new(-axis.Z, 0f, axis.X);
-            Vector3 rotation = new(
-                state.Instances[instance + 15],
-                state.Instances[instance + 16],
-                state.Instances[instance + 17]);
-            Matrix4x4 turn = Matrix4x4.CreateRotationZ(rotation.Z) *
-                Matrix4x4.CreateRotationX(rotation.X) *
-                Matrix4x4.CreateRotationY(rotation.Y);
-            wide = Vector3.TransformNormal(wide, turn);
+            Matrix4x4 standing = VfxPlaybackRuntime.ResolveStandingBasisForRender(state, state.Particles[particle]);
+            wide = Vector3.TransformNormal(wide, standing);
             Vector3 local = new Vector3(
                 state.Instances[instance],
                 state.Instances[instance + 1],
-                state.Instances[instance + 2]) - source;
-            // LTK intentionally leaves this unnormalised and allows degenerate arbitrary beams.
+                state.Instances[instance + 2]) - state.SystemOrigin;
+            // Riot adds the particle's position relative to the system origin, not the beam's
+            // source after mLocalSpaceSourceOffset, and deliberately leaves the result unnormalised.
             wide += local;
             return wide;
         }

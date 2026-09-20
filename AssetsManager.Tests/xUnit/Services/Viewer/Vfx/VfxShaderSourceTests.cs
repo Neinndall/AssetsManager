@@ -87,6 +87,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void RayFallsBackToParticleSideWhenTheEyeIsOnItsAxis()
+        {
+            Assert.Contains("right = dot(side, side) > 0.0 ? -normalize(side) : placedRight;", VfxShaderSource.ParticleVertex);
+            Assert.DoesNotContain("side = cross(up, uCamUp)", VfxShaderSource.ParticleVertex);
+            Assert.DoesNotContain("side = cross(up, uCamRight)", VfxShaderSource.ParticleVertex);
+        }
+
+        [Fact]
         public void MeshCameraAlignmentMatchesLtkAxisSelection()
         {
             Assert.Contains("uniform int uAlignPitchToCamera;", VfxShaderSource.MeshVertex);
@@ -97,6 +105,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Contains("if (uMeshSkinned == 0)", VfxShaderSource.MeshVertex);
             Assert.Contains("aside = -aside;", VfxShaderSource.MeshVertex);
             Assert.Contains("facing = -facing;", VfxShaderSource.MeshVertex);
+        }
+
+        [Fact]
+        public void MeshUsesParticleStandingBasisAndOnlyAppliesEulerAgainForCameraAim()
+        {
+            Assert.Contains("bool cameraAimed = false;", VfxShaderSource.MeshVertex);
+            Assert.Contains("placementRight = meshRotateEuler(aside, uOrbitRotation);", VfxShaderSource.MeshVertex);
+            Assert.Contains("placementUp = meshRotateEuler(lift, uOrbitRotation);", VfxShaderSource.MeshVertex);
+            Assert.Contains("vec3 carried = cameraAimed ? local : scaled;", VfxShaderSource.MeshVertex);
+            Assert.Contains("vec3 carriedSurface = cameraAimed ? surface : scaledSurface;", VfxShaderSource.MeshVertex);
+            Assert.Contains("p = placementRight * carried.x", VfxShaderSource.MeshVertex);
         }
 
         [Fact]

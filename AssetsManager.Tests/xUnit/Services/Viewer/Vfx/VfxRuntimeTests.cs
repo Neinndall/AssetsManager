@@ -637,7 +637,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void StaticTrailDoesNotRenderDegenerateParticleQuads()
+        public void TrailWithoutDefinitionProducesNoGeometryWhenBuiltDirectly()
         {
             var emitter = CreateEmitter(new Vector3(20f, 150f, 2f), VfxEmitterRenderState.Default) with
             {
@@ -725,7 +725,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             VfxPlaybackRuntime.EmitterState state = Assert.Single(simulator.Emitters);
             Assert.Equal(2, state.Particles.Count);
-            Assert.Equal(0, new VfxTrailGeometry().Build(state, Vector3.UnitZ));
+            // Riot keeps the segment even when both samples land at the same position; the
+            // submitted triangles are degenerate but still carry the two points' attributes.
+            Assert.Equal(6, new VfxTrailGeometry().Build(state, Vector3.UnitZ));
         }
 
         [Fact]
@@ -2596,6 +2598,37 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void CameraTrailUsesTheCamerasForwardDirectionLikeLtk()
+        {
+            Assert.Equal(-Vector3.UnitZ, VfxOpenGlRenderer.ResolveCameraForward(Vector3.UnitX, Vector3.UnitY));
+            Assert.Equal(-Vector3.UnitZ, VfxOpenGlRenderer.ResolveCameraForward(Vector3.Zero, Vector3.Zero));
+        }
+
+        [Fact]
+        public void DegenerateCameraTrailSideUsesTheLeastAlignedWorldAxisLikeLtk()
+        {
+            Assert.Equal(-Vector3.UnitZ, VfxTrailGeometry.SideOf(Vector3.UnitY));
+            Assert.Equal(Vector3.UnitY, VfxTrailGeometry.SideOf(Vector3.UnitZ));
+        }
+
+        [Fact]
+        public void LegacySimpleBillboardIgnoresDirectionOrientedFlagLikeLtk()
+        {
+            VfxEmitterDefinition directed = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+                IsDirectionOriented = true
+            };
+            Assert.True(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(directed));
+            Assert.False(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(
+                directed with { IsSimpleEmitter = true }));
+            Assert.False(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(
+                directed with { AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasLegacySimple: true) }));
+            Assert.False(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(
+                directed with { PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad }));
+        }
+
+        [Fact]
         public void TrailDrawBudgetMatchesLtkFourLongestSourcesPerDefinition()
         {
             VfxEmitterDefinition trail = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -2615,6 +2648,29 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             Assert.Equal(4096, used);
             Assert.Equal(0, VfxOpenGlRenderer.ResolveEmitterDrawCount(trail, used, 5000));
+        }
+
+        [Fact]
+        public void TrailSharedBufferSkipsAWholeSourceThatDoesNotFit()
+        {
+            VfxEmitterDefinition trail = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.CameraTrail,
+                IsMeshPrimitive = false,
+                Trail = new VfxTrailDefinition(VfxCurve3.Const(Vector3.Zero), 0, 0, 0, 0f)
+            };
+
+            int used = 0;
+            used += VfxOpenGlRenderer.ResolveEmitterDrawCount(trail, used, 1024);
+            used += VfxOpenGlRenderer.ResolveEmitterDrawCount(trail, used, 1000);
+            used += VfxOpenGlRenderer.ResolveEmitterDrawCount(trail, used, 1000);
+            used += VfxOpenGlRenderer.ResolveEmitterDrawCount(trail, used, 1000);
+            Assert.Equal(4024, used);
+
+            // Only 72 points remain. Riot skips this 100-point strand rather than clipping it.
+            Assert.Equal(0, VfxOpenGlRenderer.ResolveEmitterDrawCount(trail, used, 100));
+            // Because the failed strand consumed no capacity, a later 50-point strand still fits.
+            Assert.Equal(50, VfxOpenGlRenderer.ResolveEmitterDrawCount(trail, used, 50));
         }
 
         [Fact]
@@ -4381,6 +4437,93 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(geometry.Vertices[2], geometry.Vertices[stride + 2]);
             Assert.Equal(geometry.Vertices[3], geometry.Vertices[stride + 3]);
             Assert.Equal(geometry.Vertices[4], geometry.Vertices[stride + 4]);
+        }
+
+        [Fact]
+        public void TinyNonZeroArbitraryBeamKeepsItsDirectionLikeLtk()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.Beam,
+                Beam = new VfxBeamDefinition(
+                    1,
+                    0,
+                    0,
+                    VfxCurve3.Const(Vector3.One),
+                    VfxCurve4.Const(Vector4.One),
+                    false,
+                    Vector3.Zero,
+                    Vector3.Zero)
+            };
+            var state = BeamState(emitter, Vector3.Zero, new Vector3(1e-12f, 0f, 0f), Vector3.Zero);
+
+            var geometry = new VfxBeamGeometry();
+            Assert.Equal(6, geometry.Build(state, Vector3.UnitY));
+            int stride = VfxBeamGeometry.VertexStride;
+            Assert.True(MathF.Abs(geometry.Vertices[4] - geometry.Vertices[stride + 4]) > 1.9f);
+        }
+
+        [Fact]
+        public void ArbitraryBeamMeasuresParticleLocalPositionFromSystemOriginNotSourceOffset()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.Beam,
+                Beam = new VfxBeamDefinition(
+                    1,
+                    0,
+                    0,
+                    VfxCurve3.Const(Vector3.One),
+                    VfxCurve4.Const(Vector4.One),
+                    false,
+                    new Vector3(10f, 0f, 0f),
+                    Vector3.Zero)
+            };
+            // source=+10X and target=+20X make the arbitrary side +Z. The particle is -Z
+            // from the system origin, so Riot cancels that side exactly; SourceOffset does not
+            // participate in the particle-local term.
+            var state = BeamState(emitter, Vector3.Zero, new Vector3(20f, 0f, 0f), -Vector3.UnitZ);
+
+            var geometry = new VfxBeamGeometry();
+            Assert.Equal(6, geometry.Build(state, new Vector3(0f, 3f, 3f)));
+            int stride = VfxBeamGeometry.VertexStride;
+            Assert.Equal(geometry.Vertices[2], geometry.Vertices[stride + 2]);
+            Assert.Equal(geometry.Vertices[3], geometry.Vertices[stride + 3]);
+            Assert.Equal(geometry.Vertices[4], geometry.Vertices[stride + 4]);
+        }
+
+        [Fact]
+        public void ArbitraryBeamCarriesTheParticlesBirthFrameIntoItsWidth()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.Beam,
+                Beam = new VfxBeamDefinition(
+                    1,
+                    0,
+                    0,
+                    VfxCurve3.Const(Vector3.One),
+                    VfxCurve4.Const(Vector4.One),
+                    false,
+                    Vector3.Zero,
+                    Vector3.Zero)
+            };
+            var state = BeamState(emitter, Vector3.Zero, new Vector3(2f, 0f, 0f), Vector3.Zero);
+            VfxPlaybackRuntime.Particle particle = state.Particles[0];
+            particle.BirthFrame = Matrix4x4.CreateRotationY(MathF.PI * 0.5f);
+            particle.Life = 1f;
+            state.Particles[0] = particle;
+
+            var geometry = new VfxBeamGeometry();
+            Assert.Equal(6, geometry.Build(state, new Vector3(0f, 3f, 3f)));
+            int stride = VfxBeamGeometry.VertexStride;
+            float xSpan = MathF.Abs(geometry.Vertices[2] - geometry.Vertices[stride + 2]);
+            float zSpan = MathF.Abs(geometry.Vertices[4] - geometry.Vertices[stride + 4]);
+            Assert.True(xSpan > 1.9f);
+            Assert.InRange(zSpan, 0f, 0.0001f);
         }
 
         private static VfxPlaybackRuntime.EmitterState BeamState(

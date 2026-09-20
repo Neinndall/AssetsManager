@@ -492,6 +492,29 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     0f, 0f, 0f, 1f);
             }
 
+            return StandingBasis(particle, emitter, orbitalTurn, legacyRoll);
+        }
+
+        /// <summary>
+        /// The particle's own standing frame for geometry paths that deliberately ignore
+        /// isDirectionOriented (arbitrary trails and arbitrary beams). It keeps the birth/current
+        /// orientation choice, the particle's authored turn, and its orbital turn together.
+        /// </summary>
+        internal static Matrix4x4 ResolveStandingBasisForRender(EmitterState emitter, in Particle particle)
+        {
+            ArgumentNullException.ThrowIfNull(emitter);
+            float particleT = ParticleAge01(particle.Age, particle.Life);
+            float legacyRoll = emitter.Def.LegacyRotation?.Sample(particleT) * (MathF.PI / 180f) ?? 0f;
+            Matrix4x4 orbitalTurn = OrbitalTurn(particle.BirthOrbitalVelocity * particle.Age);
+            return StandingBasis(particle, emitter, orbitalTurn, legacyRoll);
+        }
+
+        private static Matrix4x4 StandingBasis(
+            in Particle particle,
+            EmitterState emitter,
+            Matrix4x4 orbitalTurn,
+            float legacyRoll)
+        {
             Vector3 rotation = particle.BirthRotation;
             Matrix4x4 standing =
                 Matrix4x4.CreateRotationZ(rotation.Z + legacyRoll) *
@@ -1298,6 +1321,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 bool canDirectionStretch =
                     d.IsDirectionOriented &&
                     d.PrimitiveKind != VfxPrimitiveKind.Ray &&
+                    !d.IsSimpleEmitter &&
                     d.AuthoredFeatures?.HasLegacySimple != true &&
                     (d.DrawsAsQuad || d.PrimitiveKind == VfxPrimitiveKind.Mesh) &&
                     direction.LengthSquared() > 0f;

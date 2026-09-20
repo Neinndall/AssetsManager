@@ -18,15 +18,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal int Build(VfxPlaybackRuntime.EmitterState state, Vector3 viewDirection, int maxPoints = TrailPointsPerSource)
         {
+            VfxTrailDefinition trail = state.Def.Trail;
+            if (trail is null) return 0;
             int count = Math.Min(ResolvePointCount(state.InstanceCount), Math.Max(0, maxPoints));
             if (count < 2) return 0;
             int needed = count * 2 * VertexStride;
             if (_points.Length < needed) _points = new float[needed];
             needed = (count - 1) * 6 * VertexStride;
             if (Vertices.Length < needed) Vertices = new float[needed];
-            var trail = state.Def.Trail;
-            bool smoothed = trail?.SmoothingMode > 0;
-            int step = trail?.SmoothingMode == 2 ? 1 : -1;
+            bool smoothed = trail.SmoothingMode > 0;
+            int step = trail.SmoothingMode == 2 ? 1 : -1;
             int start = step == 1 ? 0 : count - 1;
             float walked = 0f, uvBase = 0f;
             int held = 0, vertices = 0;
@@ -44,25 +45,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 Vector3 across;
                 if (state.Def.PrimitiveKind == VfxPrimitiveKind.ArbitraryTrail)
                 {
-                    int rotation = at * VfxPlaybackRuntime.InstanceStride + 15;
-                    var r = new Vector3(state.Instances[rotation], state.Instances[rotation + 1], state.Instances[rotation + 2]);
-                    var local = Vector3.TransformNormal(Vector3.UnitX,
-                        Matrix4x4.CreateRotationZ(r.Z) * Matrix4x4.CreateRotationX(r.X) * Matrix4x4.CreateRotationY(r.Y));
-                    across = state.PlacementRight * local.X + state.PlacementUp * local.Y + state.PlacementForward * local.Z;
+                    Matrix4x4 standing = VfxPlaybackRuntime.ResolveStandingBasisForRender(state, state.Particles[at]);
+                    across = Vector3.TransformNormal(Vector3.UnitX, standing);
                 }
                 else
                 {
                     across = Vector3.Cross(viewDirection, tangent);
-                    if (across.LengthSquared() <= 1e-10f)
-                    {
-                        across = seen > 0 ? lastAcross : Vector3.Cross(viewDirection, Vector3.UnitY);
-                        if (across.LengthSquared() <= 1e-10f) across = Vector3.UnitX;
-                    }
+                    if (across.LengthSquared() == 0f)
+                        across = seen > 0 ? lastAcross : SideOf(viewDirection);
+                    else
+                        across = Vector3.Normalize(across);
                 }
-                across = Vector3.Normalize(across);
                 Vector3 rawAcross = across;
-                if (smoothed && seen > 0 && (across + lastAcross).LengthSquared() > 1e-10f)
-                    across = Vector3.Normalize(across + lastAcross);
+                if (smoothed && seen > 0)
+                {
+                    Vector3 miter = across + lastAcross;
+                    across = miter.LengthSquared() > 0f ? Vector3.Normalize(miter) : rawAcross;
+                }
                 int source = at * VfxPlaybackRuntime.InstanceStride;
                 float halfWidth = state.Instances[source + 3];
                 var particle = state.Particles[at];
@@ -73,8 +72,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 float span = tilingV > 0f ? halfWidth / tilingV : tilingV == 0f ? 1f : -tilingV;
                 WritePoint(state, source, held * 2, point + across * halfWidth, u, 0.5f - span * 0.5f);
                 WritePoint(state, source, held * 2 + 1, point - across * halfWidth, u, 0.5f + span * 0.5f);
-                if (held > 0 && Vector3.DistanceSquared(last, point) > 1e-10f)
+                if (held > 0)
                 {
+                    // Riot still submits the two triangles when consecutive trail points land on
+                    // the same place. They are degenerate geometry, but keeping them preserves the
+                    // strand's vertex/attribute sequence exactly.
                     int v = held * 2;
                     Copy(v, ref vertices); Copy(v - 1, ref vertices); Copy(v - 2, ref vertices);
                     Copy(v, ref vertices); Copy(v + 1, ref vertices); Copy(v - 1, ref vertices);
@@ -97,6 +99,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 sum += new Vector3(state.Instances[offset], state.Instances[offset + 1], state.Instances[offset + 2]);
             }
             return sum / (last - first + 1);
+        }
+
+        internal static Vector3 SideOf(Vector3 view)
+        {
+            float x = MathF.Abs(view.X);
+            float y = MathF.Abs(view.Y);
+            float z = MathF.Abs(view.Z);
+            Vector3 axis = x <= y && x <= z
+                ? Vector3.UnitX
+                : y <= z ? Vector3.UnitY : Vector3.UnitZ;
+            Vector3 side = Vector3.Cross(view, axis);
+            return side.LengthSquared() > 0f ? Vector3.Normalize(side) : axis;
         }
 
         private void WritePoint(VfxPlaybackRuntime.EmitterState state, int source, int vertex, Vector3 position, float u, float v)

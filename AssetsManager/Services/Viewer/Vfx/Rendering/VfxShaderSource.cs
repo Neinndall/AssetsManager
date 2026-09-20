@@ -23,6 +23,7 @@ uniform int uMeshSkinned;
 uniform int uAttachedMesh;
 uniform int uUseOwnerSkinning;
 uniform int uIsGroundLayer;
+uniform vec3 uOrbitRotation;
 const int MAX_BONES = 512;
 layout(std140) uniform VfxBoneTransforms {
     mat4 uBoneTransforms[MAX_BONES];
@@ -65,6 +66,15 @@ out vec3 vColorDynamics;
 out vec3 vRim;
 out vec4 vReflect;
 
+vec3 meshRotateEuler(vec3 p, vec3 r){
+    float sz = sin(r.z); float cz = cos(r.z);
+    p = vec3(p.x * cz - p.y * sz, p.x * sz + p.y * cz, p.z);
+    float sx = sin(r.x); float cx = cos(r.x);
+    p = vec3(p.x, p.y * cx - p.z * sx, p.y * sx + p.z * cx);
+    float sy = sin(r.y); float cy = cos(r.y);
+    return vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
+}
+
 void main(){
     vec3 sourcePosition = aPos;
     vec3 sourceNormal = aNormal;
@@ -80,41 +90,36 @@ void main(){
     }
 
     vec3 scaled = sourcePosition * uScale;
-    float sz = sin(uRotation.z); float cz = cos(uRotation.z);
-    vec3 local = vec3(scaled.x * cz - scaled.y * sz, scaled.x * sz + scaled.y * cz, scaled.z);
-    float sx = sin(uRotation.x); float cx = cos(uRotation.x);
-    local = vec3(local.x, local.y * cx - local.z * sx, local.y * sx + local.z * cx);
-    float sy = sin(uRotation.y); float cy = cos(uRotation.y);
-    local = vec3(local.x * cy + local.z * sy, local.y, -local.x * sy + local.z * cy);
+    vec3 scaledSurface = sourceNormal * uScale;
+    vec3 local = meshRotateEuler(scaled, uRotation);
+    vec3 surface = meshRotateEuler(scaledSurface, uRotation);
 
-    // LTK applies the same instance matrix to the authored surface normal as it does to
-    // the mesh vertex before evaluating rim/reflection facing.
-    vec3 surface = sourceNormal * uScale;
-    surface = vec3(surface.x * cz - surface.y * sz, surface.x * sz + surface.y * cz, surface.z);
-    surface = vec3(surface.x, surface.y * cx - surface.z * sx, surface.y * sx + surface.z * cx);
-    surface = vec3(surface.x * cy + surface.z * sy, surface.y, -surface.x * sy + surface.z * cy);
-
+    // The default carrier is the particle's complete standing basis (birth/current frame,
+    // authored turn and orbital turn), supplied per instance. Camera alignment replaces only
+    // that carrier; if its look-at degenerates, the particle basis remains in charge.
     vec3 placementRight = uPlacementRight;
     vec3 placementUp = uPlacementUp;
     vec3 placementForward = uPlacementForward;
+    bool cameraAimed = false;
     if (uAlignPitchToCamera != 0 || uAlignYawToCamera != 0) {
         vec3 facing = vec3(
             uAlignYawToCamera != 0 ? uCamPos.x - uWorldPos.x : 0.0,
             uAlignPitchToCamera != 0 ? uCamPos.y - uWorldPos.y : 0.0,
             uCamPos.z - uWorldPos.z);
-        if (dot(facing, facing) > 0.000001) {
+        if (dot(facing, facing) > 0.0) {
             facing = normalize(facing);
             vec3 aside = cross(uCamUp, facing);
-            if (dot(aside, aside) > 0.000001) {
+            if (dot(aside, aside) > 0.0) {
                 aside = normalize(aside);
                 vec3 lift = cross(facing, aside);
                 if (uMeshSkinned == 0) {
                     aside = -aside;
                     facing = -facing;
                 }
-                placementRight = aside;
-                placementUp = lift;
-                placementForward = facing;
+                placementRight = meshRotateEuler(aside, uOrbitRotation);
+                placementUp = meshRotateEuler(lift, uOrbitRotation);
+                placementForward = meshRotateEuler(facing, uOrbitRotation);
+                cameraAimed = true;
             }
         }
     }
@@ -125,10 +130,12 @@ void main(){
         // LTK's AttachedMesh is the owner's DetachedBindMode skin at the scene origin.
         // A particle contributes scale/tint/UV/erosion, not its translation or rotation.
         p = scaled;
-        worldSurface = sourceNormal * uScale;
+        worldSurface = scaledSurface;
     } else {
-        p = placementRight * local.x + placementUp * local.y + placementForward * local.z + uWorldPos;
-        worldSurface = placementRight * surface.x + placementUp * surface.y + placementForward * surface.z;
+        vec3 carried = cameraAimed ? local : scaled;
+        vec3 carriedSurface = cameraAimed ? surface : scaledSurface;
+        p = placementRight * carried.x + placementUp * carried.y + placementForward * carried.z + uWorldPos;
+        worldSurface = placementRight * carriedSurface.x + placementUp * carriedSurface.y + placementForward * carriedSurface.z;
     }
     if (uIsGroundLayer != 0) p.y = 0.0;
 
@@ -267,12 +274,11 @@ void main(){
 
     if (rayPrimitive) {
         // Rays lie on the particle's own +Z and roll about that axis just enough to face
-        // the eye. The basis is computed per particle on the CPU, as in LTK.
+        // the eye. If the eye lies on the ray axis, Riot falls back to the particle's own
+        // +X instead of inventing a camera-axis side.
         up = placedForward;
         vec3 side = cross(up, uCamPos - aCenter);
-        if (dot(side, side) < 0.0001) side = cross(up, uCamUp);
-        if (dot(side, side) < 0.0001) side = cross(up, uCamRight);
-        right = -normalize(side);
+        right = dot(side, side) > 0.0 ? -normalize(side) : placedRight;
     } else if (uDirectionOriented != 0) {
         // LTK projects the particle basis' +Y (travel direction) into camera space for
         // billboards, while arbitrary quads use the world-space basis directly.
@@ -282,7 +288,7 @@ void main(){
         } else {
             vec2 projectedUp = vec2(dot(placedUp, uCamRight), dot(placedUp, uCamUp));
             float projectedLen = dot(projectedUp, projectedUp);
-            if (projectedLen > 0.000001) {
+            if (projectedLen > 0.0) {
                 projectedUp *= inversesqrt(projectedLen);
                 right = uCamRight * projectedUp.y - uCamUp * projectedUp.x;
                 up = uCamRight * projectedUp.x + uCamUp * projectedUp.y;

@@ -459,7 +459,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform1(_uFlipUMult, es.Def.TextureMultFlipU ? 1 : 0);
                 _gl.Uniform1(_uFlipVMult, es.Def.TextureMultFlipV ? 1 : 0);
                 _gl.Uniform1(_uClampUvMult, es.Def.TextureMultClampUvScroll ? 1 : 0);
-                bool directional = es.Def.IsDirectionOriented || es.Def.PrimitiveKind == VfxPrimitiveKind.Ray;
+                bool directional = ShouldDirectionOrientBillboard(es.Def);
                 bool arbitrary = es.Def.IsArbitraryQuad ||
                     es.Def.PrimitiveKind == VfxPrimitiveKind.ArbitraryTrail;
                 _gl.Uniform1(_uDirectionOriented, directional ? 1 : 0);
@@ -602,7 +602,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     int vertices = _trailGeometry.Build(
                         es,
-                        Vector3.Normalize(Vector3.Cross(camRight, camUp)),
+                        ResolveCameraForward(camRight, camUp),
                         renderInstanceCount);
                     if (vertices > 0)
                     {
@@ -839,7 +839,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private uint _meshProgram;
         private uint _meshBoneBuffer;
         private int _ownerSkinningCount;
-        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muCamPos, _muCamUp, _muAlignPitchToCamera, _muAlignYawToCamera, _muMeshSkinned, _muUseOwnerSkinning, _muIsGroundLayer, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
+        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muCamPos, _muCamUp, _muAlignPitchToCamera, _muAlignYawToCamera, _muMeshSkinned, _muUseOwnerSkinning, _muIsGroundLayer, _muOrbitRotation, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
         private int _muIsDistortion, _muDistortionTex, _muSceneTex, _muDistortionStrength;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
@@ -871,6 +871,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muMeshSkinned = _gl.GetUniformLocation(_meshProgram, "uMeshSkinned");
                 _muUseOwnerSkinning = _gl.GetUniformLocation(_meshProgram, "uUseOwnerSkinning");
                 _muIsGroundLayer = _gl.GetUniformLocation(_meshProgram, "uIsGroundLayer");
+                _muOrbitRotation = _gl.GetUniformLocation(_meshProgram, "uOrbitRotation");
                 _muColor = _gl.GetUniformLocation(_meshProgram, "uColor");
                 _muTex = _gl.GetUniformLocation(_meshProgram, "uTex");
                 _muHasTex = _gl.GetUniformLocation(_meshProgram, "uHasTex");
@@ -1093,9 +1094,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_muErosionFeatherIn, meshErosion?.FeatherIn ?? 0f);
             _gl.Uniform1(_muErosionFeatherOut, meshErosion?.FeatherOut ?? 0f);
             _gl.Uniform1(_muErosionSliceWidth, meshErosion?.SliceWidth ?? 1.5f);
-            _gl.Uniform3(_muPlacementRight, es.PlacementRight.X, es.PlacementRight.Y, es.PlacementRight.Z);
-            _gl.Uniform3(_muPlacementUp, es.PlacementUp.X, es.PlacementUp.Y, es.PlacementUp.Z);
-            _gl.Uniform3(_muPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
             _gl.Uniform1(_muHasTex, ShouldSampleBaseTexture(es.Def, es.Texture) ? 1 : 0);
@@ -1250,6 +1248,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             {
                 int o = i * Stride;
                 _gl.Uniform3(_muWorldPos, instances[o], instances[o + 1], instances[o + 2]);
+                _gl.Uniform3(_muPlacementRight, instances[o + 36], instances[o + 37], instances[o + 38]);
+                _gl.Uniform3(_muPlacementUp, instances[o + 39], instances[o + 40], instances[o + 41]);
+                _gl.Uniform3(_muPlacementForward, instances[o + 42], instances[o + 43], instances[o + 44]);
+                Vector3 orbitRotation = i < es.Particles.Count
+                    ? es.Particles[i].BirthOrbitalVelocity * es.Particles[i].Age
+                    : Vector3.Zero;
+                _gl.Uniform3(_muOrbitRotation, orbitRotation.X, orbitRotation.Y, orbitRotation.Z);
                 float ownerScale = attachedMesh && float.IsFinite(es.MeshOwnerScale) && es.MeshOwnerScale > 0f
                     ? es.MeshOwnerScale
                     : 1f;
@@ -1318,6 +1323,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.BindVertexArray(_vao);
         }
 
+        internal static Vector3 ResolveCameraForward(Vector3 cameraRight, Vector3 cameraUp)
+        {
+            Vector3 forward = Vector3.Cross(cameraUp, cameraRight);
+            return forward.LengthSquared() > 0f ? Vector3.Normalize(forward) : -Vector3.UnitZ;
+        }
+
+        internal static bool ShouldDirectionOrientBillboard(VfxEmitterDefinition definition)
+        {
+            if (definition is null || !definition.IsDirectionOriented) return false;
+            if (definition.AuthoredFeatures?.HasLegacySimple == true || definition.IsSimpleEmitter) return false;
+            return definition.PrimitiveKind is VfxPrimitiveKind.CameraQuad or VfxPrimitiveKind.CameraUnitQuad;
+        }
+
         internal static int ResolveEmitterDrawCount(
             VfxEmitterDefinition definition,
             int alreadyUsed,
@@ -1330,7 +1348,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             {
                 if (used >= VfxTrailGeometry.TrailPointsPerEmitter) return 0;
                 int perSource = VfxTrailGeometry.ResolvePointCount(instanceCount);
-                return Math.Min(perSource, VfxTrailGeometry.TrailPointsPerEmitter - used);
+                int remaining = VfxTrailGeometry.TrailPointsPerEmitter - used;
+                // ribbon.writeTrail rejects a whole strand when its vertices do not fit. It
+                // never truncates that source merely to consume the tail of the shared buffer;
+                // a later, smaller source may still fit into the same remaining capacity.
+                return perSource <= remaining ? perSource : 0;
             }
 
             int limit = definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh
