@@ -171,7 +171,112 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             Assert.Equal(
                 "belveth_skin29_pixies_autumn_tx_cm",
-                resolution.ResolveMaterialDefinition("autumnpixie").BaseTextureName);
+                resolution.ResolveMaterialDefinition("autumn_pixie").BaseTextureName);
+        }
+
+        [Fact]
+        public void Resolve_DoesNotCollapseDistinctSubmeshNames()
+        {
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Base_TX_CM.tex",
+                CreateOverride(
+                    "R_Wing",
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/R_Wing_TX_CM.tex")),
+                materialOverride2: CreateOverride(
+                    "RWing",
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/RWing_TX_CM.tex")));
+
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(
+                tree,
+                new[] { "base_tx_cm", "r_wing_tx_cm", "rwing_tx_cm" },
+                ResolveTestTexturePath);
+
+            Assert.Equal("r_wing_tx_cm", resolution.ResolveMaterialDefinition("r_wing").BaseTextureName);
+            Assert.Equal("rwing_tx_cm", resolution.ResolveMaterialDefinition("RWING").BaseTextureName);
+        }
+
+        [Fact]
+        public void Resolve_AllowsEmptySubmeshOverrideForUnnamedLegacyRange()
+        {
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Base_TX_CM.tex",
+                CreateOverride(
+                    string.Empty,
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Unnamed_TX_CM.tex")));
+
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(
+                tree,
+                new[] { "base_tx_cm", "unnamed_tx_cm" },
+                ResolveTestTexturePath);
+
+            Assert.Equal("unnamed_tx_cm", resolution.ResolveMaterialDefinition(string.Empty).BaseTextureName);
+        }
+
+        [Fact]
+        public void Resolve_DuplicateOverridesUseLastAvailableTexture()
+        {
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Base_TX_CM.tex",
+                CreateOverride(
+                    "Wing",
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Wing_First_TX_CM.tex")),
+                materialOverride2: CreateOverride(
+                    "WING",
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Wing_Last_TX_CM.tex")));
+
+            SknMaterialTextureResolution bothAvailable = SknResolver.Resolve(
+                tree,
+                new[] { "base_tx_cm", "wing_first_tx_cm", "wing_last_tx_cm" },
+                ResolveTestTexturePath);
+            SknMaterialTextureResolution lastMissing = SknResolver.Resolve(
+                tree,
+                new[] { "base_tx_cm", "wing_first_tx_cm" },
+                ResolveTestTexturePath);
+
+            Assert.Equal("wing_last_tx_cm", bothAvailable.ResolveMaterialDefinition("wing").BaseTextureName);
+            Assert.Equal("wing_first_tx_cm", lastMissing.ResolveMaterialDefinition("wing").BaseTextureName);
+        }
+
+        [Fact]
+        public void Resolve_DuplicateOverridesKeepFirstOverridesMaterialChoice()
+        {
+            const string laterMaterialPath = "Characters/Test/Skins/Skin1/Materials/Later";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Base_TX_CM.tex",
+                CreateOverride(
+                    "Wing",
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Wing_TX_CM.tex")),
+                materialOverride2: CreateOverride(
+                    "wing",
+                    new BinTreeObjectLink(
+                        Fnv1a.HashLower("Material"),
+                        Fnv1a.HashLower(laterMaterialPath))));
+            tree.Objects[Fnv1a.HashLower(laterMaterialPath)] = CreateMaterial(
+                laterMaterialPath,
+                CreateSampler(
+                    "Diffuse_Texture",
+                    "ASSETS/Characters/Test/Skins/Skin1/Later_TX_CM.tex"));
+
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(
+                tree,
+                new[] { "base_tx_cm", "wing_tx_cm", "later_tx_cm" },
+                ResolveTestTexturePath);
+
+            ModelMaterialDefinition wing = resolution.ResolveMaterialDefinition("WING");
+            Assert.Equal(ModelMaterialBindingKind.TextureOnly, wing.BindingKind);
+            Assert.Equal("wing_tx_cm", wing.BaseTextureName);
         }
 
         [Fact]
@@ -223,7 +328,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             SknMaterialTextureMetadata metadata =
                 SknMaterialTextureResolver.ReadMetadata(new[] { primaryTree, dependencyTree });
 
-            Assert.Contains("wfins", metadata.OverrideMaterials.Keys);
+            Assert.Contains("W_Fins", metadata.OverrideMaterials.Keys);
             Assert.Contains(
                 materialTexturePath,
                 metadata.ReferencedTexturePaths,
@@ -565,9 +670,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "pyke_skin45_tx_cm" });
 
-            Assert.Contains("wfins", resolution.MaterialDefinitions.Keys);
-            Assert.Equal(ModelMaterialBindingKind.Missing, resolution.ResolveMaterialDefinition("wfins").BindingKind);
-            Assert.Null(resolution.ResolveMaterialDefinition("wfins").BaseTextureName);
+            Assert.Contains("W_Fins", resolution.MaterialDefinitions.Keys);
+            Assert.Equal(ModelMaterialBindingKind.Missing, resolution.ResolveMaterialDefinition("w_fins").BindingKind);
+            Assert.Null(resolution.ResolveMaterialDefinition("W_FINS").BaseTextureName);
         }
 
         [Fact]
@@ -891,6 +996,61 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal("test_accessory_tx_cm", definition.BaseTextureName);
             Assert.Equal(ModelMaterialBlendMode.Opaque, definition.RenderState.Blending);
             Assert.Equal("test_tx_cm", resolution.ResolveMaterialDefinition("body").BaseTextureName);
+        }
+
+        [Fact]
+        public void Resolve_TextureOnlyOverrideDoesNotInheritSkinMaterial()
+        {
+            const string defaultMaterialPath = "Characters/Test/Skins/Skin1/Materials/Body";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Base_TX_CM.tex",
+                CreateOverride(
+                    "Cape",
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Cape_TX_CM.tex")),
+                CreateMaterial(
+                    defaultMaterialPath,
+                    CreateSampler(
+                        "Diffuse_Texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Material_TX_CM.tex")),
+                defaultMaterialPath: defaultMaterialPath);
+
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(
+                tree,
+                new[] { "base_tx_cm", "cape_tx_cm", "material_tx_cm" },
+                ResolveTestTexturePath);
+
+            ModelMaterialDefinition cape = resolution.ResolveMaterialDefinition("cape");
+            Assert.Equal(ModelMaterialBindingKind.TextureOnly, cape.BindingKind);
+            Assert.Equal("cape_tx_cm", cape.BaseTextureName);
+            Assert.Equal("material_tx_cm", resolution.ResolveMaterialDefinition("body").BaseTextureName);
+        }
+
+        [Fact]
+        public void Resolve_MaterialOverrideUsesItsTextureAsOpaqueFallbackWhenItHasNoBase()
+        {
+            const string materialPath = "Characters/Test/Skins/Skin1/Materials/Cape";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Base_TX_CM.tex",
+                CreateOverride(
+                    "Cape",
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Cape_TX_CM.tex"),
+                    new BinTreeObjectLink(
+                        Fnv1a.HashLower("Material"),
+                        Fnv1a.HashLower(materialPath))),
+                CreateMaterial(materialPath));
+
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(
+                tree,
+                new[] { "base_tx_cm", "cape_tx_cm" },
+                ResolveTestTexturePath);
+
+            ModelMaterialDefinition cape = resolution.ResolveMaterialDefinition("CAPE");
+            Assert.Equal(ModelMaterialBindingKind.Authored, cape.BindingKind);
+            Assert.Equal("cape_tx_cm", cape.BaseTextureName);
         }
 
         [Fact]
@@ -1404,7 +1564,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 tree,
                 new[] { "pyke_skin45_z_material_colors_03", "pyke_skin45_z_material_flames_03" });
 
-            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("wfins").Effect;
+            ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("w_fins").Effect;
             Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, effect.Kind);
             Assert.Equal("pyke_skin45_z_material_flames_03", effect.AdditiveScroll.TextureName);
             Assert.Null(effect.AdditiveScroll.MaskTextureName);
@@ -1413,7 +1573,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
             Assert.Equal(
                 Fnv1a.HashLower("Shaders/SkinnedMesh/ScrollingMaskedDiffuseBloom"),
-                metadata.OverrideMaterials["wfins"].ShaderHash);
+                metadata.OverrideMaterials["W_Fins"].ShaderHash);
             AssertContainsPath(panningPath, metadata.ReferencedTexturePaths);
         }
 

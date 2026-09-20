@@ -1053,7 +1053,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 Path.GetFileNameWithoutExtension(mask.TexturePath));
             string scopedSubmesh = submeshes
                 .Where(candidate => !candidate.Equals(submesh, StringComparison.OrdinalIgnoreCase))
-                .FirstOrDefault(candidate => maskName.Contains(candidate + "mask", StringComparison.Ordinal));
+                .FirstOrDefault(candidate =>
+                {
+                    string token = SknMaterialTextureResolver.NormalizeToken(candidate);
+                    return token.Length > 0 && maskName.Contains(token + "mask", StringComparison.Ordinal);
+                });
             return scopedSubmesh == null || scopedSubmesh.Equals(submesh, StringComparison.OrdinalIgnoreCase);
         }
 

@@ -19,11 +19,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
         internal float SkinScale { get; init; } = 1f;
 
-        internal ModelMaterialDefinition ResolveMaterialDefinition(string normalizedSubmeshName)
+        internal ModelMaterialDefinition ResolveMaterialDefinition(string submeshName)
         {
-            if (!string.IsNullOrEmpty(normalizedSubmeshName) &&
-                MaterialDefinitions != null &&
-                MaterialDefinitions.TryGetValue(normalizedSubmeshName, out ModelMaterialDefinition material))
+            string key = SknMaterialTextureResolver.NormalizeMaterialKey(submeshName);
+            if (MaterialDefinitions != null &&
+                MaterialDefinitions.TryGetValue(key, out ModelMaterialDefinition material))
             {
                 return material;
             }
@@ -118,9 +118,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         internal IReadOnlyDictionary<string, string> DirectOverrideTexturePaths { get; init; } =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        internal IReadOnlyDictionary<string, IReadOnlyList<string>> OverrideTexturePathCandidates { get; init; } =
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
 
         internal IEnumerable<string> ReferencedTexturePaths =>
             DirectOverrideTexturePaths.Values
+                .Concat(OverrideTexturePathCandidates.Values.SelectMany(paths => paths))
                 .Concat(OverrideMaterials.Values
                     .SelectMany(material => material.Samplers
                         .Select(sampler => sampler.TexturePath)))
@@ -244,6 +247,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             var overrideMaterials = new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
             var overrideMaterialLinkKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var directOverrideTexturePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var overrideTexturePathCandidates = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             var seenOverrideSubmeshes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             IReadOnlyList<string> initialHiddenSubmeshes = Array.Empty<string>();
             bool readInitialHiddenSubmeshes = false;
@@ -331,24 +335,36 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 foreach (BinTreeProperty element in materialOverrides.Elements)
                 {
                     if (element is not BinTreeStruct entry ||
-                        !TryGetString(entry, Submesh, out string submeshName))
+                        !entry.Properties.TryGetValue(Submesh, out BinTreeProperty submeshProperty) ||
+                        submeshProperty is not BinTreeString submeshValue)
                     {
                         continue;
                     }
 
-                    string normalizedSubmesh = NormalizeMaterialKey(submeshName);
-                    if (string.IsNullOrEmpty(normalizedSubmesh))
-                        continue;
-
+                    string normalizedSubmesh = NormalizeMaterialKey(submeshValue.Value);
                     bool hasMaterialLink =
                         entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
                         linkProperty is BinTreeObjectLink;
                     bool hasDirectTexture =
                         TryGetTexturePath(entry, Texture, wadChunkPathResolver, out string directTexturePath);
 
-                    // resolve_skin drops empty overrides, while bindingOf uses the first remaining
-                    // override for a submesh. A later duplicate must not change that binding.
-                    if ((!hasMaterialLink && !hasDirectTexture) || !seenOverrideSubmeshes.Add(normalizedSubmesh))
+                    // Empty overrides are omitted. Duplicate submeshes stay in authored order:
+                    // bindingOf uses the first override's material, while textureAssets lets the
+                    // last texture that actually loads replace an earlier texture for that submesh.
+                    if (!hasMaterialLink && !hasDirectTexture)
+                        continue;
+
+                    if (hasDirectTexture)
+                    {
+                        if (!overrideTexturePathCandidates.TryGetValue(normalizedSubmesh, out List<string> candidates))
+                        {
+                            candidates = new List<string>();
+                            overrideTexturePathCandidates[normalizedSubmesh] = candidates;
+                        }
+                        candidates.Add(directTexturePath);
+                    }
+
+                    if (!seenOverrideSubmeshes.Add(normalizedSubmesh))
                         continue;
 
                     if (hasMaterialLink)
@@ -396,7 +412,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ShaderDefinitions = shaderDefinitions,
                 HasDefaultMaterialLink = hasDefaultMaterialLink,
                 OverrideMaterialLinkKeys = overrideMaterialLinkKeys,
-                DirectOverrideTexturePaths = directOverrideTexturePaths
+                DirectOverrideTexturePaths = directOverrideTexturePaths,
+                OverrideTexturePathCandidates = overrideTexturePathCandidates.ToDictionary(
+                    pair => pair.Key,
+                    pair => (IReadOnlyList<string>)pair.Value,
+                    StringComparer.OrdinalIgnoreCase)
             };
         }
 
@@ -410,15 +430,28 @@ namespace AssetsManager.Services.Viewer.Resolvers
             string skinTextureKey = MatchTextureKey(metadata.DefaultTexturePath, textureKeys);
 
             var directOverrideTextureKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach ((string submesh, string texturePath) in metadata.DirectOverrideTexturePaths)
+            IEnumerable<string> textureOverrideSubmeshes = metadata.DirectOverrideTexturePaths.Keys
+                .Concat(metadata.OverrideTexturePathCandidates.Keys)
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+            foreach (string submesh in textureOverrideSubmeshes)
             {
-                string textureKey = MatchTextureKey(texturePath, textureKeys);
+                IEnumerable<string> candidates = metadata.OverrideTexturePathCandidates.TryGetValue(
+                        submesh,
+                        out IReadOnlyList<string> authoredCandidates)
+                    ? authoredCandidates
+                    : metadata.DirectOverrideTexturePaths.TryGetValue(submesh, out string directTexturePath)
+                        ? new[] { directTexturePath }
+                        : Array.Empty<string>();
+                string textureKey = candidates
+                    .Select(path => MatchTextureKey(path, textureKeys))
+                    .LastOrDefault(key => key != null);
                 if (textureKey != null)
                     directOverrideTextureKeys[submesh] = textureKey;
             }
 
             IReadOnlySet<string> overrideSubmeshKeys = metadata.OverrideMaterialLinkKeys
                 .Concat(metadata.DirectOverrideTexturePaths.Keys)
+                .Concat(metadata.OverrideTexturePathCandidates.Keys)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             SknShaderDefinition defaultShader = ResolveShaderDefinition(metadata, metadata.DefaultMaterial);
@@ -1005,17 +1038,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .ToList();
         }
 
-        internal static string NormalizeMaterialKey(string materialName)
-        {
-            if (string.IsNullOrWhiteSpace(materialName))
-            {
-                return string.Empty;
-            }
-
-            string key = materialName.TrimEnd('\0').ToLowerInvariant();
-            key = Regex.Replace(key, @"_?skn$", string.Empty, RegexOptions.IgnoreCase);
-            return Regex.Replace(key, @"[^a-z0-9]", string.Empty);
-        }
+        internal static string NormalizeMaterialKey(string materialName) =>
+            materialName?.TrimEnd('\0') ?? string.Empty;
 
         internal static IReadOnlyDictionary<uint, SknShaderDefinition> ReadShaderDefinitions(
             BinTree shaderTree,
