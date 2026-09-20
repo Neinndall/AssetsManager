@@ -1214,6 +1214,103 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Theory]
+        [InlineData("FresnelMask")]
+        [InlineData("Fresnel_Mask")]
+        [InlineData("FresnelMask_Texture")]
+        public void Resolve_BlackDedicatedFresnelMaskDisablesTheLayer(string maskSamplerName)
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler(maskSamplerName, "ASSETS/Shared/Materials/black.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["FresnelIntensity"] = Vector4.One
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                Array.Empty<string>(),
+                new[] { "Body" });
+
+            Assert.Null(effect.Fresnel);
+            Assert.False((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
+        }
+
+        [Fact]
+        public void Resolve_FresnelMaskChannelFollowsSelectedSamplerWhenTextureIsShared()
+        {
+            const string packedPath = "ASSETS/Test/packed_mask.tex";
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("Mask_Texture_green", packedPath),
+                    new SknMaterialSampler("Mask_Texture_red", packedPath)
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["FresnelIntensity"] = Vector4.One
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "packed_mask" },
+                new[] { "Body" });
+
+            Assert.Equal("packed_mask", effect.Fresnel.MaskTextureName);
+            Assert.Equal(0, effect.Fresnel.MaskChannel);
+        }
+
+        [Fact]
+        public void Resolve_IridescenceMaskChannelFollowsSelectedSamplerWhenTextureIsShared()
+        {
+            const string packedPath = "ASSETS/Test/packed_mask.tex";
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("iridescentTex", "ASSETS/Test/iridescence.tex"),
+                    new SknMaterialSampler("Mask_Texture_green", packedPath),
+                    new SknMaterialSampler("Mask_Texture_red", packedPath)
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase));
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "iridescence", "packed_mask" },
+                new[] { "Body" });
+
+            Assert.Equal("packed_mask", effect.Iridescence.MaskTextureName);
+            Assert.Equal(0, effect.Iridescence.MaskChannel);
+        }
+
+        [Theory]
+        [InlineData("Iridescence_Mask")]
+        [InlineData("AdditiveScroll_Mask")]
+        public void Resolve_BlackDedicatedIridescenceMaskDisablesTheLayer(string maskSamplerName)
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("iridescentTex", "ASSETS/Test/iridescence.tex"),
+                    new SknMaterialSampler(maskSamplerName, "ASSETS/Shared/Materials/black.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase));
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "iridescence" },
+                new[] { "Body" });
+
+            Assert.Null(effect.Iridescence);
+            Assert.False((effect.Kind & ModelMaterialEffectKind.Iridescence) != 0);
+        }
+
+        [Theory]
         [InlineData("black", false)]
         [InlineData("white", true)]
         public void Resolve_HonorsAuthoredFresnelMaskSemantics(string maskName, bool expectFresnel)

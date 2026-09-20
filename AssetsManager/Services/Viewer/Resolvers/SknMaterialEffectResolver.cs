@@ -32,6 +32,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
             "Scroll_Texture_Mask",
             "Scroll_Mask"
         };
+        private static readonly string[] FresnelMaskSamplerNames =
+        {
+            "FresnelMask",
+            "Fresnel_Mask",
+            "FresnelMask_Texture"
+        };
         private static readonly string[] IridescenceMaskSamplerNames =
         {
             "Iridescence_Mask",
@@ -447,25 +453,35 @@ namespace AssetsManager.Services.Viewer.Resolvers
             if (strength <= Epsilon)
                 return effect;
 
-            string maskTexture = FindSamplerKey(
+            (string TextureKey, int Channel)? maskBinding = FindSamplerBinding(
                 material,
                 textureKeys,
-                "FresnelMask",
-                "Fresnel_Mask",
-                "FresnelMask_Texture") ?? FindMaterialMask(material, textureKeys);
+                0,
+                FresnelMaskSamplerNames) ?? FindSamplerBinding(
+                    material,
+                    textureKeys,
+                    0,
+                    MaterialMaskSamplerNames);
+            string maskTexture = maskBinding?.TextureKey;
             string inheritedMask = effect.AdditiveScroll?.MaskTextureName ??
                 effect.FlowMap?.MaskTextureName ??
                 effect.GradientPulse?.MaskTextureName;
-            if (inheritedMask == null && maskTexture == null && HasAuthoredBlackMaterialMask(material))
+            int inheritedMaskChannel = effect.AdditiveScroll?.MaskChannel ??
+                effect.FlowMap?.MaskChannel ??
+                effect.GradientPulse?.MaskChannel ??
+                0;
+            if (inheritedMask == null && maskTexture == null && HasAuthoredBlackFresnelMask(material))
                 return effect;
 
-            string noiseTexture = FindSamplerKey(
+            (string TextureKey, int Channel)? noiseBinding = FindSamplerBinding(
                 material,
                 textureKeys,
+                0,
                 "FresnelNoise",
                 "Fresnel_Noise",
                 "FresnelNoise_Texture",
                 "Fresnel_Noise_Texture");
+            string noiseTexture = noiseBinding?.TextureKey;
             Vector2 noiseTiling = Vector2.One;
             Vector2 noiseSpeed = Vector2.Zero;
             if (material.Parameters.TryGetValue("Fresnel_Noise_Tiling_Speed", out Vector4 noise))
@@ -498,8 +514,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     strength,
                     noiseTiling,
                     noiseSpeed,
-                    ResolveSamplerChannel(material, resolvedMask, 0),
-                    ResolveSamplerChannel(material, noiseTexture, 0))
+                    maskBinding?.Channel ?? inheritedMaskChannel,
+                    noiseBinding?.Channel ?? 0)
             };
         }
 
@@ -508,13 +524,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
             SknMaterialDefinition material,
             IReadOnlyList<string> textureKeys)
         {
-            string iridescenceTexture = FindSamplerKey(
+            (string TextureKey, int Channel)? iridescenceBinding = FindSamplerBinding(
                 material,
                 textureKeys,
+                0,
                 "iridescentTex",
                 "IridescentTex",
                 "Iridescent_Texture",
                 "IridescenceTex");
+            string iridescenceTexture = iridescenceBinding?.TextureKey;
             if (iridescenceTexture == null)
             {
                 return effect;
@@ -530,13 +548,19 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "ALPHA_BLEND_ON",
                 "USE_FRESNEL_ALPHA");
             // Generic Mask holds authored coverage when no dedicated iridescence mask exists.
-            string iridescenceMask = FindSamplerKey(
+            (string TextureKey, int Channel)? iridescenceMaskBinding = FindSamplerBinding(
                 material,
                 textureKeys,
-                IridescenceMaskSamplerNames) ?? FindMaterialMask(material, textureKeys);
+                0,
+                IridescenceMaskSamplerNames) ?? FindSamplerBinding(
+                    material,
+                    textureKeys,
+                    0,
+                    MaterialMaskSamplerNames);
+            string iridescenceMask = iridescenceMaskBinding?.TextureKey;
             if (iridescenceMask == null)
             {
-                if (HasAuthoredBlackMaterialMask(material))
+                if (HasAuthoredBlackIridescenceMask(material))
                 {
                     return effect;
                 }
@@ -567,7 +591,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         "DiffuseFadeMaskValue"),
                     usesPulse,
                     usesLocalizedAlpha,
-                    ResolveSamplerChannel(material, iridescenceMask, 0))
+                    iridescenceMaskBinding?.Channel ?? ResolveSamplerChannel(material, iridescenceMask, 0))
             };
         }
 
@@ -1025,11 +1049,29 @@ namespace AssetsManager.Services.Viewer.Resolvers
         }
 
         private static bool HasAuthoredBlackMaterialMask(SknMaterialDefinition material) =>
-            material.Samplers.Any(sampler =>
-                MaterialMaskSamplerNames.Any(name =>
-                    SknMaterialTextureResolver.NormalizeToken(name) ==
-                    SknMaterialTextureResolver.NormalizeToken(sampler.TextureName)) &&
+            HasAuthoredBlackMask(material, MaterialMaskSamplerNames);
+
+        private static bool HasAuthoredBlackFresnelMask(SknMaterialDefinition material) =>
+            HasAuthoredBlackMask(
+                material,
+                FresnelMaskSamplerNames.Concat(MaterialMaskSamplerNames));
+
+        private static bool HasAuthoredBlackIridescenceMask(SknMaterialDefinition material) =>
+            HasAuthoredBlackMask(
+                material,
+                IridescenceMaskSamplerNames.Concat(MaterialMaskSamplerNames));
+
+        private static bool HasAuthoredBlackMask(
+            SknMaterialDefinition material,
+            IEnumerable<string> samplerNames)
+        {
+            HashSet<string> names = samplerNames
+                .Select(SknMaterialTextureResolver.NormalizeToken)
+                .ToHashSet(StringComparer.Ordinal);
+            return material.Samplers.Any(sampler =>
+                names.Contains(SknMaterialTextureResolver.NormalizeToken(sampler.TextureName)) &&
                 SknMaterialTextureResolver.IsNeutralTexturePath(sampler.TexturePath));
+        }
 
         private static bool IsEffectMaskApplicable(
             IReadOnlyList<SknMaterialSampler> samplers,
@@ -1072,17 +1114,28 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static string FindSamplerKey(
             SknMaterialDefinition material,
             IReadOnlyList<string> textureKeys,
+            params string[] samplerNames) =>
+            FindSamplerBinding(material, textureKeys, 0, samplerNames)?.TextureKey;
+
+        private static (string TextureKey, int Channel)? FindSamplerBinding(
+            SknMaterialDefinition material,
+            IReadOnlyList<string> textureKeys,
+            int fallbackChannel,
             params string[] samplerNames)
         {
             foreach (string samplerName in samplerNames)
             {
                 string expected = SknMaterialTextureResolver.NormalizeToken(samplerName);
                 SknMaterialSampler sampler = material.FindSampler(expected);
-                if (sampler != null && !SknMaterialTextureResolver.IsNeutralTexturePath(sampler.TexturePath))
+                if (sampler == null || SknMaterialTextureResolver.IsNeutralTexturePath(sampler.TexturePath))
+                    continue;
+
+                string textureKey = SknMaterialTextureResolver.MatchTextureKey(sampler.TexturePath, textureKeys);
+                if (textureKey != null)
                 {
-                    string textureKey = SknMaterialTextureResolver.MatchTextureKey(sampler.TexturePath, textureKeys);
-                    if (textureKey != null)
-                        return textureKey;
+                    return (
+                        textureKey,
+                        ResolveSamplerChannel(sampler.TextureName, fallbackChannel));
                 }
             }
 
@@ -1105,31 +1158,37 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 if (!string.Equals(matched, textureKey, StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                string name = SknMaterialTextureResolver.NormalizeToken(sampler.TextureName);
-                if (name.Contains("green", StringComparison.Ordinal) ||
-                    (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("g", StringComparison.Ordinal)) ||
-                    name.Contains("distortiong", StringComparison.Ordinal))
-                {
-                    return 1;
-                }
-                if (name.Contains("blue", StringComparison.Ordinal) ||
-                    (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("b", StringComparison.Ordinal)))
-                {
-                    return 2;
-                }
-                if (name.Contains("alpha", StringComparison.Ordinal) ||
-                    (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("a", StringComparison.Ordinal)))
-                {
-                    return 3;
-                }
-                if (name.Contains("red", StringComparison.Ordinal) ||
-                    name.Contains("emissionr", StringComparison.Ordinal) ||
-                    (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("r", StringComparison.Ordinal)))
-                {
-                    return 0;
-                }
+                return ResolveSamplerChannel(sampler.TextureName, fallback);
             }
 
+            return fallback;
+        }
+
+        private static int ResolveSamplerChannel(string samplerName, int fallback)
+        {
+            string name = SknMaterialTextureResolver.NormalizeToken(samplerName);
+            if (name.Contains("green", StringComparison.Ordinal) ||
+                (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("g", StringComparison.Ordinal)) ||
+                name.Contains("distortiong", StringComparison.Ordinal))
+            {
+                return 1;
+            }
+            if (name.Contains("blue", StringComparison.Ordinal) ||
+                (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("b", StringComparison.Ordinal)))
+            {
+                return 2;
+            }
+            if (name.Contains("alpha", StringComparison.Ordinal) ||
+                (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("a", StringComparison.Ordinal)))
+            {
+                return 3;
+            }
+            if (name.Contains("red", StringComparison.Ordinal) ||
+                name.Contains("emissionr", StringComparison.Ordinal) ||
+                (name.Contains("mask", StringComparison.Ordinal) && name.EndsWith("r", StringComparison.Ordinal)))
+            {
+                return 0;
+            }
             return fallback;
         }
 
