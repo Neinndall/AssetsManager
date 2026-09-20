@@ -54,17 +54,27 @@ namespace AssetsManager.Views.Models.Viewer
 
             try
             {
-                var blendIndices = skin.VerticesView
-                    .GetAccessor(VertexElement.BLEND_INDEX.Name)
-                    .AsXyzwU8Array()
-                    .ToArray();
-                var blendWeights = skin.VerticesView
-                    .GetAccessor(VertexElement.BLEND_WEIGHT.Name)
-                    .AsVector4Array()
-                    .ToArray();
-
-                if (blendIndices.Length == 0 || blendIndices.Length != blendWeights.Length)
-                    return Fail(out failureReason, "Blend index and weight data is missing or mismatched.");
+                var blendIndices = skin.VerticesView.TryGetAccessor(
+                        VertexElement.BLEND_INDEX.Name,
+                        out VertexElementAccessor blendIndexAccessor)
+                    ? blendIndexAccessor.AsXyzwU8Array().ToArray()
+                    : null;
+                var blendWeights = skin.VerticesView.TryGetAccessor(
+                        VertexElement.BLEND_WEIGHT.Name,
+                        out VertexElementAccessor blendWeightAccessor)
+                    ? blendWeightAccessor.AsVector4Array().ToArray()
+                    : null;
+                int vertexCount = skin.VerticesView.VertexCount;
+                if ((blendIndices != null && blendIndices.Length != vertexCount) ||
+                    (blendWeights != null && blendWeights.Length != vertexCount))
+                {
+                    return Fail(out failureReason, "Blend index or weight data is mismatched.");
+                }
+                if (blendIndices == null || blendWeights == null)
+                {
+                    blendIndices = null;
+                    blendWeights = null;
+                }
 
                 var parts = new Dictionary<ModelPart, PartData>(modelParts.Count);
                 foreach (ModelPart part in modelParts)
@@ -85,20 +95,15 @@ namespace AssetsManager.Views.Models.Viewer
                     for (int localVertex = 0; localVertex < sourceVertexIndices.Length; localVertex++)
                     {
                         int sourceVertex = sourceVertexIndices[localVertex];
-                        if ((uint)sourceVertex >= (uint)blendIndices.Length)
+                        if ((uint)sourceVertex >= (uint)vertexCount)
                             return Fail(out failureReason, $"Submesh '{part.Name}' references an out-of-range source vertex.");
 
-                        var sourceIndices = blendIndices[sourceVertex];
-                        var sourceWeights = blendWeights[sourceVertex];
-                        float totalWeight = sourceWeights.X + sourceWeights.Y + sourceWeights.Z + sourceWeights.W;
-                        if (!float.IsFinite(sourceWeights.X) || !float.IsFinite(sourceWeights.Y) ||
-                            !float.IsFinite(sourceWeights.Z) || !float.IsFinite(sourceWeights.W) ||
-                            sourceWeights.X < 0f || sourceWeights.Y < 0f ||
-                            sourceWeights.Z < 0f || sourceWeights.W < 0f ||
-                            !float.IsFinite(totalWeight) || totalWeight <= 0f)
-                        {
-                            return Fail(out failureReason, $"Submesh '{part.Name}' contains invalid skin weights.");
-                        }
+                        var sourceIndices = blendIndices == null
+                            ? default
+                            : blendIndices[sourceVertex];
+                        var sourceWeights = blendWeights == null
+                            ? new System.Numerics.Vector4(1f, 0f, 0f, 0f)
+                            : blendWeights[sourceVertex];
 
                         int destination = localVertex * 4;
 
@@ -147,10 +152,7 @@ namespace AssetsManager.Views.Models.Viewer
             }
 
             if (influenceIndex >= skeleton.Influences.Count)
-            {
-                jointIndex = 0;
-                return false;
-            }
+                influenceIndex = 0;
 
             short resolvedJoint = skeleton.Influences[influenceIndex];
             if (resolvedJoint < 0 || resolvedJoint >= skeleton.Joints.Count || resolvedJoint >= MaxBones)

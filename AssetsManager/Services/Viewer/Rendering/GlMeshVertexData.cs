@@ -30,7 +30,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 throw new ArgumentException("Mesh positions must match the vertex buffer size.", nameof(mesh));
 
             Array.Clear(_normalAccumulator, 0, _normalAccumulator.Length);
-            AccumulateNormals(mesh);
+            if (mesh.Normals == null || mesh.Normals.Count != VertexCount)
+                AccumulateNormals(mesh);
             WriteVertices(mesh, updateTextureCoordinates);
         }
 
@@ -86,9 +87,18 @@ namespace AssetsManager.Services.Viewer.Rendering
                 Data[offset + 1] = (float)position.Y;
                 Data[offset + 2] = (float)position.Z;
 
-                Vector3 normal = _normalAccumulator[i].LengthSquared() > 0f
-                    ? Vector3.Normalize(_normalAccumulator[i])
-                    : Vector3.UnitY;
+                Vector3 normal;
+                if (mesh.Normals != null && mesh.Normals.Count == VertexCount)
+                {
+                    Vector3D authored = mesh.Normals[i];
+                    normal = new Vector3((float)authored.X, (float)authored.Y, (float)authored.Z);
+                }
+                else
+                {
+                    normal = _normalAccumulator[i].LengthSquared() > 0f
+                        ? Vector3.Normalize(_normalAccumulator[i])
+                        : Vector3.UnitY;
+                }
                 Data[offset + 3] = normal.X;
                 Data[offset + 4] = normal.Y;
                 Data[offset + 5] = normal.Z;

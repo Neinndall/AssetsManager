@@ -28,6 +28,7 @@ namespace AssetsManager.Services.Viewer.Loading
 {
     public class SknLoadingService
     {
+        private const int MaximumLinkedMaterialBins = 32;
         private readonly LogService _logService;
         private readonly HashResolverService _hashResolverService;
 
@@ -63,7 +64,11 @@ namespace AssetsManager.Services.Viewer.Loading
                     // Chroma folders contain the replacement color maps, while the exact skin BIN
                     // may reference shared/parent-skin effect maps. Load those dependencies as well;
                     // the dictionary keeps the chroma files authoritative when names collide.
-                    var materialTextures = LoadMaterialTextures(textureDirectoryPath, loadedTextures, true);
+                    var materialTextures = LoadMaterialTextures(
+                        textureDirectoryPath,
+                        loadedTextures,
+                        true,
+                        targetSknPath: filePath);
 
                     _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
                     return await CreateSceneModel(
@@ -125,7 +130,8 @@ namespace AssetsManager.Services.Viewer.Loading
                         filePath,
                         loadedTextures,
                         true,
-                        explicitSkinBinPath);
+                        explicitSkinBinPath,
+                        filePath);
 
                     _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
                     return await CreateSceneModel(
@@ -231,6 +237,13 @@ namespace AssetsManager.Services.Viewer.Loading
             var positions = vertexAccessor.AsVector3Array().ToArray();
             var texCoordAccessor = skinnedMesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
             var texCoords = texCoordAccessor.AsVector2Array().ToArray();
+            System.Numerics.Vector3[] normals = null;
+            if (skinnedMesh.VerticesView.TryGetAccessor(VertexElement.NORMAL.Name, out VertexElementAccessor normalAccessor))
+            {
+                System.Numerics.Vector3[] authoredNormals = normalAccessor.AsVector3Array().ToArray();
+                if (authoredNormals.Length == positions.Length)
+                    normals = authoredNormals;
+            }
             var indices = skinnedMesh.Indices;
 
             foreach (var rangeObj in skinnedMesh.Ranges)
@@ -242,6 +255,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 var vertexMap = new Dictionary<int, int>();
                 var subPositions = new List<Point3D>();
                 var subTexCoords = new List<System.Windows.Point>();
+                var subNormals = normals == null ? null : new List<Vector3D>();
                 var sourceVertexIndices = new List<int>();
                 var triangleIndices = new int[rangeObj.IndexCount];
 
@@ -278,6 +292,11 @@ namespace AssetsManager.Services.Viewer.Loading
                         vertexMap[sourceIndex] = localIndex;
                         subPositions.Add(new Point3D(p.X, p.Y, p.Z));
                         subTexCoords.Add(new System.Windows.Point(uv.X, uv.Y));
+                        if (subNormals != null)
+                        {
+                            System.Numerics.Vector3 normal = normals[sourceIndex];
+                            subNormals.Add(new Vector3D(normal.X, normal.Y, normal.Z));
+                        }
                         sourceVertexIndices.Add(sourceIndex);
                     }
 
@@ -294,6 +313,7 @@ namespace AssetsManager.Services.Viewer.Loading
                     subPositions.ToArray(),
                     triangleIndices,
                     subTexCoords.ToArray(),
+                    subNormals?.ToArray(),
                     sourceVertexIndices.ToArray(),
                     materialDefinition));
             }
@@ -316,7 +336,8 @@ namespace AssetsManager.Services.Viewer.Loading
                     Name = modelName,
                     SkinnedMesh = skinnedMesh,
                     FilePath = filePath,
-                    Skeleton = skeleton
+                    Skeleton = skeleton,
+                    Scale = materialTextures?.SkinScale ?? 1f
                 };
                 _logService.LogDebug("--- Displaying Model ---");
                 var parts = new List<ModelPart>();
@@ -326,16 +347,21 @@ namespace AssetsManager.Services.Viewer.Loading
                     var positionsCol = new Point3DCollection(data.Positions);
                     var indicesCol = new Int32Collection(data.TriangleIndices);
                     var texCoordsCol = new PointCollection(data.TextureCoordinates);
+                    Vector3DCollection normalsCol = data.Normals == null
+                        ? null
+                        : new Vector3DCollection(data.Normals);
 
                     if (positionsCol.CanFreeze) positionsCol.Freeze();
                     if (indicesCol.CanFreeze) indicesCol.Freeze();
                     if (texCoordsCol.CanFreeze) texCoordsCol.Freeze();
+                    if (normalsCol?.CanFreeze == true) normalsCol.Freeze();
 
                     MeshGeometry3D meshGeometry = new MeshGeometry3D
                     {
                         Positions = positionsCol,
                         TriangleIndices = indicesCol,
-                        TextureCoordinates = texCoordsCol
+                        TextureCoordinates = texCoordsCol,
+                        Normals = normalsCol
                     };
 
                     var geometryModel = new GeometryModel3D(meshGeometry, null);
@@ -367,7 +393,8 @@ namespace AssetsManager.Services.Viewer.Loading
             string assetPath,
             Dictionary<string, BitmapSource> loadedTextures,
             bool loadReferencedTextures,
-            string explicitSkinBinPath = null)
+            string explicitSkinBinPath = null,
+            string targetSknPath = null)
         {
             string skinBinPath = !string.IsNullOrWhiteSpace(explicitSkinBinPath) && File.Exists(explicitSkinBinPath)
                 ? Path.GetFullPath(explicitSkinBinPath)
@@ -409,7 +436,11 @@ namespace AssetsManager.Services.Viewer.Loading
                     ? null
                     : _hashResolverService.ResolveBinEntry;
                 SknMaterialTextureMetadata metadata =
-                    SknMaterialTextureResolver.ReadMetadata(binTrees, wadChunkPathResolver, binEntryResolver);
+                    SknMaterialTextureResolver.ReadMetadata(
+                        binTrees,
+                        wadChunkPathResolver,
+                        binEntryResolver,
+                        targetSknPath);
                 if (loadReferencedTextures)
                 {
                     foreach (string texturePath in metadata.ReferencedTexturePaths)
@@ -445,18 +476,23 @@ namespace AssetsManager.Services.Viewer.Loading
         private IReadOnlyList<BinTree> LoadMaterialBinTrees(string primaryBinPath)
         {
             var trees = new List<BinTree>();
-            var pendingPaths = new Queue<string>();
+            var pendingPaths = new Queue<(string Path, bool IsLinked)>();
             var visitedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            pendingPaths.Enqueue(primaryBinPath);
+            pendingPaths.Enqueue((primaryBinPath, false));
+            int openedLinkedBins = 0;
 
             while (pendingPaths.Count > 0)
             {
-                string binPath = pendingPaths.Dequeue();
+                (string binPath, bool isLinked) = pendingPaths.Dequeue();
                 string fullPath = Path.GetFullPath(binPath);
-                if (!visitedPaths.Add(fullPath) || !File.Exists(fullPath))
-                {
+                if (!visitedPaths.Add(fullPath))
                     continue;
-                }
+                if (isLinked && openedLinkedBins >= MaximumLinkedMaterialBins)
+                    break;
+                if (isLinked)
+                    openedLinkedBins++;
+                if (!File.Exists(fullPath))
+                    continue;
 
                 try
                 {
@@ -470,7 +506,7 @@ namespace AssetsManager.Services.Viewer.Loading
                             SknMaterialTextureResolver.TryResolveDependencyBinPath(fullPath, dependency);
                         if (dependencyPath != null)
                         {
-                            pendingPaths.Enqueue(dependencyPath);
+                            pendingPaths.Enqueue((dependencyPath, true));
                         }
                         else
                         {
@@ -494,6 +530,7 @@ namespace AssetsManager.Services.Viewer.Loading
             Point3D[] Positions,
             int[] TriangleIndices,
             System.Windows.Point[] TextureCoordinates,
+            Vector3D[] Normals,
             int[] SourceVertexIndices,
             ModelMaterialDefinition MaterialDefinition);
 

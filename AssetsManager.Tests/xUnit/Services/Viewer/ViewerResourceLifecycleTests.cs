@@ -237,6 +237,47 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
                 new Vector3(vertexData.Data[3], vertexData.Data[4], vertexData.Data[5]));
         }
 
+        [Fact]
+        public void MeshUploadDataPreservesAuthoredNormalsLikeLtk()
+        {
+            var mesh = new MeshGeometry3D
+            {
+                Positions = new Point3DCollection
+                {
+                    new(0, 0, 0),
+                    new(1, 0, 0),
+                    new(0, 1, 0)
+                },
+                TriangleIndices = new Int32Collection { 0, 1, 2 },
+                TextureCoordinates = new PointCollection
+                {
+                    new(0, 0),
+                    new(1, 0),
+                    new(0, 1)
+                },
+                Normals = new Vector3DCollection
+                {
+                    new(0, 1, 0),
+                    new(0, 1, 0),
+                    new(0, 1, 0)
+                }
+            };
+            var vertexData = new GlMeshVertexData(mesh.Positions.Count);
+
+            vertexData.Update(mesh, updateTextureCoordinates: true);
+
+            for (int vertex = 0; vertex < 3; vertex++)
+            {
+                int offset = vertex * 8 + 3;
+                Assert.Equal(
+                    Vector3.UnitY,
+                    new Vector3(
+                        vertexData.Data[offset],
+                        vertexData.Data[offset + 1],
+                        vertexData.Data[offset + 2]));
+            }
+        }
+
         [Theory]
         [InlineData(1920, 1080, 3840, 2160)]
         [InlineData(800, 600, 2880, 2160)]

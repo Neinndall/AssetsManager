@@ -122,6 +122,55 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void TextureOnlyBindingKeepsThreeDefaultClampLikeLtk()
+        {
+            ModelMaterialDefinition material = ModelMaterialDefinition.TextureOnly("test_tx_cm");
+
+            Assert.Equal(ModelMaterialWrapMode.Clamp, material.WrapU);
+            Assert.Equal(ModelMaterialWrapMode.Clamp, material.WrapV);
+        }
+
+        [Fact]
+        public void Resolve_OpaquePassDoesNotBecomeTransparentFromOpacityAlone()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                samplers: new[] { Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex") },
+                parameters: new Dictionary<string, Vector4>
+                {
+                    ["Opacity"] = new Vector4(0.4f, 0f, 0f, 0f)
+                },
+                pass: Pass(blendEnabled: false));
+
+            ModelMaterialDefinition resolved = Resolve(material, new[] { "test_tx_cm" });
+
+            Assert.Equal(0.4f, resolved.Color.W);
+            Assert.Equal(ModelMaterialBlendMode.Opaque, resolved.RenderState.Blending);
+            Assert.False(new ModelPart { MaterialDefinition = resolved }.IsAlphaBlended);
+        }
+
+        [Fact]
+        public void Resolve_SkinFallbackDoesNotTakeBaseSamplerTiling()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                parameters: new Dictionary<string, Vector4>
+                {
+                    ["MainTex_Tile"] = new Vector4(2f, 3f, 0f, 0f)
+                },
+                pass: Pass(blendEnabled: false));
+
+            ModelMaterialDefinition resolved = Resolve(
+                material,
+                new[] { "skin_tx_cm" },
+                fallbackTextureKey: "skin_tx_cm");
+
+            Assert.Equal("skin_tx_cm", resolved.BaseTextureName);
+            Assert.Equal(ModelMaterialBaseRule.None, resolved.BaseRule);
+            Assert.Equal(Vector2.One, resolved.UvRepeat);
+            Assert.Equal(ModelMaterialWrapMode.Clamp, resolved.WrapU);
+            Assert.Equal(ModelMaterialWrapMode.Clamp, resolved.WrapV);
+        }
+
+        [Fact]
         public void Resolve_PreservesNormalBlendWhenOpacitySlotExistsAtOne()
         {
             SknMaterialDefinition material = CreateMaterial(

@@ -17,6 +17,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         IReadOnlyDictionary<string, ModelMaterialDefinition> MaterialDefinitions)
     {
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
+        internal float SkinScale { get; init; } = 1f;
 
         internal ModelMaterialDefinition ResolveMaterialDefinition(string normalizedSubmeshName)
         {
@@ -109,6 +110,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         IReadOnlyDictionary<string, SknMaterialDefinition> OverrideMaterials)
     {
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
+        internal float SkinScale { get; init; } = 1f;
         internal IReadOnlyDictionary<uint, SknShaderDefinition> ShaderDefinitions { get; init; } =
             new Dictionary<uint, SknShaderDefinition>();
         internal bool HasDefaultMaterialLink { get; init; }
@@ -152,6 +154,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint CustomShaderClass = Fnv1a.HashLower("CustomShaderDef");
         private static readonly uint SkinMeshProperties = Fnv1a.HashLower("skinMeshProperties");
         private static readonly uint SimpleSkin = Fnv1a.HashLower("simpleSkin");
+        private static readonly uint SkinScale = Fnv1a.HashLower("skinScale");
         private static readonly uint InitialSubmeshToHide = Fnv1a.HashLower("initialSubmeshToHide");
         private static readonly uint MaterialOverride = Fnv1a.HashLower("materialOverride");
         private static readonly uint Texture = Fnv1a.HashLower("texture");
@@ -198,15 +201,17 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal static SknMaterialTextureMetadata ReadMetadata(
             BinTree binTree,
             Func<ulong, string> wadChunkPathResolver = null,
-            Func<uint, string> binEntryResolver = null)
+            Func<uint, string> binEntryResolver = null,
+            string targetSknPath = null)
         {
-            return ReadMetadata(new[] { binTree }, wadChunkPathResolver, binEntryResolver);
+            return ReadMetadata(new[] { binTree }, wadChunkPathResolver, binEntryResolver, targetSknPath);
         }
 
         internal static SknMaterialTextureMetadata ReadMetadata(
             IEnumerable<BinTree> binTrees,
             Func<ulong, string> wadChunkPathResolver = null,
-            Func<uint, string> binEntryResolver = null)
+            Func<uint, string> binEntryResolver = null,
+            string targetSknPath = null)
         {
             List<BinTree> trees = (binTrees ?? Enumerable.Empty<BinTree>())
                 .Where(tree => tree != null)
@@ -237,16 +242,40 @@ namespace AssetsManager.Services.Viewer.Resolvers
             var seenOverrideSubmeshes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             IReadOnlyList<string> initialHiddenSubmeshes = Array.Empty<string>();
             bool readInitialHiddenSubmeshes = false;
+            float skinScale = 1f;
+            bool readSkinScale = false;
             bool hasDefaultMaterialLink = false;
             string defaultTexturePath = null;
             SknMaterialDefinition defaultMaterial = null;
 
             // LTK resolves skinMeshProperties only from the selected skin object. Dependency
             // BINs are walked solely to fill material links that the primary skin leaves missing.
-            foreach (BinTreeObject obj in primaryTree.Objects.Values)
+            List<BinTreeObject> primarySkins = primaryTree.Objects.Values
+                .Where(obj => obj.ClassHash == SkinPropertiesClass)
+                .ToList();
+            if (!string.IsNullOrWhiteSpace(targetSknPath))
             {
-                if (obj.ClassHash != SkinPropertiesClass ||
-                    !obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
+                BinTreeObject matchingSkin = primarySkins.FirstOrDefault(obj => MatchesTargetSkin(obj, targetSknPath));
+                if (matchingSkin != null)
+                {
+                    primarySkins = new List<BinTreeObject> { matchingSkin };
+                }
+                else
+                {
+                    List<BinTreeObject> basenameMatches = primarySkins
+                        .Where(obj => ReferencesModel(obj, targetSknPath))
+                        .ToList();
+                    primarySkins = basenameMatches.Count == 1
+                        ? basenameMatches
+                        : primarySkins.Count == 1
+                            ? primarySkins
+                            : new List<BinTreeObject>();
+                }
+            }
+
+            foreach (BinTreeObject obj in primarySkins)
+            {
+                if (!obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
                     meshProperty is not BinTreeStruct meshProperties)
                 {
                     continue;
@@ -257,6 +286,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     readInitialHiddenSubmeshes = true;
                     if (TryGetString(meshProperties, InitialSubmeshToHide, out string hiddenSubmeshes))
                         initialHiddenSubmeshes = SplitSubmeshNames(hiddenSubmeshes);
+                }
+                if (!readSkinScale)
+                {
+                    readSkinScale = true;
+                    if (meshProperties.Properties.TryGetValue(SkinScale, out BinTreeProperty scaleProperty) &&
+                        scaleProperty is BinTreeF32 authoredScale)
+                    {
+                        skinScale = authoredScale.Value;
+                    }
                 }
 
                 if (defaultTexturePath == null &&
@@ -327,6 +365,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 overrideMaterials)
             {
                 InitialHiddenSubmeshes = initialHiddenSubmeshes,
+                SkinScale = skinScale,
                 ShaderDefinitions = shaderDefinitions,
                 HasDefaultMaterialLink = hasDefaultMaterialLink,
                 OverrideMaterialLinkKeys = overrideMaterialLinkKeys,
@@ -425,7 +464,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 defaultMaterialDefinition,
                 materialDefinitions)
             {
-                InitialHiddenSubmeshes = metadata.InitialHiddenSubmeshes ?? Array.Empty<string>()
+                InitialHiddenSubmeshes = metadata.InitialHiddenSubmeshes ?? Array.Empty<string>(),
+                SkinScale = metadata.SkinScale
             };
         }
 
@@ -863,71 +903,62 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return fallbackThemeBin;
         }
 
-        private static bool ReferencesModel(BinTree binTree, string sknPath)
+        private static bool ReferencesModel(BinTree binTree, string sknPath) =>
+            binTree.Objects.Values.Any(obj => ReferencesModel(obj, sknPath));
+
+        private static bool ReferencesModel(BinTreeObject obj, string sknPath)
         {
-            string sknFileName = Path.GetFileName(sknPath);
+            if (MatchesTargetSkin(obj, sknPath))
+                return true;
+
+            return TryGetSimpleSkin(obj, out BinTreeProperty simpleSkinProperty) &&
+                   simpleSkinProperty is BinTreeString simpleSkin &&
+                   !string.IsNullOrWhiteSpace(simpleSkin.Value) &&
+                   Path.GetFileName(simpleSkin.Value).Equals(
+                       Path.GetFileName(sknPath),
+                       StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool MatchesTargetSkin(BinTreeObject obj, string sknPath)
+        {
+            if (!TryGetSimpleSkin(obj, out BinTreeProperty simpleSkinProperty))
+                return false;
+
             string normalizedSkn = NormalizeAssetPath(sknPath);
-
-            foreach (BinTreeObject obj in binTree.Objects.Values)
+            if (simpleSkinProperty is BinTreeString simpleSkin)
             {
-                if (obj.ClassHash != SkinPropertiesClass ||
-                    !obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
-                    meshProperty is not BinTreeStruct meshProperties ||
-                    !meshProperties.Properties.TryGetValue(SimpleSkin, out BinTreeProperty simpleSkinProperty))
-                {
-                    continue;
-                }
+                string declaredSkin = simpleSkin.Value;
+                if (string.IsNullOrWhiteSpace(declaredSkin))
+                    return false;
 
-                if (simpleSkinProperty is BinTreeString simpleSkin)
-                {
-                    string declaredSkin = simpleSkin.Value;
-                    if (string.IsNullOrWhiteSpace(declaredSkin))
-                    {
-                        continue;
-                    }
-
-                    if (Path.GetFileName(declaredSkin).Equals(sknFileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-
-                    string normalizedDeclared = NormalizeAssetPath(declaredSkin);
-                    if (normalizedDeclared.Equals(normalizedSkn, StringComparison.OrdinalIgnoreCase) ||
-                        normalizedSkn.EndsWith(normalizedDeclared, StringComparison.OrdinalIgnoreCase) ||
-                        normalizedDeclared.EndsWith(normalizedSkn, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
-                else if (simpleSkinProperty is BinTreeWadChunkLink chunkLink)
-                {
-                    if (XxHash64Ext.Hash(normalizedSkn) == chunkLink.Value)
-                    {
-                        return true;
-                    }
-
-                    int assetsIdx = normalizedSkn.IndexOf("assets/", StringComparison.OrdinalIgnoreCase);
-                    if (assetsIdx >= 0 && XxHash64Ext.Hash(normalizedSkn.AsSpan(assetsIdx)) == chunkLink.Value)
-                    {
-                        return true;
-                    }
-                }
-                else if (simpleSkinProperty is BinTreeU64 u64)
-                {
-                    if (XxHash64Ext.Hash(normalizedSkn) == u64.Value)
-                    {
-                        return true;
-                    }
-
-                    int assetsIdx = normalizedSkn.IndexOf("assets/", StringComparison.OrdinalIgnoreCase);
-                    if (assetsIdx >= 0 && XxHash64Ext.Hash(normalizedSkn.AsSpan(assetsIdx)) == u64.Value)
-                    {
-                        return true;
-                    }
-                }
+                string normalizedDeclared = NormalizeAssetPath(declaredSkin);
+                return normalizedDeclared.Equals(normalizedSkn, StringComparison.OrdinalIgnoreCase) ||
+                       normalizedSkn.EndsWith(normalizedDeclared, StringComparison.OrdinalIgnoreCase) ||
+                       normalizedDeclared.EndsWith(normalizedSkn, StringComparison.OrdinalIgnoreCase);
             }
 
-            return false;
+            ulong expectedHash = simpleSkinProperty switch
+            {
+                BinTreeWadChunkLink chunkLink => chunkLink.Value,
+                BinTreeU64 u64 => u64.Value,
+                _ => 0
+            };
+            if (expectedHash == 0)
+                return false;
+            if (XxHash64Ext.Hash(normalizedSkn) == expectedHash)
+                return true;
+
+            int assetsIdx = normalizedSkn.IndexOf("assets/", StringComparison.OrdinalIgnoreCase);
+            return assetsIdx >= 0 && XxHash64Ext.Hash(normalizedSkn.AsSpan(assetsIdx)) == expectedHash;
+        }
+
+        private static bool TryGetSimpleSkin(BinTreeObject obj, out BinTreeProperty simpleSkinProperty)
+        {
+            simpleSkinProperty = null;
+            return obj.ClassHash == SkinPropertiesClass &&
+                   obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) &&
+                   meshProperty is BinTreeStruct meshProperties &&
+                   meshProperties.Properties.TryGetValue(SimpleSkin, out simpleSkinProperty);
         }
 
         internal static IReadOnlyList<string> GetSelectableTextureCandidates(

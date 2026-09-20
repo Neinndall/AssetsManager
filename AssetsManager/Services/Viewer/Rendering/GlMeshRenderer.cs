@@ -23,6 +23,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _boneBuffer;
         private readonly List<ModelPart> _alphaRenderQueue = new();
         private readonly Dictionary<(ModelMaterialWrapMode U, ModelMaterialWrapMode V), uint> _auxiliarySamplers = new();
+        private readonly Dictionary<SceneModel, long> _materialTimeOrigins = new();
         private int _uViewProj;
         private int _uWorld;
         private int _uUseSkinning;
@@ -141,7 +142,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uUsesBakedDiffuse;
         private int _uHasVertexColor;
         private bool _ready;
-        private long _startTimestamp;
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
@@ -151,7 +151,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         public void Initialize(GL gl)
         {
             _gl = gl;
-            _startTimestamp = Stopwatch.GetTimestamp();
             IntPtr proc = gl.Context.GetProcAddress("glDrawElements");
             if (proc != IntPtr.Zero)
             {
@@ -254,9 +253,15 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform3(_uLightColor2, lightColor2);
             _gl.Uniform3(_uAmbient, ambientColor);
             _gl.Uniform3(_uCameraPosition, cameraPosition);
+            long now = Stopwatch.GetTimestamp();
+            if (!_materialTimeOrigins.TryGetValue(model, out long materialTimeOrigin))
+            {
+                materialTimeOrigin = now;
+                _materialTimeOrigins[model] = materialTimeOrigin;
+            }
             _gl.Uniform1(
                 _uEffectTime,
-                (float)((Stopwatch.GetTimestamp() - _startTimestamp) / (double)Stopwatch.Frequency));
+                (float)((now - materialTimeOrigin) / (double)Stopwatch.Frequency));
             _gl.Uniform1(_uLightMapColorScale, lightmapScale);
 
             // Per-part state below owns blending, depth and culling. Start and end from
@@ -741,7 +746,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             ModelMaterialRenderState state = material.RenderState;
             bool runtimeForcesBlend =
                 state.Blending == ModelMaterialBlendMode.Opaque &&
-                (material.Color.W < 0.999f || part.ColorTint.W < 0.999f);
+                (part.ColorTint.W < 0.999f || material.Effect?.RequiresAlphaBlend == true);
             ModelMaterialBlendMode blending = runtimeForcesBlend
                 ? ModelMaterialBlendMode.Normal
                 : state.Blending;
@@ -915,7 +920,12 @@ namespace AssetsManager.Services.Viewer.Rendering
         private static Vector3 NormalizeOrDefault(Vector3 value) =>
             value.LengthSquared() > 1e-6f ? Vector3.Normalize(value) : Vector3.UnitY;
 
-        public void QueueRelease(SceneModel model) => _resources?.QueueRelease(model);
+        public void QueueRelease(SceneModel model)
+        {
+            if (model != null)
+                _materialTimeOrigins.Remove(model);
+            _resources?.QueueRelease(model);
+        }
 
         public void ProcessPendingReleases()
         {
@@ -936,6 +946,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         _gl?.DeleteSampler(sampler);
                 }
                 _auxiliarySamplers.Clear();
+                _materialTimeOrigins.Clear();
                 if (_boneBuffer != 0)
                     _gl?.DeleteBuffer(_boneBuffer);
                 _boneBuffer = 0;

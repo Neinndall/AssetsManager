@@ -161,7 +161,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             (Vector4 color, bool hasOpacity) = ResolveColor(parameters, effect);
             float alphaCutoff = ResolveAlphaCutoff(parameters, macros, shaderPath);
-            Vector2 uvRepeat = ResolveUvRepeat(parameters);
+            Vector2 uvRepeat = baseSampler == null ? Vector2.One : ResolveUvRepeat(parameters);
             Vector2 uvScroll = ResolveUvScroll(parameters);
             ModelMaterialRenderState renderState = ResolveRenderState(
                 material,
@@ -186,8 +186,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 alphaCutoff,
                 uvRepeat,
                 uvScroll,
-                baseSampler?.WrapU ?? ModelMaterialWrapMode.Repeat,
-                baseSampler?.WrapV ?? ModelMaterialWrapMode.Repeat,
+                baseSampler?.WrapU ?? ModelMaterialWrapMode.Clamp,
+                baseSampler?.WrapV ?? ModelMaterialWrapMode.Clamp,
                 renderState,
                 ModelMaterialBindingKind.Authored,
                 material.IsAnimated,

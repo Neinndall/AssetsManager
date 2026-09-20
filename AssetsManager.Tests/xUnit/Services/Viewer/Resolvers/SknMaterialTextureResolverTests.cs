@@ -67,6 +67,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_PreservesAuthoredSkinScaleLikeLtkCharacter()
+        {
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex",
+                skinScale: 1.25f);
+
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(tree, Array.Empty<string>());
+
+            Assert.Equal(1.25f, resolution.SkinScale);
+        }
+
+        [Fact]
         public void Resolve_AcceptsWadChunkLinksForSkinAndMaterialTextures()
         {
             const string defaultTexturePath =
@@ -284,6 +296,117 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 ignoreCase: true);
             Assert.Empty(metadata.DirectOverrideTexturePaths);
             Assert.Empty(metadata.OverrideMaterialLinkKeys);
+        }
+
+        [Fact]
+        public void ReadMetadata_TargetSknPathSelectsOnlyMatchingPrimarySkin()
+        {
+            const string wrongSkn = "ASSETS/Characters/Test/Skins/Skin1/Target.skn";
+            const string targetSkn = "ASSETS/Characters/Test/Skins/Skin2/Target.skn";
+            const string wrongTexture = "ASSETS/Characters/Test/Skins/Skin1/Wrong_TX_CM.tex";
+            const string targetTexture = "ASSETS/Characters/Test/Skins/Skin2/Target_TX_CM.tex";
+
+            var wrongMesh = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("simpleSkin"), wrongSkn),
+                    CreateTextureLink("texture", wrongTexture),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("materialOverride"),
+                        BinPropertyType.Embedded,
+                        new[]
+                        {
+                            CreateOverride(
+                                "Hat",
+                                CreateTextureLink(
+                                    "texture",
+                                    "ASSETS/Characters/Test/Skins/Skin1/Wrong_Hat_TX_CM.tex"))
+                        })
+                });
+            var targetMesh = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("simpleSkin"), targetSkn),
+                    CreateTextureLink("texture", targetTexture)
+                });
+            var primaryTree = new BinTree(
+                new[]
+                {
+                    new BinTreeObject(
+                        "Characters/Test/Skins/Skin1",
+                        "SkinCharacterDataProperties",
+                        new BinTreeProperty[] { wrongMesh }),
+                    new BinTreeObject(
+                        "Characters/Test/Skins/Skin2",
+                        "SkinCharacterDataProperties",
+                        new BinTreeProperty[] { targetMesh })
+                },
+                Array.Empty<string>());
+
+            SknMaterialTextureMetadata metadata = SknResolver.ReadMetadata(
+                new[] { primaryTree },
+                ResolveTestTexturePath,
+                null,
+                $"C:/Extract/{targetSkn}");
+
+            Assert.Equal(targetTexture, metadata.DefaultTexturePath, ignoreCase: true);
+            Assert.Empty(metadata.DirectOverrideTexturePaths);
+            Assert.Empty(metadata.OverrideMaterialLinkKeys);
+        }
+
+        [Fact]
+        public void ReadMetadata_AmbiguousBasenameDoesNotMergeDifferentPrimarySkins()
+        {
+            var firstMesh = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(
+                        Fnv1a.HashLower("simpleSkin"),
+                        "ASSETS/Characters/Test/Skins/Skin1/Shared.skn"),
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/First_TX_CM.tex")
+                });
+            var secondMesh = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(
+                        Fnv1a.HashLower("simpleSkin"),
+                        "ASSETS/Characters/Test/Skins/Skin2/Shared.skn"),
+                    CreateTextureLink(
+                        "texture",
+                        "ASSETS/Characters/Test/Skins/Skin2/Second_TX_CM.tex")
+                });
+            var tree = new BinTree(
+                new[]
+                {
+                    new BinTreeObject(
+                        "Characters/Test/Skins/Skin1",
+                        "SkinCharacterDataProperties",
+                        new BinTreeProperty[] { firstMesh }),
+                    new BinTreeObject(
+                        "Characters/Test/Skins/Skin2",
+                        "SkinCharacterDataProperties",
+                        new BinTreeProperty[] { secondMesh })
+                },
+                Array.Empty<string>());
+
+            SknMaterialTextureMetadata metadata = SknResolver.ReadMetadata(
+                new[] { tree },
+                ResolveTestTexturePath,
+                null,
+                "C:/Extract/Unknown/Shared.skn");
+
+            Assert.Null(metadata.DefaultTexturePath);
+            Assert.Empty(metadata.DirectOverrideTexturePaths);
         }
 
         [Fact]
@@ -2398,7 +2521,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             BinTreeEmbedded materialOverride2 = null,
             string defaultMaterialPath = null,
             BinTreeProperty defaultTextureProperty = null,
-            BinTreeProperty simpleSkinProperty = null)
+            BinTreeProperty simpleSkinProperty = null,
+            float? skinScale = null)
         {
             var meshPropertyList = new System.Collections.Generic.List<BinTreeProperty>
             {
@@ -2411,6 +2535,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             else if (!string.IsNullOrWhiteSpace(simpleSkinPath))
             {
                 meshPropertyList.Add(new BinTreeString(Fnv1a.HashLower("simpleSkin"), simpleSkinPath));
+            }
+            if (skinScale.HasValue)
+            {
+                meshPropertyList.Add(new BinTreeF32(Fnv1a.HashLower("skinScale"), skinScale.Value));
             }
             if (!string.IsNullOrWhiteSpace(defaultMaterialPath))
             {
