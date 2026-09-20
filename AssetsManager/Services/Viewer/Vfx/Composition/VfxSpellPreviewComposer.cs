@@ -24,7 +24,7 @@ internal static class VfxSpellPreviewComposer
         VfxSpellBrowserItem spell,
         VfxLoadingService.Bundle bundle,
         IReadOnlyList<AnimationClipCatalogItem> clips,
-        Func<AnimationClipCatalogItem, double, string, Vector3?> sourceAt,
+        Func<AnimationClipCatalogItem, double, string, (Vector3 Origin, Vector3 Forward)?> launchFrameAt,
         Func<uint, string> resolveSystemPath)
     {
         if (spell == null || bundle == null)
@@ -47,16 +47,18 @@ internal static class VfxSpellPreviewComposer
             return Empty(VfxSpellAvailability.Unsupported, "Spell has an invalid missile start delay.");
 
         double anchorTime = release + missileDelay;
-        Vector3? sampledSource = string.IsNullOrEmpty(startBone)
-            ? Vector3.Zero
-            : sourceAt?.Invoke(animation, anchorTime, startBone);
-        if (!sampledSource.HasValue)
-            return Empty(VfxSpellAvailability.Unavailable, $"Missing launch bone: {startBone}.");
-        Vector3 source = sampledSource.Value;
+        (Vector3 Origin, Vector3 Forward)? sampledLaunch = launchFrameAt?.Invoke(animation, anchorTime, startBone);
+        if (!sampledLaunch.HasValue)
+        {
+            if (!string.IsNullOrEmpty(startBone))
+                return Empty(VfxSpellAvailability.Unavailable, $"Missing launch bone: {startBone}.");
+            sampledLaunch = (Vector3.Zero, Vector3.UnitX);
+        }
+        Vector3 source = sampledLaunch.Value.Origin;
         float range = preview.CastRange is > 0f and <= 100000f && float.IsFinite(preview.CastRange.Value)
             ? preview.CastRange.Value
             : 500f;
-        Vector3 target = new(range, source.Y, 0f);
+        Vector3 target = ResolveTarget(source, range, sampledLaunch.Value.Forward);
 
         (uint projectileKey, VfxSystemDefinition projectileSystem) = ResolveEffect(
             preview.MissileEffectKey,
@@ -141,6 +143,14 @@ internal static class VfxSpellPreviewComposer
                 item?.Clip?.GraphPathHash == graph && item.Clip.OwnerPathHash == child);
         }
         return null;
+    }
+
+    internal static Vector3 ResolveTarget(Vector3 source, float range, Vector3 forward)
+    {
+        Vector3 flat = new(forward.X, 0f, forward.Z);
+        if (!Finite(flat) || flat.LengthSquared() <= 1e-8f) flat = Vector3.UnitX;
+        else flat = Vector3.Normalize(flat);
+        return new Vector3(flat.X * range, source.Y, flat.Z * range);
     }
 
     internal static bool TryCastRelease(VfxSpellPreview preview, out double release)

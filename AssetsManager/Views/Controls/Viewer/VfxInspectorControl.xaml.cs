@@ -1937,7 +1937,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 spell,
                 _activeBundle,
                 _model.DetectedAnimations.ToArray(),
-                ResolveSpellSource,
+                ResolveSpellLaunchFrame,
                 resolveSystemPath);
             _activeSpellPlan = plan;
             if (plan.Availability != VfxSpellAvailability.Supported)
@@ -2000,16 +2000,19 @@ namespace AssetsManager.Views.Controls.Viewer
             UpdatePlayheadPosition();
         }
 
-        private Vector3? ResolveSpellSource(
+        private (Vector3 Origin, Vector3 Forward)? ResolveSpellLaunchFrame(
             AnimationClipCatalogItem animation,
             double time,
             string boneName)
         {
-            if (string.IsNullOrWhiteSpace(boneName)) return Vector3.Zero;
             if (_championModel?.Skeleton == null) return null;
 
-            Matrix4x4 boneTransform;
-            if (animation != null && _championAnimationService != null)
+            Matrix4x4 boneTransform = Matrix4x4.Identity;
+            Matrix4x4 rootTransform = Matrix4x4.Identity;
+            bool hasRootTransform;
+            bool hasLaunchBone = !string.IsNullOrWhiteSpace(boneName);
+
+            if (animation?.AnimationAsset != null && _championAnimationService != null)
             {
                 _championAnimationService.Update(
                     0f,
@@ -2019,7 +2022,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     _championModel.Parts,
                     _championModel.Name);
                 float sampleTime = SpellAnimationTime(time, animation.Duration);
-                if (!_championAnimationService.TrySampleBoneTransform(
+                if (hasLaunchBone &&
+                    !_championAnimationService.TrySampleBoneTransform(
                         sampleTime,
                         boneName,
                         Fnv1a.HashLower(boneName),
@@ -2027,22 +2031,40 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     return null;
                 }
+
+                hasRootTransform = _championAnimationService.TrySampleRootTransform(
+                    sampleTime,
+                    out rootTransform);
             }
-            else if (!AnimationService.TryGetBindBoneTransform(
-                         _championModel.Skeleton,
-                         boneName,
-                         out boneTransform))
+            else
             {
-                return null;
+                if (hasLaunchBone &&
+                    !AnimationService.TryGetBindBoneTransform(
+                        _championModel.Skeleton,
+                        boneName,
+                        out boneTransform))
+                {
+                    return null;
+                }
+
+                hasRootTransform = AnimationService.TryGetBindRootTransform(
+                    _championModel.Skeleton,
+                    out rootTransform);
             }
 
             float skinScale = _activeBundle?.OwnerSceneContext is { SkinScale: > 0f } context
                 ? context.SkinScale
                 : 1f;
-            return VfxRenderSession.PrepareBoneAnchorTransform(
-                boneTransform,
-                Vector3.Zero,
-                skinScale).Translation;
+            Vector3 origin = hasLaunchBone
+                ? VfxRenderSession.PrepareBoneAnchorTransform(
+                    boneTransform,
+                    Vector3.Zero,
+                    skinScale).Translation
+                : Vector3.Zero;
+            Vector3 forward = hasRootTransform
+                ? Vector3.TransformNormal(Vector3.UnitX, rootTransform)
+                : Vector3.UnitX;
+            return (origin, forward);
         }
 
         internal static float SpellAnimationTime(double time, float duration)

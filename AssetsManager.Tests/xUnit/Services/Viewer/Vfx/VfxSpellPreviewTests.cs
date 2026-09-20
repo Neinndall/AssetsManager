@@ -123,6 +123,32 @@ public sealed class VfxSpellPreviewTests
             new Vector3(1000f, 101f, 0f)));
     }
 
+    [Fact]
+    public void SpellTargetFollowsChampionFacingOnTheGroundPlane()
+    {
+        Vector3 source = new(25f, 80f, -40f);
+
+        Vector3 target = VfxSpellPreviewComposer.ResolveTarget(
+            source,
+            500f,
+            new Vector3(0f, 5f, -2f));
+
+        Assert.Equal(new Vector3(0f, 80f, -500f), target);
+    }
+
+    [Fact]
+    public void SpellTargetFallsBackToPositiveXForADegenerateFacing()
+    {
+        Vector3 source = new(25f, 80f, -40f);
+
+        Vector3 target = VfxSpellPreviewComposer.ResolveTarget(
+            source,
+            500f,
+            Vector3.Zero);
+
+        Assert.Equal(new Vector3(500f, 80f, 0f), target);
+    }
+
     private static VfxSpellPreview Preview(float? spellCastTime = null, float? castTime = null)
         => new(
             spellCastTime,

@@ -175,6 +175,19 @@ namespace AssetsManager.Services.Viewer.Animation
             return TryGetBoneTransform(boneName, boneHash, out transform);
         }
 
+        public bool TrySampleRootTransform(float totalSeconds, out Matrix4x4 transform)
+        {
+            transform = Matrix4x4.Identity;
+            if (_isDisposed || _lastAnimation == null || _lastSkeleton == null || _boneTransforms == null)
+                return false;
+
+            EvaluatePose(totalSeconds, _lastAnimation, _lastSkeleton);
+            int rootIndex = FindRootIndex(_lastSkeleton);
+            if (rootIndex < 0 || rootIndex >= _boneTransforms.Length) return false;
+            transform = _boneTransforms[rootIndex];
+            return true;
+        }
+
         private void EvaluatePose(float totalSeconds, IAnimationAsset animation, RigResource skeleton)
         {
             if (ReferenceEquals(animation, _evaluatedAnimation) &&
@@ -321,6 +334,27 @@ namespace AssetsManager.Services.Viewer.Animation
             }
             transform = world[jointIndex];
             return true;
+        }
+
+        internal static bool TryGetBindRootTransform(RigResource skeleton, out Matrix4x4 transform)
+        {
+            transform = Matrix4x4.Identity;
+            int rootIndex = FindRootIndex(skeleton);
+            if (rootIndex < 0) return false;
+            transform = skeleton.Joints[rootIndex].LocalTransform;
+            return true;
+        }
+
+        private static int FindRootIndex(RigResource skeleton)
+        {
+            if (skeleton?.Joints == null || skeleton.Joints.Count == 0) return -1;
+            (_, int[] parents) = BuildHierarchy(
+                skeleton.Joints.Select(static joint => (int)joint.ParentId).ToArray());
+            for (int index = 0; index < parents.Length; index++)
+            {
+                if (parents[index] < 0) return index;
+            }
+            return -1;
         }
 
         internal static (int[] Order, int[] Parents) BuildHierarchy(IReadOnlyList<int> sourceParents)
