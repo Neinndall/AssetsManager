@@ -150,7 +150,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
     internal static class SknMaterialTextureResolver
     {
         private static readonly uint SkinPropertiesClass = Fnv1a.HashLower("SkinCharacterDataProperties");
-        private static readonly uint StaticMaterialClass = Fnv1a.HashLower("StaticMaterialDef");
         private static readonly uint CustomShaderClass = Fnv1a.HashLower("CustomShaderDef");
         private static readonly uint SkinMeshProperties = Fnv1a.HashLower("skinMeshProperties");
         private static readonly uint SimpleSkin = Fnv1a.HashLower("simpleSkin");
@@ -211,9 +210,22 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IEnumerable<BinTree> binTrees,
             Func<ulong, string> wadChunkPathResolver = null,
             Func<uint, string> binEntryResolver = null,
+            string targetSknPath = null) =>
+            ReadMetadata(
+                binTrees,
+                binTrees,
+                wadChunkPathResolver,
+                binEntryResolver,
+                targetSknPath);
+
+        internal static SknMaterialTextureMetadata ReadMetadata(
+            IEnumerable<BinTree> materialTrees,
+            IEnumerable<BinTree> shaderTrees,
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null,
             string targetSknPath = null)
         {
-            List<BinTree> trees = (binTrees ?? Enumerable.Empty<BinTree>())
+            List<BinTree> trees = (materialTrees ?? Enumerable.Empty<BinTree>())
                 .Where(tree => tree != null)
                 .ToList();
             if (trees.Count == 0)
@@ -225,9 +237,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             BinTree primaryTree = trees[0];
-            var materialDefinitions = BuildMaterialDefinitionMap(trees, wadChunkPathResolver, binEntryResolver);
             var shaderDefinitions = new Dictionary<uint, SknShaderDefinition>();
-            foreach (BinTree tree in trees)
+            foreach (BinTree tree in (shaderTrees ?? Enumerable.Empty<BinTree>()).Where(tree => tree != null))
             {
                 foreach ((uint shaderHash, SknShaderDefinition shader) in
                          ReadShaderDefinitions(tree, wadChunkPathResolver, binEntryResolver))
@@ -307,10 +318,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     materialProperty is BinTreeObjectLink defaultMaterialLink)
                 {
                     hasDefaultMaterialLink = true;
-                    if (defaultMaterial == null &&
-                        materialDefinitions.TryGetValue(defaultMaterialLink.Value, out SknMaterialDefinition linkedMaterial))
+                    if (defaultMaterial == null)
                     {
-                        defaultMaterial = linkedMaterial;
+                        defaultMaterial = ResolveLinkedMaterialDefinition(
+                            trees,
+                            defaultMaterialLink.Value,
+                            wadChunkPathResolver,
+                            binEntryResolver);
                     }
                 }
 
@@ -347,12 +361,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     {
                         var materialLink = (BinTreeObjectLink)linkProperty;
                         overrideMaterialLinkKeys.Add(normalizedSubmesh);
-                        if (materialDefinitions.TryGetValue(
-                                materialLink.Value,
-                                out SknMaterialDefinition materialDefinition))
-                        {
+                        SknMaterialDefinition materialDefinition = ResolveLinkedMaterialDefinition(
+                            trees,
+                            materialLink.Value,
+                            wadChunkPathResolver,
+                            binEntryResolver);
+                        if (materialDefinition != null)
                             overrideMaterials[normalizedSubmesh] = materialDefinition;
-                        }
                     }
 
                     if (hasDirectTexture)
@@ -1078,53 +1093,50 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return result;
         }
 
-        private static Dictionary<uint, SknMaterialDefinition> BuildMaterialDefinitionMap(
+        private static SknMaterialDefinition ResolveLinkedMaterialDefinition(
             IEnumerable<BinTree> binTrees,
+            uint pathHash,
             Func<ulong, string> wadChunkPathResolver,
             Func<uint, string> binEntryResolver)
         {
-            var result = new Dictionary<uint, SknMaterialDefinition>();
             foreach (BinTree binTree in binTrees ?? Enumerable.Empty<BinTree>())
             {
-                if (binTree == null)
-                {
+                if (binTree?.Objects == null || !binTree.Objects.TryGetValue(pathHash, out BinTreeObject obj))
                     continue;
-                }
 
-                foreach ((uint pathHash, BinTreeObject obj) in binTree.Objects)
-                {
-                    if (obj.ClassHash != StaticMaterialClass || result.ContainsKey(pathHash))
-                    {
-                        continue;
-                    }
-
-                    List<SknMaterialSampler> samplers = ReadSamplers(obj, wadChunkPathResolver);
-                    Dictionary<string, Vector4> parameters = ReadParameters(obj.Properties);
-                    Dictionary<string, bool> switchStates = ReadSwitchStates(obj.Properties);
-                    HashSet<string> switches = switchStates
-                        .Where(pair => pair.Value)
-                        .Select(pair => NormalizeToken(pair.Key))
-                        .ToHashSet(StringComparer.Ordinal);
-                    Dictionary<string, string> shaderMacros = ReadStringMap(obj.Properties, ShaderMacros);
-                    SknMaterialPassDefinition pass = ReadMaterialPass(obj.Properties);
-                    // An empty StaticMaterialDef still exists. LTK treats only an unresolved
-                    // object link as missing; an empty material keeps default render state and may
-                    // fall back to the skin texture when opaque.
-                        result[pathHash] = new SknMaterialDefinition(samplers, parameters)
-                        {
-                            Switches = switches,
-                            SwitchStates = switchStates,
-                            ShaderMacros = shaderMacros,
-                            Pass = pass,
-                            IsAnimated = obj.Properties.TryGetValue(DynamicMaterial, out BinTreeProperty dynamicValue) &&
-                                         dynamicValue is BinTreeStruct,
-                            ShaderHash = pass?.ShaderHash ?? 0,
-                            ShaderPath = ResolveBinEntryName(pass?.ShaderHash ?? 0, binEntryResolver)
-                        };
-                }
+                return ReadMaterialDefinition(obj, wadChunkPathResolver, binEntryResolver);
             }
 
-            return result;
+            return null;
+        }
+
+        private static SknMaterialDefinition ReadMaterialDefinition(
+            BinTreeObject obj,
+            Func<ulong, string> wadChunkPathResolver,
+            Func<uint, string> binEntryResolver)
+        {
+            List<SknMaterialSampler> samplers = ReadSamplers(obj, wadChunkPathResolver);
+            Dictionary<string, Vector4> parameters = ReadParameters(obj.Properties);
+            Dictionary<string, bool> switchStates = ReadSwitchStates(obj.Properties);
+            HashSet<string> switches = switchStates
+                .Where(pair => pair.Value)
+                .Select(pair => NormalizeToken(pair.Key))
+                .ToHashSet(StringComparer.Ordinal);
+            Dictionary<string, string> shaderMacros = ReadStringMap(obj.Properties, ShaderMacros);
+            SknMaterialPassDefinition pass = ReadMaterialPass(obj.Properties);
+            // The Material link supplies the type context. LTK reads any object found at the
+            // linked hash as a material and treats only an absent object as missing.
+            return new SknMaterialDefinition(samplers, parameters)
+            {
+                Switches = switches,
+                SwitchStates = switchStates,
+                ShaderMacros = shaderMacros,
+                Pass = pass,
+                IsAnimated = obj.Properties.TryGetValue(DynamicMaterial, out BinTreeProperty dynamicValue) &&
+                             dynamicValue is BinTreeStruct,
+                ShaderHash = pass?.ShaderHash ?? 0,
+                ShaderPath = ResolveBinEntryName(pass?.ShaderHash ?? 0, binEntryResolver)
+            };
         }
 
         private static List<SknMaterialSampler> ReadSamplers(
@@ -1351,7 +1363,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .Split((char[])null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .SelectMany(token => token.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
 

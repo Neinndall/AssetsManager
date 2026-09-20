@@ -37,7 +37,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 {
                     new BinTreeString(
                         Fnv1a.HashLower("initialSubmeshToHide"),
-                        "Hair, Weapon   Cape\tExtra")
+                        "Hair, Weapon   Cape\tExtra Hair")
                 });
             var skin = new BinTreeObject(
                 "Characters/Test/Skins/Skin0",
@@ -48,7 +48,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             SknMaterialTextureMetadata metadata = SknResolver.ReadMetadata(tree);
             SknMaterialTextureResolution resolution = SknResolver.Resolve(tree, Array.Empty<string>());
 
-            Assert.Equal(new[] { "Hair", "Weapon", "Cape", "Extra" }, metadata.InitialHiddenSubmeshes);
+            Assert.Equal(new[] { "Hair", "Weapon", "Cape", "Extra", "Hair" }, metadata.InitialHiddenSubmeshes);
             Assert.Equal(metadata.InitialHiddenSubmeshes, resolution.InitialHiddenSubmeshes);
         }
 
@@ -195,6 +195,62 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 materialTexturePath,
                 metadata.ReferencedTexturePaths,
                 StringComparer.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void ReadMetadata_MaterialLinkReadsObjectAtHashRegardlessOfClass()
+        {
+            const string materialPath = "Characters/Test/Skins/Skin1/Materials/Variant";
+            const string materialTexturePath =
+                "ASSETS/Characters/Test/Skins/Skin1/Test_Variant_TX_CM.tex";
+            BinTreeObject materialLikeObject = new(
+                materialPath,
+                "DerivedMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new[] { CreateSampler("Diffuse_Texture", materialTexturePath) })
+                });
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex",
+                material: materialLikeObject,
+                defaultMaterialPath: materialPath);
+
+            SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
+
+            Assert.NotNull(metadata.DefaultMaterial);
+            Assert.Contains(
+                materialTexturePath,
+                metadata.ReferencedTexturePaths,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void ReadMetadata_DoesNotResolveMaterialLinksFromShaderDocument()
+        {
+            const string materialPath = "Characters/Test/Skins/Skin1/Materials/Missing";
+            BinTree skinTree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex",
+                defaultMaterialPath: materialPath);
+            BinTree shaderTree = new(
+                new[]
+                {
+                    CreateMaterial(
+                        materialPath,
+                        CreateSampler(
+                            "Diffuse_Texture",
+                            "ASSETS/Characters/Test/Skins/Skin1/Wrong_TX_CM.tex"))
+                },
+                Array.Empty<string>());
+
+            SknMaterialTextureMetadata metadata = SknResolver.ReadMetadata(
+                new[] { skinTree },
+                new[] { shaderTree });
+
+            Assert.True(metadata.HasDefaultMaterialLink);
+            Assert.Null(metadata.DefaultMaterial);
         }
 
         [Fact]

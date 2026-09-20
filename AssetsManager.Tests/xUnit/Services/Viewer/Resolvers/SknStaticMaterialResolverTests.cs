@@ -560,7 +560,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             BinTree shaderTree = new(new[] { shader }, Array.Empty<string>());
 
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(
-                new[] { skinTree, shaderTree },
+                new[] { skinTree },
+                new[] { shaderTree },
                 hash => hash == 0x1234UL ? texturePath : $"{hash:x16}",
                 hash => hash == shaderHash ? shaderPath : $"{hash:x8}");
             SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(

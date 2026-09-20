@@ -413,14 +413,23 @@ namespace AssetsManager.Services.Viewer.Loading
                     return null;
                 }
 
+                var shaderTrees = new List<BinTree>();
                 string shaderBinPath = SknMaterialTextureResolver.TryResolveShaderBinPath(assetPath);
-                if (!string.IsNullOrEmpty(shaderBinPath) &&
-                    !Path.GetFullPath(shaderBinPath).Equals(Path.GetFullPath(skinBinPath), StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(shaderBinPath))
                 {
                     try
                     {
-                        using var shaderStream = File.OpenRead(shaderBinPath);
-                        binTrees.Add(new BinTree(shaderStream));
+                        if (Path.GetFullPath(shaderBinPath).Equals(
+                                Path.GetFullPath(skinBinPath),
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            shaderTrees.Add(binTrees[0]);
+                        }
+                        else
+                        {
+                            using var shaderStream = File.OpenRead(shaderBinPath);
+                            shaderTrees.Add(new BinTree(shaderStream));
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -438,6 +447,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 SknMaterialTextureMetadata metadata =
                     SknMaterialTextureResolver.ReadMetadata(
                         binTrees,
+                        shaderTrees,
                         wadChunkPathResolver,
                         binEntryResolver,
                         targetSknPath);
