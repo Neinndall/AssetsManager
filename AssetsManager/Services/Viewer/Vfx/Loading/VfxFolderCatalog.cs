@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
@@ -23,7 +24,8 @@ internal static class VfxFolderCatalog
         string Name,
         string ObjectPath,
         uint PathHash,
-        string BinPath);
+        string BinPath,
+        VfxSpellPreview Preview);
 
     private sealed record ScanResult(
         IReadOnlyList<VfxSkinItem> Entries,
@@ -50,7 +52,7 @@ internal static class VfxFolderCatalog
     {
         var skins = new List<VfxSkinItem>();
         var effects = new List<VfxSkinItem>();
-        var spells = new Dictionary<(string Character, uint Hash), SpellDiscovery>();
+        var spells = new List<SpellDiscovery>();
         uint skinClass = Fnv1a.HashLower("SkinCharacterDataProperties");
         uint systemClass = Fnv1a.HashLower("VfxSystemDefinitionData");
         uint spellClass = Fnv1a.HashLower("SpellObject");
@@ -72,9 +74,13 @@ internal static class VfxFolderCatalog
                     {
                         string objectPath = resolveBinEntry(spell.PathHash);
                         if (!TryParseSpellPath(objectPath, out string character, out string spellName)) continue;
-                        spells.TryAdd(
-                            (character.ToLowerInvariant(), spell.PathHash),
-                            new SpellDiscovery(character, spellName, objectPath, spell.PathHash, Path.GetFullPath(path)));
+                        spells.Add(new SpellDiscovery(
+                            character,
+                            spellName,
+                            objectPath,
+                            spell.PathHash,
+                            Path.GetFullPath(path),
+                            VfxSpellPreviewReader.Read(spell)));
                     }
                 }
 
@@ -141,7 +147,7 @@ internal static class VfxFolderCatalog
             .ThenBy(item => item.SkinIndex)
             .ThenBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        return new ScanResult(entries, spells.Values.ToArray());
+        return new ScanResult(entries, spells.ToArray());
     }
 
     private static bool HasPreviewableSkin(BinTreeObject skin)
@@ -184,7 +190,6 @@ internal static class VfxFolderCatalog
         };
         var characters = new Dictionary<string, VfxBrowserFolder>(StringComparer.OrdinalIgnoreCase);
         var groups = new Dictionary<(string Character, string Group), VfxBrowserFolder>();
-        var spellGroups = new Dictionary<(string Character, string Group), VfxBrowserFolder>();
 
         VfxBrowserFolder Character(string rawName)
         {
@@ -247,33 +252,63 @@ internal static class VfxFolderCatalog
         foreach (IGrouping<string, SpellDiscovery> owner in spellDiscoveries
                      .GroupBy(spell => spell.Character, StringComparer.OrdinalIgnoreCase))
         {
-            VfxBrowserFolder spellFolder = Group(owner.Key, "Spells");
-            foreach (SpellDiscovery spell in owner.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
-            {
-                string displayName = spell.Name;
-                VfxBrowserFolder parent = spellFolder;
-                int slash = spell.Name.IndexOf('/');
-                if (slash > 0 && slash + 1 < spell.Name.Length)
+            var skinsKey = (owner.Key.ToLowerInvariant(), "Skins");
+            if (!groups.TryGetValue(skinsKey, out VfxBrowserFolder skinsFolder)) continue;
+
+            var discovered = owner
+                .GroupBy(spell => spell.PathHash)
+                .Select(group =>
                 {
-                    string groupName = spell.Name[..slash];
-                    var groupKey = (owner.Key.ToLowerInvariant(), groupName.ToLowerInvariant());
-                    if (!spellGroups.TryGetValue(groupKey, out VfxBrowserFolder groupFolder))
+                    SpellDiscovery[] declarations = group.ToArray();
+                    SpellDiscovery first = declarations[0];
+                    VfxSpellAvailability availability = declarations.Length == 1
+                        ? VfxSpellPreviewReader.AvailabilityOf(first.Preview, includeImpact: true)
+                        : VfxSpellAvailability.Ambiguous;
+                    return (First: first, Count: declarations.Length, Availability: availability);
+                })
+                .OrderBy(item => item.First.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            foreach (VfxSkinItem skin in skinsFolder.Children.OfType<VfxSkinItem>())
+            {
+                var nestedGroups = new Dictionary<string, VfxBrowserFolder>(StringComparer.OrdinalIgnoreCase);
+                foreach (var found in discovered)
+                {
+                    SpellDiscovery spell = found.First;
+                    string displayName = spell.Name;
+                    ICollection<object> target = skin.SpellItems;
+                    int slash = spell.Name.IndexOf('/');
+                    if (slash > 0 && slash + 1 < spell.Name.Length)
                     {
-                        groupFolder = new VfxBrowserFolder(groupName, VfxBrowserFolderKind.Group);
-                        spellGroups[groupKey] = groupFolder;
-                        spellFolder.Children.Add(groupFolder);
+                        string groupName = spell.Name[..slash];
+                        if (!nestedGroups.TryGetValue(groupName, out VfxBrowserFolder groupFolder))
+                        {
+                            groupFolder = new VfxBrowserFolder(groupName, VfxBrowserFolderKind.Group);
+                            nestedGroups[groupName] = groupFolder;
+                            skin.SpellItems.Add(groupFolder);
+                        }
+                        target = groupFolder.Children;
+                        displayName = spell.Name[(slash + 1)..];
                     }
-                    parent = groupFolder;
-                    displayName = spell.Name[(slash + 1)..];
+
+                    target.Add(new VfxSpellBrowserItem
+                    {
+                        Owner = skin,
+                        Name = displayName,
+                        ObjectPath = spell.ObjectPath,
+                        PathHash = spell.PathHash,
+                        BinPath = spell.BinPath,
+                        DeclarationCount = found.Count,
+                        Preview = spell.Preview,
+                        Availability = found.Availability
+                    });
                 }
 
-                parent.Children.Add(new VfxSpellBrowserItem
+                if (skin.SpellItems.Count > 0 &&
+                    !skin.Sections.Any(section => section.Kind == VfxBrowserSectionKind.Spells))
                 {
-                    Name = displayName,
-                    ObjectPath = spell.ObjectPath,
-                    PathHash = spell.PathHash,
-                    BinPath = spell.BinPath
-                });
+                    skin.Sections.Add(new VfxBrowserSection(skin, "Spells", VfxBrowserSectionKind.Spells));
+                }
             }
         }
 
@@ -293,10 +328,9 @@ internal static class VfxFolderCatalog
         static int Rank(string title) => title switch
         {
             "Skins" => 0,
-            "Spells" => 1,
-            "Animation Data" => 2,
-            "Spell Data" => 3,
-            _ => 4
+            "Animation Data" => 1,
+            "Spell Data" => 2,
+            _ => 3
         };
 
         object[] ordered = character.Children

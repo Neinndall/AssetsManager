@@ -463,11 +463,12 @@ namespace AssetsManager.Views.Models.Viewer
     {
         public VfxSkinItem()
         {
-            Sections.Add(new VfxBrowserSection(this, "Systems", false));
-            Sections.Add(new VfxBrowserSection(this, "Clips", true));
+            Sections.Add(new VfxBrowserSection(this, "Systems", VfxBrowserSectionKind.Systems));
+            Sections.Add(new VfxBrowserSection(this, "Clips", VfxBrowserSectionKind.Clips));
         }
 
         public ObservableCollection<VfxBrowserSection> Sections { get; } = new();
+        public ObservableCollection<object> SpellItems { get; } = new();
         public string Title => !string.IsNullOrWhiteSpace(BrowserTitle)
             ? BrowserTitle
             : SkinIndex == int.MaxValue
@@ -531,6 +532,7 @@ namespace AssetsManager.Views.Models.Viewer
         private string _searchQuery;
         private VfxSystemDiagnosticItem _selectedSystem;
         private AnimationClipCatalogItem _selectedAnimation;
+        private VfxSpellBrowserItem _selectedSpell;
         private float? _animationParameter;
         private bool _isAnimationMode = true;
         private bool _isPlaying;
@@ -630,6 +632,16 @@ namespace AssetsManager.Views.Models.Viewer
             set
             {
                 _selectedAnimation = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public VfxSpellBrowserItem SelectedSpell
+        {
+            get => _selectedSpell;
+            set
+            {
+                _selectedSpell = value;
                 OnPropertyChanged();
             }
         }

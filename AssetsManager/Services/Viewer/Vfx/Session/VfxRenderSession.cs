@@ -80,6 +80,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private readonly List<(double Time, uint EffectKey)> _scheduledEffectKills = new();
         private readonly Dictionary<VfxPlaybackGraphRuntime, double> _graphStopTimes = new();
         private readonly Dictionary<VfxPlaybackGraphRuntime, GraphAttachmentInfo> _graphAttachments = new();
+        private readonly Dictionary<VfxPlaybackGraphRuntime, VfxSpellPlaybackStep> _spellSteps = new();
         private VfxSystemModel _activeSystem;
         private VfxRigSettings _rigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Still);
         private double _rigDuration;
@@ -173,7 +174,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public void ApplyRigTransform()
         {
-            if (_graphs.Count == 0 || _graphAttachments.Count > 0 || _activeSystem == null) return;
+            if (_graphs.Count == 0 || _graphAttachments.Count > 0 || _spellSteps.Count > 0 || _activeSystem == null) return;
 
             var step = VfxRigMotion.Evaluate(
                 _rigSettings,
@@ -192,6 +193,29 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 graph.SetTarget(Vector3.Transform(step.Target, authoredWorld));
                 graph.IsStopped = step.IsStopped;
             }
+        }
+
+        private void ApplySpellTransforms(double time)
+        {
+            foreach ((VfxPlaybackGraphRuntime graph, VfxSpellPlaybackStep step) in _spellSteps)
+            {
+                Matrix4x4 placement = SpellTransformAt(step, time);
+                _graphPlacements[graph] = placement;
+                Matrix4x4 authoredWorld = RootAuthoredWorld(graph);
+                Matrix4x4 orientationRoot = Matrix4x4.CreateTranslation(placement.Translation) * authoredWorld;
+                graph.SetTransform(placement * authoredWorld, orientationRoot);
+                graph.SetTarget(Vector3.Transform(step.To, authoredWorld));
+                graph.IsStopped = time >= step.StopTime;
+                graph.SetJointTransformProvider(null);
+            }
+        }
+
+        internal static Matrix4x4 SpellTransformAt(VfxSpellPlaybackStep step, double time)
+        {
+            if (step is null) return Matrix4x4.Identity;
+            return step.Motion == VfxSpellPlaybackMotion.Path
+                ? VfxRigMotion.PathTransform(step.From, step.To, time, step.StartTime, step.StopTime)
+                : Matrix4x4.CreateTranslation(step.To);
         }
 
         public void Initialize(GL gl)
@@ -218,6 +242,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _scheduledEffectKills.Clear();
             _graphStopTimes.Clear();
             _graphAttachments.Clear();
+            _spellSteps.Clear();
             _lastRigOrigin = null;
             _boneTransformProvider = null;
             _boneTransformSampler = null;
@@ -271,6 +296,81 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 0,
                 ownerSceneContext);
 
+        public bool SetSpellSession(
+            IReadOnlyList<VfxSpellPlaybackStep> steps,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap,
+            string searchDirectory,
+            double animationDuration,
+            VfxOwnerSceneContext ownerSceneContext = null)
+        {
+            ClearCheckpoints();
+            steps ??= Array.Empty<VfxSpellPlaybackStep>();
+            systems ??= new Dictionary<uint, VfxSystemDefinition>();
+            resourceMap ??= new Dictionary<uint, uint>();
+            _isPlaying = false;
+            _usesStandaloneRig = false;
+            _ownerSceneContext = ownerSceneContext;
+            _graph = null;
+            _graphs.Clear();
+            _graphPlacements.Clear();
+            _scheduledEffectKills.Clear();
+            _graphStopTimes.Clear();
+            _graphAttachments.Clear();
+            _spellSteps.Clear();
+            _lastRigOrigin = null;
+            _boneTransformProvider = null;
+            _boneTransformSampler = null;
+
+            if (_ready)
+            {
+                _renderer.SetOwnerSkinningMatrices(null);
+                _renderer.SetOwnerHiddenSubmeshes(_ownerSceneContext?.InitialHiddenSubmeshHashes);
+                _renderer.ClearTextures();
+                _textureCache.Clear();
+            }
+
+            double duration = Math.Max(0.1d, animationDuration);
+            foreach (VfxSpellPlaybackStep step in steps)
+            {
+                if (step?.System is null) continue;
+                VfxPlaybackGraphRuntime graph = _loadingService.PreparePlaybackGraph(
+                    step.System,
+                    systems,
+                    resourceMap,
+                    searchDirectory,
+                    _worldTransform,
+                    step.Seed,
+                    _logService,
+                    ownerSceneContext);
+                graph.SetStartDelay((float)Math.Max(0d, step.StartTime));
+                _graphs.Add(graph);
+                _graphPlacements[graph] = Matrix4x4.Identity;
+                _spellSteps[graph] = step;
+                if (step.StopTime > step.StartTime)
+                    _graphStopTimes[graph] = step.StopTime;
+                _graph ??= graph;
+
+                double active = Math.Max(0d, step.StopTime - step.StartTime);
+                duration = Math.Max(
+                    duration,
+                    step.StopTime + VfxDurationCalculator.LingerTail(step.System, active));
+            }
+
+            _activeSystem = new VfxSystemModel
+            {
+                Name = "Spell Preview",
+                SystemCatalog = systems,
+                ResourceMap = resourceMap,
+                SearchDirectory = searchDirectory,
+                OwnerSceneContext = ownerSceneContext,
+                TotalDuration = Math.Min(Math.Max(0.1d, duration), 60d),
+                Speed = 1.0
+            };
+            ApplySpellTransforms(0d);
+            return steps.Count > 0 || animationDuration > 0d;
+        }
+
         public bool SetAnimationSession(
             VfxAbilityComposition composition,
             IReadOnlyList<VfxIdleEffectDefinition> idleEffects,
@@ -298,6 +398,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _scheduledEffectKills.Clear();
             _graphStopTimes.Clear();
             _graphAttachments.Clear();
+            _spellSteps.Clear();
 
             if (_ready)
             {
@@ -475,6 +576,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
             foreach (VfxPlaybackGraphRuntime graph in _graphs)
             {
+                if (_spellSteps.ContainsKey(graph))
+                {
+                    // Ability projectile/impact rigs are independent scene rigs in LTK; they do
+                    // not inherit the owner's live joint table even while the champion animates.
+                    graph.SetJointTransformProvider(null);
+                    continue;
+                }
+
                 // boneToSpawnAt children use the same live skeleton as clip/idle attachments.
                 graph.SetJointTransformProvider(jointProvider);
 
@@ -678,6 +787,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             {
                 _activeSystem.CurrentTime = 0;
                 ApplyRigTransform();
+                ApplySpellTransforms(0d);
             }
         }
 
@@ -691,7 +801,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         {
             ClearCheckpoints();
             _worldTransform = transform;
-            if (_graphAttachments.Count > 0)
+            if (_spellSteps.Count > 0)
+            {
+                ApplySpellTransforms(_activeSystem?.CurrentTime ?? 0d);
+            }
+            else if (_graphAttachments.Count > 0)
             {
                 foreach (VfxPlaybackGraphRuntime graph in _graphs)
                 {
@@ -805,6 +919,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             foreach (var attachment in _graphAttachments.Values) attachment.HasBoneTransform = false;
             _activeSystem.CurrentTime = 0;
             ApplyRigTransform();
+            ApplySpellTransforms(0d);
             if (_boneTransformSampler != null)
                 UpdateBoneTransforms((name, hash) => _boneTransformSampler(0, name, hash));
         }
@@ -883,6 +998,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
                 _activeSystem.CurrentTime = next;
                 ApplyRigTransform();
+                ApplySpellTransforms(next);
                 if (_boneTransformSampler != null)
                     UpdateBoneTransforms((name, hash) => _boneTransformSampler(next, name, hash));
                 else if (_boneTransformProvider != null)
@@ -1227,6 +1343,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _graphPlacements.Clear();
             _scheduledEffectKills.Clear();
             _graphStopTimes.Clear();
+            _graphAttachments.Clear();
+            _spellSteps.Clear();
             _activeSystem = null;
         }
     }

@@ -5,7 +5,9 @@ using System.Linq;
 using System.Numerics;
 using CommunityToolkit.HighPerformance.Buffers;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Loading;
+using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
@@ -942,16 +944,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 VfxBrowserFolder yunaraNode = Assert.IsType<VfxBrowserFolder>(characters.Children[0]);
                 Assert.Equal("PetChibiYunara", yunaraNode.Title);
                 Assert.Equal("Companion", yunaraNode.Subtitle);
-                Assert.Equal(new[] { "Skins", "Spells" },
+                Assert.Equal(new[] { "Skins" },
                     yunaraNode.Children.Cast<VfxBrowserFolder>().Select(folder => folder.Title));
 
                 VfxBrowserFolder skins = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[0]);
                 VfxSkinItem skin = Assert.IsType<VfxSkinItem>(Assert.Single(skins.Children));
                 Assert.Equal("Skin 1", skin.Title);
-                Assert.Equal(new[] { "Systems", "Clips" }, skin.Sections.Select(section => section.Title));
+                Assert.Equal(new[] { "Systems", "Clips", "Spells" }, skin.Sections.Select(section => section.Title));
 
-                VfxBrowserFolder spells = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[1]);
-                VfxBrowserFolder spellGroup = Assert.IsType<VfxBrowserFolder>(Assert.Single(spells.Children));
+                VfxBrowserFolder spellGroup = Assert.IsType<VfxBrowserFolder>(Assert.Single(skin.SpellItems));
                 Assert.Equal("Q", spellGroup.Title);
                 VfxSpellBrowserItem spell = Assert.IsType<VfxSpellBrowserItem>(Assert.Single(spellGroup.Children));
                 Assert.Equal("Missile", spell.Name);

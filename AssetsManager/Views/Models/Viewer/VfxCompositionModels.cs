@@ -166,6 +166,91 @@ namespace AssetsManager.Views.Models.Viewer
         VfxSystemDefinition System,
         bool UsesEnemyEffect);
 
+    public enum VfxSpellAvailability
+    {
+        Supported,
+        Unsupported,
+        Ambiguous,
+        Unavailable
+    }
+
+    public enum VfxSpellIssueKind
+    {
+        Invalid,
+        Unsupported
+    }
+
+    public sealed record VfxSpellIssue(string Path, VfxSpellIssueKind Kind);
+
+    public enum VfxSpellMissileMovementKind
+    {
+        Missing,
+        FixedSpeed,
+        FixedTime,
+        Unsupported
+    }
+
+    public sealed record VfxSpellMissilePreview(
+        VfxSpellMissileMovementKind MovementKind,
+        float? Speed,
+        float? Duration,
+        float? StartDelay,
+        string StartBoneName,
+        string TargetBoneName,
+        float? TargetHeight,
+        float? InitialTargetHeight);
+
+    /// <summary>The subset of SpellDataResource consumed by the isolated ability preview.</summary>
+    public sealed record VfxSpellPreview(
+        float? SpellCastTime,
+        float? CastTime,
+        bool? HaveHitEffect,
+        uint HitEffectKey,
+        string HitEffectName,
+        float? CastRange,
+        string AnimationName,
+        VfxSpellMissilePreview Missile,
+        uint MissileEffectKey,
+        string MissileEffectName,
+        IReadOnlyList<VfxSpellIssue> Issues)
+    {
+        public bool HasInvalidIssues => Issues?.Any(issue => issue.Kind == VfxSpellIssueKind.Invalid) == true;
+        public bool HasInvalidHitEffectFields => Issues?.Any(issue =>
+            issue.Kind == VfxSpellIssueKind.Invalid &&
+            (issue.Path == "mSpell.bHaveHitEffect" ||
+             issue.Path == "mSpell.mHitEffectKey" ||
+             issue.Path == "mSpell.mHitEffectName")) == true;
+    }
+
+    public enum VfxSpellPlaybackMotion
+    {
+        Static,
+        Path
+    }
+
+    /// <summary>One resolved visual step of a SpellObject preview in the selected skin context.</summary>
+    public sealed record VfxSpellPlaybackStep(
+        string Id,
+        VfxSystemDefinition System,
+        uint EffectKey,
+        double StartTime,
+        double StopTime,
+        Vector3 From,
+        Vector3 To,
+        VfxSpellPlaybackMotion Motion,
+        int Seed);
+
+    public sealed record VfxSpellPreviewPlan(
+        VfxSpellAvailability Availability,
+        AnimationClipCatalogItem Animation,
+        IReadOnlyList<VfxSpellPlaybackStep> Steps,
+        double Release,
+        double Arrival,
+        string StartBoneName,
+        Vector3 Source,
+        Vector3 Target,
+        string Status);
+
     public sealed record VfxAbilityComposition(
         uint SequencePathHash,
         uint SequenceClassHash,

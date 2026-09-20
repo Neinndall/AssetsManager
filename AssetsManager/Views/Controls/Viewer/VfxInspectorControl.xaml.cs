@@ -51,6 +51,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isUpdatingAnimationParameter;
         private VfxSystemDiagnosticItem _pendingSystem;
         private VfxSystemDiagnosticItem _inspectedSystem;
+        private VfxSpellBrowserItem _pendingSpell;
+        private VfxSpellPreviewPlan _activeSpellPlan;
         private GlMeshRenderer _championMeshRenderer;
         private SceneModel _championModel;
         private AnimationService _championAnimationService;
@@ -160,6 +162,11 @@ namespace AssetsManager.Views.Controls.Viewer
                     ConfigureAnimationParameterOptions(_model.SelectedAnimation);
                     PlaySelectedAnimation(_model.SelectedAnimation);
                 }
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedSpell))
+            {
+                if (_model.SelectedSpell != null)
+                    RequestSpellPreview(_model.SelectedSpell);
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.AnimationParameter) &&
                      !_isUpdatingAnimationParameter &&
@@ -646,8 +653,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 ApplyAnimationClipCues(_model.CurrentTime);
                 if (_championModel.CurrentAnimation != null && _championModel.Skeleton != null)
                 {
+                    float animationTime = _activeSpellPlan?.Animation != null
+                        ? SpellAnimationTime(_model.CurrentTime, _activeSpellPlan.Animation.Duration)
+                        : (float)_model.CurrentTime;
                     _championAnimationService.Update(
-                        (float)_model.CurrentTime,
+                        animationTime,
                         _championModel.CurrentAnimation,
                         _championModel.Skeleton,
                         _championModel.SkinnedMesh,
@@ -953,7 +963,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.IsPlaying = true;
             }
             UpdateRigControlValues();
-            ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
         }
 
         private void ApplyRigTuning(VfxRigSettings settings)
@@ -978,7 +987,6 @@ namespace AssetsManager.Views.Controls.Viewer
             UpdateRigControlValues();
             UpdateTimelineTrackMetrics();
             UpdatePlayheadPosition();
-            ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
         }
 
         private void UpdateRigControlValues()
@@ -1093,6 +1101,8 @@ namespace AssetsManager.Views.Controls.Viewer
             _vfxRenderer?.Pause();
             _pendingSystem = null;
             _inspectedSystem = null;
+            _pendingSpell = null;
+            _activeSpellPlan = null;
             ClearAnimationClipCues();
 
             if (_championModel != null)
@@ -1113,6 +1123,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _abilityCompositions = Array.Empty<VfxAbilityComposition>();
 
             _model.SelectedAnimation = null;
+            _model.SelectedSpell = null;
             _model.SelectedSystem = null;
             _model.SelectedSkin = null;
             _model.DetectedAnimations.Clear();
@@ -1223,8 +1234,12 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             _browserSkin = _model.SelectedSkin;
             if (_browserSkin == null) return;
-            _browserSkin.Sections[0].Items = CollectionViewSource.GetDefaultView(_model.Systems);
-            _browserSkin.Sections[1].Items = CollectionViewSource.GetDefaultView(_model.DetectedAnimations);
+            VfxBrowserSection systems = _browserSkin.Sections.FirstOrDefault(section => section.Kind == VfxBrowserSectionKind.Systems);
+            VfxBrowserSection clips = _browserSkin.Sections.FirstOrDefault(section => section.Kind == VfxBrowserSectionKind.Clips);
+            VfxBrowserSection spells = _browserSkin.Sections.FirstOrDefault(section => section.Kind == VfxBrowserSectionKind.Spells);
+            if (systems != null) systems.Items = CollectionViewSource.GetDefaultView(_model.Systems);
+            if (clips != null) clips.Items = CollectionViewSource.GetDefaultView(_model.DetectedAnimations);
+            if (spells != null) spells.Items = CollectionViewSource.GetDefaultView(_browserSkin.SpellItems);
             _model.IsRawSystemsMode = true;
             LoadBinFile(_browserSkin.BinPath);
         }
@@ -1245,15 +1260,29 @@ namespace AssetsManager.Views.Controls.Viewer
                     break;
                 case VfxBrowserSection section:
                     if (!ReferenceEquals(_model.SelectedSkin, section.Owner)) _model.SelectedSkin = section.Owner;
-                    _model.IsAnimationMode = section.IsAnimation;
+                    _model.IsAnimationMode = section.Kind != VfxBrowserSectionKind.Systems;
                     break;
                 case VfxSystemDiagnosticItem system:
+                    _pendingSpell = null;
+                    _model.SelectedSpell = null;
+                    _model.SelectedAnimation = null;
                     _model.IsRawSystemsMode = true;
                     _model.SelectedSystem = system;
                     break;
                 case AnimationClipCatalogItem animation:
+                    _pendingSpell = null;
+                    _model.SelectedSpell = null;
+                    _model.SelectedSystem = null;
                     _model.IsAnimationMode = true;
                     _model.SelectedAnimation = animation;
+                    break;
+                case VfxSpellBrowserItem spell:
+                    _pendingSpell = spell;
+                    if (!ReferenceEquals(_model.SelectedSkin, spell.Owner)) _model.SelectedSkin = spell.Owner;
+                    _model.SelectedSystem = null;
+                    _model.SelectedAnimation = null;
+                    _model.IsAnimationMode = true;
+                    _model.SelectedSpell = spell;
                     break;
             }
         }
@@ -1267,10 +1296,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 RememberStandaloneRun(_inspectedSystem);
             _pendingSystem = null;
             _inspectedSystem = null;
+            _pendingSpell = null;
+            _activeSpellPlan = null;
             _activeBundle = null;
             _championLoadGeneration++;
             ClearAnimationClipCues();
             _model.SelectedAnimation = null;
+            _model.SelectedSpell = null;
             _model.SetAnimationParameterOptions(Array.Empty<float>(), null);
             _model.DetectedAnimations.Clear();
             _vfxRenderer?.SetSystem(null);
@@ -1429,6 +1461,8 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             var def = systemItem.Definition;
             if (def == null) return;
+            _pendingSpell = null;
+            _activeSpellPlan = null;
 
             StandaloneRunMemory remembered = RecallStandaloneRun(systemItem);
             int playbackSeed = remembered?.Seed ?? StandalonePlaybackSeed;
@@ -1479,7 +1513,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.RigPreset = rigPreset;
             }
             SetPlaybackSpeed(playbackSpeed);
-            ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
 
             double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(_model.RigPreset, def);
             double timelineMax = ResolveTimelineDuration(rigDuration);
@@ -1605,7 +1638,11 @@ namespace AssetsManager.Views.Controls.Viewer
         private async void TryLoadChampionModelAsync(string searchDir)
         {
             if (string.IsNullOrEmpty(searchDir)) return;
-            if (_championModel != null && ReferenceEquals(_championBundle, _activeBundle)) return;
+            if (_championModel != null && ReferenceEquals(_championBundle, _activeBundle))
+            {
+                TryPlayPendingSpell();
+                return;
+            }
             int generation = ++_championLoadGeneration;
             var bundle = _activeBundle;
             try
@@ -1663,6 +1700,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         // the user explicitly chooses an Animation Clip in the browser.
                         if (_model.DetectedAnimations.Count == 0)
                             BindAnimationCatalog(searchDir);
+                        TryPlayPendingSpell();
                         return;
                     }
                 }
@@ -1763,15 +1801,12 @@ namespace AssetsManager.Views.Controls.Viewer
         private void PlaySelectedAnimation(AnimationClipCatalogItem animItem)
         {
             if (animItem == null || _championModel == null) return;
+            _pendingSpell = null;
+            _activeSpellPlan = null;
 
             // Animation Clip playback can trigger several VFX systems over time, so the
             // standalone emitter audit from a previously selected System is not meaningful here.
-            _model.SelectedEmitter = null;
-            _model.Emitters.Clear();
-            _model.Textures.Clear();
-            _model.Meshes.Clear();
-            _model.HasAnySolo = false;
-            _model.IsAllMuted = false;
+            ClearCompositeDiagnostics();
 
             _championModel.CurrentAnimation = animItem.AnimationAsset;
             _championModel.AnimationTime = 0;
@@ -1783,11 +1818,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.ActiveLoopDuration = dur;
             _model.IsPreviewLoopEnabled = true;
 
-            string searchDir = _model.RootPath;
-            if (!string.IsNullOrEmpty(searchDir) && File.Exists(searchDir))
-            {
-                searchDir = Path.GetDirectoryName(searchDir) ?? searchDir;
-            }
+            string searchDir = ResolvePreviewSearchDirectory();
 
             EnsureVfxRenderSession();
             ConfigureAnimationClipCues(animItem);
@@ -1818,6 +1849,206 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.LogMessages.Add($"[PLAY ANIMATION] {animItem.DisplayName} ({dur:F2}s) with {(animItem.Composition?.ResolvedCount ?? 0)} VFX events & {(_activeBundle?.IdleEffects.Count ?? 0)} idle auras.");
             UpdateTimelineTrackMetrics();
             UpdatePlayheadPosition();
+        }
+
+        private void ClearCompositeDiagnostics()
+        {
+            _model.SelectedEmitter = null;
+            _model.Emitters.Clear();
+            _model.Textures.Clear();
+            _model.Meshes.Clear();
+            _model.HasAnySolo = false;
+            _model.IsAllMuted = false;
+        }
+
+        private string ResolvePreviewSearchDirectory()
+        {
+            string searchDir = _model.RootPath;
+            return !string.IsNullOrEmpty(searchDir) && File.Exists(searchDir)
+                ? Path.GetDirectoryName(searchDir) ?? searchDir
+                : searchDir;
+        }
+
+        private bool IsActiveSpellSkin(VfxSpellBrowserItem spell)
+        {
+            if (spell?.Owner == null || _activeBundle == null) return false;
+            return string.Equals(
+                Path.GetFullPath(_activeBundle.PrimaryBinPath ?? string.Empty),
+                Path.GetFullPath(spell.Owner.BinPath ?? string.Empty),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void RequestSpellPreview(VfxSpellBrowserItem spell)
+        {
+            if (spell == null) return;
+            _pendingSpell = spell;
+
+            if (!ReferenceEquals(_model.SelectedSkin, spell.Owner))
+            {
+                _model.SelectedSkin = spell.Owner;
+                return;
+            }
+
+            if (!IsActiveSpellSkin(spell)) return;
+
+            if (_championModel == null || !ReferenceEquals(_championBundle, _activeBundle))
+            {
+                TryLoadChampionModelAsync(_model.RootPath);
+                return;
+            }
+
+            PlaySelectedSpell(spell);
+        }
+
+        private void TryPlayPendingSpell()
+        {
+            VfxSpellBrowserItem spell = _pendingSpell;
+            if (spell == null || !ReferenceEquals(_model.SelectedSpell, spell)) return;
+            if (!ReferenceEquals(_model.SelectedSkin, spell.Owner) ||
+                !IsActiveSpellSkin(spell) ||
+                _championModel == null ||
+                !ReferenceEquals(_championBundle, _activeBundle))
+            {
+                return;
+            }
+
+            PlaySelectedSpell(spell);
+        }
+
+        private void PlaySelectedSpell(VfxSpellBrowserItem spell)
+        {
+            if (spell == null || _activeBundle == null || _championModel == null) return;
+            _pendingSpell = null;
+
+            if (spell.Availability != VfxSpellAvailability.Supported)
+            {
+                _activeSpellPlan = null;
+                _model.IsPlaying = false;
+                _vfxRenderer?.Pause();
+                _model.StatusText = $"{spell.Name} · {spell.AvailabilityText}.";
+                return;
+            }
+
+            EnsureVfxRenderSession();
+            Func<uint, string> resolveSystemPath = VfxLoadingService == null
+                ? null
+                : hash => VfxLoadingService.ResolveBinEntryPath(hash);
+            VfxSpellPreviewPlan plan = VfxSpellPreviewComposer.Build(
+                spell,
+                _activeBundle,
+                _model.DetectedAnimations.ToArray(),
+                ResolveSpellSource,
+                resolveSystemPath);
+            _activeSpellPlan = plan;
+            if (plan.Availability != VfxSpellAvailability.Supported)
+            {
+                _model.IsPlaying = false;
+                _vfxRenderer?.Pause();
+                _model.StatusText = $"{spell.Name} · {plan.Status}";
+                return;
+            }
+
+            ClearAnimationClipCues();
+            ClearCompositeDiagnostics();
+            _model.CurrentTime = 0d;
+            _model.ActiveLoopStart = 0d;
+            _model.IsPreviewLoopEnabled = false;
+
+            AnimationClipCatalogItem animation = plan.Animation;
+            _championModel.CurrentAnimation = animation?.AnimationAsset;
+            _championModel.AnimationTime = 0d;
+            if (animation != null && _championAnimationService != null && _championModel.Skeleton != null)
+            {
+                _championAnimationService.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
+                _championAnimationService.Update(
+                    0f,
+                    animation.AnimationAsset,
+                    _championModel.Skeleton,
+                    _championModel.SkinnedMesh,
+                    _championModel.Parts,
+                    _championModel.Name);
+                _championModel.SkinningMatrices = _championAnimationService.FinalBoneTransforms;
+                _championModel.GpuSkinningData = _championAnimationService.SkinningData;
+            }
+            else
+            {
+                _championModel.SkinningMatrices = null;
+            }
+
+            string searchDir = ResolvePreviewSearchDirectory();
+
+            bool ready = _vfxRenderer?.SetSpellSession(
+                plan.Steps,
+                _activeBundle.Systems,
+                _activeBundle.ResourceMap,
+                searchDir,
+                animation?.Duration ?? 0d,
+                _activeBundle.OwnerSceneContext) == true;
+            if (_vfxRenderer != null)
+            {
+                _vfxRenderer.SetOwnerSkinningMatrices(_championModel.SkinningMatrices);
+                if (ready) _vfxRenderer.Play();
+            }
+
+            double duration = _vfxRenderer?.RigDuration ?? Math.Max(animation?.Duration ?? 0d, plan.Arrival + VfxSpellPreviewComposer.ImpactDuration);
+            _model.TotalDuration = ResolveTimelineDuration(duration);
+            _model.ActiveLoopDuration = _model.TotalDuration;
+            _model.IsPlaying = ready;
+            _model.StatusText = $"{spell.Name} · {plan.Status} · release {plan.Release:F2}s / arrival {plan.Arrival:F2}s";
+            _model.LogMessages.Add($"[PLAY SPELL] {spell.ObjectPath} · {plan.Status}.");
+            UpdateTimelineTrackMetrics();
+            UpdatePlayheadPosition();
+        }
+
+        private Vector3? ResolveSpellSource(
+            AnimationClipCatalogItem animation,
+            double time,
+            string boneName)
+        {
+            if (string.IsNullOrWhiteSpace(boneName)) return Vector3.Zero;
+            if (_championModel?.Skeleton == null) return null;
+
+            Matrix4x4 boneTransform;
+            if (animation != null && _championAnimationService != null)
+            {
+                _championAnimationService.Update(
+                    0f,
+                    animation.AnimationAsset,
+                    _championModel.Skeleton,
+                    _championModel.SkinnedMesh,
+                    _championModel.Parts,
+                    _championModel.Name);
+                float sampleTime = SpellAnimationTime(time, animation.Duration);
+                if (!_championAnimationService.TrySampleBoneTransform(
+                        sampleTime,
+                        boneName,
+                        Fnv1a.HashLower(boneName),
+                        out boneTransform))
+                {
+                    return null;
+                }
+            }
+            else if (!AnimationService.TryGetBindBoneTransform(
+                         _championModel.Skeleton,
+                         boneName,
+                         out boneTransform))
+            {
+                return null;
+            }
+
+            float skinScale = _activeBundle?.OwnerSceneContext is { SkinScale: > 0f } context
+                ? context.SkinScale
+                : 1f;
+            return VfxRenderSession.PrepareBoneAnchorTransform(
+                boneTransform,
+                Vector3.Zero,
+                skinScale).Translation;
+        }
+
+        internal static float SpellAnimationTime(double time, float duration)
+        {
+            if (!(duration > 0f) || !float.IsFinite(duration) || !double.IsFinite(time)) return 0f;
+            return (float)Math.Clamp(time, 0d, Math.Max(0d, duration - 0.000001d));
         }
 
         private void ConfigureAnimationClipCues(AnimationClipCatalogItem clip)
@@ -2374,19 +2605,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            if (_model.IsAnimationMode && _model.SelectedAnimation != null)
-            {
-                if (_model.CurrentTime >= _model.TotalDuration)
-                {
-                    PlaySelectedAnimation(_model.SelectedAnimation);
-                }
-                else
-                {
-                    _model.IsPlaying = true;
-                    _vfxRenderer?.Play();
-                }
+            if (TryPlaySelectedTimedPreview(restartWhenPlaying: false, rebuildWhenEnded: true))
                 return;
-            }
 
             if (_model.SelectedSystem != null)
             {
@@ -2636,21 +2856,56 @@ namespace AssetsManager.Views.Controls.Viewer
                ReferenceEquals(_inspectedSystem, _model.SelectedSystem) &&
                _vfxRenderer?.ActiveSystem != null;
 
-        private void Play_Click(object sender, RoutedEventArgs e)
+        private bool HasSelectedSpellReady()
+            => _model.SelectedSpell != null &&
+               _activeSpellPlan?.Availability == VfxSpellAvailability.Supported &&
+               _vfxRenderer?.ActiveSystem != null;
+
+        private bool TryPlaySelectedTimedPreview(bool restartWhenPlaying, bool rebuildWhenEnded)
         {
-            if (_model.IsAnimationMode && _model.SelectedAnimation != null)
+            bool ended = _model.CurrentTime >= _model.TotalDuration;
+            if (_model.SelectedSpell != null)
             {
-                if (_model.IsPlaying || _model.CurrentTime >= _model.TotalDuration)
+                if (!HasSelectedSpellReady() ||
+                    (restartWhenPlaying && _model.IsPlaying) ||
+                    (rebuildWhenEnded && ended))
                 {
-                    PlaySelectedAnimation(_model.SelectedAnimation);
+                    RequestSpellPreview(_model.SelectedSpell);
                 }
                 else
                 {
-                    _model.IsPlaying = true;
-                    _vfxRenderer?.Play();
+                    ResumeTimedPreview(ended);
                 }
-                return;
+                return true;
             }
+
+            if (_model.IsAnimationMode && _model.SelectedAnimation != null)
+            {
+                if ((restartWhenPlaying && _model.IsPlaying) || (rebuildWhenEnded && ended))
+                    PlaySelectedAnimation(_model.SelectedAnimation);
+                else
+                    ResumeTimedPreview(ended);
+                return true;
+            }
+
+            return false;
+        }
+
+        private void ResumeTimedPreview(bool restartFromBeginning)
+        {
+            if (restartFromBeginning)
+            {
+                _model.CurrentTime = 0d;
+                _vfxRenderer?.Seek(0d);
+            }
+            _model.IsPlaying = true;
+            _vfxRenderer?.Play();
+        }
+
+        private void Play_Click(object sender, RoutedEventArgs e)
+        {
+            if (TryPlaySelectedTimedPreview(restartWhenPlaying: true, rebuildWhenEnded: true))
+                return;
 
             if (_model.SelectedSystem != null)
             {
@@ -2678,17 +2933,8 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             else
             {
-                if (_model.IsAnimationMode && _model.SelectedAnimation != null)
-                {
-                    if (_model.CurrentTime >= _model.TotalDuration)
-                    {
-                        _model.CurrentTime = 0;
-                        _vfxRenderer?.Seek(0);
-                    }
-                    _model.IsPlaying = true;
-                    _vfxRenderer?.Play();
+                if (TryPlaySelectedTimedPreview(restartWhenPlaying: false, rebuildWhenEnded: false))
                     return;
-                }
 
                 if (_model.SelectedSystem != null)
                 {

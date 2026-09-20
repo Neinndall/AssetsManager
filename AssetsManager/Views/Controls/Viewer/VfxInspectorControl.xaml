@@ -15,6 +15,14 @@
         <Style x:Key="VfxBrowserItemStyle" TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
             <Setter Property="IsExpanded" Value="False"/>
             <EventSetter Event="Expanded" Handler="BrowserItem_Expanded"/>
+            <Style.Triggers>
+                <!-- Only VfxSpellBrowserItem exposes IsPlayable. Unsupported/ambiguous/unavailable
+                     spells stay visible like LTK, but cannot start an invalid preview. -->
+                <DataTrigger Binding="{Binding IsPlayable}" Value="False">
+                    <Setter Property="IsEnabled" Value="False"/>
+                    <Setter Property="Opacity" Value="0.55"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
         <Style x:Key="VfxBrowserBranchStyle" TargetType="TreeViewItem" BasedOn="{StaticResource VfxBrowserItemStyle}">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
@@ -66,9 +74,9 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type models:VfxSpellBrowserItem}">
             <StackPanel Orientation="Horizontal" Margin="2,4" ToolTip="{Binding ObjectPath}">
-                <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="14" Height="14" Foreground="#A78BFA" Margin="0,0,7,0"/>
+                <materialIcons:MaterialIcon Kind="PlayCircleOutline" Width="14" Height="14" Foreground="#A78BFA" Margin="0,0,7,0"/>
                 <TextBlock Text="{Binding Name}" FontSize="11" MaxWidth="205" TextTrimming="CharacterEllipsis"/>
-                <TextBlock Text="Spell" FontSize="9" Foreground="#A78BFA" Margin="8,1,0,0"/>
+                <TextBlock Text="{Binding AvailabilityText}" FontSize="9" Foreground="#A78BFA" Margin="8,1,0,0"/>
             </StackPanel>
         </DataTemplate>
 

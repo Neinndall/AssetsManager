@@ -291,6 +291,38 @@ namespace AssetsManager.Services.Viewer.Animation
             return (float)PositiveModulo(time, duration);
         }
 
+        internal static bool TryGetBindBoneTransform(
+            RigResource skeleton,
+            string boneName,
+            out Matrix4x4 transform)
+        {
+            transform = Matrix4x4.Identity;
+            if (skeleton == null || string.IsNullOrWhiteSpace(boneName)) return false;
+
+            int jointIndex = -1;
+            for (int index = 0; index < skeleton.Joints.Count; index++)
+            {
+                if (string.Equals(skeleton.Joints[index].Name, boneName, StringComparison.OrdinalIgnoreCase))
+                {
+                    jointIndex = index;
+                    break;
+                }
+            }
+            if (jointIndex < 0) return false;
+
+            (int[] order, int[] parents) = BuildHierarchy(
+                skeleton.Joints.Select(static joint => (int)joint.ParentId).ToArray());
+            var world = new Matrix4x4[skeleton.Joints.Count];
+            foreach (int index in order)
+            {
+                Matrix4x4 local = skeleton.Joints[index].LocalTransform;
+                int parent = parents[index];
+                world[index] = parent >= 0 ? local * world[parent] : local;
+            }
+            transform = world[jointIndex];
+            return true;
+        }
+
         internal static (int[] Order, int[] Parents) BuildHierarchy(IReadOnlyList<int> sourceParents)
         {
             int count = sourceParents?.Count ?? 0;

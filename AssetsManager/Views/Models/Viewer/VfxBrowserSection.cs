@@ -49,25 +49,44 @@ namespace AssetsManager.Views.Models.Viewer
     /// <summary>One named SpellObject discovered below Characters/{character}/Spells.</summary>
     public sealed class VfxSpellBrowserItem
     {
+        public VfxSkinItem Owner { get; init; }
         public string Name { get; init; }
         public string ObjectPath { get; init; }
         public uint PathHash { get; init; }
         public string BinPath { get; init; }
+        public int DeclarationCount { get; init; } = 1;
+        public VfxSpellPreview Preview { get; init; }
+        public VfxSpellAvailability Availability { get; init; }
+        public bool IsPlayable => Availability == VfxSpellAvailability.Supported;
+        public string AvailabilityText => Availability switch
+        {
+            VfxSpellAvailability.Supported => "Play",
+            VfxSpellAvailability.Ambiguous => "Ambiguous",
+            VfxSpellAvailability.Unavailable => "Unavailable",
+            _ => "Unsupported"
+        };
         public string SourceName => System.IO.Path.GetFileName(BinPath);
+    }
+
+    public enum VfxBrowserSectionKind
+    {
+        Systems,
+        Clips,
+        Spells
     }
 
     public sealed class VfxBrowserSection : INotifyPropertyChanged
     {
-        public VfxBrowserSection(VfxSkinItem owner, string title, bool isAnimation)
+        public VfxBrowserSection(VfxSkinItem owner, string title, VfxBrowserSectionKind kind)
         {
             Owner = owner;
             Title = title;
-            IsAnimation = isAnimation;
+            Kind = kind;
         }
 
         public VfxSkinItem Owner { get; }
         public string Title { get; }
-        public bool IsAnimation { get; }
+        public VfxBrowserSectionKind Kind { get; }
         private bool _isExpanded;
         public bool IsExpanded
         {

@@ -234,5 +234,40 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 }
             }
         }
+
+        /// <summary>
+        /// Evaluates the same path rig used by missile preview, but for explicit endpoints and
+        /// absolute scene times. Ability previews and the standalone Missile preset therefore
+        /// share one orientation convention instead of maintaining separate flight math.
+        /// </summary>
+        internal static Matrix4x4 PathTransform(
+            Vector3 from,
+            Vector3 to,
+            double time,
+            double startTime,
+            double stopTime)
+        {
+            double span = Math.Max(0d, stopTime - startTime);
+            float progress = span > 0d
+                ? (float)Math.Clamp((time - startTime) / span, 0d, 1d)
+                : 1f;
+            Vector3 origin = Vector3.Lerp(from, to, progress);
+            Vector3 forward = new(to.X - from.X, 0f, to.Z - from.Z);
+            if (forward.LengthSquared() == 0f) forward = Vector3.UnitZ;
+            else forward = Vector3.Normalize(forward);
+
+            Vector3 side = Vector3.Cross(Vector3.UnitY, forward);
+            if (side.LengthSquared() == 0f) side = Vector3.UnitX;
+            else side = Vector3.Normalize(side);
+            Vector3 down = Vector3.Cross(side, forward);
+            if (down.LengthSquared() == 0f) down = -Vector3.UnitY;
+            else down = Vector3.Normalize(down);
+
+            return new Matrix4x4(
+                side.X, side.Y, side.Z, 0f,
+                forward.X, forward.Y, forward.Z, 0f,
+                down.X, down.Y, down.Z, 0f,
+                origin.X, origin.Y, origin.Z, 1f);
+        }
     }
 }
