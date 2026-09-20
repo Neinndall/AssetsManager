@@ -26,6 +26,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal bool TextureResolved;
             internal string LoadedTextureKey;
             internal BitmapSource LoadedBitmap;
+            internal bool LoadedBitmapSrgb;
             internal string AuxiliaryTextureSignature;
             internal readonly Dictionary<string, uint> AuxiliaryTextures =
                 new(StringComparer.OrdinalIgnoreCase);
@@ -54,6 +55,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         private readonly ConditionalWeakTable<ModelPart, PartResources> _partResources = new();
         private readonly HashSet<PartResources> _liveResources = new();
         private readonly Dictionary<BitmapSource, SharedTexture> _sharedTextures =
+            new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<BitmapSource, SharedTexture> _sharedSrgbTextures =
             new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<BitmapSource, SharedTexture> _sharedLightmapTextures =
             new(ReferenceEqualityComparer.Instance);
@@ -272,20 +275,32 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         private void EnsureBaseTexture(ModelPart part, PartResources resources)
         {
             string selectedTexture = part.SelectedTextureName;
-            if (resources.TextureResolved && resources.LoadedTextureKey == selectedTexture)
+            bool srgb = part.MaterialDefinition != null;
+            if (resources.TextureResolved &&
+                resources.LoadedTextureKey == selectedTexture &&
+                resources.LoadedBitmapSrgb == srgb)
+            {
                 return;
+            }
 
             ReleaseBaseTexture(resources);
             resources.TextureResolved = true;
             resources.LoadedTextureKey = selectedTexture;
+            resources.LoadedBitmapSrgb = srgb;
             resources.LoadedBitmap = TextureUtils.ResolveTexture(part.AllTextures, selectedTexture);
             if (resources.LoadedBitmap == null) return;
 
+            Dictionary<BitmapSource, SharedTexture> cache = srgb ? _sharedSrgbTextures : _sharedTextures;
             resources.Texture = AcquireTexture(
-                _sharedTextures,
+                cache,
                 resources.LoadedBitmap,
-                () => UploadTexture(resources.LoadedBitmap));
+                () => UploadTexture(
+                    resources.LoadedBitmap,
+                    internalFormat: BaseTextureInternalFormat(srgb)));
         }
+
+        internal static InternalFormat BaseTextureInternalFormat(bool srgb) =>
+            srgb ? InternalFormat.Srgb8Alpha8 : InternalFormat.Rgba8;
 
         private void EnsureLightmapTexture(ModelPart part, PartResources resources)
         {
@@ -382,9 +397,12 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         private void ReleaseBaseTexture(PartResources resources)
         {
-            ReleaseSharedTexture(_sharedTextures, resources.LoadedBitmap);
+            Dictionary<BitmapSource, SharedTexture> cache =
+                resources.LoadedBitmapSrgb ? _sharedSrgbTextures : _sharedTextures;
+            ReleaseSharedTexture(cache, resources.LoadedBitmap);
             resources.Texture = 0;
             resources.LoadedBitmap = null;
+            resources.LoadedBitmapSrgb = false;
         }
 
         private void ReleaseLightmapTexture(PartResources resources)
@@ -462,7 +480,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         private uint UploadTexture(
             BitmapSource bitmap,
-            TextureWrapMode wrapMode = TextureWrapMode.Repeat)
+            TextureWrapMode wrapMode = TextureWrapMode.Repeat,
+            InternalFormat internalFormat = InternalFormat.Rgba8)
         {
             if (bitmap.Format != PixelFormats.Bgra32)
             {
@@ -485,7 +504,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             _gl.TexImage2D(
                 TextureTarget.Texture2D,
                 0,
-                InternalFormat.Rgba8,
+                internalFormat,
                 (uint)width,
                 (uint)height,
                 0,
@@ -508,6 +527,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 foreach (SharedTexture texture in _sharedTextures.Values)
                     _gl.DeleteTexture(texture.Id);
                 _sharedTextures.Clear();
+
+                foreach (SharedTexture texture in _sharedSrgbTextures.Values)
+                    _gl.DeleteTexture(texture.Id);
+                _sharedSrgbTextures.Clear();
 
                 foreach (SharedTexture texture in _sharedLightmapTextures.Values)
                     _gl.DeleteTexture(texture.Id);
@@ -541,6 +564,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             finally
             {
                 _sharedTextures.Clear();
+                _sharedSrgbTextures.Clear();
                 _sharedLightmapTextures.Clear();
                 _liveResources.Clear();
                 _pendingReleases.Clear();

@@ -24,9 +24,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         {
             Assert.Contains("uniform int uMaterialSrgb;", GlMeshShaderSource.Fragment);
             Assert.Contains("vec4 texColor = readBaseTexture(materialUv);", GlMeshShaderSource.Fragment);
+            Assert.Contains("return texture(uTex, uv);", GlMeshShaderSource.Fragment);
+            Assert.DoesNotContain("sampleValue.rgb = srgbToLinear(sampleValue.rgb);", GlMeshShaderSource.Fragment);
             Assert.Contains("? srgbToLinear(uColorTint.rgb)", GlMeshShaderSource.Fragment);
             Assert.Contains("finalColor = linearToSrgb(finalColor);", GlMeshShaderSource.Fragment);
-            Assert.DoesNotContain("sampleValue.rgb /=", GlMeshShaderSource.Fragment);
+        }
+
+        [Fact]
+        public void CharacterBaseTexturesUseSrgbGpuStorageWhileRawTexturesStayLinear()
+        {
+            Assert.Equal(InternalFormat.Srgb8Alpha8, GlMeshResourceCache.BaseTextureInternalFormat(true));
+            Assert.Equal(InternalFormat.Rgba8, GlMeshResourceCache.BaseTextureInternalFormat(false));
         }
 
         [Fact]

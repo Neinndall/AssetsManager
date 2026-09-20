@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -6,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetRipper.TextureDecoder.Etc;
+using AssetRipper.TextureDecoder.Rgb.Formats;
 using BCnEncoder.Shared;
 using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Toolkit;
@@ -66,12 +69,7 @@ namespace AssetsManager.Utils
 
                 if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
                 {
-                    Texture texture = maxWidth.HasValue && maxHeight.HasValue
-                        ? Texture.LoadTex(textureStream, maxWidth.Value, maxHeight.Value)
-                        : Texture.LoadTex(textureStream);
-                    if (texture.Mips.Length > 0)
-                        return ConvertTextureMipToBitmapSource(texture);
-                    return null;
+                    return LoadTexBitmapSource(textureStream, maxWidth, maxHeight);
                 }
                 else if (extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
                 {
@@ -113,6 +111,255 @@ namespace AssetsManager.Utils
                 return null;
             }
         }
+
+        private static BitmapSource LoadTexBitmapSource(Stream textureStream, int? maxWidth, int? maxHeight)
+        {
+            MemoryStream copy = null;
+            Stream stream = textureStream;
+            if (!stream.CanSeek)
+            {
+                copy = new MemoryStream();
+                stream.CopyTo(copy);
+                copy.Position = 0;
+                stream = copy;
+            }
+
+            try
+            {
+                long start = stream.Position;
+                TexHeader header = ReadTexHeader(stream);
+                stream.Position = start;
+
+                if (RequiresCompatibleTexDecode(header.Format))
+                    return DecodeCompatibleTex(stream, start, header, maxWidth, maxHeight);
+
+                Texture texture = maxWidth.HasValue && maxHeight.HasValue
+                    ? Texture.LoadTex(stream, maxWidth.Value, maxHeight.Value)
+                    : Texture.LoadTex(stream);
+                return texture.Mips.Length > 0 ? ConvertTextureMipToBitmapSource(texture) : null;
+            }
+            finally
+            {
+                copy?.Dispose();
+            }
+        }
+
+        private static bool RequiresCompatibleTexDecode(byte format) =>
+            format is 1 or 2 or 3 or 14 or 21 or 22;
+
+        private static TexHeader ReadTexHeader(Stream stream)
+        {
+            using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true);
+            uint magic = reader.ReadUInt32();
+            if (magic != 0x00584554)
+                throw new InvalidDataException($"Invalid TEX magic: {magic:x8}");
+
+            ushort width = reader.ReadUInt16();
+            ushort height = reader.ReadUInt16();
+            byte depth = reader.ReadByte();
+            byte format = reader.ReadByte();
+            byte resourceType = reader.ReadByte();
+            byte flags = reader.ReadByte();
+            return new TexHeader(width, height, depth, format, resourceType, flags);
+        }
+
+        private static BitmapSource DecodeCompatibleTex(
+            Stream stream,
+            long start,
+            TexHeader header,
+            int? maxWidth,
+            int? maxHeight)
+        {
+            int mipCount = (header.Flags & 1) != 0
+                ? (int)Math.Floor(Math.Log2(Math.Max(Math.Max(header.Width, header.Height), Math.Max(header.Depth, (byte)1)))) + 1
+                : 1;
+            int level = 0;
+            if (maxWidth.HasValue && maxHeight.HasValue)
+            {
+                for (int i = 0; i < mipCount; i++)
+                {
+                    int width = Math.Max(header.Width >> i, 1);
+                    int height = Math.Max(header.Height >> i, 1);
+                    if ((width <= maxWidth.Value && height <= maxHeight.Value) || i == mipCount - 1)
+                    {
+                        level = i;
+                        break;
+                    }
+                }
+            }
+
+            int mipWidth = Math.Max(header.Width >> level, 1);
+            int mipHeight = Math.Max(header.Height >> level, 1);
+            long offset = 0;
+            for (int i = mipCount - 1; i > level; i--)
+                offset = checked(offset + GetTexMipByteCount(header, i));
+
+            int sliceBytes = GetTexSliceByteCount(header.Format, mipWidth, mipHeight);
+            long dataOffset = checked(start + 12 + offset);
+            if (dataOffset < 0 || sliceBytes < 0 || dataOffset + sliceBytes > stream.Length)
+                throw new EndOfStreamException("TEX mip data is truncated.");
+
+            stream.Position = dataOffset;
+            byte[] encoded = new byte[sliceBytes];
+            stream.ReadExactly(encoded);
+            byte[] rgba = DecodeCompatibleTexPixels(header.Format, encoded, mipWidth, mipHeight);
+            return CreateBgra32BitmapSource(rgba, mipWidth, mipHeight);
+        }
+
+        private static long GetTexMipByteCount(TexHeader header, int level)
+        {
+            int width = Math.Max(header.Width >> level, 1);
+            int height = Math.Max(header.Height >> level, 1);
+            int depth = Math.Max(header.Depth >> level, 1);
+            return checked((long)GetTexSliceByteCount(header.Format, width, height) * depth);
+        }
+
+        private static int GetTexSliceByteCount(byte format, int width, int height)
+        {
+            (int blockWidth, int blockHeight, int bytesPerBlock) = format switch
+            {
+                1 => (4, 4, 8),
+                2 or 3 or 14 => (4, 4, 16),
+                21 => (1, 1, 8),
+                22 => (1, 1, 16),
+                _ => throw new NotSupportedException($"Unsupported compatible TEX format: {format}")
+            };
+            int blocksX = checked((width + blockWidth - 1) / blockWidth);
+            int blocksY = checked((height + blockHeight - 1) / blockHeight);
+            return checked(blocksX * blocksY * bytesPerBlock);
+        }
+
+        private static byte[] DecodeCompatibleTexPixels(byte format, byte[] encoded, int width, int height)
+        {
+            return format switch
+            {
+                1 => DecodeEtc(encoded, width, height, etc2: false),
+                2 or 3 => DecodeEtc(encoded, width, height, etc2: true),
+                14 => DecodeBc5Snorm(encoded, width, height),
+                21 => DecodeFloatTexture(encoded, width, height, halfPrecision: true),
+                22 => DecodeFloatTexture(encoded, width, height, halfPrecision: false),
+                _ => throw new NotSupportedException($"Unsupported compatible TEX format: {format}")
+            };
+        }
+
+        private static byte[] DecodeEtc(byte[] encoded, int width, int height, bool etc2)
+        {
+            byte[] rgba = new byte[checked(width * height * 4)];
+            if (etc2)
+                EtcDecoder.DecompressETC2A8<ColorRGBA<byte>, byte>(encoded, width, height, rgba);
+            else
+                EtcDecoder.DecompressETC<ColorRGBA<byte>, byte>(encoded, width, height, rgba);
+            return rgba;
+        }
+
+        private static byte[] DecodeBc5Snorm(byte[] encoded, int width, int height)
+        {
+            int blocksX = (width + 3) / 4;
+            int blocksY = (height + 3) / 4;
+            if (encoded.Length != checked(blocksX * blocksY * 16))
+                throw new InvalidDataException("BC5_SNORM TEX payload has an invalid size.");
+
+            byte[] rgba = new byte[checked(width * height * 4)];
+            Span<sbyte> red = stackalloc sbyte[16];
+            Span<sbyte> green = stackalloc sbyte[16];
+            for (int blockIndex = 0; blockIndex < blocksX * blocksY; blockIndex++)
+            {
+                ReadOnlySpan<byte> block = encoded.AsSpan(blockIndex * 16, 16);
+                DecodeBc4SnormBlock(block[..8], red);
+                DecodeBc4SnormBlock(block[8..], green);
+                int baseX = (blockIndex % blocksX) * 4;
+                int baseY = (blockIndex / blocksX) * 4;
+                for (int y = 0; y < 4; y++)
+                {
+                    for (int x = 0; x < 4; x++)
+                    {
+                        int pixelX = baseX + x;
+                        int pixelY = baseY + y;
+                        if (pixelX >= width || pixelY >= height)
+                            continue;
+
+                        int source = y * 4 + x;
+                        int target = (pixelY * width + pixelX) * 4;
+                        rgba[target] = SnormToUnorm(red[source]);
+                        rgba[target + 1] = SnormToUnorm(green[source]);
+                        rgba[target + 2] = 0;
+                        rgba[target + 3] = 255;
+                    }
+                }
+            }
+            return rgba;
+        }
+
+        private static void DecodeBc4SnormBlock(ReadOnlySpan<byte> block, Span<sbyte> output)
+        {
+            sbyte endpoint0 = unchecked((sbyte)block[0]);
+            sbyte endpoint1 = unchecked((sbyte)block[1]);
+            float value0 = Math.Max(endpoint0, (sbyte)-127);
+            float value1 = Math.Max(endpoint1, (sbyte)-127);
+            Span<float> palette = stackalloc float[8];
+            palette[0] = value0;
+            palette[1] = value1;
+            if (endpoint0 > endpoint1)
+            {
+                for (int i = 2; i < 8; i++)
+                    palette[i] = (value0 * (8 - i) + value1 * (i - 1)) / 7f;
+            }
+            else
+            {
+                for (int i = 2; i < 6; i++)
+                    palette[i] = (value0 * (6 - i) + value1 * (i - 1)) / 5f;
+                palette[6] = -127f;
+                palette[7] = 127f;
+            }
+
+            ulong indices = BinaryPrimitives.ReadUInt64LittleEndian(block) >> 16;
+            for (int i = 0; i < 16; i++)
+            {
+                int paletteIndex = (int)((indices >> (i * 3)) & 7);
+                output[i] = (sbyte)MathF.Round(palette[paletteIndex], MidpointRounding.AwayFromZero);
+            }
+        }
+
+        private static byte SnormToUnorm(sbyte value)
+        {
+            float normalized = Math.Max(value, (sbyte)-127) / 127f;
+            return ToUnorm8(normalized * 0.5f + 0.5f);
+        }
+
+        private static byte[] DecodeFloatTexture(byte[] encoded, int width, int height, bool halfPrecision)
+        {
+            int bytesPerChannel = halfPrecision ? 2 : 4;
+            int expected = checked(width * height * 4 * bytesPerChannel);
+            if (encoded.Length != expected)
+                throw new InvalidDataException("Floating-point TEX payload has an invalid size.");
+
+            byte[] rgba = new byte[checked(width * height * 4)];
+            for (int channel = 0; channel < rgba.Length; channel++)
+            {
+                int offset = channel * bytesPerChannel;
+                float value = halfPrecision
+                    ? (float)BitConverter.UInt16BitsToHalf(BinaryPrimitives.ReadUInt16LittleEndian(encoded.AsSpan(offset, 2)))
+                    : BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(encoded.AsSpan(offset, 4)));
+                rgba[channel] = ToUnorm8(value);
+            }
+            return rgba;
+        }
+
+        private static byte ToUnorm8(float value)
+        {
+            if (float.IsNaN(value))
+                return 0;
+            float clamped = Math.Clamp(value, 0f, 1f);
+            return (byte)MathF.Round(clamped * 255f, MidpointRounding.AwayFromZero);
+        }
+
+        private readonly record struct TexHeader(
+            ushort Width,
+            ushort Height,
+            byte Depth,
+            byte Format,
+            byte ResourceType,
+            byte Flags);
 
         private static BitmapSource ConvertTextureMipToBitmapSource(Texture texture)
         {

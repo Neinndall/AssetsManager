@@ -274,10 +274,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                         return mix(high, low, lessThanEqual(value, vec3(0.0031308)));
                     }
                     vec4 readBaseTexture(vec2 uv){
-                        vec4 sampleValue = texture(uTex, uv);
-                        if (uMaterialSrgb != 0)
-                            sampleValue.rgb = srgbToLinear(sampleValue.rgb);
-                        return sampleValue;
+                        return texture(uTex, uv);
                     }
                     vec4 sampleAux(int index, vec2 uv){
                         if (index == -2) return vec4(0.0);
