@@ -19,6 +19,51 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 GlMeshRenderer.MaterialCullFace(ModelMaterialRenderState.Default with { Inverted = true }));
         }
 
+        [Theory]
+        [InlineData(
+            ModelMaterialBlendMode.Normal,
+            false,
+            BlendingFactor.SrcAlpha,
+            BlendingFactor.OneMinusSrcAlpha,
+            BlendingFactor.One,
+            BlendingFactor.OneMinusSrcAlpha)]
+        [InlineData(
+            ModelMaterialBlendMode.Normal,
+            true,
+            BlendingFactor.One,
+            BlendingFactor.OneMinusSrcAlpha,
+            BlendingFactor.One,
+            BlendingFactor.OneMinusSrcAlpha)]
+        [InlineData(
+            ModelMaterialBlendMode.Additive,
+            false,
+            BlendingFactor.SrcAlpha,
+            BlendingFactor.One,
+            BlendingFactor.One,
+            BlendingFactor.One)]
+        [InlineData(
+            ModelMaterialBlendMode.Additive,
+            true,
+            BlendingFactor.One,
+            BlendingFactor.One,
+            BlendingFactor.One,
+            BlendingFactor.One)]
+        public void AuthoredMaterialBlendingMatchesThreeJs(
+            ModelMaterialBlendMode blending,
+            bool premultipliedAlpha,
+            BlendingFactor sourceRgb,
+            BlendingFactor destinationRgb,
+            BlendingFactor sourceAlpha,
+            BlendingFactor destinationAlpha)
+        {
+            var factors = GlMeshRenderer.MaterialBlendFactors(blending, premultipliedAlpha);
+
+            Assert.Equal(sourceRgb, factors.SourceRgb);
+            Assert.Equal(destinationRgb, factors.DestinationRgb);
+            Assert.Equal(sourceAlpha, factors.SourceAlpha);
+            Assert.Equal(destinationAlpha, factors.DestinationAlpha);
+        }
+
         [Fact]
         public void Fragment_UsesSrgbCharacterMaterialPath()
         {

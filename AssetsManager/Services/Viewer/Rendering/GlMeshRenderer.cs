@@ -758,20 +758,17 @@ namespace AssetsManager.Services.Viewer.Rendering
             else
             {
                 _gl.Enable(EnableCap.Blend);
-                if (blending == ModelMaterialBlendMode.Additive)
-                {
-                    _gl.BlendFunc(
-                        state.PremultipliedAlpha ? BlendingFactor.One : BlendingFactor.SrcAlpha,
-                        BlendingFactor.One);
-                }
-                else
-                {
-                    _gl.BlendFunc(
-                        state.PremultipliedAlpha ? BlendingFactor.One : BlendingFactor.SrcAlpha,
-                        BlendingFactor.OneMinusSrcAlpha);
-                }
+                _gl.BlendEquation(GLEnum.FuncAdd);
+                var factors = MaterialBlendFactors(blending, state.PremultipliedAlpha);
+                _gl.BlendFuncSeparate(
+                    factors.SourceRgb,
+                    factors.DestinationRgb,
+                    factors.SourceAlpha,
+                    factors.DestinationAlpha);
             }
 
+            // Three.js stock character materials use LessEqualDepth unless a material overrides it.
+            _gl.DepthFunc(DepthFunction.Lequal);
             if (state.DepthTest)
                 _gl.Enable(EnableCap.DepthTest);
             else
@@ -796,6 +793,34 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         internal static TriangleFace MaterialCullFace(ModelMaterialRenderState state)
             => state.Inverted ? TriangleFace.Front : TriangleFace.Back;
+
+        internal static (
+            BlendingFactor SourceRgb,
+            BlendingFactor DestinationRgb,
+            BlendingFactor SourceAlpha,
+            BlendingFactor DestinationAlpha) MaterialBlendFactors(
+                ModelMaterialBlendMode blending,
+                bool premultipliedAlpha)
+        {
+            return blending switch
+            {
+                ModelMaterialBlendMode.Normal => (
+                    premultipliedAlpha ? BlendingFactor.One : BlendingFactor.SrcAlpha,
+                    BlendingFactor.OneMinusSrcAlpha,
+                    BlendingFactor.One,
+                    BlendingFactor.OneMinusSrcAlpha),
+                ModelMaterialBlendMode.Additive => (
+                    premultipliedAlpha ? BlendingFactor.One : BlendingFactor.SrcAlpha,
+                    BlendingFactor.One,
+                    BlendingFactor.One,
+                    BlendingFactor.One),
+                _ => (
+                    BlendingFactor.One,
+                    BlendingFactor.Zero,
+                    BlendingFactor.One,
+                    BlendingFactor.Zero)
+            };
+        }
 
         private void ApplyUnboundPartRenderState(ModelPart part)
         {
