@@ -110,6 +110,106 @@ public sealed class VfxSystemBoundsTests
     }
 
     [Fact]
+    public void SphereShapeUsesItsAuthoredRadiusAroundTheEmitterOffset()
+    {
+        VfxEmitterDefinition emitter = Emitter() with
+        {
+            TranslationOverride = new Vector3(25f, 0f, 0f),
+            SpawnShape = new VfxSpawnShape(
+                VfxSpawnShapeKind.Sphere,
+                VfxCurve3.Const(Vector3.Zero),
+                Array.Empty<Vector3>(),
+                Array.Empty<VfxCurveF>(),
+                Radius: 400f)
+        };
+
+        VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(System(emitter), VfxRigPreset.Still);
+
+        Assert.Equal(-375f, bounds.Min.X, precision: 4);
+        Assert.Equal(425f, bounds.Max.X, precision: 4);
+    }
+
+    [Fact]
+    public void CylinderShapeRunsUpwardFromTheEmitterRatherThanAroundItsMiddle()
+    {
+        VfxEmitterDefinition emitter = Emitter() with
+        {
+            SpawnShape = new VfxSpawnShape(
+                VfxSpawnShapeKind.Cylinder,
+                VfxCurve3.Const(Vector3.Zero),
+                Array.Empty<Vector3>(),
+                Array.Empty<VfxCurveF>(),
+                Radius: 25f,
+                Height: 350f)
+        };
+
+        VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(System(emitter), VfxRigPreset.Still);
+
+        Assert.Equal(450f, bounds.Max.Y, precision: 4);
+        Assert.Equal(-100f, bounds.Min.X, precision: 4);
+        Assert.Equal(100f, bounds.Max.X, precision: 4);
+    }
+
+    [Fact]
+    public void LegacyShapeAddsItsOffsetAndBirthTranslationAtOpeningPhase()
+    {
+        VfxEmitterDefinition emitter = Emitter() with
+        {
+            SpawnShape = new VfxSpawnShape(
+                VfxSpawnShapeKind.Legacy,
+                VfxCurve3.Const(new Vector3(20f, 0f, 0f)),
+                Array.Empty<Vector3>(),
+                Array.Empty<VfxCurveF>(),
+                BirthTranslation: VfxCurve3.Const(new Vector3(30f, 0f, 0f)))
+        };
+
+        VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(System(emitter), VfxRigPreset.Still);
+
+        Assert.Equal(100f, bounds.Max.X, precision: 4);
+        Assert.Equal(-100f, bounds.Min.X, precision: 4);
+    }
+
+    [Fact]
+    public void ChildDefinitionsDoNotExpandTheRootDefinitionBounds()
+    {
+        VfxEmitterDefinition hugeChildEmitter = Emitter() with
+        {
+            SpawnShape = new VfxSpawnShape(
+                VfxSpawnShapeKind.Sphere,
+                VfxCurve3.Const(Vector3.Zero),
+                Array.Empty<Vector3>(),
+                Array.Empty<VfxCurveF>(),
+                Radius: 5000f)
+        };
+        VfxSystemDefinition child = new(2u, "child", "child", new[] { hugeChildEmitter });
+        VfxEmitterDefinition root = Emitter() with
+        {
+            ChildParticleSet = new VfxChildParticleSetDefinition(
+                new[] { new VfxChildSystemReference("child", child.PathHash, 0u) },
+                false,
+                VfxCurveF.Zero,
+                VfxCurve3.Const(Vector3.Zero),
+                0,
+                Array.Empty<string>())
+        };
+
+        VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(System(root), VfxRigPreset.Still);
+
+        Assert.Equal(new Vector3(-100f, 0f, -100f), bounds.Min);
+        Assert.Equal(new Vector3(100f, 200f, 100f), bounds.Max);
+    }
+
+    [Fact]
+    public void RigGroundUsesTheOpeningStopWithoutRigHeight()
+    {
+        Vector3 ground = VfxSystemBounds.Ground(System(), VfxRigSettings.ForPreset(VfxRigPreset.Missile));
+
+        // AssetsManager renders directly in engine/OpenGL space; LTK mirrors X only while
+        // crossing into Three.js, so the equivalent opening ground remains at engine -X here.
+        Assert.Equal(new Vector3(-600f, 0f, 0f), ground);
+    }
+
+    [Fact]
     public void PerspectiveFrameUsesLtkBoundingSphereAndMargin()
     {
         var bounds = new VfxDefinitionBounds(

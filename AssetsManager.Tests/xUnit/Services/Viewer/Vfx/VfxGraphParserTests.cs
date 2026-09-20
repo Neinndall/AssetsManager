@@ -868,6 +868,47 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void CameraSegmentBeamKeepsLtkBeamDefaultsWhenBeamBlockIsMissing()
+        {
+            var primitive = new BinTreeStruct(
+                Fnv1a.HashLower("primitive"),
+                Fnv1a.HashLower("VfxPrimitiveCameraSegmentBeam"),
+                System.Array.Empty<BinTreeProperty>());
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { primitive });
+            var system = new BinTreeObject(
+                "Effects/SegmentBeamDefaults",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal(VfxPrimitiveKind.CameraSegmentBeam, parsed.PrimitiveKind);
+            Assert.NotNull(parsed.Beam);
+            Assert.Equal(0, parsed.Beam.Mode);
+            Assert.Equal(0, parsed.Beam.TrailMode);
+            Assert.Equal(0, parsed.Beam.Segments);
+            Assert.Equal(Vector3.Zero, parsed.Beam.BirthTilingSize.Constant);
+            Assert.Equal(Vector4.One, parsed.Beam.ColorByDistance.Constant);
+            Assert.False(parsed.Beam.ColorBoundToDistance);
+            Assert.Equal(Vector3.Zero, parsed.Beam.SourceOffset);
+            Assert.Equal(Vector3.Zero, parsed.Beam.TargetOffset);
+            Assert.True(parsed.DrawsAsBeam);
+            Assert.Null(parsed.Trail);
+        }
+
+        [Fact]
         public void FieldDefaultsMatchLtkMotionReader()
         {
             var acceleration = new BinTreeStruct(
