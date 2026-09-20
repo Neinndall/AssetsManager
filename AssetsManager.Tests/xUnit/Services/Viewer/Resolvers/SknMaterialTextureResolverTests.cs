@@ -53,6 +53,39 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void ReadMetadata_AcceptsStringSkinTextureLikeAssetLocator()
+        {
+            const string texturePath = "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex";
+            BinTree tree = CreateSkinTree(
+                texturePath,
+                defaultTextureProperty: new BinTreeString(
+                    Fnv1a.HashLower("texture"),
+                    texturePath));
+
+            SknMaterialTextureMetadata metadata = SknResolver.ReadMetadata(tree);
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(
+                tree,
+                new[] { "test_tx_cm" });
+
+            Assert.Equal(texturePath.Replace('\\', '/'), metadata.DefaultTexturePath, ignoreCase: true);
+            Assert.Equal("test_tx_cm", resolution.DefaultMaterialDefinition.BaseTextureName);
+        }
+
+        [Fact]
+        public void ReadMetadata_ZeroFileLinkMeansNoSkinTexture()
+        {
+            BinTree tree = CreateSkinTree(
+                "unused.tex",
+                defaultTextureProperty: new BinTreeWadChunkLink(
+                    Fnv1a.HashLower("texture"),
+                    0));
+
+            SknMaterialTextureMetadata metadata = SknResolver.ReadMetadata(tree);
+
+            Assert.Null(metadata.DefaultTexturePath);
+        }
+
+        [Fact]
         public void Resolve_UsesSkinMeshTextureAsDefaultWithoutStaticMaterials()
         {
             BinTree tree = CreateSkinTree(

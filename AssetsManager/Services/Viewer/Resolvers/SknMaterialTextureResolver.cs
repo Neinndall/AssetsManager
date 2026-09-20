@@ -237,15 +237,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             BinTree primaryTree = trees[0];
-            var shaderDefinitions = new Dictionary<uint, SknShaderDefinition>();
-            foreach (BinTree tree in (shaderTrees ?? Enumerable.Empty<BinTree>()).Where(tree => tree != null))
-            {
-                foreach ((uint shaderHash, SknShaderDefinition shader) in
-                         ReadShaderDefinitions(tree, wadChunkPathResolver, binEntryResolver))
-                {
-                    shaderDefinitions.TryAdd(shaderHash, shader);
-                }
-            }
+            List<BinTree> shaderTreeList = (shaderTrees ?? Enumerable.Empty<BinTree>())
+                .Where(tree => tree != null)
+                .ToList();
 
             var overrideMaterials = new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
             var overrideMaterialLinkKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -374,6 +368,24 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         directOverrideTexturePaths[normalizedSubmesh] = directTexturePath;
                 }
             }
+
+            var shaderDefinitions = new Dictionary<uint, SknShaderDefinition>();
+            IEnumerable<uint> referencedShaderHashes = overrideMaterials.Values
+                .Append(defaultMaterial)
+                .Where(material => material != null && material.ShaderHash != 0)
+                .Select(material => material.ShaderHash)
+                .Distinct();
+            foreach (uint shaderHash in referencedShaderHashes)
+            {
+                SknShaderDefinition shader = ResolveLinkedShaderDefinition(
+                    shaderTreeList,
+                    shaderHash,
+                    wadChunkPathResolver,
+                    binEntryResolver);
+                if (shader != null)
+                    shaderDefinitions[shaderHash] = shader;
+            }
+
             return new SknMaterialTextureMetadata(
                 defaultTexturePath,
                 defaultMaterial,
@@ -1019,78 +1031,119 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 if (obj.ClassHash != CustomShaderClass)
                     continue;
 
-                string shaderPath = TryGetString(obj.Properties, ObjectPath, out string objectPath)
-                    ? objectPath
-                    : ResolveBinEntryName(pathHash, binEntryResolver);
-
-                var defaultSamplers = new List<SknMaterialSampler>();
-                if (obj.Properties.TryGetValue(ShaderTextures, out BinTreeProperty textureProperty) &&
-                    textureProperty is BinTreeContainer textures)
-                {
-                    foreach (BinTreeStruct texture in textures.Elements.OfType<BinTreeStruct>())
-                    {
-                        if (!TryGetString(texture, ParameterName, out string name))
-                            continue;
-
-                        TryGetTexturePath(
-                            texture.Properties,
-                            DefaultTexturePath,
-                            wadChunkPathResolver,
-                            out string texturePath);
-                        defaultSamplers.Add(new SknMaterialSampler(name, texturePath));
-                    }
-                }
-
-                var defaultParameters = new Dictionary<string, Vector4>(StringComparer.Ordinal);
-                if (obj.Properties.TryGetValue(ShaderParameters, out BinTreeProperty parameterProperty) &&
-                    parameterProperty is BinTreeContainer parameters)
-                {
-                    foreach (BinTreeStruct parameter in parameters.Elements.OfType<BinTreeStruct>())
-                    {
-                        Vector4 data = parameter.Properties.TryGetValue(ParameterData, out BinTreeProperty dataValue) &&
-                                       dataValue is BinTreeVector4 vector
-                            ? vector.Value
-                            : Vector4.Zero;
-
-                        if (parameter.Properties.TryGetValue(LogicalParameters, out BinTreeProperty logicalProperty) &&
-                            logicalProperty is BinTreeContainer logicalParameters)
-                        {
-                            foreach (BinTreeStruct logical in logicalParameters.Elements.OfType<BinTreeStruct>())
-                            {
-                                if (TryGetString(logical, ParameterName, out string logicalName))
-                                    defaultParameters[logicalName] = data;
-                            }
-                        }
-
-                        if (TryGetString(parameter, ParameterName, out string physicalName))
-                            defaultParameters[physicalName] = data;
-                    }
-                }
-
-                var defaultSwitches = new Dictionary<string, bool>(StringComparer.Ordinal);
-                if (obj.Properties.TryGetValue(StaticSwitches, out BinTreeProperty switchProperty) &&
-                    switchProperty is BinTreeContainer switches)
-                {
-                    foreach (BinTreeStruct switchDefinition in switches.Elements.OfType<BinTreeStruct>())
-                    {
-                        if (!TryGetString(switchDefinition, ParameterName, out string name))
-                            continue;
-
-                        defaultSwitches[name] = switchDefinition.Properties.TryGetValue(OnByDefault, out BinTreeProperty onByDefault)
-                            ? ReadBool(onByDefault, false)
-                            : false;
-                    }
-                }
-
-                result[pathHash] = new SknShaderDefinition(
-                    shaderPath,
-                    defaultSamplers,
-                    defaultParameters,
-                    defaultSwitches,
-                    ReadStringMap(obj.Properties, FeatureDefines));
+                result[pathHash] = ReadShaderDefinition(
+                    pathHash,
+                    obj,
+                    wadChunkPathResolver,
+                    binEntryResolver);
             }
 
             return result;
+        }
+
+        private static SknShaderDefinition ResolveLinkedShaderDefinition(
+            IEnumerable<BinTree> shaderTrees,
+            uint pathHash,
+            Func<ulong, string> wadChunkPathResolver,
+            Func<uint, string> binEntryResolver)
+        {
+            foreach (BinTree shaderTree in shaderTrees ?? Enumerable.Empty<BinTree>())
+            {
+                if (shaderTree?.Objects == null || !shaderTree.Objects.TryGetValue(pathHash, out BinTreeObject obj))
+                    continue;
+
+                // The pass's shader link supplies the type context. LTK reads the object at the
+                // linked hash and treats only an absent object as unresolved.
+                return ReadShaderDefinition(pathHash, obj, wadChunkPathResolver, binEntryResolver);
+            }
+
+            return null;
+        }
+
+        private static SknShaderDefinition ReadShaderDefinition(
+            uint pathHash,
+            BinTreeObject obj,
+            Func<ulong, string> wadChunkPathResolver,
+            Func<uint, string> binEntryResolver)
+        {
+            string shaderPath = obj.Properties.TryGetValue(ObjectPath, out BinTreeProperty objectPathProperty) &&
+                                objectPathProperty is BinTreeString objectPath
+                ? objectPath.Value
+                : ResolveBinEntryName(pathHash, binEntryResolver);
+
+            var defaultSamplers = new List<SknMaterialSampler>();
+            var defaultSamplerIndices = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (obj.Properties.TryGetValue(ShaderTextures, out BinTreeProperty textureProperty) &&
+                textureProperty is BinTreeContainer textures)
+            {
+                foreach (BinTreeStruct texture in textures.Elements.OfType<BinTreeStruct>())
+                {
+                    if (!TryGetString(texture, ParameterName, out string name))
+                        continue;
+
+                    TryGetTexturePath(
+                        texture.Properties,
+                        DefaultTexturePath,
+                        wadChunkPathResolver,
+                        out string texturePath);
+                    var sampler = new SknMaterialSampler(name, texturePath);
+                    if (defaultSamplerIndices.TryGetValue(name, out int existingIndex))
+                        defaultSamplers[existingIndex] = sampler;
+                    else
+                    {
+                        defaultSamplerIndices[name] = defaultSamplers.Count;
+                        defaultSamplers.Add(sampler);
+                    }
+                }
+            }
+
+            var defaultParameters = new Dictionary<string, Vector4>(StringComparer.Ordinal);
+            if (obj.Properties.TryGetValue(ShaderParameters, out BinTreeProperty parameterProperty) &&
+                parameterProperty is BinTreeContainer parameters)
+            {
+                foreach (BinTreeStruct parameter in parameters.Elements.OfType<BinTreeStruct>())
+                {
+                    Vector4 data = parameter.Properties.TryGetValue(ParameterData, out BinTreeProperty dataValue) &&
+                                   dataValue is BinTreeVector4 vector
+                        ? vector.Value
+                        : Vector4.Zero;
+
+                    if (parameter.Properties.TryGetValue(LogicalParameters, out BinTreeProperty logicalProperty) &&
+                        logicalProperty is BinTreeContainer logicalParameters)
+                    {
+                        foreach (BinTreeStruct logical in logicalParameters.Elements.OfType<BinTreeStruct>())
+                        {
+                            if (TryGetString(logical, ParameterName, out string logicalName))
+                                defaultParameters[logicalName] = data;
+                        }
+                    }
+
+                    if (TryGetString(parameter, ParameterName, out string physicalName))
+                        defaultParameters[physicalName] = data;
+                }
+            }
+
+            var defaultSwitches = new Dictionary<string, bool>(StringComparer.Ordinal);
+            if (obj.Properties.TryGetValue(StaticSwitches, out BinTreeProperty switchProperty) &&
+                switchProperty is BinTreeContainer switches)
+            {
+                foreach (BinTreeStruct switchDefinition in switches.Elements.OfType<BinTreeStruct>())
+                {
+                    if (!TryGetString(switchDefinition, ParameterName, out string name))
+                        continue;
+
+                    defaultSwitches[name] = switchDefinition.Properties.TryGetValue(OnByDefault, out BinTreeProperty onByDefault)
+                        ? ReadBool(onByDefault, false)
+                        : false;
+                }
+            }
+
+            return new SknShaderDefinition(
+                shaderPath,
+                defaultSamplers,
+                defaultParameters,
+                defaultSwitches,
+                ReadStringMap(obj.Properties, FeatureDefines));
         }
 
         private static SknMaterialDefinition ResolveLinkedMaterialDefinition(
@@ -1144,6 +1197,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             Func<ulong, string> wadChunkPathResolver)
         {
             var result = new List<SknMaterialSampler>();
+            var samplerIndices = new Dictionary<string, int>(StringComparer.Ordinal);
             if (!materialObject.Properties.TryGetValue(SamplerValues, out BinTreeProperty property) ||
                 property is not BinTreeContainer samplers)
             {
@@ -1174,12 +1228,19 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     }
                 }
 
-                result.Add(new SknMaterialSampler(
+                var parsedSampler = new SknMaterialSampler(
                     textureName,
                     texturePath,
                     ReadWrap(sampler.Properties, AddressU),
                     ReadWrap(sampler.Properties, AddressV),
-                    usesShaderDefaultTexture));
+                    usesShaderDefaultTexture);
+                if (samplerIndices.TryGetValue(textureName, out int existingIndex))
+                    result[existingIndex] = parsedSampler;
+                else
+                {
+                    samplerIndices[textureName] = result.Count;
+                    result.Add(parsedSampler);
+                }
             }
 
             return result;
@@ -1406,21 +1467,17 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return false;
             }
 
-            if (property is BinTreeWadChunkLink link)
+            if (property is BinTreeString text && !string.IsNullOrEmpty(text.Value))
+            {
+                result = PathUtils.ToVirtualPath(text.Value);
+                return true;
+            }
+            if (property is BinTreeWadChunkLink link && link.Value != 0)
             {
                 string resolvedPath = wadChunkPathResolver?.Invoke(link.Value);
                 result = PathUtils.ToVirtualPath(
                     string.IsNullOrWhiteSpace(resolvedPath)
                         ? $"{link.Value:x16}"
-                        : resolvedPath);
-                return true;
-            }
-            if (property is BinTreeU64 u64)
-            {
-                string resolvedPath = wadChunkPathResolver?.Invoke(u64.Value);
-                result = PathUtils.ToVirtualPath(
-                    string.IsNullOrWhiteSpace(resolvedPath)
-                        ? $"{u64.Value:x16}"
                         : resolvedPath);
                 return true;
             }
