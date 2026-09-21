@@ -65,8 +65,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private int _championLoadGeneration;
         private System.Threading.CancellationTokenSource _scanCancellation;
         private System.Threading.CancellationTokenSource _binCancellation;
-        private GridRenderer _gridRenderer;
-        private VfxPreviewGroundRenderer _previewGroundRenderer;
+        private VfxPreviewSurfaceRenderer _previewSurfaceRenderer;
         private PerspectiveCamera _previewPerspectiveCamera;
         private OrthographicCamera _previewOrthographicCamera;
         private bool _previewPreferencesLoaded;
@@ -181,6 +180,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGrid) ||
                      e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGround) ||
+                     e.PropertyName == nameof(VfxInspectorModel.ShowPreviewStage) ||
                      e.PropertyName == nameof(VfxInspectorModel.PreviewWireframeMode))
             {
                 SavePreviewDisplayPreferences();
@@ -211,6 +211,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _model.ShowPreviewGrid = viewerSettings.GridVisible;
                 _model.ShowPreviewGround = viewerSettings.GroundVisible;
+                _model.ShowPreviewStage = vfxSettings.StageVisible;
 
                 if (Enum.TryParse(vfxSettings.CameraPreset, ignoreCase: true, out VfxPreviewCameraPreset cameraPreset))
                     _model.PreviewCameraPreset = cameraPreset;
@@ -232,6 +233,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             AppSettings.StudioParameters.GridVisible = _model.ShowPreviewGrid;
             AppSettings.StudioParameters.GroundVisible = _model.ShowPreviewGround;
+            AppSettings.VfxStudio.StageVisible = _model.ShowPreviewStage;
             AppSettings.VfxStudio.CameraPreset = _model.PreviewCameraPreset.ToString();
             AppSettings.VfxStudio.WireframeMode = _model.PreviewWireframeMode.ToString();
             _ = SavePreviewDisplayPreferencesAsync();
@@ -362,13 +364,9 @@ namespace AssetsManager.Views.Controls.Viewer
             _vfxRenderer = null;
             RunReleaseStep(nameof(VfxRenderSession), () => vfxRenderer?.Dispose(), gpuBound: true);
 
-            var gridRenderer = _gridRenderer;
-            _gridRenderer = null;
-            RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
-
-            var previewGroundRenderer = _previewGroundRenderer;
-            _previewGroundRenderer = null;
-            RunReleaseStep(nameof(VfxPreviewGroundRenderer), () => previewGroundRenderer?.Dispose(), gpuBound: true);
+            var previewSurfaceRenderer = _previewSurfaceRenderer;
+            _previewSurfaceRenderer = null;
+            RunReleaseStep(nameof(VfxPreviewSurfaceRenderer), () => previewSurfaceRenderer?.Dispose(), gpuBound: true);
 
             var championMeshRenderer = _championMeshRenderer;
             _championMeshRenderer = null;
@@ -520,17 +518,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_isCleanedUp) return;
 
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
-                if (_gridRenderer == null)
-                {
-                    _gridRenderer = new GridRenderer();
-                    _gridRenderer.Initialize(_gl, false);
-                }
-
-                if (_previewGroundRenderer == null)
+                if (_previewSurfaceRenderer == null)
                 {
                     BitmapSource groundTexture = SceneElements.LoadSceneTexture(SceneElements.GroundTexturePath, LogService);
-                    _previewGroundRenderer = new VfxPreviewGroundRenderer();
-                    _previewGroundRenderer.Initialize(_gl, groundTexture);
+                    _previewSurfaceRenderer = new VfxPreviewSurfaceRenderer();
+                    _previewSurfaceRenderer.Initialize(_gl, groundTexture);
                 }
 
                 if (_championMeshRenderer == null)
@@ -549,7 +541,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
                 }
 
-                _model.LogMessages.Add("[GL] OpenGL viewport, preview ground and camera controller initialized successfully.");
+                _model.LogMessages.Add("[GL] OpenGL viewport, preview surfaces and camera controller initialized successfully.");
                 _model.LogMessages.Add(
                     $"[GL] Vendor={_gl.GetStringS(Silk.NET.OpenGL.StringName.Vendor)} | " +
                     $"Renderer={_gl.GetStringS(Silk.NET.OpenGL.StringName.Renderer)} | " +
@@ -636,11 +628,13 @@ namespace AssetsManager.Views.Controls.Viewer
             // preparation are safe even when WPF selected the system before the GL control was ready.
             TryInspectPendingSystem();
 
-            // Grid and Ground are independent viewport aids, matching the main Viewer controls.
-            if (_model.ShowPreviewGround)
-                _previewGroundRenderer?.Render(viewProj);
-            if (_model.ShowPreviewGrid)
-                _gridRenderer?.Render(viewProj);
+            // One surface renderer owns the independent Grid, Ground and Stage paths. Stage suppresses
+            // its fill when Ground is also visible so both modes can be combined without coplanar planes.
+            _previewSurfaceRenderer?.Render(
+                viewProj,
+                _model.ShowPreviewGrid,
+                _model.ShowPreviewGround,
+                _model.ShowPreviewStage);
 
             // Update Champion Animation & Bone Transforms for attached VFX
             if (_model.IsPlaying && !_isUserSeeking && _vfxRenderer?.ActiveSystem != null)

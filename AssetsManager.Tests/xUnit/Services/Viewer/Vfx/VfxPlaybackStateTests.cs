@@ -121,15 +121,21 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             Assert.True(model.ShowPreviewGrid);
             Assert.False(model.ShowPreviewGround);
+            Assert.False(model.ShowPreviewStage);
             Assert.Equal(1, model.PreviewDisplayCount);
 
             model.ShowPreviewGround = true;
             Assert.Equal(2, model.PreviewDisplayCount);
             Assert.Contains(nameof(VfxInspectorModel.ShowPreviewGround), changed);
 
+            model.ShowPreviewStage = true;
+            Assert.Equal(3, model.PreviewDisplayCount);
+            Assert.Contains(nameof(VfxInspectorModel.ShowPreviewStage), changed);
+
             model.ShowPreviewGrid = false;
             Assert.True(model.ShowPreviewGround);
-            Assert.Equal(1, model.PreviewDisplayCount);
+            Assert.True(model.ShowPreviewStage);
+            Assert.Equal(2, model.PreviewDisplayCount);
             Assert.Contains(nameof(VfxInspectorModel.ShowPreviewGrid), changed);
 
             var item = new VfxEmitterDiagnosticItem { Name = "TrailDark" };

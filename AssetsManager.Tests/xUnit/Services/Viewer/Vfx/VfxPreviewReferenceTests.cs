@@ -12,8 +12,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void GroundUsesThePreviewWorldScale()
         {
-            Assert.Equal(3200f, VfxPreviewGroundRenderer.GroundSize);
-            Assert.Equal(-0.5f, VfxPreviewGroundRenderer.GroundDrop);
+            Assert.Equal(3200f, VfxPreviewSurfaceRenderer.GroundSize);
+            Assert.Equal(-0.5f, VfxPreviewSurfaceRenderer.GroundDrop);
         }
 
         [Fact]
@@ -69,22 +69,38 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void GridAndGroundDisplayPreferencesAreIndependent()
+        public void GridGroundAndStageDisplayPreferencesAreIndependent()
         {
             var model = new VfxInspectorModel();
 
             Assert.True(model.ShowPreviewGrid);
             Assert.False(model.ShowPreviewGround);
+            Assert.False(model.ShowPreviewStage);
             Assert.Equal(1, model.PreviewDisplayCount);
 
             model.ShowPreviewGround = true;
             Assert.True(model.ShowPreviewGround);
             Assert.Equal(2, model.PreviewDisplayCount);
 
+            model.ShowPreviewStage = true;
+            Assert.True(model.ShowPreviewStage);
+            Assert.Equal(3, model.PreviewDisplayCount);
+
             model.ShowPreviewGrid = false;
             Assert.False(model.ShowPreviewGrid);
             Assert.True(model.ShowPreviewGround);
-            Assert.Equal(1, model.PreviewDisplayCount);
+            Assert.True(model.ShowPreviewStage);
+            Assert.Equal(2, model.PreviewDisplayCount);
+        }
+
+        [Fact]
+        public void StageUsesReferenceViewportScale()
+        {
+            Assert.Equal(VfxRigMotion.ChampionHeight * 16f, VfxPreviewSurfaceRenderer.StageSize);
+            Assert.Equal(-0.5f, VfxPreviewSurfaceRenderer.GroundDrop);
+            Assert.Equal(100f, VfxPreviewSurfaceRenderer.GridCellSize);
+            Assert.Equal(500f, VfxPreviewSurfaceRenderer.GridSectionSize);
+            Assert.Equal(1.5f, VfxPreviewSurfaceRenderer.GridFadeStrength);
         }
 
         [Fact]

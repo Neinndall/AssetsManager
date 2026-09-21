@@ -327,7 +327,8 @@ namespace AssetsManager.Utils
                 VfxStudio = new VfxStudioSettings
                 {
                     CameraPreset = "Game",
-                    WireframeMode = "Off"
+                    WireframeMode = "Off",
+                    StageVisible = false
                 },
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
@@ -421,6 +422,7 @@ namespace AssetsManager.Utils
     {
         public string CameraPreset { get; set; } = "Game";
         public string WireframeMode { get; set; } = "Off";
+        public bool StageVisible { get; set; }
     }
 
     public class ReportGenerationSettings

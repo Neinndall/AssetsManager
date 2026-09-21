@@ -547,6 +547,7 @@ namespace AssetsManager.Views.Models.Viewer
         private string _bgMode = "Dark";
         private bool _showPreviewGrid = true;
         private bool _showPreviewGround;
+        private bool _showPreviewStage;
         private VfxPreviewWireframeMode _previewWireframeMode = VfxPreviewWireframeMode.Off;
         private VfxPreviewCameraPreset _previewCameraPreset = VfxPreviewCameraPreset.Game;
         private VfxEmitterDiagnosticItem _selectedEmitter;
@@ -906,9 +907,22 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
+        public bool ShowPreviewStage
+        {
+            get => _showPreviewStage;
+            set
+            {
+                if (_showPreviewStage == value) return;
+                _showPreviewStage = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PreviewDisplayCount));
+            }
+        }
+
         public int PreviewDisplayCount =>
             (_showPreviewGrid ? 1 : 0) +
-            (_showPreviewGround ? 1 : 0);
+            (_showPreviewGround ? 1 : 0) +
+            (_showPreviewStage ? 1 : 0);
 
         public VfxPreviewWireframeMode PreviewWireframeMode
         {

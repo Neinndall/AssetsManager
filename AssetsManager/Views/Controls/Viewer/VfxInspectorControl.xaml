@@ -294,6 +294,8 @@
                                                       IsChecked="{Binding ShowPreviewGrid, Mode=TwoWay}"/>
                                             <CheckBox Content="Ground" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
                                                       IsChecked="{Binding ShowPreviewGround, Mode=TwoWay}"/>
+                                            <CheckBox Content="Stage" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
+                                                      IsChecked="{Binding ShowPreviewStage, Mode=TwoWay}"/>
                                         </StackPanel>
                                     </Border>
                                 </Popup>
