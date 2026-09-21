@@ -149,32 +149,17 @@ namespace AssetsManager.Views.Controls.Viewer
             var viewProj = view * proj;
             _modelInteractionController?.Update(viewProj);
 
-            // 3. Setup lighting from view model settings
-            float phi = (float)(_viewModel.LightRotation * (Math.PI / 180.0));
-            float theta = (float)(_viewModel.LightHeight * (Math.PI / 180.0));
-
-            // Key light direction
-            float x = MathF.Cos(theta) * MathF.Sin(phi);
-            float y = MathF.Sin(theta);
-            float z = MathF.Cos(theta) * MathF.Cos(phi);
-            var lightDir1 = new Vector3(-x, -y, -z);
-
-            // Fill light direction
-            var lightDir2 = new Vector3(x, y, -z);
-
-            float ambientVal = (float)(_viewModel.AmbientIntensity / 100.0);
-            var ambientColor = new Vector3(ambientVal, ambientVal, ambientVal);
-
-            float keyIntensity = 0.0f;
-            float fillIntensity = 0.0f;
-            if (_viewModel.AmbientIntensity < 95)
-            {
-                keyIntensity = (float)((100.0 - _viewModel.AmbientIntensity) / 100.0);
-                fillIntensity = keyIntensity * 0.5f;
-            }
-
-            var lightColor1 = new Vector3(keyIntensity, keyIntensity, keyIntensity);
-            var lightColor2 = new Vector3(fillIntensity, fillIntensity, fillIntensity);
+            // 3. Setup lighting from view model settings. The default values reproduce the
+            // character preview sun/ambient split while still allowing explicit studio overrides.
+            var lighting = GlMeshRenderer.StudioCharacterLighting(
+                _viewModel.AmbientIntensity,
+                _viewModel.LightRotation,
+                _viewModel.LightHeight);
+            Vector3 lightDir1 = lighting.LightDirection;
+            Vector3 lightColor1 = lighting.LightColor;
+            Vector3 lightDir2 = lighting.FillDirection;
+            Vector3 lightColor2 = lighting.FillColor;
+            Vector3 ambientColor = lighting.AmbientColor;
 
             // Render ground before the editor grid so the grid remains a world-space guide.
             if (_groundModel != null && _viewModel.IsGroundVisible && !_viewModel.IsTransparentBg)
@@ -494,16 +479,35 @@ namespace AssetsManager.Views.Controls.Viewer
 
                         var part = new ModelPart(
                             name + "_" + sceneModel.Parts.Count,
-                            new GeometryModel3D(transformedMesh, geomModel.Material));
-
-                        if (geomModel.Material is DiffuseMaterial diffuse && diffuse.Brush is ImageBrush imgBrush && imgBrush.ImageSource is BitmapSource bitmap)
+                            new GeometryModel3D(transformedMesh, geomModel.Material))
                         {
-                            string texName = "tex_" + part.Name;
-                            part.AllTextures[texName] = bitmap;
-                            part.SelectedTextureName = texName;
-                            float opacity = (float)Math.Clamp(imgBrush.Opacity, 0.0, 1.0);
-                            part.ColorTint = new Vector4(1f, 1f, 1f, opacity);
-                            if (opacity < 1f) part.AlphaCutoff = 0f;
+                            ForceUnlit = true,
+                            TreatBaseTextureAsSrgb = true
+                        };
+
+                        if (geomModel.Material is DiffuseMaterial diffuse)
+                        {
+                            if (diffuse.Brush is ImageBrush imgBrush && imgBrush.ImageSource is BitmapSource bitmap)
+                            {
+                                string texName = "tex_" + part.Name;
+                                part.AllTextures[texName] = bitmap;
+                                part.SelectedTextureName = texName;
+                                part.UseBaseTextureAlpha = true;
+                                float opacity = (float)Math.Clamp(imgBrush.Opacity, 0.0, 1.0);
+                                part.ColorTint = new Vector4(1f, 1f, 1f, opacity);
+                                if (opacity < 1f) part.AlphaCutoff = 0f;
+                            }
+                            else if (diffuse.Brush is SolidColorBrush solidBrush)
+                            {
+                                var color = solidBrush.Color;
+                                float opacity = (float)Math.Clamp(solidBrush.Opacity, 0.0, 1.0);
+                                part.ColorTint = new Vector4(
+                                    color.R / 255f,
+                                    color.G / 255f,
+                                    color.B / 255f,
+                                    color.A / 255f * opacity);
+                                if (part.ColorTint.W < 1f) part.AlphaCutoff = 0f;
+                            }
                         }
 
                         sceneModel.AddPart(part);

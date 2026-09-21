@@ -72,6 +72,11 @@ namespace AssetsManager.Views.Models.Viewer
               MaterialDefinition.Effect?.RequiresAlphaBlend == true));
         internal float AlphaCutoff { get; set; } = 0.1f;
         internal bool UsesBakedDiffuse { get; set; }
+        internal bool ForceUnlit { get; set; }
+        internal bool TreatBaseTextureAsSrgb { get; set; }
+        internal bool UseBaseTextureAlpha { get; set; }
+        internal bool UsesSrgbBaseTexture => MaterialDefinition != null || TreatBaseTextureAsSrgb;
+        internal bool UsesUnlitShading => ForceUnlit || (MaterialDefinition != null && !MaterialDefinition.IsLit);
         internal byte[] VertexColors { get; set; }
         public MapLightmapBinding Lightmap { get; set; }
 
@@ -148,6 +153,9 @@ namespace AssetsManager.Views.Models.Viewer
             VertexColors = null;
             Lightmap = null;
             MaterialDefinition = null;
+            ForceUnlit = false;
+            TreatBaseTextureAsSrgb = false;
+            UseBaseTextureAlpha = false;
 
             PropertyChanged = null;
         }

@@ -503,13 +503,14 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Uniform1(_uAlphaCutoff, alphaCutoff);
                 _gl.Uniform2(_uMaterialUvRepeat, uvRepeat.X, uvRepeat.Y);
                 _gl.Uniform2(_uMaterialUvScroll, uvScroll.X, uvScroll.Y);
-                _gl.Uniform1(_uMaterialUnlit, material != null && !material.IsLit ? 1 : 0);
+                _gl.Uniform1(_uMaterialUnlit, part.UsesUnlitShading ? 1 : 0);
                 _gl.Uniform1(
                     _uMaterialPremultipliedAlpha,
                     material?.RenderState.PremultipliedAlpha == true ? 1 : 0);
-                // Character textures and authored tint follow LTK's sRGB working/output semantics.
-                _gl.Uniform1(_uMaterialSrgb, material != null ? 1 : 0);
-                bool usesTextureAlpha = material?.UsesTextureAlpha ?? part.AlphaCutoff > 0f;
+                // Authored color textures use a linear working path and sRGB display output.
+                _gl.Uniform1(_uMaterialSrgb, part.UsesSrgbBaseTexture ? 1 : 0);
+                bool usesTextureAlpha = material?.UsesTextureAlpha ??
+                    (part.UseBaseTextureAlpha || part.AlphaCutoff > 0f);
                 _gl.Uniform1(_uMaterialUsesTextureAlpha, usesTextureAlpha ? 1 : 0);
                 _gl.Uniform1(_uUsesBakedDiffuse, part.UsesBakedDiffuse ? 1 : 0);
                 _gl.Uniform1(_uHasVertexColor, resources.ColorVbo != 0 ? 1 : 0);
@@ -844,6 +845,33 @@ namespace AssetsManager.Services.Viewer.Rendering
                 Vector3.UnitY,
                 Vector3.Zero,
                 ReferenceCharacterAmbientColor);
+
+        internal static (
+            Vector3 LightDirection,
+            Vector3 LightColor,
+            Vector3 FillDirection,
+            Vector3 FillColor,
+            Vector3 AmbientColor) StudioCharacterLighting(
+                double ambientPercent,
+                double rotationDegrees,
+                double heightDegrees)
+        {
+            float ambient = (float)Math.Clamp(ambientPercent / 100.0, 0.0, 1.0);
+            float phi = (float)(rotationDegrees * Math.PI / 180.0);
+            float theta = (float)(heightDegrees * Math.PI / 180.0);
+            var lightDirection = Vector3.Normalize(new Vector3(
+                MathF.Cos(theta) * MathF.Sin(phi),
+                MathF.Sin(theta),
+                MathF.Cos(theta) * MathF.Cos(phi)));
+            float key = 1f - ambient;
+
+            return (
+                lightDirection,
+                new Vector3(key),
+                Vector3.UnitY,
+                Vector3.Zero,
+                new Vector3(ambient));
+        }
 
         internal static (
             BlendingFactor SourceRgb,

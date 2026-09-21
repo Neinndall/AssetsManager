@@ -111,6 +111,43 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
+        public void DefaultStudioLightingMatchesReferenceCharacterLighting()
+        {
+            var studio = GlMeshRenderer.StudioCharacterLighting(
+                ViewerViewportModel.DefaultAmbientIntensity,
+                ViewerViewportModel.DefaultLightRotation,
+                ViewerViewportModel.DefaultLightHeight);
+            var reference = GlMeshRenderer.ReferenceCharacterLighting();
+
+            Assert.Equal(reference.LightDirection.X, studio.LightDirection.X, 6);
+            Assert.Equal(reference.LightDirection.Y, studio.LightDirection.Y, 6);
+            Assert.Equal(reference.LightDirection.Z, studio.LightDirection.Z, 6);
+            Assert.Equal(reference.LightColor.X, studio.LightColor.X, 6);
+            Assert.Equal(reference.LightColor.Y, studio.LightColor.Y, 6);
+            Assert.Equal(reference.LightColor.Z, studio.LightColor.Z, 6);
+            Assert.Equal(reference.FillColor, studio.FillColor);
+            Assert.Equal(reference.AmbientColor.X, studio.AmbientColor.X, 6);
+            Assert.Equal(reference.AmbientColor.Y, studio.AmbientColor.Y, 6);
+            Assert.Equal(reference.AmbientColor.Z, studio.AmbientColor.Z, 6);
+        }
+
+        [Fact]
+        public void ScenePartsCanUseUnlitSrgbTextureSemanticsWithoutAStaticMaterial()
+        {
+            var part = new ModelPart
+            {
+                ForceUnlit = true,
+                TreatBaseTextureAsSrgb = true,
+                UseBaseTextureAlpha = true
+            };
+
+            Assert.True(part.UsesUnlitShading);
+            Assert.True(part.UsesSrgbBaseTexture);
+            Assert.True(part.UseBaseTextureAlpha);
+            Assert.Null(part.MaterialDefinition);
+        }
+
+        [Fact]
         public void Fragment_AdvancesBaseUvFromModelLifetime()
         {
             Assert.Contains(
@@ -139,6 +176,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             Assert.DoesNotContain("sampleValue.rgb = srgbToLinear(sampleValue.rgb);", GlMeshShaderSource.Fragment);
             Assert.Contains("? srgbToLinear(uColorTint.rgb)", GlMeshShaderSource.Fragment);
             Assert.Contains("finalColor = linearToSrgb(finalColor);", GlMeshShaderSource.Fragment);
+        }
+
+        [Fact]
+        public void Fragment_PremultipliesBeforeSrgbOutputEncoding()
+        {
+            int finalAlphaTest = GlMeshShaderSource.Fragment.LastIndexOf(
+                "if (uAlphaCutoff > 0.0 && texColor.a < uAlphaCutoff) discard;");
+            int premultiply = GlMeshShaderSource.Fragment.IndexOf("finalColor *= texColor.a;");
+            int outputEncoding = GlMeshShaderSource.Fragment.IndexOf(
+                "finalColor = linearToSrgb(finalColor);");
+
+            Assert.True(finalAlphaTest >= 0);
+            Assert.True(premultiply > finalAlphaTest);
+            Assert.True(outputEncoding > premultiply);
         }
 
         [Fact]

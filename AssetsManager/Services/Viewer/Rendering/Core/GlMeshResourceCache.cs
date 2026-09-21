@@ -275,7 +275,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         private void EnsureBaseTexture(ModelPart part, PartResources resources)
         {
             string selectedTexture = part.SelectedTextureName;
-            bool srgb = part.MaterialDefinition != null;
+            bool srgb = part.UsesSrgbBaseTexture;
             if (resources.TextureResolved &&
                 resources.LoadedTextureKey == selectedTexture &&
                 resources.LoadedBitmapSrgb == srgb)
