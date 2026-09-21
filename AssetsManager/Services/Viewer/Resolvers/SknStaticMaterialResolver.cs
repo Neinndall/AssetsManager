@@ -486,15 +486,20 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 blending = ModelMaterialBlendMode.Additive;
             }
 
+            uint writeMask = pass?.WriteMask ?? DefaultWriteMask;
+            bool authoredTransparentPass =
+                blendEnabled &&
+                pass?.WriteMask.HasValue == true &&
+                (writeMask & DepthWriteMask) == 0;
             bool readsAlpha = hasOpacity ||
                 alphaCutoff > 0f ||
+                authoredTransparentPass ||
                 (switchedShader && SwitchedAlphaNames.Any(name => IsEnabled(switches, name)));
             if (blending == ModelMaterialBlendMode.Normal && !readsAlpha)
                 blending = ModelMaterialBlendMode.Opaque;
 
             bool cullEnabled = pass?.CullEnabled ?? true;
             uint winding = pass?.WindingToCull ?? DefaultCullWinding;
-            uint writeMask = pass?.WriteMask ?? DefaultWriteMask;
 
             return new ModelMaterialRenderState(
                 blending,

@@ -497,7 +497,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Uniform1(_uMaterialUsesTextureAlpha, usesTextureAlpha ? 1 : 0);
                 _gl.Uniform1(_uUsesBakedDiffuse, part.UsesBakedDiffuse ? 1 : 0);
                 _gl.Uniform1(_uHasVertexColor, resources.ColorVbo != 0 ? 1 : 0);
-                UploadMaterialEffects(effect, resources);
+                UploadMaterialEffects(effect, material, resources);
 
                 // --- Lightmap parameters ---
                 bool hasLightmap = resources.LightmapTexture != 0 && resources.LightmapVbo != 0;
@@ -520,6 +520,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UploadMaterialEffects(
             ModelMaterialEffectDefinition effect,
+            ModelMaterialDefinition material,
             GlMeshResourceCache.PartResources resources)
         {
             Dictionary<string, int> textureBindings = BindAuxiliaryTextures(effect, resources);
@@ -610,6 +611,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform1(_uDistortionMaskChannel, distortion?.MaskChannel ?? 0);
 
             ModelIridescenceDefinition iridescence = effect.Iridescence;
+            bool applyIridescenceAlpha = ShouldApplyIridescenceAlpha(material, iridescence);
             _gl.Uniform1(_uIridescenceTexIndex, TextureIndex(textureBindings, iridescence?.LutTextureName));
             _gl.Uniform1(
                 _uIridescenceMaskIndex,
@@ -623,10 +625,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                 iridescence?.UsesPulse == true ? iridescence.PulseSpeedMin : Vector2.Zero);
             SetVector2(
                 _uIridescenceAlphaMinMax,
-                iridescence?.RequiresAlphaBlend == true ? iridescence.FresnelAlphaMinMax : Vector2.One);
+                applyIridescenceAlpha ? iridescence.FresnelAlphaMinMax : Vector2.One);
             _gl.Uniform1(
                 _uIridescenceDiffuseFadeMask,
-                iridescence?.RequiresAlphaBlend == true ? iridescence.DiffuseFadeMaskValue : 0f);
+                applyIridescenceAlpha ? iridescence.DiffuseFadeMaskValue : 0f);
             _gl.Uniform1(_uIridescenceMaskChannel, iridescence?.MaskChannel ?? 0);
 
             ModelWaveDefinition wave = effect.Wave;
@@ -797,6 +799,13 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         internal static TriangleFace MaterialCullFace(ModelMaterialRenderState state)
             => state.Inverted ? TriangleFace.Front : TriangleFace.Back;
+
+        internal static bool ShouldApplyIridescenceAlpha(
+            ModelMaterialDefinition material,
+            ModelIridescenceDefinition iridescence) =>
+            iridescence?.UsesLocalizedAlpha == true ||
+            (material?.RenderState.Blending == ModelMaterialBlendMode.Opaque &&
+             iridescence?.RequiresAlphaBlend == true);
 
         internal static (
             Vector3 LightDirection,

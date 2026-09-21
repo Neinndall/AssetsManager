@@ -66,6 +66,37 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
+        public void TransparentAuthoredPassKeepsTextureAlphaSeparateFromInferredIridescenceAlpha()
+        {
+            var iridescence = new ModelIridescenceDefinition(
+                "lut",
+                "mask",
+                Vector4.One,
+                Vector2.Zero,
+                new Vector2(0.9f, 0.9f),
+                1f,
+                UsesPulse: false,
+                UsesLocalizedAlpha: false);
+            ModelMaterialDefinition transparent = ModelMaterialDefinition.TextureOnly("cape") with
+            {
+                RenderState = ModelMaterialRenderState.Default with
+                {
+                    Blending = ModelMaterialBlendMode.Normal,
+                    DepthWrite = false
+                }
+            };
+            ModelMaterialDefinition opaque = ModelMaterialDefinition.TextureOnly("body");
+
+            Assert.True(iridescence.RequiresAlphaBlend);
+            Assert.False(GlMeshRenderer.ShouldApplyIridescenceAlpha(transparent, iridescence));
+            Assert.True(GlMeshRenderer.ShouldApplyIridescenceAlpha(opaque, iridescence));
+            Assert.True(
+                GlMeshRenderer.ShouldApplyIridescenceAlpha(
+                    transparent,
+                    iridescence with { UsesLocalizedAlpha = true }));
+        }
+
+        [Fact]
         public void ReferenceCharacterLightingUsesTheAuthoredSunSplit()
         {
             var lighting = GlMeshRenderer.ReferenceCharacterLighting();

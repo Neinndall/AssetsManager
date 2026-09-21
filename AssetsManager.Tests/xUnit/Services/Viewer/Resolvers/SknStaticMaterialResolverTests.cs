@@ -28,6 +28,23 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_PreservesAuthoredNormalBlendWhenDepthWriteIsDisabled()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                samplers: new[] { Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex") },
+                pass: Pass(
+                    blendEnabled: true,
+                    destinationBlendFactor: 7,
+                    writeMask: 15));
+
+            ModelMaterialDefinition resolved = Resolve(material, new[] { "test_tx_cm" });
+
+            Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
+            Assert.False(resolved.RenderState.DepthWrite);
+            Assert.True(resolved.UsesTextureAlpha);
+        }
+
+        [Fact]
         public void Resolve_UsesShaderDefaultForStringAuthoredSamplerPath()
         {
             SknShaderDefinition shader = new(
