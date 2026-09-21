@@ -334,6 +334,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
             SknMaterialDefinition material,
             IReadOnlyList<string> textureKeys)
         {
+            // Dynamic gradient layers are driven by gameplay/material animation state. Until
+            // that runtime is evaluated, applying their static slots makes P/R overlays
+            // permanently visible on neutral character previews.
+            if (material.IsAnimated)
+                return effect;
+
             string gradientTexture = FindSamplerKey(
                 material,
                 textureKeys,
@@ -831,8 +837,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     "Emissive_Factor",
                     "EmissionValue");
             }
-            // A BIN parameter called Bloom_Intensity is not enough to reproduce the
-            // authored shader. Require an authored color or bloom sampler before adding it.
             if (intensity <= 0.01f || !HasSupportedEmissionSignal(material))
                 return effect;
 
@@ -849,6 +853,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "Mask_Texture_blue",
                 "Mask_Texture",
                 "Mask") ?? FindMaterialMask(material, textureKeys);
+            // Color/intensity alone do not identify where bloom belongs. Falling back to a
+            // white mask floods the whole material (for example Aatrox Skin33's animated
+            // body material), so the generic renderer only applies bloom with authored
+            // spatial coverage.
+            if (bloomMask == null)
+                return effect;
             return effect with
             {
                 Bloom = new ModelBloomDefinition(

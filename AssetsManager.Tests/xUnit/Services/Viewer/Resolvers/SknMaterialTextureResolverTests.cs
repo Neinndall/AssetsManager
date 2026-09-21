@@ -1599,6 +1599,33 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_SkipsGradientPulseForDynamicMaterials()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("Gradient_Texture", "ASSETS/Shared/Materials/Gradient_test_01.tex"),
+                    new SknMaterialSampler("Mask_Texture", "ASSETS/Characters/Aatrox/Skins/Base/Particles/Aatrox_Base_P_Sword_Mask.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Pulse_Rate"] = new Vector4(3f, 0f, 0f, 0f),
+                    ["Pulse_Max"] = new Vector4(0.4f, 0f, 0f, 0f)
+                })
+            {
+                IsAnimated = true
+            };
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Sword",
+                new[] { "gradient_test_01", "aatrox_base_p_sword_mask" },
+                new[] { "Sword" });
+
+            Assert.Equal(ModelMaterialEffectKind.None, effect.Kind);
+        }
+
+        [Fact]
         public void Resolve_RecognizesGradientScrollEnabledByMaterialSwitch()
         {
             const string materialPath = "Characters/Aatrox/Skins/Base/Materials/Wings";
@@ -2269,6 +2296,26 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal(ModelMaterialEffectKind.Bloom, effect.Kind);
             Assert.Equal("bloom", effect.Bloom.MaskTextureName);
             Assert.Equal(0, effect.Bloom.MaskChannel);
+        }
+
+        [Fact]
+        public void Resolve_DoesNotApplyUnmaskedBloomColorGlobally()
+        {
+            var material = new SknMaterialDefinition(
+                Array.Empty<SknMaterialSampler>(),
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Bloom_Color"] = new(0.01f, 0f, 0.75f, 1f),
+                    ["Bloom_Intensity"] = new(10f, 0f, 0f, 0f)
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                Array.Empty<string>(),
+                new[] { "Body" });
+
+            Assert.False((effect.Kind & ModelMaterialEffectKind.Bloom) != 0);
         }
 
         [Fact]

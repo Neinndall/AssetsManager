@@ -119,6 +119,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
+        public void Fragment_PreservesGradientPulseCalibration()
+        {
+            Assert.Contains(
+                "float bloom = clamp(uGradientBloomIntensity * 0.05, 0.0, 1.0);",
+                GlMeshShaderSource.Fragment);
+            Assert.Contains(
+                "mask * uGradientStrength * gradientStrength * 0.1 *",
+                GlMeshShaderSource.Fragment);
+            Assert.Contains("vec3(2.0));", GlMeshShaderSource.Fragment);
+        }
+
+        [Fact]
         public void Fragment_UsesSrgbCharacterMaterialPath()
         {
             Assert.Contains("uniform int uMaterialSrgb;", GlMeshShaderSource.Fragment);
