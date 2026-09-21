@@ -924,8 +924,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "DeformNoise",
                 "VertexDeformNoise",
                 "Vertex_Deform_Noise",
-                "VertexDeformTexture",
-                "Vertex_Deform_Tex",
                 "DeformationNoise");
             string maskTexture = FindSamplerKey(
                 material,
@@ -972,15 +970,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         Vector2.One,
                         "DeformTiling",
                         "Deform_Tiling",
-                        "VertexDeformTiling",
-                        "VertexDeformTilling",
-                        "VertexDeform_Tilling"),
+                        "VertexDeformTiling"),
                     ReadFloat(
                         material.Parameters,
                         ReadFloat(material.Parameters, 0f, "Anim_Wave_Speed"),
                         "DeformSpeed",
-                        "VertexDeformSpeed",
-                        "VertexDeform_Speed"),
+                        "VertexDeformSpeed"),
                     ReadFloat(
                         material.Parameters,
                         ReadFloat(material.Parameters, 1f, "Anim_Wave_Frequency"),

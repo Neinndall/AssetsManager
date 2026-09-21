@@ -2305,34 +2305,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void Resolve_UsesAuthoredVertexDeformTextureAliases()
-        {
-            var material = new SknMaterialDefinition(
-                new[]
-                {
-                    new SknMaterialSampler("VertexDeformTexture", "ASSETS/Test/vertex_deform.tex")
-                },
-                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["VertexDeformIntensity"] = new(2f, 0f, 0f, 0f),
-                    ["VertexDeform_Tilling"] = new(0.1f, 0.1f, 0f, 0f),
-                    ["VertexDeform_Speed"] = new(0.05f, 0f, 0f, 0f)
-                });
-
-            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
-                material,
-                "Body",
-                new[] { "vertex_deform" },
-                new[] { "Body" });
-
-            Assert.Equal(ModelMaterialEffectKind.VertexDeformation, effect.Kind);
-            Assert.Equal("vertex_deform", effect.VertexDeformation.NoiseTextureName);
-            Assert.Equal(2f, effect.VertexDeformation.Intensity);
-            Assert.Equal(new Vector2(0.1f, 0.1f), effect.VertexDeformation.Tiling);
-            Assert.Equal(0.05f, effect.VertexDeformation.Speed);
-        }
-
-        [Fact]
         public void Resolve_PreservesSupportedLayersFromCompositeOnsenMaterial()
         {
             const string materialPath = "Characters/Locke/Skins/Base/Materials/Onsen";
