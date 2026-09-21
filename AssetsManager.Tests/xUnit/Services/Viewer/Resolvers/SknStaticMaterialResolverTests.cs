@@ -454,6 +454,48 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_DoesNotApplyGenericUvScaleToBaseDiffuse()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                samplers: new[]
+                {
+                    Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex"),
+                    Sampler("Gradient_Texture", "ASSETS/Characters/Test/Gradient.tex"),
+                    Sampler("Mask_Texture", "ASSETS/Characters/Test/Mask.tex")
+                },
+                parameters: new Dictionary<string, Vector4>
+                {
+                    ["UV_Scale"] = new Vector4(3f, 3f, 0f, 0f),
+                    ["Scroll_Speed"] = new Vector4(0.2f, 0.1f, 0f, 0f)
+                });
+
+            ModelMaterialDefinition resolved = Resolve(
+                material,
+                new[] { "test_tx_cm", "gradient", "mask" });
+
+            Assert.Equal("test_tx_cm", resolved.BaseTextureName);
+            Assert.Equal(Vector2.One, resolved.UvRepeat);
+        }
+
+        [Fact]
+        public void Resolve_AppliesDiffuseSpecificUvScaleToBaseDiffuse()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                samplers: new[]
+                {
+                    Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex")
+                },
+                parameters: new Dictionary<string, Vector4>
+                {
+                    ["Diffuse_UV_Scale"] = new Vector4(2f, 3f, 0f, 0f)
+                });
+
+            ModelMaterialDefinition resolved = Resolve(material, new[] { "test_tx_cm" });
+
+            Assert.Equal(new Vector2(2f, 3f), resolved.UvRepeat);
+        }
+
+        [Fact]
         public void Resolve_MissingPassUsesClassRenderDefaults()
         {
             SknMaterialDefinition material = CreateMaterial();

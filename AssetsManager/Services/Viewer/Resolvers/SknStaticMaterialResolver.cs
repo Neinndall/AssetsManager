@@ -80,7 +80,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             "Diffuse_Tiling",
             "Base_Tile",
             "MainTexUV_Tile",
-            "UV_Scale",
             "Diffuse_UV_Scale"
         };
 
