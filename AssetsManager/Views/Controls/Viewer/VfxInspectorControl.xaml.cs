@@ -281,6 +281,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (IsLoaded)
             {
                 EnsureOpenGlStarted();
+                SetRenderLoopRunning(true);
             }
         }
 
@@ -291,8 +292,17 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _isActive = false;
             _pendingSystem = null;
-            // Keep the logical transport state while hidden. The render callback is already
-            // gated by _isActive, so no simulation time advances until the viewport returns.
+            // LTK stops the viewport frameloop while hidden. Keep the GL resources alive but stop
+            // scheduling empty render callbacks until the Studio becomes visible again.
+            SetRenderLoopRunning(false);
+        }
+
+        private void SetRenderLoopRunning(bool running)
+        {
+            if (!_isGlStarted || OpenTkControl == null) return;
+            OpenTkControl.RenderContinuously = running;
+            if (running)
+                OpenTkControl.InvalidateVisual();
         }
 
         private void EnsureOpenGlStarted()

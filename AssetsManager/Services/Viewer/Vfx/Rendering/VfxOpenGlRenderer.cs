@@ -35,6 +35,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _uPlacementRight, _uPlacementUp, _uPlacementForward, _uIsGroundLayer;
         private int _uWireframePass, _uWireframeColor;
         private int _instCapFloats;
+        private int _trailCapFloats;
         private bool _ready;
         private VfxTextureResourceCache _textures = null!;
         private VfxSceneCapture _capture = null!;
@@ -43,6 +44,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private float[] _sortedInstances = Array.Empty<float>();
         private float[] _instanceDepths = Array.Empty<float>();
         private int[] _instanceOrder = Array.Empty<int>();
+        private readonly Dictionary<(object Graph, string Path, int SourceOrder), int> _emitterUsed = new();
+        private readonly Dictionary<(object Graph, string Path, int SourceOrder), VfxPlaybackRuntime.EmitterState> _firstSourceByEmitter = new();
+        private readonly Dictionary<(object Graph, string Path, int SourceOrder), List<VfxPlaybackRuntime.EmitterState>> _sortedQuadGroups = new();
+        private readonly HashSet<(object Graph, string Path, int SourceOrder)> _renderedSortedQuadGroups = new();
+        private readonly List<List<VfxPlaybackRuntime.EmitterState>> _quadSourceLists = new();
+        private int _quadSourceListCount;
         private readonly HashSet<uint> _ownerHiddenSubmeshes = new();
         [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
         private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
@@ -219,7 +226,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal bool SupportsWireframe => !_gles;
 
         public void Render(IReadOnlyList<VfxRenderQueueEntry> renderQueue, Matrix4x4 viewProj, Matrix4x4 view,
-            IReadOnlyList<VfxRenderQueueEntry> stencilQueue = null,
             bool wireframePass = false,
             float wireframeOpacity = 1f)
         {
@@ -267,8 +273,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.GetInteger(GLEnum.VertexArrayBinding, out int vertexArray);
             _gl.GetInteger(GLEnum.ArrayBufferBinding, out int arrayBuffer);
             _gl.GetInteger(GLEnum.ActiveTexture, out int activeTexture);
-            var textureBindings = new int[9];
-            var cubeBindings = new int[9];
+            Span<int> textureBindings = stackalloc int[9];
+            Span<int> cubeBindings = stackalloc int[9];
             for (int unit = 0; unit < textureBindings.Length; unit++)
             {
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
@@ -276,6 +282,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.GetInteger(GLEnum.TextureBindingCubeMap, out cubeBindings[unit]);
             }
 
+            ResetEmitterDrawScratch();
             try
             {
             if (useWireframe)
@@ -316,9 +323,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Enable(EnableCap.Blend);
             _gl.BlendEquation(GLEnum.FuncAdd);
 
-            var emitterUsed = new Dictionary<(object Graph, string Path, int SourceOrder), int>();
-            var firstSourceByEmitter = new Dictionary<(object Graph, string Path, int SourceOrder), VfxPlaybackRuntime.EmitterState>();
-            var sortedQuadGroups = new Dictionary<(object Graph, string Path, int SourceOrder), List<VfxPlaybackRuntime.EmitterState>>();
+            Dictionary<(object Graph, string Path, int SourceOrder), int> emitterUsed = _emitterUsed;
+            Dictionary<(object Graph, string Path, int SourceOrder), VfxPlaybackRuntime.EmitterState> firstSourceByEmitter = _firstSourceByEmitter;
+            Dictionary<(object Graph, string Path, int SourceOrder), List<VfxPlaybackRuntime.EmitterState>> sortedQuadGroups = _sortedQuadGroups;
             foreach (VfxRenderQueueEntry candidate in renderQueue)
             {
                 VfxPlaybackRuntime.EmitterState candidateEmitter = candidate.Emitter;
@@ -330,12 +337,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     !ShouldSortInstances(candidateEmitter.Def, 2)) continue;
                 if (!sortedQuadGroups.TryGetValue(key, out List<VfxPlaybackRuntime.EmitterState> sources))
                 {
-                    sources = new List<VfxPlaybackRuntime.EmitterState>();
+                    sources = RentQuadSourceList();
                     sortedQuadGroups[key] = sources;
                 }
                 sources.Add(candidateEmitter);
             }
-            var renderedSortedQuadGroups = new HashSet<(object Graph, string Path, int SourceOrder)>();
+            HashSet<(object Graph, string Path, int SourceOrder)> renderedSortedQuadGroups = _renderedSortedQuadGroups;
 
             foreach (VfxRenderQueueEntry entry in renderQueue)
             {
@@ -441,7 +448,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     es.Def.EmitterUvScrollRate * es.RenderTime,
                     renderState.TextureAddressMode);
                 _gl.Uniform2(_uEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
-                Vector2 uvCenter = EffectiveCenter(es.Def.UvTransformCenter);
+                Vector2 uvCenter = es.Def.UvTransformCenter;
                 _gl.Uniform2(_uUvTransformCenter, uvCenter.X, uvCenter.Y);
                 _gl.Uniform1(_uHasTexMult, es.TextureMult != 0 ? 1 : 0);
                 var multDiv = es.Def.TextureMultTexDiv;
@@ -454,7 +461,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     es.Def.TextureMultEmitterUvScrollRate * es.RenderTime,
                     es.Def.TextureMultAddressMode);
                 _gl.Uniform2(_uUvScrollRateMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
-                Vector2 uvCenterMult = EffectiveCenter(es.Def.TextureMultTransformCenter);
+                Vector2 uvCenterMult = es.Def.TextureMultTransformCenter;
                 _gl.Uniform2(_uUvTransformCenterMult, uvCenterMult.X, uvCenterMult.Y);
                 _gl.Uniform1(_uFlipUMult, es.Def.TextureMultFlipU ? 1 : 0);
                 _gl.Uniform1(_uFlipVMult, es.Def.TextureMultFlipV ? 1 : 0);
@@ -608,8 +615,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     {
                         _gl.BindVertexArray(_trailVao);
                         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
-                        _gl.BufferData(BufferTargetARB.ArrayBuffer,
-                            new ReadOnlySpan<float>(_trailGeometry.Vertices, 0, vertices * VfxTrailGeometry.VertexStride), BufferUsageARB.DynamicDraw);
+                        UploadTrailVertices(new ReadOnlySpan<float>(
+                            _trailGeometry.Vertices,
+                            0,
+                            vertices * VfxTrailGeometry.VertexStride));
                         _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
                         _gl.BindVertexArray(_vao);
                     }
@@ -624,8 +633,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     {
                         _gl.BindVertexArray(_trailVao);
                         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
-                        _gl.BufferData(BufferTargetARB.ArrayBuffer,
-                            new ReadOnlySpan<float>(_beamGeometry.Vertices, 0, vertices * VfxBeamGeometry.VertexStride), BufferUsageARB.DynamicDraw);
+                        UploadTrailVertices(new ReadOnlySpan<float>(
+                            _beamGeometry.Vertices,
+                            0,
+                            vertices * VfxBeamGeometry.VertexStride));
                         _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
                         _gl.BindVertexArray(_vao);
                     }
@@ -637,6 +648,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             }
             finally
             {
+                ResetEmitterDrawScratch();
                 if (useWireframe)
                     _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
 
@@ -691,6 +703,36 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.BindBuffer(BufferTargetARB.ArrayBuffer, (uint)arrayBuffer);
                 _gl.UseProgram((uint)program);
             }
+        }
+
+        private void UploadTrailVertices(ReadOnlySpan<float> vertices)
+        {
+            if (vertices.Length > _trailCapFloats)
+            {
+                _gl.BufferData(BufferTargetARB.ArrayBuffer, vertices, BufferUsageARB.DynamicDraw);
+                _trailCapFloats = vertices.Length;
+                return;
+            }
+
+            _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, vertices);
+        }
+
+        private void ResetEmitterDrawScratch()
+        {
+            _emitterUsed.Clear();
+            _firstSourceByEmitter.Clear();
+            _sortedQuadGroups.Clear();
+            _renderedSortedQuadGroups.Clear();
+            foreach (List<VfxPlaybackRuntime.EmitterState> sources in _quadSourceLists)
+                sources.Clear();
+            _quadSourceListCount = 0;
+        }
+
+        private List<VfxPlaybackRuntime.EmitterState> RentQuadSourceList()
+        {
+            if (_quadSourceListCount == _quadSourceLists.Count)
+                _quadSourceLists.Add(new List<VfxPlaybackRuntime.EmitterState>());
+            return _quadSourceLists[_quadSourceListCount++];
         }
 
         private void ApplyAddressMode(int addressMode)
@@ -810,8 +852,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _ => throw new ArgumentOutOfRangeException(nameof(equation), equation, null)
         };
 
-        private static Vector2 EffectiveCenter(Vector2 center) => center;
-
         public void ClearTextures()
         {
             if (!_ready) return;
@@ -836,6 +876,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _meshProgram = 0;
             _meshResources.Dispose();
             _capture.Dispose();
+            ResetEmitterDrawScratch();
+            _quadSourceLists.Clear();
+            _groupedInstances = Array.Empty<float>();
+            _sortedInstances = Array.Empty<float>();
+            _instanceDepths = Array.Empty<float>();
+            _instanceOrder = Array.Empty<int>();
+            _ownerHiddenSubmeshes.Clear();
+            _instCapFloats = 0;
+            _trailCapFloats = 0;
             _ready = false;
         }
 
@@ -1063,7 +1112,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector2 texDiv = es.Def.TexDiv;
             _gl.Uniform2(_muTexDiv, texDiv.X <= 0f ? 1f : texDiv.X, texDiv.Y <= 0f ? 1f : texDiv.Y);
             _gl.Uniform2(_muTexSize, Math.Max(1f, es.TextureWidth), Math.Max(1f, es.TextureHeight));
-            Vector2 uvCenter = EffectiveCenter(es.Def.UvTransformCenter);
+            Vector2 uvCenter = es.Def.UvTransformCenter;
             _gl.Uniform2(_muUvTransformCenter, uvCenter.X, uvCenter.Y);
             _gl.Uniform1(_muHasTexMult, es.TextureMult != 0 ? 1 : 0);
             Vector2 textureMultTexDiv = es.Def.TextureMultTexDiv;
@@ -1075,7 +1124,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muTexSizeMult,
                 Math.Max(1f, es.TextureMultWidth),
                 Math.Max(1f, es.TextureMultHeight));
-            Vector2 uvCenterMult = EffectiveCenter(es.Def.TextureMultTransformCenter);
+            Vector2 uvCenterMult = es.Def.TextureMultTransformCenter;
             _gl.Uniform2(_muUvTransformCenterMult, uvCenterMult.X, uvCenterMult.Y);
             Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
                     es.Def.TextureMultEmitterUvScrollRate * es.RenderTime,

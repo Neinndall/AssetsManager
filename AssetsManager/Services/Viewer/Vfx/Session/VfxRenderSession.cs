@@ -76,6 +76,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         internal double LastSeekRestoreTime { get; private set; }
 
         private readonly List<VfxPlaybackGraphRuntime> _graphs = new();
+        private readonly List<IReadOnlyList<VfxPlaybackRuntime.EmitterState>> _renderSources = new();
+        private readonly List<VfxRenderQueueEntry> _renderQueue = new();
+        private readonly List<VfxRenderQueueEntry> _shadedRenderQueue = new();
+        private readonly List<VfxRenderQueueEntry> _distortionRenderQueue = new();
+        private readonly Dictionary<object, int> _renderGraphOrders = new();
         private readonly Dictionary<VfxPlaybackGraphRuntime, Matrix4x4> _graphPlacements = new();
         private readonly List<(double Time, uint EffectKey)> _scheduledEffectKills = new();
         private readonly Dictionary<VfxPlaybackGraphRuntime, double> _graphStopTimes = new();
@@ -1178,31 +1183,52 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (!_ready || _graphs.Count == 0) return;
 
             UploadPendingResources();
-            IEnumerable<VfxPlaybackRuntime.EmitterState> emitters =
-                _graphs.SelectMany(graph => graph.Runtimes).SelectMany(runtime => runtime.Emitters).Where(emitter => emitter.IsVisible);
+            _renderSources.Clear();
+            bool needsSoftParticles = false;
+            foreach (VfxPlaybackGraphRuntime graph in _graphs)
+            {
+                foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
+                {
+                    IReadOnlyList<VfxPlaybackRuntime.EmitterState> emitters = runtime.Emitters;
+                    _renderSources.Add(emitters);
+                    if (needsSoftParticles) continue;
+
+                    foreach (VfxPlaybackRuntime.EmitterState emitter in emitters)
+                    {
+                        if (!emitter.IsVisible || !VfxOpenGlRenderer.ShouldUseSoftParticles(emitter.Def, true))
+                            continue;
+                        needsSoftParticles = true;
+                        break;
+                    }
+                }
+            }
+
             _renderer.CaptureScene(
                 _viewportWidth,
                 _viewportHeight,
                 false,
-                emitters.Any(emitter => VfxOpenGlRenderer.ShouldUseSoftParticles(emitter.Def, true)));
-            IReadOnlyList<VfxRenderQueueEntry> renderQueue = VfxRenderQueue.Build(
-                _graphs.SelectMany(graph => graph.Runtimes).Select(runtime => runtime.Emitters),
-                view);
+                needsSoftParticles);
+            VfxRenderQueue.BuildInto(_renderSources, _renderQueue, _renderGraphOrders);
 
             bool supportsWireframe = _renderer.SupportsWireframe;
             var previewPasses = ResolvePreviewPasses(wireframeMode, supportsWireframe);
 
-            VfxRenderQueueEntry[] distortionQueue = renderQueue
-                .Where(entry => entry.Emitter.Def.Distortion != null)
-                .ToArray();
+            _shadedRenderQueue.Clear();
+            _distortionRenderQueue.Clear();
+            foreach (VfxRenderQueueEntry entry in _renderQueue)
+            {
+                if (entry.Emitter.Def.Distortion != null)
+                    _distortionRenderQueue.Add(entry);
+                else
+                    _shadedRenderQueue.Add(entry);
+            }
 
             if (previewPasses.Shaded)
             {
                 _renderer.Render(
-                    renderQueue.Where(entry => entry.Emitter.Def.Distortion == null).ToArray(),
+                    _shadedRenderQueue,
                     viewProjection,
-                    view,
-                    renderQueue);
+                    view);
             }
 
             // LTK keeps every wire twin on the particle colour layer, including the twin of a
@@ -1211,18 +1237,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (previewPasses.Wireframe)
             {
                 _renderer.Render(
-                    renderQueue,
+                    _renderQueue,
                     viewProjection,
                     view,
-                    renderQueue,
                     wireframePass: true,
                     wireframeOpacity: previewPasses.WireOpacity);
             }
 
-            if (previewPasses.Shaded && distortionQueue.Length > 0)
+            if (previewPasses.Shaded && _distortionRenderQueue.Count > 0)
             {
                 _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
-                _renderer.Render(distortionQueue, viewProjection, view, renderQueue);
+                _renderer.Render(_distortionRenderQueue, viewProjection, view);
             }
         }
 
@@ -1241,76 +1266,81 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         private void UploadPendingResources()
         {
-            foreach (VfxPlaybackRuntime runtime in _graphs.SelectMany(graph => graph.Runtimes))
+            foreach (VfxPlaybackGraphRuntime graph in _graphs)
             {
-                foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+                foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
                 {
-                    UploadTexture(ref emitter.PendingTexture, texture =>
+                    foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
                     {
-                        emitter.Texture = texture;
-                        if (emitter.PendingTexture is BitmapSource bitmap)
+                        if (emitter.PendingTexture is BitmapSource baseTexture)
                         {
-                            emitter.TextureWidth = bitmap.PixelWidth;
-                            emitter.TextureHeight = bitmap.PixelHeight;
+                            emitter.TextureWidth = baseTexture.PixelWidth;
+                            emitter.TextureHeight = baseTexture.PixelHeight;
                         }
-                    });
-                    UploadTexture(ref emitter.PendingTextureMult, texture =>
-                    {
-                        emitter.TextureMult = texture;
-                        if (emitter.PendingTextureMult is BitmapSource bitmap)
-                        {
-                            emitter.TextureMultWidth = bitmap.PixelWidth;
-                            emitter.TextureMultHeight = bitmap.PixelHeight;
-                        }
-                    });
-                    UploadTexture(ref emitter.PendingDistortionTexture, texture => emitter.DistortionTexture = texture);
-                    UploadTexture(ref emitter.PendingErosionTexture, texture => emitter.ErosionTexture = texture);
-                    UploadCubeMap(ref emitter.PendingReflectionTexture, texture => emitter.ReflectionTexture = texture);
-                    UploadTexture(ref emitter.PendingColorGradient, texture =>
-                        emitter.ColorGradientTexture = texture);
-                    UploadTexture(ref emitter.PendingPaletteTexture, texture =>
-                        emitter.PaletteTexture = texture);
+                        emitter.Texture = UploadTexture(ref emitter.PendingTexture, emitter.Texture);
 
-                    if (emitter.PendingMesh is { } mesh)
-                    {
-                        emitter.MeshOwnerScale = float.IsFinite(mesh.OwnerScale) && mesh.OwnerScale > 0f
-                            ? mesh.OwnerScale
-                            : 1f;
-                        emitter.MeshRanges = mesh.Ranges ?? Array.Empty<VfxMeshRangeData>();
-                        _renderer.UploadEmitterMesh(
-                            emitter,
-                            mesh.Positions,
-                            mesh.Normals,
-                            mesh.Uvs,
-                            mesh.Colors,
-                            mesh.Indices,
-                            mesh.BoneIndices,
-                            mesh.BoneWeights);
-                        emitter.PendingMesh = null;
+                        if (emitter.PendingTextureMult is BitmapSource multiplierTexture)
+                        {
+                            emitter.TextureMultWidth = multiplierTexture.PixelWidth;
+                            emitter.TextureMultHeight = multiplierTexture.PixelHeight;
+                        }
+                        emitter.TextureMult = UploadTexture(ref emitter.PendingTextureMult, emitter.TextureMult);
+                        emitter.DistortionTexture = UploadTexture(
+                            ref emitter.PendingDistortionTexture,
+                            emitter.DistortionTexture);
+                        emitter.ErosionTexture = UploadTexture(
+                            ref emitter.PendingErosionTexture,
+                            emitter.ErosionTexture);
+                        emitter.ReflectionTexture = UploadCubeMap(
+                            ref emitter.PendingReflectionTexture,
+                            emitter.ReflectionTexture);
+                        emitter.ColorGradientTexture = UploadTexture(
+                            ref emitter.PendingColorGradient,
+                            emitter.ColorGradientTexture);
+                        emitter.PaletteTexture = UploadTexture(
+                            ref emitter.PendingPaletteTexture,
+                            emitter.PaletteTexture);
+
+                        if (emitter.PendingMesh is { } mesh)
+                        {
+                            emitter.MeshOwnerScale = float.IsFinite(mesh.OwnerScale) && mesh.OwnerScale > 0f
+                                ? mesh.OwnerScale
+                                : 1f;
+                            emitter.MeshRanges = mesh.Ranges ?? Array.Empty<VfxMeshRangeData>();
+                            _renderer.UploadEmitterMesh(
+                                emitter,
+                                mesh.Positions,
+                                mesh.Normals,
+                                mesh.Uvs,
+                                mesh.Colors,
+                                mesh.Indices,
+                                mesh.BoneIndices,
+                                mesh.BoneWeights);
+                            emitter.PendingMesh = null;
+                        }
                     }
                 }
             }
         }
 
-        private void UploadTexture(ref object pending, Action<uint> assign)
+        private uint UploadTexture(ref object pending, uint currentTexture)
         {
-            if (pending is not BitmapSource bitmap) return;
+            if (pending is not BitmapSource bitmap) return currentTexture;
             if (!_textureCache.TryGetValue(bitmap, out uint texture))
             {
                 texture = UploadBitmap(bitmap);
                 _textureCache[bitmap] = texture;
             }
-            assign(texture);
             pending = null;
+            return texture;
         }
 
-        private void UploadCubeMap(ref object pending, Action<uint> assign)
+        private uint UploadCubeMap(ref object pending, uint currentTexture)
         {
-            if (pending is not VfxCubeMapData cube) return;
+            if (pending is not VfxCubeMapData cube) return currentTexture;
             uint texture = _renderer.UploadCubeMap(cube);
-            if (texture != 0)
-                assign(texture);
             pending = null;
+            return texture != 0 ? texture : currentTexture;
         }
 
         private uint UploadBitmap(BitmapSource bitmap)
@@ -1347,6 +1377,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 _loadingService.Dispose();
             _graph = null;
             _graphs.Clear();
+            _renderSources.Clear();
+            _renderQueue.Clear();
+            _shadedRenderQueue.Clear();
+            _distortionRenderQueue.Clear();
+            _renderGraphOrders.Clear();
             _graphPlacements.Clear();
             _scheduledEffectKills.Clear();
             _graphStopTimes.Clear();

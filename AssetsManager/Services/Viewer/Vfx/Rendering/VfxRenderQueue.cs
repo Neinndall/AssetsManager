@@ -8,29 +8,52 @@ using AssetsManager.Views.Models.Viewer;
 namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
     /// <summary>One drawable emitter plus its stable position in the composed effect graph.</summary>
-    public sealed record VfxRenderQueueEntry(
+    public readonly record struct VfxRenderQueueEntry(
         VfxPlaybackRuntime.EmitterState Emitter,
         int GraphOrder,
-        int QueueOrder,
-        float ViewDepth);
+        int QueueOrder);
 
     /// <summary>
     /// Builds one backend-neutral render queue across roots, children, and ability events.
-    /// Authored phase/pass ordering is preserved before optional back-to-front emitter sorting.
+    /// LTK orders emitter definitions by authored draw rank; only quad particles sort by eye distance.
     /// </summary>
     public static class VfxRenderQueue
     {
         public static IReadOnlyList<VfxRenderQueueEntry> Build(
-            IEnumerable<IReadOnlyList<VfxPlaybackRuntime.EmitterState>> runtimes,
-            Matrix4x4 view)
+            IEnumerable<IReadOnlyList<VfxPlaybackRuntime.EmitterState>> runtimes)
         {
             ArgumentNullException.ThrowIfNull(runtimes);
+            var sources = runtimes as IReadOnlyList<IReadOnlyList<VfxPlaybackRuntime.EmitterState>>;
+            if (sources is null)
+            {
+                var collected = new List<IReadOnlyList<VfxPlaybackRuntime.EmitterState>>();
+                foreach (IReadOnlyList<VfxPlaybackRuntime.EmitterState> emitters in runtimes)
+                    collected.Add(emitters);
+                sources = collected;
+            }
+
             var entries = new List<VfxRenderQueueEntry>();
             var graphOrders = new Dictionary<object, int>();
+            BuildInto(sources, entries, graphOrders);
+            return entries;
+        }
+
+        internal static void BuildInto(
+            IReadOnlyList<IReadOnlyList<VfxPlaybackRuntime.EmitterState>> runtimes,
+            List<VfxRenderQueueEntry> entries,
+            Dictionary<object, int> graphOrders)
+        {
+            ArgumentNullException.ThrowIfNull(runtimes);
+            ArgumentNullException.ThrowIfNull(entries);
+            ArgumentNullException.ThrowIfNull(graphOrders);
+
+            entries.Clear();
+            graphOrders.Clear();
             int nextGraphOrder = 0;
             int queueOrder = 0;
-            foreach (IReadOnlyList<VfxPlaybackRuntime.EmitterState> emitters in runtimes)
+            for (int runtimeIndex = 0; runtimeIndex < runtimes.Count; runtimeIndex++)
             {
+                IReadOnlyList<VfxPlaybackRuntime.EmitterState> emitters = runtimes[runtimeIndex];
                 object runtimeKey = emitters.Count > 0
                     ? emitters[0].RenderGraphKey ?? emitters
                     : emitters;
@@ -40,19 +63,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     graphOrders[runtimeKey] = graphOrder;
                 }
 
-                foreach (VfxPlaybackRuntime.EmitterState emitter in emitters)
+                for (int emitterIndex = 0; emitterIndex < emitters.Count; emitterIndex++)
                 {
-                    Vector3 viewPosition = Vector3.Transform(emitter.BasePos, view);
+                    VfxPlaybackRuntime.EmitterState emitter = emitters[emitterIndex];
                     entries.Add(new VfxRenderQueueEntry(
                         emitter,
                         graphOrder,
-                        queueOrder++,
-                        viewPosition.Z));
+                        queueOrder++));
                 }
             }
 
             entries.Sort(Compare);
-            return entries;
         }
 
         private static int Compare(VfxRenderQueueEntry left, VfxRenderQueueEntry right)

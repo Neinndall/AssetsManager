@@ -3709,11 +3709,42 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             earlier.RenderRank = 2;
 
             IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(
-                new[] { laterRuntime.Emitters, earlierRuntime.Emitters },
-                Matrix4x4.Identity);
+                new[] { laterRuntime.Emitters, earlierRuntime.Emitters });
 
             Assert.Equal("earlier", queue[0].Emitter.Def.Name);
             Assert.Equal("later", queue[1].Emitter.Def.Name);
+        }
+
+        [Fact]
+        public void GlobalRenderQueueBuildIntoClearsReusableScratch()
+        {
+            VfxEmitterDefinition first = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with { Name = "first" };
+            VfxEmitterDefinition second = first with { Name = "second" };
+            var initialRuntime = new VfxPlaybackRuntime(7);
+            initialRuntime.SetSystem(
+                new VfxSystemDefinition(1, "initial", "initial", new[] { first, second }),
+                Vector3.Zero);
+
+            VfxEmitterDefinition replacement = first with { Name = "replacement" };
+            var replacementRuntime = new VfxPlaybackRuntime(8);
+            replacementRuntime.SetSystem(
+                new VfxSystemDefinition(2, "replacement", "replacement", new[] { replacement }),
+                Vector3.Zero);
+
+            var sources = new List<IReadOnlyList<VfxPlaybackRuntime.EmitterState>> { initialRuntime.Emitters };
+            var entries = new List<VfxRenderQueueEntry>();
+            var graphOrders = new Dictionary<object, int>();
+
+            VfxRenderQueue.BuildInto(sources, entries, graphOrders);
+            Assert.Equal(2, entries.Count);
+            Assert.Single(graphOrders);
+
+            sources[0] = replacementRuntime.Emitters;
+            VfxRenderQueue.BuildInto(sources, entries, graphOrders);
+
+            VfxRenderQueueEntry entry = Assert.Single(entries);
+            Assert.Equal("replacement", entry.Emitter.Def.Name);
+            Assert.Single(graphOrders);
         }
 
         [Fact]
@@ -3739,8 +3770,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             }
 
             IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(
-                new[] { firstRuntime.Emitters, secondRuntime.Emitters },
-                Matrix4x4.Identity);
+                new[] { firstRuntime.Emitters, secondRuntime.Emitters });
 
             Assert.Same(first, queue[0].Emitter);
             Assert.Same(second, queue[1].Emitter);
@@ -3771,7 +3801,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new VfxSystemDefinition(1, "ground-order", "ground-order", new[] { defaultLayer, groundLayer }),
                 Vector3.Zero);
 
-            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters }, Matrix4x4.Identity);
+            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters });
 
             Assert.Equal("ground", queue[0].Emitter.Def.Name);
             Assert.Equal("default", queue[1].Emitter.Def.Name);
@@ -3808,7 +3838,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new VfxSystemDefinition(1, "draw-kind", "draw-kind", new[] { alpha, addMiscHigh, addMiscLow }),
                 Vector3.Zero);
 
-            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters }, Matrix4x4.Identity);
+            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters });
 
             Assert.Equal("add-misc-low", queue[0].Emitter.Def.Name);
             Assert.Equal("add-misc-high", queue[1].Emitter.Def.Name);
@@ -3834,7 +3864,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             var runtime = new VfxPlaybackRuntime(7);
             runtime.SetSystem(new VfxSystemDefinition(1, "depth", "depth", new[] { near, far }), Vector3.Zero);
 
-            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters }, Matrix4x4.Identity);
+            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters });
 
             Assert.Equal("near", queue[0].Emitter.Def.Name);
             Assert.Equal("far", queue[1].Emitter.Def.Name);
