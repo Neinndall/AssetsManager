@@ -8,6 +8,12 @@ namespace AssetsManager.Views.Models.Viewer
         ModelMaterialWrapMode WrapU,
         ModelMaterialWrapMode WrapV);
 
+    public sealed record ModelTextureLayerChannelDefinition(
+        Vector2 ScrollSpeed,
+        Vector4 Color,
+        float Strength,
+        int TextureChannel);
+
     public sealed record ModelTextureLayerDefinition(
         string TextureName,
         string MaskTextureName,
@@ -16,7 +22,9 @@ namespace AssetsManager.Views.Models.Viewer
         Vector4 Color,
         float Strength,
         int TextureChannel = -1,
-        int MaskChannel = 0);
+        int MaskChannel = 0,
+        ModelTextureLayerChannelDefinition GreenChannel = null,
+        ModelTextureLayerChannelDefinition AlphaChannel = null);
 
     public sealed record ModelFlowMapDefinition(
         string TextureName,

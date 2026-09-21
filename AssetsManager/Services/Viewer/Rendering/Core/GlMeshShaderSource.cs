@@ -178,6 +178,14 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform vec4 uAdditiveColor;
                     uniform float uAdditiveStrength;
                     uniform int uAdditiveTextureChannel;
+                    uniform vec2 uAdditiveScrollSpeedG;
+                    uniform vec4 uAdditiveColorG;
+                    uniform float uAdditiveStrengthG;
+                    uniform int uAdditiveTextureChannelG;
+                    uniform vec2 uAdditiveScrollSpeedA;
+                    uniform vec4 uAdditiveColorA;
+                    uniform float uAdditiveStrengthA;
+                    uniform int uAdditiveTextureChannelA;
                     uniform int uAdditiveMaskChannel;
                     uniform int uFlowTexIndex;
                     uniform int uFlowMaskIndex;
@@ -397,14 +405,30 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
                             if ((uEffectKind & 1) != 0 && uAdditiveTexIndex >= 0)
                             {
-                                vec2 uv = vUv * max(uAdditiveTiling, vec2(0.0001)) +
-                                    uAdditiveScrollSpeed * uEffectTime;
-                                vec4 additiveSample = sampleAux(uAdditiveTexIndex, uv);
-                                vec3 additiveColor = channelColor(additiveSample, uAdditiveTextureChannel);
                                 float mask = uAdditiveMaskIndex >= 0
                                     ? channelValue(sampleAux(uAdditiveMaskIndex, vUv), uAdditiveMaskChannel)
                                     : 1.0;
-                                finalColor += additiveColor * uAdditiveColor.rgb * uAdditiveStrength * mask;
+                                vec2 uvR = vUv * max(uAdditiveTiling, vec2(0.0001)) +
+                                    uAdditiveScrollSpeed * uEffectTime;
+                                vec4 additiveSampleR = sampleAux(uAdditiveTexIndex, uvR);
+                                vec3 additiveColorR = channelColor(additiveSampleR, uAdditiveTextureChannel);
+                                finalColor += additiveColorR * uAdditiveColor.rgb * uAdditiveStrength * mask;
+                                if (uAdditiveTextureChannelG >= 0 && abs(uAdditiveStrengthG) > 0.0001)
+                                {
+                                    vec2 uvG = vUv * max(uAdditiveTiling, vec2(0.0001)) +
+                                        uAdditiveScrollSpeedG * uEffectTime;
+                                    vec4 additiveSampleG = sampleAux(uAdditiveTexIndex, uvG);
+                                    vec3 additiveColorG = channelColor(additiveSampleG, uAdditiveTextureChannelG);
+                                    finalColor += additiveColorG * uAdditiveColorG.rgb * uAdditiveStrengthG * mask;
+                                }
+                                if (uAdditiveTextureChannelA >= 0 && abs(uAdditiveStrengthA) > 0.0001)
+                                {
+                                    vec2 uvA = vUv * max(uAdditiveTiling, vec2(0.0001)) +
+                                        uAdditiveScrollSpeedA * uEffectTime;
+                                    vec4 additiveSampleA = sampleAux(uAdditiveTexIndex, uvA);
+                                    vec3 additiveColorA = channelColor(additiveSampleA, uAdditiveTextureChannelA);
+                                    finalColor += additiveColorA * uAdditiveColorA.rgb * uAdditiveStrengthA * mask;
+                                }
                             }
 
                             if ((uEffectKind & 2) != 0 && uFlowTexIndex >= 0)

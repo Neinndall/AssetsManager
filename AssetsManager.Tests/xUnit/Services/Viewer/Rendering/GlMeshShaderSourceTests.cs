@@ -168,6 +168,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
+        public void Fragment_ComposesPackedAdditiveChannelsWithIndependentScroll()
+        {
+            Assert.Contains("uniform vec2 uAdditiveScrollSpeedG;", GlMeshShaderSource.Fragment);
+            Assert.Contains("uniform float uAdditiveStrengthG;", GlMeshShaderSource.Fragment);
+            Assert.Contains("uniform vec2 uAdditiveScrollSpeedA;", GlMeshShaderSource.Fragment);
+            Assert.Contains("uniform float uAdditiveStrengthA;", GlMeshShaderSource.Fragment);
+            Assert.Contains("uAdditiveScrollSpeedG * uEffectTime", GlMeshShaderSource.Fragment);
+            Assert.Contains("uAdditiveScrollSpeedA * uEffectTime", GlMeshShaderSource.Fragment);
+            Assert.Contains("channelColor(additiveSampleG, uAdditiveTextureChannelG)", GlMeshShaderSource.Fragment);
+            Assert.Contains("channelColor(additiveSampleA, uAdditiveTextureChannelA)", GlMeshShaderSource.Fragment);
+        }
+
+        [Fact]
         public void Fragment_UsesAuthoredStateDistortionAndChannels()
         {
             Assert.Contains("uDissolveStateIndex >= 0", GlMeshShaderSource.Fragment);

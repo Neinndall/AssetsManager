@@ -44,6 +44,14 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uAdditiveColor;
         private int _uAdditiveStrength;
         private int _uAdditiveTextureChannel;
+        private int _uAdditiveScrollSpeedG;
+        private int _uAdditiveColorG;
+        private int _uAdditiveStrengthG;
+        private int _uAdditiveTextureChannelG;
+        private int _uAdditiveScrollSpeedA;
+        private int _uAdditiveColorA;
+        private int _uAdditiveStrengthA;
+        private int _uAdditiveTextureChannelA;
         private int _uAdditiveMaskChannel;
         private int _uFlowTexIndex;
         private int _uFlowMaskIndex;
@@ -306,6 +314,14 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uAdditiveColor = gl.GetUniformLocation(_program, "uAdditiveColor");
             _uAdditiveStrength = gl.GetUniformLocation(_program, "uAdditiveStrength");
             _uAdditiveTextureChannel = gl.GetUniformLocation(_program, "uAdditiveTextureChannel");
+            _uAdditiveScrollSpeedG = gl.GetUniformLocation(_program, "uAdditiveScrollSpeedG");
+            _uAdditiveColorG = gl.GetUniformLocation(_program, "uAdditiveColorG");
+            _uAdditiveStrengthG = gl.GetUniformLocation(_program, "uAdditiveStrengthG");
+            _uAdditiveTextureChannelG = gl.GetUniformLocation(_program, "uAdditiveTextureChannelG");
+            _uAdditiveScrollSpeedA = gl.GetUniformLocation(_program, "uAdditiveScrollSpeedA");
+            _uAdditiveColorA = gl.GetUniformLocation(_program, "uAdditiveColorA");
+            _uAdditiveStrengthA = gl.GetUniformLocation(_program, "uAdditiveStrengthA");
+            _uAdditiveTextureChannelA = gl.GetUniformLocation(_program, "uAdditiveTextureChannelA");
             _uAdditiveMaskChannel = gl.GetUniformLocation(_program, "uAdditiveMaskChannel");
             _uFlowTexIndex = gl.GetUniformLocation(_program, "uFlowTexIndex");
             _uFlowMaskIndex = gl.GetUniformLocation(_program, "uFlowMaskIndex");
@@ -534,6 +550,16 @@ namespace AssetsManager.Services.Viewer.Rendering
             SetVector4(_uAdditiveColor, additive?.Color ?? Vector4.One);
             _gl.Uniform1(_uAdditiveStrength, additive?.Strength ?? 0f);
             _gl.Uniform1(_uAdditiveTextureChannel, additive?.TextureChannel ?? -1);
+            ModelTextureLayerChannelDefinition additiveG = additive?.GreenChannel;
+            SetVector2(_uAdditiveScrollSpeedG, additiveG?.ScrollSpeed ?? Vector2.Zero);
+            SetVector4(_uAdditiveColorG, additiveG?.Color ?? Vector4.One);
+            _gl.Uniform1(_uAdditiveStrengthG, additiveG?.Strength ?? 0f);
+            _gl.Uniform1(_uAdditiveTextureChannelG, additiveG?.TextureChannel ?? -1);
+            ModelTextureLayerChannelDefinition additiveA = additive?.AlphaChannel;
+            SetVector2(_uAdditiveScrollSpeedA, additiveA?.ScrollSpeed ?? Vector2.Zero);
+            SetVector4(_uAdditiveColorA, additiveA?.Color ?? Vector4.One);
+            _gl.Uniform1(_uAdditiveStrengthA, additiveA?.Strength ?? 0f);
+            _gl.Uniform1(_uAdditiveTextureChannelA, additiveA?.TextureChannel ?? -1);
             _gl.Uniform1(_uAdditiveMaskChannel, additive?.MaskChannel ?? 0);
 
             ModelFlowMapDefinition flow = effect.FlowMap;

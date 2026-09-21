@@ -953,6 +953,52 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_PreservesPackedAdditiveGreenAndAlphaChannels()
+        {
+            const string materialPath = "Characters/Test/Skins/Skin1/Materials/PackedScroll";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex",
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", "ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex"),
+                        CreateSampler("AdditiveScrollTex", "ASSETS/Characters/Test/Skins/Skin1/Packed.tex"),
+                        CreateSampler("AdditiveScroll_Mask", "ASSETS/Characters/Test/Skins/Skin1/PackedMask.tex")
+                    },
+                    CreateParameter("AdditiveTexTile", new Vector4(3f, 2f, 0f, 0f)),
+                    CreateParameter("AdditiveStrength_R", Vector4.Zero),
+                    CreateParameter("AdditiveTexScrollSpeed_R", Vector4.Zero),
+                    CreateParameter("AdditiveStrength_G", new Vector4(0.675f, 0f, 0f, 0f)),
+                    CreateParameter("AdditiveTexScrollSpeed_G", new Vector4(0f, -0.2f, 0f, 0f)),
+                    CreateParameter("AdditiveScroll_ColorTint_G", new Vector4(0.9f, 0.88f, 0.89f, 1f)),
+                    CreateParameter("AdditiveStrength_A", new Vector4(1.5f, 0f, 0f, 0f)),
+                    CreateParameter("AdditiveTexScrollSpeed_A", new Vector4(0.1f, 0.05f, 0f, 0f)),
+                    CreateParameter("AdditiveScroll_ColorTint_A", new Vector4(0.88f, 0.17f, 0.8f, 1f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "test_tx_cm", "packed", "packedmask" });
+
+            ModelTextureLayerDefinition additive = resolution.ResolveMaterialDefinition("body").Effect.AdditiveScroll;
+            Assert.NotNull(additive);
+            Assert.Equal(0f, additive.Strength);
+            Assert.NotNull(additive.GreenChannel);
+            Assert.Equal(1, additive.GreenChannel.TextureChannel);
+            Assert.Equal(0.675f, additive.GreenChannel.Strength);
+            Assert.Equal(new Vector2(0f, -0.2f), additive.GreenChannel.ScrollSpeed);
+            Assert.Equal(new Vector4(0.9f, 0.88f, 0.89f, 1f), additive.GreenChannel.Color);
+            Assert.NotNull(additive.AlphaChannel);
+            Assert.Equal(3, additive.AlphaChannel.TextureChannel);
+            Assert.Equal(1.5f, additive.AlphaChannel.Strength);
+            Assert.Equal(new Vector2(0.1f, 0.05f), additive.AlphaChannel.ScrollSpeed);
+            Assert.Equal(new Vector4(0.88f, 0.17f, 0.8f, 1f), additive.AlphaChannel.Color);
+        }
+
+        [Fact]
         public void Resolve_BuildsDefaultMaterialDefinitionFromStaticMaterial()
         {
             const string materialPath = "Characters/Test/Skins/Skin1/Materials/Body";
@@ -1966,6 +2012,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
         }
 
+        [Fact]
+        public void Resolve_UsesAuthoredTransitionValueWidthAndPatternTillingAliases()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("Transition_PatternTexture", "ASSETS/Test/transition_pattern.tex"),
+                    new SknMaterialSampler("Transition_State2", "ASSETS/Test/transition_state.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Transition_Value"] = new(0.65f, 0f, 0f, 0f),
+                    ["Transition_Width"] = new(0.2f, 0f, 0f, 0f),
+                    ["Transition_Pattern_Tilling"] = new(0.02f, 0.5f, 0f, 0f)
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "transition_pattern", "transition_state" },
+                new[] { "Body" });
+
+            Assert.Equal(ModelMaterialEffectKind.Dissolve, effect.Kind);
+            Assert.Equal(0.65f, effect.Dissolve.Threshold);
+            Assert.Equal(0.2f, effect.Dissolve.Softness);
+            Assert.Equal(new Vector2(0.02f, 0.5f), effect.Dissolve.Tiling);
+        }
+
         [Theory]
         [InlineData("FlowMap")]
         [InlineData("Flow_Map")]
@@ -1996,6 +2070,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal(ModelMaterialEffectKind.FlowMap, effect.Kind);
             Assert.Equal("cloudfm_tx_cm", effect.FlowMap.TextureName);
             Assert.Equal(new Vector2(0.2f, -0.1f), effect.FlowMap.ScrollSpeed);
+        }
+
+        [Fact]
+        public void Resolve_DoesNotInferFlowMapFromSamplerWithoutAuthoredDriver()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("FlowmapTex", "ASSETS/Test/flow.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase));
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "flow" },
+                new[] { "Body" });
+
+            Assert.Equal(ModelMaterialEffectKind.None, effect.Kind);
         }
 
         [Fact]
@@ -2151,6 +2244,33 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal(2, effect.Bloom.MaskChannel);
         }
 
+        [Theory]
+        [InlineData("Bloom_Texture")]
+        [InlineData("Bloom_Mask")]
+        public void Resolve_UsesAuthoredBloomTextureAliasesAsSpatialMask(string samplerName)
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler(samplerName, "ASSETS/Test/bloom.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Bloom_Color"] = new(0.45f, 0.06f, 0f, 1f),
+                    ["Bloom_Intensity"] = new(1f, 0f, 0f, 0f)
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "bloom" },
+                new[] { "Body" });
+
+            Assert.Equal(ModelMaterialEffectKind.Bloom, effect.Kind);
+            Assert.Equal("bloom", effect.Bloom.MaskTextureName);
+            Assert.Equal(0, effect.Bloom.MaskChannel);
+        }
+
         [Fact]
         public void Resolve_UsesAuthoredNoiseForComplexVertexDeformation()
         {
@@ -2182,6 +2302,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal("deform_mask", effect.VertexDeformation.MaskTextureName);
             Assert.Equal(0.8f, effect.VertexDeformation.Intensity);
             Assert.Equal(1.5f, effect.VertexDeformation.Protection);
+        }
+
+        [Fact]
+        public void Resolve_UsesAuthoredVertexDeformTextureAliases()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("VertexDeformTexture", "ASSETS/Test/vertex_deform.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["VertexDeformIntensity"] = new(2f, 0f, 0f, 0f),
+                    ["VertexDeform_Tilling"] = new(0.1f, 0.1f, 0f, 0f),
+                    ["VertexDeform_Speed"] = new(0.05f, 0f, 0f, 0f)
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "vertex_deform" },
+                new[] { "Body" });
+
+            Assert.Equal(ModelMaterialEffectKind.VertexDeformation, effect.Kind);
+            Assert.Equal("vertex_deform", effect.VertexDeformation.NoiseTextureName);
+            Assert.Equal(2f, effect.VertexDeformation.Intensity);
+            Assert.Equal(new Vector2(0.1f, 0.1f), effect.VertexDeformation.Tiling);
+            Assert.Equal(0.05f, effect.VertexDeformation.Speed);
         }
 
         [Fact]

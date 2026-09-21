@@ -175,15 +175,22 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "AdditiveStrength_R",
                 "ScrollStrength_R",
                 "ScrollStrength");
+            ModelTextureLayerChannelDefinition additiveG = ReadPackedAdditiveChannel(material.Parameters, "G", 1);
+            ModelTextureLayerChannelDefinition additiveA = ReadPackedAdditiveChannel(material.Parameters, "A", 3);
+            bool hasActiveAdditiveChannel = additiveStrength > Epsilon || additiveG != null || additiveA != null;
             if (effect.AdditiveScroll == null &&
                 additiveTexture != null &&
                 additiveMask != null &&
-                additiveStrength > Epsilon &&
+                hasActiveAdditiveChannel &&
                 HasAnyParameter(
                     material.Parameters,
                     "AdditiveTexScrollSpeed_R",
+                    "AdditiveTexScrollSpeed_G",
+                    "AdditiveTexScrollSpeed_A",
                     "AdditiveTexTile",
                     "ScrollSpeed_R",
+                    "ScrollSpeed_G",
+                    "ScrollSpeed_A",
                     "Scroll_Speed",
                     "ScrollSpeed",
                     "ScrollTexTile") &&
@@ -217,7 +224,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                             "ScrollColorTint"),
                         additiveStrength,
                         0,
-                        ResolveSamplerChannel(material, additiveMask, 0))
+                        ResolveSamplerChannel(material, additiveMask, 0),
+                        additiveG,
+                        additiveA)
                 };
             }
 
@@ -228,7 +237,18 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "FlowMap",
                 "Flow_Texture",
                 "Flowmap_Texture");
-            if (flowTexture != null)
+            bool hasFlowDriver = HasAnyParameter(
+                material.Parameters,
+                "FlowSpeed",
+                "FlowmapSpeed",
+                "Flow_Speed",
+                "FlowTiling",
+                "Flow_Tiling",
+                "FlowmapTiling",
+                "FlowmapIntensity",
+                "FlowIntensity",
+                "Flow_Amount");
+            if (flowTexture != null && hasFlowDriver)
             {
                 string flowMask = FindSamplerKey(
                     material,
@@ -289,14 +309,22 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 !HasEffectiveScrollSpeed(
                     material.Parameters,
                     "AdditiveTexScrollSpeed_R",
+                    "AdditiveTexScrollSpeed_G",
+                    "AdditiveTexScrollSpeed_A",
                     "ScrollSpeed_R",
+                    "ScrollSpeed_G",
+                    "ScrollSpeed_A",
                     "Scroll_Speed",
                     "ScrollSpeed") &&
                 !HasAnyParameter(
                     material.Parameters,
                     "AdditiveScroll_ColorTint_R",
+                    "AdditiveScroll_ColorTint_G",
+                    "AdditiveScroll_ColorTint_A",
                     "AdditiveScroll_ColorTint",
                     "Scroll_Color_Tint_R",
+                    "Scroll_Color_Tint_G",
+                    "Scroll_Color_Tint_A",
                     "ScrollColor",
                     "ScrollColorTint");
         }
@@ -383,7 +411,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     "DissolveWidth",
                     "Dissolve_SmoothStep",
                     "Transition",
-                    "TransitionAmount"))
+                    "TransitionAmount",
+                    "Transition_Value"))
             {
                 return effect;
             }
@@ -397,7 +426,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "DissolveValue",
                 "DissolveBias",
                 "Dissolve_Bias",
-                "TransitionAmount");
+                "TransitionAmount",
+                "Transition_Value");
             if (!float.IsFinite(dissolveThreshold) ||
                 dissolveThreshold < 0f ||
                 dissolveThreshold > 1f)
@@ -429,7 +459,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         Vector2.One,
                         "DissolveTiling",
                         "Dissolve_Tiling",
-                        "Transition_Tiling"),
+                        "Transition_Tiling",
+                        "Transition_Pattern_Tilling"),
                     dissolveThreshold,
                     ReadDissolveSoftness(material.Parameters),
                     ResolveSamplerChannel(material, patternTexture, 0),
@@ -703,7 +734,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     "EmissionMask",
                     "EmissiveMask",
                     "BloomMask",
+                    "Bloom_Mask",
                     "BloomMask_Texture",
+                    "Bloom_Texture",
                     "Outline_Bloom_Mask",
                     "Mask_Texture_red",
                     "Mask_Texture_green",
@@ -807,7 +840,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 material,
                 textureKeys,
                 "BloomMask",
+                "Bloom_Mask",
                 "BloomMask_Texture",
+                "Bloom_Texture",
                 "Outline_Bloom_Mask",
                 "Mask_Texture_red",
                 "Mask_Texture_green",
@@ -860,7 +895,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 -1f,
                 "DissolveSoftness",
                 "DissolveEdge",
-                "DissolveWidth");
+                "DissolveWidth",
+                "Transition_Width");
             if (explicitSoftness >= 0f)
             {
                 return explicitSoftness;
@@ -888,6 +924,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "DeformNoise",
                 "VertexDeformNoise",
                 "Vertex_Deform_Noise",
+                "VertexDeformTexture",
+                "Vertex_Deform_Tex",
                 "DeformationNoise");
             string maskTexture = FindSamplerKey(
                 material,
@@ -934,12 +972,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         Vector2.One,
                         "DeformTiling",
                         "Deform_Tiling",
-                        "VertexDeformTiling"),
+                        "VertexDeformTiling",
+                        "VertexDeformTilling",
+                        "VertexDeform_Tilling"),
                     ReadFloat(
                         material.Parameters,
                         ReadFloat(material.Parameters, 0f, "Anim_Wave_Speed"),
                         "DeformSpeed",
-                        "VertexDeformSpeed"),
+                        "VertexDeformSpeed",
+                        "VertexDeform_Speed"),
                     ReadFloat(
                         material.Parameters,
                         ReadFloat(material.Parameters, 1f, "Anim_Wave_Frequency"),
@@ -1219,6 +1260,21 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             // Standalone distortion maps conventionally carry a 2D vector in RG.
             return 1;
+        }
+
+        private static ModelTextureLayerChannelDefinition ReadPackedAdditiveChannel(
+            IReadOnlyDictionary<string, Vector4> parameters,
+            string suffix,
+            int textureChannel)
+        {
+            float strength = ReadFloat(parameters, 0f, $"AdditiveStrength_{suffix}", $"ScrollStrength_{suffix}");
+            return strength > Epsilon
+                ? new ModelTextureLayerChannelDefinition(
+                    ReadVector2(parameters, Vector2.Zero, $"AdditiveTexScrollSpeed_{suffix}", $"ScrollSpeed_{suffix}"),
+                    ReadVector4(parameters, Vector4.One, $"AdditiveScroll_ColorTint_{suffix}", $"Scroll_Color_Tint_{suffix}"),
+                    strength,
+                    textureChannel)
+                : null;
         }
 
         private static bool HasAnyParameter(
