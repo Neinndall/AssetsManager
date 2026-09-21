@@ -44,6 +44,7 @@ New Features
   - VFX Studio now activates OpenGL only while visible, keeps folder/BIN scanning independent from GPU startup, creates its render session on the first selected system with a valid context, scopes one loading/resource cache to each Viewer, and releases OpenGL, decoded texture, mesh, animation, and index resources when the Viewer closes.
   - VFX Studio / Reduced per-frame render and child-simulation allocations by reusing queue, grouping, lineage, and dynamic ribbon buffers without changing authored draw order or playback limits.
   - VFX Studio / Hidden previews now stop their continuous OpenGL frame loop while retaining reusable GPU state for instant resume.
+  - VFX Studio / Reorganized BIN parsing into dedicated system, animation, resource, value, and schema services without changing supported VFX behavior.
   - Viewer / Model materials now animate BIN-authored vertex waves and Fresnel noise when the material declares those features.
   - Viewer / Model materials now apply BIN-authored Fresnel, masked emission, and simple dissolve transitions alongside animated scroll and flow textures.
   - Viewer / Ignore un-tinted static white additive placeholders in iridescent material graphs so champion skin layers do not wash out the base diffuse texture.
