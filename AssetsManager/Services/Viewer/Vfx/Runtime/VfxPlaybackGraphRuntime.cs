@@ -110,7 +110,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             int seed,
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
             IReadOnlyDictionary<uint, uint> resourceMap,
-            Func<VfxSystemDefinition, Matrix4x4, int, VfxPlaybackRuntime> runtimeFactory)
+            Func<VfxSystemDefinition, Matrix4x4, int, VfxPlaybackRuntime> runtimeFactory,
+            int? rootParticleCapacity = null)
         {
             ArgumentNullException.ThrowIfNull(rootDefinition);
             _systems = systems ?? throw new ArgumentNullException(nameof(systems));
@@ -125,7 +126,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _orientationRootTransform = _rootTransform;
             BuildRenderRanks(rootDefinition);
 
-            Root = CreateRuntime(rootDefinition, Matrix4x4.Identity, 0, string.Empty, seed);
+            Root = CreateRuntime(
+                rootDefinition,
+                Matrix4x4.Identity,
+                0,
+                string.Empty,
+                seed,
+                particleCapacity: rootParticleCapacity);
             _runtimes.Add(Root);
             SyncRenderTimes();
         }

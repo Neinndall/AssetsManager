@@ -181,6 +181,8 @@ namespace AssetsManager
       services.AddSingleton<MapMaterialParser>();
       services.AddSingleton<MapPlaceableParser>();
       services.AddSingleton<MapCharacterParser>();
+      services.AddSingleton<MapParticleParser>();
+      services.AddSingleton<MapParticleSystemParser>();
       services.AddSingleton<MapCharacterSkinParser>();
       services.AddSingleton<MapCharacterMeshDecoder>();
       services.AddSingleton<MapVariantParser>();

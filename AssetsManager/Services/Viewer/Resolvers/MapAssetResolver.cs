@@ -121,6 +121,33 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return null;
         }
 
+        public async Task<IReadOnlyDictionary<MapAssetReference, MapResolvedAsset>> ResolveReferencesAsync(
+            IEnumerable<MapAssetReference> references,
+            string projectRoot,
+            CancellationToken cancellationToken = default)
+        {
+            MapAssetReference[] requested = (references ?? Array.Empty<MapAssetReference>())
+                .Where(reference => reference?.IsEmpty == false)
+                .Distinct()
+                .ToArray();
+            if (requested.Length == 0)
+                return new Dictionary<MapAssetReference, MapResolvedAsset>();
+
+            MapTextureReference[] compatible = requested
+                .Select(reference => new MapTextureReference(reference.VirtualPath, reference.PathHash))
+                .ToArray();
+            IReadOnlyDictionary<MapTextureReference, MapResolvedAsset> resolvedTextures =
+                await ResolveTexturesAsync(compatible, projectRoot, cancellationToken);
+            var resolved = new Dictionary<MapAssetReference, MapResolvedAsset>();
+            foreach (MapAssetReference reference in requested)
+            {
+                var key = new MapTextureReference(reference.VirtualPath, reference.PathHash);
+                if (resolvedTextures.TryGetValue(key, out MapResolvedAsset asset))
+                    resolved[reference] = asset;
+            }
+            return resolved;
+        }
+
         public async Task<IReadOnlyDictionary<MapTextureReference, MapResolvedAsset>> ResolveTexturesAsync(
             IEnumerable<MapTextureReference> references,
             string projectRoot,

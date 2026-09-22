@@ -18,6 +18,8 @@ namespace AssetsManager.Views.Models.Viewer
         public IReadOnlyDictionary<string, BitmapSource> Textures { get; }
         public IReadOnlyList<MapPlaceableChunkData> Placeables { get; }
         public IReadOnlyList<MapCharacterData> Characters { get; }
+        public IReadOnlyList<MapParticleData> Particles { get; }
+        public MapParticleSystemCatalog ParticleSystems { get; }
         public Vector3? Origin { get; }
 
         public MapSceneData(
@@ -29,6 +31,8 @@ namespace AssetsManager.Views.Models.Viewer
             IReadOnlyDictionary<string, BitmapSource> textures,
             IReadOnlyList<MapPlaceableChunkData> placeables,
             IReadOnlyList<MapCharacterData> characters,
+            IReadOnlyList<MapParticleData> particles,
+            MapParticleSystemCatalog particleSystems,
             Vector3? origin = null)
         {
             Source = source;
@@ -39,6 +43,8 @@ namespace AssetsManager.Views.Models.Viewer
             Textures = textures;
             Placeables = placeables;
             Characters = characters;
+            Particles = particles;
+            ParticleSystems = particleSystems;
             Origin = origin;
         }
     }

@@ -163,7 +163,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 materials,
                 new Dictionary<string, System.Windows.Media.Imaging.BitmapSource>(),
                 Array.Empty<MapPlaceableChunkData>(),
-                Array.Empty<MapCharacterData>());
+                Array.Empty<MapCharacterData>(),
+                Array.Empty<MapParticleData>(),
+                new MapParticleSystemCatalog(
+                    new Dictionary<uint, VfxSystemDefinition>(),
+                    new Dictionary<uint, uint>(),
+                    Array.Empty<MapParticleSystemGroupData>()));
         }
 
         private static MapGeometryMeshData Mesh(

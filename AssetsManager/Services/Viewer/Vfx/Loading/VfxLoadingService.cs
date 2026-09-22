@@ -240,6 +240,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 ownerSceneContext,
                 applyDefinitionTransform: true);
 
+        internal VfxPlaybackRuntime PreparePlaybackAtWorldTransform(
+            VfxSystemDefinition definition,
+            string searchDirectory,
+            Matrix4x4 worldTransform,
+            int seed,
+            LogService log,
+            VfxOwnerSceneContext ownerSceneContext = null)
+            => PreparePlaybackCore(
+                definition,
+                searchDirectory,
+                worldTransform,
+                seed,
+                log,
+                ownerSceneContext,
+                applyDefinitionTransform: false);
+
         private VfxPlaybackRuntime PreparePlaybackCore(
             VfxSystemDefinition definition,
             string searchDirectory,

@@ -26,6 +26,8 @@ namespace AssetsManager.Services.Viewer.Loading
         private readonly MapMaterialParser _materialParser;
         private readonly MapPlaceableParser _placeableParser;
         private readonly MapCharacterParser _characterParser;
+        private readonly MapParticleParser _particleParser;
+        private readonly MapParticleSystemParser _particleSystemParser;
         private readonly MapTextureLoadingService _textureLoadingService;
         private readonly HashResolverService _hashResolver;
         private readonly LogService _logService;
@@ -36,6 +38,8 @@ namespace AssetsManager.Services.Viewer.Loading
             MapMaterialParser materialParser,
             MapPlaceableParser placeableParser,
             MapCharacterParser characterParser,
+            MapParticleParser particleParser,
+            MapParticleSystemParser particleSystemParser,
             MapTextureLoadingService textureLoadingService,
             HashResolverService hashResolver,
             LogService logService)
@@ -45,6 +49,8 @@ namespace AssetsManager.Services.Viewer.Loading
             _materialParser = materialParser;
             _placeableParser = placeableParser;
             _characterParser = characterParser;
+            _particleParser = particleParser;
+            _particleSystemParser = particleSystemParser;
             _textureLoadingService = textureLoadingService;
             _hashResolver = hashResolver;
             _logService = logService;
@@ -95,6 +101,11 @@ namespace AssetsManager.Services.Viewer.Loading
                 geometry.Materials);
             IReadOnlyList<MapPlaceableChunkData> placeables = _placeableParser.Parse(materials);
             IReadOnlyList<MapCharacterData> characters = _characterParser.Parse(placeables);
+            IReadOnlyList<MapParticleData> particles = _particleParser.Parse(placeables);
+            IReadOnlyList<MapParticleData> playedParticles = MapParticleSemantics.PlayedOnLayer(particles, 0);
+            MapParticleSystemCatalog particleSystems = _particleSystemParser.Parse(
+                materials,
+                MapParticleSemantics.GroupBySystem(playedParticles));
             IReadOnlyDictionary<string, System.Windows.Media.Imaging.BitmapSource> textures =
                 await _textureLoadingService.LoadPreviewAsync(
                     materialDefinitions,
@@ -107,7 +118,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 $"meshes={geometry.Meshes.Count}, submeshes={geometry.Submeshes.Count}, " +
                 $"materials={geometry.Materials.Count}, textures={textures.Count}, " +
                 $"chunks={placeables.Count}, placeables={placeables.Sum(chunk => chunk.Items.Count)}, " +
-                $"characters={characters.Count}.");
+                $"characters={characters.Count}, particles={particles.Count}, " +
+                $"particleSystems={particleSystems.Groups.Count}.");
             return new MapSceneData(
                 source,
                 assets,
@@ -117,6 +129,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 textures,
                 placeables,
                 characters,
+                particles,
+                particleSystems,
                 MapGeometrySemantics.CalculateOrigin(geometry));
         }
 
