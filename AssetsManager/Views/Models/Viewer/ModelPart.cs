@@ -68,7 +68,8 @@ namespace AssetsManager.Views.Models.Viewer
         public System.Numerics.Vector4 ColorTint { get; set; } = System.Numerics.Vector4.One;
         internal bool IsAlphaBlended => ColorTint.W < 0.999f ||
             (MaterialDefinition != null &&
-             (MaterialDefinition.RenderState.Blending != ModelMaterialBlendMode.Opaque ||
+             ((MaterialDefinition.RenderState.Blending != ModelMaterialBlendMode.Opaque &&
+               !MaterialDefinition.RenderState.Cutout) ||
               MaterialDefinition.Effect?.RequiresAlphaBlend == true));
         internal float AlphaCutoff { get; set; } = 0.1f;
         internal bool UsesBakedDiffuse { get; set; }

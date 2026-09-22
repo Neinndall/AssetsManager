@@ -91,6 +91,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         IReadOnlyDictionary<string, Vector4> Parameters,
         IReadOnlyDictionary<string, string> ShaderMacros,
         bool? BlendEnabled,
+        uint? SourceColorBlendFactor,
         uint? DestinationColorBlendFactor,
         bool? CullEnabled,
         uint? WindingToCull,
@@ -178,6 +179,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint Passes = Fnv1a.HashLower("passes");
         private static readonly uint Shader = Fnv1a.HashLower("shader");
         private static readonly uint BlendEnable = Fnv1a.HashLower("blendEnable");
+        private static readonly uint SourceColorBlendFactor = Fnv1a.HashLower("srcColorBlendFactor");
         private static readonly uint DestinationColorBlendFactor = Fnv1a.HashLower("dstColorBlendFactor");
         private static readonly uint CullEnable = Fnv1a.HashLower("cullEnable");
         private static readonly uint WindingToCull = Fnv1a.HashLower("windingToCull");
@@ -422,7 +424,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         internal static SknMaterialTextureResolution Resolve(
             SknMaterialTextureMetadata metadata,
-            IEnumerable<string> availableTextureKeys)
+            IEnumerable<string> availableTextureKeys,
+            bool includeSpecializedEffects = true)
         {
             var textureKeys = availableTextureKeys?.ToList() ?? new List<string>();
             // Once a skin BIN is available, only its authored texture participates. LTK does not
@@ -455,8 +458,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             SknShaderDefinition defaultShader = ResolveShaderDefinition(metadata, metadata.DefaultMaterial);
-            SknMaterialDefinition defaultEffectMaterial =
-                SknStaticMaterialResolver.CreateEffectiveEffectMaterial(metadata.DefaultMaterial, defaultShader);
+            SknMaterialDefinition defaultEffectMaterial = includeSpecializedEffects
+                ? SknStaticMaterialResolver.CreateEffectiveEffectMaterial(metadata.DefaultMaterial, defaultShader)
+                : null;
             ModelMaterialEffectDefinition defaultEffect = defaultEffectMaterial == null
                 ? ModelMaterialEffectDefinition.None
                 : SknMaterialEffectResolver.Resolve(
@@ -500,13 +504,16 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     }
 
                     SknShaderDefinition shader = ResolveShaderDefinition(metadata, material);
-                    SknMaterialDefinition effectMaterial =
-                        SknStaticMaterialResolver.CreateEffectiveEffectMaterial(material, shader);
-                    ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
-                        effectMaterial,
-                        submesh,
-                        textureKeys,
-                        overrideSubmeshKeys);
+                    SknMaterialDefinition effectMaterial = includeSpecializedEffects
+                        ? SknStaticMaterialResolver.CreateEffectiveEffectMaterial(material, shader)
+                        : null;
+                    ModelMaterialEffectDefinition effect = effectMaterial == null
+                        ? ModelMaterialEffectDefinition.None
+                        : SknMaterialEffectResolver.Resolve(
+                            effectMaterial,
+                            submesh,
+                            textureKeys,
+                            overrideSubmeshKeys);
                     materialDefinitions[submesh] = SknStaticMaterialResolver.Resolve(
                         material,
                         shader,
@@ -1361,6 +1368,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ReadParameters(pass.Properties),
                 ReadStringMap(pass.Properties, ShaderMacros),
                 ReadOptionalBool(pass.Properties, BlendEnable),
+                ReadOptionalUInt(pass.Properties, SourceColorBlendFactor),
                 ReadOptionalUInt(pass.Properties, DestinationColorBlendFactor),
                 ReadOptionalBool(pass.Properties, CullEnable),
                 ReadOptionalUInt(pass.Properties, WindingToCull),

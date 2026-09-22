@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Hashing;
 using Xunit;
 
@@ -115,6 +118,36 @@ public class VfxClipCatalogTests
         Assert.Equal("leaf", resolved.ClipName);
     }
 
+    [Fact]
+    public void GraphTickRetimesAnimationDurationAndSamplingTogether()
+    {
+        var source = new RecordingAnimationAsset(duration: 1f, fps: 30f);
+        IAnimationAsset retimed = VfxClipCatalog.RetimeForGraph(source, 1f / 60f);
+        var pose = new Dictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)>();
+
+        Assert.Equal(0.5f, retimed.Duration, 5);
+        Assert.Equal(60f, retimed.Fps, 5);
+
+        retimed.Evaluate(0.25f, pose);
+
+        Assert.Equal(0.5f, source.LastEvaluationTime, 5);
+    }
+
+    [Fact]
+    public void MissingGraphTickKeepsTheAnimationNativeClock()
+    {
+        var source = new RecordingAnimationAsset(duration: 1f, fps: 30f);
+        IAnimationAsset retimed = VfxClipCatalog.RetimeForGraph(source, 0f);
+        var pose = new Dictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)>();
+
+        Assert.Equal(1f, retimed.Duration, 5);
+        Assert.Equal(30f, retimed.Fps, 5);
+
+        retimed.Evaluate(0.5f, pose);
+
+        Assert.Equal(0.5f, source.LastEvaluationTime, 5);
+    }
+
     private static AnimationClipDefinition Clip(
         uint ownerPathHash,
         uint graphPathHash,
@@ -132,4 +165,19 @@ public class VfxClipCatalogTests
             graphPathHash,
             Array.Empty<uint>(),
             Array.Empty<float>());
+
+    private sealed class RecordingAnimationAsset(float duration, float fps) : IAnimationAsset
+    {
+        public float Duration { get; } = duration;
+        public float Fps { get; } = fps;
+        public bool IsDisposed { get; private set; }
+        public float LastEvaluationTime { get; private set; } = float.NaN;
+
+        public void Evaluate(
+            float time,
+            IDictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> pose)
+            => LastEvaluationTime = time;
+
+        public void Dispose() => IsDisposed = true;
+    }
 }

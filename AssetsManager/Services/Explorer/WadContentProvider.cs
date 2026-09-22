@@ -137,6 +137,71 @@ namespace AssetsManager.Services.Explorer
             }, cancellationToken);
         }
 
+        /// <summary>
+        /// Searches WAD files for a set of already-authored path hashes in one pass.
+        /// This is used when a BIN stores a WadChunkLink whose original virtual path is unknown.
+        /// </summary>
+        public async Task<IReadOnlyDictionary<ulong, FileSystemNodeModel>> FindNodesByPathHashesAsync(
+            IEnumerable<ulong> pathHashes,
+            string gameDataPath,
+            CancellationToken cancellationToken = default)
+        {
+            if (pathHashes == null || string.IsNullOrWhiteSpace(gameDataPath) || !Directory.Exists(gameDataPath))
+                return new Dictionary<ulong, FileSystemNodeModel>();
+
+            return await Task.Run(() =>
+            {
+                var unresolved = pathHashes
+                    .Where(hash => hash != 0)
+                    .Distinct()
+                    .ToHashSet();
+                var results = new Dictionary<ulong, FileSystemNodeModel>();
+                if (unresolved.Count == 0)
+                    return (IReadOnlyDictionary<ulong, FileSystemNodeModel>)results;
+
+                var resolved = new List<ulong>();
+                var seenWads = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string wadPath in Directory.EnumerateFiles(gameDataPath, "*.wad", SearchOption.AllDirectories)
+                    .Concat(Directory.EnumerateFiles(gameDataPath, "*.wad.client", SearchOption.AllDirectories)))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!seenWads.Add(wadPath))
+                        continue;
+
+                    try
+                    {
+                        using var wadFile = new WadFile(wadPath);
+                        resolved.Clear();
+                        foreach (ulong hash in unresolved)
+                        {
+                            if (!wadFile.Chunks.TryGetValue(hash, out WadChunk chunk))
+                                continue;
+
+                            string virtualName = $"{hash:x16}";
+                            results[hash] = new FileSystemNodeModel(virtualName, false, virtualName, wadPath)
+                            {
+                                SourceChunkPathHash = chunk.PathHash,
+                                SourceWadPath = wadPath,
+                                Type = NodeType.VirtualFile
+                            };
+                            resolved.Add(hash);
+                        }
+
+                        foreach (ulong hash in resolved)
+                            unresolved.Remove(hash);
+                        if (unresolved.Count == 0)
+                            break;
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logService.LogWarning($"Error processing WAD file {wadPath}: {ex.Message}");
+                    }
+                }
+
+                return (IReadOnlyDictionary<ulong, FileSystemNodeModel>)results;
+            }, cancellationToken);
+        }
+
         private async Task<byte[]> ReadAndDecompressBackupChunkAsync(
             string chunkPath,
             WadChunkCompression? compressionType,

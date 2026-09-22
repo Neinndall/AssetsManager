@@ -28,20 +28,21 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void Resolve_PreservesAuthoredNormalBlendWhenDepthWriteIsDisabled()
+        public void Resolve_DemotesBlendWithoutAlphaEvenWhenDepthWriteIsDisabled()
         {
             SknMaterialDefinition material = CreateMaterial(
                 samplers: new[] { Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex") },
                 pass: Pass(
                     blendEnabled: true,
+                    sourceBlendFactor: 6,
                     destinationBlendFactor: 7,
                     writeMask: 15));
 
             ModelMaterialDefinition resolved = Resolve(material, new[] { "test_tx_cm" });
 
-            Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
+            Assert.Equal(ModelMaterialBlendMode.Opaque, resolved.RenderState.Blending);
             Assert.False(resolved.RenderState.DepthWrite);
-            Assert.True(resolved.UsesTextureAlpha);
+            Assert.False(resolved.UsesTextureAlpha);
         }
 
         [Fact]
@@ -196,7 +197,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 {
                     ["Opacity"] = new Vector4(1f, 0f, 0f, 0f)
                 },
-                pass: Pass(blendEnabled: true));
+                pass: Pass(
+                    blendEnabled: true,
+                    sourceBlendFactor: 6,
+                    destinationBlendFactor: 7));
 
             ModelMaterialDefinition resolved = Resolve(material, new[] { "test_tx_cm" });
 
@@ -224,6 +228,41 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.True(resolved.RenderState.Inverted);
             Assert.False(resolved.RenderState.DepthWrite);
             Assert.False(resolved.RenderState.DepthTest);
+        }
+
+        [Fact]
+        public void Resolve_ReadsModulateFactorPairLikeLtk()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                pass: Pass(
+                    blendEnabled: true,
+                    sourceBlendFactor: 3,
+                    destinationBlendFactor: 0));
+
+            ModelMaterialDefinition resolved = Resolve(material, Array.Empty<string>());
+
+            Assert.Equal(ModelMaterialBlendMode.Modulate, resolved.RenderState.Blending);
+            Assert.False(resolved.RenderState.Cutout);
+        }
+
+        [Fact]
+        public void Resolve_AuthoredAlphaTestWithDepthWriteIsCutout()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                parameters: new Dictionary<string, Vector4>
+                {
+                    ["AlphaTestValue"] = new Vector4(0.5f, 0f, 0f, 0f)
+                },
+                pass: Pass(
+                    blendEnabled: true,
+                    sourceBlendFactor: 6,
+                    destinationBlendFactor: 7));
+
+            ModelMaterialDefinition resolved = Resolve(material, Array.Empty<string>());
+
+            Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
+            Assert.True(resolved.RenderState.Cutout);
+            Assert.True(resolved.RenderState.DepthWrite);
         }
 
         [Fact]
@@ -296,6 +335,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 },
                 pass: Pass(
                     blendEnabled: true,
+                    sourceBlendFactor: 6,
+                    destinationBlendFactor: 7,
                     parameters: new Dictionary<string, Vector4>
                     {
                         ["TintColor"] = new Vector4(2f, 2f, 2f, 1f)
@@ -372,7 +413,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     ["MAINTEX_ON"] = true,
                     ["ADDITIVEALPHA_ON"] = true
                 },
-                pass: Pass(shaderHash: shaderHash, blendEnabled: true),
+                pass: Pass(
+                    shaderHash: shaderHash,
+                    blendEnabled: true,
+                    sourceBlendFactor: 6,
+                    destinationBlendFactor: 7),
                 shaderHash: shaderHash);
 
             ModelMaterialDefinition resolved = Resolve(material, new[] { "black", "test_tx_cm" });
@@ -589,7 +634,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             BinTreeEmbedded pass = Embedded(
                 "StaticMaterialPassDef",
                 new BinTreeObjectLink(Fnv1a.HashLower("shader"), shaderHash),
-                new BinTreeBool(Fnv1a.HashLower("blendEnable"), true));
+                new BinTreeBool(Fnv1a.HashLower("blendEnable"), true),
+                new BinTreeU32(Fnv1a.HashLower("srcColorBlendFactor"), 6),
+                new BinTreeU32(Fnv1a.HashLower("dstColorBlendFactor"), 7));
             BinTreeEmbedded technique = Embedded(
                 "StaticMaterialTechniqueDef",
                 new BinTreeString(Fnv1a.HashLower("name"), "normal"),
@@ -679,7 +726,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             BinTreeEmbedded pass = Embedded(
                 "StaticMaterialPassDef",
                 new BinTreeObjectLink(Fnv1a.HashLower("shader"), shaderHash),
-                new BinTreeBool(Fnv1a.HashLower("blendEnable"), true));
+                new BinTreeBool(Fnv1a.HashLower("blendEnable"), true),
+                new BinTreeU32(Fnv1a.HashLower("srcColorBlendFactor"), 6),
+                new BinTreeU32(Fnv1a.HashLower("dstColorBlendFactor"), 7));
             BinTreeEmbedded technique = Embedded(
                 "StaticMaterialTechniqueDef",
                 new BinTreeString(Fnv1a.HashLower("name"), "normal"),
@@ -861,6 +910,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         private static SknMaterialPassDefinition Pass(
             uint shaderHash = 0,
             bool? blendEnabled = null,
+            uint? sourceBlendFactor = null,
             uint? destinationBlendFactor = null,
             bool? cullEnabled = null,
             uint? windingToCull = null,
@@ -873,6 +923,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 parameters ?? new Dictionary<string, Vector4>(),
                 macros ?? new Dictionary<string, string>(),
                 blendEnabled,
+                sourceBlendFactor,
                 destinationBlendFactor,
                 cullEnabled,
                 windingToCull,

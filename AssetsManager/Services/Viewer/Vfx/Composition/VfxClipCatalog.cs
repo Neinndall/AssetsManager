@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Animation;
@@ -83,10 +84,9 @@ internal sealed class VfxClipCatalog : IDisposable
                     }
                 }
 
-                steps.Add(asset);
-                float tick = atomic.TickDuration > 0f
-                    ? atomic.TickDuration
-                    : 1f / (asset.Fps > 0f ? asset.Fps : 30f);
+                IAnimationAsset timedAsset = RetimeForGraph(asset, atomic.TickDuration);
+                steps.Add(timedAsset);
+                float tick = 1f / timedAsset.Fps;
 
                 VfxAbilityComposition composition = VfxAbilityCompositionBuilder.Build(
                     atomic,
@@ -148,7 +148,7 @@ internal sealed class VfxClipCatalog : IDisposable
                     }
                 }
 
-                passTime += asset.Duration;
+                passTime += timedAsset.Duration;
             }
 
             if (missing)
@@ -182,7 +182,7 @@ internal sealed class VfxClipCatalog : IDisposable
                 $"{name} · {clip.OwnerPathHash:x8}",
                 firstResolvedPath ?? playlist[0].AnimationFilePath,
                 passTime,
-                new ClipPlaylist(steps),
+                AnimationGraphPlayback.CreatePlaylist(steps),
                 clip,
                 merged,
                 timedCues.OrderBy(cue => cue.AtSeconds).ToArray(),
@@ -200,109 +200,26 @@ internal sealed class VfxClipCatalog : IDisposable
 
     internal static IReadOnlyList<AnimationClipDefinition> SelectGraphClips(
         IReadOnlyList<AnimationClipDefinition> clips,
-        uint animationGraphPathHash)
-    {
-        if (animationGraphPathHash == 0u) return clips;
-        return clips.Where(clip => clip.GraphPathHash == animationGraphPathHash).ToArray();
-    }
+        uint animationGraphPathHash) =>
+        AnimationGraphPlayback.SelectGraphClips(clips, animationGraphPathHash);
 
-    internal static string DisplayNameFor(AnimationClipDefinition clip)
-        => !string.IsNullOrWhiteSpace(clip?.ClipName)
-            ? clip.ClipName
-            : $"0x{clip?.OwnerPathHash ?? 0u:x8}";
+    internal static string DisplayNameFor(AnimationClipDefinition clip) =>
+        AnimationGraphPlayback.DisplayNameFor(clip);
 
-    internal static IReadOnlyList<float> ParameterValues(AnimationClipDefinition clip)
-    {
-        if (clip?.OwnerClassHash != ParametricClipClass)
-            return Array.Empty<float>();
+    internal static IReadOnlyList<float> ParameterValues(AnimationClipDefinition clip) =>
+        AnimationGraphPlayback.ParameterValues(clip);
 
-        IEnumerable<float?> authored = clip.ParametricValues ??
-            (clip.ChildParameters ?? Array.Empty<float>()).Select(value => (float?)value);
-        float[] values = authored
-            .Where(value => value.HasValue && float.IsFinite(value.Value))
-            .Select(value => value.Value)
-            .Distinct()
-            .OrderBy(value => value)
-            .ToArray();
-        return values.Length > 1 ? values : Array.Empty<float>();
-    }
-
-    internal static float NearestParameter(IReadOnlyList<float> values, float value)
-    {
-        if (values == null || values.Count == 0) return value;
-
-        float best = values[0];
-        float bestDistance = MathF.Abs(best - value);
-        for (int index = 1; index < values.Count; index++)
-        {
-            float distance = MathF.Abs(values[index] - value);
-            if (distance < bestDistance)
-            {
-                best = values[index];
-                bestDistance = distance;
-            }
-        }
-        return best;
-    }
+    internal static float NearestParameter(IReadOnlyList<float> values, float value) =>
+        AnimationGraphPlayback.NearestParameter(values, value);
 
     internal static IReadOnlyList<AnimationClipDefinition> ResolvePlaylist(
         AnimationClipDefinition clip,
         IReadOnlyList<AnimationClipDefinition> clips,
-        float? parameter = null)
-    {
-        var byKey = clips
-            .Where(item => item.GraphPathHash == clip.GraphPathHash)
-            .GroupBy(item => item.OwnerPathHash)
-            .ToDictionary(group => group.Key, group => group.First());
-        var path = new HashSet<uint>();
-        var result = new List<AnimationClipDefinition>();
+        float? parameter = null) =>
+        AnimationGraphPlayback.ResolvePlaylist(clip, clips, parameter);
 
-        void Visit(AnimationClipDefinition current)
-        {
-            if (!path.Add(current.OwnerPathHash)) return;
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(current.AnimationFilePath))
-                {
-                    result.Add(current);
-                    return;
-                }
-
-                IReadOnlyList<uint> children = current.ChildClipHashes ?? Array.Empty<uint>();
-                IEnumerable<int> order = Enumerable.Range(0, children.Count);
-                if (current.OwnerClassHash == ParametricClipClass &&
-                    children.Count > 0 &&
-                    parameter.HasValue)
-                {
-                    IReadOnlyList<float?> values = current.ParametricValues ??
-                        (current.ChildParameters ?? Array.Empty<float>())
-                            .Select(value => (float?)value)
-                            .ToArray();
-                    float selected = parameter.Value;
-                    order = order
-                        .OrderBy(index => MathF.Abs(
-                            ((index < values.Count ? values[index] : null) ?? 0f) - selected))
-                        .ThenBy(index => index);
-                }
-
-                foreach (int index in order)
-                {
-                    int before = result.Count;
-                    if (byKey.TryGetValue(children[index], out AnimationClipDefinition next))
-                        Visit(next);
-                    if (result.Count > before && current.OwnerClassHash != SequencerClipClass)
-                        break;
-                }
-            }
-            finally
-            {
-                path.Remove(current.OwnerPathHash);
-            }
-        }
-
-        Visit(clip);
-        return result;
-    }
+    internal static IAnimationAsset RetimeForGraph(IAnimationAsset asset, float tickDuration) =>
+        AnimationGraphPlayback.RetimeForGraph(asset, tickDuration);
 
     public void Dispose()
     {
@@ -326,30 +243,4 @@ internal sealed class VfxClipCatalog : IDisposable
                    out _);
     }
 
-    private sealed class ClipPlaylist(IReadOnlyList<IAnimationAsset> steps) : IAnimationAsset
-    {
-        public float Duration { get; } = steps.Sum(step => step.Duration);
-        public float Fps => steps.Count > 0 ? steps[0].Fps : 30f;
-        public bool IsDisposed { get; private set; }
-
-        public void Dispose() => IsDisposed = true;
-
-        public void Evaluate(
-            float time,
-            IDictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> pose)
-        {
-            if (IsDisposed) return;
-            float remaining = Math.Clamp(time, 0f, Duration);
-            for (int index = 0; index < steps.Count; index++)
-            {
-                IAnimationAsset step = steps[index];
-                if (remaining < step.Duration || index == steps.Count - 1)
-                {
-                    step.Evaluate(Math.Min(remaining, step.Duration), pose);
-                    return;
-                }
-                remaining -= step.Duration;
-            }
-        }
-    }
 }

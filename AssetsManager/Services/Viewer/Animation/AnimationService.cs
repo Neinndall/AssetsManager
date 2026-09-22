@@ -30,6 +30,7 @@ namespace AssetsManager.Services.Viewer.Animation
         private IAnimationAsset _lastAnimation;
         private IAnimationAsset _evaluatedAnimation;
         private RigResource _evaluatedSkeleton;
+        private RigResource _poseSkeleton;
         private float _evaluatedTime = float.NaN;
 
         // Cached model-specific data
@@ -62,6 +63,7 @@ namespace AssetsManager.Services.Viewer.Animation
             _lastAnimation = null;
             _evaluatedAnimation = null;
             _evaluatedSkeleton = null;
+            _poseSkeleton = null;
             _gpuSkinningData = null;
             _hierarchyOrder = null;
             _hierarchyParents = null;
@@ -77,28 +79,7 @@ namespace AssetsManager.Services.Viewer.Animation
         {
             if (_isDisposed) throw new ObjectDisposedException(nameof(AnimationService));
 
-            int jointCount = skeleton.Joints.Count;
-            if (_boneTransforms == null ||
-                _boneTransforms.Length != jointCount ||
-                _lastModelName != modelName ||
-                !ReferenceEquals(_lastSkeleton, skeleton))
-            {
-                _boneTransforms = new Matrix4x4[jointCount];
-                _baseBoneTransforms = new Matrix4x4[jointCount];
-                _localTransforms = new Matrix4x4[jointCount];
-                _finalBoneTransforms = new Matrix4x4[jointCount];
-                _jointHashes = new uint[jointCount];
-                _jointFnvHashes = new uint[jointCount];
-                for (int i = 0; i < jointCount; i++)
-                {
-                    string jointName = skeleton.Joints[i].Name;
-                    _jointHashes[i] = Elf.HashLower(jointName);
-                    _jointFnvHashes[i] = Fnv1a.HashLower(jointName);
-                }
-
-                (_hierarchyOrder, _hierarchyParents) = BuildHierarchy(
-                    skeleton.Joints.Select(static joint => (int)joint.ParentId).ToArray());
-            }
+            EnsurePoseBuffers(skeleton);
 
             if (_lastModelName != modelName ||
                 !ReferenceEquals(_lastSkeleton, skeleton) ||
@@ -121,6 +102,57 @@ namespace AssetsManager.Services.Viewer.Animation
                         $"GPU skinning unavailable for model '{modelName}': {failureReason ?? "Unsupported skin data."} The model will remain in bind pose.");
                 }
             }
+        }
+
+        private void EnsurePoseBuffers(RigResource skeleton)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(nameof(AnimationService));
+            ArgumentNullException.ThrowIfNull(skeleton);
+
+            int jointCount = skeleton.Joints.Count;
+            if (_boneTransforms != null &&
+                _boneTransforms.Length == jointCount &&
+                ReferenceEquals(_poseSkeleton, skeleton))
+            {
+                return;
+            }
+
+            _poseSkeleton = skeleton;
+            _boneTransforms = new Matrix4x4[jointCount];
+            _baseBoneTransforms = new Matrix4x4[jointCount];
+            _localTransforms = new Matrix4x4[jointCount];
+            _finalBoneTransforms = new Matrix4x4[jointCount];
+            _jointHashes = new uint[jointCount];
+            _jointFnvHashes = new uint[jointCount];
+            for (int i = 0; i < jointCount; i++)
+            {
+                string jointName = skeleton.Joints[i].Name;
+                _jointHashes[i] = Elf.HashLower(jointName);
+                _jointFnvHashes[i] = Fnv1a.HashLower(jointName);
+            }
+
+            (_hierarchyOrder, _hierarchyParents) = BuildHierarchy(
+                skeleton.Joints.Select(static joint => (int)joint.ParentId).ToArray());
+            _evaluatedAnimation = null;
+            _evaluatedSkeleton = null;
+            _evaluatedTime = float.NaN;
+        }
+
+        internal Matrix4x4[] EvaluateSkinningTransforms(
+            float totalSeconds,
+            IAnimationAsset animation,
+            RigResource skeleton)
+        {
+            if (_isDisposed || animation == null || skeleton == null)
+                return Array.Empty<Matrix4x4>();
+
+            EnsurePoseBuffers(skeleton);
+            _lastAnimation = animation;
+            _lastSkeleton = skeleton;
+            EvaluatePose(totalSeconds, animation, skeleton);
+            for (int i = 0; i < skeleton.Joints.Count; i++)
+                _finalBoneTransforms[i] = skeleton.Joints[i].InverseBindTransform * _boneTransforms[i];
+            return _finalBoneTransforms;
         }
 
         public void SetJointSnapCues(IReadOnlyList<AnimationJointSnapCue> cues)

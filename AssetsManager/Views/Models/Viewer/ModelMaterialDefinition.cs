@@ -20,6 +20,8 @@ namespace AssetsManager.Views.Models.Viewer
         string ShaderPath,
         ModelMaterialEffectDefinition Effect)
     {
+        internal bool HasAuthoredTint { get; init; }
+
         public bool IsLit =>
             BindingKind != ModelMaterialBindingKind.Missing &&
             RenderState.Blending != ModelMaterialBlendMode.Additive;
@@ -69,6 +71,7 @@ namespace AssetsManager.Views.Models.Viewer
     public sealed record ModelMaterialRenderState(
         ModelMaterialBlendMode Blending,
         bool PremultipliedAlpha,
+        bool Cutout,
         bool DoubleSided,
         bool Inverted,
         bool DepthWrite,
@@ -79,12 +82,14 @@ namespace AssetsManager.Views.Models.Viewer
             false,
             false,
             false,
+            false,
             true,
             true);
 
         // A skin with no StaticMaterialDef is drawn from its texture alone and keeps both faces.
         public static ModelMaterialRenderState TextureOnly { get; } = new(
             ModelMaterialBlendMode.Opaque,
+            false,
             false,
             true,
             false,
@@ -103,7 +108,8 @@ namespace AssetsManager.Views.Models.Viewer
     {
         Opaque,
         Normal,
-        Additive
+        Additive,
+        Modulate
     }
 
     public enum ModelMaterialWrapMode

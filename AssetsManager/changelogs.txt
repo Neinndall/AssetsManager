@@ -46,6 +46,8 @@ New Features
   - VFX Studio / Hidden previews now stop their continuous OpenGL frame loop while retaining reusable GPU state for instant resume.
   - VFX Studio / Added a neutral Stage display option with a dark floor, subtle metre grid, major sections, and distance fade alongside Grid and Ground.
   - VFX Studio / Reorganized BIN parsing into dedicated system, animation, resource, value, and schema services without changing supported VFX behavior.
+  - VFX Studio / AnimationGraph clip timing now retimes the character pose with mTickDuration so attached particle events and joint cues stay synchronized with the animation.
+  - Viewer / MAPGEO now has a dedicated LTK 1.20.0-style scene pipeline with project-to-WAD asset resolution, authored geometry/material semantics, 64→1024 texture waves, layer-0 backdrop grouping, mirrored world coordinates, isolated OpenGL renderers, one shared authored placeable snapshot, Map/MapSkin/MapContainer variants, and structures/level props with shared SKN/SKL/ANM, AnimationGraph idle playback, GPU skinning, authored materials and transparent sorting instead of routing map content through champion ModelParts.
   - Viewer / Model materials now animate BIN-authored vertex waves and Fresnel noise when the material declares those features.
   - Viewer / Model materials now apply BIN-authored Fresnel, masked emission, and simple dissolve transitions alongside animated scroll and flow textures.
   - Viewer / Ignore un-tinted static white additive placeholders in iridescent material graphs so champion skin layers do not wash out the base diffuse texture.
@@ -113,6 +115,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / Rebuilt the MAPGEO loading core around canonical map paths, project-to-WAD asset resolution, flat geometry buffers, LTK 1.20.0 StaticMaterialDef semantics, shader defaults, and bounded batch texture decoding without routing maps through SceneModel/ModelPart.
   - Viewer / Animation player now uses a cleaner grouped timeline, dynamic Play/Stop/Resume control, and compact speed controls while preserving the current playhead.
   - VFX Studio / Added shared Viewer Grid/Ground preferences plus Shaded/Wire/Overlay, camera reset, and standalone system motion controls directly in the viewport toolbar.
   - VFX Studio / Timeline Loop now works across Systems, Clips, and Spells, stays enabled while switching previews, and starts each preview range at 0 through its full duration.

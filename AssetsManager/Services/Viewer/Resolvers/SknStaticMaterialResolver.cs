@@ -15,7 +15,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
     /// </summary>
     internal static class SknStaticMaterialResolver
     {
-        private const uint DestinationBlendFactorOne = 1;
+        private const uint BlendFactorZero = 0;
+        private const uint BlendFactorOne = 1;
+        private const uint BlendFactorOneMinusSrcColor = 3;
+        private const uint BlendFactorSrcAlpha = 6;
+        private const uint BlendFactorOneMinusSrcAlpha = 7;
         private const uint DepthWriteMask = 16;
         private const uint DefaultWriteMask = 31;
         private const uint DefaultCullWinding = 1;
@@ -158,7 +162,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ? null
                 : SknMaterialTextureResolver.MatchTextureKey(baseSampler.TexturePath, textureKeys);
 
-            (Vector4 color, bool hasOpacity) = ResolveColor(parameters, effect);
+            (Vector4 color, bool hasOpacity, bool hasTint) = ResolveColor(parameters, effect);
+            bool hasAuthoredAlphaTest = TryFirst(parameters, AlphaTestNames, out Vector4 authoredAlphaTest) &&
+                authoredAlphaTest.X > 0f && authoredAlphaTest.X < 1f;
             float alphaCutoff = ResolveAlphaCutoff(parameters, macros, shaderPath);
             Vector2 uvRepeat = baseSampler == null ? Vector2.One : ResolveUvRepeat(parameters);
             Vector2 uvScroll = ResolveUvScroll(parameters);
@@ -169,6 +175,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 switches,
                 switchedShader,
                 hasOpacity,
+                color.W,
+                hasAuthoredAlphaTest,
                 alphaCutoff);
 
             // LTK falls back to the skin texture only when the material names no base sampler at all.
@@ -191,7 +199,10 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ModelMaterialBindingKind.Authored,
                 material.IsAnimated,
                 shaderPath,
-                effect ?? ModelMaterialEffectDefinition.None);
+                effect ?? ModelMaterialEffectDefinition.None)
+            {
+                HasAuthoredTint = hasTint
+            };
         }
 
         internal static SknMaterialDefinition CreateEffectiveEffectMaterial(
@@ -384,7 +395,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 : (null, ModelMaterialBaseRule.None);
         }
 
-        private static (Vector4 Color, bool HasOpacity) ResolveColor(
+        private static (Vector4 Color, bool HasOpacity, bool HasTint) ResolveColor(
             IReadOnlyDictionary<string, Vector4> parameters,
             ModelMaterialEffectDefinition effect)
         {
@@ -416,7 +427,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 hasOpacity = true;
             }
 
-            return (tint, hasOpacity);
+            return (tint, hasOpacity, hasTint);
         }
 
         private static float ResolveAlphaCutoff(
@@ -461,23 +472,32 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IReadOnlyDictionary<string, bool> switches,
             bool switchedShader,
             bool hasOpacity,
+            float opacity,
+            bool hasAuthoredAlphaTest,
             float alphaCutoff)
         {
             SknMaterialPassDefinition pass = material.Pass;
             bool blendEnabled = pass?.BlendEnabled ?? false;
-            uint destinationBlendFactor = pass?.DestinationColorBlendFactor ?? 0;
+            uint sourceBlendFactor = pass?.SourceColorBlendFactor ?? BlendFactorOne;
+            uint destinationBlendFactor = pass?.DestinationColorBlendFactor ?? BlendFactorZero;
 
             bool additive =
-                (blendEnabled && destinationBlendFactor == DestinationBlendFactorOne) ||
+                (blendEnabled && destinationBlendFactor == BlendFactorOne) ||
                 IsMacroEnabled(macros, "SKINNED_MATERIAL_ADDITIVE") ||
                 (blendEnabled && !switchedShader &&
                  !string.IsNullOrWhiteSpace(shaderPath) &&
                  AdditiveShader.IsMatch(shaderPath));
             ModelMaterialBlendMode blending = additive
                 ? ModelMaterialBlendMode.Additive
-                : blendEnabled
-                    ? ModelMaterialBlendMode.Normal
-                    : ModelMaterialBlendMode.Opaque;
+                : !blendEnabled
+                    ? ModelMaterialBlendMode.Opaque
+                    : sourceBlendFactor == BlendFactorOneMinusSrcColor &&
+                      destinationBlendFactor == BlendFactorZero
+                        ? ModelMaterialBlendMode.Modulate
+                        : sourceBlendFactor == BlendFactorOne &&
+                          destinationBlendFactor == BlendFactorZero
+                            ? ModelMaterialBlendMode.Opaque
+                            : ModelMaterialBlendMode.Normal;
 
             if (switchedShader && blending == ModelMaterialBlendMode.Normal &&
                 IsEnabled(switches, "ADDITIVEALPHA_ON"))
@@ -486,26 +506,30 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             uint writeMask = pass?.WriteMask ?? DefaultWriteMask;
-            bool authoredTransparentPass =
-                blendEnabled &&
-                pass?.WriteMask.HasValue == true &&
-                (writeMask & DepthWriteMask) == 0;
             bool readsAlpha = hasOpacity ||
                 alphaCutoff > 0f ||
-                authoredTransparentPass ||
                 (switchedShader && SwitchedAlphaNames.Any(name => IsEnabled(switches, name)));
             if (blending == ModelMaterialBlendMode.Normal && !readsAlpha)
                 blending = ModelMaterialBlendMode.Opaque;
 
             bool cullEnabled = pass?.CullEnabled ?? true;
             uint winding = pass?.WindingToCull ?? DefaultCullWinding;
+            bool depthWrite = (writeMask & DepthWriteMask) != 0;
+            bool cutout = blending == ModelMaterialBlendMode.Normal &&
+                depthWrite &&
+                hasAuthoredAlphaTest &&
+                (!hasOpacity || opacity >= 1f);
+            bool premultiplied = blendEnabled
+                ? sourceBlendFactor == BlendFactorOne && destinationBlendFactor == BlendFactorOneMinusSrcAlpha
+                : IsMacroEnabled(macros, "PREMULTIPLIED_ALPHA");
 
             return new ModelMaterialRenderState(
                 blending,
-                IsMacroEnabled(macros, "PREMULTIPLIED_ALPHA"),
+                premultiplied,
+                cutout,
                 !cullEnabled,
                 winding != DefaultCullWinding,
-                (writeMask & DepthWriteMask) != 0,
+                depthWrite,
                 pass?.DepthEnabled ?? true);
         }
 

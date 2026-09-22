@@ -782,7 +782,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                 (part.ColorTint.W < 0.999f || material.Effect?.RequiresAlphaBlend == true);
             ModelMaterialBlendMode blending = runtimeForcesBlend
                 ? ModelMaterialBlendMode.Normal
-                : state.Blending;
+                : state.Cutout
+                    ? ModelMaterialBlendMode.Opaque
+                    : state.Blending;
 
             if (blending == ModelMaterialBlendMode.Opaque)
             {
@@ -893,6 +895,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                     BlendingFactor.One,
                     BlendingFactor.One,
                     BlendingFactor.One),
+                ModelMaterialBlendMode.Modulate => (
+                    BlendingFactor.OneMinusSrcColor,
+                    BlendingFactor.Zero,
+                    BlendingFactor.OneMinusSrcColor,
+                    BlendingFactor.Zero),
                 _ => (
                     BlendingFactor.One,
                     BlendingFactor.Zero,
