@@ -19,6 +19,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private const int MaximumChildParticleCapacity = 4096;
         private const int MaximumChildParticleCapacityBudget = 1 << 17;
 
+        private static readonly IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> EmptyEmissionSurfaces =
+            new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>(ReferenceEqualityComparer.Instance);
+        private static readonly IReadOnlyDictionary<string, IVfxMeshJointProvider> EmptyMeshJoints =
+            new Dictionary<string, IVfxMeshJointProvider>(StringComparer.Ordinal);
         private readonly IReadOnlyDictionary<uint, VfxSystemDefinition> _systems;
         private readonly IReadOnlyDictionary<uint, uint> _resourceMap;
         private readonly Func<VfxSystemDefinition, Matrix4x4, int, VfxPlaybackRuntime> _runtimeFactory;
@@ -48,6 +52,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private Matrix4x4 _orientationRootTransform;
         private float _sourceTime;
         private Func<string, Matrix4x4?> _jointTransformProvider;
+        private IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> _emissionSurfaces = EmptyEmissionSurfaces;
+        private IReadOnlyDictionary<string, IVfxMeshJointProvider> _meshJoints = EmptyMeshJoints;
+        private readonly Dictionary<string, IVfxMeshJointProvider> _loadedMeshJoints = new(StringComparer.Ordinal);
         private bool _allEmittersVisible = true;
 
         private sealed class CarriedChildInfo
@@ -180,6 +187,33 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         /// </summary>
         internal void SetJointTransformProvider(Func<string, Matrix4x4?> provider)
             => _jointTransformProvider = provider;
+
+        /// <summary>
+        /// Shares one loaded emission-surface catalog across the full child lineage. The caller
+        /// owns any time replay because only the session knows the historical rig transforms.
+        /// </summary>
+        internal bool SetEmissionSurfaces(
+            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> surfaces)
+        {
+            surfaces ??= EmptyEmissionSurfaces;
+            if (ReferenceEquals(_emissionSurfaces, surfaces)) return false;
+            _emissionSurfaces = surfaces;
+            foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
+                runtime.SetEmissionSurfaces(surfaces, replayCurrentTime: false);
+            return true;
+        }
+
+        /// <summary>
+        /// VFX-mesh joints are keyed exactly like LTK drawn emitters: root "0", descendant
+        /// "0.0:1", and so on. A present mesh joint table overrides the owner rig table.
+        /// </summary>
+        internal bool SetMeshJointProviders(IReadOnlyDictionary<string, IVfxMeshJointProvider> joints)
+        {
+            joints ??= EmptyMeshJoints;
+            if (ReferenceEquals(_meshJoints, joints)) return false;
+            _meshJoints = joints;
+            return true;
+        }
 
         public void SetStartDelay(float seconds) => Root.SetStartDelay(seconds);
 
@@ -484,6 +518,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             runtime.SetTransform(
                 saved.LocalTransform * _rootTransform,
                 saved.LocalTransform * _orientationRootTransform);
+            runtime.SetEmissionSurfaces(_emissionSurfaces, replayCurrentTime: false);
             runtime.SetInitialRandomState(saved.InitialRandomState);
             runtime.SetParticleCapacity(saved.ParticleCapacity);
             runtime.ParticleLifecycle += OnParticleLifecycle;
@@ -681,6 +716,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             runtime.SetTransform(
                 effectiveLocalTransform * _rootTransform,
                 effectiveLocalTransform * _orientationRootTransform);
+            runtime.SetEmissionSurfaces(_emissionSurfaces, replayCurrentTime: false);
             if (particleCapacity.HasValue)
                 runtime.SetParticleCapacity(particleCapacity.Value);
             if (initialRandomState.HasValue)
@@ -764,7 +800,43 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     emitter.SourceOrder);
                 emitter.RenderRank = _renderRanks.GetValueOrDefault((renderPath, emitter.SourceOrder), int.MaxValue);
                 emitter.IsVisible = RootIsVisible(emitter.RenderRootSourceOrder);
+
+                string emitterKey = string.IsNullOrEmpty(renderPath)
+                    ? emitter.SourceOrder.ToString()
+                    : $"{renderPath}:{emitter.SourceOrder}";
+                if (emitter.MeshAnimationVariants is { Length: > 0 } variants)
+                {
+                    // main animationOf(): one stable variant per definition key, unaffected by
+                    // particle RNG, seeks or resource reloads.
+                    int variant = MeshAnimationVariantIndex(
+                        emitter.Def.MeshPath,
+                        renderPath,
+                        emitter.SourceOrder,
+                        variants.Length);
+                    emitter.MeshAnimation = variants[variant];
+                }
+                else
+                {
+                    emitter.MeshAnimation = emitter.MeshBaseAnimation;
+                }
+
+                if (emitter.MeshAnimation is IVfxMeshJointProvider meshJoints)
+                    _loadedMeshJoints[emitterKey] = meshJoints;
             }
+        }
+
+        internal static int MeshAnimationVariantIndex(
+            string meshPath,
+            string renderPath,
+            int sourceOrder,
+            int variantCount)
+        {
+            if (variantCount <= 0) return -1;
+            string emitterKey = string.IsNullOrEmpty(renderPath)
+                ? sourceOrder.ToString()
+                : $"{renderPath}:{sourceOrder}";
+            uint hash = Fnv1a.HashLower($"{meshPath ?? string.Empty}:{emitterKey}");
+            return (int)(hash % (uint)variantCount);
         }
 
         private void OnParticleLifecycle(
@@ -843,7 +915,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Matrix4x4 placement = bearing;
                 if (!string.IsNullOrEmpty(child.BoneName))
                 {
-                    Matrix4x4? joint = _jointTransformProvider?.Invoke(child.BoneName);
+                    Matrix4x4? joint = ResolveChildJoint(
+                        parentRuntime,
+                        particle.SourceOrder,
+                        child.BoneName,
+                        particle.ParticleTime);
                     if (!joint.HasValue) continue;
                     placement = ReRootOnJoint(bearing, joint.Value);
                 }
@@ -877,12 +953,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             // bypasses childrenProbability, and rejects the set when there are too few bones.
             if (bones.Count > 0)
             {
-                if (bones.Count < childSet.Children.Count || _jointTransformProvider is null) return;
+                if (bones.Count < childSet.Children.Count) return;
                 for (int slot = 0; slot < childSet.Children.Count; slot++)
                 {
                     if (LiveChildSystemCount >= MaximumActiveChildSystems) break;
                     string bone = bones[slot];
-                    Matrix4x4? joint = _jointTransformProvider(bone);
+                    Matrix4x4? joint = ResolveChildJoint(
+                        parentRuntime,
+                        particle.SourceOrder,
+                        bone,
+                        particle.ParticleTime);
                     if (!joint.HasValue) continue;
                     Matrix4x4 placement = ReRootOnJoint(bearing, joint.Value);
                     int childSeed = ChildSeed(_initialSeed, $"{emitterPath}.{slot}", particle.Serial);
@@ -1044,6 +1124,32 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             bearing.M42 = childPosition.Y;
             bearing.M43 = childPosition.Z;
             return bearing;
+        }
+
+        private Matrix4x4? ResolveChildJoint(
+            VfxPlaybackRuntime parentRuntime,
+            int sourceOrder,
+            string boneName,
+            float particleTime)
+        {
+            string parentPath = _paths.GetValueOrDefault(parentRuntime, string.Empty);
+            string key = string.IsNullOrEmpty(parentPath)
+                ? sourceOrder.ToString()
+                : $"{parentPath}:{sourceOrder}";
+            if (_loadedMeshJoints.TryGetValue(key, out IVfxMeshJointProvider loadedMeshJoints))
+            {
+                return loadedMeshJoints.TryGetJointTransform(boneName, particleTime, out Matrix4x4 transform)
+                    ? transform
+                    : null;
+            }
+            if (_meshJoints.TryGetValue(key, out IVfxMeshJointProvider meshJoints))
+            {
+                return meshJoints.TryGetJointTransform(boneName, particleTime, out Matrix4x4 transform)
+                    ? transform
+                    : null;
+            }
+
+            return _jointTransformProvider?.Invoke(boneName);
         }
 
         private static Matrix4x4 ReRootOnJoint(Matrix4x4 bearing, Matrix4x4 joint)

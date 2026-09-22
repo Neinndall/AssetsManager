@@ -104,6 +104,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             // Distortion leaves alpha as warp mask even under Add
             Vector4 distortionResult = VfxColorSemantics.PremultiplyForAddOrSubtract(color, 0, true);
             Assert.Equal(color, distortionResult);
+
+            // A resolved CustomMaterial owns premultiplication in its fragment shader/render state.
+            Vector4 customMaterial = VfxColorSemantics.PremultiplyForAddOrSubtract(color, 0, false, true);
+            Assert.Equal(color, customMaterial);
         }
     }
 }

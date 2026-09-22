@@ -18,7 +18,7 @@ namespace AssetsManager.Views.Models.Viewer
     {
         public static MapSceneSource FromGeometryFile(string geometryFilePath, string projectRoot)
         {
-            if (!MapPath.TryFromGeometryFile(geometryFilePath, projectRoot, out MapPath mapPath))
+            if (!MapPath.TryFromGeometryFile(geometryFilePath, out MapPath mapPath))
             {
                 throw new InvalidDataException(
                     $"Could not derive a Riot MapPath from '{geometryFilePath}'.");

@@ -139,7 +139,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         VfxBinDocument document = VfxGraphParser.ParseDocument(
                             fileBytes,
                             ResolveGraphHashName,
-                            ResolveGraphClassName);
+                            ResolveGraphClassName,
+                            _hashResolverService == null ? null : _hashResolverService.ResolveHash,
+                            _hashResolverService == null ? null : _hashResolverService.ResolveBinEntry);
                         bundle.LoadedBins.Add(Path.GetFullPath(currentBinPath));
 
                         foreach (var kv in document.Systems)
@@ -324,16 +326,59 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 {
                     if (!string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
                     {
-                        emitter.PendingMesh = _resources.ResolveMesh(
+                        VfxMeshData? mesh = _resources.ResolveMesh(
                             emitter.Def.MeshPath,
                             emitter.Def.SubmeshesToDraw,
                             emitter.Def.SubmeshesToDrawAlways,
                             searchDirectory);
-                        // LTK 1.19.6 treats a VfxPrimitiveMesh SKN as static bind-pose geometry.
-                        // Its MeshModel keeps only the geometry asset, submesh masks, camera
-                        // alignment flags and the skinned/simple kind; .skl/.anm data never enters
-                        // the VFX renderer. Preserve parsed metadata for diagnostics, but do not
-                        // animate particle meshes here.
+
+                        // Current LTK main poses a skinned VFX mesh independently for every live
+                        // particle. Resolve the skeleton even when no ANM is authored so bind-pose
+                        // skinning and boneToSpawnAt children share the same joint table.
+                        if (mesh.HasValue && emitter.Def.MeshIsSkinned &&
+                            !string.IsNullOrWhiteSpace(emitter.Def.MeshSkeletonPath))
+                        {
+                            VfxAnimatedMesh bindPose = _resources.ResolveMeshAnimation(
+                                emitter.Def.MeshPath,
+                                emitter.Def.MeshSkeletonPath,
+                                null,
+                                searchDirectory,
+                                log);
+                            if (bindPose is not null)
+                            {
+                                mesh = mesh.Value with
+                                {
+                                    BoneIndices = bindPose.BoneIndices,
+                                    BoneWeights = bindPose.BoneWeights
+                                };
+
+                                emitter.MeshBaseAnimation = string.IsNullOrWhiteSpace(emitter.Def.MeshAnimationPath)
+                                    ? bindPose
+                                    : _resources.ResolveMeshAnimation(
+                                        emitter.Def.MeshPath,
+                                        emitter.Def.MeshSkeletonPath,
+                                        emitter.Def.MeshAnimationPath,
+                                        searchDirectory,
+                                        log) ?? bindPose;
+
+                                IReadOnlyList<string> variants = emitter.Def.MeshAnimationVariants ?? Array.Empty<string>();
+                                if (variants.Count > 0)
+                                {
+                                    emitter.MeshAnimationVariants = new VfxAnimatedMesh[variants.Count];
+                                    for (int variant = 0; variant < variants.Count; variant++)
+                                    {
+                                        emitter.MeshAnimationVariants[variant] = _resources.ResolveMeshAnimation(
+                                            emitter.Def.MeshPath,
+                                            emitter.Def.MeshSkeletonPath,
+                                            variants[variant],
+                                            searchDirectory,
+                                            log);
+                                    }
+                                }
+                                emitter.MeshAnimation = emitter.MeshBaseAnimation;
+                            }
+                        }
+                        emitter.PendingMesh = mesh;
                     }
                 }
             }

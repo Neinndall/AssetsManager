@@ -35,9 +35,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
             return Multiply(birthColor, color);
         }
 
-        public static Vector4 PremultiplyForAddOrSubtract(Vector4 color, int blendMode, bool isDistortion = false)
+        public static Vector4 PremultiplyForAddOrSubtract(
+            Vector4 color,
+            int blendMode,
+            bool isDistortion = false,
+            bool hasCustomMaterial = false)
         {
-            if (isDistortion) return color;
+            // LTK's custom material fragment owns premultiplication from the linked material's
+            // render state, so emitter ADD/SUBTRACT preprocessing must not touch particle tint.
+            if (isDistortion || hasCustomMaterial) return color;
             if (blendMode is not (0 or 2)) return color;
             return new Vector4(color.X * color.W, color.Y * color.W, color.Z * color.W, 1f);
         }

@@ -72,17 +72,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             internal Vector3? TrailSpawnedAt;
             internal float[] NoiseLast = Array.Empty<float>();
             internal int[] NoiseFired = Array.Empty<int>();
+            internal PreparedNoiseField[] PreparedNoise = Array.Empty<PreparedNoiseField>();
 
             // Mesh-primitive emitters (0 = billboard)
             public uint MeshVao, MeshVbo, MeshEbo;
             public int MeshVertexCount, MeshIndexCount;
             public float[] MeshInterleaved;
-            /// <summary>True when the uploaded owner mesh carries direct joint indices/weights.</summary>
+            /// <summary>True when the uploaded mesh carries a valid four-weight skinning layout.</summary>
             public bool MeshHasSkinning;
             /// <summary>Owner skinScale, applied after skeleton skinning for AttachedMesh.</summary>
             public float MeshOwnerScale = 1f;
             /// <summary>Owner SKN draw groups retained so clip visibility can change AttachedMesh live.</summary>
             public VfxMeshRangeData[] MeshRanges = Array.Empty<VfxMeshRangeData>();
+            /// <summary>Selected particle-mesh pose. Unlike AttachedMesh, it advances on each particle's age.</summary>
+            internal VfxAnimatedMesh MeshAnimation;
+            internal VfxAnimatedMesh MeshBaseAnimation;
+            internal VfxAnimatedMesh[] MeshAnimationVariants = Array.Empty<VfxAnimatedMesh>();
             /// <summary>Emitter-local age in seconds; drives emitter-phase curves and mesh animation time.</summary>
             public float EmitterAge => Age;
             /// <summary>
@@ -120,8 +125,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         public IReadOnlyList<EmitterState> Emitters => _emitters;
         private readonly List<EmitterState> _emitters = new();
+        private EmitterStepContext[] _stepContexts = Array.Empty<EmitterStepContext>();
+        private int[] _newbornStarts = Array.Empty<int>();
         private readonly int _seed;
         private VfxSystemDefinition _definition;
+        private static readonly IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> EmptyEmissionSurfaces =
+            new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>(ReferenceEqualityComparer.Instance);
+        private IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> _emissionSurfaces = EmptyEmissionSurfaces;
         private uint _initialRandomState;
         private VfxLtkRandom _rng;
         private uint _particleSerial;
@@ -375,6 +385,25 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         /// </summary>
         internal void SetParticleCapacity(int capacity)
             => _particleCapacity = Math.Clamp(capacity, 1, RootParticleCapacity);
+
+        /// <summary>
+        /// Installs loaded emission surfaces by emitter identity. Matching LTK, a late surface
+        /// install rewinds and deterministically replays the current time so already-born
+        /// particles are not left in the old spawn state.
+        /// </summary>
+        public void SetEmissionSurfaces(
+            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> surfaces,
+            bool replayCurrentTime = true)
+        {
+            surfaces ??= EmptyEmissionSurfaces;
+            if (ReferenceEquals(_emissionSurfaces, surfaces)) return;
+            _emissionSurfaces = surfaces;
+
+            if (!replayCurrentTime || _definition is null || CurrentTime <= 0f) return;
+            float targetTime = CurrentTime;
+            Reset();
+            Seek(targetTime);
+        }
 
         /// <summary>
         /// Child systems in LTK start empty and receive their first simulation step on the
@@ -804,34 +833,53 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             // LTK integrates and retires the entire shared pool before any emitter is
             // allowed to consume slots for newborns. Keep the per-emitter storage, but
             // preserve that system-wide phase ordering.
-            var contexts = new EmitterStepContext[_emitters.Count];
+            EnsureStepScratch();
+            int availableParticleSlots = _particleCapacity;
             for (int index = 0; index < _emitters.Count; index++)
-                contexts[index] = IntegrateEmitter(_emitters[index], dt, systemDelta);
+            {
+                EmitterState emitter = _emitters[index];
+                _stepContexts[index] = IntegrateEmitter(emitter, dt, systemDelta);
+                availableParticleSlots -= emitter.Particles.Count;
+            }
+            availableParticleSlots = Math.Max(0, availableParticleSlots);
 
-            var newbornStarts = new int[_emitters.Count];
-            Array.Fill(newbornStarts, -1);
+            Array.Fill(_newbornStarts, -1);
             for (int index = 0; index < _emitters.Count; index++)
-                newbornStarts[index] = EmitEmitter(_emitters[index], contexts[index]);
+            {
+                _newbornStarts[index] = EmitEmitter(
+                    _emitters[index],
+                    _stepContexts[index],
+                    ref availableParticleSlots);
+            }
 
             int live = 0;
             for (int index = 0; index < _emitters.Count; index++)
             {
                 EmitterState state = _emitters[index];
-                if (newbornStarts[index] >= 0)
+                if (_newbornStarts[index] >= 0)
                 {
                     ApplyFieldsToNewborns(
                         state.Def.Fields,
                         state,
-                        contexts[index].EmitterT,
-                        contexts[index].PreparedNoise,
-                        contexts[index].FieldOrigin,
-                        newbornStarts[index]);
+                        _stepContexts[index].EmitterT,
+                        _stepContexts[index].PreparedNoise,
+                        _stepContexts[index].FieldOrigin,
+                        _newbornStarts[index]);
                 }
                 BuildInstances(state);
                 live += state.InstanceCount;
             }
             LiveParticleCount = live;
         }
+        private void EnsureStepScratch()
+        {
+            int count = _emitters.Count;
+            if (_stepContexts.Length != count)
+                _stepContexts = new EmitterStepContext[count];
+            if (_newbornStarts.Length != count)
+                _newbornStarts = new int[count];
+        }
+
         private void SettleEmitter(EmitterState state, float dt)
         {
             VfxEmitterDefinition definition = state.Def;
@@ -892,7 +940,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 if (p.Age >= p.Life)
                 {
                     ParticleLifecycle?.Invoke(this, d, LifecycleInfo(s, p, died: true));
-                    s.Particles.RemoveAt(i);
+                    // LTK retires from its packed pool by moving the final live particle into
+                    // the freed slot. Keep the same O(1) retirement here; renderers that need
+                    // birth order (trails) reconstruct it from the particle serial.
+                    int last = s.Particles.Count - 1;
+                    if (i != last)
+                        s.Particles[i] = s.Particles[last];
+                    s.Particles.RemoveAt(last);
                     continue;
                 }
 
@@ -973,7 +1027,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return new EmitterStepContext(emitterT, preparedNoise, fieldOrigin);
         }
 
-        private int EmitEmitter(EmitterState s, EmitterStepContext context)
+        private int EmitEmitter(
+            EmitterState s,
+            EmitterStepContext context,
+            ref int availableParticleSlots)
         {
             VfxEmitterDefinition d = s.Def;
             float emitterT = context.EmitterT;
@@ -1021,7 +1078,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     s.SharedRandom = _rng.NextUnitFloat();
                     s.SharedRandomRolled = true;
                 }
-                int actualCount = Math.Min(requestedCount, AvailableParticleSlots());
+                int actualCount = Math.Min(requestedCount, availableParticleSlots);
+                availableParticleSlots -= actualCount;
                 int firstNewborn = s.Particles.Count;
                 for (int born = 0; born < actualCount; born++) Spawn(s, emitterT);
 
@@ -1044,17 +1102,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             float EmitterT,
             PreparedNoiseField[] PreparedNoise,
             Vector3 FieldOrigin);
-
-        private int AvailableParticleSlots()
-        {
-            int live = 0;
-            foreach (EmitterState emitter in _emitters)
-            {
-                live += emitter.Particles.Count;
-                if (live >= _particleCapacity) return 0;
-            }
-            return _particleCapacity - live;
-        }
 
         private static void ApplyAnalyticDrag(ref Particle particle, ref Vector3 moving, Vector3 drag, float dt)
         {
@@ -1189,6 +1236,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 ? shape.SampleOffset(_rng, emitterT, sharedRoll, out spawnRotation)
                 : Vector3.Zero;
             localOffset *= ResolveFlexMultiplier(d.FlexShape?.ScaleEmitOffsetByBoundObjectSize);
+
+            bool onEmissionSurface = false;
+            VfxSurfaceBirth surfaceBirth = default;
+            if (d.EmissionSurface is not null &&
+                _emissionSurfaces.TryGetValue(d, out IVfxEmissionSurfaceSampler surfaceSampler))
+            {
+                onEmissionSurface = surfaceSampler.TrySample(s.Age, _rng, out surfaceBirth);
+                if (onEmissionSurface)
+                    localOffset += surfaceBirth.Position;
+            }
+
+            if (onEmissionSurface && d.EmissionSurface.UseNormal)
+                vel = surfaceBirth.Normal * vel.Length();
+
             Matrix4x4 placement = EmitterPlacement(d);
             var worldOffset = Vector3.TransformNormal(localOffset, placement);
             vel = Vector3.TransformNormal(vel, spawnRotation);
@@ -1281,7 +1342,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector4 col = lingering && d.Linger?.Color is { } lingerColor
                     ? p.BirthColor * lingerColor.Sample(particleLingerT)
                     : VfxColorSemantics.ResolveParticle(p.BirthColor, d.ColorOverLife, t);
-                col = VfxColorSemantics.PremultiplyForAddOrSubtract(col, d.BlendMode, d.Distortion != null);
+                col = VfxColorSemantics.PremultiplyForAddOrSubtract(
+                    col,
+                    d.BlendMode,
+                    d.DrawsAsDistortion,
+                    d.HasResolvedCustomMaterial);
 
                 // League keeps one logical flipbook counter for both texture layers. Each
                 // sampler wraps that counter against its own texDiv grid at draw time, so do
@@ -1437,7 +1502,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return MathF.Max(0f, 1f + value * extent);
         }
 
-        private readonly record struct PreparedNoiseField(
+        internal readonly record struct PreparedNoiseField(
             Vector3 Center,
             float Radius,
             float Delta,
@@ -1463,7 +1528,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 state.NoiseFired = new int[noiseCount];
             }
 
-            var prepared = new PreparedNoiseField[noiseCount];
+            if (state.PreparedNoise.Length != noiseCount)
+                state.PreparedNoise = new PreparedNoiseField[noiseCount];
+            PreparedNoiseField[] prepared = state.PreparedNoise;
             for (int slot = 0; slot < noiseCount; slot++)
             {
                 VfxNoiseField field = fields.Noise[slot];

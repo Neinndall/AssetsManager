@@ -86,10 +86,8 @@ namespace AssetsManager.Services.Viewer.Runtime
             foreach (MapParticleRuntime runtime in _runtimes)
             {
                 if (runtime?.Particle == null ||
-                    MapOutlineSemantics.IsHidden(
-                        hidden,
-                        runtime.Particle.ChunkHash,
-                        runtime.Particle.KeyHash))
+                    (hidden != null && hidden.Count > 0 &&
+                     (hidden.Contains(runtime.ChunkId) || hidden.Contains(runtime.ItemId))))
                 {
                     continue;
                 }

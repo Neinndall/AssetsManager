@@ -68,6 +68,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void CustomMaterialUsesRawPrimitiveUvAndBypassesEmitterFragmentLayers()
+        {
+            Assert.Contains("vRawUv = aUv;", VfxShaderSource.MeshVertex);
+            Assert.Contains("vRawUv = trailPrimitive ? aCorner : quadUv;", VfxShaderSource.ParticleVertex);
+
+            foreach (string fragment in new[] { VfxShaderSource.MeshFragment, VfxShaderSource.ParticleFragment })
+            {
+                Assert.Contains("uniform int uUseCustomMaterial;", fragment);
+                Assert.Contains("vec2 held = vRawUv * uMaterialRepeat;", fragment);
+                Assert.Contains("customAddress(held.x, uMaterialAddressU)", fragment);
+                Assert.Contains("customCoverage(held.x, uMaterialAddressU)", fragment);
+                Assert.Contains("if (uMaterialPremultiplied != 0) color.rgb *= color.a;", fragment);
+            }
+
+            Assert.Contains("vec4 color = texel * uColor * uMaterialTint;", VfxShaderSource.MeshFragment);
+            Assert.Contains("vec4 color = texel * vColor * uMaterialTint;", VfxShaderSource.ParticleFragment);
+            foreach (string fragment in new[] { VfxShaderSource.MeshFragment, VfxShaderSource.ParticleFragment })
+            {
+                int wire = fragment.IndexOf("if (uWireframePass != 0)");
+                int custom = fragment.IndexOf("if (uUseCustomMaterial != 0)");
+                int regular = fragment.IndexOf("if (uHasPalette != 0)");
+                Assert.True(wire >= 0 && wire < custom);
+                Assert.True(custom >= 0 && custom < regular);
+                Assert.Contains("uHasTex != 0 ? texture(uTex, uv) * coverage : vec4(1.0)", fragment);
+            }
+        }
+
+        [Fact]
         public void InspectorOnlyModulationFactorDoesNotAlterLtkMaterials()
         {
             Assert.DoesNotContain("uModulationFactor", VfxShaderSource.ParticleFragment);
@@ -132,12 +160,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void AttachedMeshUsesOwnerSkinningAndParticleTintLikeLtk()
+        public void MeshShaderSupportsOwnerAndPerParticleSkinningWithTheSamePaletteContract()
         {
             Assert.Contains("layout(location=4) in vec4 aBoneIndices;", VfxShaderSource.MeshVertex);
             Assert.Contains("layout(location=5) in vec4 aBoneWeights;", VfxShaderSource.MeshVertex);
             Assert.Contains("layout(std140) uniform VfxBoneTransforms", VfxShaderSource.MeshVertex);
-            Assert.Contains("if (uUseOwnerSkinning != 0)", VfxShaderSource.MeshVertex);
+            Assert.Contains("uniform int uUseSkinning;", VfxShaderSource.MeshVertex);
+            Assert.Contains("if (uUseSkinning != 0)", VfxShaderSource.MeshVertex);
+            Assert.DoesNotContain("uUseOwnerSkinning", VfxShaderSource.MeshVertex);
             Assert.Contains("sourcePosition = (skinMatrix * vec4(aPos, 1.0)).xyz;", VfxShaderSource.MeshVertex);
             Assert.Contains("vec3 scaled = sourcePosition * uScale;", VfxShaderSource.MeshVertex);
             Assert.Contains("if (uAttachedMesh != 0)", VfxShaderSource.MeshVertex);

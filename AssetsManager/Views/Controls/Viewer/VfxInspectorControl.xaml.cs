@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -18,6 +19,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Vfx.Authoring;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
@@ -72,6 +74,10 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isLoadingPreviewPreferences;
         private bool _suppressCameraPresetFit;
         private bool _deferOrbitProjectionSwap;
+        private bool _isUpdatingEmitterAuthoringControls;
+        private bool _hasTransientEmitterPreview;
+        private Vector3? _authoringOriginalTranslation;
+        private Vector3? _authoringOriginalRotation;
 
         private sealed record StandaloneRunMemory(
             int Seed,
@@ -151,6 +157,10 @@ namespace AssetsManager.Views.Controls.Viewer
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedSystem))
             {
                 RequestSystemInspection(_model.SelectedSystem);
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedEmitter))
+            {
+                LoadEmitterAuthoringControls(_model.SelectedEmitter);
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedAnimation))
             {
@@ -628,8 +638,7 @@ namespace AssetsManager.Views.Controls.Viewer
             // preparation are safe even when WPF selected the system before the GL control was ready.
             TryInspectPendingSystem();
 
-            // One surface renderer owns the independent Grid, Ground and Stage paths. Stage suppresses
-            // its fill when Ground is also visible so both modes can be combined without coplanar planes.
+            // One preview surface owner reuses the shared editor Grid, textured Ground and VFX Stage paths.
             _previewSurfaceRenderer?.Render(
                 viewProj,
                 _model.ShowPreviewGrid,
@@ -2185,6 +2194,1177 @@ namespace AssetsManager.Views.Controls.Viewer
             if (sender is not FrameworkElement { DataContext: VfxEmitterDiagnosticItem item }) return;
             _model.SelectedEmitter = item;
             Focus();
+        }
+
+        private void LoadEmitterAuthoringControls(VfxEmitterDiagnosticItem item)
+        {
+            CancelTransientEmitterPreview();
+            _isUpdatingEmitterAuthoringControls = true;
+            try
+            {
+                if (item?.EmitterDef == null)
+                {
+                    SetEmitterTransformText(Vector3.Zero, Vector3.Zero);
+                    if (EmitterAuthoringStatusText != null)
+                        EmitterAuthoringStatusText.Text = "Select an emitter to author it";
+                    if (EmitterForceSummaryText != null)
+                        EmitterForceSummaryText.Text = string.Empty;
+                    _model.ForceAuthoringItems.Clear();
+                    _model.CurveAuthoringItems.Clear();
+                    _model.SelectedCurveAuthoringItem = null;
+                    _authoringOriginalTranslation = null;
+                    _authoringOriginalRotation = null;
+                    return;
+                }
+
+                _authoringOriginalTranslation = item.EmitterDef.TranslationOverride;
+                _authoringOriginalRotation = item.EmitterDef.RotationOverride;
+                SetEmitterTransformText(
+                    _authoringOriginalTranslation ?? Vector3.Zero,
+                    _authoringOriginalRotation ?? Vector3.Zero);
+                UpdateEmitterForceSummary(item.EmitterDef);
+                RebuildForceAuthoringItems(item.EmitterDef);
+                RebuildCurveAuthoringItems(item.EmitterDef);
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = "Edit values to preview · Enter saves · Esc reverts";
+            }
+            finally
+            {
+                _isUpdatingEmitterAuthoringControls = false;
+            }
+        }
+
+        private void SetEmitterTransformText(Vector3 translation, Vector3 rotation)
+        {
+            if (EmitterTranslationXTextBox == null) return;
+            EmitterTranslationXTextBox.Text = AuthoringNumber(translation.X);
+            EmitterTranslationYTextBox.Text = AuthoringNumber(translation.Y);
+            EmitterTranslationZTextBox.Text = AuthoringNumber(translation.Z);
+            EmitterRotationXTextBox.Text = AuthoringNumber(rotation.X);
+            EmitterRotationYTextBox.Text = AuthoringNumber(rotation.Y);
+            EmitterRotationZTextBox.Text = AuthoringNumber(rotation.Z);
+        }
+
+        private static string AuthoringNumber(float value)
+            => value.ToString("0.###", CultureInfo.InvariantCulture);
+
+        private static bool TryAuthoringNumber(TextBox textBox, out float value)
+            => TryAuthoringNumber(textBox?.Text, out value);
+
+        private static bool TryAuthoringNumber(string text, out float value)
+        {
+            text = text?.Trim();
+            if (float.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value) && float.IsFinite(value))
+                return true;
+            return float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value) && float.IsFinite(value);
+        }
+
+        private bool TryReadEmitterTransforms(out Vector3 translation, out Vector3 rotation)
+        {
+            translation = default;
+            rotation = default;
+            if (!TryAuthoringNumber(EmitterTranslationXTextBox, out float tx) ||
+                !TryAuthoringNumber(EmitterTranslationYTextBox, out float ty) ||
+                !TryAuthoringNumber(EmitterTranslationZTextBox, out float tz) ||
+                !TryAuthoringNumber(EmitterRotationXTextBox, out float rx) ||
+                !TryAuthoringNumber(EmitterRotationYTextBox, out float ry) ||
+                !TryAuthoringNumber(EmitterRotationZTextBox, out float rz))
+            {
+                return false;
+            }
+
+            translation = new Vector3(tx, ty, tz);
+            rotation = new Vector3(rx, ry, rz);
+            return true;
+        }
+
+        private bool HasEmitterTransformChanges(Vector3 translation, Vector3 rotation)
+            => translation != (_authoringOriginalTranslation ?? Vector3.Zero) ||
+               rotation != (_authoringOriginalRotation ?? Vector3.Zero);
+
+        private void EmitterTransform_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingEmitterAuthoringControls ||
+                _model.SelectedEmitter?.EmitterDef == null ||
+                _inspectedSystem?.Definition == null)
+            {
+                return;
+            }
+
+            if (!TryReadEmitterTransforms(out Vector3 translation, out Vector3 rotation))
+            {
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = "Invalid transform value";
+                return;
+            }
+
+            if (!HasEmitterTransformChanges(translation, rotation))
+            {
+                CancelTransientEmitterPreview();
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = "No transform changes";
+                return;
+            }
+
+            VfxEmitterDiagnosticItem selected = _model.SelectedEmitter;
+            int sourceOrder = selected.SourceOrder;
+            VfxSystemDefinition baseDefinition = _inspectedSystem.Definition;
+            if ((uint)sourceOrder >= (uint)baseDefinition.Emitters.Count) return;
+
+            VfxEmitterDefinition[] emitters = baseDefinition.Emitters.ToArray();
+            emitters[sourceOrder] = emitters[sourceOrder] with
+            {
+                TranslationOverride = translation,
+                RotationOverride = rotation
+            };
+            VfxSystemDefinition preview = baseDefinition with { Emitters = emitters };
+            if (_vfxRenderer?.SwapStandaloneDefinition(preview) == true)
+            {
+                _hasTransientEmitterPreview = true;
+                UpdateEmittersVisibility();
+                _model.CurrentTime = _vfxRenderer.PlaybackTime;
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = "Previewing unsaved transform";
+            }
+        }
+
+        private void EmitterTransform_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                e.Handled = true;
+                ApplyEmitterTransforms();
+            }
+            else if (e.Key == Key.Escape)
+            {
+                e.Handled = true;
+                CancelTransientEmitterPreview();
+                LoadEmitterAuthoringControls(_model.SelectedEmitter);
+            }
+        }
+
+        private void ApplyEmitterTransforms_Click(object sender, RoutedEventArgs e)
+            => ApplyEmitterTransforms();
+
+        private bool ApplyEmitterTransforms()
+        {
+            VfxEmitterDiagnosticItem selected = _model.SelectedEmitter;
+            if (selected?.EmitterDef == null || _inspectedSystem?.Definition == null)
+                return false;
+            if (!TryReadEmitterTransforms(out Vector3 translation, out Vector3 rotation))
+            {
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = "Cannot save: one or more values are invalid";
+                return false;
+            }
+
+            Vector3 originalTranslation = _authoringOriginalTranslation ?? Vector3.Zero;
+            Vector3 originalRotation = _authoringOriginalRotation ?? Vector3.Zero;
+            bool translationChanged = translation != originalTranslation;
+            bool rotationChanged = rotation != originalRotation;
+            if (!translationChanged && !rotationChanged)
+            {
+                CancelTransientEmitterPreview();
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = "No transform changes to save";
+                return true;
+            }
+
+            if (_activeBundle?.SystemSources.TryGetValue(_inspectedSystem.PathHash, out string sourceBin) != true)
+            {
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = "Source BIN for this system is unavailable";
+                return false;
+            }
+
+            bool saved = VfxEmitterAuthoringService.TryWriteTransforms(
+                sourceBin,
+                _inspectedSystem.PathHash,
+                selected.SourceOrder,
+                translationChanged ? translation : null,
+                rotationChanged ? rotation : null,
+                out VfxSystemDefinition updated,
+                out string error);
+            if (!saved)
+            {
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = $"Save failed: {error}";
+                return false;
+            }
+
+            AcceptAuthoredSystem(updated);
+            _authoringOriginalTranslation = updated.Emitters[selected.SourceOrder].TranslationOverride;
+            _authoringOriginalRotation = updated.Emitters[selected.SourceOrder].RotationOverride;
+            _hasTransientEmitterPreview = false;
+            if (EmitterAuthoringStatusText != null)
+                EmitterAuthoringStatusText.Text = $"Saved to {Path.GetFileName(sourceBin)}";
+            return true;
+        }
+
+        private void CancelTransientEmitterPreview()
+        {
+            if (!_hasTransientEmitterPreview) return;
+            _hasTransientEmitterPreview = false;
+            if (_inspectedSystem?.Definition != null &&
+                _vfxRenderer?.SwapStandaloneDefinition(_inspectedSystem.Definition) == true)
+            {
+                UpdateEmittersVisibility();
+                _model.CurrentTime = _vfxRenderer.PlaybackTime;
+            }
+        }
+
+        private void AcceptAuthoredSystem(VfxSystemDefinition updated)
+        {
+            if (updated == null || _inspectedSystem == null) return;
+            _inspectedSystem.Definition = updated;
+            if (_activeBundle?.Systems != null)
+                _activeBundle.Systems[updated.PathHash] = updated;
+
+            foreach (VfxEmitterDiagnosticItem diagnostic in _model.Emitters)
+            {
+                if ((uint)diagnostic.SourceOrder < (uint)updated.Emitters.Count)
+                    diagnostic.EmitterDef = updated.Emitters[diagnostic.SourceOrder];
+            }
+
+            _vfxRenderer?.SwapStandaloneDefinition(updated);
+            UpdateEmittersVisibility();
+            if (_vfxRenderer?.ActiveSystem != null)
+                _model.CurrentTime = _vfxRenderer.PlaybackTime;
+            UpdateEmitterForceSummary(_model.SelectedEmitter?.EmitterDef);
+            RebuildForceAuthoringItems(_model.SelectedEmitter?.EmitterDef);
+            RebuildCurveAuthoringItems(_model.SelectedEmitter?.EmitterDef);
+        }
+
+        private void RebuildForceAuthoringItems(VfxEmitterDefinition emitter)
+        {
+            _model.ForceAuthoringItems.Clear();
+            VfxFieldCollectionDefinition fields = emitter?.Fields;
+            if (fields == null) return;
+
+            for (int index = 0; index < (fields.Acceleration?.Count ?? 0); index++)
+            {
+                VfxAccelerationField field = fields.Acceleration[index];
+                var item = ForceItem(VfxEmitterForceKind.Acceleration, index, "Acceleration");
+                item.Properties.Add(ForceVector(
+                    item,
+                    VfxEmitterForceProperty.Acceleration,
+                    "Acceleration",
+                    field.Acceleration.Constant,
+                    canAnimate: true,
+                    hasCurve: HasCurve(field.Acceleration.Times, field.Acceleration.Values)));
+                item.Properties.Add(ForceBool(item, VfxEmitterForceProperty.LocalSpace, "Local Space", field.LocalSpace));
+                _model.ForceAuthoringItems.Add(item);
+            }
+
+            for (int index = 0; index < (fields.Attraction?.Count ?? 0); index++)
+            {
+                VfxAttractionField field = fields.Attraction[index];
+                var item = ForceItem(VfxEmitterForceKind.Attraction, index, "Attraction");
+                item.Properties.Add(ForceVector(item, VfxEmitterForceProperty.Position, "Center", field.Position.Constant, true, HasCurve(field.Position.Times, field.Position.Values)));
+                item.Properties.Add(ForceScalar(item, VfxEmitterForceProperty.Radius, "Radius", field.Radius.Constant, true, HasCurve(field.Radius.Times, field.Radius.Values)));
+                item.Properties.Add(ForceScalar(item, VfxEmitterForceProperty.Acceleration, "Acceleration", field.Acceleration.Constant, true, HasCurve(field.Acceleration.Times, field.Acceleration.Values)));
+                _model.ForceAuthoringItems.Add(item);
+            }
+
+            for (int index = 0; index < (fields.Noise?.Count ?? 0); index++)
+            {
+                VfxNoiseField field = fields.Noise[index];
+                var item = ForceItem(VfxEmitterForceKind.Noise, index, "Noise");
+                item.Properties.Add(ForceVector(item, VfxEmitterForceProperty.Position, "Center", field.Position.Constant, true, HasCurve(field.Position.Times, field.Position.Values)));
+                item.Properties.Add(ForceScalar(item, VfxEmitterForceProperty.Radius, "Radius", field.Radius.Constant, true, HasCurve(field.Radius.Times, field.Radius.Values)));
+                item.Properties.Add(ForceScalar(item, VfxEmitterForceProperty.Frequency, "Frequency", field.Frequency.Constant, true, HasCurve(field.Frequency.Times, field.Frequency.Values)));
+                item.Properties.Add(ForceScalar(item, VfxEmitterForceProperty.VelocityDelta, "Velocity Δ", field.VelocityDelta.Constant, true, HasCurve(field.VelocityDelta.Times, field.VelocityDelta.Values)));
+                item.Properties.Add(ForceVector(item, VfxEmitterForceProperty.AxisFraction, "Axis Weights", field.AxisFraction, false, false));
+                _model.ForceAuthoringItems.Add(item);
+            }
+
+            for (int index = 0; index < (fields.Drag?.Count ?? 0); index++)
+            {
+                VfxDragField field = fields.Drag[index];
+                var item = ForceItem(VfxEmitterForceKind.Drag, index, "Drag");
+                item.Properties.Add(ForceVector(item, VfxEmitterForceProperty.Position, "Center", field.Position.Constant, true, HasCurve(field.Position.Times, field.Position.Values)));
+                item.Properties.Add(ForceScalar(item, VfxEmitterForceProperty.Radius, "Radius", field.Radius.Constant, true, HasCurve(field.Radius.Times, field.Radius.Values)));
+                item.Properties.Add(ForceScalar(item, VfxEmitterForceProperty.Strength, "Strength", field.Strength.Constant, true, HasCurve(field.Strength.Times, field.Strength.Values)));
+                _model.ForceAuthoringItems.Add(item);
+            }
+
+            for (int index = 0; index < (fields.Orbital?.Count ?? 0); index++)
+            {
+                VfxOrbitalField field = fields.Orbital[index];
+                var item = ForceItem(VfxEmitterForceKind.Orbital, index, "Orbital");
+                item.Properties.Add(ForceVector(item, VfxEmitterForceProperty.Direction, "Direction", field.Direction.Constant, true, HasCurve(field.Direction.Times, field.Direction.Values)));
+                item.Properties.Add(ForceBool(item, VfxEmitterForceProperty.LocalSpace, "Local Space", field.LocalSpace));
+                _model.ForceAuthoringItems.Add(item);
+            }
+        }
+
+        private void RebuildCurveAuthoringItems(VfxEmitterDefinition emitter)
+        {
+            string wanted = _model.SelectedCurveAuthoringItem?.Identity;
+            _model.SelectedCurveAuthoringItem = null;
+            _model.CurveAuthoringItems.Clear();
+            if (emitter == null) return;
+
+            AddCurve("Rate", "rate", emitter.Rate);
+            AddCurve("Particle Lifetime", "particleLifetime", emitter.ParticleLifetime);
+            AddCurve("Birth Scale", "birthScale0", emitter.BirthScale);
+            AddCurve("Scale Over Life", "scale0", emitter.ScaleOverLife ?? VfxCurve3.Const(Vector3.One));
+            AddCurve("Birth Color", "birthColor", emitter.BirthColor);
+            AddCurve("Color Over Life", "color", emitter.ColorOverLife ?? VfxCurve4.Const(Vector4.One));
+            AddCurve("Birth Velocity", "birthVelocity", emitter.BirthVelocity ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Velocity Over Life", "velocity", emitter.VelocityOverLife ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("World Acceleration", "worldAcceleration", emitter.Acceleration ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Birth Acceleration", "birthAcceleration", emitter.BirthAcceleration ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Acceleration Over Life", "acceleration", emitter.AccelerationOverLife ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Birth Orbital Velocity", "birthOrbitalVelocity", emitter.BirthOrbitalVelocity ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Birth Drag", "birthDrag", emitter.BirthDrag ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Drag Over Life", "drag", emitter.DragOverLife ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Birth Rotation", "birthRotation0", emitter.BirthRotation ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Rotation Over Life", "rotation0", emitter.RotationOverLife ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Rotation 1", "rotation1", emitter.Rotation1 ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Birth Rotational Velocity", "birthRotationalVelocity0", emitter.BirthRotationalVelocity ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Birth Rotational Acceleration", "birthRotationalAcceleration", emitter.BirthRotationalAcceleration ?? VfxCurve3.Const(Vector3.Zero));
+            AddCurve("Emitter Position", "emitterPosition", emitter.EmitterPosition);
+            AddCurve("Birth Frame Rate", "birthFrameRate", emitter.BirthFrameRate ?? VfxCurveF.Const(1f));
+            AddCurve("Birth Scale 1", "birthScale1", emitter.BirthScale1 ?? VfxCurve3.Const(Vector3.One));
+            AddCurve("Bind Weight", "bindWeight", emitter.BindWeight ?? VfxCurveF.Zero);
+            AddCurve("Birth UV Offset", "birthUVOffset", emitter.BirthUvOffset ?? VfxCurve2.Const(Vector2.Zero));
+            AddCurve("UV Scale", "uvScale", emitter.UvScale ?? VfxCurve2.Const(Vector2.One));
+            AddCurve("UV Rotation", "uvRotation", emitter.UvRotation ?? VfxCurveF.Zero);
+            AddCurve("Birth UV Scroll", "birthUvScrollRate", emitter.BirthUvScrollRateCurve ?? VfxCurve2.Const(Vector2.Zero));
+            AddCurve("Particle UV Scroll", "particleUVScrollRate", emitter.ParticleUvScrollRate ?? VfxCurve2.Const(Vector2.Zero));
+            AddCurve("Birth UV Rotate", "birthUvRotateRate", emitter.BirthUvRotateRate ?? VfxCurveF.Zero);
+            AddCurve("Particle UV Rotate", "particleUVRotateRate", emitter.ParticleUvRotateRate ?? VfxCurveF.Zero);
+            AddCurve("Mult Birth UV Offset", "birthUVOffsetMult", emitter.TextureMultBirthUvOffset ?? VfxCurve2.Const(Vector2.Zero));
+            AddCurve("Mult Birth UV Scroll", "birthUvScrollRateMult", emitter.TextureMultBirthUvScrollRate ?? VfxCurve2.Const(Vector2.Zero));
+            AddCurve("Mult Particle UV Scroll", "ParticleIntegratedUvScrollMult", emitter.TextureMultParticleUvScroll ?? VfxCurve2.Const(Vector2.Zero));
+            AddCurve("Mult UV Scale", "uvScaleMult", emitter.TextureMultUvScale ?? VfxCurve2.Const(Vector2.One));
+            AddCurve("Mult UV Rotation", "UvRotationMult", emitter.TextureMultUvRotation ?? VfxCurveF.Zero);
+            AddCurve("Mult Birth UV Rotate", "birthUvRotateRateMult", emitter.TextureMultBirthUvRotateRate ?? VfxCurveF.Zero);
+            AddCurve("Mult Particle UV Rotate", "ParticleIntegratedUvRotateMult", emitter.TextureMultParticleUvRotate ?? VfxCurveF.Zero);
+            AddForceCurves(emitter.Fields);
+
+            _model.SelectedCurveAuthoringItem = !string.IsNullOrEmpty(wanted)
+                ? _model.CurveAuthoringItems.FirstOrDefault(item => item.Identity == wanted)
+                : _model.CurveAuthoringItems.FirstOrDefault();
+            _model.SelectedCurveAuthoringItem ??= _model.CurveAuthoringItems.FirstOrDefault();
+        }
+
+        private void AddCurve(string name, string fieldName, VfxCurveF curve)
+        {
+            Vector4 constant = new(curve.Constant, 0f, 0f, 0f);
+            Vector4[] values = curve.Values?.Select(value => new Vector4(value, 0f, 0f, 0f)).ToArray();
+            AddCurve(name, fieldName, VfxEmitterCurveFamily.Scalar, 1, constant, curve.Times, values);
+        }
+
+        private void AddCurve(string name, string fieldName, VfxCurve2 curve)
+        {
+            Vector4 constant = new(curve.Constant, 0f, 0f);
+            Vector4[] values = curve.Values?.Select(value => new Vector4(value, 0f, 0f)).ToArray();
+            AddCurve(name, fieldName, VfxEmitterCurveFamily.Vector2, 2, constant, curve.Times, values);
+        }
+
+        private void AddCurve(string name, string fieldName, VfxCurve3 curve)
+        {
+            Vector4 constant = new(curve.Constant, 0f);
+            Vector4[] values = curve.Values?.Select(value => new Vector4(value, 0f)).ToArray();
+            AddCurve(name, fieldName, VfxEmitterCurveFamily.Vector3, 3, constant, curve.Times, values);
+        }
+
+        private void AddCurve(string name, string fieldName, VfxCurve4 curve)
+            => AddCurve(name, fieldName, VfxEmitterCurveFamily.Vector4, 4, curve.Constant, curve.Times, curve.Values);
+
+        private void AddCurve(
+            string name,
+            string fieldName,
+            VfxEmitterCurveFamily family,
+            int components,
+            Vector4 constant,
+            float[] times,
+            Vector4[] values)
+        {
+            AddCurveItem(
+                identity: $"emitter:{Fnv1a.HashLower(fieldName):x8}",
+                name,
+                fieldName,
+                Fnv1a.HashLower(fieldName),
+                family,
+                components,
+                constant,
+                times,
+                values,
+                isForceCurve: false,
+                default,
+                -1,
+                default);
+        }
+
+        private void AddCurveItem(
+            string identity,
+            string name,
+            string fieldName,
+            uint propertyHash,
+            VfxEmitterCurveFamily family,
+            int components,
+            Vector4 constant,
+            float[] times,
+            Vector4[] values,
+            bool isForceCurve,
+            VfxEmitterForceKind forceKind,
+            int forceIndex,
+            VfxEmitterForceProperty forceProperty)
+        {
+            bool keyed = HasCurve(times, values);
+            var item = new VfxCurveAuthoringItem
+            {
+                Identity = identity,
+                Name = name,
+                FieldName = fieldName,
+                PropertyHash = propertyHash,
+                Family = family,
+                ComponentCount = components,
+                Constant = constant,
+                HasCurve = keyed,
+                IsForceCurve = isForceCurve,
+                ForceKind = forceKind,
+                ForceIndex = forceIndex,
+                ForceProperty = forceProperty
+            };
+            if (keyed)
+            {
+                int count = Math.Min(times.Length, values.Length);
+                for (int index = 0; index < count; index++)
+                {
+                    Vector4 value = values[index];
+                    item.Keys.Add(new VfxCurveKeyAuthoringItem
+                    {
+                        Owner = item,
+                        KeyIndex = index,
+                        TimeText = AuthoringNumber(times[index]),
+                        XText = AuthoringNumber(value.X),
+                        YText = components >= 2 ? AuthoringNumber(value.Y) : string.Empty,
+                        ZText = components >= 3 ? AuthoringNumber(value.Z) : string.Empty,
+                        WText = components >= 4 ? AuthoringNumber(value.W) : string.Empty
+                    });
+                }
+            }
+            _model.CurveAuthoringItems.Add(item);
+        }
+
+        private void AddForceCurves(VfxFieldCollectionDefinition fields)
+        {
+            if (fields == null) return;
+
+            for (int index = 0; index < (fields.Acceleration?.Count ?? 0); index++)
+            {
+                VfxAccelerationField field = fields.Acceleration[index];
+                AddForceCurve(VfxEmitterForceKind.Acceleration, index, VfxEmitterForceProperty.Acceleration,
+                    "Acceleration", "acceleration", field.Acceleration);
+            }
+            for (int index = 0; index < (fields.Attraction?.Count ?? 0); index++)
+            {
+                VfxAttractionField field = fields.Attraction[index];
+                AddForceCurve(VfxEmitterForceKind.Attraction, index, VfxEmitterForceProperty.Position,
+                    "Center", "Position", field.Position);
+                AddForceCurve(VfxEmitterForceKind.Attraction, index, VfxEmitterForceProperty.Radius,
+                    "Radius", "radius", field.Radius);
+                AddForceCurve(VfxEmitterForceKind.Attraction, index, VfxEmitterForceProperty.Acceleration,
+                    "Acceleration", "acceleration", field.Acceleration);
+            }
+            for (int index = 0; index < (fields.Noise?.Count ?? 0); index++)
+            {
+                VfxNoiseField field = fields.Noise[index];
+                AddForceCurve(VfxEmitterForceKind.Noise, index, VfxEmitterForceProperty.Position,
+                    "Center", "Position", field.Position);
+                AddForceCurve(VfxEmitterForceKind.Noise, index, VfxEmitterForceProperty.Radius,
+                    "Radius", "radius", field.Radius);
+                AddForceCurve(VfxEmitterForceKind.Noise, index, VfxEmitterForceProperty.Frequency,
+                    "Frequency", "frequency", field.Frequency);
+                AddForceCurve(VfxEmitterForceKind.Noise, index, VfxEmitterForceProperty.VelocityDelta,
+                    "Velocity Δ", "velocityDelta", field.VelocityDelta);
+            }
+            for (int index = 0; index < (fields.Drag?.Count ?? 0); index++)
+            {
+                VfxDragField field = fields.Drag[index];
+                AddForceCurve(VfxEmitterForceKind.Drag, index, VfxEmitterForceProperty.Position,
+                    "Center", "Position", field.Position);
+                AddForceCurve(VfxEmitterForceKind.Drag, index, VfxEmitterForceProperty.Radius,
+                    "Radius", "radius", field.Radius);
+                AddForceCurve(VfxEmitterForceKind.Drag, index, VfxEmitterForceProperty.Strength,
+                    "Strength", "strength", field.Strength);
+            }
+            for (int index = 0; index < (fields.Orbital?.Count ?? 0); index++)
+            {
+                VfxOrbitalField field = fields.Orbital[index];
+                AddForceCurve(VfxEmitterForceKind.Orbital, index, VfxEmitterForceProperty.Direction,
+                    "Direction", "direction", field.Direction);
+            }
+        }
+
+        private void AddForceCurve(
+            VfxEmitterForceKind kind,
+            int forceIndex,
+            VfxEmitterForceProperty property,
+            string label,
+            string fieldName,
+            VfxCurveF curve)
+        {
+            if (!HasCurve(curve.Times, curve.Values)) return;
+            Vector4 constant = new(curve.Constant, 0f, 0f, 0f);
+            Vector4[] values = curve.Values.Select(value => new Vector4(value, 0f, 0f, 0f)).ToArray();
+            AddCurveItem(
+                $"force:{kind}:{forceIndex}:{property}",
+                $"Force · {kind} {forceIndex + 1} · {label}",
+                $"{kind}[{forceIndex}].{fieldName}",
+                Fnv1a.HashLower(fieldName),
+                VfxEmitterCurveFamily.Scalar,
+                1,
+                constant,
+                curve.Times,
+                values,
+                true,
+                kind,
+                forceIndex,
+                property);
+        }
+
+        private void AddForceCurve(
+            VfxEmitterForceKind kind,
+            int forceIndex,
+            VfxEmitterForceProperty property,
+            string label,
+            string fieldName,
+            VfxCurve3 curve)
+        {
+            if (!HasCurve(curve.Times, curve.Values)) return;
+            Vector4 constant = new(curve.Constant, 0f);
+            Vector4[] values = curve.Values.Select(value => new Vector4(value, 0f)).ToArray();
+            AddCurveItem(
+                $"force:{kind}:{forceIndex}:{property}",
+                $"Force · {kind} {forceIndex + 1} · {label}",
+                $"{kind}[{forceIndex}].{fieldName}",
+                Fnv1a.HashLower(fieldName),
+                VfxEmitterCurveFamily.Vector3,
+                3,
+                constant,
+                curve.Times,
+                values,
+                true,
+                kind,
+                forceIndex,
+                property);
+        }
+
+        private static bool HasCurve<T>(float[] times, T[] values)
+            => times is { Length: > 0 } && values is { Length: > 0 };
+
+        private static VfxForceAuthoringItem ForceItem(VfxEmitterForceKind kind, int index, string title)
+            => new()
+            {
+                Kind = kind,
+                ForceIndex = index,
+                Title = $"{title} {index + 1}"
+            };
+
+        private static VfxForcePropertyAuthoringItem ForceScalar(
+            VfxForceAuthoringItem owner,
+            VfxEmitterForceProperty property,
+            string label,
+            float value,
+            bool canAnimate,
+            bool hasCurve)
+            => new()
+            {
+                ForceKind = owner.Kind,
+                ForceIndex = owner.ForceIndex,
+                Property = property,
+                Label = label,
+                ValueKind = VfxForceAuthoringValueKind.Scalar,
+                CanAnimate = canAnimate,
+                HasCurve = hasCurve,
+                XText = AuthoringNumber(value)
+            };
+
+        private static VfxForcePropertyAuthoringItem ForceVector(
+            VfxForceAuthoringItem owner,
+            VfxEmitterForceProperty property,
+            string label,
+            Vector3 value,
+            bool canAnimate,
+            bool hasCurve)
+            => new()
+            {
+                ForceKind = owner.Kind,
+                ForceIndex = owner.ForceIndex,
+                Property = property,
+                Label = label,
+                ValueKind = VfxForceAuthoringValueKind.Vector3,
+                CanAnimate = canAnimate,
+                HasCurve = hasCurve,
+                XText = AuthoringNumber(value.X),
+                YText = AuthoringNumber(value.Y),
+                ZText = AuthoringNumber(value.Z)
+            };
+
+        private static VfxForcePropertyAuthoringItem ForceBool(
+            VfxForceAuthoringItem owner,
+            VfxEmitterForceProperty property,
+            string label,
+            bool value)
+            => new()
+            {
+                ForceKind = owner.Kind,
+                ForceIndex = owner.ForceIndex,
+                Property = property,
+                Label = label,
+                ValueKind = VfxForceAuthoringValueKind.Boolean,
+                CanAnimate = false,
+                HasCurve = false,
+                BoolValue = value
+            };
+
+        private void UpdateEmitterForceSummary(VfxEmitterDefinition emitter)
+        {
+            if (EmitterForceSummaryText == null) return;
+            VfxFieldCollectionDefinition fields = emitter?.Fields;
+            if (fields == null)
+            {
+                EmitterForceSummaryText.Text = "none";
+                return;
+            }
+
+            int acceleration = fields.Acceleration?.Count ?? 0;
+            int attraction = fields.Attraction?.Count ?? 0;
+            int noise = fields.Noise?.Count ?? 0;
+            int drag = fields.Drag?.Count ?? 0;
+            int orbital = fields.Orbital?.Count ?? 0;
+            EmitterForceSummaryText.Text = $"A{acceleration} · T{attraction} · N{noise} · D{drag} · O{orbital}";
+        }
+
+        private void AddEmitterForce_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: string tag } ||
+                !Enum.TryParse(tag, ignoreCase: true, out VfxEmitterForceKind kind) ||
+                _model.SelectedEmitter is not { } selected ||
+                _inspectedSystem?.Definition == null)
+            {
+                return;
+            }
+
+            if (!ApplyEmitterTransforms()) return;
+            if (_activeBundle?.SystemSources.TryGetValue(_inspectedSystem.PathHash, out string sourceBin) != true)
+            {
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = "Source BIN for this system is unavailable";
+                return;
+            }
+
+            if (!VfxEmitterAuthoringService.TryAddForce(
+                    sourceBin,
+                    _inspectedSystem.PathHash,
+                    selected.SourceOrder,
+                    kind,
+                    out VfxSystemDefinition updated,
+                    out string error))
+            {
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = $"Force add failed: {error}";
+                return;
+            }
+
+            AcceptAuthoredSystem(updated);
+            if (EmitterAuthoringStatusText != null)
+                EmitterAuthoringStatusText.Text = $"Added {kind} force";
+        }
+
+        private void ForceValue_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (sender is not FrameworkElement { DataContext: VfxForcePropertyAuthoringItem property }) return;
+            if (e.Key == Key.Enter)
+            {
+                e.Handled = true;
+                CommitForceProperty(property);
+            }
+            else if (e.Key == Key.Escape)
+            {
+                e.Handled = true;
+                RebuildForceAuthoringItems(_model.SelectedEmitter?.EmitterDef);
+                Focus();
+            }
+        }
+
+        private void ForceBool_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement { DataContext: VfxForcePropertyAuthoringItem property })
+                CommitForceProperty(property);
+        }
+
+        private bool CommitForceProperty(VfxForcePropertyAuthoringItem property)
+        {
+            if (property == null || _model.SelectedEmitter is not { } selected || _inspectedSystem?.Definition == null)
+                return false;
+            if (!ApplyEmitterTransforms()) return false;
+            if (_activeBundle?.SystemSources.TryGetValue(_inspectedSystem.PathHash, out string sourceBin) != true)
+            {
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = "Source BIN for this system is unavailable";
+                return false;
+            }
+
+            bool saved;
+            VfxSystemDefinition updated;
+            string error;
+            switch (property.ValueKind)
+            {
+                case VfxForceAuthoringValueKind.Scalar:
+                    if (!TryAuthoringNumber(property.XText, out float scalar))
+                    {
+                        if (EmitterAuthoringStatusText != null)
+                            EmitterAuthoringStatusText.Text = $"Invalid {property.Label} value";
+                        return false;
+                    }
+                    saved = VfxEmitterAuthoringService.TryWriteForceScalar(
+                        sourceBin,
+                        _inspectedSystem.PathHash,
+                        selected.SourceOrder,
+                        property.ForceKind,
+                        property.ForceIndex,
+                        property.Property,
+                        scalar,
+                        out updated,
+                        out error);
+                    break;
+
+                case VfxForceAuthoringValueKind.Vector3:
+                    if (!TryAuthoringNumber(property.XText, out float x) ||
+                        !TryAuthoringNumber(property.YText, out float y) ||
+                        !TryAuthoringNumber(property.ZText, out float z))
+                    {
+                        if (EmitterAuthoringStatusText != null)
+                            EmitterAuthoringStatusText.Text = $"Invalid {property.Label} vector";
+                        return false;
+                    }
+                    saved = VfxEmitterAuthoringService.TryWriteForceVector(
+                        sourceBin,
+                        _inspectedSystem.PathHash,
+                        selected.SourceOrder,
+                        property.ForceKind,
+                        property.ForceIndex,
+                        property.Property,
+                        new Vector3(x, y, z),
+                        out updated,
+                        out error);
+                    break;
+
+                case VfxForceAuthoringValueKind.Boolean:
+                    saved = VfxEmitterAuthoringService.TryWriteForceBool(
+                        sourceBin,
+                        _inspectedSystem.PathHash,
+                        selected.SourceOrder,
+                        property.ForceKind,
+                        property.ForceIndex,
+                        property.Property,
+                        property.BoolValue,
+                        out updated,
+                        out error);
+                    break;
+
+                default:
+                    return false;
+            }
+
+            if (!saved)
+            {
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = $"Force save failed: {error}";
+                return false;
+            }
+
+            AcceptAuthoredSystem(updated);
+            if (EmitterAuthoringStatusText != null)
+                EmitterAuthoringStatusText.Text = $"Saved {property.Label}";
+            return true;
+        }
+
+        private void RemoveEmitterForce_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { DataContext: VfxForceAuthoringItem force } ||
+                _model.SelectedEmitter is not { } selected ||
+                _inspectedSystem?.Definition == null)
+            {
+                return;
+            }
+            if (!ApplyEmitterTransforms()) return;
+            if (_activeBundle?.SystemSources.TryGetValue(_inspectedSystem.PathHash, out string sourceBin) != true)
+                return;
+
+            if (!VfxEmitterAuthoringService.TryRemoveForce(
+                    sourceBin,
+                    _inspectedSystem.PathHash,
+                    selected.SourceOrder,
+                    force.Kind,
+                    force.ForceIndex,
+                    out VfxSystemDefinition updated,
+                    out string error))
+            {
+                if (EmitterAuthoringStatusText != null)
+                    EmitterAuthoringStatusText.Text = $"Force remove failed: {error}";
+                return;
+            }
+
+            AcceptAuthoredSystem(updated);
+            if (EmitterAuthoringStatusText != null)
+                EmitterAuthoringStatusText.Text = $"Removed {force.Title}";
+        }
+
+        private void ActivateCurve_Click(object sender, RoutedEventArgs e)
+        {
+            VfxCurveAuthoringItem curve = _model.SelectedCurveAuthoringItem;
+            if (curve == null || curve.HasCurve || curve.IsForceCurve || _model.SelectedEmitter is not { } selected || _inspectedSystem == null)
+                return;
+            if (!ApplyEmitterTransforms()) return;
+            if (!TryGetAuthoringSource(out string sourceBin)) return;
+
+            if (!VfxEmitterAuthoringService.TryActivateCurve(
+                    sourceBin,
+                    _inspectedSystem.PathHash,
+                    selected.SourceOrder,
+                    curve.PropertyHash,
+                    curve.Family,
+                    curve.Constant,
+                    out VfxSystemDefinition updated,
+                    out string error))
+            {
+                SetAuthoringStatus($"Curve activation failed: {error}");
+                return;
+            }
+
+            string identity = curve.Identity;
+            AcceptAuthoredSystem(updated);
+            SelectCurve(identity, 0);
+            SetAuthoringStatus($"Activated {curve.Name} curve");
+        }
+
+        private void CurveKey_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (sender is not FrameworkElement { DataContext: VfxCurveKeyAuthoringItem key }) return;
+            if (e.Key == Key.Enter)
+            {
+                e.Handled = true;
+                CommitCurveKey(key);
+            }
+            else if (e.Key == Key.Escape)
+            {
+                e.Handled = true;
+                string identity = key.Owner.Identity;
+                int index = key.KeyIndex;
+                RebuildCurveAuthoringItems(_model.SelectedEmitter?.EmitterDef);
+                SelectCurve(identity, index);
+                Focus();
+            }
+        }
+
+        private bool CommitCurveKey(VfxCurveKeyAuthoringItem key)
+        {
+            if (key?.Owner == null || _model.SelectedEmitter is not { } selected || _inspectedSystem == null)
+                return false;
+            if (!TryReadCurveKey(key, out float time, out Vector4 value))
+            {
+                SetAuthoringStatus($"Invalid key values for {key.Owner.Name}");
+                return false;
+            }
+            if (!IsCurveKeyTimeWithinNeighbors(key.Owner, key.KeyIndex, time))
+            {
+                SetAuthoringStatus($"Key time for {key.Owner.Name} must stay between its neighboring keys");
+                return false;
+            }
+            if (!ApplyEmitterTransforms()) return false;
+            if (!TryGetAuthoringSource(out string sourceBin)) return false;
+
+            bool saved = key.Owner.IsForceCurve
+                ? VfxEmitterAuthoringService.TryWriteForceCurveKey(
+                    sourceBin,
+                    _inspectedSystem.PathHash,
+                    selected.SourceOrder,
+                    key.Owner.ForceKind,
+                    key.Owner.ForceIndex,
+                    key.Owner.ForceProperty,
+                    key.KeyIndex,
+                    time,
+                    value,
+                    out VfxSystemDefinition updated,
+                    out string error)
+                : VfxEmitterAuthoringService.TryWriteCurveKey(
+                    sourceBin,
+                    _inspectedSystem.PathHash,
+                    selected.SourceOrder,
+                    key.Owner.PropertyHash,
+                    key.Owner.Family,
+                    key.KeyIndex,
+                    time,
+                    value,
+                    out updated,
+                    out error);
+            if (!saved)
+            {
+                SetAuthoringStatus($"Curve save failed: {error}");
+                return false;
+            }
+
+            string identity = key.Owner.Identity;
+            int keyIndex = key.KeyIndex;
+            AcceptAuthoredSystem(updated);
+            SelectCurve(identity, keyIndex);
+            SetAuthoringStatus($"Saved {key.Owner.Name} key {keyIndex + 1}");
+            return true;
+        }
+
+        private void AddCurveKey_Click(object sender, RoutedEventArgs e)
+        {
+            VfxCurveAuthoringItem curve = _model.SelectedCurveAuthoringItem;
+            if (curve == null || !curve.HasCurve || _model.SelectedEmitter is not { } selected || _inspectedSystem == null)
+                return;
+            if (!TrySuggestCurveKey(curve, _model.SelectedCurveKeyAuthoringItem, out int index, out float time, out Vector4 value))
+            {
+                SetAuthoringStatus("Cannot derive a valid curve key from the current values");
+                return;
+            }
+            if (!ApplyEmitterTransforms()) return;
+            if (!TryGetAuthoringSource(out string sourceBin)) return;
+
+            bool saved = curve.IsForceCurve
+                ? VfxEmitterAuthoringService.TryInsertForceCurveKey(
+                    sourceBin,
+                    _inspectedSystem.PathHash,
+                    selected.SourceOrder,
+                    curve.ForceKind,
+                    curve.ForceIndex,
+                    curve.ForceProperty,
+                    index,
+                    time,
+                    value,
+                    out VfxSystemDefinition updated,
+                    out string error)
+                : VfxEmitterAuthoringService.TryInsertCurveKey(
+                    sourceBin,
+                    _inspectedSystem.PathHash,
+                    selected.SourceOrder,
+                    curve.PropertyHash,
+                    curve.Family,
+                    index,
+                    time,
+                    value,
+                    out updated,
+                    out error);
+            if (!saved)
+            {
+                SetAuthoringStatus($"Add key failed: {error}");
+                return;
+            }
+
+            string identity = curve.Identity;
+            AcceptAuthoredSystem(updated);
+            SelectCurve(identity, index);
+            SetAuthoringStatus($"Added {curve.Name} key at {time:0.###}");
+        }
+
+        private void RemoveCurveKey_Click(object sender, RoutedEventArgs e)
+        {
+            VfxCurveKeyAuthoringItem key = sender is FrameworkElement { DataContext: VfxCurveKeyAuthoringItem row }
+                ? row
+                : _model.SelectedCurveKeyAuthoringItem;
+            if (key?.Owner == null || _model.SelectedEmitter is not { } selected || _inspectedSystem == null)
+                return;
+            if (!ApplyEmitterTransforms()) return;
+            if (!TryGetAuthoringSource(out string sourceBin)) return;
+
+            bool saved = key.Owner.IsForceCurve
+                ? VfxEmitterAuthoringService.TryRemoveForceCurveKeys(
+                    sourceBin,
+                    _inspectedSystem.PathHash,
+                    selected.SourceOrder,
+                    key.Owner.ForceKind,
+                    key.Owner.ForceIndex,
+                    key.Owner.ForceProperty,
+                    new[] { key.KeyIndex },
+                    out VfxSystemDefinition updated,
+                    out string error)
+                : VfxEmitterAuthoringService.TryRemoveCurveKeys(
+                    sourceBin,
+                    _inspectedSystem.PathHash,
+                    selected.SourceOrder,
+                    key.Owner.PropertyHash,
+                    new[] { key.KeyIndex },
+                    out updated,
+                    out error);
+            if (!saved)
+            {
+                SetAuthoringStatus($"Remove key failed: {error}");
+                return;
+            }
+
+            string identity = key.Owner.Identity;
+            int next = Math.Max(0, key.KeyIndex - 1);
+            AcceptAuthoredSystem(updated);
+            SelectCurve(identity, next);
+            SetAuthoringStatus($"Removed {key.Owner.Name} key {key.KeyIndex + 1}");
+        }
+
+        private bool TryReadCurveKey(VfxCurveKeyAuthoringItem key, out float time, out Vector4 value)
+        {
+            time = 0f;
+            value = default;
+            if (key?.Owner == null || !TryAuthoringNumber(key.TimeText, out time) ||
+                !TryAuthoringNumber(key.XText, out float x))
+            {
+                return false;
+            }
+
+            float y = 0f;
+            float z = 0f;
+            float w = 0f;
+            if (key.Owner.ComponentCount >= 2 && !TryAuthoringNumber(key.YText, out y)) return false;
+            if (key.Owner.ComponentCount >= 3 && !TryAuthoringNumber(key.ZText, out z)) return false;
+            if (key.Owner.ComponentCount >= 4 && !TryAuthoringNumber(key.WText, out w)) return false;
+            value = new Vector4(x, y, z, w);
+            return true;
+        }
+
+        internal static bool IsCurveKeyTimeWithinNeighbors(
+            VfxCurveAuthoringItem curve,
+            int keyIndex,
+            float time)
+        {
+            if (curve == null || keyIndex < 0 || keyIndex >= curve.Keys.Count || !float.IsFinite(time))
+                return false;
+            if (keyIndex > 0 &&
+                TryCurveRow(curve.Keys[keyIndex - 1], out float previous, out _) &&
+                time < previous)
+            {
+                return false;
+            }
+            if (keyIndex + 1 < curve.Keys.Count &&
+                TryCurveRow(curve.Keys[keyIndex + 1], out float next, out _) &&
+                time > next)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        private static bool TrySuggestCurveKey(
+            VfxCurveAuthoringItem curve,
+            VfxCurveKeyAuthoringItem selected,
+            out int insertionIndex,
+            out float time,
+            out Vector4 value)
+        {
+            insertionIndex = 0;
+            time = 0f;
+            value = curve?.Constant ?? Vector4.Zero;
+            if (curve == null) return false;
+            if (curve.Keys.Count == 0) return true;
+
+            int selectedIndex = selected?.Owner == curve
+                ? Math.Clamp(selected.KeyIndex, 0, curve.Keys.Count - 1)
+                : 0;
+            if (!TryCurveRow(curve.Keys[selectedIndex], out float currentTime, out _)) return false;
+            if (selectedIndex + 1 < curve.Keys.Count)
+            {
+                if (!TryCurveRow(curve.Keys[selectedIndex + 1], out float nextTime, out _)) return false;
+                time = (currentTime + nextTime) * 0.5f;
+            }
+            else if (currentTime < 1f)
+            {
+                time = (currentTime + 1f) * 0.5f;
+            }
+            else
+            {
+                time = currentTime + 0.25f;
+            }
+
+            value = SampleCurveRows(curve, time);
+            insertionIndex = curve.Keys.Count;
+            for (int index = 0; index < curve.Keys.Count; index++)
+            {
+                if (!TryCurveRow(curve.Keys[index], out float keyTime, out _)) return false;
+                if (keyTime > time)
+                {
+                    insertionIndex = index;
+                    break;
+                }
+            }
+            return true;
+        }
+
+        private static Vector4 SampleCurveRows(VfxCurveAuthoringItem curve, float time)
+        {
+            if (curve.Keys.Count == 0) return curve.Constant;
+            if (!TryCurveRow(curve.Keys[0], out float firstTime, out Vector4 first)) return curve.Constant;
+            if (time <= firstTime) return first;
+
+            for (int index = 1; index < curve.Keys.Count; index++)
+            {
+                if (!TryCurveRow(curve.Keys[index], out float rightTime, out Vector4 right)) continue;
+                if (time > rightTime)
+                {
+                    firstTime = rightTime;
+                    first = right;
+                    continue;
+                }
+                float span = rightTime - firstTime;
+                if (Math.Abs(span) <= 1e-7f) return right;
+                float amount = Math.Clamp((time - firstTime) / span, 0f, 1f);
+                return Vector4.Lerp(first, right, amount);
+            }
+            return first;
+        }
+
+        private static bool TryCurveRow(VfxCurveKeyAuthoringItem key, out float time, out Vector4 value)
+        {
+            time = 0f;
+            value = default;
+            if (key?.Owner == null || !TryAuthoringNumber(key.TimeText, out time) ||
+                !TryAuthoringNumber(key.XText, out float x)) return false;
+            float y = 0f;
+            float z = 0f;
+            float w = 0f;
+            if (key.Owner.ComponentCount >= 2 && !TryAuthoringNumber(key.YText, out y)) return false;
+            if (key.Owner.ComponentCount >= 3 && !TryAuthoringNumber(key.ZText, out z)) return false;
+            if (key.Owner.ComponentCount >= 4 && !TryAuthoringNumber(key.WText, out w)) return false;
+            value = new Vector4(x, y, z, w);
+            return true;
+        }
+
+        private void SelectCurve(string identity, int keyIndex)
+        {
+            VfxCurveAuthoringItem curve = _model.CurveAuthoringItems.FirstOrDefault(item => item.Identity == identity);
+            _model.SelectedCurveAuthoringItem = curve;
+            if (curve == null || curve.Keys.Count == 0)
+            {
+                _model.SelectedCurveKeyAuthoringItem = null;
+                return;
+            }
+            int safe = Math.Clamp(keyIndex, 0, curve.Keys.Count - 1);
+            _model.SelectedCurveKeyAuthoringItem = curve.Keys[safe];
+        }
+
+        private bool TryGetAuthoringSource(out string sourceBin)
+        {
+            sourceBin = null;
+            if (_inspectedSystem != null &&
+                _activeBundle?.SystemSources.TryGetValue(_inspectedSystem.PathHash, out sourceBin) == true)
+            {
+                return true;
+            }
+            SetAuthoringStatus("Source BIN for this system is unavailable");
+            return false;
+        }
+
+        private void SetAuthoringStatus(string status)
+        {
+            if (EmitterAuthoringStatusText != null)
+                EmitterAuthoringStatusText.Text = status ?? string.Empty;
         }
 
         private void EmitterSolo_Click(object sender, RoutedEventArgs e)

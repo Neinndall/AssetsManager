@@ -122,6 +122,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             bool isMesh = primitiveKind is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
             bool isArbitraryQuad = prim is BinTreeStruct aq && aq.ClassHash == PrimArbitraryQuad;
             string meshPath = null, meshSkl = null, meshAnm = null, meshFallbackPath = null;
+            IReadOnlyList<string> meshAnimationVariants = Array.Empty<string>();
             bool meshIsSkinned = false;
             bool meshAlignPitch = false;
             bool meshAlignYaw = false;
@@ -153,6 +154,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 }
 
                 meshAnm = ReadAsset(md.Properties, F_meshAnim, ".anm");
+                meshAnimationVariants = ReadAssetContainer(Get(md.Properties, F_meshAnimationVariants), ".anm");
                 meshAlignPitch = GetBool(ps2.Properties, F_meshAlignPitch);
                 meshAlignYaw = GetBool(ps2.Properties, F_meshAlignYaw);
                 submeshesToDraw = ReadHashContainer(Get(md.Properties, F_submeshesToDraw));
@@ -327,6 +329,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 fallback: VfxAuthoredDefaults.ColorLookUpTypeY);
             byte lingerType = NormalizeEnumByte(GetU8(p, F_particleLingerType), 2, 0);
             byte uvMode = NormalizeEnumByte(GetU8(p, F_uvMode), 5, 0);
+            VfxEmissionSurfaceDefinition emissionSurface = ReadEmissionSurface(p);
+            uint customMaterialPathHash = ReadCustomMaterialPathHash(p);
 
             return new VfxEmitterDefinition(
                 Name: GetString(p, F_emitterName) ?? string.Empty,
@@ -477,6 +481,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 Beam: beam,
                 Linger: linger,
                 IsSimpleEmitter: isSimpleEmitter,
+                MeshAnimationVariants: meshAnimationVariants,
+                EmissionSurface: emissionSurface,
+                CustomMaterialPathHash: customMaterialPathHash,
                 SubmeshesToDraw: submeshesToDraw,
                 SubmeshesToDrawAlways: submeshesToDrawAlways,
                 AttachedSubmeshHashes: attachedSubmeshHashes,
@@ -576,6 +583,53 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 .Select(static value => value.Value)
                 .Where(static value => !string.IsNullOrWhiteSpace(value))
                 .ToArray();
+        }
+
+        private static IReadOnlyList<string> ReadAssetContainer(BinTreeProperty property, string extension)
+        {
+            if (property is not BinTreeContainer container || container.Elements.Count == 0)
+                return Array.Empty<string>();
+            return container.Elements
+                .Select(value => ReadAsset(value, extension))
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+        }
+
+        private static uint ReadCustomMaterialPathHash(IReadOnlyDictionary<uint, BinTreeProperty> emitterProperties)
+        {
+            if (Get(emitterProperties, F_customMaterial) is not BinTreeStruct custom) return 0u;
+            return AsU32(Get(custom.Properties, F_customMaterialLink)) ?? 0u;
+        }
+
+        private static VfxEmissionSurfaceDefinition ReadEmissionSurface(
+            IReadOnlyDictionary<uint, BinTreeProperty> emitterProperties)
+        {
+            if (Get(emitterProperties, F_emissionSurfaceDefinition) is not BinTreeStruct outer) return null;
+
+            BinTreeStruct held = outer;
+            BinTreeProperty nested = Get(outer.Properties, F_emissionSurface);
+            if (nested is BinTreeStruct nestedSurface)
+            {
+                if (nestedSurface.ClassHash != EmissionSkeletonClass && nestedSurface.ClassHash != EmissionMeshClass)
+                    return null;
+                held = nestedSurface;
+            }
+            else if (nested is not null)
+            {
+                return null;
+            }
+
+            IReadOnlyDictionary<uint, BinTreeProperty> properties = held.Properties;
+            return new VfxEmissionSurfaceDefinition(
+                held.ClassHash == EmissionSkeletonClass ? VfxEmissionSurfaceKind.Skeleton : VfxEmissionSurfaceKind.Mesh,
+                ReadAsset(properties, F_emissionMesh, ".skn"),
+                ReadAsset(properties, F_emissionSkeleton, ".skl"),
+                ReadAsset(properties, F_emissionAnimation, ".anm"),
+                ReadHashContainer(Get(properties, F_emissionSubmeshes)),
+                ReadHashContainer(Get(properties, F_emissionJointMask)),
+                GetF32(properties, F_emissionMeshScale) ?? 1f,
+                Math.Clamp(GetI32(properties, F_emissionMaxJointWeights) ?? GetU8(properties, F_emissionMaxJointWeights) ?? 4, 0, 4),
+                GetBool(properties, F_emissionUseSurfaceNormal, defaultValue: true));
         }
 
         private static IReadOnlyList<uint> ReadHashContainer(BinTreeProperty property)

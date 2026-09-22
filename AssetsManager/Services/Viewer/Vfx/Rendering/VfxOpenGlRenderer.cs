@@ -34,6 +34,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _uErosionFeatherIn, _uErosionFeatherOut, _uErosionSliceWidth;
         private int _uPlacementRight, _uPlacementUp, _uPlacementForward, _uIsGroundLayer;
         private int _uWireframePass, _uWireframeColor;
+        private int _uUseCustomMaterial, _uMaterialTint, _uMaterialRepeat, _uMaterialAddressU, _uMaterialAddressV, _uMaterialPremultiplied;
         private int _instCapFloats;
         private int _trailCapFloats;
         private bool _ready;
@@ -145,6 +146,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uIsGroundLayer = gl.GetUniformLocation(_program, "uIsGroundLayer");
             _uWireframePass = gl.GetUniformLocation(_program, "uWireframePass");
             _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
+            _uUseCustomMaterial = gl.GetUniformLocation(_program, "uUseCustomMaterial");
+            _uMaterialTint = gl.GetUniformLocation(_program, "uMaterialTint");
+            _uMaterialRepeat = gl.GetUniformLocation(_program, "uMaterialRepeat");
+            _uMaterialAddressU = gl.GetUniformLocation(_program, "uMaterialAddressU");
+            _uMaterialAddressV = gl.GetUniformLocation(_program, "uMaterialAddressV");
+            _uMaterialPremultiplied = gl.GetUniformLocation(_program, "uMaterialPremultiplied");
             _vao = gl.GenVertexArray();
             gl.BindVertexArray(_vao);
             // static base quad (4 corners, drawn as a triangle fan)
@@ -402,7 +409,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
-                    bool meshDistortion = es.Def.Distortion != null && !useWireframe;
+                    bool meshDistortion = es.Def.DrawsAsDistortion && !useWireframe;
                     ApplyEmitterDepthState(es.Def, meshDistortion);
                     if (useWireframe)
                     {
@@ -412,7 +419,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     if (useWireframe)
                         ApplyWireframeBlend();
                     else
-                        ApplyBlendMode(es.Def.BlendMode, meshDistortion);
+                        ApplyEmitterBlendState(es.Def, meshDistortion);
                     RenderMeshEmitter(
                         es,
                         viewProj,
@@ -426,7 +433,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     continue;
                 }
                 if (!es.Def.IsVisual) continue;
-                bool isDistortion = es.Def.Distortion is not null && !useWireframe;
+                bool isDistortion = es.Def.DrawsAsDistortion && !useWireframe;
                 bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
                 if (warpsFrame && _capture.ColorTexture == 0) continue;
 
@@ -488,11 +495,25 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (useWireframe)
                     ApplyWireframeBlend();
                 else
-                    ApplyBlendMode(es.Def.BlendMode, isDistortion);
-                _gl.Uniform1(_uAlphaCutoff, renderState.AlphaCutoff);
+                    ApplyEmitterBlendState(es.Def, isDistortion);
+                if (!useWireframe)
+                    ApplyParticleCullState(es.Def);
+                ModelMaterialDefinition customMaterial = es.Def.HasResolvedCustomMaterial ? es.Def.CustomMaterial : null;
+                ApplyCustomMaterialUniforms(
+                    customMaterial,
+                    _uUseCustomMaterial,
+                    _uMaterialTint,
+                    _uMaterialRepeat,
+                    _uMaterialAddressU,
+                    _uMaterialAddressV,
+                    _uMaterialPremultiplied);
+                float alphaCutoff = customMaterial?.AlphaCutoff ?? renderState.AlphaCutoff;
+                _gl.Uniform1(_uAlphaCutoff, alphaCutoff);
                 _gl.Uniform1(
                     _uAlphaTest,
-                    VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0);
+                    customMaterial is not null
+                        ? (alphaCutoff > 0f ? 1 : 0)
+                        : (VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0));
                 _gl.Uniform1(_uEmissiveStrength, VfxBlendModes.ResolveEmissiveStrength(es.Def.BlendMode));
                 bool hasMultLayer = HasTextureMultLayer(es.Def);
                 bool useColorRamp = ShouldUseColorRamp(es.Def, es.ColorGradientTexture != 0);
@@ -750,17 +771,28 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private void ApplyEmitterDepthState(VfxEmitterDefinition definition, bool isDistortion)
         {
-            var renderState = definition.RenderState ?? VfxEmitterRenderState.Default;
-            bool writeDepth = !isDistortion && VfxBlendModes.ShouldWriteDepth(
-                definition.BlendMode,
-                renderState.AlphaReference);
-            _gl.DepthMask(writeDepth);
+            ModelMaterialDefinition customMaterial = definition.HasResolvedCustomMaterial ? definition.CustomMaterial : null;
+            if (customMaterial is not null)
+            {
+                _gl.DepthMask(customMaterial.RenderState.DepthWrite);
+                if (customMaterial.RenderState.DepthTest) _gl.Enable(EnableCap.DepthTest);
+                else _gl.Disable(EnableCap.DepthTest);
+            }
+            else
+            {
+                var renderState = definition.RenderState ?? VfxEmitterRenderState.Default;
+                bool writeDepth = !isDistortion && VfxBlendModes.ShouldWriteDepth(
+                    definition.BlendMode,
+                    renderState.AlphaReference);
+                _gl.DepthMask(writeDepth);
+                if (VfxBlendModes.ShouldTestDepth(definition.MiscRenderFlags)) _gl.Enable(EnableCap.DepthTest);
+                else _gl.Disable(EnableCap.DepthTest);
+            }
+
             // Three.js ShaderMaterial defaults to LessEqualDepth, and LTK never overrides it
             // for VFX materials. Keep equal-depth fragments eligible instead of inheriting
             // OpenGL's default LESS from the surrounding viewer.
             _gl.DepthFunc(DepthFunction.Lequal);
-            if (VfxBlendModes.ShouldTestDepth(definition.MiscRenderFlags)) _gl.Enable(EnableCap.DepthTest);
-            else _gl.Disable(EnableCap.DepthTest);
 
             Vector2? bias = ResolvePolygonOffset(definition);
             if (bias is { } polygonBias)
@@ -810,6 +842,87 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 BlendingFactor.One,
                 BlendingFactor.OneMinusSrcAlpha);
         }
+
+        private void ApplyEmitterBlendState(VfxEmitterDefinition definition, bool distortion = false)
+        {
+            if (definition.HasResolvedCustomMaterial)
+            {
+                ApplyCustomMaterialBlend(definition);
+                return;
+            }
+            ApplyBlendMode(definition.BlendMode, distortion);
+        }
+
+        private void ApplyCustomMaterialBlend(VfxEmitterDefinition definition)
+        {
+            ModelMaterialRenderState state = definition.CustomMaterial.RenderState;
+            if (state.Blending == ModelMaterialBlendMode.Opaque)
+            {
+                _gl.Disable(EnableCap.Blend);
+                return;
+            }
+
+            _gl.Enable(EnableCap.Blend);
+            _gl.BlendEquation(GLEnum.FuncAdd);
+            _gl.BlendFunc(
+                ToOpenGl(definition.CustomMaterialSourceBlendFactor),
+                ToOpenGl(definition.CustomMaterialDestinationBlendFactor));
+        }
+
+        private void ApplyParticleCullState(VfxEmitterDefinition definition)
+        {
+            if (!definition.HasResolvedCustomMaterial)
+            {
+                // LTK's ordinary quad/ribbon particle materials are DoubleSide.
+                _gl.Disable(EnableCap.CullFace);
+                return;
+            }
+            ApplyCustomMaterialCull(definition.CustomMaterial.RenderState);
+        }
+
+        private void ApplyCustomMaterialCull(ModelMaterialRenderState state)
+        {
+            if (state.DoubleSided)
+            {
+                _gl.Disable(EnableCap.CullFace);
+                return;
+            }
+            _gl.Enable(EnableCap.CullFace);
+            _gl.CullFace(state.Inverted ? TriangleFace.Front : TriangleFace.Back);
+        }
+
+        private void ApplyCustomMaterialUniforms(
+            ModelMaterialDefinition material,
+            int useLocation,
+            int tintLocation,
+            int repeatLocation,
+            int addressULocation,
+            int addressVLocation,
+            int premultipliedLocation)
+        {
+            bool enabled = material is not null;
+            _gl.Uniform1(useLocation, enabled ? 1 : 0);
+            Vector4 tint = material?.Color ?? Vector4.One;
+            Vector2 repeat = material?.UvRepeat ?? Vector2.One;
+            _gl.Uniform4(tintLocation, tint.X, tint.Y, tint.Z, tint.W);
+            _gl.Uniform2(repeatLocation, repeat.X, repeat.Y);
+            _gl.Uniform1(addressULocation, enabled ? (int)material.WrapU : 0);
+            _gl.Uniform1(addressVLocation, enabled ? (int)material.WrapV : 0);
+            _gl.Uniform1(premultipliedLocation, enabled && material.RenderState.PremultipliedAlpha ? 1 : 0);
+        }
+
+        internal static BlendingFactor ToOpenGl(VfxCustomMaterialBlendFactor factor) => factor switch
+        {
+            VfxCustomMaterialBlendFactor.Zero => BlendingFactor.Zero,
+            VfxCustomMaterialBlendFactor.One => BlendingFactor.One,
+            VfxCustomMaterialBlendFactor.SourceColor => BlendingFactor.SrcColor,
+            VfxCustomMaterialBlendFactor.OneMinusSourceColor => BlendingFactor.OneMinusSrcColor,
+            VfxCustomMaterialBlendFactor.DestinationColor => BlendingFactor.DstColor,
+            VfxCustomMaterialBlendFactor.OneMinusDestinationColor => BlendingFactor.OneMinusDstColor,
+            VfxCustomMaterialBlendFactor.SourceAlpha => BlendingFactor.SrcAlpha,
+            VfxCustomMaterialBlendFactor.OneMinusSourceAlpha => BlendingFactor.OneMinusSrcAlpha,
+            _ => throw new ArgumentOutOfRangeException(nameof(factor), factor, null)
+        };
 
         private void ApplyBlendMode(int blendMode, bool distortion = false)
         {
@@ -871,6 +984,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.DeleteProgram(_program);
             if (_meshBoneBuffer != 0) _gl.DeleteBuffer(_meshBoneBuffer);
             _meshBoneBuffer = 0;
+            _ownerSkinningMatrices = null;
             _ownerSkinningCount = 0;
             if (_meshProgram != 0) _gl.DeleteProgram(_meshProgram);
             _meshProgram = 0;
@@ -891,8 +1005,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private const uint OwnerBoneBinding = 1;
         private uint _meshProgram;
         private uint _meshBoneBuffer;
+        private Matrix4x4[] _ownerSkinningMatrices;
         private int _ownerSkinningCount;
-        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muCamPos, _muCamUp, _muAlignPitchToCamera, _muAlignYawToCamera, _muMeshSkinned, _muUseOwnerSkinning, _muIsGroundLayer, _muOrbitRotation, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
+        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muCamPos, _muCamUp, _muAlignPitchToCamera, _muAlignYawToCamera, _muMeshSkinned, _muUseSkinning, _muIsGroundLayer, _muOrbitRotation, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
         private int _muIsDistortion, _muDistortionTex, _muSceneTex, _muDistortionStrength;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
@@ -907,6 +1022,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _muReflectionTex, _muHasReflection, _muFresnel, _muReflection, _muReflectionColor, _muAttachedMesh;
         private int _muSceneDepthTex, _muHasSoftParticle, _muSoftParticleParams, _muSoftParticleControl, _muDepthProjection, _muViewportSize;
         private int _muWireframePass, _muWireframeColor;
+        private int _muUseCustomMaterial, _muMaterialTint, _muMaterialRepeat, _muMaterialAddressU, _muMaterialAddressV, _muMaterialPremultiplied;
 
         private void EnsureMeshProgram()
         {
@@ -922,7 +1038,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muAlignPitchToCamera = _gl.GetUniformLocation(_meshProgram, "uAlignPitchToCamera");
                 _muAlignYawToCamera = _gl.GetUniformLocation(_meshProgram, "uAlignYawToCamera");
                 _muMeshSkinned = _gl.GetUniformLocation(_meshProgram, "uMeshSkinned");
-                _muUseOwnerSkinning = _gl.GetUniformLocation(_meshProgram, "uUseOwnerSkinning");
+                _muUseSkinning = _gl.GetUniformLocation(_meshProgram, "uUseSkinning");
                 _muIsGroundLayer = _gl.GetUniformLocation(_meshProgram, "uIsGroundLayer");
                 _muOrbitRotation = _gl.GetUniformLocation(_meshProgram, "uOrbitRotation");
                 _muColor = _gl.GetUniformLocation(_meshProgram, "uColor");
@@ -1003,6 +1119,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _muViewportSize = _gl.GetUniformLocation(_meshProgram, "uViewportSize");
                 _muWireframePass = _gl.GetUniformLocation(_meshProgram, "uWireframePass");
                 _muWireframeColor = _gl.GetUniformLocation(_meshProgram, "uWireframeColor");
+                _muUseCustomMaterial = _gl.GetUniformLocation(_meshProgram, "uUseCustomMaterial");
+                _muMaterialTint = _gl.GetUniformLocation(_meshProgram, "uMaterialTint");
+                _muMaterialRepeat = _gl.GetUniformLocation(_meshProgram, "uMaterialRepeat");
+                _muMaterialAddressU = _gl.GetUniformLocation(_meshProgram, "uMaterialAddressU");
+                _muMaterialAddressV = _gl.GetUniformLocation(_meshProgram, "uMaterialAddressV");
+                _muMaterialPremultiplied = _gl.GetUniformLocation(_meshProgram, "uMaterialPremultiplied");
 
                 uint boneBlock = _gl.GetUniformBlockIndex(_meshProgram, "VfxBoneTransforms");
                 if (boneBlock != uint.MaxValue)
@@ -1035,16 +1157,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal void SetOwnerSkinningMatrices(Matrix4x4[] matrices)
         {
+            _ownerSkinningMatrices = matrices;
             _ownerSkinningCount = Math.Min(matrices?.Length ?? 0, GpuSkinningData.MaxBones);
             if (!_ready || _ownerSkinningCount == 0)
                 return;
 
             EnsureMeshProgram();
+            UploadMeshBonePalette(new ReadOnlySpan<Matrix4x4>(matrices, 0, _ownerSkinningCount));
+        }
+
+        private void UploadMeshBonePalette(ReadOnlySpan<Matrix4x4> matrices)
+        {
+            if (_meshBoneBuffer == 0 || matrices.Length == 0) return;
+            int count = Math.Min(matrices.Length, GpuSkinningData.MaxBones);
             _gl.BindBuffer(BufferTargetARB.UniformBuffer, _meshBoneBuffer);
-            _gl.BufferSubData(
-                BufferTargetARB.UniformBuffer,
-                0,
-                new ReadOnlySpan<Matrix4x4>(matrices, 0, _ownerSkinningCount));
+            _gl.BufferSubData(BufferTargetARB.UniformBuffer, 0, matrices[..count]);
             _gl.BindBufferBase(BufferTargetARB.UniformBuffer, OwnerBoneBinding, _meshBoneBuffer);
             _gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
         }
@@ -1072,7 +1199,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             float wireframeOpacity)
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
-            bool isDistortion = es.Def.Distortion != null && !wireframePass;
+            bool isDistortion = es.Def.DrawsAsDistortion && !wireframePass;
             bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
             if (warpsFrame && _capture.ColorTexture == 0) return;
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
@@ -1091,9 +1218,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform3(_muCamUp, camUp.X, camUp.Y, camUp.Z);
             bool attachedMesh = es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh;
             bool useOwnerSkinning = attachedMesh && es.MeshHasSkinning && _ownerSkinningCount > 0;
-            _gl.Uniform1(_muUseOwnerSkinning, useOwnerSkinning ? 1 : 0);
-            if (useOwnerSkinning)
-                _gl.BindBufferBase(BufferTargetARB.UniformBuffer, OwnerBoneBinding, _meshBoneBuffer);
+            bool useParticleMeshSkinning = !attachedMesh && es.MeshHasSkinning && es.MeshAnimation is not null;
+            bool useSkinning = useOwnerSkinning || useParticleMeshSkinning;
+            _gl.Uniform1(_muUseSkinning, useSkinning ? 1 : 0);
+            if (useOwnerSkinning && _ownerSkinningMatrices is { Length: > 0 })
+                UploadMeshBonePalette(new ReadOnlySpan<Matrix4x4>(_ownerSkinningMatrices, 0, _ownerSkinningCount));
 
             // Direction-oriented mesh particles take precedence over camera alignment in LTK.
             bool cameraAlignedMesh = !attachedMesh && !es.Def.IsDirectionOriented &&
@@ -1151,11 +1280,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
             _gl.Uniform1(_muHasTex, ShouldSampleBaseTexture(es.Def, es.Texture) ? 1 : 0);
             var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
+            ModelMaterialDefinition customMaterial = es.Def.HasResolvedCustomMaterial ? es.Def.CustomMaterial : null;
+            ApplyCustomMaterialUniforms(
+                customMaterial,
+                _muUseCustomMaterial,
+                _muMaterialTint,
+                _muMaterialRepeat,
+                _muMaterialAddressU,
+                _muMaterialAddressV,
+                _muMaterialPremultiplied);
             ApplyAddressMode(2);
-            _gl.Uniform1(_muAlphaCutoff, renderState.AlphaCutoff);
+            float alphaCutoff = customMaterial?.AlphaCutoff ?? renderState.AlphaCutoff;
+            _gl.Uniform1(_muAlphaCutoff, alphaCutoff);
             _gl.Uniform1(
                 _muAlphaTest,
-                VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0);
+                customMaterial is not null
+                    ? (alphaCutoff > 0f ? 1 : 0)
+                    : (VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0));
             _gl.Uniform1(_muEmissiveStrength, VfxBlendModes.ResolveEmissiveStrength(es.Def.BlendMode));
             _gl.Uniform1(_muIsDistortion, isDistortion ? 1 : 0);
             _gl.Uniform1(_muDistortionStrength, es.Def.Distortion?.Strength ?? 0f);
@@ -1285,12 +1426,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             }
             else
             {
-                // Riot meshes cull backfaces unless the authored material explicitly opts out.
-                if (es.Def.RenderState?.DisableBackfaceCull == true)
-                    _gl.Disable(EnableCap.CullFace);
+                if (customMaterial is not null)
+                {
+                    ApplyCustomMaterialCull(customMaterial.RenderState);
+                }
                 else
-                    _gl.Enable(EnableCap.CullFace);
-                ApplyBlendMode(es.Def.BlendMode, isDistortion);
+                {
+                    // Riot meshes cull backfaces unless the authored emitter explicitly opts out.
+                    if (es.Def.RenderState?.DisableBackfaceCull == true)
+                        _gl.Disable(EnableCap.CullFace);
+                    else
+                    {
+                        _gl.Enable(EnableCap.CullFace);
+                        _gl.CullFace(TriangleFace.Back);
+                    }
+                }
+                ApplyEmitterBlendState(es.Def, isDistortion);
             }
 
             Vector2 emitterUvOffset = VfxUvSemantics.Periodic(
@@ -1335,6 +1486,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform1(_muUvRotationMult, instances[o + 33]);
                 _gl.Uniform1(_muFrame, instances[o + 10]);
                 _gl.Uniform1(_muPaletteSelector, instances[o + 35]);
+
+                if (useParticleMeshSkinning && i < es.Particles.Count)
+                    UploadMeshBonePalette(es.MeshAnimation.EvaluatePalette(es.Particles[i].Age));
 
                 if (es.MeshIndexCount > 0)
                 {
@@ -1433,7 +1587,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             => definition is not null &&
                instanceCount > 1 &&
                definition.DrawsAsQuad &&
-               VfxBlendModes.ShouldSortBackToFront(definition.BlendMode);
+               (definition.HasResolvedCustomMaterial
+                   ? definition.CustomMaterial.RenderState.Blending != ModelMaterialBlendMode.Opaque
+                   : VfxBlendModes.ShouldSortBackToFront(definition.BlendMode));
 
         private static float ClampScale(float value)
             => float.IsFinite(value) ? value : 1f;
@@ -1470,7 +1626,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                ContainsHash(always, hash);
 
         internal static bool ShouldSampleBaseTexture(VfxEmitterDefinition definition, uint textureHandle)
-            => textureHandle != 0 || string.IsNullOrWhiteSpace(definition?.TexturePath);
+        {
+            if (definition?.HasResolvedCustomMaterial == true)
+            {
+                return textureHandle != 0 &&
+                    !string.IsNullOrWhiteSpace(definition.CustomMaterial?.BaseTextureName);
+            }
+
+            return textureHandle != 0 || string.IsNullOrWhiteSpace(definition?.TexturePath);
+        }
 
         internal static float ResolveEmitterPhase(VfxEmitterDefinition definition, float age)
         {

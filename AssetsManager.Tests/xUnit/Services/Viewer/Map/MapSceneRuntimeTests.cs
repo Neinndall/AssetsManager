@@ -46,6 +46,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void FullBackdropTextureWaveReplacesThePreviewSet()
+        {
+            using var runtime = new MapSceneRuntime(
+                Scene(),
+                Array.Empty<MapCharacterRuntimeGroup>(),
+                new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>()));
+            var full = new Dictionary<string, System.Windows.Media.Imaging.BitmapSource>();
+
+            runtime.SetBackdropTextures(full);
+
+            Assert.Same(full, runtime.BackdropTextures);
+        }
+
+        [Fact]
         public void HiddenIdsCanBeAddedAndRemovedWithoutRebuildingTheScene()
         {
             using var runtime = new MapSceneRuntime(

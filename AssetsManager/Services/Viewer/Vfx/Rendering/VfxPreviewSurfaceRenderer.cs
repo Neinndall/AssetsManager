@@ -184,33 +184,6 @@ void main() {
                 _groundTexture = UploadTexture(groundTexture);
         }
 
-        private void InitializeStage(bool gles)
-        {
-            _stageProgram = GlShaderCompiler.CreateProgram(_gl, gles, StageVertexShader, StageFragmentShader);
-            _stageViewProjection = _gl.GetUniformLocation(_stageProgram, "uViewProjection");
-            _stageHeight = _gl.GetUniformLocation(_stageProgram, "uHeight");
-            _stageMode = _gl.GetUniformLocation(_stageProgram, "uMode");
-
-            float half = StageSize * 0.5f;
-            float[] vertices =
-            {
-                -half, -half,
-                 half, -half,
-                 half,  half,
-                -half,  half
-            };
-
-            _stageVao = _gl.GenVertexArray();
-            _stageVbo = _gl.GenBuffer();
-            _gl.BindVertexArray(_stageVao);
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _stageVbo);
-            _gl.BufferData(BufferTargetARB.ArrayBuffer, new ReadOnlySpan<float>(vertices), BufferUsageARB.StaticDraw);
-            _gl.EnableVertexAttribArray(0);
-            _gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 2 * sizeof(float), IntPtr.Zero);
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
-            _gl.BindVertexArray(0);
-        }
-
         private void RenderGround(Matrix4x4 viewProjection)
         {
             _gl.GetInteger(GLEnum.CurrentProgram, out int previousProgram);
@@ -252,6 +225,33 @@ void main() {
                 _gl.BindVertexArray((uint)previousVao);
                 _gl.UseProgram((uint)previousProgram);
             }
+        }
+
+        private void InitializeStage(bool gles)
+        {
+            _stageProgram = GlShaderCompiler.CreateProgram(_gl, gles, StageVertexShader, StageFragmentShader);
+            _stageViewProjection = _gl.GetUniformLocation(_stageProgram, "uViewProjection");
+            _stageHeight = _gl.GetUniformLocation(_stageProgram, "uHeight");
+            _stageMode = _gl.GetUniformLocation(_stageProgram, "uMode");
+
+            float half = StageSize * 0.5f;
+            float[] vertices =
+            {
+                -half, -half,
+                 half, -half,
+                 half,  half,
+                -half,  half
+            };
+
+            _stageVao = _gl.GenVertexArray();
+            _stageVbo = _gl.GenBuffer();
+            _gl.BindVertexArray(_stageVao);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _stageVbo);
+            _gl.BufferData(BufferTargetARB.ArrayBuffer, new ReadOnlySpan<float>(vertices), BufferUsageARB.StaticDraw);
+            _gl.EnableVertexAttribArray(0);
+            _gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 2 * sizeof(float), IntPtr.Zero);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
+            _gl.BindVertexArray(0);
         }
 
         private void RenderStage(Matrix4x4 viewProjection, bool drawFill)

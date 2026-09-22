@@ -16,7 +16,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         private const string SwitchedShaderPath = "Shaders/SkinnedMesh/AlphaBlend_Additive_Scroll_Packed";
 
         [Fact]
-        public void Resolve_DemotesPlainNormalBlendWithoutAlphaToOpaque()
+        public void Resolve_BlendEnableWithOpaqueFactorsRemainsOpaque()
         {
             SknMaterialDefinition material = CreateMaterial(
                 samplers: new[] { Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex") },
@@ -28,7 +28,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void Resolve_DemotesBlendWithoutAlphaEvenWhenDepthWriteIsDisabled()
+        public void Resolve_PreservesAuthoredAlphaBlendAndTextureCoverageWithoutOpacitySlot()
         {
             SknMaterialDefinition material = CreateMaterial(
                 samplers: new[] { Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex") },
@@ -40,9 +40,33 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialDefinition resolved = Resolve(material, new[] { "test_tx_cm" });
 
-            Assert.Equal(ModelMaterialBlendMode.Opaque, resolved.RenderState.Blending);
+            Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
             Assert.False(resolved.RenderState.DepthWrite);
-            Assert.False(resolved.UsesTextureAlpha);
+            Assert.True(resolved.UsesTextureAlpha);
+        }
+
+        [Fact]
+        public void Resolve_SeraphineCapeAlphaPassKeepsAuthoredBaseTextureCoverage()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                samplers: new[]
+                {
+                    Sampler(
+                        "Diffuse_Texture",
+                        "ASSETS/Characters/Seraphine/Skins/Skin69/Seraphine_Skin69_Cape_TX_CM.tex")
+                },
+                pass: Pass(
+                    blendEnabled: true,
+                    sourceBlendFactor: 6,
+                    destinationBlendFactor: 7,
+                    writeMask: 15));
+
+            ModelMaterialDefinition resolved = Resolve(material, new[] { "seraphine_skin69_cape_tx_cm" });
+
+            Assert.Equal("seraphine_skin69_cape_tx_cm", resolved.BaseTextureName);
+            Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
+            Assert.True(resolved.UsesTextureAlpha);
+            Assert.False(resolved.RenderState.DepthWrite);
         }
 
         [Fact]

@@ -42,6 +42,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void ParserReadsFlagPropertiesLikeLtk()
+        {
+            BinTree tree = Tree(Container(
+                0x10000001,
+                Item(
+                    0x20000001,
+                    MapParticleParser.MapParticleClass,
+                    new BinTreeObjectLink(MapParticleParser.SystemField, 0x30000001),
+                    new BinTreeBitBool(MapParticleParser.TransitionalField, true),
+                    new BinTreeBitBool(MapParticleParser.StartDisabledField, true))));
+
+            IReadOnlyList<MapPlaceableChunkData> chunks = new MapPlaceableParser().Parse(tree);
+            MapParticleData particle = Assert.Single(new MapParticleParser().Parse(chunks));
+
+            Assert.True(particle.Transitional);
+            Assert.True(particle.StartDisabled);
+        }
+
+        [Fact]
         public void PlayedParticlesMatchLtkBackdropRules()
         {
             MapParticleData near = Particle("Near", visibility: 255);

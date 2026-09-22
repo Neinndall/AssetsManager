@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Windows.Media.Imaging;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Views.Models.Viewer;
 
@@ -24,11 +25,13 @@ namespace AssetsManager.Services.Viewer.Runtime
             MapParticleSceneRuntime particles)
         {
             Scene = scene ?? throw new ArgumentNullException(nameof(scene));
+            BackdropTextures = scene.Textures ?? new Dictionary<string, BitmapSource>();
             CharacterGroups = characterGroups ?? Array.Empty<MapCharacterRuntimeGroup>();
             Particles = particles ?? new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>());
         }
 
         internal MapSceneData Scene { get; }
+        internal IReadOnlyDictionary<string, BitmapSource> BackdropTextures { get; private set; }
         internal IReadOnlyList<MapCharacterRuntimeGroup> CharacterGroups { get; }
         internal MapParticleSceneRuntime Particles { get; }
         internal IReadOnlySet<string> Hidden => _hidden;
@@ -64,6 +67,13 @@ namespace AssetsManager.Services.Viewer.Runtime
 
             if (ShowParticles)
                 Particles.Update(viewProjection, deltaSeconds, _hidden);
+        }
+
+        internal void SetBackdropTextures(IReadOnlyDictionary<string, BitmapSource> textures)
+        {
+            ThrowIfDisposed();
+            if (textures != null)
+                BackdropTextures = textures;
         }
 
         internal void SetHidden(string id, bool hidden)

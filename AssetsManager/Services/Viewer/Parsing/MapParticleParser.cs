@@ -72,6 +72,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             return property switch
             {
                 BinTreeBool value => value.Value,
+                BinTreeBitBool value => value.Value,
                 BinTreeU8 value => value.Value != 0,
                 _ => false
             };

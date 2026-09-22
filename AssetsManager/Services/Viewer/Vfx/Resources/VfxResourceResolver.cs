@@ -210,19 +210,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         {
             if (string.IsNullOrWhiteSpace(meshPath) ||
                 string.IsNullOrWhiteSpace(skeletonPath) ||
-                string.IsNullOrWhiteSpace(animationPath) ||
                 string.IsNullOrWhiteSpace(searchDirectory))
             {
                 return null;
             }
 
-            string key = CreateKey($"{meshPath}|{skeletonPath}|{animationPath}", searchDirectory);
+            string animationKey = string.IsNullOrWhiteSpace(animationPath) ? "<bind>" : animationPath;
+            string key = CreateKey($"{meshPath}|{skeletonPath}|{animationKey}", searchDirectory);
             if (_meshAnimations.TryGetValue(key, out VfxAnimatedMesh cached)) return cached;
 
             string resolvedMesh = ResolvePath(meshPath, searchDirectory, new[] { ".skn" });
             string resolvedSkeleton = ResolvePath(skeletonPath, searchDirectory, SkeletonExtensions);
-            string resolvedAnimation = ResolvePath(animationPath, searchDirectory, AnimationExtensions);
-            if (resolvedMesh == null || resolvedSkeleton == null || resolvedAnimation == null)
+            string resolvedAnimation = string.IsNullOrWhiteSpace(animationPath)
+                ? null
+                : ResolvePath(animationPath, searchDirectory, AnimationExtensions);
+            if (resolvedMesh == null || resolvedSkeleton == null ||
+                (!string.IsNullOrWhiteSpace(animationPath) && resolvedAnimation == null))
             {
                 _meshAnimations[key] = null;
                 return null;
@@ -238,7 +241,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             {
                 log?.LogError(
                     ex,
-                    $"Failed to load VFX mesh animation: {resolvedAnimation} (mesh: {resolvedMesh}, skeleton: {resolvedSkeleton}).");
+                    $"Failed to load VFX mesh pose: {resolvedAnimation ?? "bind pose"} (mesh: {resolvedMesh}, skeleton: {resolvedSkeleton}).");
                 _meshAnimations[key] = null;
                 return null;
             }

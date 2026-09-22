@@ -1177,6 +1177,56 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ReadStringMap(obj.Properties, FeatureDefines));
         }
 
+        /// <summary>
+        /// Resolves one linked StaticMaterialDef as the generic authored preview used by the
+        /// viewer. VFX CustomMaterial uses this directly instead of maintaining a second parser.
+        /// </summary>
+        internal static ModelMaterialDefinition ResolveLinkedMaterialPreview(
+            BinTree binTree,
+            uint pathHash,
+            out VfxCustomMaterialBlendFactor sourceBlendFactor,
+            out VfxCustomMaterialBlendFactor destinationBlendFactor,
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null)
+        {
+            sourceBlendFactor = VfxCustomMaterialBlendFactor.One;
+            destinationBlendFactor = VfxCustomMaterialBlendFactor.Zero;
+            if (binTree == null || pathHash == 0)
+                return ModelMaterialDefinition.Missing;
+
+            var trees = new[] { binTree };
+            SknMaterialDefinition material = ResolveLinkedMaterialDefinition(
+                trees,
+                pathHash,
+                wadChunkPathResolver,
+                binEntryResolver);
+            if (material == null)
+                return ModelMaterialDefinition.Missing;
+
+            sourceBlendFactor = ResolveVfxBlendFactor(
+                material.Pass?.SourceColorBlendFactor,
+                VfxCustomMaterialBlendFactor.One);
+            destinationBlendFactor = ResolveVfxBlendFactor(
+                material.Pass?.DestinationColorBlendFactor,
+                VfxCustomMaterialBlendFactor.Zero);
+
+            SknShaderDefinition shader = material.ShaderHash == 0
+                ? null
+                : ResolveLinkedShaderDefinition(
+                    trees,
+                    material.ShaderHash,
+                    wadChunkPathResolver,
+                    binEntryResolver);
+            return SknStaticMaterialResolver.ResolveAuthoredPreview(material, shader);
+        }
+
+        private static VfxCustomMaterialBlendFactor ResolveVfxBlendFactor(
+            uint? authored,
+            VfxCustomMaterialBlendFactor fallback)
+            => authored.HasValue && authored.Value <= (uint)VfxCustomMaterialBlendFactor.OneMinusSourceAlpha
+                ? (VfxCustomMaterialBlendFactor)authored.Value
+                : fallback;
+
         private static SknMaterialDefinition ResolveLinkedMaterialDefinition(
             IEnumerable<BinTree> binTrees,
             uint pathHash,

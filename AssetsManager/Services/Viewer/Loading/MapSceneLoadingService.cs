@@ -96,7 +96,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 ShaderDefinitionsPath,
                 source.ProjectRoot,
                 cancellationToken);
-            BinTree shaders = await OpenBinTreeAsync(shaderAsset, cancellationToken);
+            BinTree shaders = await OpenOptionalBinTreeAsync(shaderAsset, cancellationToken);
             IReadOnlyList<MapMaterialDefinition> materialDefinitions = _materialParser.Parse(
                 materials,
                 shaders,
@@ -164,6 +164,29 @@ namespace AssetsManager.Services.Viewer.Loading
             return stream == null
                 ? null
                 : await Task.Run(() => new BinTree(stream), cancellationToken);
+        }
+
+        private async Task<BinTree> OpenOptionalBinTreeAsync(
+            MapResolvedAsset asset,
+            CancellationToken cancellationToken)
+        {
+            if (asset == null)
+                return null;
+
+            try
+            {
+                return await OpenBinTreeAsync(asset, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logService?.LogDebug(
+                    $"MAP optional BIN unavailable '{asset.VirtualPath}': {ex.Message}");
+                return null;
+            }
         }
     }
 }

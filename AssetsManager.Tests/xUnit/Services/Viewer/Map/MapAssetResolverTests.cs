@@ -42,8 +42,26 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
                 File.WriteAllBytes(file, Array.Empty<byte>());
 
-                Assert.True(MapPath.TryFromGeometryFile(file, root, out MapPath map));
+                Assert.True(MapPath.TryFromGeometryFile(file, out MapPath map));
                 Assert.Equal("Maps/MapGeometry/Map11/Base_SRX", map.Value, ignoreCase: true);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void GeometryFileOutsideDataTreeIsNotAMapFile()
+        {
+            string root = NewTempDirectory();
+            try
+            {
+                string file = Path.Combine(root, "Maps", "MapGeometry", "Map11", "Base_SRX.mapgeo");
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                File.WriteAllBytes(file, Array.Empty<byte>());
+
+                Assert.False(MapPath.TryFromGeometryFile(file, out _));
             }
             finally
             {

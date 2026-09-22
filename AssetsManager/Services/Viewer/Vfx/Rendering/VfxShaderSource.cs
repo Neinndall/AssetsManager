@@ -21,7 +21,7 @@ uniform int uAlignPitchToCamera;
 uniform int uAlignYawToCamera;
 uniform int uMeshSkinned;
 uniform int uAttachedMesh;
-uniform int uUseOwnerSkinning;
+uniform int uUseSkinning;
 uniform int uIsGroundLayer;
 uniform vec3 uOrbitRotation;
 const int MAX_BONES = 512;
@@ -58,6 +58,7 @@ uniform vec4 uFresnel;
 uniform vec4 uReflection;
 out vec2 vCell;
 out vec2 vCellMult;
+out vec2 vRawUv;
 out vec2 vLocalUv;
 out vec2 vLocalUvMult;
 out vec2 vCornerUv;
@@ -78,7 +79,7 @@ vec3 meshRotateEuler(vec3 p, vec3 r){
 void main(){
     vec3 sourcePosition = aPos;
     vec3 sourceNormal = aNormal;
-    if (uUseOwnerSkinning != 0) {
+    if (uUseSkinning != 0) {
         ivec4 boneIndices = ivec4(aBoneIndices + vec4(0.5));
         mat4 skinMatrix =
             uBoneTransforms[boneIndices.x] * aBoneWeights.x +
@@ -155,6 +156,7 @@ void main(){
     }
     gl_Position = uViewProj * vec4(p, 1.0);
     vec2 baseUv = aUv;
+    vRawUv = aUv;
     // mesh_ps_fixedalphauv samples the transformed-but-unscrolled coordinate. Unlike the
     // normal layer transform this path has no authored centre or translation column.
     vec2 alphaUv = baseUv * uUvScale;
@@ -244,6 +246,7 @@ uniform vec3 uPlacementUp;
 uniform vec3 uPlacementForward;
 out vec2 vCell;
 out vec2 vCellMult;
+out vec2 vRawUv;
 out vec4 vColor;
 out float vErosionDrive;
 out vec4 vErosionMixer;
@@ -329,6 +332,7 @@ void main(){
     vec2 quadUv = uArbitraryQuad != 0
         ? vec2(aCorner.y + 0.5, aCorner.x + 0.5)
         : vec2(cell.x, 1.0 - cell.y);
+    vRawUv = trailPrimitive ? aCorner : quadUv;
     if (trailPrimitive) {
         // Ribbon geometry already carries the engine's final per-vertex layer transforms.
         // This preserves its LOCK_ALPHA uv, independent base/mult cells and beam transpose.
@@ -410,6 +414,7 @@ vec2 atlasUv(vec2 local, vec2 cell, vec2 divisions, vec2 size, int mode){
         internal const string MeshFragment = TextureSampling + @"
 in vec2 vCell;
 in vec2 vCellMult;
+in vec2 vRawUv;
 in vec2 vLocalUv;
 in vec2 vLocalUvMult;
 in vec2 vCornerUv;
@@ -469,7 +474,21 @@ uniform int uAttachedMesh;
 uniform vec4 uReflectionColor;
 uniform int uWireframePass;
 uniform vec4 uWireframeColor;
+uniform int uUseCustomMaterial;
+uniform vec4 uMaterialTint;
+uniform vec2 uMaterialRepeat;
+uniform int uMaterialAddressU;
+uniform int uMaterialAddressV;
+uniform int uMaterialPremultiplied;
 out vec4 fragColor;
+float customAddress(float value, int mode){
+    if (mode == 0) return fract(value);
+    if (mode == 2) return 1.0 - abs(mod(value, 2.0) - 1.0);
+    return clamp(value, 0.0, 1.0);
+}
+float customCoverage(float value, int mode){
+    return mode == 3 && (value < 0.0 || value > 1.0) ? 0.0 : 1.0;
+}
 float colorLookUpDriver(int type){
     if (type == 1) return vColorDynamics.x;
     if (type == 2) return vColorDynamics.y;
@@ -491,6 +510,17 @@ vec4 applyParticleColor(vec4 texel){
 void main(){
     if (uWireframePass != 0) {
         fragColor = uWireframeColor;
+        return;
+    }
+    if (uUseCustomMaterial != 0) {
+        vec2 held = vRawUv * uMaterialRepeat;
+        vec2 uv = vec2(customAddress(held.x, uMaterialAddressU), customAddress(held.y, uMaterialAddressV));
+        float coverage = customCoverage(held.x, uMaterialAddressU) * customCoverage(held.y, uMaterialAddressV);
+        vec4 texel = uHasTex != 0 ? texture(uTex, uv) * coverage : vec4(1.0);
+        vec4 color = texel * uColor * uMaterialTint;
+        if (color.a < uAlphaCutoff) discard;
+        if (uMaterialPremultiplied != 0) color.rgb *= color.a;
+        fragColor = color;
         return;
     }
     vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uAddressMode);
@@ -579,6 +609,7 @@ void main(){
         internal const string ParticleFragment = TextureSampling + @"
 in vec2 vCell;
 in vec2 vCellMult;
+in vec2 vRawUv;
 in vec4 vColor;
 in float vErosionDrive;
 in vec4 vErosionMixer;
@@ -633,7 +664,21 @@ uniform vec4 uSoftParticleControl;
 uniform vec2 uDepthProjection;
 uniform int uWireframePass;
 uniform vec4 uWireframeColor;
+uniform int uUseCustomMaterial;
+uniform vec4 uMaterialTint;
+uniform vec2 uMaterialRepeat;
+uniform int uMaterialAddressU;
+uniform int uMaterialAddressV;
+uniform int uMaterialPremultiplied;
 out vec4 fragColor;
+float customAddress(float value, int mode){
+    if (mode == 0) return fract(value);
+    if (mode == 2) return 1.0 - abs(mod(value, 2.0) - 1.0);
+    return clamp(value, 0.0, 1.0);
+}
+float customCoverage(float value, int mode){
+    return mode == 3 && (value < 0.0 || value > 1.0) ? 0.0 : 1.0;
+}
 float colorLookUpDriver(int type){
     if (type == 1) return vColorDynamics.x;
     if (type == 2) return vColorDynamics.y;
@@ -660,6 +705,17 @@ vec4 applyParticleColor(vec4 tex){
 void main(){
     if (uWireframePass != 0) {
         fragColor = uWireframeColor;
+        return;
+    }
+    if (uUseCustomMaterial != 0) {
+        vec2 held = vRawUv * uMaterialRepeat;
+        vec2 uv = vec2(customAddress(held.x, uMaterialAddressU), customAddress(held.y, uMaterialAddressV));
+        float coverage = customCoverage(held.x, uMaterialAddressU) * customCoverage(held.y, uMaterialAddressV);
+        vec4 texel = uHasTex != 0 ? texture(uTex, uv) * coverage : vec4(1.0);
+        vec4 color = texel * vColor * uMaterialTint;
+        if (color.a < uAlphaCutoff) discard;
+        if (uMaterialPremultiplied != 0) color.rgb *= color.a;
+        fragColor = color;
         return;
     }
     vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uAddressMode);

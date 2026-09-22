@@ -175,7 +175,8 @@ namespace AssetsManager.Services.Viewer.Parsing
                     Array.Empty<MapMaterialSamplerData>(),
                     EmptyVectorMap,
                     EmptyBoolMap,
-                    EmptyStringMap);
+                    EmptyStringMap,
+                    false);
             }
 
             if (!shaders.Objects.TryGetValue(shaderHash, out BinTreeObject shaderObject))
@@ -186,7 +187,8 @@ namespace AssetsManager.Services.Viewer.Parsing
                     Array.Empty<MapMaterialSamplerData>(),
                     EmptyVectorMap,
                     EmptyBoolMap,
-                    EmptyStringMap);
+                    EmptyStringMap,
+                    false);
             }
 
             IReadOnlyDictionary<uint, BinTreeProperty> fields = shaderObject.Properties;
@@ -199,7 +201,8 @@ namespace AssetsManager.Services.Viewer.Parsing
                 ReadShaderSamplers(fields),
                 ReadShaderParameters(fields),
                 ReadShaderSwitches(fields),
-                ReadStringMap(fields, FeatureDefines));
+                ReadStringMap(fields, FeatureDefines),
+                true);
         }
 
         private IReadOnlyList<MapMaterialSamplerData> ReadMaterialSamplers(
@@ -215,9 +218,11 @@ namespace AssetsManager.Services.Viewer.Parsing
 
             var result = new List<MapMaterialSamplerData>();
             var indices = new Dictionary<string, int>(StringComparer.Ordinal);
-            HashSet<string> declared = shader?.DefaultSamplers
-                ?.Select(sampler => sampler.Name)
-                .ToHashSet(StringComparer.Ordinal);
+            HashSet<string> declared = shader?.IsDeclared == true
+                ? (shader.DefaultSamplers ?? Array.Empty<MapMaterialSamplerData>())
+                    .Select(sampler => sampler.Name)
+                    .ToHashSet(StringComparer.Ordinal)
+                : null;
 
             foreach (BinTreeStruct sampler in samplers.Elements.OfType<BinTreeStruct>())
             {
@@ -297,7 +302,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             ICollection<string> warnings)
         {
             Dictionary<string, Vector4> parameters = ReadParametersRaw(properties);
-            if (shader == null)
+            if (shader?.IsDeclared != true)
                 return parameters;
 
             foreach (string name in parameters.Keys)
@@ -344,7 +349,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             {
                 if (!TryReadString(item.Properties, Name, out string name))
                     continue;
-                if (shader != null && !shader.DefaultSwitches.ContainsKey(name))
+                if (shader?.IsDeclared == true && !shader.DefaultSwitches.ContainsKey(name))
                     warnings.Add($"UndeclaredSwitch:{name}");
                 result[name] = item.Properties.TryGetValue(On, out BinTreeProperty enabled)
                     ? ReadBool(enabled, fallback: true)

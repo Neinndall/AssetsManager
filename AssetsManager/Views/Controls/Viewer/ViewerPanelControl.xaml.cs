@@ -826,6 +826,28 @@ namespace AssetsManager.Views.Controls.Viewer
             RefreshMapOutlinerVisibility();
             ViewModel.ShowMainContent();
             Viewport.SnapCamera();
+            _ = UpgradeMapTexturesAsync(runtime, cancellationToken);
+        }
+
+        private async Task UpgradeMapTexturesAsync(
+            MapSceneRuntime runtime,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                IReadOnlyDictionary<string, System.Windows.Media.Imaging.BitmapSource> textures =
+                    await MapViewerSceneService.LoadFullTexturesAsync(runtime, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (Viewport?.IsMapSceneActive(runtime) == true)
+                    Viewport.UpdateMapTextures(runtime, textures);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogDebug($"MAPGEO full texture wave unavailable: {ex.Message}");
+            }
         }
 
         private void MapOutlinerChunkEye_Click(object sender, RoutedEventArgs e)
@@ -1045,6 +1067,8 @@ namespace AssetsManager.Views.Controls.Viewer
             settings.StudioParameters ??= new StudioParametersSettings();
             settings.StudioParameters.GroundVisible = viewportModel.IsGroundVisible;
             settings.StudioParameters.GridVisible = viewportModel.IsGridVisible;
+            settings.StudioParameters.SkyboxVisible = viewportModel.ShowSkybox;
+            settings.StudioParameters.TransparentBackground = viewportModel.IsTransparentBg;
 
             try
             {
@@ -1052,7 +1076,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
-                LogService?.LogError(ex, "Failed to save shared Viewer Ground/Grid preferences.");
+                LogService?.LogError(ex, "Failed to save Viewer environment preferences.");
             }
         }
 

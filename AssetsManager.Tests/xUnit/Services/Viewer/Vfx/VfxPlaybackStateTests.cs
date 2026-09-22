@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
@@ -103,6 +104,38 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             Assert.False(second.IsSelected);
             Assert.False(model.HasSelectedEmitter);
+        }
+
+        [Fact]
+        public void CurveKeyEditorKeepsNormalEditsBetweenNeighboringTimes()
+        {
+            var curve = new VfxCurveAuthoringItem { Name = "Rate", ComponentCount = 1, HasCurve = true };
+            curve.Keys.Add(new VfxCurveKeyAuthoringItem
+            {
+                Owner = curve,
+                KeyIndex = 0,
+                TimeText = "0",
+                XText = "1"
+            });
+            curve.Keys.Add(new VfxCurveKeyAuthoringItem
+            {
+                Owner = curve,
+                KeyIndex = 1,
+                TimeText = "0.5",
+                XText = "2"
+            });
+            curve.Keys.Add(new VfxCurveKeyAuthoringItem
+            {
+                Owner = curve,
+                KeyIndex = 2,
+                TimeText = "1",
+                XText = "3"
+            });
+
+            Assert.True(VfxInspectorControl.IsCurveKeyTimeWithinNeighbors(curve, 1, 0.25f));
+            Assert.True(VfxInspectorControl.IsCurveKeyTimeWithinNeighbors(curve, 1, 0.75f));
+            Assert.False(VfxInspectorControl.IsCurveKeyTimeWithinNeighbors(curve, 1, -0.01f));
+            Assert.False(VfxInspectorControl.IsCurveKeyTimeWithinNeighbors(curve, 1, 1.01f));
         }
 
         [Fact]

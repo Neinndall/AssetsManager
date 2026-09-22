@@ -915,13 +915,15 @@
                                         </Style.Triggers>
                                     </Style>
                                 </UniformGrid.Style>
-                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.ShowSkybox, Mode=TwoWay}" Margin="0,0,4,0">
+                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.ShowSkybox, Mode=TwoWay}" Margin="0,0,4,0"
+                                              Click="SharedViewerEnvironment_Click">
                                     <StackPanel>
                                         <materialIcons:MaterialIcon Kind="Earth" Width="22" Height="22" Margin="0,0,0,3"/>
                                         <TextBlock Text="Skybox" FontSize="10.5" FontWeight="SemiBold"/>
                                     </StackPanel>
                                 </ToggleButton>
-                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.IsTransparentBg, Mode=TwoWay}" Margin="0,0,4,0">
+                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.IsTransparentBg, Mode=TwoWay}" Margin="0,0,4,0"
+                                              Click="SharedViewerEnvironment_Click">
                                     <StackPanel>
                                         <materialIcons:MaterialIcon Kind="ImageOff" Width="22" Height="22" Margin="0,0,0,3"/>
                                         <TextBlock Text="No BG" FontSize="10.5" FontWeight="SemiBold"/>

@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Services.Viewer.Vfx.Authoring;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils.Framework;
@@ -329,6 +330,137 @@ namespace AssetsManager.Views.Models.Viewer
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
     }
 
+    internal enum VfxForceAuthoringValueKind
+    {
+        Scalar,
+        Vector3,
+        Boolean
+    }
+
+    public sealed class VfxForcePropertyAuthoringItem : INotifyPropertyChanged
+    {
+        private string _xText;
+        private string _yText;
+        private string _zText;
+        private bool _boolValue;
+
+        internal VfxEmitterForceKind ForceKind { get; init; }
+        internal int ForceIndex { get; init; }
+        internal VfxEmitterForceProperty Property { get; init; }
+        internal VfxForceAuthoringValueKind ValueKind { get; init; }
+        internal bool CanAnimate { get; init; }
+        internal bool HasCurve { get; init; }
+        public string Label { get; init; }
+        public bool IsScalar => ValueKind == VfxForceAuthoringValueKind.Scalar;
+        public bool IsVector => ValueKind == VfxForceAuthoringValueKind.Vector3;
+        public bool IsBoolean => ValueKind == VfxForceAuthoringValueKind.Boolean;
+
+        public string XText
+        {
+            get => _xText;
+            set { if (_xText == value) return; _xText = value; OnPropertyChanged(); }
+        }
+
+        public string YText
+        {
+            get => _yText;
+            set { if (_yText == value) return; _yText = value; OnPropertyChanged(); }
+        }
+
+        public string ZText
+        {
+            get => _zText;
+            set { if (_zText == value) return; _zText = value; OnPropertyChanged(); }
+        }
+
+        public bool BoolValue
+        {
+            get => _boolValue;
+            set { if (_boolValue == value) return; _boolValue = value; OnPropertyChanged(); }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string prop = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+    }
+
+    public sealed class VfxForceAuthoringItem
+    {
+        internal VfxEmitterForceKind Kind { get; init; }
+        internal int ForceIndex { get; init; }
+        public string Title { get; init; }
+        public ObservableCollection<VfxForcePropertyAuthoringItem> Properties { get; } = new();
+    }
+
+    public sealed class VfxCurveKeyAuthoringItem : INotifyPropertyChanged
+    {
+        private string _timeText;
+        private string _xText;
+        private string _yText;
+        private string _zText;
+        private string _wText;
+
+        internal VfxCurveAuthoringItem Owner { get; init; }
+        internal int KeyIndex { get; init; }
+        public int DisplayIndex => KeyIndex + 1;
+        public bool HasY => Owner?.ComponentCount >= 2;
+        public bool HasZ => Owner?.ComponentCount >= 3;
+        public bool HasW => Owner?.ComponentCount >= 4;
+
+        public string TimeText
+        {
+            get => _timeText;
+            set { if (_timeText == value) return; _timeText = value; OnPropertyChanged(); }
+        }
+
+        public string XText
+        {
+            get => _xText;
+            set { if (_xText == value) return; _xText = value; OnPropertyChanged(); }
+        }
+
+        public string YText
+        {
+            get => _yText;
+            set { if (_yText == value) return; _yText = value; OnPropertyChanged(); }
+        }
+
+        public string ZText
+        {
+            get => _zText;
+            set { if (_zText == value) return; _zText = value; OnPropertyChanged(); }
+        }
+
+        public string WText
+        {
+            get => _wText;
+            set { if (_wText == value) return; _wText = value; OnPropertyChanged(); }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string prop = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+    }
+
+    public sealed class VfxCurveAuthoringItem
+    {
+        internal string Identity { get; init; }
+        internal uint PropertyHash { get; init; }
+        internal VfxEmitterCurveFamily Family { get; init; }
+        internal System.Numerics.Vector4 Constant { get; init; }
+        internal bool IsForceCurve { get; init; }
+        internal VfxEmitterForceKind ForceKind { get; init; }
+        internal int ForceIndex { get; init; } = -1;
+        internal VfxEmitterForceProperty ForceProperty { get; init; }
+        public string Name { get; init; }
+        public string FieldName { get; init; }
+        public int ComponentCount { get; init; }
+        public bool HasCurve { get; init; }
+        public bool CanActivate => !HasCurve && !IsForceCurve;
+        public string StateText => HasCurve ? $"{Keys.Count} keys" : "Constant";
+        public ObservableCollection<VfxCurveKeyAuthoringItem> Keys { get; } = new();
+    }
+
     /// <summary>
     /// Audit item for textures referenced by an effect system.
     /// </summary>
@@ -551,6 +683,8 @@ namespace AssetsManager.Views.Models.Viewer
         private VfxPreviewWireframeMode _previewWireframeMode = VfxPreviewWireframeMode.Off;
         private VfxPreviewCameraPreset _previewCameraPreset = VfxPreviewCameraPreset.Game;
         private VfxEmitterDiagnosticItem _selectedEmitter;
+        private VfxCurveAuthoringItem _selectedCurveAuthoringItem;
+        private VfxCurveKeyAuthoringItem _selectedCurveKeyAuthoringItem;
         private string _statusText = "Ready";
         private bool _hasAnySolo;
         private bool _isAllMuted;
@@ -605,6 +739,8 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<float> AnimationParameterValues { get; } = new();
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
+        public ObservableCollection<VfxForceAuthoringItem> ForceAuthoringItems { get; } = new();
+        public ObservableCollection<VfxCurveAuthoringItem> CurveAuthoringItems { get; } = new();
         public ObservableCollection<VfxTextureDiagnosticItem> Textures { get; } = new();
         public ObservableCollection<VfxMeshDiagnosticItem> Meshes { get; } = new();
         public ObservableCollection<string> LogMessages { get; } = new();
@@ -1028,6 +1164,33 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public bool HasSelectedEmitter => _selectedEmitter != null;
+
+        public VfxCurveAuthoringItem SelectedCurveAuthoringItem
+        {
+            get => _selectedCurveAuthoringItem;
+            set
+            {
+                if (ReferenceEquals(_selectedCurveAuthoringItem, value)) return;
+                _selectedCurveAuthoringItem = value;
+                _selectedCurveKeyAuthoringItem = null;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectedCurveKeyAuthoringItem));
+                OnPropertyChanged(nameof(HasSelectedCurveAuthoringItem));
+            }
+        }
+
+        public bool HasSelectedCurveAuthoringItem => _selectedCurveAuthoringItem != null;
+
+        public VfxCurveKeyAuthoringItem SelectedCurveKeyAuthoringItem
+        {
+            get => _selectedCurveKeyAuthoringItem;
+            set
+            {
+                if (ReferenceEquals(_selectedCurveKeyAuthoringItem, value)) return;
+                _selectedCurveKeyAuthoringItem = value;
+                OnPropertyChanged();
+            }
+        }
 
         public string StatusText
         {

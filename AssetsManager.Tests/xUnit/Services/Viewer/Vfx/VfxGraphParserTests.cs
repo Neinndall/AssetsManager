@@ -487,6 +487,270 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ParsesMainBranchMeshAnimationVariantsEmissionSurfaceAndCustomMaterialLink()
+        {
+            const uint materialHash = 0x13572468u;
+            var meshDefinition = new BinTreeStruct(
+                0x0d89732d,
+                Fnv1a.HashLower("VfxMeshDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mMeshName"), "Effects/Skinned.skn"),
+                    new BinTreeString(0x90595a15, "Effects/Skinned.skl"),
+                    new BinTreeString(Fnv1a.HashLower("mAnimationName"), "Effects/Idle.anm"),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("mAnimationVariants"),
+                        BinPropertyType.String,
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeString(0, "Effects/Idle_A.anm"),
+                            new BinTreeString(0, "Effects/Idle_B.anm")
+                        })
+                });
+            var surface = new BinTreeStruct(
+                Fnv1a.HashLower("EmissionSurface"),
+                Fnv1a.HashLower("VfxEmissionMeshData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("meshName"), "Effects/Surface.skn"),
+                    new BinTreeString(Fnv1a.HashLower("skeletonName"), "Effects/Surface.skl"),
+                    new BinTreeString(Fnv1a.HashLower("AnimationName"), "Effects/Surface.anm"),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("Submeshes"),
+                        BinPropertyType.Hash,
+                        new BinTreeProperty[] { new BinTreeHash(0, 11), new BinTreeHash(0, 22) }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("JointMask"),
+                        BinPropertyType.Hash,
+                        new BinTreeProperty[] { new BinTreeHash(0, 33) }),
+                    new BinTreeF32(Fnv1a.HashLower("meshScale"), 1.5f),
+                    new BinTreeU8(Fnv1a.HashLower("maxJointWeights"), 7)
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("primitive"),
+                        Fnv1a.HashLower("VfxPrimitiveMesh"),
+                        new BinTreeProperty[] { meshDefinition }),
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("emissionSurfaceDefinition"),
+                        Fnv1a.HashLower("VfxEmissionSurfaceData"),
+                        new BinTreeProperty[] { surface }),
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("CustomMaterial"),
+                        Fnv1a.HashLower("VfxMaterialDefinitionData"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeObjectLink(Fnv1a.HashLower("Material"), materialHash)
+                        })
+                });
+            var system = new BinTreeObject(
+                "Effects/MainDelta",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal("Effects/Idle.anm", parsed.MeshAnimationPath);
+            Assert.Equal(new[] { "Effects/Idle_A.anm", "Effects/Idle_B.anm" }, parsed.MeshAnimationVariants);
+            Assert.Equal(materialHash, parsed.CustomMaterialPathHash);
+            Assert.NotNull(parsed.EmissionSurface);
+            Assert.Equal(VfxEmissionSurfaceKind.Mesh, parsed.EmissionSurface.Kind);
+            Assert.Equal("Effects/Surface.skn", parsed.EmissionSurface.MeshPath);
+            Assert.Equal("Effects/Surface.skl", parsed.EmissionSurface.SkeletonPath);
+            Assert.Equal("Effects/Surface.anm", parsed.EmissionSurface.AnimationPath);
+            Assert.Equal(new uint[] { 11, 22 }, parsed.EmissionSurface.Submeshes);
+            Assert.Equal(new uint[] { 33 }, parsed.EmissionSurface.Joints);
+            Assert.Equal(1.5f, parsed.EmissionSurface.Scale);
+            Assert.Equal(4, parsed.EmissionSurface.MaxJointWeights);
+            Assert.True(parsed.EmissionSurface.UseNormal);
+        }
+
+        [Fact]
+        public void CustomMaterialPreviewReplacesEmitterTextureWhenLinkedObjectExists()
+        {
+            const ulong customTextureHash = 0x1234567890abcdefUL;
+            const string materialPath = "Effects/Materials/Particle";
+            const string customTexturePath = "ASSETS/Effects/Particle_TX_CM.tex";
+            const string fallbackTexturePath = "ASSETS/Effects/Fallback.tex";
+            uint materialHash = Fnv1a.HashLower(materialPath);
+
+            var sampler = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("textureName"), "Diffuse_Texture"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), customTextureHash)
+                });
+            var pass = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialPassDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeBool(Fnv1a.HashLower("blendEnable"), true),
+                    new BinTreeU32(Fnv1a.HashLower("srcColorBlendFactor"), 6),
+                    new BinTreeU32(Fnv1a.HashLower("dstColorBlendFactor"), 7)
+                });
+            var technique = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialTechniqueDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "normal"),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("passes"),
+                        BinPropertyType.Embedded,
+                        new BinTreeProperty[] { pass })
+                });
+            var material = new BinTreeObject(
+                materialPath,
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new BinTreeProperty[] { sampler }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("techniques"),
+                        BinPropertyType.Embedded,
+                        new BinTreeProperty[] { technique })
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("texture"), fallbackTexturePath),
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("CustomMaterial"),
+                        Fnv1a.HashLower("VfxMaterialDefinitionData"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeObjectLink(Fnv1a.HashLower("Material"), materialHash)
+                        })
+                });
+            var system = new BinTreeObject(
+                "Effects/CustomMaterial",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system, material }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(
+                    stream.ToArray(),
+                    wadChunkPathResolver: hash => hash == customTextureHash ? customTexturePath : null).Systems).Value.Emitters);
+
+            Assert.Equal(materialHash, parsed.CustomMaterialPathHash);
+            Assert.NotNull(parsed.CustomMaterial);
+            Assert.Equal(ModelMaterialBindingKind.Authored, parsed.CustomMaterial.BindingKind);
+            Assert.Equal(VfxCustomMaterialBlendFactor.SourceAlpha, parsed.CustomMaterialSourceBlendFactor);
+            Assert.Equal(VfxCustomMaterialBlendFactor.OneMinusSourceAlpha, parsed.CustomMaterialDestinationBlendFactor);
+            Assert.Equal(customTexturePath.ToLowerInvariant(), parsed.CustomMaterial.BaseTextureName);
+            Assert.Equal(customTexturePath.ToLowerInvariant(), parsed.TexturePath);
+        }
+
+        [Fact]
+        public void MissingCustomMaterialKeepsAuthoredEmitterTextureFallback()
+        {
+            const string fallbackTexturePath = "ASSETS/Effects/Fallback.tex";
+            const uint missingMaterialHash = 0x13572468u;
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("texture"), fallbackTexturePath),
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("CustomMaterial"),
+                        Fnv1a.HashLower("VfxMaterialDefinitionData"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeObjectLink(Fnv1a.HashLower("Material"), missingMaterialHash)
+                        })
+                });
+            var system = new BinTreeObject(
+                "Effects/MissingCustomMaterial",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal(missingMaterialHash, parsed.CustomMaterialPathHash);
+            Assert.NotNull(parsed.CustomMaterial);
+            Assert.Equal(ModelMaterialBindingKind.Missing, parsed.CustomMaterial.BindingKind);
+            Assert.Equal(fallbackTexturePath, parsed.TexturePath);
+        }
+
+        [Fact]
+        public void LegacyEmissionSurfaceUsesOuterClassAndAuthoredNormalFlag()
+        {
+            var emissionSurface = new BinTreeStruct(
+                Fnv1a.HashLower("emissionSurfaceDefinition"),
+                Fnv1a.HashLower("VfxEmissionSkeletonData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("skeletonName"), "Effects/Legacy.skl"),
+                    new BinTreeBool(Fnv1a.HashLower("useSurfaceNormalForBirthPhysics"), false)
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { emissionSurface });
+            var system = new BinTreeObject(
+                "Effects/LegacySurface",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmissionSurfaceDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters).EmissionSurface;
+
+            Assert.NotNull(parsed);
+            Assert.Equal(VfxEmissionSurfaceKind.Skeleton, parsed.Kind);
+            Assert.Equal("Effects/Legacy.skl", parsed.SkeletonPath);
+            Assert.False(parsed.UseNormal);
+            Assert.Equal(1f, parsed.Scale);
+            Assert.Equal(4, parsed.MaxJointWeights);
+        }
+
+        [Fact]
         public void SimpleMeshUsesOnlyExtensionsAcceptedByLtk()
         {
             BinTreeStruct EmitterFor(string path) => new(

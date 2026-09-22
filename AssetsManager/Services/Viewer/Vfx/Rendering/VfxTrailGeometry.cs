@@ -12,6 +12,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal const int TrailPointsPerEmitter = TrailPointsPerSource * 4;
         internal float[] Vertices { get; private set; } = Array.Empty<float>();
         private float[] _points = Array.Empty<float>();
+        private ulong[] _birthOrder = Array.Empty<ulong>();
 
         internal static int ResolvePointCount(int instanceCount)
             => Math.Min(Math.Max(0, instanceCount), TrailPointsPerSource);
@@ -20,8 +21,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             VfxTrailDefinition trail = state.Def.Trail;
             if (trail is null) return 0;
-            int count = Math.Min(ResolvePointCount(state.InstanceCount), Math.Max(0, maxPoints));
+            int count = Math.Min(
+                Math.Min(ResolvePointCount(state.InstanceCount), state.Particles.Count),
+                Math.Max(0, maxPoints));
             if (count < 2) return 0;
+
+            // LTK's packed pool retires by swapping the final live particle into a freed slot.
+            // Trails therefore recover birth order from each particle serial before building the
+            // ribbon. Include the physical slot as a tie-breaker for deterministic test/fallback data.
+            if (_birthOrder.Length < count)
+                _birthOrder = new ulong[count];
+            for (int index = 0; index < count; index++)
+                _birthOrder[index] = ((ulong)state.Particles[index].Serial << 32) | (uint)index;
+            Array.Sort(_birthOrder, 0, count);
+
             int needed = count * 2 * VertexStride;
             if (_points.Length < needed) _points = new float[needed];
             needed = (count - 1) * 6 * VertexStride;
@@ -34,9 +47,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector3 last = default, lastAcross = default;
             for (int seen = 0; seen < count; seen++)
             {
-                int at = start + seen * step;
-                Vector3 point = Position(state, at, count, smoothed && seen != 0 && at != 0);
-                Vector3 tangent = seen == 0 ? Position(state, at + step, count, false) - point : point - last;
+                int orderedAt = start + seen * step;
+                int at = ParticleIndex(orderedAt);
+                Vector3 point = Position(state, orderedAt, count, smoothed && seen != 0 && orderedAt != 0);
+                Vector3 tangent = seen == 0
+                    ? Position(state, orderedAt + step, count, false) - point
+                    : point - last;
                 if (seen > 0)
                 {
                     walked += tangent.Length();
@@ -78,8 +94,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     // the same place. They are degenerate geometry, but keeping them preserves the
                     // strand's vertex/attribute sequence exactly.
                     int v = held * 2;
-                    Copy(v, ref vertices); Copy(v - 1, ref vertices); Copy(v - 2, ref vertices);
-                    Copy(v, ref vertices); Copy(v + 1, ref vertices); Copy(v - 1, ref vertices);
+                    // LTK ribbon indices are [v, v-2, v-1] and [v, v-1, v+1].
+                    // Keep that authored winding: CustomMaterial may enable face culling even
+                    // though ordinary trail materials are double-sided.
+                    Copy(v, ref vertices); Copy(v - 2, ref vertices); Copy(v - 1, ref vertices);
+                    Copy(v, ref vertices); Copy(v - 1, ref vertices); Copy(v + 1, ref vertices);
                 }
                 held++;
                 last = point;
@@ -88,14 +107,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return vertices;
         }
 
-        private static Vector3 Position(VfxPlaybackRuntime.EmitterState state, int at, int count, bool filtered)
+        private int ParticleIndex(int orderedIndex)
+            => (int)(_birthOrder[orderedIndex] & uint.MaxValue);
+
+        private Vector3 Position(VfxPlaybackRuntime.EmitterState state, int orderedAt, int count, bool filtered)
         {
-            int first = filtered ? Math.Max(0, at - 3) : at;
-            int last = filtered ? Math.Min(count - 1, at + 3) : at;
+            int first = filtered ? Math.Max(0, orderedAt - 3) : orderedAt;
+            int last = filtered ? Math.Min(count - 1, orderedAt + 3) : orderedAt;
             Vector3 sum = default;
-            for (int i = first; i <= last; i++)
+            for (int orderedIndex = first; orderedIndex <= last; orderedIndex++)
             {
-                int offset = i * VfxPlaybackRuntime.InstanceStride;
+                int sourceIndex = ParticleIndex(orderedIndex);
+                int offset = sourceIndex * VfxPlaybackRuntime.InstanceStride;
                 sum += new Vector3(state.Instances[offset], state.Instances[offset + 1], state.Instances[offset + 2]);
             }
             return sum / (last - first + 1);

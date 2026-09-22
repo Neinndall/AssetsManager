@@ -35,6 +35,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal(unchecked((int)MapParticleSemantics.Seed("Brazier1")), runtime.Graph.InitialSeed);
             Assert.Equal(MapParticleSemantics.RigidTransform(transform), runtime.Graph.Root.WorldTransform);
             Assert.Same(particle, runtime.Graph.UserTag);
+            Assert.Equal(MapOutlineSemantics.ChunkId(particle.ChunkHash), runtime.ChunkId);
+            Assert.Equal(MapOutlineSemantics.ItemId(particle.ChunkHash, particle.KeyHash), runtime.ItemId);
         }
 
         [Fact]

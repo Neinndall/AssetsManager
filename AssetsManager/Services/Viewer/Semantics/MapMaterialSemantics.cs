@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text.RegularExpressions;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Viewer.Semantics
 {
@@ -32,10 +33,8 @@ namespace AssetsManager.Services.Viewer.Semantics
         IReadOnlyList<MapMaterialSamplerData> DefaultSamplers,
         IReadOnlyDictionary<string, Vector4> DefaultParameters,
         IReadOnlyDictionary<string, bool> DefaultSwitches,
-        IReadOnlyDictionary<string, string> FeatureDefines)
-    {
-        public bool IsDeclared => true;
-    }
+        IReadOnlyDictionary<string, string> FeatureDefines,
+        bool IsDeclared);
 
     internal static class MapMaterialSemantics
     {
@@ -44,6 +43,7 @@ namespace AssetsManager.Services.Viewer.Semantics
         private const uint DefaultCullWinding = 1;
         private const float MaskedAlphaCutoff = 0.5f;
         private const string SwitchedShader = "Shaders/SkinnedMesh/AlphaBlend_Additive_Scroll_Packed";
+        private static readonly uint SwitchedShaderHash = Fnv1a.HashLower(SwitchedShader);
 
         private static readonly string[] BaseExactNames =
         {
@@ -130,7 +130,7 @@ namespace AssetsManager.Services.Viewer.Semantics
             IReadOnlyDictionary<string, bool> switches = MergeSwitches(authoredSwitches, shader);
             IReadOnlyDictionary<string, string> macros = MergeMacros(materialMacros, pass?.ShaderMacros, shader);
             string shaderPath = shader?.Path;
-            bool switchedShader = IsSwitchedShader(shaderPath);
+            bool switchedShader = pass?.ShaderHash == SwitchedShaderHash || IsSwitchedShader(shaderPath);
 
             (MapMaterialSamplerData sampler, MapMaterialBaseRule rule) =
                 SelectBaseSampler(samplers, switches, switchedShader);
@@ -194,7 +194,10 @@ namespace AssetsManager.Services.Viewer.Semantics
             MapShaderDefinitionData shader)
         {
             var result = new List<MapMaterialSamplerData>();
-            var defaults = (shader?.DefaultSamplers ?? Array.Empty<MapMaterialSamplerData>())
+            IReadOnlyList<MapMaterialSamplerData> shaderSamplers = shader?.IsDeclared == true
+                ? shader.DefaultSamplers ?? Array.Empty<MapMaterialSamplerData>()
+                : Array.Empty<MapMaterialSamplerData>();
+            var defaults = shaderSamplers
                 .ToDictionary(sampler => sampler.Name, StringComparer.Ordinal);
 
             foreach (MapMaterialSamplerData authoredSampler in authored ?? Array.Empty<MapMaterialSamplerData>())
@@ -213,7 +216,7 @@ namespace AssetsManager.Services.Viewer.Semantics
             }
 
             var authoredNames = result.Select(sampler => sampler.Name).ToHashSet(StringComparer.Ordinal);
-            foreach (MapMaterialSamplerData fallback in shader?.DefaultSamplers ?? Array.Empty<MapMaterialSamplerData>())
+            foreach (MapMaterialSamplerData fallback in shaderSamplers)
                 if (!authoredNames.Contains(fallback.Name))
                     result.Add(fallback);
 
@@ -226,13 +229,14 @@ namespace AssetsManager.Services.Viewer.Semantics
             MapShaderDefinitionData shader)
         {
             var result = new Dictionary<string, Vector4>(StringComparer.Ordinal);
-            if (shader?.DefaultParameters != null)
+            if (shader?.IsDeclared == true && shader.DefaultParameters != null)
             {
                 foreach ((string key, Vector4 value) in shader.DefaultParameters)
                     result[key] = value;
             }
 
-            bool IsDeclared(string key) => shader == null || shader.DefaultParameters.ContainsKey(key);
+            bool IsDeclared(string key) =>
+                shader?.IsDeclared != true || shader.DefaultParameters.ContainsKey(key);
             foreach ((string key, Vector4 value) in material ?? EmptyVectorMap)
                 if (IsDeclared(key))
                     result[key] = value;
@@ -247,8 +251,11 @@ namespace AssetsManager.Services.Viewer.Semantics
             MapShaderDefinitionData shader)
         {
             var result = new Dictionary<string, bool>(StringComparer.Ordinal);
-            foreach ((string key, bool value) in shader?.DefaultSwitches ?? EmptyBoolMap)
-                result[key] = value;
+            if (shader?.IsDeclared == true)
+            {
+                foreach ((string key, bool value) in shader.DefaultSwitches ?? EmptyBoolMap)
+                    result[key] = value;
+            }
             foreach ((string key, bool value) in material ?? EmptyBoolMap)
                 result[key] = value;
             return result;
@@ -262,8 +269,11 @@ namespace AssetsManager.Services.Viewer.Semantics
             var result = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach ((string key, string value) in material ?? EmptyStringMap)
                 result[key] = value;
-            foreach ((string key, string value) in shader?.FeatureDefines ?? EmptyStringMap)
-                result[key] = value;
+            if (shader?.IsDeclared == true)
+            {
+                foreach ((string key, string value) in shader.FeatureDefines ?? EmptyStringMap)
+                    result[key] = value;
+            }
             foreach ((string key, string value) in pass ?? EmptyStringMap)
                 result[key] = value;
             return result;

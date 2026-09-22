@@ -95,14 +95,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             "Diffuse_ScrollSpeed"
         };
 
-        private static readonly string[] SwitchedAlphaNames =
-        {
-            "ALPHABLEND_MAIN",
-            "ALPHABLEND_BLENDMAT",
-            "USE_MAINTEXALPHA",
-            "ALPHACLIP_ON"
-        };
-
         private static readonly Regex PlaceholderTexture = new(
             @"(?i)shared[\\/]materials[\\/](black|white|grey|gray|flat_normal|default|transparent|blank)|[\\/]blank\.tex$|alpha-mask\.tex$",
             RegexOptions.Compiled);
@@ -136,13 +128,45 @@ namespace AssetsManager.Services.Viewer.Resolvers
             SknShaderDefinition shader,
             IReadOnlyList<string> textureKeys,
             string fallbackTextureKey,
-            ModelMaterialEffectDefinition effect)
+            ModelMaterialEffectDefinition effect) =>
+            ResolveCore(
+                material,
+                shader,
+                path => SknMaterialTextureResolver.MatchTextureKey(path, textureKeys),
+                fallbackTextureKey,
+                effect,
+                missingAsTextureOnly: true);
+
+        /// <summary>
+        /// Resolves the same StaticMaterialDef preview contract while retaining the authored
+        /// base texture path. VFX resource loading needs the path rather than a skin texture key.
+        /// </summary>
+        internal static ModelMaterialDefinition ResolveAuthoredPreview(
+            SknMaterialDefinition material,
+            SknShaderDefinition shader) =>
+            ResolveCore(
+                material,
+                shader,
+                static path => path,
+                fallbackTextureKey: null,
+                ModelMaterialEffectDefinition.None,
+                missingAsTextureOnly: false);
+
+        private static ModelMaterialDefinition ResolveCore(
+            SknMaterialDefinition material,
+            SknShaderDefinition shader,
+            Func<string, string> resolveTexture,
+            string fallbackTextureKey,
+            ModelMaterialEffectDefinition effect,
+            bool missingAsTextureOnly)
         {
             if (material == null)
             {
-                return ModelMaterialDefinition.TextureOnly(
-                    fallbackTextureKey,
-                    effect ?? ModelMaterialEffectDefinition.None);
+                return missingAsTextureOnly
+                    ? ModelMaterialDefinition.TextureOnly(
+                        fallbackTextureKey,
+                        effect ?? ModelMaterialEffectDefinition.None)
+                    : ModelMaterialDefinition.Missing;
             }
 
             IReadOnlyList<SknMaterialSampler> samplers = MergeSamplers(material, shader);
@@ -160,7 +184,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 SelectBaseSampler(samplers, switches, switchedShader);
             string baseTextureKey = baseSampler == null
                 ? null
-                : SknMaterialTextureResolver.MatchTextureKey(baseSampler.TexturePath, textureKeys);
+                : resolveTexture(baseSampler.TexturePath);
 
             (Vector4 color, bool hasOpacity, bool hasTint) = ResolveColor(parameters, effect);
             bool hasAuthoredAlphaTest = TryFirst(parameters, AlphaTestNames, out Vector4 authoredAlphaTest) &&
@@ -505,12 +529,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 blending = ModelMaterialBlendMode.Additive;
             }
 
+            // Preserve the pass's authored blend factors. LTK main does not demote an explicit
+            // SrcAlpha/OneMinusSrcAlpha pass merely because the material has no scalar Opacity
+            // parameter: the sampled base texture can itself carry authored coverage (for example
+            // Seraphine Skin69's cape gradient).
             uint writeMask = pass?.WriteMask ?? DefaultWriteMask;
-            bool readsAlpha = hasOpacity ||
-                alphaCutoff > 0f ||
-                (switchedShader && SwitchedAlphaNames.Any(name => IsEnabled(switches, name)));
-            if (blending == ModelMaterialBlendMode.Normal && !readsAlpha)
-                blending = ModelMaterialBlendMode.Opaque;
 
             bool cullEnabled = pass?.CullEnabled ?? true;
             uint winding = pass?.WindingToCull ?? DefaultCullWinding;

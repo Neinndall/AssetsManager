@@ -26,6 +26,18 @@ namespace AssetsManager.Views.Models.Viewer
         Analytic
     }
 
+    public enum VfxCustomMaterialBlendFactor
+    {
+        Zero = 0,
+        One = 1,
+        SourceColor = 2,
+        OneMinusSourceColor = 3,
+        DestinationColor = 4,
+        OneMinusDestinationColor = 5,
+        SourceAlpha = 6,
+        OneMinusSourceAlpha = 7
+    }
+
     internal sealed record VfxBinDocument(
         IReadOnlyDictionary<uint, VfxSystemDefinition> Systems,
         IReadOnlyDictionary<uint, uint> ResourceMap,
@@ -192,7 +204,13 @@ namespace AssetsManager.Views.Models.Viewer
         float DepthPushPull = 0f,
         VfxBeamDefinition Beam = null,
         VfxLingerDefinition Linger = null,
-        bool IsSimpleEmitter = false)
+        bool IsSimpleEmitter = false,
+        IReadOnlyList<string> MeshAnimationVariants = null,
+        VfxEmissionSurfaceDefinition EmissionSurface = null,
+        uint CustomMaterialPathHash = 0,
+        ModelMaterialDefinition CustomMaterial = null,
+        VfxCustomMaterialBlendFactor CustomMaterialSourceBlendFactor = VfxCustomMaterialBlendFactor.One,
+        VfxCustomMaterialBlendFactor CustomMaterialDestinationBlendFactor = VfxCustomMaterialBlendFactor.Zero)
     {
         /// <summary>LTK drawKind.ts: this emitter reaches the quad renderer.</summary>
         public bool DrawsAsQuad => PrimitiveKind is
@@ -206,6 +224,15 @@ namespace AssetsManager.Views.Models.Viewer
 
         /// <summary>LTK drawKind.ts: a beam ribbon is suppressed when the same primitive names a mesh.</summary>
         public bool DrawsAsBeam => Beam is not null && string.IsNullOrWhiteSpace(MeshPath);
+
+        public bool HasResolvedCustomMaterial =>
+            CustomMaterial is not null && CustomMaterial.BindingKind != ModelMaterialBindingKind.Missing;
+
+        /// <summary>
+        /// LTK drawKind.ts: a resolved CustomMaterial owns the shading path and suppresses the
+        /// legacy distortion pass. A missing linked material falls back to the authored emitter.
+        /// </summary>
+        public bool DrawsAsDistortion => Distortion is not null && !HasResolvedCustomMaterial;
 
         /// <summary>
         /// Riot suppresses a beam's ribbon when its primitive also names a mesh. Because a beam
@@ -226,6 +253,27 @@ namespace AssetsManager.Views.Models.Viewer
     public sealed record VfxSystemAuthoredFeatures(
         bool HasMaterialOverrides = false,
         bool HasAssetRemapping = false);
+
+    public enum VfxEmissionSurfaceKind
+    {
+        Mesh,
+        Skeleton
+    }
+
+    /// <summary>
+    /// Mesh or skeleton sampled at particle birth. Asset loading/posing is deliberately
+    /// separate from simulation so deterministic playback can consume a sampler later.
+    /// </summary>
+    public sealed record VfxEmissionSurfaceDefinition(
+        VfxEmissionSurfaceKind Kind,
+        string MeshPath,
+        string SkeletonPath,
+        string AnimationPath,
+        IReadOnlyList<uint> Submeshes,
+        IReadOnlyList<uint> Joints,
+        float Scale = 1f,
+        int MaxJointWeights = 4,
+        bool UseNormal = true);
 
     public sealed record VfxEmitterAuthoredFeatures(
         uint PrimitiveClassHash = 0,

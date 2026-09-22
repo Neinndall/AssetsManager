@@ -1,6 +1,8 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Windows.Media.Imaging;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Views.Models.Viewer;
 
@@ -21,6 +23,14 @@ namespace AssetsManager.Services.Viewer.Loading
         {
             _sceneLoadingService = sceneLoadingService;
             _runtimeFactory = runtimeFactory;
+        }
+
+        internal Task<IReadOnlyDictionary<string, BitmapSource>> LoadFullTexturesAsync(
+            MapSceneRuntime runtime,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(runtime);
+            return _sceneLoadingService.LoadFullTexturesAsync(runtime.Scene, cancellationToken);
         }
 
         internal async Task<MapSceneRuntime> LoadAsync(

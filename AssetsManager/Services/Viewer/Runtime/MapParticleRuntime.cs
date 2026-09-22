@@ -23,12 +23,16 @@ namespace AssetsManager.Services.Viewer.Runtime
             System = system;
             Graph = graph;
             Capacity = capacity;
+            ChunkId = MapOutlineSemantics.ChunkId(particle.ChunkHash);
+            ItemId = MapOutlineSemantics.ItemId(particle.ChunkHash, particle.KeyHash);
         }
 
         public MapParticleData Particle { get; }
         public VfxSystemDefinition System { get; }
         public VfxPlaybackGraphRuntime Graph { get; }
         public int Capacity { get; }
+        internal string ChunkId { get; }
+        internal string ItemId { get; }
 
         internal static MapParticleRuntime Create(
             MapParticleData particle,

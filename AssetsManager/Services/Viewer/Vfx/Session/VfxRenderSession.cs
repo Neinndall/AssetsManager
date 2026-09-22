@@ -284,6 +284,61 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             }
         }
 
+        /// <summary>
+        /// Rebuilds only the standalone simulation around an edited definition while preserving
+        /// playback time, rig settings, seed and GPU caches. This mirrors LTK's driver.swap + seek
+        /// authoring path without reloading unchanged textures or meshes.
+        /// </summary>
+        public bool SwapStandaloneDefinition(VfxSystemDefinition definition)
+        {
+            if (!_usesStandaloneRig ||
+                _activeSystem?.Definition == null ||
+                definition == null ||
+                _activeSystem.Definition.PathHash != definition.PathHash)
+            {
+                return false;
+            }
+
+            double restoreTime = _activeSystem.CurrentTime;
+            bool restorePlaying = _isPlaying;
+            ClearCheckpoints();
+            _isPlaying = false;
+
+            var catalog = new Dictionary<uint, VfxSystemDefinition>(
+                _activeSystem.SystemCatalog ?? new Dictionary<uint, VfxSystemDefinition>());
+            catalog[definition.PathHash] = definition;
+            _activeSystem.Definition = definition;
+            _activeSystem.SystemCatalog = catalog;
+            _activeSystem.TotalDuration = VfxDurationCalculator.SystemSpan(definition);
+            _rigDuration = VfxRigMotion.RunLength(_rigSettings, definition);
+
+            _graph = null;
+            _graphs.Clear();
+            _graphPlacements.Clear();
+            _scheduledEffectKills.Clear();
+            _graphStopTimes.Clear();
+            _graphAttachments.Clear();
+            _spellSteps.Clear();
+            _lastRigOrigin = null;
+
+            _graph = _loadingService.PreparePlaybackGraph(
+                definition,
+                _activeSystem.SystemCatalog,
+                _activeSystem.ResourceMap,
+                _activeSystem.SearchDirectory,
+                _worldTransform,
+                _activeSystem.PlaybackSeed,
+                _logService,
+                _activeSystem.OwnerSceneContext);
+            _graphs.Add(_graph);
+            _graphPlacements[_graph] = Matrix4x4.Identity;
+            _activeSystem.CurrentTime = 0d;
+            ApplyRigTransform();
+            Seek(restoreTime);
+            _isPlaying = restorePlaying;
+            return true;
+        }
+
         public bool SetAbilityComposition(
             VfxAbilityComposition composition,
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
@@ -954,6 +1009,44 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         /// <summary>
+        /// Installs newly loaded emission surfaces on one graph. Like LTK's driver.setSurfaces,
+        /// changing the shared lineage resource replays the run so earlier births use it too.
+        /// </summary>
+        internal bool SetEmissionSurfaces(
+            VfxPlaybackGraphRuntime graph,
+            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> surfaces)
+        {
+            if (graph is null || !_graphs.Contains(graph) || !graph.SetEmissionSurfaces(surfaces))
+                return false;
+            ReplayAfterLineageResourceChange();
+            return true;
+        }
+
+        /// <summary>
+        /// Installs VFX-mesh joint tables on one graph and deterministically replays the session.
+        /// The session owns the replay because it alone can reconstruct rig and attachment motion.
+        /// </summary>
+        internal bool SetMeshJointProviders(
+            VfxPlaybackGraphRuntime graph,
+            IReadOnlyDictionary<string, IVfxMeshJointProvider> joints)
+        {
+            if (graph is null || !_graphs.Contains(graph) || !graph.SetMeshJointProviders(joints))
+                return false;
+            ReplayAfterLineageResourceChange();
+            return true;
+        }
+
+        private void ReplayAfterLineageResourceChange()
+        {
+            ClearCheckpoints();
+            if (_activeSystem is null || _activeSystem.CurrentTime <= 0d) return;
+
+            double target = _activeSystem.CurrentTime;
+            ResetSimulationToStart();
+            AdvanceTo(target, fixedSeekSteps: true);
+        }
+
+        /// <summary>
         /// Supplies the owner character's final skinning palette to AttachedMesh emitters.
         /// The same matrices are used by the champion renderer, matching LTK's detached
         /// SkinnedMesh path where particles reuse the live character skeleton.
@@ -1217,7 +1310,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _distortionRenderQueue.Clear();
             foreach (VfxRenderQueueEntry entry in _renderQueue)
             {
-                if (entry.Emitter.Def.Distortion != null)
+                if (entry.Emitter.Def.DrawsAsDistortion)
                     _distortionRenderQueue.Add(entry);
                 else
                     _shadedRenderQueue.Add(entry);

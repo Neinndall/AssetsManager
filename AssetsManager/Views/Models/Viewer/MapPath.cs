@@ -54,7 +54,6 @@ namespace AssetsManager.Views.Models.Viewer
 
         public static bool TryFromGeometryFile(
             string geometryFilePath,
-            string projectRoot,
             out MapPath mapPath)
         {
             mapPath = null;
@@ -64,27 +63,12 @@ namespace AssetsManager.Views.Models.Viewer
                 return false;
             }
 
-            string fullPath = Path.GetFullPath(geometryFilePath);
-            string normalized = PathUtils.NormalizeSeparators(fullPath);
+            string normalized = PathUtils.NormalizeSeparators(Path.GetFullPath(geometryFilePath));
             int dataIndex = normalized.LastIndexOf("/data/", StringComparison.OrdinalIgnoreCase);
-            if (dataIndex >= 0)
-                return TryFromEntryPath(normalized[(dataIndex + "/data/".Length)..], out mapPath);
+            if (dataIndex < 0)
+                return false;
 
-            if (!string.IsNullOrWhiteSpace(projectRoot) && Directory.Exists(projectRoot))
-            {
-                string root = Path.GetFullPath(projectRoot);
-                string relative = Path.GetRelativePath(root, fullPath);
-                if (!relative.StartsWith("..", StringComparison.Ordinal) &&
-                    !Path.IsPathRooted(relative) &&
-                    TryFromEntryPath(relative, out mapPath))
-                {
-                    return true;
-                }
-            }
-
-            int mapsIndex = normalized.LastIndexOf("/maps/", StringComparison.OrdinalIgnoreCase);
-            return mapsIndex >= 0 &&
-                   TryFromEntryPath(normalized[(mapsIndex + 1)..], out mapPath);
+            return TryFromEntryPath(normalized[(dataIndex + "/data/".Length)..], out mapPath);
         }
 
         public bool Equals(MapPath other) =>

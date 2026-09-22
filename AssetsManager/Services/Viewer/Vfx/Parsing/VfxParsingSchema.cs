@@ -141,7 +141,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static readonly uint F_sortEmittersByPos = VfxParsingHash.Fnv1a("SortEmittersByPos");
         internal static readonly uint F_emissionMeshName = VfxParsingHash.Fnv1a("emissionMeshName");
         internal static readonly uint F_emissionSurfaceDefinition = VfxParsingHash.Fnv1a("emissionSurfaceDefinition");
+        internal static readonly uint F_emissionSurface = VfxParsingHash.Fnv1a("EmissionSurface");
+        internal static readonly uint F_emissionMesh = VfxParsingHash.Fnv1a("meshName");
+        internal static readonly uint F_emissionSkeleton = VfxParsingHash.Fnv1a("skeletonName");
+        internal static readonly uint F_emissionAnimation = VfxParsingHash.Fnv1a("AnimationName");
+        internal static readonly uint F_emissionSubmeshes = VfxParsingHash.Fnv1a("Submeshes");
+        internal static readonly uint F_emissionJointMask = VfxParsingHash.Fnv1a("JointMask");
+        internal static readonly uint F_emissionMeshScale = VfxParsingHash.Fnv1a("meshScale");
+        internal static readonly uint F_emissionMaxJointWeights = VfxParsingHash.Fnv1a("maxJointWeights");
+        internal static readonly uint F_emissionUseSurfaceNormal = VfxParsingHash.Fnv1a("useSurfaceNormalForBirthPhysics");
         internal static readonly uint F_useEmissionMeshNormal = VfxParsingHash.Fnv1a("useEmissionMeshNormalForBirth");
+        internal static readonly uint F_customMaterialLink = VfxParsingHash.Fnv1a("Material");
+        internal static readonly uint EmissionSkeletonClass = VfxParsingHash.Fnv1a("VfxEmissionSkeletonData");
+        internal static readonly uint EmissionMeshClass = VfxParsingHash.Fnv1a("VfxEmissionMeshData");
         internal static readonly uint F_translationOverride = VfxParsingHash.Fnv1a("translationOverride");
         internal static readonly uint F_rotationOverride = VfxParsingHash.Fnv1a("rotationOverride");
         internal static readonly uint F_scaleOverride = VfxParsingHash.Fnv1a("scaleOverride");
@@ -268,6 +280,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static readonly uint F_birthUvScroll = VfxParsingHash.Fnv1a("birthUvScrollRate");
         internal static readonly uint F_meshSkeleton  = 0x90595a15; // VfxMeshDefinitionData skeleton field
         internal static readonly uint F_meshAnim      = VfxParsingHash.Fnv1a("mAnimationName");
+        internal static readonly uint F_meshAnimationVariants = VfxParsingHash.Fnv1a("mAnimationVariants");
         internal static readonly uint F_trailDefinition = VfxParsingHash.Fnv1a("mTrail");
         internal static readonly uint F_beamDefinition = VfxParsingHash.Fnv1a("mBeam");
         internal static readonly uint F_trailBirthTilingSize = VfxParsingHash.Fnv1a("mBirthTilingSize");

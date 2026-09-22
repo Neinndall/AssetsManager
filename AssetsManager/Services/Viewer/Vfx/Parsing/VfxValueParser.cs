@@ -185,8 +185,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         }
 
         internal static string ReadAsset(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash, string extension)
+            => ReadAsset(Get(p, hash), extension);
+
+        internal static string ReadAsset(BinTreeProperty prop, string extension)
         {
-            var prop = Get(p, hash);
             if (prop is BinTreeOptional opt)
                 prop = opt.Value;
 

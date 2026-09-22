@@ -132,8 +132,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private const int BoneWeightOffset = 16;
 
         private readonly GL _gl;
-        private readonly Dictionary<float[], MeshGpuResource> _meshes =
-            new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<(float[] Positions, bool Skinning), MeshGpuResource> _meshes = new();
 
         internal VfxMeshResourceCache(GL gl)
         {
@@ -150,18 +149,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             float[] boneIndices = null,
             float[] boneWeights = null)
         {
-            if (_meshes.TryGetValue(positions, out MeshGpuResource cached))
-            {
-                Assign(emitter, cached);
-                return;
-            }
-
             int vertexCount = positions.Length / 3;
             bool hasSkinning =
                 boneIndices is { Length: > 0 } &&
                 boneWeights is { Length: > 0 } &&
                 boneIndices.Length == vertexCount * 4 &&
                 boneWeights.Length == vertexCount * 4;
+            var cacheKey = (positions, hasSkinning);
+            if (_meshes.TryGetValue(cacheKey, out MeshGpuResource cached))
+            {
+                Assign(emitter, cached);
+                return;
+            }
             float[] interleaved = BuildInterleaved(positions, normals, uvs, colors, boneIndices, boneWeights);
             uint vao = _gl.GenVertexArray();
             uint vbo = _gl.GenBuffer();
@@ -193,7 +192,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 indices?.Length ?? 0,
                 interleaved,
                 hasSkinning);
-            _meshes[positions] = resource;
+            _meshes[cacheKey] = resource;
             Assign(emitter, resource);
         }
 

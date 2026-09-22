@@ -76,6 +76,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void MeshAnimationVariantSelectionUsesTheStableLtkDefinitionKey()
+        {
+            Assert.Equal(2, VfxPlaybackGraphRuntime.MeshAnimationVariantIndex("assets/test.skn", string.Empty, 0, 3));
+            Assert.Equal(0, VfxPlaybackGraphRuntime.MeshAnimationVariantIndex("assets/test.skn", "0.0", 1, 3));
+            Assert.Equal(-1, VfxPlaybackGraphRuntime.MeshAnimationVariantIndex("assets/test.skn", string.Empty, 0, 0));
+        }
+
+        [Fact]
+        public void ResolvedCustomMaterialSuppressesLegacyDistortionClassification()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Distortion = new VfxDistortionDefinition(1f, 1, "normal.tex")
+            };
+
+            Assert.True(emitter.DrawsAsDistortion);
+            Assert.False((emitter with { CustomMaterial = ModelMaterialDefinition.TextureOnly("custom.tex") }).DrawsAsDistortion);
+            Assert.True((emitter with { CustomMaterial = ModelMaterialDefinition.Missing }).DrawsAsDistortion);
+        }
+
+        [Fact]
         public void MeshInstancesPreserveAuthoredNonUniformScale()
         {
             var emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default);
@@ -90,6 +111,76 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(2f, state.Instances[3]);
             Assert.Equal(3f, state.Instances[4]);
             Assert.Equal(4f, state.Instances[18]);
+        }
+
+        [Fact]
+        public void EmissionSurfaceAddsToSpawnShapeAndRedirectsBirthVelocityAlongNormal()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                SpawnShape = new VfxSpawnShape(
+                    VfxSpawnShapeKind.Point,
+                    VfxCurve3.Const(new Vector3(1f, 0f, 0f)),
+                    Array.Empty<Vector3>(),
+                    Array.Empty<VfxCurveF>()),
+                BirthVelocity = VfxCurve3.Const(new Vector3(0f, 2f, 0f)),
+                EmissionSurface = new VfxEmissionSurfaceDefinition(
+                    VfxEmissionSurfaceKind.Mesh,
+                    "surface.skn",
+                    null,
+                    null,
+                    Array.Empty<uint>(),
+                    Array.Empty<uint>(),
+                    UseNormal: true)
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "surface", "surface", new[] { emitter }), Vector3.Zero);
+            runtime.SetEmissionSurfaces(new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>
+            {
+                [emitter] = new FixedEmissionSurfaceSampler(
+                    new VfxSurfaceBirth(new Vector3(3f, 0f, 0f), Vector3.UnitX))
+            });
+
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+            Assert.Equal(4f, particle.Pos.X, precision: 5);
+            Assert.Equal(0f, particle.Pos.Y, precision: 5);
+            Assert.Equal(2f, particle.Vel.X, precision: 5);
+            Assert.Equal(0f, particle.Vel.Y, precision: 5);
+        }
+
+        [Fact]
+        public void LateEmissionSurfaceInstallReplaysCurrentTimeDeterministically()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                SpawnShape = new VfxSpawnShape(
+                    VfxSpawnShapeKind.Point,
+                    VfxCurve3.Const(new Vector3(1f, 0f, 0f)),
+                    Array.Empty<Vector3>(),
+                    Array.Empty<VfxCurveF>()),
+                EmissionSurface = new VfxEmissionSurfaceDefinition(
+                    VfxEmissionSurfaceKind.Mesh,
+                    "surface.skn",
+                    null,
+                    null,
+                    Array.Empty<uint>(),
+                    Array.Empty<uint>())
+            };
+            var runtime = new VfxPlaybackRuntime(17);
+            runtime.SetSystem(new VfxSystemDefinition(1, "surface-replay", "surface-replay", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.02f);
+            Assert.Equal(1f, Assert.Single(Assert.Single(runtime.Emitters).Particles).Pos.X, precision: 5);
+
+            runtime.SetEmissionSurfaces(new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>
+            {
+                [emitter] = new FixedEmissionSurfaceSampler(
+                    new VfxSurfaceBirth(new Vector3(3f, 0f, 0f), Vector3.UnitY))
+            });
+
+            Assert.Equal(0.02f, runtime.CurrentTime, precision: 5);
+            Assert.Equal(4f, Assert.Single(Assert.Single(runtime.Emitters).Particles).Pos.X, precision: 5);
         }
 
         [Fact]
@@ -642,6 +733,32 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(4f, MathF.Abs(geometry.Vertices[3] - geometry.Vertices[4 * stride + 3]), 3);
             Assert.Equal(geometry.Vertices[0], geometry.Vertices[3 * stride]);
             Assert.Equal(0.5f, MathF.Abs(geometry.Vertices[0] - geometry.Vertices[2 * stride]), 3);
+        }
+
+        [Fact]
+        public void TrailTrianglesKeepLtkFrontFaceWindingForCustomMaterialCulling()
+        {
+            VfxPlaybackRuntime.EmitterState state = TrailState(0f);
+            var geometry = new VfxTrailGeometry();
+
+            Assert.Equal(18, geometry.Build(state, Vector3.UnitZ));
+
+            int stride = VfxTrailGeometry.VertexStride;
+            Vector3 a = new(
+                geometry.Vertices[2],
+                geometry.Vertices[3],
+                geometry.Vertices[4]);
+            Vector3 b = new(
+                geometry.Vertices[stride + 2],
+                geometry.Vertices[stride + 3],
+                geometry.Vertices[stride + 4]);
+            Vector3 c = new(
+                geometry.Vertices[2 * stride + 2],
+                geometry.Vertices[2 * stride + 3],
+                geometry.Vertices[2 * stride + 4]);
+
+            Vector3 normal = Vector3.Cross(b - a, c - a);
+            Assert.True(normal.Z > 0f, $"Expected LTK ribbon winding toward +Z, got {normal}.");
         }
 
         [Fact]
@@ -1873,6 +1990,287 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void VfxMeshJointOverridesOwnerJointAndUsesOwningParticleAge()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ParticleLifetime = VfxCurveF.Const(1f),
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0,
+                    new[] { "R_Hand" })
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            VfxPlaybackGraphRuntime graph = CreateGraph(parent, child);
+            graph.SetJointTransformProvider(_ => Matrix4x4.CreateTranslation(99f, 0f, 0f));
+            graph.SetMeshJointProviders(new Dictionary<string, IVfxMeshJointProvider>
+            {
+                ["0"] = new DelegateMeshJointProvider((name, time) =>
+                    name == "R_Hand" ? Matrix4x4.CreateTranslation(time * 100f, 0f, 0f) : null)
+            });
+
+            graph.Update(0.02f); // birth pose uses particle age 0
+            VfxPlaybackRuntime runtime = Assert.Single(graph.Runtimes.Skip(1));
+            Assert.Equal(0f, runtime.Emitters[0].BasePos.X, precision: 4);
+
+            graph.Update(0.02f); // carried child follows the mesh pose at particle age 0.02
+            Assert.Equal(2f, runtime.Emitters[0].BasePos.X, precision: 4);
+        }
+
+        [Fact]
+        public void PresentVfxMeshJointTableDoesNotFallBackToOwnerJointWhenBoneIsMissing()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0,
+                    new[] { "R_Hand" })
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            VfxPlaybackGraphRuntime graph = CreateGraph(parent, child);
+            graph.SetJointTransformProvider(_ => Matrix4x4.CreateTranslation(99f, 0f, 0f));
+            graph.SetMeshJointProviders(new Dictionary<string, IVfxMeshJointProvider>
+            {
+                ["0"] = new DelegateMeshJointProvider((_, _) => null)
+            });
+
+            graph.Update(0.02f);
+
+            Assert.Single(graph.Runtimes);
+        }
+
+        [Fact]
+        public void NestedVfxMeshJointUsesTheDrawnEmitterKeyScheme()
+        {
+            VfxEmitterDefinition grandchildEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var grandchild = new VfxSystemDefinition(3, "grandchild", "grandchild", new[] { grandchildEmitter });
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("grandchild", 3, 0) },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0,
+                    new[] { "Tip" })
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            VfxEmitterDefinition rootEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var root = new VfxSystemDefinition(1, "root", "root", new[] { rootEmitter });
+            var systems = new Dictionary<uint, VfxSystemDefinition>
+            {
+                [1] = root,
+                [2] = child,
+                [3] = grandchild
+            };
+            var graph = new VfxPlaybackGraphRuntime(
+                root,
+                Matrix4x4.Identity,
+                7,
+                systems,
+                new Dictionary<uint, uint>(),
+                (definition, transform, seed) =>
+                {
+                    var runtime = new VfxPlaybackRuntime(seed);
+                    runtime.SetSystem(definition, transform);
+                    return runtime;
+                });
+            graph.SetMeshJointProviders(new Dictionary<string, IVfxMeshJointProvider>
+            {
+                ["0.0:0"] = new DelegateMeshJointProvider((name, _) =>
+                    name == "Tip" ? Matrix4x4.CreateTranslation(12f, 0f, 0f) : null)
+            });
+
+            graph.Update(0.02f);
+            graph.Update(0.02f);
+
+            VfxPlaybackRuntime nested = Assert.Single(
+                graph.Runtimes,
+                runtime => ReferenceEquals(runtime.Definition, grandchild));
+            Assert.Equal(12f, nested.Emitters[0].BasePos.X, precision: 4);
+        }
+
+        [Fact]
+        public void ChildRuntimeInheritsSharedEmissionSurfaces()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmissionSurface = new VfxEmissionSurfaceDefinition(
+                    VfxEmissionSurfaceKind.Mesh,
+                    "surface.skn",
+                    null,
+                    null,
+                    Array.Empty<uint>(),
+                    Array.Empty<uint>())
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            VfxPlaybackGraphRuntime graph = CreateGraph(parent, child);
+            var surfaces = new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>
+            {
+                [childEmitter] = new FixedEmissionSurfaceSampler(
+                    new VfxSurfaceBirth(new Vector3(7f, 0f, 0f), Vector3.UnitY))
+            };
+            Assert.True(graph.SetEmissionSurfaces(surfaces));
+            Assert.False(graph.SetEmissionSurfaces(surfaces));
+
+            graph.Update(0.02f);
+            graph.Update(0.02f);
+
+            VfxPlaybackRuntime childRuntime = Assert.Single(graph.Runtimes.Skip(1));
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(childRuntime.Emitters).Particles);
+            Assert.Equal(7f, particle.Pos.X, precision: 4);
+        }
+
+        [Fact]
+        public void RestoredChildRuntimeRetainsSharedEmissionSurfaces()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                TimeBeforeFirstEmission = 0.04f,
+                EmissionSurface = new VfxEmissionSurfaceDefinition(
+                    VfxEmissionSurfaceKind.Mesh,
+                    "surface.skn",
+                    null,
+                    null,
+                    Array.Empty<uint>(),
+                    Array.Empty<uint>())
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            VfxPlaybackGraphRuntime graph = CreateGraph(parent, child);
+            graph.SetEmissionSurfaces(new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>
+            {
+                [childEmitter] = new FixedEmissionSurfaceSampler(
+                    new VfxSurfaceBirth(new Vector3(5f, 0f, 0f), Vector3.UnitY))
+            });
+
+            graph.Update(0.02f);
+            VfxPlaybackGraphRuntime.Snapshot checkpoint = graph.CaptureSnapshot();
+            graph.Update(0.04f);
+            graph.RestoreSnapshot(checkpoint);
+            graph.Update(0.04f);
+
+            VfxPlaybackRuntime childRuntime = Assert.Single(graph.Runtimes.Skip(1));
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(childRuntime.Emitters).Particles);
+            Assert.Equal(5f, particle.Pos.X, precision: 4);
+        }
+
+        [Fact]
+        public void DeathChildSamplesVfxMeshJointAtTheParentParticleLifetime()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ParticleLifetime = VfxCurveF.Const(0.05f),
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    true,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0,
+                    new[] { "Tip" })
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            VfxPlaybackGraphRuntime graph = CreateGraph(parent, child);
+            graph.SetMeshJointProviders(new Dictionary<string, IVfxMeshJointProvider>
+            {
+                ["0"] = new DelegateMeshJointProvider((name, time) =>
+                    name == "Tip" ? Matrix4x4.CreateTranslation(time * 100f, 0f, 0f) : null)
+            });
+
+            graph.Update(0.02f);
+            graph.Update(0.02f);
+            graph.Update(0.02f);
+            graph.Update(0.02f);
+
+            VfxPlaybackRuntime deathChild = Assert.Single(graph.Runtimes, runtime => ReferenceEquals(runtime.Definition, child));
+            Assert.Equal(5f, deathChild.Emitters[0].BasePos.X, precision: 4);
+        }
+
+        [Fact]
+        public void SessionReplaysToCurrentTimeWhenEmissionSurfacesArriveLate()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmissionSurface = new VfxEmissionSurfaceDefinition(
+                    VfxEmissionSurfaceKind.Mesh,
+                    "surface.skn",
+                    null,
+                    null,
+                    Array.Empty<uint>(),
+                    Array.Empty<uint>())
+            };
+            var definition = new VfxSystemDefinition(1, "late-surface", "late-surface", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "late-surface",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [1] = definition },
+                ResourceMap = new Dictionary<uint, uint>(),
+                SearchDirectory = Path.GetTempPath(),
+                TotalDuration = 1d
+            };
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.SynchronizeTo(0.1d);
+            VfxPlaybackGraphRuntime graph = Assert.Single(session.Graphs);
+            Assert.Equal(0f, Assert.Single(Assert.Single(graph.Root.Emitters).Particles).Pos.X, precision: 4);
+
+            Assert.True(session.SetEmissionSurfaces(
+                graph,
+                new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>
+                {
+                    [emitter] = new FixedEmissionSurfaceSampler(
+                        new VfxSurfaceBirth(new Vector3(9f, 0f, 0f), Vector3.UnitY))
+                }));
+
+            Assert.Equal(0.1d, model.CurrentTime, precision: 6);
+            Assert.Equal(9f, Assert.Single(Assert.Single(graph.Root.Emitters).Particles).Pos.X, precision: 4);
+        }
+
+        [Fact]
         public void BoneChildSetSpawnsNothingWhenItNamesFewerBonesThanChildren()
         {
             VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
@@ -2714,6 +3112,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.False(VfxOpenGlRenderer.ShouldSortInstances(attached, 4));
             Assert.False(VfxOpenGlRenderer.ShouldSortInstances(mesh, 4));
             Assert.True(VfxOpenGlRenderer.ShouldSortInstances(quad, 4));
+
+            ModelMaterialDefinition opaqueCustom = ModelMaterialDefinition.TextureOnly("custom.tex");
+            ModelMaterialDefinition transparentCustom = opaqueCustom with
+            {
+                RenderState = ModelMaterialRenderState.Default with { Blending = ModelMaterialBlendMode.Normal }
+            };
+            Assert.False(VfxOpenGlRenderer.ShouldSortInstances(quad with { CustomMaterial = opaqueCustom }, 4));
+            Assert.True(VfxOpenGlRenderer.ShouldSortInstances(quad with { CustomMaterial = transparentCustom }, 4));
         }
 
         [Fact]
@@ -2746,6 +3152,33 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.True(VfxOpenGlRenderer.ShouldSampleBaseTexture(unnamed, 0));
             Assert.False(VfxOpenGlRenderer.ShouldSampleBaseTexture(named, 0));
             Assert.True(VfxOpenGlRenderer.ShouldSampleBaseTexture(named, 7));
+        }
+
+        [Fact]
+        public void CustomMaterialWithoutBaseTextureUsesUntexturedTintLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                TexturePath = null,
+                CustomMaterial = ModelMaterialDefinition.TextureOnly(null)
+            };
+
+            Assert.True(emitter.HasResolvedCustomMaterial);
+            Assert.False(VfxOpenGlRenderer.ShouldSampleBaseTexture(emitter, 0));
+            Assert.False(VfxOpenGlRenderer.ShouldSampleBaseTexture(emitter, 7));
+        }
+
+        [Fact]
+        public void CustomMaterialSamplesOnlyItsLoadedBaseTextureLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                TexturePath = "custom.tex",
+                CustomMaterial = ModelMaterialDefinition.TextureOnly("custom.tex")
+            };
+
+            Assert.False(VfxOpenGlRenderer.ShouldSampleBaseTexture(emitter, 0));
+            Assert.True(VfxOpenGlRenderer.ShouldSampleBaseTexture(emitter, 7));
         }
 
         [Fact]
@@ -3257,6 +3690,60 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             for (int frame = 0; frame < 6; frame++) session.Update(0.1f);
             Assert.True(session.LiveParticleCount > 0);
+        }
+
+        [Fact]
+        public void AnimationClipParticleCueEndFrameStopsItsGraphAtAuthoredTime()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Rate = VfxCurveF.Const(30f),
+                ParticleLifetime = VfxCurveF.Const(5f)
+            };
+            var system = new VfxSystemDefinition(100, "event", "event", new[] { emitter });
+            var particleEvent = new VfxParticleEventDefinition(
+                EventHash: 1,
+                NameHash: 0,
+                StartFrame: 0f,
+                EndFrame: 15f,
+                EffectKey: 10,
+                EnemyEffectKey: 0,
+                EffectName: string.Empty,
+                IsLoop: false,
+                IsKillEvent: false,
+                IsDetachable: false,
+                IsSelfOnly: false,
+                FireIfAnimationEndsEarly: false,
+                SkipIfPastEndFrame: false,
+                ScalePlaySpeedWithAnimation: false,
+                Scale: 1f,
+                Attachments: Array.Empty<VfxParticleEventAttachment>());
+            var composition = new VfxAbilityComposition(
+                SequencePathHash: 5,
+                SequenceClassHash: 6,
+                TickDuration: 1f / 30f,
+                StartFrame: 0f,
+                EndFrame: 60f,
+                Events: new[] { new VfxCompositionEvent(particleEvent, 100, system, false) })
+            {
+                ResolvedCount = 1
+            };
+            using var session = new VfxRenderSession();
+
+            Assert.True(session.SetAbilityComposition(
+                composition,
+                new Dictionary<uint, VfxSystemDefinition> { [100] = system },
+                new Dictionary<uint, uint>(),
+                Path.GetTempPath(),
+                seed: 7));
+            VfxPlaybackGraphRuntime graph = Assert.Single(session.Graphs);
+            session.Play();
+            for (int frame = 0; frame < 4; frame++) session.Update(0.1f);
+            session.Update(0.09f);
+            Assert.False(graph.IsStopped);
+
+            session.Update(0.02f);
+            Assert.True(graph.IsStopped);
         }
 
         [Fact]
@@ -4240,6 +4727,46 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void SteadyStateUpdateReusesEmitterStepAndNoiseScratchBuffers()
+        {
+            var noise = new VfxNoiseField(
+                VfxCurveF.Const(10f),
+                VfxCurveF.Const(5f),
+                VfxCurve3.Const(Vector3.Zero),
+                VfxCurveF.Const(1000f),
+                Vector3.One);
+            var fields = new VfxFieldCollectionDefinition(
+                Array.Empty<VfxAccelerationField>(),
+                Array.Empty<VfxAttractionField>(),
+                Array.Empty<VfxDragField>(),
+                Array.Empty<VfxOrbitalField>(),
+                new[] { noise });
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                Rate = VfxCurveF.Zero,
+                ParticleLifetime = VfxCurveF.Const(1f),
+                Fields = fields
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "scratch", "scratch", new[] { emitter }), Vector3.Zero);
+
+            for (int index = 0; index < 8; index++)
+                runtime.Update(1f / 60f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            VfxPlaybackRuntime.PreparedNoiseField[] preparedNoise = state.PreparedNoise;
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (int index = 0; index < 200; index++)
+                runtime.Update(1f / 60f);
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+            Assert.Same(preparedNoise, state.PreparedNoise);
+            Assert.InRange(allocated, 0, 4096);
+        }
+
+        [Fact]
         public void ModernSphereIgnoresLegacyEmitOffsetAndTurnsVelocityWithItsRadialFrame()
         {
             var shape = new VfxSpawnShape(
@@ -4618,8 +5145,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(12, geometry.Build(state, Vector3.UnitZ));
             int stride = VfxTrailGeometry.VertexStride;
             // The shared corner is byte-identical across adjacent segments, including colour and UV.
+            // Current-main winding expands the next segment as [v, v-2, v-1], so this side
+            // reappears at expanded vertex 7 rather than the reversed-winding vertex 8.
             for (int component = 0; component < stride; component++)
-                Assert.Equal(geometry.Vertices[component], geometry.Vertices[8 * stride + component]);
+                Assert.Equal(geometry.Vertices[component], geometry.Vertices[7 * stride + component]);
             Assert.NotEqual(geometry.Vertices[7], geometry.Vertices[2 * stride + 7]);
         }
 
@@ -4635,6 +5164,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             state.InstanceCount--;
             Assert.Equal(12, geometry.Build(state, Vector3.UnitZ));
             Assert.Equal(newestU, geometry.Vertices[2 * VfxTrailGeometry.VertexStride]);
+        }
+
+        [Fact]
+        public void TrailReconstructsBirthOrderAfterPackedPoolRetirementSwap()
+        {
+            var state = TrailState(cutoff: 0f);
+            var geometry = new VfxTrailGeometry();
+            Assert.Equal(18, geometry.Build(state, Vector3.UnitZ));
+            float[] expected = (float[])geometry.Vertices.Clone();
+
+            (state.Particles[0], state.Particles[3]) = (state.Particles[3], state.Particles[0]);
+            int stride = VfxPlaybackRuntime.InstanceStride;
+            var first = new float[stride];
+            Array.Copy(state.Instances, 0, first, 0, stride);
+            Array.Copy(state.Instances, 3 * stride, state.Instances, 0, stride);
+            Array.Copy(first, 0, state.Instances, 3 * stride, stride);
+
+            Assert.Equal(18, geometry.Build(state, Vector3.UnitZ));
+            Assert.Equal(expected, geometry.Vertices);
         }
 
         [Fact]
@@ -4703,7 +5251,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 state.Instances[at + 3] = i + 1;
                 state.Instances[at + 5] = i * 0.25f;
                 state.Instances[at + 21] = state.Instances[at + 22] = 1f;
-                state.Particles.Add(new VfxPlaybackRuntime.Particle { TrailTiling = Vector3.One, TrailBirthDistance = i });
+                state.Particles.Add(new VfxPlaybackRuntime.Particle
+                {
+                    Serial = (uint)i,
+                    TrailTiling = Vector3.One,
+                    TrailBirthDistance = i
+                });
             }
             return state;
         }
@@ -4725,6 +5278,39 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     runtime.SetSystem(definition, transform);
                     return runtime;
                 });
+        }
+
+        private sealed class DelegateMeshJointProvider : IVfxMeshJointProvider
+        {
+            private readonly Func<string, float, Matrix4x4?> _resolve;
+
+            public DelegateMeshJointProvider(Func<string, float, Matrix4x4?> resolve)
+            {
+                _resolve = resolve;
+            }
+
+            public bool TryGetJointTransform(string jointName, float time, out Matrix4x4 transform)
+            {
+                Matrix4x4? resolved = _resolve(jointName, time);
+                transform = resolved.GetValueOrDefault(Matrix4x4.Identity);
+                return resolved.HasValue;
+            }
+        }
+
+        private sealed class FixedEmissionSurfaceSampler : IVfxEmissionSurfaceSampler
+        {
+            private readonly VfxSurfaceBirth _birth;
+
+            public FixedEmissionSurfaceSampler(VfxSurfaceBirth birth)
+            {
+                _birth = birth;
+            }
+
+            public bool TrySample(float time, VfxLtkRandom rng, out VfxSurfaceBirth birth)
+            {
+                birth = _birth;
+                return true;
+            }
         }
 
         private static VfxEmitterDefinition CreateEmitter(Vector3 birthScale, VfxEmitterRenderState renderState)

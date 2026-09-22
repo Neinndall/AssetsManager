@@ -19,8 +19,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         VfxMeshRangeData[] Ranges = null)
     {
         /// <summary>
-        /// Attached meshes reuse the owner's animated skeleton. These arrays already contain
-        /// direct joint indices (not SKN influence-table indices), four entries per vertex.
+        /// Four skin indices/weights per vertex. AttachedMesh uses direct owner-joint indices;
+        /// an animated VFX mesh uses its SKN influence-table indices and uploads the matching
+        /// influence palette per particle.
         /// </summary>
         public bool HasSkinning =>
             BoneIndices is { Length: > 0 } &&

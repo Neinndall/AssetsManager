@@ -41,6 +41,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isMapGeometry;
         private MapSceneRuntime _mapSceneRuntime;
         private bool _mapGpuSceneDirty;
+        private bool _mapTexturesDirty;
         private Vector3? _mapFocusPosition;
 
         private readonly ViewerViewportModel _viewModel;
@@ -236,7 +237,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void EnsureSceneRenderers(bool required = false)
         {
             bool hasClassicScene = required || _loadedModels.Count > 0 || _auxiliaryModels.Count > 0;
-            bool hasMapScene = _mapSceneRuntime != null || _mapGpuSceneDirty;
+            bool hasMapScene = _mapSceneRuntime != null || _mapGpuSceneDirty || _mapTexturesDirty;
             if (_gl == null || (!hasClassicScene && !hasMapScene)) return;
 
             if (hasClassicScene && _meshRenderer == null)
@@ -278,15 +279,26 @@ namespace AssetsManager.Views.Controls.Viewer
                 _mapFocusMarkerRenderer.Initialize(_gl);
             }
 
-            if (!_mapGpuSceneDirty)
+            if (_mapGpuSceneDirty)
+            {
+                _mapGeometryRenderer.ClearScene();
+                _mapCharacterRenderer.Clear();
+                _mapParticleRenderer.Clear();
+                if (_mapSceneRuntime != null)
+                {
+                    _mapGeometryRenderer.LoadScene(_mapSceneRuntime.Scene);
+                    _mapGeometryRenderer.UpdateTextures(_mapSceneRuntime.BackdropTextures);
+                }
+                _mapGpuSceneDirty = false;
+                _mapTexturesDirty = false;
                 return;
+            }
 
-            _mapGeometryRenderer.ClearScene();
-            _mapCharacterRenderer.Clear();
-            _mapParticleRenderer.Clear();
-            if (_mapSceneRuntime != null)
-                _mapGeometryRenderer.LoadScene(_mapSceneRuntime.Scene);
-            _mapGpuSceneDirty = false;
+            if (_mapTexturesDirty && _mapSceneRuntime != null)
+            {
+                _mapGeometryRenderer.UpdateTextures(_mapSceneRuntime.BackdropTextures);
+                _mapTexturesDirty = false;
+            }
         }
 
         private CustomCameraController _cameraController;
@@ -1000,6 +1012,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _mapSceneRuntime.ShowStructures = _viewModel.IsMapStructuresVisible;
             _mapSceneRuntime.ShowParticles = _viewModel.IsMapParticlesVisible;
             _mapGpuSceneDirty = true;
+            _mapTexturesDirty = false;
             SetupScene(true);
             _firstRenderedFrame = CreateFrameCompletionSource();
             ResetRenderTiming();
@@ -1008,6 +1021,18 @@ namespace AssetsManager.Views.Controls.Viewer
 
         internal bool IsMapSceneActive(MapSceneRuntime runtime) =>
             runtime != null && ReferenceEquals(_mapSceneRuntime, runtime);
+
+        internal void UpdateMapTextures(
+            MapSceneRuntime runtime,
+            IReadOnlyDictionary<string, System.Windows.Media.Imaging.BitmapSource> textures)
+        {
+            if (!IsMapSceneActive(runtime) || textures == null)
+                return;
+
+            runtime.SetBackdropTextures(textures);
+            _mapTexturesDirty = true;
+            RequestRender();
+        }
 
         internal void SetMapHidden(string id, bool hidden)
         {
@@ -1070,6 +1095,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             MapSceneRuntime runtime = _mapSceneRuntime;
             _mapSceneRuntime = null;
+            _mapTexturesDirty = false;
             _mapFocusPosition = null;
             if (runtime == null) return;
 
