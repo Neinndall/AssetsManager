@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using AssetsManager.Services.Viewer.Map.Parsing;
-using AssetsManager.Services.Viewer.Map.Runtime;
-using AssetsManager.Services.Viewer.Map.Semantics;
+using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Runtime;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using Xunit;
@@ -29,6 +29,21 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal(new[] { visible }, scene.VisibleRuntimes);
             Assert.Equal(MapParticleSemantics.LongestStepSeconds, visible.Graph.Root.CurrentTime, 5);
             Assert.Equal(0f, outside.Graph.Root.CurrentTime, 5);
+        }
+
+        [Fact]
+        public void RestartRewindsPlacedDriversToTheirInitialSeededState()
+        {
+            MapParticleRuntime runtime = Runtime("Restart", new Vector3(0f, 0f, -10f));
+            using var scene = new MapParticleSceneRuntime(new[] { runtime });
+
+            runtime.Advance(0.25f);
+            Assert.Equal(0.25f, runtime.Graph.Root.CurrentTime, 5);
+
+            scene.Restart();
+
+            Assert.Equal(0f, runtime.Graph.Root.CurrentTime, 5);
+            Assert.Empty(scene.VisibleRuntimes);
         }
 
         [Fact]

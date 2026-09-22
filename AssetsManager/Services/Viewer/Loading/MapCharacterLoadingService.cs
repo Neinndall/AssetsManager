@@ -9,8 +9,8 @@ using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Viewer.Animation;
-using AssetsManager.Services.Viewer.Map.Parsing;
-using AssetsManager.Services.Viewer.Map.Semantics;
+using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
@@ -105,6 +105,10 @@ namespace AssetsManager.Services.Viewer.Loading
                     if (stream == null) return null;
                     skeleton = new RigResource(stream);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -230,6 +234,10 @@ namespace AssetsManager.Services.Viewer.Loading
                 await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
                 return stream == null ? null : new BinTree(stream);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logService?.LogWarning($"MAP character BIN unavailable '{asset?.VirtualPath}': {ex.Message}");
@@ -275,6 +283,10 @@ namespace AssetsManager.Services.Viewer.Loading
                         cancellationToken);
                     if (bitmap != null)
                         loaded[key] = bitmap;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {

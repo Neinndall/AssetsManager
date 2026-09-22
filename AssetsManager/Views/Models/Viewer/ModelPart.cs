@@ -63,7 +63,6 @@ namespace AssetsManager.Views.Models.Viewer
         public int[] SourceVertexIndices { get; set; }
         public bool IsTextureTiled { get; set; } = true;
         public bool IsDoubleSided { get; set; } = true;
-        public bool IsDecal { get; set; }
         // Runtime tint/opacity used by Viewer and Diff controls; authored SKN color lives in MaterialDefinition.
         public System.Numerics.Vector4 ColorTint { get; set; } = System.Numerics.Vector4.One;
         internal bool IsAlphaBlended => ColorTint.W < 0.999f ||
@@ -72,14 +71,11 @@ namespace AssetsManager.Views.Models.Viewer
                !MaterialDefinition.RenderState.Cutout) ||
               MaterialDefinition.Effect?.RequiresAlphaBlend == true));
         internal float AlphaCutoff { get; set; } = 0.1f;
-        internal bool UsesBakedDiffuse { get; set; }
         internal bool ForceUnlit { get; set; }
         internal bool TreatBaseTextureAsSrgb { get; set; }
         internal bool UseBaseTextureAlpha { get; set; }
         internal bool UsesSrgbBaseTexture => MaterialDefinition != null || TreatBaseTextureAsSrgb;
         internal bool UsesUnlitShading => ForceUnlit || (MaterialDefinition != null && !MaterialDefinition.IsLit);
-        internal byte[] VertexColors { get; set; }
-        public MapLightmapBinding Lightmap { get; set; }
 
         // SKN loaders attach the authored material here; other mesh pipelines keep their own material semantics.
         public ModelMaterialDefinition MaterialDefinition { get; set; }
@@ -151,8 +147,6 @@ namespace AssetsManager.Views.Models.Viewer
 
             AvailableTextureNames?.Clear();
             SourceVertexIndices = null;
-            VertexColors = null;
-            Lightmap = null;
             MaterialDefinition = null;
             ForceUnlit = false;
             TreatBaseTextureAsSrgb = false;

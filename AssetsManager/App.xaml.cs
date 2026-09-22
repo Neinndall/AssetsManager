@@ -21,7 +21,8 @@ using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Viewer.Loading;
-using AssetsManager.Services.Viewer.Map.Parsing;
+using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Explorer;
@@ -175,7 +176,6 @@ namespace AssetsManager
 
       // Viewer Loading Services
       services.AddSingleton<SknLoadingService>();
-      services.AddSingleton<MapGeometryLoadingService>();
       services.AddSingleton<MapAssetResolver>();
       services.AddSingleton<MapGeometryDecoder>();
       services.AddSingleton<MapMaterialParser>();
@@ -189,6 +189,10 @@ namespace AssetsManager
       services.AddSingleton<MapTextureLoadingService>();
       services.AddSingleton<MapCharacterLoadingService>();
       services.AddSingleton<MapSceneLoadingService>();
+      services.AddSingleton<MapSceneRuntimeFactory>();
+      services.AddSingleton<MapViewerSceneService>(provider => new MapViewerSceneService(
+        provider.GetRequiredService<MapSceneLoadingService>(),
+        provider.GetRequiredService<MapSceneRuntimeFactory>()));
       services.AddSingleton<ChromaLoadingService>();
       services.AddTransient<VfxLoadingService>();
 

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using AssetsManager.Services.Viewer.Map.Semantics;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 

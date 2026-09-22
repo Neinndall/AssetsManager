@@ -20,6 +20,7 @@ namespace AssetsManager.Views.Models.Viewer
         public IReadOnlyList<MapCharacterData> Characters { get; }
         public IReadOnlyList<MapParticleData> Particles { get; }
         public MapParticleSystemCatalog ParticleSystems { get; }
+        public IReadOnlyList<MapOutlineChunkData> Outline { get; }
         public Vector3? Origin { get; }
 
         public MapSceneData(
@@ -33,7 +34,8 @@ namespace AssetsManager.Views.Models.Viewer
             IReadOnlyList<MapCharacterData> characters,
             IReadOnlyList<MapParticleData> particles,
             MapParticleSystemCatalog particleSystems,
-            Vector3? origin = null)
+            Vector3? origin = null,
+            IReadOnlyList<MapOutlineChunkData> outline = null)
         {
             Source = source;
             Assets = assets;
@@ -45,6 +47,7 @@ namespace AssetsManager.Views.Models.Viewer
             Characters = characters;
             Particles = particles;
             ParticleSystems = particleSystems;
+            Outline = outline ?? System.Array.Empty<MapOutlineChunkData>();
             Origin = origin;
         }
     }

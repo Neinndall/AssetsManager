@@ -1,5 +1,5 @@
 using System;
-using AssetsManager.Services.Viewer.Map.Parsing;
+using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;

@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
-using AssetsManager.Services.Viewer.Map.Runtime;
+using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;

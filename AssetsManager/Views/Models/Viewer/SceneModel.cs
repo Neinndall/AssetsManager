@@ -30,7 +30,6 @@ namespace AssetsManager.Views.Models.Viewer
         public string FilePath { get; set; } = string.Empty;
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
-        public MapLightingProfile MapLightingProfile { get; set; }
 
         private double _positionX;
         private double _positionY;
@@ -370,7 +369,6 @@ namespace AssetsManager.Views.Models.Viewer
             Skeleton = null;
             GpuSkinningData = null;
             SkinningMatrices = null;
-            MapLightingProfile = null;
             RootVisual = null;
 
             IsAnimationPaused = false;

@@ -31,7 +31,7 @@ namespace AssetsManager.Views
             TaskCancellationManager taskCancellationManager,
             AppSettings appSettings,
             SknLoadingService sknLoadingService,
-            MapGeometryLoadingService mapGeometryLoadingService,
+            MapViewerSceneService mapViewerSceneService,
             ChromaLoadingService chromaLoadingService,
             VfxLoadingService vfxLoadingService,
             CustomMessageBoxService customMessageBoxService)
@@ -50,7 +50,7 @@ namespace AssetsManager.Views
             ViewportControl.AppSettings = appSettings;
 
             PanelControl.SknLoadingService = sknLoadingService;
-            PanelControl.MapGeometryLoadingService = mapGeometryLoadingService;
+            PanelControl.MapViewerSceneService = mapViewerSceneService;
             PanelControl.ChromaLoadingService = chromaLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = customMessageBoxService;
@@ -157,7 +157,6 @@ namespace AssetsManager.Views
             }
             else if (extension == ".mapgeo")
             {
-                string materialsBinPath = System.IO.Path.ChangeExtension(filePath, ".materials.bin");
                 string gameDataPath = !string.IsNullOrEmpty(ProjectExplorer?.CurrentRootFolder)
                     ? ProjectExplorer.CurrentRootFolder
                     : System.IO.Path.GetDirectoryName(filePath);
@@ -165,7 +164,7 @@ namespace AssetsManager.Views
                 _viewModel.LoadingDescription = ViewerWindowModel.MapGeoLoadingDescription;
                 _viewModel.IsLoadingVisible = true;
 
-                await PanelControl.LoadMapGeometry(filePath, materialsBinPath, gameDataPath);
+                await PanelControl.LoadMapGeometry(filePath, gameDataPath);
 
                 _viewModel.IsLoadingVisible = false;
             }

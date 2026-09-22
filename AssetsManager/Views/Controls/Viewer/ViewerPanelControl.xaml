@@ -149,10 +149,130 @@
                               Visibility="{Binding IsChecked, ElementName=TabScene, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel Margin="14,0,14,14">
 
+                        <!-- ====== MAP OUTLINER ====== -->
+                        <StackPanel Visibility="{Binding IsMapMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Border Background="{StaticResource CardBackground}"
+                                    CornerRadius="12"
+                                    BorderBrush="{StaticResource BorderColor}"
+                                    BorderThickness="1"
+                                    Padding="10,9"
+                                    Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="#15FFFFFF" CornerRadius="8" Width="32" Height="32" Margin="0,0,9,0">
+                                        <materialIcons:MaterialIcon Kind="FileTreeOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="OUTLINER" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                        <TextBlock Text="Map chunks and placeables" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border Background="{StaticResource CardBackground}"
+                                    CornerRadius="10"
+                                    BorderBrush="{StaticResource BorderColor}"
+                                    BorderThickness="1"
+                                    Padding="5"
+                                    Visibility="{Binding HasMapOutline, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TreeView x:Name="MapOutlinerTree"
+                                          ItemsSource="{Binding MapOutlineChunks}"
+                                          Style="{StaticResource ModernTreeView}"
+                                          MaxHeight="560"
+                                          ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                    <TreeView.Resources>
+                                        <HierarchicalDataTemplate DataType="{x:Type viewer:MapOutlinerChunkModel}" ItemsSource="{Binding Items}">
+                                            <Grid MinHeight="26">
+                                                <Grid.Style>
+                                                    <Style TargetType="Grid">
+                                                        <Setter Property="Opacity" Value="1"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                                                                <Setter Property="Opacity" Value="0.5"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Grid.Style>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding ItemCount}" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="8,0,5,0" VerticalAlignment="Center"/>
+                                                <Button Grid.Column="2" Click="MapOutlinerChunkEye_Click" Style="{StaticResource TransparentIconButton}" Width="24" Height="24" Padding="0" ToolTip="Show / hide chunk">
+                                                    <materialIcons:MaterialIcon Kind="{Binding IsHidden, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='EyeOff,Eye'}" Width="13" Height="13"/>
+                                                </Button>
+                                            </Grid>
+                                        </HierarchicalDataTemplate>
+
+                                        <DataTemplate DataType="{x:Type viewer:MapOutlinerItemModel}">
+                                            <Border MinHeight="26" Padding="2,0" MouseLeftButtonUp="MapOutlinerItemRow_MouseLeftButtonUp">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="Transparent"/>
+                                                        <Setter Property="Opacity" Value="1"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsFocused}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                                                                <Setter Property="Opacity" Value="0.5"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <materialIcons:MaterialIcon Grid.Column="0" Width="13" Height="13" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon.Style>
+                                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                                <Setter Property="Kind" Value="CubeOutline"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Kind}" Value="{x:Static viewer:MapOutlineItemKind.Particle}"><Setter Property="Kind" Value="AutoFix"/></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Kind}" Value="{x:Static viewer:MapOutlineItemKind.Character}"><Setter Property="Kind" Value="AccountBoxOutline"/></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Kind}" Value="{x:Static viewer:MapOutlineItemKind.Locator}"><Setter Property="Kind" Value="Map"/></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Kind}" Value="{x:Static viewer:MapOutlineItemKind.Group}"><Setter Property="Kind" Value="Layers"/></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Kind}" Value="{x:Static viewer:MapOutlineItemKind.Audio}"><Setter Property="Kind" Value="VolumeHigh"/></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialIcons:MaterialIcon.Style>
+                                                    </materialIcons:MaterialIcon>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="10.5" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="2" Text="{Binding ClassName}" FontSize="8.5" Foreground="{StaticResource TextMuted}" Margin="8,0,5,0" MaxWidth="105" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                    <Button Grid.Column="3" Click="MapOutlinerItemEye_Click" Style="{StaticResource TransparentIconButton}" Width="24" Height="24" Padding="0" ToolTip="Show / hide placeable"
+                                                            Visibility="{Binding IsDrawable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                        <materialIcons:MaterialIcon Kind="{Binding IsHidden, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='EyeOff,Eye'}" Width="13" Height="13"/>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </TreeView.Resources>
+                                </TreeView>
+                            </Border>
+
+                            <Border Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,16"
+                                    Visibility="{Binding HasMapOutline, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="FileTreeOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.5"/>
+                                    <TextBlock Text="No map placeables" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
                         <!-- ====== MODELS (Hierarchy) ====== -->
                         <ToggleButton x:Name="SectionModels" 
                                       IsChecked="{Binding IsModelsSectionExpanded, Mode=TwoWay}"
-                                      Style="{StaticResource CollapsibleSectionHeaderStyle}">
+                                      Style="{StaticResource CollapsibleSectionHeaderStyle}"
+                                      Visibility="{Binding IsMapMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                             <Grid Margin="10,10,10,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -176,8 +296,16 @@
                         </ToggleButton>
 
                         <!-- Models section content -->
-                        <StackPanel Margin="0,4,0,0"
-                                    Visibility="{Binding IsChecked, ElementName=SectionModels, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Margin="0,4,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMapMode}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=SectionModels}" Value="False"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
                             <!-- Models search (only shown when 3+ models) -->
                             <shared:SearchBoxControl x:Name="ModelsSearchBox" 
                                                      Tag="Search models..."
@@ -249,7 +377,8 @@
                         <ToggleButton x:Name="SectionInspector" 
                                       IsChecked="{Binding IsInspectorSectionExpanded, Mode=TwoWay}"
                                       Style="{StaticResource CollapsibleSectionHeaderStyle}"
-                                      Margin="0,14,0,0">
+                                      Margin="0,14,0,0"
+                                      Visibility="{Binding IsMapMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                             <Grid Margin="10,10,10,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -273,8 +402,16 @@
                         </ToggleButton>
 
                         <!-- Inspector section content -->
-                        <StackPanel Margin="0,4,0,0"
-                                    Visibility="{Binding IsChecked, ElementName=SectionInspector, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Margin="0,4,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMapMode}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                        <DataTrigger Binding="{Binding IsChecked, ElementName=SectionInspector}" Value="False"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
                              <!-- Inspector Navigation (sub-tabs) -->
                               <Border Margin="0,0,0,12" Background="{StaticResource SidebarBackground}" CornerRadius="9" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                                       Visibility="{Binding HasSelectedModel, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -766,7 +903,18 @@
 
                         <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,12" Margin="0,4,0,0"
                                 Visibility="{Binding IsChecked, ElementName=SectionEnvironment, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Grid>
                             <UniformGrid Columns="4" Height="68">
+                                <UniformGrid.Style>
+                                    <Style TargetType="UniformGrid">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsMapMode}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </UniformGrid.Style>
                                 <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.ShowSkybox, Mode=TwoWay}" Margin="0,0,4,0">
                                     <StackPanel>
                                         <materialIcons:MaterialIcon Kind="Earth" Width="22" Height="22" Margin="0,0,0,3"/>
@@ -794,6 +942,27 @@
                                     </StackPanel>
                                 </ToggleButton>
                             </UniformGrid>
+
+                            <UniformGrid Columns="2" Height="68"
+                                         Visibility="{Binding IsMapMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <ToggleButton Style="{StaticResource ModernTileToggleButton}"
+                                              IsChecked="{Binding ViewportViewModel.IsMapStructuresVisible, Mode=TwoWay}"
+                                              Margin="0,0,4,0">
+                                    <StackPanel>
+                                        <materialIcons:MaterialIcon Kind="LayersOutline" Width="22" Height="22" Margin="0,0,0,3"/>
+                                        <TextBlock Text="Structures" FontSize="10.5" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{StaticResource ModernTileToggleButton}"
+                                              IsChecked="{Binding ViewportViewModel.IsMapParticlesVisible, Mode=TwoWay}"
+                                              Margin="0">
+                                    <StackPanel>
+                                        <materialIcons:MaterialIcon Kind="Sparkles" Width="22" Height="22" Margin="0,0,0,3"/>
+                                        <TextBlock Text="Particles" FontSize="10.5" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                            </UniformGrid>
+                            </Grid>
                         </Border>
 
                         <!-- ====== CAMERA ====== -->

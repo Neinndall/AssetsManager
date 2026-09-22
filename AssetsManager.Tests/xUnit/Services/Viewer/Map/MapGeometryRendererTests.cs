@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using AssetsManager.Services.Viewer.Rendering.Map;
+using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Environment;
 using Xunit;

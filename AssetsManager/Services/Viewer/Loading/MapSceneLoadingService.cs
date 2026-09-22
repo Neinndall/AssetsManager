@@ -6,8 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
-using AssetsManager.Services.Viewer.Map.Parsing;
-using AssetsManager.Services.Viewer.Map.Semantics;
+using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
@@ -62,10 +62,12 @@ namespace AssetsManager.Services.Viewer.Loading
             CancellationToken cancellationToken = default)
         {
             MapSceneSource source = MapSceneSource.FromGeometryFile(geometryFilePath, projectRoot);
+            cancellationToken.ThrowIfCancellationRequested();
             if (_hashResolver != null)
             {
                 await _hashResolver.LoadHashesAsync();
                 await _hashResolver.LoadBinHashesAsync();
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             MapSceneAssets assets = await _assetResolver.ResolveSceneAssetsAsync(source, cancellationToken);
@@ -102,6 +104,11 @@ namespace AssetsManager.Services.Viewer.Loading
             IReadOnlyList<MapPlaceableChunkData> placeables = _placeableParser.Parse(materials);
             IReadOnlyList<MapCharacterData> characters = _characterParser.Parse(placeables);
             IReadOnlyList<MapParticleData> particles = _particleParser.Parse(placeables);
+            IReadOnlyList<MapOutlineChunkData> outline = MapOutlineSemantics.Build(
+                placeables,
+                characters,
+                particles,
+                _hashResolver);
             IReadOnlyList<MapParticleData> playedParticles = MapParticleSemantics.PlayedOnLayer(particles, 0);
             MapParticleSystemCatalog particleSystems = _particleSystemParser.Parse(
                 materials,
@@ -131,7 +138,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 characters,
                 particles,
                 particleSystems,
-                MapGeometrySemantics.CalculateOrigin(geometry));
+                MapGeometrySemantics.CalculateOrigin(geometry),
+                outline);
         }
 
         public Task<IReadOnlyDictionary<string, System.Windows.Media.Imaging.BitmapSource>> LoadFullTexturesAsync(

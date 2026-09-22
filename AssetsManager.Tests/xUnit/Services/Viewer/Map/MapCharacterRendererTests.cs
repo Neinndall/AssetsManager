@@ -1,6 +1,6 @@
 using System;
 using System.Numerics;
-using AssetsManager.Services.Viewer.Rendering.Map;
+using AssetsManager.Services.Viewer.Rendering;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Map

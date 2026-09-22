@@ -32,12 +32,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 new(StringComparer.OrdinalIgnoreCase);
             internal readonly Dictionary<string, BitmapSource> LoadedAuxiliaryBitmaps =
                 new(StringComparer.OrdinalIgnoreCase);
-            internal uint LightmapTexture;
-            internal bool LightmapTextureResolved;
-            internal string LoadedLightmapTextureKey;
-            internal BitmapSource LoadedLightmapBitmap;
-            internal uint LightmapVbo;
-            internal uint ColorVbo;
             internal uint BoneIndexVbo;
             internal uint BoneWeightVbo;
             internal GpuSkinningData.PartData SkinningData;
@@ -57,8 +51,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         private readonly Dictionary<BitmapSource, SharedTexture> _sharedTextures =
             new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<BitmapSource, SharedTexture> _sharedSrgbTextures =
-            new(ReferenceEqualityComparer.Instance);
-        private readonly Dictionary<BitmapSource, SharedTexture> _sharedLightmapTextures =
             new(ReferenceEqualityComparer.Instance);
         private readonly HashSet<ModelPart> _pendingReleases = new();
 
@@ -83,11 +75,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
             EnsureBaseTexture(part, resources);
             EnsureAuxiliaryTextures(part, resources);
-            EnsureLightmapTexture(part, resources);
             resources = EnsureMeshBuffers(part, resources);
             EnsureSkinningBuffers(model, resources, part);
-            EnsureLightmapVertexBuffer(part, resources);
-            EnsureVertexColorBuffer(part, resources);
             return resources;
         }
 
@@ -216,62 +205,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 offset);
         }
 
-        private void EnsureVertexColorBuffer(ModelPart part, PartResources resources)
-        {
-            byte[] colors = part.VertexColors;
-            if (resources.Vao == 0 || resources.ColorVbo != 0 ||
-                colors == null || colors.Length != resources.VertexCount * 4)
-            {
-                return;
-            }
-
-            resources.ColorVbo = _gl.GenBuffer();
-            _gl.BindVertexArray(resources.Vao);
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.ColorVbo);
-            _gl.BufferData(
-                BufferTargetARB.ArrayBuffer,
-                new ReadOnlySpan<byte>(colors),
-                BufferUsageARB.StaticDraw);
-            _gl.EnableVertexAttribArray(4);
-            _gl.VertexAttribPointer(
-                4,
-                4,
-                VertexAttribPointerType.UnsignedByte,
-                true,
-                4,
-                IntPtr.Zero);
-            _gl.BindVertexArray(0);
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
-        }
-
-        private void EnsureLightmapVertexBuffer(ModelPart part, PartResources resources)
-        {
-            float[] coordinates = part.Lightmap?.UvCoordinates;
-            if (resources.Vao == 0 || resources.LightmapVbo != 0 ||
-                coordinates == null || coordinates.Length != resources.VertexCount * 2)
-            {
-                return;
-            }
-
-            resources.LightmapVbo = _gl.GenBuffer();
-            _gl.BindVertexArray(resources.Vao);
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.LightmapVbo);
-            _gl.BufferData(
-                BufferTargetARB.ArrayBuffer,
-                new ReadOnlySpan<float>(coordinates),
-                BufferUsageARB.StaticDraw);
-            _gl.EnableVertexAttribArray(3);
-            _gl.VertexAttribPointer(
-                3,
-                2,
-                VertexAttribPointerType.Float,
-                false,
-                2 * sizeof(float),
-                IntPtr.Zero);
-            _gl.BindVertexArray(0);
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
-        }
-
         private void EnsureBaseTexture(ModelPart part, PartResources resources)
         {
             string selectedTexture = part.SelectedTextureName;
@@ -301,26 +234,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         internal static InternalFormat BaseTextureInternalFormat(bool srgb) =>
             srgb ? InternalFormat.Srgb8Alpha8 : InternalFormat.Rgba8;
-
-        private void EnsureLightmapTexture(ModelPart part, PartResources resources)
-        {
-            string selectedTexture = part.Lightmap?.TextureKey;
-            if (resources.LightmapTextureResolved && resources.LoadedLightmapTextureKey == selectedTexture)
-                return;
-
-            ReleaseLightmapTexture(resources);
-            resources.LightmapTextureResolved = true;
-            resources.LoadedLightmapTextureKey = selectedTexture;
-            resources.LoadedLightmapBitmap = TextureUtils.ResolveTexture(part.AllTextures, selectedTexture);
-            if (resources.LoadedLightmapBitmap == null) return;
-
-            resources.LightmapTexture = AcquireTexture(
-                _sharedLightmapTextures,
-                resources.LoadedLightmapBitmap,
-                () => UploadTexture(
-                    resources.LoadedLightmapBitmap,
-                    wrapMode: TextureWrapMode.ClampToEdge));
-        }
 
         private void EnsureAuxiliaryTextures(ModelPart part, PartResources resources)
         {
@@ -378,12 +291,9 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
             ReleaseBaseTexture(resources);
             ReleaseAuxiliaryTextures(resources);
-            ReleaseLightmapTexture(resources);
             DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
             DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
             DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
-            DeleteHandle(resources.LightmapVbo, _gl.DeleteBuffer);
-            DeleteHandle(resources.ColorVbo, _gl.DeleteBuffer);
             DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
             DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
             _liveResources.Remove(resources);
@@ -403,13 +313,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             resources.Texture = 0;
             resources.LoadedBitmap = null;
             resources.LoadedBitmapSrgb = false;
-        }
-
-        private void ReleaseLightmapTexture(PartResources resources)
-        {
-            ReleaseSharedTexture(_sharedLightmapTextures, resources.LoadedLightmapBitmap);
-            resources.LightmapTexture = 0;
-            resources.LoadedLightmapBitmap = null;
         }
 
         private void ReleaseAuxiliaryTextures(PartResources resources)
@@ -532,17 +435,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     _gl.DeleteTexture(texture.Id);
                 _sharedSrgbTextures.Clear();
 
-                foreach (SharedTexture texture in _sharedLightmapTextures.Values)
-                    _gl.DeleteTexture(texture.Id);
-                _sharedLightmapTextures.Clear();
-
                 foreach (PartResources resources in _liveResources)
                 {
                     DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
                     DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
                     DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
-                    DeleteHandle(resources.LightmapVbo, _gl.DeleteBuffer);
-                    DeleteHandle(resources.ColorVbo, _gl.DeleteBuffer);
                     DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
                     DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
                 }
@@ -565,7 +462,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             {
                 _sharedTextures.Clear();
                 _sharedSrgbTextures.Clear();
-                _sharedLightmapTextures.Clear();
                 _liveResources.Clear();
                 _pendingReleases.Clear();
             }

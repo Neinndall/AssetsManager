@@ -163,6 +163,10 @@ namespace AssetsManager.Services.Viewer.Animation
                 _sources[animationPath] = animation;
                 return animation;
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logService?.LogDebug($"MAP structure animation unavailable '{animationPath}': {ex.Message}");

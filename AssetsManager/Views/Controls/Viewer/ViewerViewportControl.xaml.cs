@@ -14,6 +14,8 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Interaction;
+using AssetsManager.Services.Viewer.Runtime;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
@@ -32,7 +34,14 @@ namespace AssetsManager.Views.Controls.Viewer
         private Silk.NET.OpenGL.GL _gl;
         private GlMeshRenderer _meshRenderer;
         private GridRenderer _gridRenderer;
+        private MapGeometryRenderer _mapGeometryRenderer;
+        private MapCharacterRenderer _mapCharacterRenderer;
+        private MapParticleRenderer _mapParticleRenderer;
+        private MapFocusMarkerRenderer _mapFocusMarkerRenderer;
         private bool _isMapGeometry;
+        private MapSceneRuntime _mapSceneRuntime;
+        private bool _mapGpuSceneDirty;
+        private Vector3? _mapFocusPosition;
 
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
@@ -104,13 +113,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _lastRenderedAt = renderTime;
             UpdateScene(frameDelta);
-            RenderScene(framebufferWidth, framebufferHeight);
+            RenderScene(framebufferWidth, framebufferHeight, frameDelta);
             RecordRenderedFrame();
             ProcessPendingSnapshot();
             _firstRenderedFrame.TrySetResult(true);
         }
 
-        private void RenderScene(int framebufferWidth, int framebufferHeight)
+        private void RenderScene(int framebufferWidth, int framebufferHeight, TimeSpan mapFrameDelta)
         {
             _meshRenderer?.ProcessPendingReleases();
             _gl.Viewport(0, 0, (uint)framebufferWidth, (uint)framebufferHeight);
@@ -148,6 +157,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 CalculateProjectionFarPlane(lookDir));
             var viewProj = view * proj;
             _modelInteractionController?.Update(viewProj);
+            _mapSceneRuntime?.Update(viewProj, (float)Math.Max(0d, mapFrameDelta.TotalSeconds));
 
             // 3. Setup lighting from view model settings. The default values reproduce the
             // character preview sun/ambient split while still allowing explicit studio overrides.
@@ -174,6 +184,37 @@ namespace AssetsManager.Views.Controls.Viewer
                 _gridRenderer.Render(viewProj);
             }
 
+            if (_mapSceneRuntime != null)
+            {
+                _mapGeometryRenderer?.Render(viewProj);
+                if (_mapSceneRuntime.ShowStructures)
+                {
+                    _mapCharacterRenderer?.Render(
+                        _mapSceneRuntime.CharacterGroups,
+                        viewProj,
+                        eye,
+                        _mapSceneRuntime.CharacterTimeSeconds,
+                        _mapSceneRuntime.Hidden);
+                }
+                if (_mapSceneRuntime.ShowParticles)
+                {
+                    _mapParticleRenderer?.Render(
+                        _mapSceneRuntime.Particles.VisibleRuntimes,
+                        viewProj,
+                        view,
+                        (uint)framebufferWidth,
+                        (uint)framebufferHeight);
+                }
+
+                if (_mapFocusPosition is Vector3 focusPosition)
+                {
+                    _mapFocusMarkerRenderer?.Render(
+                        viewProj,
+                        focusPosition,
+                        ResolveMapFocusColor());
+                }
+            }
+
             // Render primary models, then auxiliary diff geometry.
             foreach (var model in _loadedModels)
             {
@@ -194,19 +235,58 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void EnsureSceneRenderers(bool required = false)
         {
-            if (_gl == null || (!required && _loadedModels.Count == 0 && _auxiliaryModels.Count == 0)) return;
+            bool hasClassicScene = required || _loadedModels.Count > 0 || _auxiliaryModels.Count > 0;
+            bool hasMapScene = _mapSceneRuntime != null || _mapGpuSceneDirty;
+            if (_gl == null || (!hasClassicScene && !hasMapScene)) return;
 
-            if (_meshRenderer == null)
+            if (hasClassicScene && _meshRenderer == null)
             {
                 _meshRenderer = new GlMeshRenderer();
                 _meshRenderer.Initialize(_gl);
             }
 
-            if (_gridRenderer == null && _viewModel.IsGridVisible)
+            if (hasClassicScene && _gridRenderer == null && _viewModel.IsGridVisible)
             {
                 _gridRenderer = new GridRenderer();
                 _gridRenderer.Initialize(_gl, GlShaderCompiler.UsesEmbeddedProfile(_gl), 1000f);
             }
+
+            if (hasMapScene)
+                EnsureMapSceneRenderers();
+        }
+
+        private void EnsureMapSceneRenderers()
+        {
+            if (_mapGeometryRenderer == null)
+            {
+                _mapGeometryRenderer = new MapGeometryRenderer();
+                _mapGeometryRenderer.Initialize(_gl);
+            }
+            if (_mapCharacterRenderer == null)
+            {
+                _mapCharacterRenderer = new MapCharacterRenderer();
+                _mapCharacterRenderer.Initialize(_gl);
+            }
+            if (_mapParticleRenderer == null)
+            {
+                _mapParticleRenderer = new MapParticleRenderer();
+                _mapParticleRenderer.Initialize(_gl);
+            }
+            if (_mapFocusMarkerRenderer == null)
+            {
+                _mapFocusMarkerRenderer = new MapFocusMarkerRenderer();
+                _mapFocusMarkerRenderer.Initialize(_gl);
+            }
+
+            if (!_mapGpuSceneDirty)
+                return;
+
+            _mapGeometryRenderer.ClearScene();
+            _mapCharacterRenderer.Clear();
+            _mapParticleRenderer.Clear();
+            if (_mapSceneRuntime != null)
+                _mapGeometryRenderer.LoadScene(_mapSceneRuntime.Scene);
+            _mapGpuSceneDirty = false;
         }
 
         private CustomCameraController _cameraController;
@@ -298,6 +378,16 @@ namespace AssetsManager.Views.Controls.Viewer
                     SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
                     break;
                 case nameof(ViewerViewportModel.IsGridVisible):
+                    break;
+                case nameof(ViewerViewportModel.IsMapStructuresVisible):
+                    if (_mapSceneRuntime != null)
+                        _mapSceneRuntime.ShowStructures = _viewModel.IsMapStructuresVisible;
+                    RequestRender();
+                    break;
+                case nameof(ViewerViewportModel.IsMapParticlesVisible):
+                    if (_mapSceneRuntime != null)
+                        _mapSceneRuntime.ShowParticles = _viewModel.IsMapParticlesVisible;
+                    RequestRender();
                     break;
                 case nameof(ViewerViewportModel.ShowSkybox):
                     SetSkyboxVisibility(_viewModel.ShowSkybox);
@@ -532,6 +622,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SetupScene(bool isMapGeometry)
         {
+            if (!isMapGeometry && _mapSceneRuntime != null)
+                ReleaseMapRuntime();
+
             _isMapGeometry = isMapGeometry;
             if (_cameraController != null)
                 _cameraController.IsMapGroundCollisionEnabled = isMapGeometry;
@@ -639,6 +732,22 @@ namespace AssetsManager.Views.Controls.Viewer
                 var gridRenderer = _gridRenderer;
                 _gridRenderer = null;
                 RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
+
+                var mapGeometryRenderer = _mapGeometryRenderer;
+                _mapGeometryRenderer = null;
+                RunReleaseStep(nameof(MapGeometryRenderer), () => mapGeometryRenderer?.Dispose(), gpuBound: true);
+
+                var mapCharacterRenderer = _mapCharacterRenderer;
+                _mapCharacterRenderer = null;
+                RunReleaseStep(nameof(MapCharacterRenderer), () => mapCharacterRenderer?.Dispose(), gpuBound: true);
+
+                var mapParticleRenderer = _mapParticleRenderer;
+                _mapParticleRenderer = null;
+                RunReleaseStep(nameof(MapParticleRenderer), () => mapParticleRenderer?.Dispose(), gpuBound: true);
+
+                var mapFocusMarkerRenderer = _mapFocusMarkerRenderer;
+                _mapFocusMarkerRenderer = null;
+                RunReleaseStep(nameof(MapFocusMarkerRenderer), () => mapFocusMarkerRenderer?.Dispose(), gpuBound: true);
 
                 var gl = _gl;
                 _gl = null;
@@ -844,6 +953,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public void ResetScene()
         {
             StopAnimation();
+            ReleaseMapRuntime();
 
             foreach (var model in _loadedModels)
             {
@@ -878,6 +988,94 @@ namespace AssetsManager.Views.Controls.Viewer
             _lastModelUpdates.Clear();
 
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
+        }
+
+        internal void SetMapScene(MapSceneRuntime runtime)
+        {
+            ArgumentNullException.ThrowIfNull(runtime);
+
+            ResetScene();
+            _mapSceneRuntime = runtime;
+            _mapFocusPosition = null;
+            _mapSceneRuntime.ShowStructures = _viewModel.IsMapStructuresVisible;
+            _mapSceneRuntime.ShowParticles = _viewModel.IsMapParticlesVisible;
+            _mapGpuSceneDirty = true;
+            SetupScene(true);
+            _firstRenderedFrame = CreateFrameCompletionSource();
+            ResetRenderTiming();
+            RequestRender();
+        }
+
+        internal bool IsMapSceneActive(MapSceneRuntime runtime) =>
+            runtime != null && ReferenceEquals(_mapSceneRuntime, runtime);
+
+        internal void SetMapHidden(string id, bool hidden)
+        {
+            if (_mapSceneRuntime == null) return;
+            _mapSceneRuntime.SetHidden(id, hidden);
+            RequestRender();
+        }
+
+        internal bool IsMapHidden(string id) =>
+            _mapSceneRuntime?.Hidden?.Contains(id) == true;
+
+        internal bool IsMapHidden(uint chunkHash, uint keyHash) =>
+            _mapSceneRuntime != null &&
+            MapOutlineSemantics.IsHidden(_mapSceneRuntime.Hidden, chunkHash, keyHash);
+
+        internal void FocusMapPlaceable(Vector3 enginePosition, bool smooth = true)
+        {
+            if (_mapSceneRuntime == null ||
+                _cameraController == null ||
+                Viewport.Camera is not ProjectionCamera camera)
+            {
+                return;
+            }
+
+            var pose = CalculateMapFocusPose(enginePosition, camera.LookDirection);
+            if (pose == null)
+                return;
+
+            _mapFocusPosition = new Vector3(
+                (float)pose.Value.Target.X,
+                (float)pose.Value.Target.Y,
+                (float)pose.Value.Target.Z);
+
+            if (smooth)
+                _cameraController.FlyTo(pose.Value.Position, pose.Value.LookDirection, camera.UpDirection);
+            else
+                _cameraController.SnapTo(pose.Value.Position, pose.Value.LookDirection, camera.UpDirection);
+
+            RequestRender();
+        }
+
+        internal static (Point3D Target, Point3D Position, Vector3D LookDirection)? CalculateMapFocusPose(
+            Vector3 enginePosition,
+            Vector3D currentLookDirection)
+        {
+            double distance = currentLookDirection.Length;
+            if (!double.IsFinite(distance) || distance <= 0.001)
+                return null;
+
+            Point3D target = new(-enginePosition.X, enginePosition.Y, enginePosition.Z);
+            Vector3D direction = currentLookDirection;
+            direction.Normalize();
+            double focusDistance = Math.Min(distance, 1500d);
+            Vector3D lookDirection = direction * focusDistance;
+            Point3D position = target - lookDirection;
+            return (target, position, lookDirection);
+        }
+
+        private void ReleaseMapRuntime()
+        {
+            MapSceneRuntime runtime = _mapSceneRuntime;
+            _mapSceneRuntime = null;
+            _mapFocusPosition = null;
+            if (runtime == null) return;
+
+            runtime.Dispose();
+            _mapGpuSceneDirty = true;
+            RequestRender();
         }
 
         public void AddModel(SceneModel model) => AddModelCore(model, isAuxiliary: false);
@@ -1144,13 +1342,36 @@ namespace AssetsManager.Views.Controls.Viewer
             Vector3D lookDirection;
             Vector3D upDirection = new Vector3D(0.00, 1.00, 0.00);
 
-            if (TryGetModelBounds(isMap, out var center, out var maxDim, out var horizontalDim))
+            if (isMap && TryGetMapFrame(out Point3D mapTarget, out double mapRadius))
             {
-                double distance = isMap ? horizontalDim * 0.18 : maxDim * 1.25;
+                Vector3D direction = Viewport.Camera is PerspectiveCamera mapCamera
+                    ? -mapCamera.LookDirection
+                    : new Vector3D(280, 150, 400);
+                if (direction.LengthSquared < 1e-8)
+                    direction = new Vector3D(280, 150, 400);
+                direction.Normalize();
+
+                double aspect = Math.Max(1d, OpenTkControl.ActualWidth) /
+                                Math.Max(1d, OpenTkControl.ActualHeight);
+                double distance = CalculateMapFrameDistance(mapRadius, 45d, aspect);
+                position = mapTarget + direction * distance;
+                lookDirection = mapTarget - position;
+
+                if (smooth)
+                    _cameraController?.FlyTo(position, lookDirection, upDirection);
+                else
+                    _cameraController?.SnapTo(position, lookDirection, upDirection);
+                _viewModel.FieldOfView = 45;
+                return;
+            }
+
+            if (TryGetModelBounds(out var center, out var maxDim, out var horizontalDim))
+            {
+                double distance = maxDim * 1.25;
                 if (distance < 50) distance = 250;
 
-                double heightFactor = isMap ? 1.30 : 0.15;
-                double horizontalAngle = isMap ? Math.PI * 0.75 : Math.PI / 2;
+                double heightFactor = 0.15;
+                double horizontalAngle = Math.PI / 2;
 
                 position = new Point3D(
                     center.X + Math.Cos(horizontalAngle) * distance,
@@ -1188,6 +1409,21 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SnapCamera() => ResetCamera(false);
 
+        private static Vector4 ResolveMapFocusColor()
+        {
+            if (Application.Current?.TryFindResource("AccentBrush") is SolidColorBrush brush)
+            {
+                Color color = brush.Color;
+                return new Vector4(
+                    color.R / 255f,
+                    color.G / 255f,
+                    color.B / 255f,
+                    color.A / 255f);
+            }
+
+            return new Vector4(0.21f, 0.89f, 0.76f, 1f);
+        }
+
         internal static float CalculateProjectionNearPlane(
             Vector3 lookDirection,
             bool isMapGeometry = false)
@@ -1223,11 +1459,17 @@ namespace AssetsManager.Views.Controls.Viewer
             Point3D targetPoint = new Point3D(0, 90.00 + baselineY, 0);
             double distance = 300.00;
 
-            if (TryGetModelBounds(isMap, out var center, out var maxDim, out var horizontalDim))
+            if (isMap && TryGetMapFrame(out Point3D mapTarget, out double mapRadius))
+            {
+                targetPoint = mapTarget;
+                double aspect = Math.Max(1d, OpenTkControl.ActualWidth) /
+                                Math.Max(1d, OpenTkControl.ActualHeight);
+                distance = CalculateMapFrameDistance(mapRadius, 45d, aspect);
+            }
+            else if (TryGetModelBounds(out var center, out var maxDim, out _))
             {
                 targetPoint = center;
-                double framingDim = isMap ? horizontalDim : maxDim;
-                distance = (isMap ? 1.5 : 1.25) * framingDim;
+                distance = 1.25 * maxDim;
                 if (distance < 50) distance = 250;
             }
 
@@ -1284,8 +1526,35 @@ namespace AssetsManager.Views.Controls.Viewer
             };
         }
 
+        private bool TryGetMapFrame(out Point3D target, out double radius)
+        {
+            target = default;
+            radius = 0d;
+            if (_mapSceneRuntime?.Scene?.Origin is not Vector3 engineOrigin)
+                return false;
+
+            Vector3 origin = new(-engineOrigin.X, engineOrigin.Y, engineOrigin.Z);
+            target = new Point3D(origin.X, origin.Y + 300f, origin.Z);
+            radius = Math.Sqrt(1500d * 1500d + 300d * 300d + 1500d * 1500d);
+            return true;
+        }
+
+        internal static double CalculateMapFrameDistance(double radius, double fovDegrees, double aspect)
+        {
+            if (!double.IsFinite(radius) || radius <= 0d ||
+                !double.IsFinite(fovDegrees) || fovDegrees <= 0d || fovDegrees >= 180d ||
+                !double.IsFinite(aspect) || aspect <= 0d)
+            {
+                return 0d;
+            }
+
+            double vertical = fovDegrees * Math.PI / 180d;
+            double horizontal = 2d * Math.Atan(Math.Tan(vertical / 2d) * aspect);
+            double half = Math.Min(vertical, horizontal) / 2d;
+            return radius / Math.Sin(half) * 1.15d;
+        }
+
         private bool TryGetModelBounds(
-            bool isMapGeometry,
             out Point3D center,
             out double maxDim,
             out double horizontalDim)
@@ -1297,24 +1566,17 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_activeSceneModel?.Parts?.Count > 0)
             {
                 var bounds = Rect3D.Empty;
-                var playableBounds = Rect3D.Empty;
                 foreach (var part in _activeSceneModel.Parts)
                 {
                     if (part.Geometry?.Geometry is MeshGeometry3D mesh)
-                    {
                         bounds.Union(mesh.Bounds);
-                        if (isMapGeometry && part.Name?.StartsWith("LM_", StringComparison.OrdinalIgnoreCase) == true)
-                            playableBounds.Union(mesh.Bounds);
-                    }
                 }
 
                 if (!bounds.IsEmpty)
                 {
-                    Rect3D focusBounds = isMapGeometry && !playableBounds.IsEmpty ? playableBounds : bounds;
-                    double centerX = focusBounds.X + focusBounds.SizeX / 2 + _activeSceneModel.PositionX;
-                    double focusHeight = isMapGeometry ? 0.85 : 0.5;
-                    double centerY = focusBounds.Y + focusBounds.SizeY * focusHeight + _activeSceneModel.PositionY;
-                    double centerZ = focusBounds.Z + focusBounds.SizeZ / 2 + _activeSceneModel.PositionZ;
+                    double centerX = bounds.X + bounds.SizeX / 2 + _activeSceneModel.PositionX;
+                    double centerY = bounds.Y + bounds.SizeY * 0.5 + _activeSceneModel.PositionY;
+                    double centerZ = bounds.Z + bounds.SizeZ / 2 + _activeSceneModel.PositionZ;
                     center = new Point3D(centerX, centerY, centerZ);
 
                     maxDim = Math.Max(bounds.SizeX, Math.Max(bounds.SizeY, bounds.SizeZ));
@@ -1381,7 +1643,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     request.Height,
                     OpenTkControl.FrameBufferWidth,
                     OpenTkControl.FrameBufferHeight,
-                    () => RenderScene(request.Width, request.Height));
+                    () => RenderScene(request.Width, request.Height, TimeSpan.Zero));
                 _ = SaveSnapshotAsync(snapshot, request.FilePath);
             }
             catch (Exception ex)

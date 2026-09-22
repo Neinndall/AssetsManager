@@ -47,7 +47,9 @@ New Features
   - VFX Studio / Added a neutral Stage display option with a dark floor, subtle metre grid, major sections, and distance fade alongside Grid and Ground.
   - VFX Studio / Reorganized BIN parsing into dedicated system, animation, resource, value, and schema services without changing supported VFX behavior.
   - VFX Studio / AnimationGraph clip timing now retimes the character pose with mTickDuration so attached particle events and joint cues stay synchronized with the animation.
-  - Viewer / MAPGEO now has a dedicated LTK 1.20.0-style scene pipeline with project-to-WAD asset resolution, authored geometry/material semantics, 64→1024 texture waves, layer-0 backdrop grouping, mirrored world coordinates, isolated OpenGL renderers, one shared authored placeable snapshot, Map/MapSkin/MapContainer variants, and structures/level props with shared SKN/SKL/ANM, AnimationGraph idle playback, GPU skinning, authored materials and transparent sorting instead of routing map content through champion ModelParts.
+  - Viewer / MAPGEO now has a dedicated scene pipeline with project-to-WAD asset resolution, authored geometry/material semantics, 64→1024 texture waves, layer-0 backdrop grouping, mirrored world coordinates, isolated OpenGL renderers, one shared authored placeable snapshot, Map/MapSkin/MapContainer variants, and structures/level props with shared SKN/SKL/ANM, AnimationGraph idle playback, GPU skinning, authored materials and transparent sorting instead of routing map content through champion ModelParts.
+  - Viewer / Load MapGeometry now mounts the dedicated MAP scene directly in the main viewport, composing backdrop, animated structures and map particle VFX with MAP-specific framing, Structures/Particles display toggles, frame-driven timing and symmetric CPU/GPU teardown on scene changes or window close.
+  - Viewer / MAP Outliner authored chunk→placeable order, resolved labels/classes, type icons, chunk/item visibility eyes for drawn content, inherited hidden state, repeatable camera focus with a 1500-unit reach, and a depth-independent 60-unit wireframe marker.
   - Viewer / Model materials now animate BIN-authored vertex waves and Fresnel noise when the material declares those features.
   - Viewer / Model materials now apply BIN-authored Fresnel, masked emission, and simple dissolve transitions alongside animated scroll and flow textures.
   - Viewer / Ignore un-tinted static white additive placeholders in iridescent material graphs so champion skin layers do not wash out the base diffuse texture.
@@ -56,7 +58,6 @@ New Features
   - Viewer / Champion previews now start from the authored directional/ambient lighting split without an implicit fill light, while Studio lighting controls remain available for explicit overrides.
   - Viewer / Ground and sky scene textures now use unlit sRGB rendering and preserve image alpha when scene opacity is adjusted.
   - Viewer / Project Browser can load multiple selected animation files from its context menu.
-  - Viewer / Map Environment now applies map-authored sun, ambient lighting, and baked lightmaps to static geometry.
   - Viewer / Champion skin materials now resolve WadChunkLink texture paths.
   - Viewer / Champion skin submeshes now resolve material overrides from dependent BIN files, including Pyke Skin45 W_Fins texture assignments.
   - Chroma Library now groups variants by their source skin with family selection and a persistent selected count.
@@ -115,7 +116,9 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
-  - Viewer / Rebuilt the MAPGEO loading core around canonical map paths, project-to-WAD asset resolution, flat geometry buffers, LTK 1.20.0 StaticMaterialDef semantics, shader defaults, and bounded batch texture decoding without routing maps through SceneModel/ModelPart.
+  - Viewer / Rebuilt the MAPGEO loading core around canonical map paths, project-to-WAD asset resolution, flat geometry buffers, StaticMaterialDef semantics, shader defaults, and bounded batch texture decoding without routing maps through SceneModel/ModelPart.
+  - Viewer / Removed the retired SceneModel-based MAPGEO loader, CPU terrain compositor, map lightmap state and renderer branches now that Load MapGeometry is fully owned by the dedicated MAP scene pipeline.
+  - Viewer / MAP scene runtime now memoizes structure animation groups and placement matrices, propagates stale-load cancellation through BIN/texture/ANM reads, and releases already completed skin runtimes plus temporary MapVfx resources when a parallel map load is cancelled.
   - Viewer / Animation player now uses a cleaner grouped timeline, dynamic Play/Stop/Resume control, and compact speed controls while preserving the current playhead.
   - VFX Studio / Added shared Viewer Grid/Ground preferences plus Shaded/Wire/Overlay, camera reset, and standalone system motion controls directly in the viewport toolbar.
   - VFX Studio / Timeline Loop now works across Systems, Clips, and Spells, stays enabled while switching previews, and starts each preview range at 0 through its full duration.
@@ -124,10 +127,10 @@ Improvements
   - VFX Studio / Skin browser sections now start collapsed and Animation Clip playback clears stale standalone System emitter diagnostics.
   - VFX Studio / Removed the duplicate preview stats overlay so live particle status stays in the existing viewport header.
   - VFX Studio / Camera framing now follows authored system spawn bounds and preview rig motion, keeping large, offset, missile, and trail effects in view consistently.
-  - VFX Studio / Playback now matches the audited LTK behavior more closely with deterministic xorshift32 random streams, Animation Clip cue seed 7331, probability-table singleValue semantics, carried/death child systems, boneToSpawnAt lineage, and deterministic child RNG state.
+  - VFX Studio / Playback now matches behavior more closely with deterministic xorshift32 random streams, Animation Clip cue seed 7331, probability-table singleValue semantics, carried/death child systems, boneToSpawnAt lineage, and deterministic child RNG state.
   - VFX Studio / Timeline seeking now restores bounded quarter-second simulation checkpoints instead of always replaying from zero, preserving particles, RNG, noise, transforms, child lineage, attachments, stop/kill state, and emitter timing while respecting a capped memory budget.
   - VFX Studio / Improved authored mesh and render parity with skinned/simple mesh selection, camera pitch/yaw alignment, material culling, LOCK_ALPHA/color-ramp handling, additive fallback semantics, skinScale-aware bone placement, and single-application system transforms.
-  - Viewer / SKN materials now use one authored material pipeline with LTK-aligned sRGB texture/tint/output handling across model loads.
+  - Viewer / SKN materials now use one authored material pipeline with sRGB texture/tint/output handling across model loads.
   - Viewer / SKN materials now honor authored blend, depth, culling, UV tiling/scroll, wrapping, alpha test, and premultiplied alpha across model loads.
   - Viewer / SKN material effects now preserve simultaneous authored layers independently, including additive scroll, flow, Fresnel noise, transitions with a second state, emission/bloom, distortion, iridescence, channel masks, authored sampler wrapping, and supported vertex deformation.
   - 3D Mesh Analyzer / Mesh Parts now uses a compact HUD layout with clearer change states and quick Show All / Hide All controls.
@@ -406,14 +409,14 @@ Changes
 Bug Fixes
   - VFX Studio / Fixed unresolved child identifiers incorrectly synthesizing or falling back to effect keys from unrelated hashes or names.
   - VFX Studio / Fixed null primitive defaults and invalid curve key pairs to match League VFX parsing semantics.
-  - VFX Studio / Matched LTK birth probability tables by using one shared random chance across every populated value channel.
+  - VFX Studio / Matched birth probability tables by using one shared random chance across every populated value channel.
   - VFX Studio / Preserved authored VFX color channels outside the display range until shader and blend evaluation instead of clamping them during curve sampling.
   - VFX Studio / Corrected LegacySimple birth rotation to use its authored Z axis and whole-degree wrapped particle spin.
   - VFX Studio / Synchronized trail and beam emitter UV scrolling to the source playback clock so child ribbons no longer drift from other primitives.
-  - VFX Studio / Matched LTK spawn placement with emission-only trail distance tracking, exact shape fallbacks, and authored multi-axis rotation order.
+  - VFX Studio / Matched spawn placement with emission-only trail distance tracking, exact shape fallbacks, and authored multi-axis rotation order.
   - VFX Studio / Preserved tiny nonzero direction and spawn axes and applied LegacySimple lifetime scale across all three particle axes.
-  - VFX Studio / Matched LTK emitter-space integration and force-field spaces, including bind motion, birth-frame offsets, local field orientation, and tiny orbital axes.
-  - VFX Studio / Matched LTK variable-step playback and rig-loop replay so playback speed, checkpoints, and loop boundaries no longer alter particle integration timing.
+  - VFX Studio / Matched emitter-space integration and force-field spaces, including bind motion, birth-frame offsets, local field orientation, and tiny orbital axes.
+  - VFX Studio / Matched variable-step playback and rig-loop replay so playback speed, checkpoints, and loop boundaries no longer alter particle integration timing.
   - VFX Studio / Rig remains visible in the preview toolbar while standalone motion tuning stays disabled for skeleton-driven Animation Clips.
   - VFX Studio / Parametric clip changes no longer invalidate cached animation assets while rebuilding AnimationGraph playback.
   - VFX Studio / Skin selection now loads its model, Systems, and Animation Clips without auto-playing a System or Animation Clip; playback starts only after explicit selection.
@@ -633,13 +636,13 @@ Bug Fixes
   - Viewer / Fixed greenish-blue silhouette edges on champion skins by resolving extracted WAD mask textures and honoring authored coverage.
   - Viewer / Supported procedural glass materials with transparency and fresnel highlights, preventing opaque white surfaces on untextured glass submeshes.
   - Viewer / Expanded authored SKN material effects with independent distortion, layered masks, transitions, emission, flow and vertex deformation without dropping existing material behavior.
-  - VFX Studio / Aligned particle emission, integration, curve sampling, linger rotation and global particle pool behavior with LTK.
-  - VFX Studio / Aligned skin animation idle effects with LTK deterministic seeds and missing-bone attachment offsets.
-  - VFX Studio / Aligned child-system pool budgets, lifecycle timing, deterministic lineage and checkpoint restoration with LTK.
-  - VFX Studio / Aligned linked BIN resolver scope, named asset lookup and mesh fallback resolution with LTK.
-  - VFX Studio / Aligned shader premultiplication, texture filtering and distortion fallbacks with LTK.
-  - VFX Studio / Aligned mesh and texture resource failures and VFX mesh tinting with LTK.
-  - VFX Studio / Aligned rig clocks, animation pose looping, bone anchors, hierarchy and world-space transforms with LTK.
+  - VFX Studio / Aligned particle emission, integration, curve sampling, linger rotation and global particle pool behavior.
+  - VFX Studio / Aligned skin animation idle effects with deterministic seeds and missing-bone attachment offsets.
+  - VFX Studio / Aligned child-system pool budgets, lifecycle timing, deterministic lineage and checkpoint restoration.
+  - VFX Studio / Aligned linked BIN resolver scope, named asset lookup and mesh fallback resolution.
+  - VFX Studio / Aligned shader premultiplication, texture filtering and distortion fallbacks.
+  - VFX Studio / Aligned mesh and texture resource failures and VFX mesh tinting.
+  - VFX Studio / Aligned rig clocks, animation pose looping, bone anchors, hierarchy and world-space transforms.
   - VFX Studio / Improved playback transport, rig tuning, deterministic seeds and per-system run state.
   - Viewer / Fixed opaque SKN color-map alpha creating transparent holes in champion models.
   - VFX Studio / Fixed loading crashes for particle lifetimes using single-value probability tables.

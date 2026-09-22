@@ -287,7 +287,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Theory]
-        [InlineData(16, 16, 48, 14)]
+        [InlineData(16, 16, 48, 15)]
         [InlineData(32, 32, 192, 20)]
         [InlineData(64, 64, 256, 20)]
         public void Renderer_CapsAuxiliaryTexturesToContextLimits(

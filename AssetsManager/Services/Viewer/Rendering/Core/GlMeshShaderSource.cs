@@ -12,14 +12,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     layout(location=0) in vec3 aPos;
                     layout(location=1) in vec3 aNormal;
                     layout(location=2) in vec2 aUv;
-                    layout(location=3) in vec2 aLightmapUv;
-                    layout(location=4) in vec4 aColor;
                     layout(location=5) in vec4 aBoneIndices;
                     layout(location=6) in vec4 aBoneWeights;
                     uniform mat4 uViewProj;
                     uniform mat4 uWorld;
                     uniform int uUseSkinning;
-                    uniform int uHasVertexColor;
                     uniform int uEffectKind;
                     uniform float uEffectTime;
                     uniform sampler2D uAuxTex0;
@@ -58,8 +55,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     out vec3 vNormal;
                     out vec3 vWorldPosition;
                     out vec2 vUv;
-                    out vec2 vLightmapUv;
-                    out vec4 vColor;
                     vec4 sampleAux(int index, vec2 uv){
                         if (index == -2) return vec4(0.0);
                         if (index == 0) return texture(uAuxTex0, uv);
@@ -141,18 +136,13 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             vNormal = normalize(mat3(uWorld) * animatedNormal);
                             vWorldPosition = worldPos.xyz;
                             vUv = aUv;
-                            vLightmapUv = aLightmapUv;
-                            vColor = uHasVertexColor != 0 ? aColor : vec4(1.0);
                     }";
 
         internal const string Fragment = @"
                     in vec3 vNormal;
                     in vec3 vWorldPosition;
                     in vec2 vUv;
-                    in vec2 vLightmapUv;
-                    in vec4 vColor;
                     uniform sampler2D uTex;
-                    uniform sampler2D uLightmap;
                     uniform sampler2D uAuxTex0;
                     uniform sampler2D uAuxTex1;
                     uniform sampler2D uAuxTex2;
@@ -167,7 +157,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform sampler2D uAuxTex11;
                     uniform sampler2D uAuxTex12;
                     uniform sampler2D uAuxTex13;
-                    uniform int uHasLightmap;
                     uniform int uEffectKind;
                     uniform float uEffectTime;
                     uniform vec3 uCameraPosition;
@@ -254,7 +243,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform vec2 uIridescenceAlphaMinMax;
                     uniform float uIridescenceDiffuseFadeMask;
                     uniform int uIridescenceMaskChannel;
-                    uniform float uLightMapColorScale;
                     uniform vec4 uColorTint;
                     uniform float uAlphaCutoff;
                     uniform vec2 uMaterialUvRepeat;
@@ -263,7 +251,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform int uMaterialPremultipliedAlpha;
                     uniform int uMaterialSrgb;
                     uniform int uMaterialUsesTextureAlpha;
-                    uniform int uUsesBakedDiffuse;
                     uniform vec3 uLightDir;
                     uniform vec3 uLightColor;
                     uniform vec3 uLightDir2;
@@ -345,31 +332,19 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
                             vec4 texColor = readBaseTexture(materialUv);
                             float coverageAlpha = uMaterialUsesTextureAlpha != 0 ? texColor.a : 1.0;
-                            coverageAlpha *= vColor.a * uColorTint.a;
+                            coverageAlpha *= uColorTint.a;
                             if (uAlphaCutoff > 0.0 && coverageAlpha < uAlphaCutoff) discard;
                             vec3 tintRgb = uMaterialSrgb != 0
                                 ? srgbToLinear(uColorTint.rgb)
                                 : uColorTint.rgb;
-                            texColor.rgb *= vColor.rgb * tintRgb;
+                            texColor.rgb *= tintRgb;
                             texColor.a = coverageAlpha;
                             float diff1 = max(dot(vNormal, uLightDir), 0.0);
                             float diff2 = max(dot(vNormal, uLightDir2), 0.0);
                             vec3 finalLight = clamp(uAmbient + diff1 * uLightColor + diff2 * uLightColor2, 0.0, 1.0);
-                            vec3 finalColor;
-                            if (uMaterialUnlit != 0)
-                            {
-                                finalColor = texColor.rgb;
-                            }
-                            else if (uUsesBakedDiffuse != 0 && uHasLightmap != 0)
-                            {
-                                finalColor = texture(uLightmap, vLightmapUv).rgb * vColor.rgb;
-                            }
-                            else
-                            {
-                                finalColor = texColor.rgb * finalLight;
-                                if (uHasLightmap != 0)
-                                    finalColor += texture(uLightmap, vLightmapUv).rgb * uLightMapColorScale;
-                            }
+                            vec3 finalColor = uMaterialUnlit != 0
+                                ? texColor.rgb
+                                : texColor.rgb * finalLight;
 
                             if ((uEffectKind & 256) != 0 && uGradientTexIndex >= 0)
                             {

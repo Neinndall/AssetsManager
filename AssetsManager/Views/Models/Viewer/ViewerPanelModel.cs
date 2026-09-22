@@ -28,6 +28,7 @@ namespace AssetsManager.Views.Models.Viewer
         // --- Data Collections ---
         private readonly ObservableRangeCollection<SceneModel> _loadedModels = new();
         private readonly ObservableRangeCollection<AnimationModel> _animationModels = new();
+        private readonly ObservableCollection<MapOutlinerChunkModel> _mapOutlineChunks = new();
         private ObservableRangeCollection<ModelPart> _selectedModelParts;
         private SceneModel _selectedModel;
         private AnimationModel _selectedAnimation;
@@ -63,6 +64,8 @@ namespace AssetsManager.Views.Models.Viewer
 
         public ObservableRangeCollection<SceneModel> LoadedModels => _loadedModels;
         public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
+        public ObservableCollection<MapOutlinerChunkModel> MapOutlineChunks => _mapOutlineChunks;
+        public bool HasMapOutline => _mapOutlineChunks.Count > 0;
 
         public bool IsMeshSyncEnabled
         {
@@ -135,6 +138,24 @@ namespace AssetsManager.Views.Models.Viewer
                     OnPropertyChanged();
                 }
             }
+        }
+
+        internal void SetMapOutline(IEnumerable<MapOutlineChunkData> chunks)
+        {
+            _mapOutlineChunks.Clear();
+            if (chunks != null)
+            {
+                foreach (MapOutlineChunkData chunk in chunks)
+                    _mapOutlineChunks.Add(new MapOutlinerChunkModel(chunk));
+            }
+            OnPropertyChanged(nameof(HasMapOutline));
+        }
+
+        internal void ClearMapOutline()
+        {
+            if (_mapOutlineChunks.Count == 0) return;
+            _mapOutlineChunks.Clear();
+            OnPropertyChanged(nameof(HasMapOutline));
         }
 
         // --- Navigation State (Control Deck v3.3) ---

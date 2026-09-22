@@ -15,7 +15,6 @@ namespace AssetsManager.Services.Viewer.Rendering
     /// </summary>
     public sealed class GlMeshRenderer : IDisposable
     {
-        private const float DefaultLightmapEmissionScale = 0.1f;
         private static readonly Vector3 ReferenceCharacterLightDirection =
             Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
         private static readonly Vector3 ReferenceCharacterLightColor = new(0.4f, 0.4f, 0.4f);
@@ -140,9 +139,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uLightDir2;
         private int _uLightColor2;
         private int _uAmbient;
-        private int _uLightmap;
-        private int _uHasLightmap;
-        private int _uLightMapColorScale;
         private int _uColorTint;
         private int _uAlphaCutoff;
         private int _uMaterialUvRepeat;
@@ -151,8 +147,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uMaterialPremultipliedAlpha;
         private int _uMaterialSrgb;
         private int _uMaterialUsesTextureAlpha;
-        private int _uUsesBakedDiffuse;
-        private int _uHasVertexColor;
         private bool _ready;
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -183,12 +177,11 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (boneBlock != uint.MaxValue)
                 gl.UniformBlockBinding(_program, boneBlock, 0);
 
-            // Initialize static sampler uniform slot assignments once
+            // Initialize static sampler uniform slot assignments once.
             gl.UseProgram(_program);
             gl.Uniform1(_uTex, 0);
-            gl.Uniform1(_uLightmap, 1);
             for (int i = 0; i < _maxAuxiliaryTextures; i++)
-                gl.Uniform1(_uAuxTex[i], i + 2);
+                gl.Uniform1(_uAuxTex[i], i + 1);
             gl.UseProgram(0);
 
             _resources = new GlMeshResourceCache(gl);
@@ -219,9 +212,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             int vertexTextureUnits,
             int combinedTextureUnits)
         {
-            int fragmentCapacity = Math.Max(0, fragmentTextureUnits - 2);
+            int fragmentCapacity = Math.Max(0, fragmentTextureUnits - 1);
             int vertexCapacity = Math.Max(0, vertexTextureUnits);
-            int combinedCapacity = Math.Max(0, (combinedTextureUnits - 2) / 2);
+            int combinedCapacity = Math.Max(0, (combinedTextureUnits - 1) / 2);
             int available = Math.Min(
                 fragmentCapacity,
                 Math.Min(vertexCapacity, combinedCapacity));
@@ -243,17 +236,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             if (!_ready || model == null || !model.IsVisible) return;
 
-            float lightmapScale = DefaultLightmapEmissionScale;
-            if (model.MapLightingProfile is MapLightingProfile mapLighting)
-            {
-                lightDir = mapLighting.SunDirection;
-                lightColor = mapLighting.SunColor;
-                lightDir2 = Vector3.UnitY;
-                lightColor2 = Vector3.Zero;
-                ambientColor = mapLighting.AmbientColor;
-                lightmapScale *= mapLighting.LightMapColorScale;
-            }
-
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
             Matrix4x4 world = CreateWorldMatrix(model);
@@ -274,20 +256,16 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform1(
                 _uEffectTime,
                 (float)((now - materialTimeOrigin) / (double)Stopwatch.Frequency));
-            _gl.Uniform1(_uLightMapColorScale, lightmapScale);
 
             // Per-part state below owns blending, depth and culling. Start and end from
-            // conservative defaults so unbound Map/Diff parts keep their shared behavior unchanged.
+            // conservative defaults so unbound Viewer/Diff parts keep their shared behavior unchanged.
             _gl.Enable(EnableCap.DepthTest);
             _gl.DepthMask(true);
             _gl.Disable(EnableCap.Blend);
             _gl.Disable(EnableCap.CullFace);
-            RenderParts(model, false, false, cameraPosition, world);
-            RenderParts(model, true, false, cameraPosition, world);
-            RenderParts(model, false, true, cameraPosition, world);
-            RenderParts(model, true, true, cameraPosition, world);
+            RenderParts(model, false, cameraPosition, world);
+            RenderParts(model, true, cameraPosition, world);
 
-            _gl.Disable(EnableCap.PolygonOffsetFill);
             _gl.Disable(EnableCap.Blend);
             _gl.Disable(EnableCap.CullFace);
             _gl.Enable(EnableCap.DepthTest);
@@ -410,9 +388,6 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uLightDir2 = gl.GetUniformLocation(_program, "uLightDir2");
             _uLightColor2 = gl.GetUniformLocation(_program, "uLightColor2");
             _uAmbient = gl.GetUniformLocation(_program, "uAmbient");
-            _uLightmap = gl.GetUniformLocation(_program, "uLightmap");
-            _uHasLightmap = gl.GetUniformLocation(_program, "uHasLightmap");
-            _uLightMapColorScale = gl.GetUniformLocation(_program, "uLightMapColorScale");
             _uColorTint = gl.GetUniformLocation(_program, "uColorTint");
             _uAlphaCutoff = gl.GetUniformLocation(_program, "uAlphaCutoff");
             _uMaterialUvRepeat = gl.GetUniformLocation(_program, "uMaterialUvRepeat");
@@ -421,28 +396,16 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uMaterialPremultipliedAlpha = gl.GetUniformLocation(_program, "uMaterialPremultipliedAlpha");
             _uMaterialSrgb = gl.GetUniformLocation(_program, "uMaterialSrgb");
             _uMaterialUsesTextureAlpha = gl.GetUniformLocation(_program, "uMaterialUsesTextureAlpha");
-            _uUsesBakedDiffuse = gl.GetUniformLocation(_program, "uUsesBakedDiffuse");
-            _uHasVertexColor = gl.GetUniformLocation(_program, "uHasVertexColor");
         }
 
-        private void RenderParts(SceneModel model, bool renderDecals, bool alphaBlended, Vector3 cameraPosition, Matrix4x4 world)
+        private void RenderParts(SceneModel model, bool alphaBlended, Vector3 cameraPosition, Matrix4x4 world)
         {
-            if (renderDecals)
-            {
-                _gl.Enable(EnableCap.PolygonOffsetFill);
-                _gl.PolygonOffset(-1f, -1f);
-            }
-            else
-            {
-                _gl.Disable(EnableCap.PolygonOffsetFill);
-            }
-
             IEnumerable<ModelPart> parts = model.Parts;
             if (alphaBlended)
             {
                 _alphaRenderQueue.Clear();
                 foreach (ModelPart part in model.Parts)
-                    if (part.IsVisible && part.IsDecal == renderDecals && part.IsAlphaBlended)
+                    if (part.IsVisible && part.IsAlphaBlended)
                         _alphaRenderQueue.Add(part);
 
                 _alphaRenderQueue.Sort((left, right) =>
@@ -455,12 +418,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             foreach (ModelPart part in parts)
             {
-                if (!part.IsVisible ||
-                    part.IsDecal != renderDecals ||
-                    part.IsAlphaBlended != alphaBlended)
-                {
+                if (!part.IsVisible || part.IsAlphaBlended != alphaBlended)
                     continue;
-                }
 
                 GlMeshResourceCache.PartResources resources = _resources.Ensure(model, part);
                 if (resources.Vao == 0) continue;
@@ -512,18 +471,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 bool usesTextureAlpha = material?.UsesTextureAlpha ??
                     (part.UseBaseTextureAlpha || part.AlphaCutoff > 0f);
                 _gl.Uniform1(_uMaterialUsesTextureAlpha, usesTextureAlpha ? 1 : 0);
-                _gl.Uniform1(_uUsesBakedDiffuse, part.UsesBakedDiffuse ? 1 : 0);
-                _gl.Uniform1(_uHasVertexColor, resources.ColorVbo != 0 ? 1 : 0);
                 UploadMaterialEffects(effect, material, resources);
-
-                // --- Lightmap parameters ---
-                bool hasLightmap = resources.LightmapTexture != 0 && resources.LightmapVbo != 0;
-                _gl.Uniform1(_uHasLightmap, hasLightmap ? 1 : 0);
-                if (hasLightmap)
-                {
-                    _gl.ActiveTexture(TextureUnit.Texture1);
-                    _gl.BindTexture(TextureTarget.Texture2D, resources.LightmapTexture);
-                }
 
                 _drawElements?.Invoke(
                     (uint)PrimitiveType.Triangles,
@@ -699,17 +647,17 @@ namespace AssetsManager.Services.Viewer.Rendering
                 }
 
                 bindings[textureKey] = slot;
-                _gl.ActiveTexture(ToTextureUnit(slot + 2));
+                _gl.ActiveTexture(ToTextureUnit(slot + 1));
                 _gl.BindTexture(TextureTarget.Texture2D, texture);
-                _gl.BindSampler((uint)(slot + 2), ResolveAuxiliarySampler(effect, textureKey));
+                _gl.BindSampler((uint)(slot + 1), ResolveAuxiliarySampler(effect, textureKey));
                 slot++;
             }
 
             for (int i = slot; i < _maxAuxiliaryTextures; i++)
             {
-                _gl.ActiveTexture(ToTextureUnit(i + 2));
+                _gl.ActiveTexture(ToTextureUnit(i + 1));
                 _gl.BindTexture(TextureTarget.Texture2D, 0);
-                _gl.BindSampler((uint)(i + 2), 0);
+                _gl.BindSampler((uint)(i + 1), 0);
             }
             return bindings;
         }
@@ -974,7 +922,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UnbindSceneTextures()
         {
-            for (int i = _maxAuxiliaryTextures + 1; i >= 0; i--)
+            for (int i = _maxAuxiliaryTextures; i >= 0; i--)
             {
                 _gl.ActiveTexture(ToTextureUnit(i));
                 _gl.BindTexture(TextureTarget.Texture2D, 0);
