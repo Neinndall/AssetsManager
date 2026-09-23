@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Memory;
@@ -17,14 +18,16 @@ namespace AssetsManager.Views.Models.Viewer
 
         internal sealed class PartData
         {
-            internal PartData(float[] boneIndices, float[] boneWeights)
+            internal PartData(float[] boneIndices, float[] boneWeights, Vector4[] tangents)
             {
                 BoneIndices = boneIndices;
                 BoneWeights = boneWeights;
+                Tangents = tangents;
             }
 
             internal float[] BoneIndices { get; }
             internal float[] BoneWeights { get; }
+            internal Vector4[] Tangents { get; }
             internal int VertexCount => BoneIndices.Length / 4;
         }
 
@@ -64,9 +67,15 @@ namespace AssetsManager.Views.Models.Viewer
                         out VertexElementAccessor blendWeightAccessor)
                     ? blendWeightAccessor.AsVector4Array().ToArray()
                     : null;
+                Vector4[] sourceTangents = skin.VerticesView.TryGetAccessor(
+                        VertexElement.TANGENT.Name,
+                        out VertexElementAccessor tangentAccessor)
+                    ? tangentAccessor.AsVector4Array().ToArray()
+                    : null;
                 int vertexCount = skin.VerticesView.VertexCount;
                 if ((blendIndices != null && blendIndices.Length != vertexCount) ||
-                    (blendWeights != null && blendWeights.Length != vertexCount))
+                    (blendWeights != null && blendWeights.Length != vertexCount) ||
+                    (sourceTangents != null && sourceTangents.Length != vertexCount))
                 {
                     return Fail(out failureReason, "Blend index or weight data is mismatched.");
                 }
@@ -91,6 +100,9 @@ namespace AssetsManager.Views.Models.Viewer
 
                     var directBoneIndices = new float[sourceVertexIndices.Length * 4];
                     var weights = new float[sourceVertexIndices.Length * 4];
+                    Vector4[] tangents = sourceTangents == null
+                        ? null
+                        : new Vector4[sourceVertexIndices.Length];
 
                     for (int localVertex = 0; localVertex < sourceVertexIndices.Length; localVertex++)
                     {
@@ -119,9 +131,11 @@ namespace AssetsManager.Views.Models.Viewer
                         weights[destination + 1] = sourceWeights.Y;
                         weights[destination + 2] = sourceWeights.Z;
                         weights[destination + 3] = sourceWeights.W;
+                        if (tangents != null)
+                            tangents[localVertex] = sourceTangents[sourceVertex];
                     }
 
-                    parts[part] = new PartData(directBoneIndices, weights);
+                    parts[part] = new PartData(directBoneIndices, weights, tangents);
                 }
 
                 return new GpuSkinningData(parts);

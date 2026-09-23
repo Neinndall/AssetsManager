@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using AssetsManager.Shaders;
@@ -15,9 +15,9 @@ namespace AssetsManager.Services.Viewer.Rendering
 {
     /// <summary>
     /// OpenGL execution layer for translated game material programs. Resolution/translation stay in
-    /// MapGameShaderProgramResolver/Translator; this class owns only GL programs, UBOs and bindings.
+    /// GameShaderProgramResolver/Translator; this class owns only GL programs, UBOs and bindings.
     /// </summary>
-    internal sealed class MapGameShaderRuntime : IDisposable
+    internal sealed class GameShaderRuntime : IDisposable
     {
         private const string Globals = "$Globals";
         private const string MaterialTextureSuffix = "__TX";
@@ -37,6 +37,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3 Eye,
             float TimeSeconds,
             MapSunData Sun);
+
+        private readonly record struct CharacterDraw(
+            Matrix4x4 World,
+            IReadOnlyList<Matrix4x4> Bones);
 
         private sealed class BlockRuntime
         {
@@ -95,7 +99,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly AppSettings _settings;
         private readonly string _shaderCachePath;
         private readonly WadFile _shaderCache;
-        private readonly Dictionary<MapMaterialDefinition, CacheEntry> _programs =
+        private readonly Dictionary<object, CacheEntry> _programs =
             new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<string, ProgramRuntime> _sharedPrograms =
             new(StringComparer.Ordinal);
@@ -107,12 +111,12 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _maxTextureUnits;
         private bool _disposed;
 
-        internal MapGameShaderRuntime(GL gl, bool gles, AppSettings settings)
+        internal GameShaderRuntime(GL gl, bool gles, AppSettings settings)
         {
             _gl = gl ?? throw new ArgumentNullException(nameof(gl));
             _gles = gles;
             _settings = settings;
-            _shaderCachePath = MapGameShaderProgramResolver.FindShaderCachePath(settings);
+            _shaderCachePath = GameShaderProgramResolver.FindShaderCachePath(settings);
             if (!string.IsNullOrWhiteSpace(_shaderCachePath))
             {
                 try
@@ -137,16 +141,40 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (_disposed || material?.Program == null || material.Program.Kind != MapMaterialKind.StaticMesh)
                 return false;
 
-            CacheEntry entry = GetOrCreate(material);
+            CacheEntry entry = GetOrCreate(material, material.Program);
             ProgramRuntime runtime = entry?.Program;
             if (runtime == null)
                 return false;
 
             _gl.UseProgram(runtime.Program);
-            ApplyGenericAttributeDefaults(runtime.Attributes);
-            UpdateBlocks(runtime, entry.Pass, mesh, frame);
+            ApplyGenericAttributeDefaults(runtime.Attributes, MapMaterialKind.StaticMesh, hasTangents: false);
+            UpdateBlocks(runtime, entry.Pass, mesh, frame, null);
             BindTextures(runtime, entry.Pass, material, mesh, programTexture, lightmapTexture);
             ApplyPassState(entry.Pass.State, meshDoubleSided);
+            return true;
+        }
+
+        internal bool TryBindSkinned(
+            ModelMaterialDefinition material,
+            Matrix4x4 world,
+            IReadOnlyList<Matrix4x4> bones,
+            bool hasTangents,
+            in Frame frame,
+            Func<string, uint?> programTexture)
+        {
+            if (_disposed || material?.Program == null || material.Program.Kind != MapMaterialKind.SkinnedMesh)
+                return false;
+
+            CacheEntry entry = GetOrCreate(material, material.Program);
+            ProgramRuntime runtime = entry?.Program;
+            if (runtime == null)
+                return false;
+
+            _gl.UseProgram(runtime.Program);
+            ApplyGenericAttributeDefaults(runtime.Attributes, MapMaterialKind.SkinnedMesh, hasTangents);
+            UpdateBlocks(runtime, entry.Pass, null, frame, new CharacterDraw(world, bones));
+            BindSkinnedTextures(runtime, entry.Pass, programTexture);
+            ApplyPassState(entry.Pass.State, material.RenderState.DoubleSided);
             return true;
         }
 
@@ -155,9 +183,14 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ? entry.Failure
                 : null;
 
-        private CacheEntry GetOrCreate(MapMaterialDefinition material)
+        internal string FailureFor(ModelMaterialDefinition material) =>
+            material != null && _programs.TryGetValue(material, out CacheEntry entry)
+                ? entry.Failure
+                : null;
+
+        private CacheEntry GetOrCreate(object owner, MapResolvedMaterialProgramData program)
         {
-            if (_programs.TryGetValue(material, out CacheEntry cached))
+            if (owner != null && _programs.TryGetValue(owner, out CacheEntry cached))
                 return cached;
 
             CacheEntry created;
@@ -174,9 +207,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                 }
                 else
                 {
-                    MapGameShaderProgramResolver.ShaderBytecodeMaterialProgram bytecodes =
-                        MapGameShaderProgramResolver.ReadProgram(
-                            material.Program,
+                    GameShaderProgramResolver.ShaderBytecodeMaterialProgram bytecodes =
+                        GameShaderProgramResolver.ReadProgram(
+                            program,
                             _shaderCache,
                             _shaderCachePath);
                     if (bytecodes == null)
@@ -188,7 +221,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         ProgramRuntime ready = null;
                         MapResolvedMaterialPassData readyPass = null;
                         var failures = new List<string>();
-                        foreach (MapGameShaderProgramResolver.ShaderBytecodePassRead passRead in bytecodes.Passes)
+                        foreach (GameShaderProgramResolver.ShaderBytecodePassRead passRead in bytecodes.Passes)
                         {
                             if (passRead?.Bytecode?.Ready != true)
                             {
@@ -219,7 +252,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
                             try
                             {
-                                ready = CreateProgram(translated.Program);
+                                ready = CreateProgram(translated.Program, program.Kind);
                                 _sharedPrograms[key] = ready;
                                 readyPass = passRead.Pass;
                                 break;
@@ -242,13 +275,16 @@ namespace AssetsManager.Services.Viewer.Rendering
                 created = new CacheEntry(null, null, ex.Message);
             }
 
-            _programs[material] = created;
+            if (owner != null)
+                _programs[owner] = created;
             return created;
         }
 
-        private ProgramRuntime CreateProgram(GameShaderTranslator.TranslatedProgram translated)
+        private ProgramRuntime CreateProgram(
+            GameShaderTranslator.TranslatedProgram translated,
+            MapMaterialKind kind)
         {
-            IReadOnlyDictionary<uint, string> attributes = AttributeLocations(translated.Vertex.Sidecar.Attributes);
+            IReadOnlyDictionary<uint, string> attributes = AttributeLocations(translated.Vertex.Sidecar.Attributes, kind);
             string vertex = SourceForProfile(translated.Vertex.Glsl, vertexStage: true);
             string pixel = SourceForProfile(translated.Pixel.Glsl, vertexStage: false);
             uint program = GlShaderCompiler.CreateRawProgram(_gl, vertex, pixel, attributes);
@@ -323,9 +359,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             string result = source ?? string.Empty;
             if (vertexStage)
             {
-                // SPIRV-Cross may preserve Vulkan interface locations. The MAP VAO has stable
-                // engine semantics at 0..3, so remove only vertex-input locations and let
-                // glBindAttribLocation apply the same name-to-stream aliases LTK gives Three.js.
+                // SPIRV-Cross may preserve Vulkan interface locations. The renderer owns stable
+                // engine semantics, so remove only vertex-input locations and let
+                // glBindAttribLocation apply the translated name-to-stream mapping.
                 result = Regex.Replace(
                     result,
                     @"(?m)^\s*layout\(location\s*=\s*\d+\)\s+(?=in\s)",
@@ -355,7 +391,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private static string ProgramKey(
             MapResolvedMaterialPassData pass,
-            MapGameShaderProgramResolver.ShaderBytecodeProgram bytecode)
+            GameShaderProgramResolver.ShaderBytecodeProgram bytecode)
         {
             string shader = pass?.ShaderPath ?? string.Empty;
             string defines = string.Join(
@@ -366,34 +402,55 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         private static IReadOnlyDictionary<uint, string> AttributeLocations(
-            IReadOnlyList<GameShaderTranslator.AttributeBinding> attributes)
+            IReadOnlyList<GameShaderTranslator.AttributeBinding> attributes,
+            MapMaterialKind kind)
         {
             var result = new Dictionary<uint, string>();
-            uint next = 7;
+            uint next = kind == MapMaterialKind.SkinnedMesh ? 7u : 7u;
             foreach (GameShaderTranslator.AttributeBinding attribute in attributes ?? Array.Empty<GameShaderTranslator.AttributeBinding>())
             {
-                uint location = (attribute.Semantic.ToUpperInvariant(), attribute.Index) switch
-                {
-                    ("POSITION", _) => 0,
-                    ("NORMAL", _) => 1,
-                    ("TEXCOORD", 0) => 2,
-                    ("TEXCOORD", 7) => 3,
-                    ("COLOR", _) => 4,
-                    ("TEXCOORD", 5) => 5,
-                    ("TEXCOORD", 6) => 6,
-                    _ => next++
-                };
+                string semantic = attribute.Semantic.ToUpperInvariant();
+                uint location = kind == MapMaterialKind.SkinnedMesh
+                    ? (semantic, attribute.Index) switch
+                    {
+                        ("POSITION", _) => 0,
+                        ("NORMAL", _) => 1,
+                        ("TEXCOORD", 0) => 2,
+                        ("TANGENT", _) => 3,
+                        ("COLOR", _) => 4,
+                        ("BLENDINDICES", _) => 5,
+                        ("BLENDWEIGHT", _) => 6,
+                        _ => next++
+                    }
+                    : (semantic, attribute.Index) switch
+                    {
+                        ("POSITION", _) => 0,
+                        ("NORMAL", _) => 1,
+                        ("TEXCOORD", 0) => 2,
+                        ("TEXCOORD", 7) => 3,
+                        ("COLOR", _) => 4,
+                        ("TEXCOORD", 5) => 5,
+                        ("TEXCOORD", 6) => 6,
+                        _ => next++
+                    };
                 result[location] = attribute.GlslName;
             }
             return result;
         }
 
-        private void ApplyGenericAttributeDefaults(IReadOnlyDictionary<uint, string> attributes)
+        private void ApplyGenericAttributeDefaults(
+            IReadOnlyDictionary<uint, string> attributes,
+            MapMaterialKind kind,
+            bool hasTangents)
         {
             foreach ((uint location, string name) in attributes)
             {
-                if (location <= 3)
+                bool provided = kind == MapMaterialKind.SkinnedMesh
+                    ? location is 0 or 1 or 2 or 5 or 6 || (location == 3 && hasTangents)
+                    : location <= 3;
+                if (provided)
                     continue;
+
                 _gl.DisableVertexAttribArray(location);
                 if (name.Contains("COLOR", StringComparison.OrdinalIgnoreCase))
                     _gl.VertexAttrib4(location, 1f, 1f, 1f, 1f);
@@ -408,8 +465,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             ProgramRuntime runtime,
             MapResolvedMaterialPassData pass,
             MapGeometryMeshData mesh,
-            in Frame frame)
+            in Frame frame,
+            CharacterDraw? character)
         {
+            bool skinned = character.HasValue;
             foreach (BlockRuntime block in runtime.Blocks)
             {
                 Array.Clear(block.Data, 0, block.Data.Length);
@@ -419,10 +478,19 @@ namespace AssetsManager.Services.Viewer.Rendering
                         WriteGlobals(block.Data, block.Block, pass, mesh);
                         break;
                     case "PerFrameVertexCB":
-                        WritePerFrameVertex(block.Data, frame);
+                        WritePerFrameVertex(block.Data, frame, skinned);
                         break;
                     case "PerFramePixelCB":
-                        WritePerFramePixel(block.Data, frame);
+                        WritePerFramePixel(block.Data, frame, skinned);
+                        break;
+                    case "CharacterPerDrawVertexCB" when character.HasValue:
+                        WriteCharacterPerDrawVertex(block.Data, frame);
+                        break;
+                    case "CharacterPerDrawPS" when character.HasValue:
+                        WriteCharacterPerDrawPixel(block.Data);
+                        break;
+                    case "BonesCB" when character.HasValue:
+                        WriteBones(block.Data, character.Value);
                         break;
                 }
 
@@ -487,30 +555,38 @@ namespace AssetsManager.Services.Viewer.Rendering
             Set(data, at + 3, channel?.Bias.Y ?? 0f);
         }
 
-        private static void WritePerFrameVertex(float[] data, in Frame frame)
+        private static void WritePerFrameVertex(float[] data, in Frame frame, bool skinned)
         {
             Matrix4x4 mirror = Matrix4x4.CreateScale(-1f, 1f, 1f);
-            Matrix4x4 clip = mirror * frame.View * frame.Projection;
+            Matrix4x4 clip = skinned
+                ? frame.View * frame.Projection
+                : mirror * frame.View * frame.Projection;
             Matrix4x4.Invert(frame.View, out Matrix4x4 cameraWorld);
-            Vector3 eye = new(-frame.Eye.X, frame.Eye.Y, frame.Eye.Z);
-            Vector3 direction = ResolveSunDirection(frame.Sun);
+            Vector3 eye = skinned
+                ? frame.Eye
+                : new Vector3(-frame.Eye.X, frame.Eye.Y, frame.Eye.Z);
+            Vector3 direction = ResolveSunDirection(frame.Sun, skinned);
 
-            WriteMatrixRows(data, 0, clip);
+            WriteClipRows(data, 0, clip);
             WriteVector3(data, 16, eye);
             Set(data, 20, frame.TimeSeconds);
-            WriteMatrixRows(data, 28, clip);
+            WriteClipRows(data, 28, clip);
             WriteMatrixRows(data, 96, frame.View);
             WriteMatrixRows(data, 112, cameraWorld);
             WriteVector3(data, 132, direction);
         }
 
-        private static void WritePerFramePixel(float[] data, in Frame frame)
+        private static void WritePerFramePixel(float[] data, in Frame frame, bool skinned)
         {
             ResolveSun(frame.Sun, out Vector3 color, out float intensity, out Vector3 sky, out float skyScale,
                 out Vector3 direction, out float lightMapScale, out bool fogEnabled, out Vector3 fog,
                 out Vector3 fogAlternate, out Vector2 fogStartEnd, out float fogEmissive);
             Matrix4x4.Invert(frame.View, out Matrix4x4 cameraWorld);
-            Vector3 eye = new(-frame.Eye.X, frame.Eye.Y, frame.Eye.Z);
+            Vector3 eye = skinned
+                ? frame.Eye
+                : new Vector3(-frame.Eye.X, frame.Eye.Y, frame.Eye.Z);
+            if (skinned)
+                direction.X = -direction.X;
             Vector3 sun = color * intensity;
             Vector3 shadow = sky * skyScale;
             Vector3 complement = Vector3.Max(sun - shadow, Vector3.Zero);
@@ -543,6 +619,133 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
             WriteMatrixRows(data, 68, frame.View);
             WriteMatrixRows(data, 104, cameraWorld);
+        }
+
+        private static void WriteCharacterPerDrawVertex(float[] data, in Frame frame)
+        {
+            WriteIdentityRows(data, 0, 16);
+            ResolveSun(
+                frame.Sun,
+                out Vector3 color,
+                out float intensity,
+                out Vector3 sky,
+                out float skyScale,
+                out Vector3 direction,
+                out _,
+                out _,
+                out _,
+                out _,
+                out _,
+                out _);
+            direction.X = -direction.X;
+            Vector3 ground = frame.Sun == null
+                ? sky
+                : new Vector3(frame.Sun.GroundColor.X, frame.Sun.GroundColor.Y, frame.Sun.GroundColor.Z);
+            Vector3 horizon = frame.Sun == null
+                ? sky
+                : new Vector3(frame.Sun.HorizonColor.X, frame.Sun.HorizonColor.Y, frame.Sun.HorizonColor.Z);
+            Vector3 sun = color * intensity;
+            Vector3[] faces =
+            {
+                Vector3.UnitX,
+                -Vector3.UnitX,
+                Vector3.UnitY,
+                -Vector3.UnitY,
+                Vector3.UnitZ,
+                -Vector3.UnitZ
+            };
+
+            for (int face = 0; face < faces.Length; face++)
+            {
+                Vector3 axis = faces[face];
+                Vector3 basis = axis.Y > 0f ? sky : axis.Y < 0f ? ground : horizon;
+                Vector3 shaded = basis * skyScale;
+                float facing = MathF.Max(Vector3.Dot(axis, direction), 0f);
+                Vector3 lit = shaded + Vector3.Max(sun - shaded, Vector3.Zero) * facing;
+                int at = 16 + face * 4;
+                WriteVector3(data, at, lit);
+                Set(data, at + 3, 1f);
+            }
+            WriteIdentityRows(data, 44, 16);
+        }
+
+        private static void WriteCharacterPerDrawPixel(float[] data)
+        {
+            Set(data, 7, 1f);
+            Set(data, 8, 1f);
+            Set(data, 9, 1f);
+            WriteIdentityRows(data, 16, 16);
+            WriteIdentityRows(data, 32, 16);
+        }
+
+        private static void WriteBones(float[] data, in CharacterDraw character)
+        {
+            IReadOnlyList<Matrix4x4> bones = character.Bones;
+            if (bones == null || bones.Count == 0)
+                return;
+
+            int count = Math.Min(256, Math.Min(bones.Count, data.Length / 12));
+            for (int bone = 0; bone < count; bone++)
+            {
+                Matrix4x4 matrix = bones[bone] * character.World;
+                int at = bone * 12;
+                Set(data, at + 0, matrix.M11); Set(data, at + 1, matrix.M21); Set(data, at + 2, matrix.M31); Set(data, at + 3, matrix.M41);
+                Set(data, at + 4, matrix.M12); Set(data, at + 5, matrix.M22); Set(data, at + 6, matrix.M32); Set(data, at + 7, matrix.M42);
+                Set(data, at + 8, matrix.M13); Set(data, at + 9, matrix.M23); Set(data, at + 10, matrix.M33); Set(data, at + 11, matrix.M43);
+            }
+        }
+
+        private void BindSkinnedTextures(
+            ProgramRuntime runtime,
+            MapResolvedMaterialPassData pass,
+            Func<string, uint?> programTexture)
+        {
+            foreach (SamplerRuntime sampler in runtime.Samplers)
+            {
+                string name = sampler.TextureName;
+                uint texture;
+                TextureTarget target;
+                uint samplerObject;
+
+                if (name.EndsWith(SharedTextureSuffix, StringComparison.Ordinal))
+                {
+                    (texture, target) = NeutralFor(sampler.Dimension, black: true);
+                    samplerObject = ResolveNeutralSampler(clamp: true);
+                }
+                else
+                {
+                    string own = name.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
+                        ? name[..^MaterialTextureSuffix.Length]
+                        : name;
+                    MapMaterialPassTextureData declared = pass.Textures?
+                        .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
+                    string authoredPath = declared?.Texture?.VirtualPath;
+                    if (string.IsNullOrWhiteSpace(authoredPath) && declared?.Texture?.PathHash > 0)
+                        authoredPath = declared.Texture.PathHash.ToString("x16");
+                    uint? loaded = sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D &&
+                                   !string.IsNullOrWhiteSpace(authoredPath)
+                        ? programTexture?.Invoke(authoredPath)
+                        : null;
+                    if (loaded.HasValue && loaded.Value != 0)
+                    {
+                        texture = loaded.Value;
+                        target = TextureTarget.Texture2D;
+                        samplerObject = declared != null
+                            ? ResolveSampler(declared.Sampler)
+                            : ResolveNeutralSampler(clamp: false);
+                    }
+                    else
+                    {
+                        (texture, target) = NeutralFor(sampler.Dimension, black: false);
+                        samplerObject = ResolveNeutralSampler(clamp: true);
+                    }
+                }
+
+                _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + sampler.Unit));
+                _gl.BindTexture(target, texture);
+                _gl.BindSampler(sampler.Unit, samplerObject);
+            }
+            _gl.ActiveTexture(TextureUnit.Texture0);
         }
 
         private void BindTextures(
@@ -964,13 +1167,16 @@ namespace AssetsManager.Services.Viewer.Rendering
             fogEmissive = sun.FogEmissiveRemap;
         }
 
-        private static Vector3 ResolveSunDirection(MapSunData sun)
+        private static Vector3 ResolveSunDirection(MapSunData sun, bool skinned = false)
         {
             Vector3 direction = sun?.Direction ?? new Vector3(-0.25f, 0.75f, -0.05f);
-            return float.IsFinite(direction.X) && float.IsFinite(direction.Y) && float.IsFinite(direction.Z) &&
-                   direction.LengthSquared() > 1e-12f
+            direction = float.IsFinite(direction.X) && float.IsFinite(direction.Y) && float.IsFinite(direction.Z) &&
+                        direction.LengthSquared() > 1e-12f
                 ? Vector3.Normalize(direction)
                 : Vector3.Normalize(new Vector3(-0.25f, 0.75f, -0.05f));
+            if (skinned)
+                direction.X = -direction.X;
+            return direction;
         }
 
         private static void WriteVector4(float[] data, int at, int count, Vector4 value)
@@ -993,6 +1199,18 @@ namespace AssetsManager.Services.Viewer.Rendering
             int rows = Math.Min(4, floats / 4);
             for (int row = 0; row < rows; row++)
                 Set(data, at + row * 4 + row, 1f);
+        }
+
+        private static void WriteClipRows(float[] data, int at, Matrix4x4 matrix)
+        {
+            WriteMatrixRows(data, at, matrix);
+            for (int column = 0; column < 4; column++)
+            {
+                int z = at + 8 + column;
+                int w = at + 12 + column;
+                if ((uint)z < (uint)data.Length && (uint)w < (uint)data.Length)
+                    data[z] = (data[z] + data[w]) * 0.5f;
+            }
         }
 
         /// <summary>

@@ -225,7 +225,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 shaderPath,
                 effect ?? ModelMaterialEffectDefinition.None)
             {
-                HasAuthoredTint = hasTint
+                HasAuthoredTint = hasTint,
+                Program = material.Program
             };
         }
 

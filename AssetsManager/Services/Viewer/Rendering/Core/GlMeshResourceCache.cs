@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using Silk.NET.OpenGL;
+using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 
@@ -32,6 +33,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 new(StringComparer.OrdinalIgnoreCase);
             internal readonly Dictionary<string, BitmapSource> LoadedAuxiliaryBitmaps =
                 new(StringComparer.OrdinalIgnoreCase);
+            internal readonly Dictionary<string, uint> ProgramTextures =
+                new(StringComparer.OrdinalIgnoreCase);
+            internal readonly Dictionary<string, BitmapSource> LoadedProgramBitmaps =
+                new(StringComparer.OrdinalIgnoreCase);
+            internal uint TangentVbo;
             internal uint BoneIndexVbo;
             internal uint BoneWeightVbo;
             internal GpuSkinningData.PartData SkinningData;
@@ -78,6 +84,28 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             resources = EnsureMeshBuffers(part, resources);
             EnsureSkinningBuffers(model, resources, part);
             return resources;
+        }
+
+        internal uint? ResolveProgramTexture(ModelPart part, PartResources resources, string authoredPath)
+        {
+            if (part?.AllTextures == null || resources == null || string.IsNullOrWhiteSpace(authoredPath))
+                return null;
+
+            string key = SknMaterialTextureResolver.MatchTextureKey(
+                authoredPath,
+                part.AllTextures.Keys.ToArray());
+            if (string.IsNullOrWhiteSpace(key))
+                return null;
+            if (resources.ProgramTextures.TryGetValue(key, out uint cached))
+                return cached;
+
+            BitmapSource bitmap = TextureUtils.ResolveTexture(part.AllTextures, key);
+            if (bitmap == null)
+                return null;
+            uint texture = AcquireTexture(_sharedTextures, bitmap, () => UploadTexture(bitmap));
+            resources.LoadedProgramBitmaps[key] = bitmap;
+            resources.ProgramTextures[key] = texture;
+            return texture;
         }
 
         internal void QueueRelease(SceneModel model)
@@ -163,13 +191,33 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             resources.BoneWeightVbo = _gl.GenBuffer();
 
             _gl.BindVertexArray(resources.Vao);
+            if (skinningData.Tangents != null && skinningData.Tangents.Length == resources.VertexCount)
+            {
+                resources.TangentVbo = _gl.GenBuffer();
+                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.TangentVbo);
+                _gl.BufferData(
+                    BufferTargetARB.ArrayBuffer,
+                    new ReadOnlySpan<System.Numerics.Vector4>(skinningData.Tangents),
+                    BufferUsageARB.StaticDraw);
+                ConfigureVertexAttribute(3, 4, 4 * sizeof(float), IntPtr.Zero);
+            }
 
+            ushort[] boneIndices = skinningData.BoneIndices
+                .Select(value => checked((ushort)Math.Clamp((int)MathF.Round(value), 0, ushort.MaxValue)))
+                .ToArray();
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.BoneIndexVbo);
             _gl.BufferData(
                 BufferTargetARB.ArrayBuffer,
-                new ReadOnlySpan<float>(skinningData.BoneIndices),
+                new ReadOnlySpan<ushort>(boneIndices),
                 BufferUsageARB.StaticDraw);
-            ConfigureVertexAttribute(5, 4, 4 * sizeof(float), IntPtr.Zero);
+            _gl.EnableVertexAttribArray(5);
+            _gl.VertexAttribPointer(
+                5,
+                4,
+                VertexAttribPointerType.UnsignedShort,
+                false,
+                4 * sizeof(ushort),
+                IntPtr.Zero);
 
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.BoneWeightVbo);
             _gl.BufferData(
@@ -185,8 +233,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         private void ReleaseSkinningBuffers(PartResources resources)
         {
+            DeleteHandle(resources.TangentVbo, _gl.DeleteBuffer);
             DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
             DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
+            resources.TangentVbo = 0;
             resources.BoneIndexVbo = 0;
             resources.BoneWeightVbo = 0;
             resources.SkinningData = null;
@@ -291,6 +341,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
             ReleaseBaseTexture(resources);
             ReleaseAuxiliaryTextures(resources);
+            ReleaseProgramTextures(resources);
             DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
             DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
             DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
@@ -323,6 +374,14 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             resources.AuxiliaryTextures.Clear();
             resources.LoadedAuxiliaryBitmaps.Clear();
             resources.AuxiliaryTextureSignature = null;
+        }
+
+        private void ReleaseProgramTextures(PartResources resources)
+        {
+            foreach (BitmapSource bitmap in resources.LoadedProgramBitmaps.Values)
+                ReleaseSharedTexture(_sharedTextures, bitmap);
+            resources.ProgramTextures.Clear();
+            resources.LoadedProgramBitmaps.Clear();
         }
 
         private void ReleaseSharedTexture(

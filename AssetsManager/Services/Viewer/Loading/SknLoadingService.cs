@@ -20,6 +20,7 @@ using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Views.Models.Viewer;
 
@@ -29,16 +30,23 @@ namespace AssetsManager.Services.Viewer.Loading
     public class SknLoadingService
     {
         private const int MaximumLinkedMaterialBins = 32;
+        private const string ShaderDefinitionsPath = "data/shaders/shaders.bin";
         private readonly LogService _logService;
         private readonly HashResolverService _hashResolverService;
+        private readonly MapAssetResolver _assetResolver;
 
 
         public SknLoadingService(
             LogService logService,
-            HashResolverService hashResolverService = null)
+            HashResolverService hashResolverService = null,
+            WadContentProvider wadContentProvider = null,
+            AppSettings appSettings = null)
         {
             _logService = logService;
             _hashResolverService = hashResolverService;
+            _assetResolver = wadContentProvider != null && appSettings != null
+                ? new MapAssetResolver(wadContentProvider, appSettings)
+                : null;
         }
 
         // Loads an SKN model and its textures from a custom texture directory (for chromas).
@@ -64,11 +72,12 @@ namespace AssetsManager.Services.Viewer.Loading
                     // Chroma folders contain the replacement color maps, while the exact skin BIN
                     // may reference shared/parent-skin effect maps. Load those dependencies as well;
                     // the dictionary keeps the chroma files authoritative when names collide.
-                    var materialTextures = LoadMaterialTextures(
+                    var materialTextures = await LoadMaterialTexturesAsync(
                         textureDirectoryPath,
                         loadedTextures,
                         true,
-                        targetSknPath: filePath);
+                        targetSknPath: filePath,
+                        cancellationToken: cancellationToken);
 
                     _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
                     return await CreateSceneModel(
@@ -126,12 +135,13 @@ namespace AssetsManager.Services.Viewer.Loading
 
                     var loadedTextures = LoadTexturesFromDirectory(modelDirectory, cancellationToken);
                     string[] selectableTextureKeys = loadedTextures.Keys.ToArray();
-                    var materialTextures = LoadMaterialTextures(
+                    var materialTextures = await LoadMaterialTexturesAsync(
                         filePath,
                         loadedTextures,
                         true,
                         explicitSkinBinPath,
-                        filePath);
+                        filePath,
+                        cancellationToken);
 
                     _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
                     return await CreateSceneModel(
@@ -389,12 +399,13 @@ namespace AssetsManager.Services.Viewer.Loading
             });
         }
 
-        private SknMaterialTextureResolution LoadMaterialTextures(
+        private async Task<SknMaterialTextureResolution> LoadMaterialTexturesAsync(
             string assetPath,
             Dictionary<string, BitmapSource> loadedTextures,
             bool loadReferencedTextures,
             string explicitSkinBinPath = null,
-            string targetSknPath = null)
+            string targetSknPath = null,
+            CancellationToken cancellationToken = default)
         {
             string skinBinPath = !string.IsNullOrWhiteSpace(explicitSkinBinPath) && File.Exists(explicitSkinBinPath)
                 ? Path.GetFullPath(explicitSkinBinPath)
@@ -433,8 +444,31 @@ namespace AssetsManager.Services.Viewer.Loading
                     }
                     catch (Exception ex)
                     {
-                        // Shader definitions are optional; material-authored values remain valid when the shared file is absent or unreadable.
-                        _logService.LogDebug($"Could not read optional shader definitions '{shaderBinPath}': {ex.Message}");
+                        _logService.LogDebug($"Could not read shader definitions '{shaderBinPath}': {ex.Message}");
+                    }
+                }
+                else if (_assetResolver != null)
+                {
+                    try
+                    {
+                        MapResolvedAsset shaderAsset = await _assetResolver.ResolveVirtualAsync(
+                            ShaderDefinitionsPath,
+                            Path.GetDirectoryName(assetPath),
+                            cancellationToken);
+                        if (shaderAsset != null)
+                        {
+                            await using Stream shaderStream = await _assetResolver.OpenReadAsync(shaderAsset, cancellationToken);
+                            if (shaderStream != null)
+                                shaderTrees.Add(new BinTree(shaderStream));
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogDebug($"Could not resolve installed shader definitions: {ex.Message}");
                     }
                 }
 
@@ -455,15 +489,45 @@ namespace AssetsManager.Services.Viewer.Loading
                 {
                     foreach (string texturePath in metadata.ReferencedTexturePaths)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         string resolvedPath =
                             SknMaterialTextureResolver.TryResolveTexturePath(assetPath, texturePath);
                         if (resolvedPath != null)
                         {
                             string textureKey = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(resolvedPath));
                             if (!loadedTextures.ContainsKey(textureKey))
-                            {
                                 LoadTextureFile(resolvedPath, loadedTextures);
-                            }
+                            continue;
+                        }
+
+                        if (_assetResolver == null)
+                            continue;
+                        try
+                        {
+                            MapResolvedAsset textureAsset = await _assetResolver.ResolveVirtualAsync(
+                                texturePath,
+                                Path.GetDirectoryName(assetPath),
+                                cancellationToken);
+                            if (textureAsset == null)
+                                continue;
+                            await using Stream textureStream = await _assetResolver.OpenReadAsync(textureAsset, cancellationToken);
+                            if (textureStream == null)
+                                continue;
+                            string extension = MapTextureLoadingService.DetectTextureExtension(textureStream, texturePath);
+                            BitmapSource bitmap = TextureUtils.LoadViewerTexture(textureStream, extension);
+                            if (bitmap == null)
+                                continue;
+                            string textureKey = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(texturePath));
+                            if (!string.IsNullOrWhiteSpace(textureKey) && !loadedTextures.ContainsKey(textureKey))
+                                loadedTextures[textureKey] = bitmap;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logService.LogDebug($"Could not resolve material texture '{texturePath}': {ex.Message}");
                         }
                     }
                 }

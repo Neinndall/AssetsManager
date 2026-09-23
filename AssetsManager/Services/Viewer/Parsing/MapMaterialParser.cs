@@ -117,7 +117,7 @@ namespace AssetsManager.Services.Viewer.Parsing
 
             MapResolvedMaterialProgramData program = ResolveProgram(
                 material.Properties,
-                shaders,
+                shaders == null ? Array.Empty<BinTree>() : new[] { shaders },
                 passes,
                 animated,
                 warnings);
@@ -193,33 +193,36 @@ namespace AssetsManager.Services.Viewer.Parsing
         private MapShaderDefinitionData ReadShaderDefinition(
             BinTree shaders,
             uint shaderHash,
+            ICollection<string> warnings) =>
+            ReadShaderDefinition(
+                shaders == null ? Array.Empty<BinTree>() : new[] { shaders },
+                shaderHash,
+                warnings);
+
+        private MapShaderDefinitionData ReadShaderDefinition(
+            IEnumerable<BinTree> shaderTrees,
+            uint shaderHash,
             ICollection<string> warnings)
         {
             if (shaderHash == 0)
                 return null;
 
-            if (shaders?.Objects == null)
+            BinTree[] trees = (shaderTrees ?? Enumerable.Empty<BinTree>())
+                .Where(tree => tree?.Objects != null)
+                .ToArray();
+            if (trees.Length == 0)
             {
                 warnings.Add("NoShaderDefs");
-                return new MapShaderDefinitionData(
-                    ResolveBinEntry(shaderHash),
-                    Array.Empty<MapMaterialSamplerData>(),
-                    EmptyVectorMap,
-                    EmptyBoolMap,
-                    EmptyStringMap,
-                    false);
+                return UndeclaredShader(shaderHash);
             }
 
-            if (!shaders.Objects.TryGetValue(shaderHash, out BinTreeObject shaderObject))
+            BinTreeObject shaderObject = trees
+                .Select(tree => tree.Objects.TryGetValue(shaderHash, out BinTreeObject candidate) ? candidate : null)
+                .FirstOrDefault(candidate => candidate != null);
+            if (shaderObject == null)
             {
                 warnings.Add($"UnresolvedShader:{shaderHash:x8}");
-                return new MapShaderDefinitionData(
-                    ResolveBinEntry(shaderHash),
-                    Array.Empty<MapMaterialSamplerData>(),
-                    EmptyVectorMap,
-                    EmptyBoolMap,
-                    EmptyStringMap,
-                    false);
+                return UndeclaredShader(shaderHash);
             }
 
             IReadOnlyDictionary<uint, BinTreeProperty> fields = shaderObject.Properties;
@@ -238,6 +241,14 @@ namespace AssetsManager.Services.Viewer.Parsing
                 ReadShaderPhysicalParameters(fields),
                 switchDeclarations);
         }
+
+        private MapShaderDefinitionData UndeclaredShader(uint shaderHash) => new(
+            ResolveBinEntry(shaderHash),
+            Array.Empty<MapMaterialSamplerData>(),
+            EmptyVectorMap,
+            EmptyBoolMap,
+            EmptyStringMap,
+            false);
 
         private IReadOnlyList<MapMaterialSamplerData> ReadMaterialSamplers(
             IReadOnlyDictionary<uint, BinTreeProperty> properties,
@@ -508,9 +519,23 @@ namespace AssetsManager.Services.Viewer.Parsing
             return result;
         }
 
+        internal MapResolvedMaterialProgramData ParseProgram(
+            BinTreeObject material,
+            IEnumerable<BinTree> shaderTrees)
+        {
+            if (material == null)
+                return null;
+
+            var warnings = new List<string>();
+            IReadOnlyList<MapMaterialPassData> passes = ReadPasses(material.Properties, warnings);
+            bool animated = material.Properties.TryGetValue(DynamicMaterial, out BinTreeProperty dynamicValue) &&
+                            dynamicValue is BinTreeStruct;
+            return ResolveProgram(material.Properties, shaderTrees, passes, animated, warnings);
+        }
+
         private MapResolvedMaterialProgramData ResolveProgram(
             IReadOnlyDictionary<uint, BinTreeProperty> material,
-            BinTree shaders,
+            IEnumerable<BinTree> shaderTrees,
             IReadOnlyList<MapMaterialPassData> passes,
             bool animated,
             ICollection<string> warnings)
@@ -521,7 +546,7 @@ namespace AssetsManager.Services.Viewer.Parsing
 
             foreach (MapMaterialPassData pass in passes ?? Array.Empty<MapMaterialPassData>())
             {
-                MapShaderDefinitionData shader = ReadShaderDefinition(shaders, pass.ShaderHash, warnings);
+                MapShaderDefinitionData shader = ReadShaderDefinition(shaderTrees, pass.ShaderHash, warnings);
                 IReadOnlyList<MapMaterialSamplerData> authoredSamplers = ReadMaterialSamplers(material, shader, warnings);
                 IReadOnlyDictionary<string, bool> switches = ResolveProgramSwitches(material, shader, warnings);
                 resolved.Add(new MapResolvedMaterialPassData(

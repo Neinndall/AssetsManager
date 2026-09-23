@@ -147,7 +147,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uWireframePass;
         private int _uWireframeColor;
         private LightState _light = ResolveLight(null);
-        private MapGameShaderRuntime _gameShaderRuntime;
+        private GameShaderRuntime _gameShaderRuntime;
         private bool _gles;
         private bool _ready;
 
@@ -214,7 +214,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             // Keep the large ShaderCache WAD and translated/linked game programs alive for the
             // renderer lifetime. Map variants commonly reuse the same 14-ish permutations.
             _gameShaderRuntime = _appSettings != null
-                ? new MapGameShaderRuntime(_gl, _gles, _appSettings)
+                ? new GameShaderRuntime(_gl, _gles, _appSettings)
                 : null;
             _ready = true;
         }
@@ -331,7 +331,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             VfxPreviewViewMode solidMode = viewMode == VfxPreviewViewMode.Wireframe
                 ? VfxPreviewViewMode.Lit
                 : viewMode;
-            var gameFrame = new MapGameShaderRuntime.Frame(
+            var gameFrame = new GameShaderRuntime.Frame(
                 view,
                 projection,
                 eye,
@@ -429,7 +429,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private void DrawGroups(
             IReadOnlyList<DrawGroup> groups,
             VfxPreviewViewMode viewMode,
-            in MapGameShaderRuntime.Frame gameFrame)
+            in GameShaderRuntime.Frame gameFrame)
         {
             _gl.UseProgram(_program);
             int activeStockMaterial = -1;

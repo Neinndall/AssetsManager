@@ -21,6 +21,7 @@ namespace AssetsManager.Views.Models.Viewer
         ModelMaterialEffectDefinition Effect)
     {
         internal bool HasAuthoredTint { get; init; }
+        internal MapResolvedMaterialProgramData Program { get; init; }
 
         public bool IsLit =>
             BindingKind != ModelMaterialBindingKind.Missing &&

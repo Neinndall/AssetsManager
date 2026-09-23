@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -15,10 +15,10 @@ using LeagueToolkit.Hashing;
 namespace AssetsManager.Services.Viewer.Rendering
 {
     /// <summary>
-    /// Resolves the exact DX11 shader-cache permutation used by current LTK MAIN.
+    /// Resolves the exact DX11 shader-cache permutation required by a resolved game material pass.
     /// Translation to SPIR-V/GLSL is intentionally a separate capability boundary.
     /// </summary>
-    internal static class MapGameShaderProgramResolver
+    internal static class GameShaderProgramResolver
     {
         private const string ShaderCacheRelativePath = @"Game\DATA\FINAL\ShaderCache.dx11.wad.client";
         private const int RecordsPerBundle = 100;

@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
 using AssetsManager.Services.Viewer.Rendering.Core;
+using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 
@@ -20,8 +21,10 @@ namespace AssetsManager.Services.Viewer.Rendering
         private static readonly Vector3 ReferenceCharacterLightColor = new(0.4f, 0.4f, 0.4f);
         private static readonly Vector3 ReferenceCharacterAmbientColor = new(0.6f, 0.6f, 0.6f);
 
+        private readonly AppSettings _appSettings;
         private GL _gl = null!;
         private GlMeshResourceCache _resources = null!;
+        private GameShaderRuntime _gameShaderRuntime;
         private uint _program;
         private uint _boneBuffer;
         private readonly List<ModelPart> _alphaRenderQueue = new();
@@ -147,7 +150,13 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uMaterialPremultipliedAlpha;
         private int _uMaterialSrgb;
         private int _uMaterialUsesTextureAlpha;
+        private bool _gles;
         private bool _ready;
+
+        public GlMeshRenderer(AppSettings appSettings = null)
+        {
+            _appSettings = appSettings;
+        }
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
@@ -166,10 +175,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             _maxAuxiliaryTextures = ResolveAuxiliaryTextureCapacity(gl);
             _uAuxTex = new int[_maxAuxiliaryTextures];
 
-            bool gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
+            _gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
             _program = GlShaderCompiler.CreateProgram(
                 gl,
-                gles,
+                _gles,
                 GlMeshShaderSource.CreateVertex(_maxAuxiliaryTextures),
                 GlMeshShaderSource.CreateFragment(_maxAuxiliaryTextures));
             CacheUniformLocations(gl);
@@ -185,6 +194,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             gl.UseProgram(0);
 
             _resources = new GlMeshResourceCache(gl);
+            _gameShaderRuntime = _appSettings != null
+                ? new GameShaderRuntime(_gl, _gles, _appSettings)
+                : null;
             _boneBuffer = gl.GenBuffer();
             gl.BindBuffer(BufferTargetARB.UniformBuffer, _boneBuffer);
             gl.BufferData(
@@ -227,6 +239,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         public void Render(
             SceneModel model,
             Matrix4x4 viewProj,
+            Matrix4x4 view,
+            Matrix4x4 projection,
             Vector3 cameraPosition,
             Vector3 lightDir,
             Vector3 lightColor,
@@ -236,26 +250,32 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             if (!_ready || model == null || !model.IsVisible) return;
 
-            _gl.UseProgram(_program);
-            _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
             Matrix4x4 world = CreateWorldMatrix(model);
-            _gl.UniformMatrix4(_uWorld, 1, false, in world.M11);
             UploadBoneTransforms(model.SkinningMatrices);
-            _gl.Uniform3(_uLightDir, NormalizeOrDefault(lightDir));
-            _gl.Uniform3(_uLightColor, lightColor);
-            _gl.Uniform3(_uLightDir2, NormalizeOrDefault(lightDir2));
-            _gl.Uniform3(_uLightColor2, lightColor2);
-            _gl.Uniform3(_uAmbient, ambientColor);
-            _gl.Uniform3(_uCameraPosition, cameraPosition);
             long now = Stopwatch.GetTimestamp();
             if (!_materialTimeOrigins.TryGetValue(model, out long materialTimeOrigin))
             {
                 materialTimeOrigin = now;
                 _materialTimeOrigins[model] = materialTimeOrigin;
             }
-            _gl.Uniform1(
-                _uEffectTime,
-                (float)((now - materialTimeOrigin) / (double)Stopwatch.Frequency));
+            float materialTimeSeconds =
+                (float)((now - materialTimeOrigin) / (double)Stopwatch.Frequency);
+            var gameFrame = new GameShaderRuntime.Frame(
+                view,
+                projection,
+                cameraPosition,
+                materialTimeSeconds,
+                null);
+            UseStockProgram(
+                viewProj,
+                world,
+                cameraPosition,
+                lightDir,
+                lightColor,
+                lightDir2,
+                lightColor2,
+                ambientColor,
+                materialTimeSeconds);
 
             // Per-part state below owns blending, depth and culling. Start and end from
             // conservative defaults so unbound Viewer/Diff parts keep their shared behavior unchanged.
@@ -263,8 +283,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.DepthMask(true);
             _gl.Disable(EnableCap.Blend);
             _gl.Disable(EnableCap.CullFace);
-            RenderParts(model, false, cameraPosition, world);
-            RenderParts(model, true, cameraPosition, world);
+            RenderParts(model, false, cameraPosition, world, viewProj, in gameFrame,
+                lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds);
+            RenderParts(model, true, cameraPosition, world, viewProj, in gameFrame,
+                lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds);
 
             _gl.Disable(EnableCap.Blend);
             _gl.Disable(EnableCap.CullFace);
@@ -398,7 +420,72 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uMaterialUsesTextureAlpha = gl.GetUniformLocation(_program, "uMaterialUsesTextureAlpha");
         }
 
-        private void RenderParts(SceneModel model, bool alphaBlended, Vector3 cameraPosition, Matrix4x4 world)
+        private void ConfigureSkinIndexAttribute(
+            GlMeshResourceCache.PartResources resources,
+            bool integer)
+        {
+            if (resources?.BoneIndexVbo == 0)
+                return;
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.BoneIndexVbo);
+            _gl.EnableVertexAttribArray(5);
+            if (integer)
+            {
+                _gl.VertexAttribIPointer(
+                    5,
+                    4,
+                    VertexAttribIType.UnsignedShort,
+                    4 * sizeof(ushort),
+                    IntPtr.Zero);
+            }
+            else
+            {
+                _gl.VertexAttribPointer(
+                    5,
+                    4,
+                    VertexAttribPointerType.UnsignedShort,
+                    false,
+                    4 * sizeof(ushort),
+                    IntPtr.Zero);
+            }
+        }
+
+        private void UseStockProgram(
+            Matrix4x4 viewProj,
+            Matrix4x4 world,
+            Vector3 cameraPosition,
+            Vector3 lightDir,
+            Vector3 lightColor,
+            Vector3 lightDir2,
+            Vector3 lightColor2,
+            Vector3 ambientColor,
+            float materialTimeSeconds)
+        {
+            _gl.UseProgram(_program);
+            _gl.BindBufferBase(BufferTargetARB.UniformBuffer, 0, _boneBuffer);
+            _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
+            _gl.UniformMatrix4(_uWorld, 1, false, in world.M11);
+            _gl.Uniform3(_uLightDir, NormalizeOrDefault(lightDir));
+            _gl.Uniform3(_uLightColor, lightColor);
+            _gl.Uniform3(_uLightDir2, NormalizeOrDefault(lightDir2));
+            _gl.Uniform3(_uLightColor2, lightColor2);
+            _gl.Uniform3(_uAmbient, ambientColor);
+            _gl.Uniform3(_uCameraPosition, cameraPosition);
+            _gl.Uniform1(_uEffectTime, materialTimeSeconds);
+        }
+
+        private void RenderParts(
+            SceneModel model,
+            bool alphaBlended,
+            Vector3 cameraPosition,
+            Matrix4x4 world,
+            Matrix4x4 viewProj,
+            in GameShaderRuntime.Frame gameFrame,
+            Vector3 lightDir,
+            Vector3 lightColor,
+            Vector3 lightDir2,
+            Vector3 lightColor2,
+            Vector3 ambientColor,
+            float materialTimeSeconds)
         {
             IEnumerable<ModelPart> parts = model.Parts;
             if (alphaBlended)
@@ -424,10 +511,50 @@ namespace AssetsManager.Services.Viewer.Rendering
                 GlMeshResourceCache.PartResources resources = _resources.Ensure(model, part);
                 if (resources.Vao == 0) continue;
 
-                ModelMaterialDefinition material = part.MaterialDefinition;
-                ApplyPartRenderState(part, material);
-
                 _gl.BindVertexArray(resources.Vao);
+                ModelMaterialDefinition material = part.MaterialDefinition;
+                bool wantsGameProgram = resources.IsGpuSkinned &&
+                                        model.SkinningMatrices != null &&
+                                        material?.Program != null;
+                if (wantsGameProgram)
+                    ConfigureSkinIndexAttribute(resources, integer: true);
+
+                bool gameBound = wantsGameProgram &&
+                                 _gameShaderRuntime?.TryBindSkinned(
+                                     material,
+                                     world,
+                                     model.SkinningMatrices,
+                                     hasTangents: resources.TangentVbo != 0,
+                                     in gameFrame,
+                                     path => _resources.ResolveProgramTexture(part, resources, path)) == true;
+                if (gameBound)
+                {
+                    _gl.FrontFace(world.GetDeterminant() < 0f
+                        ? FrontFaceDirection.CW
+                        : FrontFaceDirection.Ccw);
+                    _drawElements?.Invoke(
+                        (uint)PrimitiveType.Triangles,
+                        resources.IndexCount,
+                        (uint)DrawElementsType.UnsignedInt,
+                        IntPtr.Zero);
+                    _gameShaderRuntime.ResetBindings();
+                    lastBoundTex0 = uint.MaxValue;
+                    continue;
+                }
+
+                if (resources.IsGpuSkinned)
+                    ConfigureSkinIndexAttribute(resources, integer: false);
+                UseStockProgram(
+                    viewProj,
+                    world,
+                    cameraPosition,
+                    lightDir,
+                    lightColor,
+                    lightDir2,
+                    lightColor2,
+                    ambientColor,
+                    materialTimeSeconds);
+                ApplyPartRenderState(part, material);
                 _gl.Uniform1(
                     _uUseSkinning,
                     resources.IsGpuSkinned && model.SkinningMatrices != null ? 1 : 0);
@@ -998,6 +1125,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             try
             {
+                _gameShaderRuntime?.Dispose();
+                _gameShaderRuntime = null;
                 _resources?.Dispose();
                 foreach (uint sampler in _auxiliarySamplers.Values)
                 {
@@ -1021,6 +1150,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
             finally
             {
+                _gameShaderRuntime = null;
                 _boneBuffer = 0;
                 _program = 0;
                 _ready = false;

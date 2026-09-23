@@ -165,7 +165,7 @@ namespace AssetsManager.Views.Controls.Viewer
             // Render ground before the editor grid so the grid remains a world-space guide.
             if (_groundModel != null && _viewModel.IsGroundVisible && !_viewModel.IsTransparentBg)
             {
-                _meshRenderer.Render(_groundModel, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+                _meshRenderer.Render(_groundModel, viewProj, view, proj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
 
             // Render the grid before transparent model passes. Transparent parts do not write
@@ -178,17 +178,17 @@ namespace AssetsManager.Views.Controls.Viewer
             // Render primary models, then auxiliary diff geometry.
             foreach (var model in _loadedModels)
             {
-                _meshRenderer.Render(model, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+                _meshRenderer.Render(model, viewProj, view, proj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
             foreach (var model in _auxiliaryModels)
             {
-                _meshRenderer.Render(model, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+                _meshRenderer.Render(model, viewProj, view, proj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
 
             // Render skybox if visible
             if (_skyModel != null && _viewModel.ShowSkybox)
             {
-                _meshRenderer.Render(_skyModel, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+                _meshRenderer.Render(_skyModel, viewProj, view, proj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
 
         }
@@ -200,7 +200,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (hasClassicScene && _meshRenderer == null)
             {
-                _meshRenderer = new GlMeshRenderer();
+                _meshRenderer = new GlMeshRenderer(AppSettings);
                 _meshRenderer.Initialize(_gl);
             }
 

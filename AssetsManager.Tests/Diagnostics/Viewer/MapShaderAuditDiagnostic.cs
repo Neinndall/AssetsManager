@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -136,8 +136,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 foreach (MapResolvedMaterialPassData pass in program.Passes)
                 {
                     passes++;
-                    MapGameShaderProgramResolver.ShaderBytecodeRead read =
-                        MapGameShaderProgramResolver.Read(pass, program.Kind, settings);
+                    GameShaderProgramResolver.ShaderBytecodeRead read =
+                        GameShaderProgramResolver.Read(pass, program.Kind, settings);
                     if (!read.Ready)
                     {
                         AddFailure(failures, "bytecode: " + read.Failure);

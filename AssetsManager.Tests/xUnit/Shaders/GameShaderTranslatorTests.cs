@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using AssetsManager.Shaders;
@@ -60,8 +60,8 @@ namespace AssetsManager.Tests.xUnit.Shaders
                     3,
                     31));
 
-            MapGameShaderProgramResolver.ShaderBytecodeRead read =
-                MapGameShaderProgramResolver.Read(pass, MapMaterialKind.StaticMesh, settings);
+            GameShaderProgramResolver.ShaderBytecodeRead read =
+                GameShaderProgramResolver.Read(pass, MapMaterialKind.StaticMesh, settings);
             Assert.True(read.Ready, read.Failure);
 
             GameShaderTranslator.TranslationRead translated =

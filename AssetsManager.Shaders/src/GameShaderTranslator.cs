@@ -11,7 +11,7 @@ namespace AssetsManager.Shaders
 {
     /// <summary>
     /// Translates DXBC shader stages into OpenGL-compatible GLSL through the
-    /// dxbc-spirv/SPIRV-Cross pipeline used by the game-shader preview path.
+    /// vkd3d-shader/SPIRV-Cross pipeline used by the game-shader preview path.
     /// </summary>
     public static class GameShaderTranslator
     {

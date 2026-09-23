@@ -10,17 +10,17 @@ using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 {
-    public sealed class MapGameShaderProgramResolverTests
+    public sealed class GameShaderProgramResolverTests
     {
         [Fact]
         public void GeneratedShaderCachePathsMatchCurrentLtkMain()
         {
             Assert.Equal(
                 "assets/shaders/generated/shaders/staticmesh/defaultenv_flat.vs-dx11",
-                MapGameShaderProgramResolver.TocPath("Shaders/StaticMesh/DefaultEnv_Flat", "vs"));
+                GameShaderProgramResolver.TocPath("Shaders/StaticMesh/DefaultEnv_Flat", "vs"));
             Assert.Equal(
                 "assets/shaders/generated/shaders/staticmesh/defaultenv_flat.vs-dx11_300",
-                MapGameShaderProgramResolver.BundlePath(
+                GameShaderProgramResolver.BundlePath(
                     "assets/shaders/generated/shaders/staticmesh/defaultenv_flat.vs-dx11",
                     347));
         }
@@ -33,7 +33,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 new MapMaterialDefineData("OWN", "7", MapMaterialDefineSource.Material));
 
             IReadOnlyList<MapMaterialDefineData> defines =
-                MapGameShaderProgramResolver.BuildDefineList(pass, MapMaterialKind.SkinnedMesh, lowQuality: true);
+                GameShaderProgramResolver.BuildDefineList(pass, MapMaterialKind.SkinnedMesh, lowQuality: true);
 
             Assert.Equal("0", defines.Single(item => item.Name == "DISABLE_FOW").Value);
             Assert.Equal("1", defines.Single(item => item.Name == "DISABLE_SHADOWS").Value);
@@ -61,7 +61,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             BitConverter.GetBytes((uint)dxbc.Length).CopyTo(bundle, 0);
             dxbc.CopyTo(bundle, 4);
 
-            byte[] trimmed = MapGameShaderProgramResolver.ReadBundleRecord(bundle, 0);
+            byte[] trimmed = GameShaderProgramResolver.ReadBundleRecord(bundle, 0);
 
             Assert.Equal(32, trimmed.Length);
             Assert.Equal("DXBC", System.Text.Encoding.ASCII.GetString(trimmed, 0, 4));
@@ -80,8 +80,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             var pass = Pass();
             pass = pass with { ShaderPath = "Shaders/StaticMesh/DefaultEnv_Flat" };
 
-            MapGameShaderProgramResolver.ShaderBytecodeRead read =
-                MapGameShaderProgramResolver.Read(pass, MapMaterialKind.StaticMesh, settings);
+            GameShaderProgramResolver.ShaderBytecodeRead read =
+                GameShaderProgramResolver.Read(pass, MapMaterialKind.StaticMesh, settings);
 
             Assert.True(read.Ready, read.Failure);
             Assert.StartsWith("DXBC", System.Text.Encoding.ASCII.GetString(read.Program.Vertex, 0, 4));
@@ -109,8 +109,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 true,
                 new[] { ready, missing });
 
-            MapGameShaderProgramResolver.ShaderBytecodeMaterialProgram read =
-                MapGameShaderProgramResolver.ReadProgram(program, settings);
+            GameShaderProgramResolver.ShaderBytecodeMaterialProgram read =
+                GameShaderProgramResolver.ReadProgram(program, settings);
 
             Assert.False(read.Ready);
             Assert.True(read.Animated);

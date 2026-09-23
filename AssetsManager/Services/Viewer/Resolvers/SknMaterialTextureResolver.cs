@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text.RegularExpressions;
+using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
@@ -60,6 +61,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal bool IsAnimated { get; init; }
         internal uint ShaderHash { get; init; }
         internal string ShaderPath { get; init; }
+        internal MapResolvedMaterialProgramData Program { get; init; }
 
         private Dictionary<string, SknMaterialSampler> _normalizedSamplers;
 
@@ -324,7 +326,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                             trees,
                             defaultMaterialLink.Value,
                             wadChunkPathResolver,
-                            binEntryResolver);
+                            binEntryResolver,
+                            shaderTreeList);
                     }
                 }
 
@@ -377,7 +380,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                             trees,
                             materialLink.Value,
                             wadChunkPathResolver,
-                            binEntryResolver);
+                            binEntryResolver,
+                            shaderTreeList);
                         if (materialDefinition != null)
                             overrideMaterials[normalizedSubmesh] = materialDefinition;
                     }
@@ -1138,7 +1142,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                                    dataValue is BinTreeVector4 vector
                         ? vector.Value
                         : Vector4.Zero;
-
                     if (parameter.Properties.TryGetValue(LogicalParameters, out BinTreeProperty logicalProperty) &&
                         logicalProperty is BinTreeContainer logicalParameters)
                     {
@@ -1231,14 +1234,23 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IEnumerable<BinTree> binTrees,
             uint pathHash,
             Func<ulong, string> wadChunkPathResolver,
-            Func<uint, string> binEntryResolver)
+            Func<uint, string> binEntryResolver,
+            IEnumerable<BinTree> shaderTrees = null)
         {
             foreach (BinTree binTree in binTrees ?? Enumerable.Empty<BinTree>())
             {
                 if (binTree?.Objects == null || !binTree.Objects.TryGetValue(pathHash, out BinTreeObject obj))
                     continue;
 
-                return ReadMaterialDefinition(obj, wadChunkPathResolver, binEntryResolver);
+                SknMaterialDefinition material = ReadMaterialDefinition(obj, wadChunkPathResolver, binEntryResolver);
+                if (shaderTrees != null)
+                {
+                    material = material with
+                    {
+                        Program = new MapMaterialParser().ParseProgram(obj, shaderTrees)
+                    };
+                }
+                return material;
             }
 
             return null;

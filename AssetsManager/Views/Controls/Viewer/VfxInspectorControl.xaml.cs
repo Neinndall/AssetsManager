@@ -607,7 +607,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (_championMeshRenderer == null)
                 {
-                    _championMeshRenderer = new GlMeshRenderer();
+                    _championMeshRenderer = new GlMeshRenderer(AppSettings);
                     _championMeshRenderer.Initialize(_gl);
                 }
 
@@ -618,7 +618,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
                 if (_mapCharacterRenderer == null)
                 {
-                    _mapCharacterRenderer = new MapCharacterRenderer();
+                    _mapCharacterRenderer = new MapCharacterRenderer(AppSettings);
                     _mapCharacterRenderer.Initialize(_gl);
                 }
                 if (_mapParticleRenderer == null)
@@ -750,8 +750,11 @@ namespace AssetsManager.Views.Controls.Viewer
                     _mapCharacterRenderer?.Render(
                         _mapSceneRuntime.CharacterGroups,
                         viewProj,
+                        view,
+                        proj,
                         eye,
                         _mapSceneRuntime.CharacterTimeSeconds,
+                        _mapSceneRuntime.Scene.Sun,
                         _mapSceneRuntime.Hidden,
                         viewMode: _model.PreviewViewMode,
                         wireOverlay: _model.EffectivePreviewWireOverlay);
@@ -843,6 +846,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 _championMeshRenderer.Render(
                     _championModel,
                     viewProj,
+                    view,
+                    proj,
                     eye,
                     lighting.LightDirection,
                     lighting.LightColor,
