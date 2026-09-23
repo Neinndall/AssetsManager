@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using CommunityToolkit.HighPerformance.Buffers;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
@@ -821,6 +822,26 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void SkinnedMeshDecodeAcceptsNormalizedIndicesFlagLikeLtk()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxNormalizedSkn", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string meshPath = Path.Combine(root, "normalized_ranges.skn");
+            try
+            {
+                WriteTwoRangeSkinnedMesh(meshPath, normalizedIndices: true);
+                using var resolver = new VfxResourceResolver();
+                VfxMeshData decoded = Assert.IsType<VfxMeshData>(resolver.ResolveMesh("normalized_ranges.skn", root));
+
+                Assert.Equal(new uint[] { 0, 1, 2, 3, 4, 5 }, decoded.Indices);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void SkinnedMeshDecodeRejectsAnInvalidRangeEvenWhenTheDrawListHidesIt()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxBadSknRange", Guid.NewGuid().ToString("N"));
@@ -828,7 +849,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             string meshPath = Path.Combine(root, "bad_range.skn");
             try
             {
-                WriteTwoRangeSkinnedMesh(meshPath, new ushort[] { 0, 1, 9 });
+                WriteTwoRangeSkinnedMesh(meshPath, new ushort[] { 3, 4, 9 });
                 using var resolver = new VfxResourceResolver();
                 uint body = Fnv1a.HashLower("body");
 
@@ -903,6 +924,123 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void FolderCatalogListsEveryMapGeometryWithoutSelectingAPrimaryMap()
+        {
+            string parent = Path.Combine(Path.GetTempPath(), "AssetsManagerMapCatalog", Guid.NewGuid().ToString("N"));
+            string root = Path.Combine(parent, "map11.wad.client");
+            try
+            {
+                string map11 = Path.Combine(root, "data", "maps", "mapgeometry", "map11");
+                string map12 = Path.Combine(root, "data", "maps", "mapgeometry", "map12");
+                Directory.CreateDirectory(map11);
+                Directory.CreateDirectory(map12);
+                File.WriteAllBytes(Path.Combine(map11, "base_srx.mapgeo"), Array.Empty<byte>());
+                File.WriteAllBytes(Path.Combine(map11, "base_srx.materials.bin"), Array.Empty<byte>());
+                File.WriteAllBytes(Path.Combine(map12, "base_other.mapgeo"), Array.Empty<byte>());
+                File.WriteAllBytes(Path.Combine(map12, "base_other.materials.bin"), Array.Empty<byte>());
+
+                VfxFolderCatalog.BrowserCatalog catalog = VfxFolderCatalog.ScanBrowser(
+                    root,
+                    System.Threading.CancellationToken.None,
+                    resolveBinEntry: null);
+
+                Assert.Equal(2, catalog.MapSources.Count);
+                Assert.Equal("Maps/MapGeometry/Map11/Base_SRX", catalog.MapSources[0].Map.Value, ignoreCase: true);
+                Assert.Equal("Maps/MapGeometry/Map12/Base_Other", catalog.MapSources[1].Map.Value, ignoreCase: true);
+                Assert.All(catalog.MapSources, source => Assert.Equal(Path.GetFullPath(root), source.ProjectRoot));
+
+                VfxBrowserFolder mapRoot = Assert.Single(catalog.Roots);
+                Assert.Equal("MapGeometry", mapRoot.Title);
+                MapBrowserNode[] nodes = mapRoot.Children.OfType<MapBrowserNode>().ToArray();
+                Assert.Equal(2, nodes.Length);
+                Assert.All(nodes, node => Assert.Equal(MapBrowserNodeKind.MapFile, node.Kind));
+                Assert.Equal("base_srx.mapgeo", nodes[0].Title, ignoreCase: true);
+                Assert.Equal("base_other.mapgeo", nodes[1].Title, ignoreCase: true);
+            }
+            finally
+            {
+                if (Directory.Exists(parent)) Directory.Delete(parent, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void FolderCatalogPreservesAuthoredMapVariantsWithoutSelectingAMap()
+        {
+            string parent = Path.Combine(Path.GetTempPath(), "AssetsManagerMapVariants", Guid.NewGuid().ToString("N"));
+            string root = Path.Combine(parent, "map11.wad.client");
+            const string mapEntry = "Maps/Shipping/Map11";
+            const string defaultSkin = "Maps/Shipping/Map11/MapSkins/Default";
+            const string odysseySkin = "Maps/Shipping/Map11/MapSkins/Odyssey";
+            const string defaultMap = "Maps/MapGeometry/Map11/Base_SRX";
+            const string odysseyMap = "Maps/MapGeometry/Map11/Odyssey";
+            try
+            {
+                string mapDirectory = Path.Combine(root, "data", "maps", "mapgeometry", "map11");
+                Directory.CreateDirectory(mapDirectory);
+                File.WriteAllBytes(Path.Combine(mapDirectory, "base_srx.mapgeo"), Array.Empty<byte>());
+                File.WriteAllBytes(Path.Combine(mapDirectory, "base_srx.materials.bin"), Array.Empty<byte>());
+                File.WriteAllBytes(Path.Combine(mapDirectory, "odyssey.mapgeo"), Array.Empty<byte>());
+                File.WriteAllBytes(Path.Combine(mapDirectory, "odyssey.materials.bin"), Array.Empty<byte>());
+
+                string declarationDirectory = Path.Combine(root, "data", "maps", "shipping");
+                Directory.CreateDirectory(declarationDirectory);
+                WriteBin(
+                    Path.Combine(declarationDirectory, "map11.bin"),
+                    new[]
+                    {
+                        new BinTreeObject(
+                            Fnv1a.HashLower(mapEntry),
+                            MapVariantParser.MapClass,
+                            new BinTreeProperty[]
+                            {
+                                new BinTreeUnorderedContainer(
+                                    MapVariantParser.MapSkinsField,
+                                    BinPropertyType.ObjectLink,
+                                    new BinTreeProperty[]
+                                    {
+                                        new BinTreeObjectLink(0, Fnv1a.HashLower(odysseySkin)),
+                                        new BinTreeObjectLink(0, Fnv1a.HashLower(defaultSkin))
+                                    })
+                            }),
+                        new BinTreeObject(
+                            Fnv1a.HashLower(odysseySkin),
+                            MapVariantParser.MapSkinClass,
+                            new BinTreeProperty[]
+                            {
+                                new BinTreeString(MapVariantParser.SkinNameField, "Odyssey"),
+                                new BinTreeString(MapVariantParser.ContainerLinkField, odysseyMap)
+                            }),
+                        new BinTreeObject(
+                            Fnv1a.HashLower(defaultSkin),
+                            MapVariantParser.MapSkinClass,
+                            new BinTreeProperty[]
+                            {
+                                new BinTreeString(MapVariantParser.SkinNameField, "Default"),
+                                new BinTreeString(MapVariantParser.ContainerLinkField, defaultMap)
+                            })
+                    },
+                    Array.Empty<string>());
+
+                VfxFolderCatalog.BrowserCatalog catalog = VfxFolderCatalog.ScanBrowser(
+                    root,
+                    System.Threading.CancellationToken.None,
+                    resolveBinEntry: null);
+
+                Assert.Equal(2, catalog.MapVariants.Count);
+                Assert.Equal("Odyssey", catalog.MapVariants[0].Skin);
+                Assert.Equal("Default", catalog.MapVariants[1].Skin);
+                Assert.Equal(defaultMap, MapVariantData.Opening(catalog.MapVariants).Map.Value);
+                Assert.Equal(2, catalog.MapSources.Count);
+                Assert.Contains(catalog.MapSources, source => source.Map.Value.Equals(defaultMap, StringComparison.OrdinalIgnoreCase));
+                Assert.Contains(catalog.MapSources, source => source.Map.Value.Equals(odysseyMap, StringComparison.OrdinalIgnoreCase));
+            }
+            finally
+            {
+                if (Directory.Exists(parent)) Directory.Delete(parent, recursive: true);
+            }
+        }
+
+        [Fact]
         public void FolderCatalogBuildsCharacterSkinAndSpellHierarchyWhileKeepingThemesAsSupportData()
         {
             string root = Path.Combine(Path.GetTempPath(), "Companions.wad.client");
@@ -967,7 +1105,59 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             }
         }
 
-        private static void WriteTwoRangeSkinnedMesh(string path, ushort[] secondRangeIndices = null)
+        [Fact]
+        public void PreparePlaybackInstallsAuthoredMeshEmissionSurface()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxEmissionSurface", Guid.NewGuid().ToString("N"));
+            string searchDirectory = Path.Combine(root, "data", "characters", "hero", "skins");
+            string assetDirectory = Path.Combine(root, "assets", "effects");
+            Directory.CreateDirectory(searchDirectory);
+            Directory.CreateDirectory(assetDirectory);
+            string meshPath = Path.Combine(assetDirectory, "surface.skn");
+            WriteTwoRangeSkinnedMesh(meshPath);
+
+            VfxEmitterDefinition emitter = CreateEmitter(VfxPrimitiveKind.CameraQuad) with
+            {
+                EmissionSurface = new VfxEmissionSurfaceDefinition(
+                    VfxEmissionSurfaceKind.Mesh,
+                    "assets/effects/surface.skn",
+                    null,
+                    null,
+                    Array.Empty<uint>(),
+                    Array.Empty<uint>(),
+                    Scale: 1f,
+                    MaxJointWeights: 4,
+                    UseNormal: false)
+            };
+            var definition = new VfxSystemDefinition(1, "surface", "Effects/Surface", new[] { emitter });
+
+            try
+            {
+                using var logger = new LoggerConfiguration().CreateLogger();
+                using var service = new VfxLoadingService();
+                VfxPlaybackRuntime runtime = service.PreparePlayback(
+                    definition,
+                    searchDirectory,
+                    Matrix4x4.Identity,
+                    1234,
+                    new LogService(logger));
+
+                runtime.Update(0.02f);
+
+                var particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+                Assert.NotEqual(Vector3.Zero, particle.Pos);
+                Assert.Equal(particle.Pos.X * 2f, particle.Pos.Y, precision: 4);
+                Assert.Equal(particle.Pos.X * 3f, particle.Pos.Z, precision: 4);
+            }
+            finally
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            }
+        }
+        private static void WriteTwoRangeSkinnedMesh(
+            string path,
+            ushort[] secondRangeIndices = null,
+            bool normalizedIndices = false)
         {
             VertexBufferDescription description = SkinnedMeshVertex.BASIC;
             var vertexOwner = VertexBuffer.AllocateForElements(description.Elements, 6);
@@ -989,11 +1179,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VertexBuffer vertexBuffer = VertexBuffer.Create(description.Usage, description.Elements, vertexOwner);
             MemoryOwner<byte> indexOwner = MemoryOwner<byte>.Allocate(6 * sizeof(ushort));
             Span<byte> indices = indexOwner.Span;
-            secondRangeIndices ??= new ushort[] { 0, 1, 2 };
+            secondRangeIndices ??= normalizedIndices
+                ? new ushort[] { 0, 1, 2 }
+                : new ushort[] { 3, 4, 5 };
             Assert.Equal(3, secondRangeIndices.Length);
-            ushort[] local = { 0, 1, 2, secondRangeIndices[0], secondRangeIndices[1], secondRangeIndices[2] };
-            for (int index = 0; index < local.Length; index++)
-                BitConverter.TryWriteBytes(indices.Slice(index * sizeof(ushort), sizeof(ushort)), local[index]);
+            ushort[] stored = { 0, 1, 2, secondRangeIndices[0], secondRangeIndices[1], secondRangeIndices[2] };
+            for (int index = 0; index < stored.Length; index++)
+                BitConverter.TryWriteBytes(indices.Slice(index * sizeof(ushort), sizeof(ushort)), stored[index]);
             IndexBuffer indexBuffer = IndexBuffer.Create(IndexFormat.U16, indexOwner);
 
             using var mesh = new SkinnedMesh(
@@ -1005,6 +1197,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 vertexBuffer,
                 indexBuffer);
             mesh.WriteSimpleSkin(path);
+
+            if (normalizedIndices)
+                PatchSimpleSkinFlags(path, SkinnedMeshIndexSemantics.NormalizedIndicesFlag);
+        }
+
+        private static void PatchSimpleSkinFlags(string path, uint flags)
+        {
+            using var stream = File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true);
+            stream.Position = 8;
+            uint rangeCount = reader.ReadUInt32();
+            stream.Position = checked(12L + (rangeCount * 80L));
+            using var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true);
+            writer.Write(flags);
         }
 
         private static void WriteSkinBin(string path, bool previewable = true)

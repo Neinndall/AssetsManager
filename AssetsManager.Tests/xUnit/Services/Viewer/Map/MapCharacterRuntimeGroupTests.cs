@@ -37,6 +37,38 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void PreviewClipOverridesOnlyTheSelectedSkinGroupState()
+        {
+            var clip = new AnimationClipDefinition(
+                0x1234,
+                0x5678,
+                1f / 30f,
+                0f,
+                30f,
+                Array.Empty<AnimationClipEventDefinition>(),
+                "Run",
+                "run.anm");
+            MapCharacterData first = Character(1, "Idle", Vector3.Zero);
+            MapCharacterData selected = Character(2, "Idle", new Vector3(20f, 0f, 0f));
+            var group = new MapCharacterRuntimeGroup(
+                null,
+                null,
+                new[] { first, selected });
+
+            group.SetPreviewClip(clip, selected);
+            group.PreviewTimeSeconds = 0.75f;
+
+            Assert.Same(clip, group.PreviewClip);
+            Assert.Same(selected, group.PreviewPlacement);
+            Assert.NotSame(first, group.PreviewPlacement);
+            Assert.Equal(0.75f, group.PreviewTimeSeconds);
+            group.ClearPreviewClip();
+            Assert.Null(group.PreviewClip);
+            Assert.Null(group.PreviewPlacement);
+            Assert.Equal(0f, group.PreviewTimeSeconds);
+        }
+
+        [Fact]
         public void DisposeCompletedCharacterLoadsReleasesOnlyOwnedCompletedGroups()
         {
             var animation = new MapCharacterAnimationRuntime(null, null);

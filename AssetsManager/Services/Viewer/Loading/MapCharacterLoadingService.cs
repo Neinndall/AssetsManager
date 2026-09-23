@@ -12,6 +12,7 @@ using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Animation;
@@ -159,6 +160,12 @@ namespace AssetsManager.Services.Viewer.Loading
                 skin.AnimationGraphHash,
                 graphHashNameResolver,
                 graphClassNameResolver);
+            MapCharacterVfxCatalog vfx = BuildVfxCatalog(
+                documents,
+                graphHashNameResolver,
+                graphClassNameResolver,
+                wadChunkPathResolver,
+                binEntryResolver);
 
             return new MapCharacterAssetData(
                 skin with
@@ -171,7 +178,57 @@ namespace AssetsManager.Services.Viewer.Loading
                 materials,
                 textures,
                 documents,
-                graph);
+                graph,
+                vfx);
+        }
+
+        internal static MapCharacterVfxCatalog BuildVfxCatalog(
+            IReadOnlyList<BinTree> documents,
+            Func<uint, string> graphHashNameResolver,
+            Func<uint, string> graphClassNameResolver,
+            Func<ulong, string> wadChunkPathResolver,
+            Func<uint, string> binEntryResolver)
+        {
+            if (documents == null || documents.Count == 0)
+                return MapCharacterVfxCatalog.Empty;
+
+            var systems = new Dictionary<uint, VfxSystemDefinition>();
+            var resourceMap = new Dictionary<uint, uint>();
+            var idleEffects = new List<VfxIdleEffectDefinition>();
+            VfxOwnerSceneContext ownerSceneContext = null;
+
+            for (int index = 0; index < documents.Count; index++)
+            {
+                BinTree tree = documents[index];
+                if (tree == null) continue;
+
+                VfxBinDocument parsed = VfxGraphParser.ParseDocument(
+                    tree,
+                    graphHashNameResolver,
+                    graphClassNameResolver,
+                    wadChunkPathResolver,
+                    binEntryResolver);
+                foreach ((uint hash, VfxSystemDefinition system) in parsed.Systems)
+                    systems.TryAdd(hash, system);
+
+                // Clip effect keys are scoped to the owner skin's resource resolver. Linked VFX
+                // definitions retain their own document-local ResourceMap in VfxSystemDefinition.
+                if (index == 0)
+                {
+                    foreach ((uint key, uint systemHash) in parsed.SkinResourceMap)
+                        resourceMap.TryAdd(key, systemHash);
+                    foreach (VfxIdleEffectDefinition idle in parsed.IdleEffects ?? Array.Empty<VfxIdleEffectDefinition>())
+                        idleEffects.Add(idle);
+                }
+
+                ownerSceneContext ??= parsed.OwnerSceneContext;
+            }
+
+            return new MapCharacterVfxCatalog(
+                systems,
+                resourceMap,
+                idleEffects,
+                ownerSceneContext);
         }
 
         private async Task<List<BinTree>> LoadDocumentClosureAsync(
@@ -201,12 +258,25 @@ namespace AssetsManager.Services.Viewer.Loading
                 {
                     if (string.IsNullOrWhiteSpace(dependency))
                         continue;
-                    MapResolvedAsset resolved = await _assetResolver.ResolveReferenceAsync(
+
+                    IReadOnlyList<MapResolvedAsset> projectMatches =
+                        _assetResolver.ResolveLinkedProjectBins(dependency, projectRoot);
+                    if (projectMatches.Count > 0)
+                    {
+                        foreach (MapResolvedAsset resolved in projectMatches)
+                        {
+                            if (!seen.Contains(AssetIdentity(resolved)))
+                                pending.Enqueue(resolved);
+                        }
+                        continue;
+                    }
+
+                    MapResolvedAsset fallback = await _assetResolver.ResolveReferenceAsync(
                         new MapAssetReference(dependency, 0),
                         projectRoot,
                         cancellationToken);
-                    if (resolved != null && !seen.Contains(AssetIdentity(resolved)))
-                        pending.Enqueue(resolved);
+                    if (fallback != null && !seen.Contains(AssetIdentity(fallback)))
+                        pending.Enqueue(fallback);
                 }
             }
 

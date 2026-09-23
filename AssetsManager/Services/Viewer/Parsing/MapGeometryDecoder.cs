@@ -144,7 +144,9 @@ namespace AssetsManager.Services.Viewer.Parsing
                     submeshes.Count - firstSubmesh,
                     mesh.RenderFlags,
                     mesh.VisibilityControllerPathHash,
-                    mesh.RegionHash));
+                    mesh.RegionHash,
+                    MapGeometryLightChannelData.From(mesh.BakedLight),
+                    MapGeometryLightChannelData.From(mesh.StationaryLight)));
 
                 vertexBase = checked(vertexBase + meshVertexCount);
             }

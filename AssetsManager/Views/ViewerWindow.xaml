@@ -29,7 +29,7 @@
                         </StackPanel>
 
                         <!-- Action Cards -->
-                        <UniformGrid Columns="4" HorizontalAlignment="Center">
+                        <UniformGrid Columns="3" HorizontalAlignment="Center">
                             <!-- Open Project Folder Card -->
                             <Button Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenProjectFolder_Click"
@@ -43,7 +43,7 @@
                                                FontSize="14"
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Explore models &amp; map environments"
+                                    <TextBlock Text="Explore models &amp; animations"
                                                FontSize="12"
                                                Foreground="{StaticResource TextMuted}"
                                                HorizontalAlignment="Center"
@@ -76,29 +76,6 @@
                                 </StackPanel>
                             </Button>
 
-                            <!-- Load Map Card -->
-                            <Button Style="{StaticResource SelectionCardButtonStyle}"
-                                    Click="OpenGeometryFile_Click"
-                                    Width="180" Height="160">
-                                <StackPanel>
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
-                                        <materialIcons:MaterialIcon Kind="Map" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Map Environment"
-                                               FontWeight="SemiBold"
-                                               FontSize="14"
-                                               Foreground="{StaticResource TextPrimary}"
-                                               HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Render 3D maps &amp; textures"
-                                               FontSize="12"
-                                               Foreground="{StaticResource TextMuted}"
-                                               HorizontalAlignment="Center"
-                                               TextAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               Margin="0,4,0,0"/>
-                                </StackPanel>
-                            </Button>
-
                             <!-- VFX Inspector Card -->
                             <Button Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenVfxInspector_Click"
@@ -112,7 +89,7 @@
                                                FontSize="14"
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Inspect &amp; replay visual effects"
+                                    <TextBlock Text="Inspect VFX, champions &amp; maps"
                                                FontSize="12"
                                                Foreground="{StaticResource TextMuted}"
                                                HorizontalAlignment="Center"

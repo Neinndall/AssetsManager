@@ -34,7 +34,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public ViewerPanelModel ViewModel => _viewModel;
 
         public SknLoadingService SknLoadingService { get; set; }
-        internal MapViewerSceneService MapViewerSceneService { get; set; }
         public ChromaLoadingService ChromaLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
@@ -438,8 +437,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void ResetScene()
         {
-            _viewModel.ClearMapOutline();
-
             // Dispose all loaded animations
             foreach (var animModel in _viewModel.AnimationModels)
             {
@@ -658,9 +655,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public async Task ProcessModelLoading(string modelPath, string texturePath, bool isInitialLoad)
         {
-            ViewModel.IsMapMode = false;
-            _viewModel.ClearMapOutline();
-
             // Start a new cancellable operation. If another load is already in flight
             // (rapid clicks, double-load) it will be cancelled and its result dropped.
             _modelLoadingCts?.Cancel();
@@ -700,7 +694,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     if (_viewModel.LoadedModels.Count == 0)
                         Viewport?.ApplyStudioParameters();
 
-                    Viewport?.SetupScene(false);
+                    Viewport?.SetupScene();
                     ViewModel.ShowMainContent(); // MVVM State Update
                 }
 
@@ -779,124 +773,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
 
                 _viewModel.AnimationModels.Add(animationModel);
-            }
-        }
-
-        public async Task LoadMapGeometry(string filePath, string gameDataPath)
-        {
-            ViewModel.IsMapMode = true;
-            _viewModel.ClearMapOutline();
-
-            _modelLoadingCts?.Cancel();
-            _modelLoadingCts?.Dispose();
-            _modelLoadingCts = new CancellationTokenSource();
-            CancellationToken cancellationToken = _modelLoadingCts.Token;
-
-            MapSceneRuntime runtime = null;
-            try
-            {
-                runtime = await MapViewerSceneService.LoadAsync(
-                    filePath,
-                    gameDataPath,
-                    cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-            catch (OperationCanceledException)
-            {
-                runtime?.Dispose();
-                LogService.LogDebug("MAP scene loading cancelled before completion.");
-                return;
-            }
-
-            if (runtime == null || cancellationToken.IsCancellationRequested)
-            {
-                runtime?.Dispose();
-                return;
-            }
-
-            if (Viewport == null)
-            {
-                runtime.Dispose();
-                return;
-            }
-
-            Viewport.SetMapScene(runtime);
-            ClearModelUiStateAfterViewportReset();
-            _viewModel.SetMapOutline(runtime.Scene.Outline);
-            RefreshMapOutlinerVisibility();
-            ViewModel.ShowMainContent();
-            Viewport.SnapCamera();
-            _ = UpgradeMapTexturesAsync(runtime, cancellationToken);
-        }
-
-        private async Task UpgradeMapTexturesAsync(
-            MapSceneRuntime runtime,
-            CancellationToken cancellationToken)
-        {
-            try
-            {
-                IReadOnlyDictionary<string, System.Windows.Media.Imaging.BitmapSource> textures =
-                    await MapViewerSceneService.LoadFullTexturesAsync(runtime, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-                if (Viewport?.IsMapSceneActive(runtime) == true)
-                    Viewport.UpdateMapTextures(runtime, textures);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception ex)
-            {
-                LogService?.LogDebug($"MAPGEO full texture wave unavailable: {ex.Message}");
-            }
-        }
-
-        private void MapOutlinerChunkEye_Click(object sender, RoutedEventArgs e)
-        {
-            e.Handled = true;
-            if ((sender as FrameworkElement)?.DataContext is not MapOutlinerChunkModel chunk || Viewport == null)
-                return;
-
-            Viewport.SetMapHidden(chunk.Id, !chunk.IsHidden);
-            RefreshMapOutlinerVisibility();
-        }
-
-        private void MapOutlinerItemEye_Click(object sender, RoutedEventArgs e)
-        {
-            e.Handled = true;
-            if ((sender as FrameworkElement)?.DataContext is not MapOutlinerItemModel item || Viewport == null)
-                return;
-
-            Viewport.SetMapHidden(item.Id, !item.IsHidden);
-            RefreshMapOutlinerVisibility();
-        }
-
-        private void MapOutlinerItemRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.DataContext is not MapOutlinerItemModel item || Viewport == null)
-                return;
-
-            foreach (MapOutlinerChunkModel chunk in _viewModel.MapOutlineChunks)
-            {
-                foreach (MapOutlinerItemModel candidate in chunk.Items)
-                    candidate.IsFocused = ReferenceEquals(candidate, item);
-            }
-
-            Viewport.FocusMapPlaceable(item.Data.Position);
-            e.Handled = true;
-        }
-
-        private void RefreshMapOutlinerVisibility()
-        {
-            if (Viewport == null)
-                return;
-
-            foreach (MapOutlinerChunkModel chunk in _viewModel.MapOutlineChunks)
-            {
-                chunk.IsHidden = Viewport.IsMapHidden(chunk.Id);
-                foreach (MapOutlinerItemModel item in chunk.Items)
-                {
-                    item.IsHidden = Viewport.IsMapHidden(item.Data.ChunkHash, item.Data.KeyHash);
-                }
             }
         }
 
@@ -995,58 +871,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private static string FindProjectRoot(string mapGeoPath)
-        {
-            for (var directory = new DirectoryInfo(Path.GetDirectoryName(mapGeoPath)); directory != null; directory = directory.Parent)
-            {
-                if (directory.Name.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) ||
-                    (Directory.Exists(Path.Combine(directory.FullName, "assets")) &&
-                     Directory.Exists(Path.Combine(directory.FullName, "data"))))
-                    return directory.FullName;
-            }
-
-            return Path.GetDirectoryName(mapGeoPath);
-        }
-
-        public async Task OpenMapGeometry()
-        {
-            var openMapGeoDialog = new OpenFileDialog
-            {
-                Filter = "MapGeometry Files (*.mapgeo)|*.mapgeo|All Files (*.*)|*.*",
-                Title = "Select a mapgeo file"
-            };
-
-            if (openMapGeoDialog.ShowDialog() == true)
-            {
-                string mapGeoPath = openMapGeoDialog.FileName;
-
-                if (WindowViewModel != null)
-                {
-                    WindowViewModel.LoadingTitle = ViewerWindowModel.MapGeoLoadingTitle;
-                    WindowViewModel.LoadingDescription = ViewerWindowModel.MapGeoLoadingDescription;
-                    WindowViewModel.IsLoadingVisible = true;
-                }
-
-                string gameDataPath = ProjectExplorer?.CurrentRootFolder;
-
-                if (string.IsNullOrEmpty(gameDataPath))
-                {
-                    gameDataPath = FindProjectRoot(mapGeoPath);
-                    ProjectExplorer?.LoadProjectFolder(gameDataPath);
-
-                    if (ProjectExplorer != null && WindowViewModel != null)
-                        WindowViewModel.IsProjectExplorerVisible = true;
-
-                    gameDataPath = ProjectExplorer?.CurrentRootFolder ?? gameDataPath;
-                }
-
-                await LoadMapGeometry(mapGeoPath, gameDataPath);
-
-                if (WindowViewModel != null)
-                    WindowViewModel.IsLoadingVisible = false;
-            }
-        }
-
         // STUDIO HANDLERS
         private void SnapshotButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1094,7 +918,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 Viewport?.ResetScene();
                 ResetScene();
 
-                _viewModel.IsMapMode = false;
                 WindowViewModel?.IsProjectExplorerVisible = false;
                 ProjectExplorer?.ClearImagePreview();
                 _viewModel.ShowSelectionScreen();

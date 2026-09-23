@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Numerics;
-using System.Windows.Media.Imaging;
 using LeagueToolkit.Core.Meta;
 
 namespace AssetsManager.Views.Models.Viewer
@@ -15,13 +14,18 @@ namespace AssetsManager.Views.Models.Viewer
         public MapGeometryData Geometry { get; }
         public BinTree MaterialsDocument { get; }
         public IReadOnlyList<MapMaterialDefinition> Materials { get; }
-        public IReadOnlyDictionary<string, BitmapSource> Textures { get; }
+        public IReadOnlyDictionary<string, MapTextureImage> Textures { get; }
+        public IReadOnlyDictionary<string, MapTextureImage> ProgramTextures { get; }
+        public IReadOnlyDictionary<string, MapTextureImage> Lightmaps { get; }
         public IReadOnlyList<MapPlaceableChunkData> Placeables { get; }
         public IReadOnlyList<MapCharacterData> Characters { get; }
         public IReadOnlyList<MapParticleData> Particles { get; }
         public MapParticleSystemCatalog ParticleSystems { get; }
         public IReadOnlyList<MapOutlineChunkData> Outline { get; }
         public Vector3? Origin { get; }
+        public MapSunData Sun { get; }
+        public MapPostEffectsData PostEffects { get; }
+        public MapSsaoData AmbientOcclusion { get; }
 
         public MapSceneData(
             MapSceneSource source,
@@ -29,13 +33,18 @@ namespace AssetsManager.Views.Models.Viewer
             MapGeometryData geometry,
             BinTree materialsDocument,
             IReadOnlyList<MapMaterialDefinition> materials,
-            IReadOnlyDictionary<string, BitmapSource> textures,
+            IReadOnlyDictionary<string, MapTextureImage> textures,
             IReadOnlyList<MapPlaceableChunkData> placeables,
             IReadOnlyList<MapCharacterData> characters,
             IReadOnlyList<MapParticleData> particles,
             MapParticleSystemCatalog particleSystems,
             Vector3? origin = null,
-            IReadOnlyList<MapOutlineChunkData> outline = null)
+            IReadOnlyList<MapOutlineChunkData> outline = null,
+            MapSunData sun = null,
+            MapPostEffectsData postEffects = null,
+            MapSsaoData ambientOcclusion = null,
+            IReadOnlyDictionary<string, MapTextureImage> lightmaps = null,
+            IReadOnlyDictionary<string, MapTextureImage> programTextures = null)
         {
             Source = source;
             Assets = assets;
@@ -43,12 +52,17 @@ namespace AssetsManager.Views.Models.Viewer
             MaterialsDocument = materialsDocument;
             Materials = materials;
             Textures = textures;
+            ProgramTextures = programTextures ?? new Dictionary<string, MapTextureImage>(System.StringComparer.Ordinal);
+            Lightmaps = lightmaps ?? new Dictionary<string, MapTextureImage>(System.StringComparer.OrdinalIgnoreCase);
             Placeables = placeables;
             Characters = characters;
             Particles = particles;
             ParticleSystems = particleSystems;
             Outline = outline ?? System.Array.Empty<MapOutlineChunkData>();
             Origin = origin;
+            Sun = sun;
+            PostEffects = postEffects;
+            AmbientOcclusion = ambientOcclusion;
         }
     }
 }

@@ -56,12 +56,28 @@ namespace AssetsManager.Services.Viewer.Loading
             _logService = logService;
         }
 
-        public async Task<MapSceneData> LoadAsync(
-            string geometryFilePath,
+        public Task<MapSceneData> LoadAsync(
+            string mapFilePath,
             string projectRoot,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default) =>
+            LoadAsync(MapSceneSource.FromMapFile(mapFilePath, projectRoot), cancellationToken);
+
+        public Task<MapSceneData> LoadAsync(
+            MapSceneSource source,
+            CancellationToken cancellationToken = default) =>
+            LoadCoreAsync(source, includePreviewTextures: true, cancellationToken);
+
+        internal Task<MapSceneData> LoadBackdropAsync(
+            MapSceneSource source,
+            CancellationToken cancellationToken = default) =>
+            LoadCoreAsync(source, includePreviewTextures: false, cancellationToken);
+
+        private async Task<MapSceneData> LoadCoreAsync(
+            MapSceneSource source,
+            bool includePreviewTextures,
+            CancellationToken cancellationToken)
         {
-            MapSceneSource source = MapSceneSource.FromGeometryFile(geometryFilePath, projectRoot);
+            ArgumentNullException.ThrowIfNull(source);
             cancellationToken.ThrowIfCancellationRequested();
             if (_hashResolver != null)
             {
@@ -73,7 +89,7 @@ namespace AssetsManager.Services.Viewer.Loading
             MapSceneAssets assets = await _assetResolver.ResolveSceneAssetsAsync(source, cancellationToken);
             if (assets.Geometry == null)
             {
-                _logService.LogWarning($"MAPGEO geometry could not be resolved: {source.Map.GeometryVirtualPath}");
+                _logService?.LogWarning($"MAPGEO geometry could not be resolved: {source.Map.GeometryVirtualPath}");
                 return null;
             }
 
@@ -82,7 +98,7 @@ namespace AssetsManager.Services.Viewer.Loading
             {
                 if (stream == null)
                 {
-                    _logService.LogWarning($"MAPGEO geometry could not be opened: {assets.Geometry.VirtualPath}");
+                    _logService?.LogWarning($"MAPGEO geometry could not be opened: {assets.Geometry.VirtualPath}");
                     return null;
                 }
 
@@ -113,20 +129,41 @@ namespace AssetsManager.Services.Viewer.Loading
             MapParticleSystemCatalog particleSystems = _particleSystemParser.Parse(
                 materials,
                 MapParticleSemantics.GroupBySystem(playedParticles));
-            IReadOnlyDictionary<string, System.Windows.Media.Imaging.BitmapSource> textures =
-                await _textureLoadingService.LoadPreviewAsync(
+            MapSunData sun = MapSunParser.Parse(materials, source.Map);
+            MapPostEffectsData postEffects = MapPostEffectsParser.Parse(materials, source.Map);
+            MapSsaoData ambientOcclusion = MapSsaoParser.Parse(materials, source.Map);
+            IReadOnlyDictionary<string, MapTextureImage> textures = includePreviewTextures
+                ? await _textureLoadingService.LoadPreviewAsync(
                     materialDefinitions,
                     source.ProjectRoot,
-                    cancellationToken);
+                    cancellationToken)
+                : new Dictionary<string, MapTextureImage>();
+            IReadOnlyDictionary<string, MapTextureImage> programTextures = includePreviewTextures
+                ? await _textureLoadingService.LoadProgramPreviewAsync(
+                    materialDefinitions,
+                    source.ProjectRoot,
+                    cancellationToken)
+                : new Dictionary<string, MapTextureImage>(StringComparer.Ordinal);
+            IReadOnlyDictionary<string, MapTextureImage> lightmaps = includePreviewTextures
+                ? await _textureLoadingService.LoadLightmapsPreviewAsync(
+                    geometry.Lightmaps,
+                    source.ProjectRoot,
+                    cancellationToken)
+                : new Dictionary<string, MapTextureImage>(StringComparer.OrdinalIgnoreCase);
 
             cancellationToken.ThrowIfCancellationRequested();
-            _logService.LogDebug(
+            string textureStatus = includePreviewTextures ? textures.Count.ToString() : "deferred";
+            string programTextureStatus = includePreviewTextures ? programTextures.Count.ToString() : "deferred";
+            string lightmapStatus = includePreviewTextures ? lightmaps.Count.ToString() : "deferred";
+            _logService?.LogDebug(
                 $"MAPGEO scene decoded: {source.Map} " +
                 $"meshes={geometry.Meshes.Count}, submeshes={geometry.Submeshes.Count}, " +
-                $"materials={geometry.Materials.Count}, textures={textures.Count}, " +
+                $"materials={geometry.Materials.Count}, textures={textureStatus}, programTextures={programTextureStatus}, lightmaps={lightmapStatus}, " +
                 $"chunks={placeables.Count}, placeables={placeables.Sum(chunk => chunk.Items.Count)}, " +
                 $"characters={characters.Count}, particles={particles.Count}, " +
-                $"particleSystems={particleSystems.Groups.Count}.");
+                $"particleSystems={particleSystems.Groups.Count}, sun={(sun == null ? "default" : "authored")}, " +
+                $"postEffects={(postEffects?.DrawsAnything == true ? "on" : "off")}, " +
+                $"ssao={(ambientOcclusion?.DrawsAnything == true ? "on" : "off")}.");
             return new MapSceneData(
                 source,
                 assets,
@@ -139,16 +176,76 @@ namespace AssetsManager.Services.Viewer.Loading
                 particles,
                 particleSystems,
                 MapGeometrySemantics.CalculateOrigin(geometry),
-                outline);
+                outline,
+                sun,
+                postEffects,
+                ambientOcclusion,
+                lightmaps,
+                programTextures);
         }
 
-        public Task<IReadOnlyDictionary<string, System.Windows.Media.Imaging.BitmapSource>> LoadFullTexturesAsync(
+        internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewTexturesAsync(
+            MapSceneData scene,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(scene);
+            return _textureLoadingService.LoadPreviewAsync(
+                scene.Materials,
+                scene.Source.ProjectRoot,
+                cancellationToken);
+        }
+
+        public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullTexturesAsync(
             MapSceneData scene,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(scene);
             return _textureLoadingService.LoadFullAsync(
                 scene.Materials,
+                scene.Source.ProjectRoot,
+                cancellationToken);
+        }
+
+        internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewProgramTexturesAsync(
+            MapSceneData scene,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(scene);
+            return _textureLoadingService.LoadProgramPreviewAsync(
+                scene.Materials,
+                scene.Source.ProjectRoot,
+                cancellationToken);
+        }
+
+        internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullProgramTexturesAsync(
+            MapSceneData scene,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(scene);
+            return _textureLoadingService.LoadProgramFullAsync(
+                scene.Materials,
+                scene.Source.ProjectRoot,
+                cancellationToken);
+        }
+
+        internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewLightmapsAsync(
+            MapSceneData scene,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(scene);
+            return _textureLoadingService.LoadLightmapsPreviewAsync(
+                scene.Geometry.Lightmaps,
+                scene.Source.ProjectRoot,
+                cancellationToken);
+        }
+
+        internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullLightmapsAsync(
+            MapSceneData scene,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(scene);
+            return _textureLoadingService.LoadLightmapsFullAsync(
+                scene.Geometry.Lightmaps,
                 scene.Source.ProjectRoot,
                 cancellationToken);
         }

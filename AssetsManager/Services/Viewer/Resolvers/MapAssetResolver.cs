@@ -1,14 +1,17 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Viewer.Resolvers
 {
@@ -19,6 +22,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
     {
         private readonly WadContentProvider _wadContentProvider;
         private readonly AppSettings _appSettings;
+        private readonly ConcurrentDictionary<string, Lazy<VfxResourceIndex>> _projectIndexes =
+            new(StringComparer.OrdinalIgnoreCase);
 
         public MapAssetResolver(
             WadContentProvider wadContentProvider,
@@ -35,9 +40,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             ArgumentNullException.ThrowIfNull(source);
 
             MapResolvedAsset geometry = await ResolveGeometryAsync(source, cancellationToken);
-            if (geometry == null)
-                return new MapSceneAssets(source, null, null);
-
             MapResolvedAsset materials = await ResolveMaterialsAsync(source, cancellationToken);
             return new MapSceneAssets(source, geometry, materials);
         }
@@ -62,16 +64,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return null;
 
             string virtualPath = NormalizeVirtualPath(reference.VirtualPath);
-            if (!string.IsNullOrWhiteSpace(virtualPath))
+            string projectFile = TryResolveProjectFile(projectRoot, virtualPath, reference.PathHash);
+            if (projectFile != null)
             {
-                string projectFile = TryResolveProjectFile(projectRoot, virtualPath);
-                if (projectFile != null)
-                {
-                    return MapResolvedAsset.FromPhysical(
-                        virtualPath,
-                        projectFile,
-                        MapAssetOrigin.ProjectFile);
-                }
+                return MapResolvedAsset.FromPhysical(
+                    string.IsNullOrWhiteSpace(virtualPath) ? Path.GetFileName(projectFile) : virtualPath,
+                    projectFile,
+                    MapAssetOrigin.ProjectFile);
             }
 
             if (_wadContentProvider == null)
@@ -121,6 +120,30 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return null;
         }
 
+        internal IReadOnlyList<MapResolvedAsset> ResolveLinkedProjectBins(
+            string authoredPath,
+            string projectRoot)
+        {
+            string normalized = NormalizeVirtualPath(authoredPath);
+            if (string.IsNullOrWhiteSpace(normalized) ||
+                string.IsNullOrWhiteSpace(projectRoot) ||
+                !Directory.Exists(projectRoot))
+            {
+                return Array.Empty<MapResolvedAsset>();
+            }
+
+            string fullRoot = Path.GetFullPath(projectRoot);
+            IReadOnlyList<string> matches = GetProjectIndex(fullRoot)
+                .ResolveLinkedAll(normalized, new[] { ".bin" });
+            return matches
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(path => MapResolvedAsset.FromPhysical(
+                    normalized,
+                    path,
+                    MapAssetOrigin.ProjectFile))
+                .ToArray();
+        }
+
         public async Task<IReadOnlyDictionary<MapAssetReference, MapResolvedAsset>> ResolveReferencesAsync(
             IEnumerable<MapAssetReference> references,
             string projectRoot,
@@ -164,13 +187,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
             foreach (MapTextureReference reference in requested)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (string.IsNullOrWhiteSpace(reference.VirtualPath))
-                    continue;
-
-                string projectFile = TryResolveProjectFile(projectRoot, reference.VirtualPath);
+                string virtualPath = NormalizeVirtualPath(reference.VirtualPath);
+                string projectFile = TryResolveProjectFile(projectRoot, virtualPath, reference.PathHash);
                 if (projectFile != null)
                     resolved[reference] = MapResolvedAsset.FromPhysical(
-                        reference.VirtualPath,
+                        string.IsNullOrWhiteSpace(virtualPath) ? Path.GetFileName(projectFile) : virtualPath,
                         projectFile,
                         MapAssetOrigin.ProjectFile);
             }
@@ -327,14 +348,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
             MapSceneSource source,
             CancellationToken cancellationToken)
         {
-            string selected = File.Exists(source.SelectedGeometryPath)
-                ? source.SelectedGeometryPath
+            string selected = ExistingFile(source.SelectedGeometryPath);
+            string sibling = selected == null
+                ? ExistingSibling(source.SelectedMaterialsPath, ".materials.bin", ".mapgeo")
                 : null;
             return ResolveVirtualCoreAsync(
                 source.Map.GeometryVirtualPath,
                 source.ProjectRoot,
-                selected,
-                MapAssetOrigin.SelectedFile,
+                selected ?? sibling,
+                selected != null ? MapAssetOrigin.SelectedFile : MapAssetOrigin.ProjectFile,
                 cancellationToken);
         }
 
@@ -342,17 +364,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
             MapSceneSource source,
             CancellationToken cancellationToken)
         {
-            string sibling = string.IsNullOrWhiteSpace(source.SelectedGeometryPath)
-                ? null
-                : Path.ChangeExtension(source.SelectedGeometryPath, ".materials.bin");
-            if (!File.Exists(sibling))
-                sibling = null;
-
+            string selected = ExistingFile(source.SelectedMaterialsPath);
+            string sibling = selected == null
+                ? ExistingSibling(source.SelectedGeometryPath, ".mapgeo", ".materials.bin")
+                : null;
             return ResolveVirtualCoreAsync(
                 source.Map.MaterialsVirtualPath,
                 source.ProjectRoot,
-                sibling,
-                MapAssetOrigin.ProjectFile,
+                selected ?? sibling,
+                selected != null ? MapAssetOrigin.SelectedFile : MapAssetOrigin.ProjectFile,
                 cancellationToken);
         }
 
@@ -395,20 +415,61 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return null;
         }
 
-        private static string TryResolveProjectFile(string projectRoot, string virtualPath)
+        private static string ExistingFile(string path) =>
+            !string.IsNullOrWhiteSpace(path) && File.Exists(path) ? path : null;
+
+        private static string ExistingSibling(string selectedPath, string fromSuffix, string toSuffix)
+        {
+            if (string.IsNullOrWhiteSpace(selectedPath) ||
+                !selectedPath.EndsWith(fromSuffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            string sibling = selectedPath[..^fromSuffix.Length] + toSuffix;
+            return File.Exists(sibling) ? sibling : null;
+        }
+
+        private string TryResolveProjectFile(
+            string projectRoot,
+            string virtualPath,
+            ulong pathHash = 0)
         {
             if (string.IsNullOrWhiteSpace(projectRoot) || !Directory.Exists(projectRoot))
                 return null;
 
-            string relative = virtualPath.Replace('/', Path.DirectorySeparatorChar);
-            string candidate = Path.GetFullPath(Path.Combine(projectRoot, relative));
-            string root = Path.GetFullPath(projectRoot)
+            string fullRoot = Path.GetFullPath(projectRoot);
+            string rootPrefix = fullRoot
                 .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            if (!candidate.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            string normalized = NormalizeVirtualPath(virtualPath);
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                string relative = normalized.Replace('/', Path.DirectorySeparatorChar);
+                string candidate = Path.GetFullPath(Path.Combine(fullRoot, relative));
+                if (candidate.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase) && File.Exists(candidate))
+                    return candidate;
+            }
+
+            // Extracted WADs keep unresolved paths at their container root as
+            // <xxHash64><extension>. Project files remain authoritative over installation WADs,
+            // so probe that exact extraction convention before falling back to the game install.
+            ulong hash = pathHash;
+            if (hash == 0 && !string.IsNullOrWhiteSpace(normalized))
+                hash = XxHash64Ext.Hash(normalized.ToLowerInvariant());
+            if (hash == 0)
                 return null;
 
-            return File.Exists(candidate) ? candidate : null;
+            string stem = hash.ToString("x16");
+            return GetProjectIndex(fullRoot).Resolve(stem, Array.Empty<string>());
         }
+
+        private VfxResourceIndex GetProjectIndex(string fullRoot) =>
+            _projectIndexes.GetOrAdd(
+                    Path.GetFullPath(fullRoot),
+                    root => new Lazy<VfxResourceIndex>(
+                        () => VfxResourceIndex.Build(root),
+                        LazyThreadSafetyMode.ExecutionAndPublication))
+                .Value;
 
         private static string NormalizeVirtualPath(string virtualPath) =>
             PathUtils.ToVirtualPath(virtualPath);

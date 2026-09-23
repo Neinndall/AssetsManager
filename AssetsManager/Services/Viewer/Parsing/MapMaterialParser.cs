@@ -13,7 +13,7 @@ using LeagueToolkit.Hashing;
 namespace AssetsManager.Services.Viewer.Parsing
 {
     /// <summary>
-    /// Reads the generic StaticMaterialDef preview contract used by LTK Manager 1.20.0.
+    /// Reads the generic StaticMaterialDef preview contract used by current LTK Manager MAIN.
     /// </summary>
     internal sealed class MapMaterialParser
     {
@@ -29,6 +29,9 @@ namespace AssetsManager.Services.Viewer.Parsing
         private static readonly uint TexturePath = Fnv1a.HashLower("texturePath");
         private static readonly uint AddressU = Fnv1a.HashLower("addressU");
         private static readonly uint AddressV = Fnv1a.HashLower("addressV");
+        private static readonly uint AddressW = Fnv1a.HashLower("addressW");
+        private static readonly uint FilterMin = Fnv1a.HashLower("filterMin");
+        private static readonly uint FilterMag = Fnv1a.HashLower("filterMag");
         private static readonly uint Name = Fnv1a.HashLower("name");
         private static readonly uint Value = Fnv1a.HashLower("value");
         private static readonly uint On = Fnv1a.HashLower("on");
@@ -37,10 +40,14 @@ namespace AssetsManager.Services.Viewer.Parsing
         private static readonly uint BlendEnable = Fnv1a.HashLower("blendEnable");
         private static readonly uint SourceColorBlendFactor = Fnv1a.HashLower("srcColorBlendFactor");
         private static readonly uint DestinationColorBlendFactor = Fnv1a.HashLower("dstColorBlendFactor");
+        private static readonly uint SourceAlphaBlendFactor = Fnv1a.HashLower("srcAlphaBlendFactor");
+        private static readonly uint DestinationAlphaBlendFactor = Fnv1a.HashLower("dstAlphaBlendFactor");
         private static readonly uint CullEnable = Fnv1a.HashLower("cullEnable");
         private static readonly uint WindingToCull = Fnv1a.HashLower("windingToCull");
         private static readonly uint DepthEnable = Fnv1a.HashLower("depthEnable");
+        private static readonly uint DepthCompareFunc = Fnv1a.HashLower("depthCompareFunc");
         private static readonly uint WriteMask = Fnv1a.HashLower("writeMask");
+        private static readonly uint MaterialType = Fnv1a.HashLower("type");
 
         private static readonly uint ObjectPath = Fnv1a.HashLower("objectPath");
         private static readonly uint ShaderTextures = Fnv1a.HashLower("textures");
@@ -50,7 +57,10 @@ namespace AssetsManager.Services.Viewer.Parsing
         private static readonly uint DefaultTexturePath = Fnv1a.HashLower("defaultTexturePath");
         private static readonly uint ParameterData = Fnv1a.HashLower("data");
         private static readonly uint LogicalParameters = Fnv1a.HashLower("logicalParameters");
+        private static readonly uint LogicalFields = Fnv1a.HashLower("fields");
         private static readonly uint OnByDefault = Fnv1a.HashLower("onByDefault");
+        private static readonly uint RuntimeSwitch = 0x066e669c;
+        private static readonly uint SamplerName = Fnv1a.HashLower("samplerName");
 
         private readonly HashResolverService _hashResolver;
 
@@ -87,14 +97,16 @@ namespace AssetsManager.Services.Viewer.Parsing
             }
 
             var warnings = new List<string>();
-            MapMaterialPassData pass = ReadFirstPass(material.Properties, warnings);
+            IReadOnlyList<MapMaterialPassData> passes = ReadPasses(material.Properties, warnings);
+            MapMaterialPassData pass = passes.FirstOrDefault();
             MapShaderDefinitionData shader = ReadShaderDefinition(shaders, pass?.ShaderHash ?? 0, warnings);
+            bool animated = material.Properties.TryGetValue(DynamicMaterial, out BinTreeProperty dynamicValue) &&
+                            dynamicValue is BinTreeStruct;
 
-            return MapMaterialSemantics.Resolve(
+            MapMaterialDefinition preview = MapMaterialSemantics.Resolve(
                 name,
                 pathHash,
-                material.Properties.TryGetValue(DynamicMaterial, out BinTreeProperty dynamicValue) &&
-                    dynamicValue is BinTreeStruct,
+                animated,
                 pass,
                 shader,
                 ReadMaterialSamplers(material.Properties, shader, warnings),
@@ -102,9 +114,21 @@ namespace AssetsManager.Services.Viewer.Parsing
                 ReadSwitches(material.Properties, shader, warnings),
                 ReadStringMap(material.Properties, ShaderMacros),
                 warnings);
+
+            MapResolvedMaterialProgramData program = ResolveProgram(
+                material.Properties,
+                shaders,
+                passes,
+                animated,
+                warnings);
+            return preview with
+            {
+                Program = program,
+                Warnings = warnings.Distinct(StringComparer.Ordinal).ToArray()
+            };
         }
 
-        private MapMaterialPassData ReadFirstPass(
+        private IReadOnlyList<MapMaterialPassData> ReadPasses(
             IReadOnlyDictionary<uint, BinTreeProperty> properties,
             ICollection<string> warnings)
         {
@@ -112,7 +136,7 @@ namespace AssetsManager.Services.Viewer.Parsing
                 techniquesProperty is not BinTreeContainer techniques)
             {
                 warnings.Add("NoPass");
-                return null;
+                return Array.Empty<MapMaterialPassData>();
             }
 
             BinTreeStruct technique = techniques.Elements
@@ -126,19 +150,23 @@ namespace AssetsManager.Services.Viewer.Parsing
                 passesProperty is not BinTreeContainer passes)
             {
                 warnings.Add("NoPass");
-                return null;
+                return Array.Empty<MapMaterialPassData>();
             }
 
             BinTreeStruct[] authoredPasses = passes.Elements.OfType<BinTreeStruct>().ToArray();
             if (authoredPasses.Length == 0)
             {
                 warnings.Add("NoPass");
-                return null;
+                return Array.Empty<MapMaterialPassData>();
             }
-            if (authoredPasses.Length > 1)
-                warnings.Add("SecondPass");
 
-            IReadOnlyDictionary<uint, BinTreeProperty> pass = authoredPasses[0].Properties;
+            return authoredPasses.Select(item => ReadPass(item.Properties, warnings)).ToArray();
+        }
+
+        private MapMaterialPassData ReadPass(
+            IReadOnlyDictionary<uint, BinTreeProperty> pass,
+            ICollection<string> warnings)
+        {
             uint shaderHash = pass.TryGetValue(Shader, out BinTreeProperty shaderProperty) &&
                               shaderProperty is BinTreeObjectLink shaderLink
                 ? shaderLink.Value
@@ -156,7 +184,10 @@ namespace AssetsManager.Services.Viewer.Parsing
                 ReadOptionalBool(pass, CullEnable),
                 ReadOptionalUInt(pass, WindingToCull),
                 ReadOptionalBool(pass, DepthEnable),
-                ReadOptionalUInt(pass, WriteMask));
+                ReadOptionalUInt(pass, WriteMask),
+                ReadOptionalUInt(pass, SourceAlphaBlendFactor),
+                ReadOptionalUInt(pass, DestinationAlphaBlendFactor),
+                ReadOptionalUInt(pass, DepthCompareFunc));
         }
 
         private MapShaderDefinitionData ReadShaderDefinition(
@@ -196,13 +227,16 @@ namespace AssetsManager.Services.Viewer.Parsing
                 ? authoredPath
                 : ResolveBinEntry(shaderHash);
 
+            IReadOnlyDictionary<string, MapShaderSwitchData> switchDeclarations = ReadShaderSwitchDeclarations(fields);
             return new MapShaderDefinitionData(
                 shaderPath,
                 ReadShaderSamplers(fields),
                 ReadShaderParameters(fields),
-                ReadShaderSwitches(fields),
+                switchDeclarations.ToDictionary(pair => pair.Key, pair => pair.Value.OnByDefault, StringComparer.Ordinal),
                 ReadStringMap(fields, FeatureDefines),
-                true);
+                true,
+                ReadShaderPhysicalParameters(fields),
+                switchDeclarations);
         }
 
         private IReadOnlyList<MapMaterialSamplerData> ReadMaterialSamplers(
@@ -246,12 +280,23 @@ namespace AssetsManager.Services.Viewer.Parsing
                     }
                 }
 
+                MapMaterialSamplerData declaredSampler = shader?.DefaultSamplers?.FirstOrDefault(item => item.Name == name);
+                MapMaterialTextureSource source = texture != null
+                    ? MapMaterialTextureSource.Material
+                    : declaredSampler?.Texture != null
+                        ? MapMaterialTextureSource.ShaderDefault
+                        : MapMaterialTextureSource.Fallback;
                 var parsed = new MapMaterialSamplerData(
                     name,
                     texture,
                     ReadWrap(sampler.Properties, AddressU),
                     ReadWrap(sampler.Properties, AddressV),
-                    shaderDefault);
+                    shaderDefault || texture == null,
+                    ReadWrap(sampler.Properties, AddressW),
+                    (ReadOptionalUInt(sampler.Properties, FilterMin) ?? 1) == 1,
+                    (ReadOptionalUInt(sampler.Properties, FilterMag) ?? 1) == 1,
+                    declaredSampler?.SharedSampler,
+                    source);
                 if (indices.TryGetValue(name, out int existing))
                     result[existing] = parsed;
                 else
@@ -280,11 +325,21 @@ namespace AssetsManager.Services.Viewer.Parsing
                     continue;
 
                 texture.Properties.TryGetValue(DefaultTexturePath, out BinTreeProperty pathProperty);
+                MapTextureReference defaultTexture = ReadAsset(pathProperty);
+                TryReadString(texture.Properties, SamplerName, out string sharedSampler);
                 var sampler = new MapMaterialSamplerData(
                     name,
-                    ReadAsset(pathProperty),
+                    defaultTexture,
                     MapTextureWrap.Repeat,
-                    MapTextureWrap.Repeat);
+                    MapTextureWrap.Repeat,
+                    false,
+                    MapTextureWrap.Repeat,
+                    true,
+                    true,
+                    sharedSampler,
+                    defaultTexture != null
+                        ? MapMaterialTextureSource.ShaderDefault
+                        : MapMaterialTextureSource.Fallback);
                 if (indices.TryGetValue(name, out int existing))
                     result[existing] = sampler;
                 else
@@ -390,9 +445,14 @@ namespace AssetsManager.Services.Viewer.Parsing
         }
 
         private static IReadOnlyDictionary<string, bool> ReadShaderSwitches(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties) =>
+            ReadShaderSwitchDeclarations(properties)
+                .ToDictionary(pair => pair.Key, pair => pair.Value.OnByDefault, StringComparer.Ordinal);
+
+        private static IReadOnlyDictionary<string, MapShaderSwitchData> ReadShaderSwitchDeclarations(
             IReadOnlyDictionary<uint, BinTreeProperty> properties)
         {
-            var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+            var result = new Dictionary<string, MapShaderSwitchData>(StringComparer.Ordinal);
             if (!properties.TryGetValue(StaticSwitches, out BinTreeProperty property) ||
                 property is not BinTreeContainer switches)
             {
@@ -403,11 +463,328 @@ namespace AssetsManager.Services.Viewer.Parsing
             {
                 if (!TryReadString(item.Properties, Name, out string name))
                     continue;
-                result[name] = item.Properties.TryGetValue(OnByDefault, out BinTreeProperty enabled) &&
-                    ReadBool(enabled, fallback: false);
+                bool onByDefault = item.Properties.TryGetValue(OnByDefault, out BinTreeProperty enabled) &&
+                                   ReadBool(enabled, fallback: false);
+                bool runtime = item.Properties.TryGetValue(RuntimeSwitch, out BinTreeProperty runtimeValue) &&
+                               ReadBool(runtimeValue, fallback: false);
+                result[name] = new MapShaderSwitchData(onByDefault, runtime);
             }
             return result;
         }
+
+        private static IReadOnlyList<MapShaderPhysicalParameterData> ReadShaderPhysicalParameters(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties)
+        {
+            var result = new List<MapShaderPhysicalParameterData>();
+            if (!properties.TryGetValue(ShaderParameters, out BinTreeProperty property) ||
+                property is not BinTreeContainer parameters)
+            {
+                return result;
+            }
+
+            foreach (BinTreeStruct parameter in parameters.Elements.OfType<BinTreeStruct>())
+            {
+                if (!TryReadString(parameter.Properties, Name, out string physicalName))
+                    continue;
+                Vector4 data = parameter.Properties.TryGetValue(ParameterData, out BinTreeProperty dataValue) &&
+                               dataValue is BinTreeVector4 vector
+                    ? vector.Value
+                    : Vector4.Zero;
+                var logical = new List<MapShaderLogicalParameterData>();
+                if (parameter.Properties.TryGetValue(LogicalParameters, out BinTreeProperty logicalProperty) &&
+                    logicalProperty is BinTreeContainer logicalParameters)
+                {
+                    foreach (BinTreeStruct entry in logicalParameters.Elements.OfType<BinTreeStruct>())
+                    {
+                        if (!TryReadString(entry.Properties, Name, out string logicalName))
+                            continue;
+                        logical.Add(new MapShaderLogicalParameterData(
+                            logicalName,
+                            ReadOptionalUInt(entry.Properties, LogicalFields) ?? 0));
+                    }
+                }
+                result.Add(new MapShaderPhysicalParameterData(physicalName, data, logical));
+            }
+            return result;
+        }
+
+        private MapResolvedMaterialProgramData ResolveProgram(
+            IReadOnlyDictionary<uint, BinTreeProperty> material,
+            BinTree shaders,
+            IReadOnlyList<MapMaterialPassData> passes,
+            bool animated,
+            ICollection<string> warnings)
+        {
+            IReadOnlyDictionary<string, Vector4> materialParameters = ReadParametersRaw(material);
+            IReadOnlyDictionary<string, string> materialMacros = ReadStringMap(material, ShaderMacros);
+            var resolved = new List<MapResolvedMaterialPassData>();
+
+            foreach (MapMaterialPassData pass in passes ?? Array.Empty<MapMaterialPassData>())
+            {
+                MapShaderDefinitionData shader = ReadShaderDefinition(shaders, pass.ShaderHash, warnings);
+                IReadOnlyList<MapMaterialSamplerData> authoredSamplers = ReadMaterialSamplers(material, shader, warnings);
+                IReadOnlyDictionary<string, bool> switches = ResolveProgramSwitches(material, shader, warnings);
+                resolved.Add(new MapResolvedMaterialPassData(
+                    pass.ShaderHash,
+                    shader?.Path,
+                    ResolveProgramDefines(materialMacros, pass.ShaderMacros, shader, switches),
+                    ResolveRuntimeSwitches(shader, switches),
+                    ResolveProgramTextures(authoredSamplers, shader),
+                    ResolveProgramParameters(materialParameters, pass.Parameters, shader, warnings),
+                    ResolveProgramState(pass)));
+            }
+
+            return new MapResolvedMaterialProgramData(
+                ResolveMaterialKind(ReadOptionalUInt(material, MaterialType)),
+                animated,
+                resolved);
+        }
+
+        private IReadOnlyDictionary<string, bool> ResolveProgramSwitches(
+            IReadOnlyDictionary<uint, BinTreeProperty> material,
+            MapShaderDefinitionData shader,
+            ICollection<string> warnings)
+        {
+            var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+            if (shader?.SwitchDeclarations != null)
+            {
+                foreach ((string name, MapShaderSwitchData declaration) in shader.SwitchDeclarations)
+                    result[name] = declaration.OnByDefault;
+            }
+            foreach ((string name, bool enabled) in ReadSwitches(material, shader, warnings))
+                result[name] = enabled;
+            return result;
+        }
+
+        private static IReadOnlyList<MapMaterialDefineData> ResolveProgramDefines(
+            IReadOnlyDictionary<string, string> material,
+            IReadOnlyDictionary<string, string> pass,
+            MapShaderDefinitionData shader,
+            IReadOnlyDictionary<string, bool> switches)
+        {
+            var result = new Dictionary<string, MapMaterialDefineData>(StringComparer.Ordinal);
+            void Set(string name, string value, MapMaterialDefineSource source)
+            {
+                if (!string.IsNullOrWhiteSpace(name))
+                    result[name] = new MapMaterialDefineData(name, value ?? string.Empty, source);
+            }
+
+            foreach ((string name, string value) in material ?? EmptyStringMap)
+                Set(name, value, MapMaterialDefineSource.Material);
+            foreach ((string name, string value) in shader?.FeatureDefines ?? EmptyStringMap)
+                Set(name, value, MapMaterialDefineSource.Feature);
+            if (shader?.SwitchDeclarations != null)
+            {
+                foreach ((string name, MapShaderSwitchData declaration) in shader.SwitchDeclarations)
+                {
+                    if (!declaration.Runtime)
+                        Set(name, switches.TryGetValue(name, out bool on) && on ? "1" : "0", MapMaterialDefineSource.Switch);
+                }
+            }
+            foreach ((string name, string value) in pass ?? EmptyStringMap)
+                Set(name, value, MapMaterialDefineSource.Pass);
+
+            return result.Values.OrderBy(item => item.Name, StringComparer.Ordinal).ToArray();
+        }
+
+        private static IReadOnlyList<KeyValuePair<string, bool>> ResolveRuntimeSwitches(
+            MapShaderDefinitionData shader,
+            IReadOnlyDictionary<string, bool> switches)
+        {
+            if (shader?.SwitchDeclarations == null)
+                return Array.Empty<KeyValuePair<string, bool>>();
+
+            return shader.SwitchDeclarations
+                .Where(pair => pair.Value.Runtime)
+                .Select(pair => new KeyValuePair<string, bool>(
+                    pair.Key,
+                    switches.TryGetValue(pair.Key, out bool on) ? on : pair.Value.OnByDefault))
+                .ToArray();
+        }
+
+        private static IReadOnlyList<MapMaterialPassTextureData> ResolveProgramTextures(
+            IReadOnlyList<MapMaterialSamplerData> authored,
+            MapShaderDefinitionData shader)
+        {
+            var merged = new Dictionary<string, MapMaterialSamplerData>(StringComparer.Ordinal);
+            foreach (MapMaterialSamplerData sampler in authored ?? Array.Empty<MapMaterialSamplerData>())
+                merged[sampler.Name] = sampler;
+
+            foreach (MapMaterialSamplerData fallback in shader?.DefaultSamplers ?? Array.Empty<MapMaterialSamplerData>())
+            {
+                if (!merged.TryGetValue(fallback.Name, out MapMaterialSamplerData sampler))
+                {
+                    merged[fallback.Name] = fallback;
+                    continue;
+                }
+                if (sampler.Texture == null && sampler.UsesShaderDefaultTexture)
+                {
+                    merged[fallback.Name] = sampler with
+                    {
+                        Texture = fallback.Texture,
+                        SharedSampler = fallback.SharedSampler,
+                        TextureSource = fallback.Texture != null
+                            ? MapMaterialTextureSource.ShaderDefault
+                            : MapMaterialTextureSource.Fallback
+                    };
+                }
+            }
+
+            IEnumerable<string> names = shader?.IsDeclared == true
+                ? (shader.DefaultSamplers ?? Array.Empty<MapMaterialSamplerData>()).Select(item => item.Name)
+                : merged.Keys;
+            return names
+                .Where(merged.ContainsKey)
+                .Select(name =>
+                {
+                    MapMaterialSamplerData sampler = merged[name];
+                    return new MapMaterialPassTextureData(
+                        name,
+                        sampler.Texture,
+                        sampler.TextureSource,
+                        new MapMaterialSamplerStateData(
+                            sampler.SharedSampler,
+                            sampler.WrapU,
+                            sampler.WrapV,
+                            sampler.WrapW,
+                            sampler.FilterMin,
+                            sampler.FilterMag));
+                })
+                .ToArray();
+        }
+
+        private static IReadOnlyList<MapMaterialPassParamData> ResolveProgramParameters(
+            IReadOnlyDictionary<string, Vector4> material,
+            IReadOnlyDictionary<string, Vector4> pass,
+            MapShaderDefinitionData shader,
+            ICollection<string> warnings)
+        {
+            if (shader?.IsDeclared != true || shader.PhysicalParameters == null)
+            {
+                var values = new Dictionary<string, MapMaterialPassParamData>(StringComparer.Ordinal);
+                foreach ((string name, Vector4 value) in material ?? EmptyVectorMap)
+                    values[name] = new MapMaterialPassParamData(name, value, MapMaterialParamSource.Material);
+                foreach ((string name, Vector4 value) in pass ?? EmptyVectorMap)
+                    values[name] = new MapMaterialPassParamData(name, value, MapMaterialParamSource.Pass);
+                return values.Values.ToArray();
+            }
+
+            var resolved = shader.PhysicalParameters
+                .Select(item => new MapMaterialPassParamData(item.Name, item.Data, MapMaterialParamSource.ShaderDefault))
+                .ToArray();
+            ApplyProgramParameters(resolved, material, MapMaterialParamSource.Material, shader, warnings);
+            ApplyProgramParameters(resolved, pass, MapMaterialParamSource.Pass, shader, warnings);
+            return resolved;
+        }
+
+        private static void ApplyProgramParameters(
+            MapMaterialPassParamData[] target,
+            IReadOnlyDictionary<string, Vector4> values,
+            MapMaterialParamSource source,
+            MapShaderDefinitionData shader,
+            ICollection<string> warnings)
+        {
+            foreach ((string name, Vector4 value) in values ?? EmptyVectorMap)
+            {
+                if (!TryFindParameterTarget(shader.PhysicalParameters, name, out int index, out uint mask))
+                {
+                    warnings.Add($"UndeclaredParam:{name}");
+                    continue;
+                }
+
+                Vector4 current = target[index].Value;
+                if (!Scatter(ref current, mask, value))
+                    continue;
+                target[index] = target[index] with { Value = current, Source = source };
+            }
+        }
+
+        private static bool TryFindParameterTarget(
+            IReadOnlyList<MapShaderPhysicalParameterData> physical,
+            string name,
+            out int index,
+            out uint mask)
+        {
+            for (int i = 0; i < physical.Count; i++)
+            {
+                MapShaderLogicalParameterData logical = physical[i].LogicalParameters?.FirstOrDefault(item => item.Name == name);
+                if (logical != null)
+                {
+                    index = i;
+                    mask = logical.Fields;
+                    return true;
+                }
+            }
+            for (int i = 0; i < physical.Count; i++)
+            {
+                if (physical[i].Name == name)
+                {
+                    index = i;
+                    mask = 0b1111;
+                    return true;
+                }
+            }
+            index = -1;
+            mask = 0;
+            return false;
+        }
+
+        private static bool Scatter(ref Vector4 target, uint mask, Vector4 input)
+        {
+            float[] destination = { target.X, target.Y, target.Z, target.W };
+            float[] source = { input.X, input.Y, input.Z, input.W };
+            int next = 0;
+            bool wrote = false;
+            for (int component = 0; component < 4 && next < 4; component++)
+            {
+                if ((mask & (1u << component)) == 0)
+                    continue;
+                destination[component] = source[next++];
+                wrote = true;
+            }
+            target = new Vector4(destination[0], destination[1], destination[2], destination[3]);
+            return wrote;
+        }
+
+        private static MapMaterialPassStateData ResolveProgramState(MapMaterialPassData pass) =>
+            new(
+                pass?.BlendEnabled ?? false,
+                ToBlendFactor(pass?.SourceBlendFactor, MapBlendFactor.One),
+                ToBlendFactor(pass?.DestinationBlendFactor, MapBlendFactor.Zero),
+                ToBlendFactor(pass?.SourceAlphaBlendFactor, MapBlendFactor.One),
+                ToBlendFactor(pass?.DestinationAlphaBlendFactor, MapBlendFactor.Zero),
+                pass?.CullEnabled ?? true,
+                (pass?.WindingToCull ?? 1) == 0
+                    ? MapMaterialWinding.Clockwise
+                    : MapMaterialWinding.CounterClockwise,
+                pass?.DepthEnabled ?? true,
+                pass?.DepthCompareFunc ?? 3,
+                pass?.WriteMask ?? 31);
+
+        private static MapBlendFactor ToBlendFactor(uint? value, MapBlendFactor fallback) =>
+            value switch
+            {
+                0 => MapBlendFactor.Zero,
+                1 => MapBlendFactor.One,
+                2 => MapBlendFactor.SourceColor,
+                3 => MapBlendFactor.OneMinusSourceColor,
+                4 => MapBlendFactor.DestinationColor,
+                5 => MapBlendFactor.OneMinusDestinationColor,
+                6 => MapBlendFactor.SourceAlpha,
+                7 => MapBlendFactor.OneMinusSourceAlpha,
+                _ => fallback
+            };
+
+        private static MapMaterialKind ResolveMaterialKind(uint? value) =>
+            value switch
+            {
+                0 => MapMaterialKind.StaticMesh,
+                null or 1 => MapMaterialKind.SkinnedMesh,
+                2 => MapMaterialKind.Particles,
+                3 => MapMaterialKind.Ui,
+                4 => MapMaterialKind.PostProcess,
+                _ => MapMaterialKind.Unknown
+            };
 
         private MapTextureReference ReadAsset(BinTreeProperty property)
         {

@@ -7,7 +7,7 @@ namespace AssetsManager.Views.Models.Viewer
     /// <summary>
     /// Identifies one map by the entry path stored in Riot map containers.
     /// </summary>
-    internal sealed class MapPath : IEquatable<MapPath>
+    public sealed class MapPath : IEquatable<MapPath>
     {
         private const string DataPrefix = "data/";
         private const string GeometrySuffix = ".mapgeo";
@@ -52,23 +52,34 @@ namespace AssetsManager.Views.Models.Viewer
             return true;
         }
 
-        public static bool TryFromGeometryFile(
-            string geometryFilePath,
+        public static bool TryFromMapFile(
+            string mapFilePath,
             out MapPath mapPath)
         {
             mapPath = null;
-            if (string.IsNullOrWhiteSpace(geometryFilePath) ||
-                !geometryFilePath.EndsWith(GeometrySuffix, StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrWhiteSpace(mapFilePath) ||
+                (!mapFilePath.EndsWith(GeometrySuffix, StringComparison.OrdinalIgnoreCase) &&
+                 !mapFilePath.EndsWith(MaterialsSuffix, StringComparison.OrdinalIgnoreCase)))
             {
                 return false;
             }
 
-            string normalized = PathUtils.NormalizeSeparators(Path.GetFullPath(geometryFilePath));
+            string normalized = PathUtils.NormalizeSeparators(Path.GetFullPath(mapFilePath));
             int dataIndex = normalized.LastIndexOf("/data/", StringComparison.OrdinalIgnoreCase);
             if (dataIndex < 0)
                 return false;
 
             return TryFromEntryPath(normalized[(dataIndex + "/data/".Length)..], out mapPath);
+        }
+
+        public static bool TryFromGeometryFile(
+            string geometryFilePath,
+            out MapPath mapPath)
+        {
+            mapPath = null;
+            return !string.IsNullOrWhiteSpace(geometryFilePath) &&
+                   geometryFilePath.EndsWith(GeometrySuffix, StringComparison.OrdinalIgnoreCase) &&
+                   TryFromMapFile(geometryFilePath, out mapPath);
         }
 
         public bool Equals(MapPath other) =>

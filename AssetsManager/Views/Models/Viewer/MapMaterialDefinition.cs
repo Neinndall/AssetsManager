@@ -30,7 +30,14 @@ namespace AssetsManager.Views.Models.Viewer
         Vector2? UvRepeat,
         Vector2? UvScroll,
         MapMaterialRenderState RenderState,
-        IReadOnlyList<string> Warnings);
+        IReadOnlyList<string> Warnings)
+    {
+        /// <summary>
+        /// Full normal-technique program contract matching current LTK MAIN. The legacy preview
+        /// fields above remain the first-pass fallback until translated game shaders are available.
+        /// </summary>
+        public MapResolvedMaterialProgramData Program { get; init; }
+    }
 
     internal sealed record MapMaterialRenderState(
         MapMaterialBlendMode Blending,

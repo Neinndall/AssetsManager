@@ -48,7 +48,10 @@ New Features
   - VFX Studio / Reorganized BIN parsing into dedicated system, animation, resource, value, and schema services without changing supported VFX behavior.
   - VFX Studio / AnimationGraph clip timing now retimes the character pose with mTickDuration so attached particle events and joint cues stay synchronized with the animation.
   - Viewer / MAPGEO now has a dedicated scene pipeline with project-to-WAD asset resolution, authored geometry/material semantics, 64→1024 texture waves, layer-0 backdrop grouping, mirrored world coordinates, isolated OpenGL renderers, one shared authored placeable snapshot, Map/MapSkin/MapContainer variants, and structures/level props with shared SKN/SKL/ANM, AnimationGraph idle playback, GPU skinning, authored materials and transparent sorting instead of routing map content through champion ModelParts.
-  - Viewer / Load MapGeometry now mounts the dedicated MAP scene directly in the main viewport, composing backdrop, animated structures and map particle VFX with MAP-specific framing, Structures/Particles display toggles, frame-driven timing and symmetric CPU/GPU teardown on scene changes or window close.
+  - Viewer / MAPGEO Lit mode now renders the game's own shader permutations from ShaderCache with authored pass textures, lightmaps, fog, material parameters and render state, while keeping safe preview fallbacks and alternate view modes.
+  - Viewer / Moved DXBC reflection and DXBC→SPIR-V→GLSL translation into the dedicated AssetsManager.Shaders library, using the `ShadowDusk.HLSL` NuGet runtime for vkd3d-shader instead of shipping a project-owned native bridge.
+  - Viewer / MAP scenes now apply authored screen-space SSAO, edge-aware blur, depth/height fog and depth of field after scene VFX, while reusing the shared framebuffer capture path used by VFX soft particles and distortion.
+  - VFX Studio / MAP projects now load through the unified Studio tree, composing backdrop, animated structures and map particle VFX with MAP-specific framing, semantic selection and symmetric CPU/GPU teardown without a separate main-Viewer MapGeometry loader.
   - Viewer / MAP Outliner authored chunk→placeable order, resolved labels/classes, type icons, chunk/item visibility eyes for drawn content, inherited hidden state, repeatable camera focus with a 1500-unit reach, and a depth-independent 60-unit wireframe marker.
   - Viewer / Model materials now animate BIN-authored vertex waves and Fresnel noise when the material declares those features.
   - Viewer / Model materials now apply BIN-authored Fresnel, masked emission, and simple dissolve transitions alongside animated scroll and flow textures.
@@ -117,7 +120,7 @@ New Features
 
 Improvements
   - Viewer / Rebuilt the MAPGEO loading core around canonical map paths, project-to-WAD asset resolution, flat geometry buffers, StaticMaterialDef semantics, shader defaults, and bounded batch texture decoding without routing maps through SceneModel/ModelPart.
-  - Viewer / Removed the retired SceneModel-based MAPGEO loader, CPU terrain compositor, map lightmap state and renderer branches now that Load MapGeometry is fully owned by the dedicated MAP scene pipeline.
+  - Viewer / Removed the retired SceneModel-based MAPGEO loader, CPU terrain compositor and legacy MapGeometry entry paths; MAP project discovery and explicit scene loading are now owned exclusively by VFX Studio.
   - Viewer / MAP scene runtime now memoizes structure animation groups and placement matrices, propagates stale-load cancellation through BIN/texture/ANM reads, and releases already completed skin runtimes plus temporary MapVfx resources when a parallel map load is cancelled.
   - Viewer / Animation player now uses a cleaner grouped timeline, dynamic Play/Stop/Resume control, and compact speed controls while preserving the current playhead.
   - VFX Studio / Added shared Viewer Grid/Ground preferences plus Shaded/Wire/Overlay, camera reset, and standalone system motion controls directly in the viewport toolbar.
@@ -246,11 +249,9 @@ Improvements
   - BIN files and comparisons now use the canonical Ritobin structure with linked dependencies, typed properties, and property-level diff filtering; removed the legacy JSON BIN serializer.
   - VFX Studio now follows declared BIN links from the selected skin root, avoiding unrelated sibling or basename matches while preserving truncated extraction collisions.
   - VFX Studio now places the loop boundary at the final particle frame produced by playback.
-  - Viewer / Simplified manual map geometry loading to 1-step file dialog using automatic root texture resolution.
-  - Viewer / Updated Load Project description to "Explore models & map environments".
-  - Viewer / Improved map texture resolution with recursive parent root fallback when loading maps from Project Explorer.
-  - Viewer / Supported .mapgeo file selection directly inside Project Explorer browser tree.
-  - Viewer / Updated landing descriptions for 3D Workspace hero header, Load Map, and VFX Studio cards.
+  - VFX Studio / MAP project loading now starts from the Studio folder selector, discovers MapGeometry assets without auto-playing content, and loads a map only after explicit selection in the unified browser.
+  - Viewer / Project Explorer remains dedicated to model, animation, and image assets; `.mapgeo` project loading has been removed from the main Viewer so MAP ownership is not split across two workflows.
+  - VFX Studio / Updated project and asset labels to describe maps, skins, effects, and animations consistently.
   - Viewer / Collapsed bottom dock in Map mode to remove obsolete button and empty spacing.
   - VFX Studio / Removed the incomplete AttachedMesh model-binding and rendering path; these emitters remain identified but are skipped until proper owner-model support is implemented.
   - Viewer / Synchronized model visibility toggle in Scene list to enable or hide all submeshes at once.
@@ -407,6 +408,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / MAP scenes now resolve shared SKN indices, hash-only Animation Clips, and truncated or collision-renamed BIN dependencies directly from the extracted container so structures and clip VFX are not dropped.
   - VFX Studio / Fixed unresolved child identifiers incorrectly synthesizing or falling back to effect keys from unrelated hashes or names.
   - VFX Studio / Fixed null primitive defaults and invalid curve key pairs to match League VFX parsing semantics.
   - VFX Studio / Matched birth probability tables by using one shared random chance across every populated value channel.

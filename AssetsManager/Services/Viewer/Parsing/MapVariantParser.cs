@@ -7,7 +7,7 @@ using LeagueToolkit.Core.Meta.Properties;
 namespace AssetsManager.Services.Viewer.Parsing
 {
     /// <summary>
-    /// Resolves the map variants declared by Map, MapSkin, and MapContainer objects exactly as LTK Manager 1.20.0.
+    /// Resolves the map variants declared by Map, MapSkin, and MapContainer objects like current LTK Manager MAIN.
     /// </summary>
     internal sealed class MapVariantParser
     {

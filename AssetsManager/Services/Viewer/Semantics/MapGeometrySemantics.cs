@@ -8,7 +8,7 @@ namespace AssetsManager.Services.Viewer.Semantics
 {
     /// <summary>
     /// Layer and framing semantics shared by the MAPGEO renderer and scene runtime.
-    /// Mirrors LTK Manager 1.20.0 mapBuffer.ts.
+    /// Mirrors the current LTK Manager MAIN map-buffer semantics.
     /// </summary>
     internal static class MapGeometrySemantics
     {

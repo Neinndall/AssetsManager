@@ -18,11 +18,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
     /// The GPU consumes influence-index skinning attributes while children can query the
     /// same pose by joint name, both at particle-local time.
     /// </summary>
-    internal sealed class VfxAnimatedMesh : IVfxMeshJointProvider, IDisposable
+    internal sealed class VfxAnimatedMesh : IVfxMeshJointProvider, IVfxEmissionSurfacePose, IDisposable
     {
         private readonly RigResource _skeleton;
         private readonly IAnimationAsset _animation;
-        private readonly uint[] _jointHashes;
+        private readonly uint[] _jointAnimationHashes;
+        private readonly uint[] _jointNameHashes;
         private readonly int[] _hierarchyOrder;
         private readonly int[] _hierarchyParents;
         private readonly Dictionary<string, int> _jointsByName;
@@ -37,11 +38,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             RigResource skeleton,
             IAnimationAsset animation)
         {
-            BoneIndices = boneIndices;
-            BoneWeights = boneWeights;
+            BoneIndices = boneIndices ?? Array.Empty<float>();
+            BoneWeights = boneWeights ?? Array.Empty<float>();
             _skeleton = skeleton;
             _animation = animation;
-            _jointHashes = skeleton.Joints.Select(joint => Elf.HashLower(joint.Name)).ToArray();
+            _jointAnimationHashes = skeleton.Joints.Select(joint => Elf.HashLower(joint.Name)).ToArray();
+            _jointNameHashes = skeleton.Joints.Select(joint => Fnv1a.HashLower(joint.Name)).ToArray();
             (_hierarchyOrder, _hierarchyParents) = AnimationService.BuildHierarchy(
                 skeleton.Joints.Select(static joint => (int)joint.ParentId).ToArray());
             _jointsByName = skeleton.Joints
@@ -53,17 +55,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             _palette = new Matrix4x4[skeleton.Influences.Count];
         }
 
-        internal float[] BoneIndices { get; }
-        internal float[] BoneWeights { get; }
+        public float[] BoneIndices { get; }
+        public float[] BoneWeights { get; }
         internal int PaletteCount => _palette.Length;
+        public int JointCount => _skeleton.Joints.Count;
 
         internal static VfxAnimatedMesh Load(string meshPath, string skeletonPath, string animationPath = null)
         {
             using var mesh = SkinnedMesh.ReadFromSimpleSkin(meshPath);
-            RigResource skeleton;
-            using (var stream = File.OpenRead(skeletonPath))
-                skeleton = new RigResource(stream);
-            if (skeleton.Joints.Count == 0 || skeleton.Joints.Count > GpuSkinningData.MaxBones ||
+            RigResource skeleton = LoadSkeletonResource(skeletonPath);
+            if (skeleton.Joints.Count > GpuSkinningData.MaxBones ||
                 skeleton.Influences.Count == 0 || skeleton.Influences.Count > GpuSkinningData.MaxBones)
             {
                 throw new InvalidDataException("VFX mesh skeleton is outside the supported GPU skinning limits.");
@@ -108,16 +109,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 }
             }
 
-            IAnimationAsset animation = null;
-            if (!string.IsNullOrWhiteSpace(animationPath))
-            {
-                using var stream = File.OpenRead(animationPath);
-                animation = AnimationAsset.Load(stream);
-            }
-            return new VfxAnimatedMesh(boneIndices, boneWeights, skeleton, animation);
+            return new VfxAnimatedMesh(boneIndices, boneWeights, skeleton, LoadAnimation(animationPath));
         }
 
-        internal ReadOnlySpan<Matrix4x4> EvaluatePalette(float seconds)
+        internal static VfxAnimatedMesh LoadSkeleton(string skeletonPath, string animationPath = null)
+            => new(Array.Empty<float>(), Array.Empty<float>(), LoadSkeletonResource(skeletonPath), LoadAnimation(animationPath));
+
+        public ReadOnlySpan<Matrix4x4> EvaluatePalette(float seconds)
         {
             EvaluatePose(seconds);
             for (int influence = 0; influence < _palette.Length; influence++)
@@ -128,6 +126,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                     : Matrix4x4.Identity;
             }
             return _palette;
+        }
+
+        public uint JointHashAt(int index) => _jointNameHashes[index];
+
+        public int ParentIndexAt(int index) => _hierarchyParents[index];
+
+        public void EvaluateJointPositions(float seconds, Span<Vector3> positions)
+        {
+            if (positions.Length < _worldTransforms.Length)
+                throw new ArgumentException("Joint position buffer is smaller than the skeleton.", nameof(positions));
+            EvaluatePose(seconds);
+            for (int index = 0; index < _worldTransforms.Length; index++)
+                positions[index] = _worldTransforms[index].Translation;
         }
 
         public bool TryGetJointTransform(string jointName, float particleTime, out Matrix4x4 transform)
@@ -163,7 +174,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             {
                 var joint = _skeleton.Joints[index];
                 Matrix4x4 local = joint.LocalTransform;
-                if (_pose.TryGetValue(_jointHashes[index], out var pose))
+                if (_pose.TryGetValue(_jointAnimationHashes[index], out var pose))
                 {
                     local = Matrix4x4.CreateScale(pose.Scale) *
                             Matrix4x4.CreateFromQuaternion(pose.Rotation) *
@@ -173,6 +184,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 _worldTransforms[index] = parent >= 0 ? local * _worldTransforms[parent] : local;
             }
             _evaluatedTime = time;
+        }
+
+        private static RigResource LoadSkeletonResource(string skeletonPath)
+        {
+            using var stream = File.OpenRead(skeletonPath);
+            var skeleton = new RigResource(stream);
+            if (skeleton.Joints.Count == 0)
+                throw new InvalidDataException("VFX skeleton has no joints.");
+            return skeleton;
+        }
+
+        private static IAnimationAsset LoadAnimation(string animationPath)
+        {
+            if (string.IsNullOrWhiteSpace(animationPath)) return null;
+            using var stream = File.OpenRead(animationPath);
+            return AnimationAsset.Load(stream);
         }
 
         public void Dispose() => _animation?.Dispose();

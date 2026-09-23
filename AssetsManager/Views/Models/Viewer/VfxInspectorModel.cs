@@ -665,6 +665,8 @@ namespace AssetsManager.Views.Models.Viewer
         private VfxSystemDiagnosticItem _selectedSystem;
         private AnimationClipCatalogItem _selectedAnimation;
         private VfxSpellBrowserItem _selectedSpell;
+        private MapVariantData _selectedMapVariant;
+        private MapBrowserNode _selectedMapNode;
         private float? _animationParameter;
         private bool _isAnimationMode = true;
         private bool _isPlaying;
@@ -680,7 +682,8 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _showPreviewGrid = true;
         private bool _showPreviewGround;
         private bool _showPreviewStage;
-        private VfxPreviewWireframeMode _previewWireframeMode = VfxPreviewWireframeMode.Off;
+        private VfxPreviewViewMode _previewViewMode = VfxPreviewViewMode.Lit;
+        private bool _previewWireOverlay;
         private VfxPreviewCameraPreset _previewCameraPreset = VfxPreviewCameraPreset.Game;
         private VfxEmitterDiagnosticItem _selectedEmitter;
         private VfxCurveAuthoringItem _selectedCurveAuthoringItem;
@@ -733,10 +736,11 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsMissileRig => _rigPreset == VfxRigPreset.Missile;
         public bool IsTrailRig => _rigPreset == VfxRigPreset.Trail;
 
-        public ObservableCollection<VfxBrowserFolder> BrowserRoots { get; } = new();
+        public ObservableCollection<object> BrowserRoots { get; } = new();
         public ObservableCollection<VfxSkinItem> DetectedSkins { get; } = new();
         public ObservableCollection<AnimationClipCatalogItem> DetectedAnimations { get; } = new();
         public ObservableCollection<float> AnimationParameterValues { get; } = new();
+        public ObservableCollection<MapVariantData> MapVariants { get; } = new();
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxForceAuthoringItem> ForceAuthoringItems { get; } = new();
@@ -781,6 +785,58 @@ namespace AssetsManager.Views.Models.Viewer
                 _selectedSpell = value;
                 OnPropertyChanged();
             }
+        }
+
+        public MapVariantData SelectedMapVariant
+        {
+            get => _selectedMapVariant;
+            set
+            {
+                if (ReferenceEquals(_selectedMapVariant, value)) return;
+                _selectedMapVariant = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool HasMultipleMapVariants => MapVariants.Count > 1;
+
+        public MapBrowserNode SelectedMapNode
+        {
+            get => _selectedMapNode;
+            set
+            {
+                if (ReferenceEquals(_selectedMapNode, value)) return;
+                _selectedMapNode = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasSelectedMapNode));
+                OnPropertyChanged(nameof(ViewportSelectionTitle));
+                OnPropertyChanged(nameof(ViewportSelectionDetail));
+            }
+        }
+
+        public bool HasSelectedMapNode => _selectedMapNode != null;
+
+        public string ViewportSelectionTitle =>
+            _selectedMapNode?.Title ?? _selectedSystem?.Name ?? "No asset selected";
+
+        public string ViewportSelectionDetail =>
+            !string.IsNullOrWhiteSpace(_selectedMapNode?.InspectorSummary)
+                ? _selectedMapNode.InspectorSummary
+                : _selectedMapNode != null
+                    ? _selectedMapNode.Subtitle ?? _selectedMapNode.Kind.ToString()
+                    : _selectedSystem != null
+                        ? $"Particles: {_liveParticleCount}"
+                        : "Select an asset to inspect";
+
+        internal void SetMapVariants(IEnumerable<MapVariantData> variants)
+        {
+            MapVariants.Clear();
+            foreach (MapVariantData variant in variants ?? Array.Empty<MapVariantData>())
+                MapVariants.Add(variant);
+
+            _selectedMapVariant = MapVariantData.Opening(MapVariants);
+            OnPropertyChanged(nameof(SelectedMapVariant));
+            OnPropertyChanged(nameof(HasMultipleMapVariants));
         }
 
         public float? AnimationParameter
@@ -924,6 +980,8 @@ namespace AssetsManager.Views.Models.Viewer
                 _selectedSystem = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(HasStandaloneSystem));
+                OnPropertyChanged(nameof(ViewportSelectionTitle));
+                OnPropertyChanged(nameof(ViewportSelectionDetail));
             }
         }
 
@@ -1010,7 +1068,14 @@ namespace AssetsManager.Views.Models.Viewer
         public int LiveParticleCount
         {
             get => _liveParticleCount;
-            set { _liveParticleCount = value; OnPropertyChanged(); }
+            set
+            {
+                if (_liveParticleCount == value) return;
+                _liveParticleCount = value;
+                OnPropertyChanged();
+                if (_selectedMapNode == null)
+                    OnPropertyChanged(nameof(ViewportSelectionDetail));
+            }
         }
 
         public string BgMode
@@ -1060,44 +1125,72 @@ namespace AssetsManager.Views.Models.Viewer
             (_showPreviewGround ? 1 : 0) +
             (_showPreviewStage ? 1 : 0);
 
-        public VfxPreviewWireframeMode PreviewWireframeMode
+        public VfxPreviewViewMode PreviewViewMode
         {
-            get => _previewWireframeMode;
+            get => _previewViewMode;
             set
             {
-                if (_previewWireframeMode == value) return;
-                _previewWireframeMode = value;
+                if (_previewViewMode == value) return;
+                _previewViewMode = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(PreviewWireframeText));
-                OnPropertyChanged(nameof(IsPreviewWireframeOff));
-                OnPropertyChanged(nameof(IsPreviewWireframeOnly));
-                OnPropertyChanged(nameof(IsPreviewWireframeOverlay));
+                OnPropertyChanged(nameof(PreviewViewModeText));
+                OnPropertyChanged(nameof(IsPreviewViewLit));
+                OnPropertyChanged(nameof(IsPreviewViewUnshaded));
+                OnPropertyChanged(nameof(IsPreviewViewUntextured));
+                OnPropertyChanged(nameof(IsPreviewViewWireframe));
+                OnPropertyChanged(nameof(CanPreviewWireOverlay));
+                OnPropertyChanged(nameof(EffectivePreviewWireOverlay));
             }
         }
 
-        public string PreviewWireframeText => _previewWireframeMode switch
+        public bool PreviewWireOverlay
         {
-            VfxPreviewWireframeMode.Only => "Wire",
-            VfxPreviewWireframeMode.Overlay => "Overlay",
-            _ => "Shaded"
+            get => _previewWireOverlay;
+            set
+            {
+                if (_previewWireOverlay == value) return;
+                _previewWireOverlay = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(EffectivePreviewWireOverlay));
+            }
+        }
+
+        public bool CanPreviewWireOverlay =>
+            _previewViewMode == VfxPreviewViewMode.Lit ||
+            _previewViewMode == VfxPreviewViewMode.Untextured;
+
+        public bool EffectivePreviewWireOverlay => _previewWireOverlay && CanPreviewWireOverlay;
+
+        public string PreviewViewModeText => _previewViewMode switch
+        {
+            VfxPreviewViewMode.Unshaded => "Unshaded",
+            VfxPreviewViewMode.Untextured => "Untextured",
+            VfxPreviewViewMode.Wireframe => "Wireframe",
+            _ => "Lit"
         };
 
-        public bool IsPreviewWireframeOff
+        public bool IsPreviewViewLit
         {
-            get => _previewWireframeMode == VfxPreviewWireframeMode.Off;
-            set { if (value) PreviewWireframeMode = VfxPreviewWireframeMode.Off; }
+            get => _previewViewMode == VfxPreviewViewMode.Lit;
+            set { if (value) PreviewViewMode = VfxPreviewViewMode.Lit; }
         }
 
-        public bool IsPreviewWireframeOnly
+        public bool IsPreviewViewUnshaded
         {
-            get => _previewWireframeMode == VfxPreviewWireframeMode.Only;
-            set { if (value) PreviewWireframeMode = VfxPreviewWireframeMode.Only; }
+            get => _previewViewMode == VfxPreviewViewMode.Unshaded;
+            set { if (value) PreviewViewMode = VfxPreviewViewMode.Unshaded; }
         }
 
-        public bool IsPreviewWireframeOverlay
+        public bool IsPreviewViewUntextured
         {
-            get => _previewWireframeMode == VfxPreviewWireframeMode.Overlay;
-            set { if (value) PreviewWireframeMode = VfxPreviewWireframeMode.Overlay; }
+            get => _previewViewMode == VfxPreviewViewMode.Untextured;
+            set { if (value) PreviewViewMode = VfxPreviewViewMode.Untextured; }
+        }
+
+        public bool IsPreviewViewWireframe
+        {
+            get => _previewViewMode == VfxPreviewViewMode.Wireframe;
+            set { if (value) PreviewViewMode = VfxPreviewViewMode.Wireframe; }
         }
 
         public VfxPreviewCameraPreset PreviewCameraPreset

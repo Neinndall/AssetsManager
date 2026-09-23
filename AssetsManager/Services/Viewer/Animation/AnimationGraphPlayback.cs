@@ -10,7 +10,7 @@ namespace AssetsManager.Services.Viewer.Animation
 {
     /// <summary>
     /// Shared AnimationGraph playback semantics used by champion/VFX and MAP structures.
-    /// Composite resolution, idle selection and mTickDuration retiming mirror LTK Manager 1.20.0.
+    /// Composite resolution, idle selection and mTickDuration retiming mirror current LTK Manager MAIN.
     /// </summary>
     internal static class AnimationGraphPlayback
     {

@@ -2,7 +2,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 {
     /// <summary>
     /// Stock character material shader for MAP structures. It mirrors the Lambert/Basic split
-    /// used by LTK Manager 1.20.0 without enabling AssetsManager's champion-only shader effects.
+    /// used by current LTK Manager MAIN without enabling AssetsManager's champion-only shader effects.
     /// </summary>
     internal static class MapCharacterShaderSource
     {
@@ -64,6 +64,8 @@ uniform vec2 uUvOffset;
 uniform int uLit;
 uniform int uPremultipliedAlpha;
 uniform vec3 uLightDirection;
+uniform int uWireframePass;
+uniform vec4 uWireframeColor;
 
 out vec4 FragColor;
 
@@ -84,6 +86,12 @@ vec3 linearToSrgb(vec3 value)
 
 void main()
 {
+    if (uWireframePass != 0)
+    {
+        FragColor = uWireframeColor;
+        return;
+    }
+
     vec4 texel = uHasTexture != 0
         ? texture(uBaseTexture, vUv * uUvRepeat + uUvOffset)
         : vec4(1.0);

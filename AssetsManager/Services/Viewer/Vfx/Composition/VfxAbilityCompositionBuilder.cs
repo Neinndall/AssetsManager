@@ -64,6 +64,78 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
             };
         }
 
+        internal static VfxAbilityComposition BuildTimedPlaylist(
+            AnimationClipDefinition root,
+            IReadOnlyList<AnimationClipDefinition> playlist,
+            IReadOnlyList<float> stepDurations,
+            IReadOnlyList<float> frameSeconds,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap)
+        {
+            ArgumentNullException.ThrowIfNull(root);
+            ArgumentNullException.ThrowIfNull(playlist);
+            ArgumentNullException.ThrowIfNull(stepDurations);
+            ArgumentNullException.ThrowIfNull(frameSeconds);
+            ArgumentNullException.ThrowIfNull(systems);
+            ArgumentNullException.ThrowIfNull(resourceMap);
+
+            var events = new List<VfxCompositionEvent>();
+            float passTime = 0f;
+            int resolvedCount = 0;
+            int count = Math.Min(playlist.Count, Math.Min(stepDurations.Count, frameSeconds.Count));
+            for (int index = 0; index < count; index++)
+            {
+                AnimationClipDefinition step = playlist[index];
+                float tick = float.IsFinite(frameSeconds[index]) && frameSeconds[index] > 0f
+                    ? frameSeconds[index]
+                    : 1f / 30f;
+                VfxAbilityComposition atomic = Build(
+                    step,
+                    systems,
+                    resourceMap,
+                    allowEffectNameFallback: false,
+                    resolverOnly: true);
+                foreach (VfxCompositionEvent compositionEvent in atomic.Events)
+                {
+                    VfxParticleEventDefinition cue = compositionEvent.Event;
+                    if (cue.IsKillEvent) continue;
+                    float start = passTime + cue.StartFrame * tick;
+                    float end = cue.EndFrame < 0f
+                        ? -1f
+                        : passTime + cue.EndFrame * tick;
+                    VfxCompositionEvent timed = compositionEvent with
+                    {
+                        Event = cue with
+                        {
+                            StartFrame = start,
+                            EndFrame = end
+                        }
+                    };
+                    events.Add(timed);
+                    if (timed.System != null) resolvedCount++;
+                }
+
+                float duration = stepDurations[index];
+                if (float.IsFinite(duration) && duration > 0f)
+                    passTime += duration;
+            }
+
+            return new VfxAbilityComposition(
+                root.OwnerPathHash,
+                root.OwnerClassHash,
+                1f,
+                0f,
+                passTime,
+                events.OrderBy(item => item.Event.StartFrame).ToArray(),
+                root.ClipName,
+                root.AnimationFilePath,
+                root.GraphPathHash,
+                root.ChildClipHashes)
+            {
+                ResolvedCount = resolvedCount
+            };
+        }
+
         public static IReadOnlyList<VfxAbilityComposition> BuildAll(
             IEnumerable<AnimationClipDefinition> sequences,
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,

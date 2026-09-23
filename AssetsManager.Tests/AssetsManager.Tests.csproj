@@ -17,6 +17,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <ProjectReference Include="..\AssetsManager\AssetsManager.csproj" />
+    <ProjectReference Include="..\AssetsManager.Shaders\AssetsManager.Shaders.csproj" />
     <Reference Include="BCnEncoder">
       <HintPath>..\..\LeagueToolkit-4.1.0-beta.53\src\LeagueToolkit\BCnEncoder.dll</HintPath>
     </Reference>

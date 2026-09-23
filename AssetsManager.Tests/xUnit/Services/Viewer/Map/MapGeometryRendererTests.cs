@@ -4,6 +4,7 @@ using System.Numerics;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Environment;
+using Silk.NET.OpenGL;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
@@ -117,6 +118,58 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void DefaultLightMatchesCurrentLtkRiftFallback()
+        {
+            MapGeometryRenderer.LightState light = MapGeometryRenderer.ResolveLight(null);
+
+            Assert.Equal(0.4f, light.SunStrength, 4);
+            Assert.Equal(0.6f, light.AmbientStrength, 4);
+            Assert.Equal(Vector3.One, light.SunColor);
+            Assert.Equal(Vector3.One, light.SkyColor);
+            Assert.Equal(Vector3.One, light.GroundColor);
+            Assert.True(light.Direction.X > 0f, "Viewport space mirrors the authored negative X direction.");
+        }
+
+        [Fact]
+        public void AuthoredLightNormalizesSunAndSkySharesLikeCurrentLtk()
+        {
+            var sun = new MapSunData(
+                new Vector3(-0.25f, 0.75f, -0.05f),
+                Vector4.One,
+                1f,
+                Vector4.One,
+                new Vector4(0.1f, 0.1f, 0.1f, 1f),
+                1.5f);
+
+            MapGeometryRenderer.LightState light = MapGeometryRenderer.ResolveLight(sun);
+
+            Assert.Equal(0.4f, light.SunStrength, 4);
+            Assert.Equal(0.6f, light.AmbientStrength, 4);
+            Assert.InRange(light.Direction.Length(), 0.9999f, 1.0001f);
+            Assert.True(light.Direction.X > 0f);
+            Assert.True(light.GroundColor.X < 0.02f, "Authored sun colours are converted from sRGB to linear light.");
+        }
+
+        [Fact]
+        public void TextureSamplingSpacesMatchLtkBackdropContracts()
+        {
+            Assert.Equal(
+                InternalFormat.Srgb8Alpha8,
+                MapGeometryRenderer.TextureInternalFormat(MapGeometryRenderer.TextureSamplingSpace.SrgbColor));
+            Assert.Equal(
+                InternalFormat.Rgba8,
+                MapGeometryRenderer.TextureInternalFormat(MapGeometryRenderer.TextureSamplingSpace.LinearRaw));
+            Assert.True(MapGeometryRenderer.PreservesDirectXRowOrder);
+        }
+
+        [Fact]
+        public void StockShaderPremultipliesOnlyAtRenderTime()
+        {
+            Assert.Contains("if (uPremultipliedAlpha != 0)", MapGeometryShaderSource.Fragment);
+            Assert.Contains("color *= alpha;", MapGeometryShaderSource.Fragment);
+        }
+
+        [Fact]
         public void UvRepeatForcesRepeatWrappingLikeLtkBinding()
         {
             MapMaterialDefinition material = Material(
@@ -161,7 +214,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 geometry,
                 null,
                 materials,
-                new Dictionary<string, System.Windows.Media.Imaging.BitmapSource>(),
+                new Dictionary<string, MapTextureImage>(),
                 Array.Empty<MapPlaceableChunkData>(),
                 Array.Empty<MapCharacterData>(),
                 Array.Empty<MapParticleData>(),

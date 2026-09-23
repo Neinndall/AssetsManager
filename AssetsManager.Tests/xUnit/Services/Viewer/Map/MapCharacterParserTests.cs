@@ -124,6 +124,23 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void VfxWorldTransformMirrorsCharacterSpaceWithoutApplyingSkinScaleTwice()
+        {
+            Matrix4x4 authored = Matrix4x4.CreateTranslation(10f, 20f, 30f);
+
+            Matrix4x4 vfxWorld = MapCharacterSemantics.VfxWorldTransform(authored);
+            Matrix4x4 skinnedWorld = MapCharacterSemantics.WorldTransform(authored, 2f);
+
+            Assert.Equal(new Vector3(-10f, 20f, 30f), vfxWorld.Translation);
+            Assert.Equal(-1f, vfxWorld.M11);
+            Assert.Equal(1f, vfxWorld.M22);
+            Assert.Equal(1f, vfxWorld.M33);
+            Assert.Equal(-2f, skinnedWorld.M11);
+            Assert.Equal(2f, skinnedWorld.M22);
+            Assert.Equal(2f, skinnedWorld.M33);
+        }
+
+        [Fact]
         public void SkinFileMatchesLtkPathSpelling()
         {
             Assert.Equal(

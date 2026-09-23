@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using AssetsManager.Services.Viewer.Parsing;
 using LeagueToolkit.Core.Mesh;
 
 namespace AssetsManager.Tests.Diagnostics.Viewer
@@ -18,6 +19,11 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
 
             sknPath = Path.GetFullPath(sknPath);
+            if (Directory.Exists(sknPath))
+            {
+                AuditDirectory(sknPath);
+                return;
+            }
             if (!File.Exists(sknPath))
             {
                 Console.WriteLine($"[InspectSkn] File not found: {sknPath}");
@@ -25,7 +31,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
 
             Console.WriteLine($"[InspectSkn] Inspecting: {sknPath}");
-            var skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(sknPath);
+            using var skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(sknPath);
 
             Console.WriteLine($"SKN Submesh Count (Ranges): {skinnedMesh.Ranges.Count}");
 
@@ -62,6 +68,40 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 Console.WriteLine($"    usesLocalIndices  = {usesLocalIndices}");
                 Console.WriteLine($"    RESULT: {(usesLocalIndices && !usesGlobalIndices ? "USES RELATIVE/LOCAL INDICES (Requires +StartVertex offset)" : "USES GLOBAL INDICES")}");
             }
+        }
+
+        private static void AuditDirectory(string root)
+        {
+            string[] files = Directory.GetFiles(root, "*.skn", SearchOption.AllDirectories);
+            int passed = 0;
+            int failed = 0;
+            int normalized = 0;
+            int directBlend = 0;
+            var decoder = new MapCharacterMeshDecoder();
+
+            foreach (string path in files)
+            {
+                try
+                {
+                    using var probe = SkinnedMesh.ReadFromSimpleSkin(path);
+                    if ((probe.Flags & SkinnedMeshIndexSemantics.NormalizedIndicesFlag) != 0)
+                        normalized++;
+                    if ((probe.Flags & SkinnedMeshIndexSemantics.DirectBlendIndicesFlag) != 0)
+                        directBlend++;
+
+                    using Stream stream = File.OpenRead(path);
+                    decoder.Decode(stream);
+                    passed++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Console.WriteLine($"[InspectSkn] FAIL {path}: {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            Console.WriteLine(
+                $"[InspectSkn] Directory audit: total={files.Length}, passed={passed}, failed={failed}, normalized={normalized}, classic={files.Length - normalized}, directBlend={directBlend}.");
         }
     }
 }

@@ -8,7 +8,7 @@ namespace AssetsManager.Services.Viewer.Parsing
 {
     /// <summary>
     /// Resolves the structures and level props that map placeables draw as character skins,
-    /// matching LTK Manager 1.20.0's map/characters.rs contract.
+    /// matching current LTK Manager MAIN's map/characters contract.
     /// </summary>
     internal sealed class MapCharacterParser
     {

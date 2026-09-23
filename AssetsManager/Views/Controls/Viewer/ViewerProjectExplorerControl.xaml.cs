@@ -111,7 +111,6 @@ namespace AssetsManager.Views.Controls.Viewer
         
         private readonly SolidColorBrush _folderBrush = new SolidColorBrush(Color.FromRgb(255, 179, 0)); // Accent Orange/Gold
         private readonly SolidColorBrush _modelBrush = new SolidColorBrush(Color.FromRgb(3, 169, 244));  // Accent DodgerBlue
-        private readonly SolidColorBrush _mapBrush = new SolidColorBrush(Color.FromRgb(76, 175, 80));    // Accent Green
         private readonly SolidColorBrush _animBrush = new SolidColorBrush(Color.FromRgb(0, 230, 118));   // Accent LightGreen
         private readonly SolidColorBrush _imageBrush = new SolidColorBrush(Color.FromRgb(156, 39, 176)); // Accent Purple
         private readonly SolidColorBrush _skeletonBrush = new SolidColorBrush(Color.FromRgb(233, 30, 99)); // Accent Pink
@@ -265,10 +264,11 @@ namespace AssetsManager.Views.Controls.Viewer
                     }
                 }
 
-                // Scan files (.skn, .sco, .mapgeo, .skl, .anm, and image extensions)
+                // MAP projects are owned exclusively by VFX Studio. The main Viewer project
+                // explorer remains focused on character/model assets and must not expose .mapgeo.
                 var allowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ".skn", ".sco", ".mapgeo", ".skl", ".anm", ".dds", ".tex", ".png", ".jpg", ".tga"
+                    ".skn", ".sco", ".skl", ".anm", ".dds", ".tex", ".png", ".jpg", ".tga"
                 };
 
                 var files = Directory.GetFiles(currentDir)
@@ -283,10 +283,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     if (ext == ".skn" || ext == ".sco")
                     {
                         color = _modelBrush;
-                    }
-                    else if (ext == ".mapgeo")
-                    {
-                        color = _mapBrush;
                     }
                     else if (ext == ".skl")
                     {

@@ -1,10 +1,11 @@
 namespace AssetsManager.Views.Models.Viewer
 {
-    public enum VfxPreviewWireframeMode
+    public enum VfxPreviewViewMode
     {
-        Off,
-        Only,
-        Overlay
+        Lit,
+        Unshaded,
+        Untextured,
+        Wireframe
     }
 
     public enum VfxPreviewCameraPreset

@@ -11,6 +11,7 @@ using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Animation;
+using LeagueToolkit.Hashing;
 using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer.Rendering
@@ -30,6 +31,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             internal uint PositionVbo;
             internal uint NormalVbo;
             internal uint UvVbo;
+            internal uint TangentVbo;
             internal uint SkinIndexVbo;
             internal uint SkinWeightVbo;
             internal uint Ebo;
@@ -43,6 +45,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             int StartIndex,
             int IndexCount,
             string Name,
+            uint NameHash,
+            bool HiddenByDefault,
             ModelMaterialDefinition Material,
             BitmapSource Texture,
             bool Lit,
@@ -59,6 +63,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             float TimeSeconds);
 
         private static readonly Vector3 SunDirection = Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
+        private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
         private static readonly Vector3 DefaultUntextured = new(0.5f);
         private static readonly Vector3 DefaultErrored = new(1f, 0.08f, 0.16f);
 
@@ -88,6 +93,9 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uLit;
         private int _uPremultipliedAlpha;
         private int _uLightDirection;
+        private int _uWireframePass;
+        private int _uWireframeColor;
+        private bool _gles;
         private bool _ready;
 
         internal void Initialize(GL gl)
@@ -101,9 +109,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                 throw new InvalidOperationException("OpenGL glDrawElements is unavailable for MAP character rendering.");
             _drawElements = Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(drawElements);
 
+            _gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
             _program = GlShaderCompiler.CreateProgram(
                 gl,
-                GlShaderCompiler.UsesEmbeddedProfile(gl),
+                _gles,
                 MapCharacterShaderSource.Vertex,
                 MapCharacterShaderSource.Fragment);
             _uViewProjection = gl.GetUniformLocation(_program, "uViewProjection");
@@ -119,6 +128,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uLit = gl.GetUniformLocation(_program, "uLit");
             _uPremultipliedAlpha = gl.GetUniformLocation(_program, "uPremultipliedAlpha");
             _uLightDirection = gl.GetUniformLocation(_program, "uLightDirection");
+            _uWireframePass = gl.GetUniformLocation(_program, "uWireframePass");
+            _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
 
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
@@ -146,7 +157,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             float timeSeconds,
             IReadOnlySet<string> hidden = null,
             Vector3? untexturedLinear = null,
-            Vector3? erroredLinear = null)
+            Vector3? erroredLinear = null,
+            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            bool wireOverlay = false)
         {
             if (!_ready || groups == null || groups.Count == 0)
                 return;
@@ -158,6 +171,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                 return;
 
             _transparent.Sort((left, right) => right.DistanceSquared.CompareTo(left.DistanceSquared));
+            (bool solids, bool wireframe, float wireOpacity) =
+                MapGeometryRenderer.ResolveViewPasses(viewMode, wireOverlay, supportsWireframe: !_gles);
+            VfxPreviewViewMode solidMode = viewMode == VfxPreviewViewMode.Wireframe
+                ? VfxPreviewViewMode.Lit
+                : viewMode;
 
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProjection, 1, false, in viewProjection.M11);
@@ -168,11 +186,35 @@ namespace AssetsManager.Services.Viewer.Rendering
             uint activeVao = 0;
             try
             {
-                DrawQueue(_opaque, untextured, errored, ref activePalette, ref activeVao);
-                DrawQueue(_transparent, untextured, errored, ref activePalette, ref activeVao);
+                if (solids)
+                {
+                    _gl.Uniform1(_uWireframePass, 0);
+                    DrawQueue(_opaque, untextured, errored, solidMode, wireframePass: false, ref activePalette, ref activeVao);
+                    DrawQueue(_transparent, untextured, errored, solidMode, wireframePass: false, ref activePalette, ref activeVao);
+                }
+
+                if (wireframe)
+                {
+                    activePalette = null;
+                    activeVao = 0;
+                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
+                    _gl.Uniform1(_uWireframePass, 1);
+                    _gl.Uniform4(
+                        _uWireframeColor,
+                        PreviewWireColor.X,
+                        PreviewWireColor.Y,
+                        PreviewWireColor.Z,
+                        wireOpacity);
+                    ApplyWireframeState(wireOpacity);
+                    DrawQueue(_opaque, untextured, errored, solidMode, wireframePass: true, ref activePalette, ref activeVao);
+                    DrawQueue(_transparent, untextured, errored, solidMode, wireframePass: true, ref activePalette, ref activeVao);
+                }
             }
             finally
             {
+                if (!_gles)
+                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
+                _gl.Uniform1(_uWireframePass, 0);
                 _gl.FrontFace(FrontFaceDirection.Ccw);
                 _gl.Disable(EnableCap.Blend);
                 _gl.Disable(EnableCap.CullFace);
@@ -202,28 +244,101 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (resources?.Ranges == null || resources.Ranges.Count == 0)
                     continue;
 
+                if (group.PreviewClip != null && group.PreviewPlacement != null)
+                {
+                    Matrix4x4[] previewJoints = group.Animation.EvaluateClip(
+                        group.Asset,
+                        group.PreviewClip,
+                        group.PreviewTimeSeconds);
+                    Matrix4x4[] previewPalette = GetPalette(resources, $"preview:{group.PreviewClip.OwnerPathHash:x8}");
+                    FillInfluencePalette(previewPalette, previewJoints, resources.InfluenceJointSlots);
+
+                    foreach (MapCharacterAnimationPlacementGroup animationGroup in group.AnimationGroups)
+                    {
+                        Matrix4x4[] authoredJoints = group.Animation.Evaluate(
+                            group.Asset,
+                            animationGroup.Animation,
+                            timeSeconds);
+                        Matrix4x4[] authoredPalette = GetPalette(resources, animationGroup.Animation);
+                        FillInfluencePalette(authoredPalette, authoredJoints, resources.InfluenceJointSlots);
+
+                        foreach (MapCharacterRuntimePlacement runtimePlacement in animationGroup.Placements)
+                        {
+                            bool previewPlacement = ReferenceEquals(runtimePlacement.Placement, group.PreviewPlacement);
+                            QueuePlacement(
+                                group,
+                                resources,
+                                runtimePlacement,
+                                previewPlacement ? previewPalette : authoredPalette,
+                                cameraPosition,
+                                hidden,
+                                timeSeconds,
+                                previewPlacement);
+                        }
+                    }
+                    continue;
+                }
+
                 foreach (MapCharacterAnimationPlacementGroup animationGroup in group.AnimationGroups)
                 {
                     Matrix4x4[] joints = group.Animation.Evaluate(group.Asset, animationGroup.Animation, timeSeconds);
                     Matrix4x4[] palette = GetPalette(resources, animationGroup.Animation);
                     FillInfluencePalette(palette, joints, resources.InfluenceJointSlots);
-
-                    foreach (MapCharacterRuntimePlacement runtimePlacement in animationGroup.Placements)
-                    {
-                        MapCharacterData placement = runtimePlacement.Placement;
-                        if (MapOutlineSemantics.IsHidden(hidden, placement.ChunkHash, placement.KeyHash))
-                            continue;
-
-                        Matrix4x4 world = runtimePlacement.World;
-                        float distance = Vector3.DistanceSquared(runtimePlacement.Position, cameraPosition);
-                        foreach (BoundRange range in resources.Ranges)
-                        {
-                            var command = new DrawCommand(resources, range, world, palette, distance, timeSeconds);
-                            if (range.Transparent) _transparent.Add(command);
-                            else _opaque.Add(command);
-                        }
-                    }
+                    QueuePlacements(group, resources, animationGroup.Placements, palette, cameraPosition, hidden, timeSeconds);
                 }
+            }
+        }
+
+        private void QueuePlacements(
+            MapCharacterRuntimeGroup group,
+            SkinResources resources,
+            IReadOnlyList<MapCharacterRuntimePlacement> placements,
+            Matrix4x4[] palette,
+            Vector3 cameraPosition,
+            IReadOnlySet<string> hidden,
+            float timeSeconds)
+        {
+            foreach (MapCharacterRuntimePlacement runtimePlacement in placements)
+            {
+                QueuePlacement(
+                    group,
+                    resources,
+                    runtimePlacement,
+                    palette,
+                    cameraPosition,
+                    hidden,
+                    timeSeconds,
+                    previewVisibility: false);
+            }
+        }
+
+        private void QueuePlacement(
+            MapCharacterRuntimeGroup group,
+            SkinResources resources,
+            MapCharacterRuntimePlacement runtimePlacement,
+            Matrix4x4[] palette,
+            Vector3 cameraPosition,
+            IReadOnlySet<string> hidden,
+            float timeSeconds,
+            bool previewVisibility)
+        {
+            MapCharacterData placement = runtimePlacement.Placement;
+            if (MapOutlineSemantics.IsHidden(hidden, placement.ChunkHash, placement.KeyHash))
+                return;
+
+            Matrix4x4 world = runtimePlacement.World;
+            float distance = Vector3.DistanceSquared(runtimePlacement.Position, cameraPosition);
+            foreach (BoundRange range in resources.Ranges)
+            {
+                bool submeshHidden = previewVisibility
+                    ? group.PreviewHiddenSubmeshes.Contains(range.NameHash)
+                    : range.HiddenByDefault;
+                if (submeshHidden)
+                    continue;
+
+                var command = new DrawCommand(resources, range, world, palette, distance, timeSeconds);
+                if (range.Transparent) _transparent.Add(command);
+                else _opaque.Add(command);
             }
         }
 
@@ -231,6 +346,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             IReadOnlyList<DrawCommand> queue,
             Vector3 untextured,
             Vector3 errored,
+            VfxPreviewViewMode viewMode,
+            bool wireframePass,
             ref Matrix4x4[] activePalette,
             ref uint activeVao)
         {
@@ -254,7 +371,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.FrontFace(world.GetDeterminant() < 0f
                     ? FrontFaceDirection.CW
                     : FrontFaceDirection.Ccw);
-                ApplyMaterial(command.Range, command.TimeSeconds, untextured, errored);
+                if (!wireframePass)
+                    ApplyMaterial(command.Range, command.TimeSeconds, untextured, errored, viewMode);
 
                 _drawElements(
                     (uint)PrimitiveType.Triangles,
@@ -290,6 +408,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             resources.PositionVbo = UploadVector3Attribute(0, mesh.Positions);
             resources.NormalVbo = UploadVector3Attribute(1, normals);
             resources.UvVbo = UploadVector2Attribute(2, uv);
+            if (mesh.HasTangents)
+                resources.TangentVbo = UploadVector4Attribute(5, mesh.Tangents);
             if (mesh.HasSkin)
             {
                 resources.SkinIndexVbo = UploadByte4Attribute(3, mesh.SkinIndices);
@@ -323,9 +443,11 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             foreach (MapCharacterMeshRange range in ranges)
             {
-                if (range.IndexCount <= 0 || hidden.Contains(range.Name ?? string.Empty))
+                if (range.IndexCount <= 0)
                     continue;
 
+                string rangeName = range.Name ?? string.Empty;
+                bool hiddenByDefault = hidden.Contains(rangeName);
                 ModelMaterialDefinition material = asset.Materials?.ResolveMaterialDefinition(range.Name) ??
                                                    ModelMaterialDefinition.TextureOnly(null);
                 BitmapSource texture = null;
@@ -341,7 +463,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                 result.Add(new BoundRange(
                     range.StartIndex,
                     range.IndexCount,
-                    range.Name ?? string.Empty,
+                    rangeName,
+                    Fnv1a.HashLower(rangeName),
+                    hiddenByDefault,
                     material,
                     texture,
                     material.IsLit,
@@ -357,13 +481,18 @@ namespace AssetsManager.Services.Viewer.Rendering
             BoundRange range,
             float timeSeconds,
             Vector3 untextured,
-            Vector3 errored)
+            Vector3 errored,
+            VfxPreviewViewMode viewMode)
         {
             ModelMaterialDefinition material = range.Material;
-            bool hasTexture = range.Texture != null;
+            bool forceUntextured = viewMode == VfxPreviewViewMode.Untextured;
+            bool forceUnshaded = viewMode == VfxPreviewViewMode.Unshaded;
+            bool hasTexture = !forceUntextured && range.Texture != null;
             uint textureId = hasTexture ? AcquireTexture(range.Texture) : _whiteTexture;
             Vector3 color;
-            if (material.BindingKind == ModelMaterialBindingKind.Missing)
+            if (forceUntextured)
+                color = untextured;
+            else if (material.BindingKind == ModelMaterialBindingKind.Missing)
                 color = errored;
             else if (!hasTexture && material.BindingKind == ModelMaterialBindingKind.Authored && !material.HasAuthoredTint)
                 color = untextured;
@@ -372,22 +501,46 @@ namespace AssetsManager.Services.Viewer.Rendering
             else
                 color = SrgbToLinear(new Vector3(material.Color.X, material.Color.Y, material.Color.Z));
 
-            Vector2 scroll = new(
-                ScrollAt(material.UvScroll.X, timeSeconds),
-                ScrollAt(material.UvScroll.Y, timeSeconds));
+            Vector2 scroll = forceUntextured
+                ? Vector2.Zero
+                : new Vector2(
+                    ScrollAt(material.UvScroll.X, timeSeconds),
+                    ScrollAt(material.UvScroll.Y, timeSeconds));
+            ModelMaterialRenderState renderState = forceUntextured
+                ? ModelMaterialRenderState.Default with { DoubleSided = material.RenderState.DoubleSided }
+                : material.RenderState;
+            bool transparent = !forceUntextured && range.Transparent;
 
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, textureId);
             _gl.BindSampler(0, ResolveSampler(range.WrapU, range.WrapV));
             _gl.Uniform1(_uHasTexture, hasTexture ? 1 : 0);
             _gl.Uniform3(_uColor, color.X, color.Y, color.Z);
-            _gl.Uniform1(_uOpacity, material.BindingKind == ModelMaterialBindingKind.Missing ? 1f : material.Color.W);
-            _gl.Uniform1(_uAlphaTest, material.BindingKind == ModelMaterialBindingKind.Missing ? 0f : material.AlphaCutoff);
-            _gl.Uniform2(_uUvRepeat, material.UvRepeat.X, material.UvRepeat.Y);
+            _gl.Uniform1(_uOpacity, forceUntextured || material.BindingKind == ModelMaterialBindingKind.Missing ? 1f : material.Color.W);
+            _gl.Uniform1(_uAlphaTest, forceUntextured || material.BindingKind == ModelMaterialBindingKind.Missing ? 0f : material.AlphaCutoff);
+            _gl.Uniform2(_uUvRepeat, forceUntextured ? 1f : material.UvRepeat.X, forceUntextured ? 1f : material.UvRepeat.Y);
             _gl.Uniform2(_uUvOffset, scroll.X, scroll.Y);
-            _gl.Uniform1(_uLit, range.Lit ? 1 : 0);
-            _gl.Uniform1(_uPremultipliedAlpha, material.RenderState.PremultipliedAlpha ? 1 : 0);
-            ApplyRenderState(material.RenderState, range.Transparent);
+            _gl.Uniform1(_uLit, forceUntextured || (!forceUnshaded && range.Lit) ? 1 : 0);
+            _gl.Uniform1(_uPremultipliedAlpha, renderState.PremultipliedAlpha ? 1 : 0);
+            ApplyRenderState(renderState, transparent);
+        }
+
+        private void ApplyWireframeState(float opacity)
+        {
+            _gl.Disable(EnableCap.CullFace);
+            _gl.Enable(EnableCap.DepthTest);
+            _gl.DepthFunc(DepthFunction.Lequal);
+            bool overlay = opacity < 1f;
+            _gl.DepthMask(!overlay);
+            if (overlay)
+            {
+                _gl.Enable(EnableCap.Blend);
+                _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            }
+            else
+            {
+                _gl.Disable(EnableCap.Blend);
+            }
         }
 
         private void ApplyRenderState(ModelMaterialRenderState state, bool transparent)
@@ -549,6 +702,16 @@ namespace AssetsManager.Services.Viewer.Rendering
             return buffer;
         }
 
+        private uint UploadVector4Attribute(uint location, Vector4[] values)
+        {
+            uint buffer = _gl.GenBuffer();
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, buffer);
+            _gl.BufferData(BufferTargetARB.ArrayBuffer, new ReadOnlySpan<Vector4>(values), BufferUsageARB.StaticDraw);
+            _gl.EnableVertexAttribArray(location);
+            _gl.VertexAttribPointer(location, 4, VertexAttribPointerType.Float, false, (uint)Marshal.SizeOf<Vector4>(), IntPtr.Zero);
+            return buffer;
+        }
+
         private uint UploadByte4Attribute(uint location, byte[] values)
         {
             uint buffer = _gl.GenBuffer();
@@ -680,6 +843,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             DeleteBuffer(resources.PositionVbo);
             DeleteBuffer(resources.NormalVbo);
             DeleteBuffer(resources.UvVbo);
+            DeleteBuffer(resources.TangentVbo);
             DeleteBuffer(resources.SkinIndexVbo);
             DeleteBuffer(resources.SkinWeightVbo);
             DeleteBuffer(resources.Ebo);

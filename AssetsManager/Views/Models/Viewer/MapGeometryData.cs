@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using LeagueToolkit.Core.Environment;
 
@@ -13,6 +14,17 @@ namespace AssetsManager.Views.Models.Viewer
         RegionAnchored = 1 << 1
     }
 
+    internal sealed record MapGeometryLightChannelData(
+        string Texture,
+        Vector2 Scale,
+        Vector2 Bias)
+    {
+        public bool IsEmpty => string.IsNullOrWhiteSpace(Texture);
+
+        public static MapGeometryLightChannelData From(EnvironmentAssetChannel channel) =>
+            new(channel.Texture, channel.Scale, channel.Bias);
+    }
+
     internal sealed record MapGeometryMeshData(
         Vector3 Min,
         Vector3 Max,
@@ -23,7 +35,9 @@ namespace AssetsManager.Views.Models.Viewer
         int SubmeshCount,
         EnvironmentAssetMeshRenderFlags RenderFlags,
         uint VisibilityControllerPathHash,
-        uint RegionHash)
+        uint RegionHash,
+        MapGeometryLightChannelData BakedLight = null,
+        MapGeometryLightChannelData StationaryLight = null)
     {
         public bool IsVisibleOnLayer(int layer)
         {
@@ -52,6 +66,13 @@ namespace AssetsManager.Views.Models.Viewer
         public IReadOnlyList<MapGeometrySubmeshData> Submeshes { get; }
         public IReadOnlyList<string> Materials { get; }
         public bool HasUv1 => Uv1 != null;
+
+        public IReadOnlyList<string> Lightmaps => Meshes
+            .SelectMany(mesh => new[] { mesh.BakedLight, mesh.StationaryLight })
+            .Where(channel => channel?.IsEmpty == false)
+            .Select(channel => channel.Texture)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         public MapGeometryData(
             Vector3[] positions,

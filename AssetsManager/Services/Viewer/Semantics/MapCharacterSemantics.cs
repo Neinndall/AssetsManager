@@ -7,7 +7,7 @@ using AssetsManager.Views.Models.Viewer;
 namespace AssetsManager.Services.Viewer.Semantics
 {
     /// <summary>
-    /// Scene-side rules for map characters, matching the LTK Manager 1.20.0 preview.
+    /// Scene-side rules for map characters, matching the current LTK Manager MAIN preview.
     /// </summary>
     internal static class MapCharacterSemantics
     {
@@ -62,5 +62,13 @@ namespace AssetsManager.Services.Viewer.Semantics
             Matrix4x4 characterMirrorScale = Matrix4x4.CreateScale(-skinScale, skinScale, skinScale);
             return characterMirrorScale * placement;
         }
+
+        /// <summary>
+        /// World frame used by character-attached VFX in the viewport. The character-local X mirror
+        /// belongs here, while skin scale remains owned by VfxOwnerSceneContext so bone offsets and
+        /// attached meshes are not scaled twice.
+        /// </summary>
+        internal static Matrix4x4 VfxWorldTransform(Matrix4x4 authoredTransform) =>
+            Matrix4x4.CreateScale(-1f, 1f, 1f) * SceneTransform(authoredTransform);
     }
 }

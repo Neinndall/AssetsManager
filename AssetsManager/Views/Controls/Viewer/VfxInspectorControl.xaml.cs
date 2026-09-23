@@ -19,10 +19,13 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Runtime;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Authoring;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils;
@@ -67,6 +70,22 @@ namespace AssetsManager.Views.Controls.Viewer
         private int _championLoadGeneration;
         private System.Threading.CancellationTokenSource _scanCancellation;
         private System.Threading.CancellationTokenSource _binCancellation;
+        private System.Threading.CancellationTokenSource _mapCancellation;
+        private System.Threading.CancellationTokenSource _mapClipCancellation;
+        private MapSceneRuntime _mapSceneRuntime;
+        private MapBrowserNode _mapBrowserRoot;
+        private MapGeometryRenderer _mapGeometryRenderer;
+        private MapCharacterRenderer _mapCharacterRenderer;
+        private MapParticleRenderer _mapParticleRenderer;
+        private MapPostEffectsRenderer _mapPostEffectsRenderer;
+        private MapCharacterRuntimeGroup _activeMapCharacterGroup;
+        private MapCharacterData _activeMapCharacterPlacement;
+        private AnimationClipDefinition _activeMapCharacterClip;
+        private VfxSceneResourceContext _mapClipVfxResources;
+        private MapCharacterRuntimeGroup _mapClipVfxResourceGroup;
+        private bool _mapGpuSceneDirty;
+        private bool _mapTexturesDirty;
+        private bool _suppressMapVariantReload;
         private VfxPreviewSurfaceRenderer _previewSurfaceRenderer;
         private PerspectiveCamera _previewPerspectiveCamera;
         private OrthographicCamera _previewOrthographicCamera;
@@ -103,6 +122,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
         /// <summary>Injected by the host and owned by ViewerWindow.</summary>
         public VfxLoadingService VfxLoadingService { get; set; }
+
+        /// <summary>Injected by the host; decoded MAP scenes stay inside the VFX Studio viewport.</summary>
+        internal MapViewerSceneService MapViewerSceneService { get; set; }
 
         /// <summary>Injected by the host; VFX preview display preferences persist here.</summary>
         public AppSettings AppSettings { get; set; }
@@ -175,12 +197,30 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_model.SelectedSpell != null)
                     RequestSpellPreview(_model.SelectedSpell);
             }
+            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedMapVariant) &&
+                     !_suppressMapVariantReload &&
+                     _mapSceneRuntime != null &&
+                     _model.SelectedMapVariant != null &&
+                     !string.IsNullOrWhiteSpace(_model.RootPath))
+            {
+                _ = LoadDetectedMapAsync(new MapSceneSource(
+                    _model.SelectedMapVariant.Map,
+                    SelectedMapFileFor(_model.SelectedMapVariant.Map, _model.RootPath),
+                    _model.RootPath));
+            }
             else if (e.PropertyName == nameof(VfxInspectorModel.AnimationParameter) &&
                      !_isUpdatingAnimationParameter &&
-                     _model.SelectedAnimation != null &&
                      _model.AnimationParameter.HasValue)
             {
-                RebuildAnimationsForParameter(_model.AnimationParameter.Value);
+                if (_model.SelectedMapNode?.Kind == MapBrowserNodeKind.Clip &&
+                    _model.SelectedMapNode.Payload is MapCharacterClipSelection mapClip)
+                {
+                    _ = PlayMapCharacterClipAsync(mapClip, preservePlayhead: true);
+                }
+                else if (_model.SelectedAnimation != null)
+                {
+                    RebuildAnimationsForParameter(_model.AnimationParameter.Value);
+                }
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.PreviewCameraPreset))
             {
@@ -191,7 +231,8 @@ namespace AssetsManager.Views.Controls.Viewer
             else if (e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGrid) ||
                      e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGround) ||
                      e.PropertyName == nameof(VfxInspectorModel.ShowPreviewStage) ||
-                     e.PropertyName == nameof(VfxInspectorModel.PreviewWireframeMode))
+                     e.PropertyName == nameof(VfxInspectorModel.PreviewViewMode) ||
+                     e.PropertyName == nameof(VfxInspectorModel.PreviewWireOverlay))
             {
                 SavePreviewDisplayPreferences();
             }
@@ -225,8 +266,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (Enum.TryParse(vfxSettings.CameraPreset, ignoreCase: true, out VfxPreviewCameraPreset cameraPreset))
                     _model.PreviewCameraPreset = cameraPreset;
-                if (Enum.TryParse(vfxSettings.WireframeMode, ignoreCase: true, out VfxPreviewWireframeMode wireframeMode))
-                    _model.PreviewWireframeMode = wireframeMode;
+                if (Enum.TryParse(vfxSettings.ViewMode, ignoreCase: true, out VfxPreviewViewMode viewMode))
+                    _model.PreviewViewMode = viewMode;
+                _model.PreviewWireOverlay = vfxSettings.WireOverlay;
             }
             finally
             {
@@ -245,7 +287,8 @@ namespace AssetsManager.Views.Controls.Viewer
             AppSettings.StudioParameters.GroundVisible = _model.ShowPreviewGround;
             AppSettings.VfxStudio.StageVisible = _model.ShowPreviewStage;
             AppSettings.VfxStudio.CameraPreset = _model.PreviewCameraPreset.ToString();
-            AppSettings.VfxStudio.WireframeMode = _model.PreviewWireframeMode.ToString();
+            AppSettings.VfxStudio.ViewMode = _model.PreviewViewMode.ToString();
+            AppSettings.VfxStudio.WireOverlay = _model.PreviewWireOverlay;
             _ = SavePreviewDisplayPreferencesAsync();
         }
 
@@ -360,6 +403,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             RunReleaseStep("VFX folder scan cancellation", () => _scanCancellation?.Cancel());
             RunReleaseStep("VFX BIN load cancellation", () => _binCancellation?.Cancel());
+            RunReleaseStep("MAP scene load cancellation", () => _mapCancellation?.Cancel());
+            RunReleaseStep("MAP clip load cancellation", () => _mapClipCancellation?.Cancel());
 
             var cameraController = _cameraController;
             _cameraController = null;
@@ -377,6 +422,31 @@ namespace AssetsManager.Views.Controls.Viewer
             var previewSurfaceRenderer = _previewSurfaceRenderer;
             _previewSurfaceRenderer = null;
             RunReleaseStep(nameof(VfxPreviewSurfaceRenderer), () => previewSurfaceRenderer?.Dispose(), gpuBound: true);
+
+            var mapGeometryRenderer = _mapGeometryRenderer;
+            _mapGeometryRenderer = null;
+            RunReleaseStep(nameof(MapGeometryRenderer), () => mapGeometryRenderer?.Dispose(), gpuBound: true);
+
+            var mapCharacterRenderer = _mapCharacterRenderer;
+            _mapCharacterRenderer = null;
+            RunReleaseStep(nameof(MapCharacterRenderer), () => mapCharacterRenderer?.Dispose(), gpuBound: true);
+
+            var mapParticleRenderer = _mapParticleRenderer;
+            _mapParticleRenderer = null;
+            RunReleaseStep(nameof(MapParticleRenderer), () => mapParticleRenderer?.Dispose(), gpuBound: true);
+
+            var mapPostEffectsRenderer = _mapPostEffectsRenderer;
+            _mapPostEffectsRenderer = null;
+            RunReleaseStep(nameof(MapPostEffectsRenderer), () => mapPostEffectsRenderer?.Dispose(), gpuBound: true);
+
+            var mapClipVfxResources = _mapClipVfxResources;
+            _mapClipVfxResources = null;
+            _mapClipVfxResourceGroup = null;
+            RunReleaseStep(nameof(VfxSceneResourceContext), () => mapClipVfxResources?.Dispose());
+
+            var mapSceneRuntime = _mapSceneRuntime;
+            _mapSceneRuntime = null;
+            RunReleaseStep(nameof(MapSceneRuntime), () => mapSceneRuntime?.Dispose());
 
             var championMeshRenderer = _championMeshRenderer;
             _championMeshRenderer = null;
@@ -541,6 +611,21 @@ namespace AssetsManager.Views.Controls.Viewer
                     _championMeshRenderer.Initialize(_gl);
                 }
 
+                if (_mapGeometryRenderer == null)
+                {
+                    _mapGeometryRenderer = new MapGeometryRenderer(AppSettings);
+                    _mapGeometryRenderer.Initialize(_gl);
+                }
+                if (_mapCharacterRenderer == null)
+                {
+                    _mapCharacterRenderer = new MapCharacterRenderer();
+                    _mapCharacterRenderer.Initialize(_gl);
+                }
+                if (_mapParticleRenderer == null)
+                {
+                    _mapParticleRenderer = new MapParticleRenderer();
+                    _mapParticleRenderer.Initialize(_gl);
+                }
                 _championAnimationService ??= new AnimationService(LogService);
 
                 if (_cameraController == null)
@@ -618,18 +703,25 @@ namespace AssetsManager.Views.Controls.Viewer
             var view = Matrix4x4.CreateLookAt(eye, target, up);
 
             float aspect = (float)Math.Max(1, OpenTkControl.ActualWidth) / (float)Math.Max(1, OpenTkControl.ActualHeight);
+            bool hasMapScene = _mapSceneRuntime != null;
+            float projectionNear = hasMapScene
+                ? ViewerViewportControl.CalculateProjectionNearPlane(lookDir, isMapGeometry: true)
+                : VfxPreviewCamera.NearPlane;
+            float projectionFar = hasMapScene
+                ? ViewerViewportControl.CalculateProjectionFarPlane(lookDir)
+                : VfxPreviewCamera.FarPlane;
             Matrix4x4 proj = camera switch
             {
                 PerspectiveCamera perspective => Matrix4x4.CreatePerspectiveFieldOfView(
                     (float)(perspective.FieldOfView * (Math.PI / 180.0)),
                     aspect,
-                    VfxPreviewCamera.NearPlane,
-                    VfxPreviewCamera.FarPlane),
+                    projectionNear,
+                    projectionFar),
                 OrthographicCamera orthographic => Matrix4x4.CreateOrthographic(
                     (float)Math.Max(1d, orthographic.Width),
                     (float)Math.Max(1d, orthographic.Width / Math.Max(0.001f, aspect)),
-                    VfxPreviewCamera.NearPlane,
-                    VfxPreviewCamera.FarPlane),
+                    projectionNear,
+                    projectionFar),
                 _ => Matrix4x4.Identity
             };
             var viewProj = view * proj;
@@ -637,16 +729,59 @@ namespace AssetsManager.Views.Controls.Viewer
             // OpenTK has the current context here, so deferred session creation and resource
             // preparation are safe even when WPF selected the system before the GL control was ready.
             TryInspectPendingSystem();
+            ApplyPendingMapGpuState();
 
-            // One preview surface owner reuses the shared editor Grid, textured Ground and VFX Stage paths.
-            _previewSurfaceRenderer?.Render(
-                viewProj,
-                _model.ShowPreviewGrid,
-                _model.ShowPreviewGround,
-                _model.ShowPreviewStage);
+            // A detected map container owns the world backdrop. VFX helper surfaces are only a
+            // standalone-effect aid and must not be layered over authored MAP geometry.
+            if (_mapSceneRuntime != null)
+            {
+                AdvanceMapCharacterClip(dt);
+                _mapSceneRuntime.Update(viewProj, dt);
+                _mapGeometryRenderer?.Render(
+                    viewProj,
+                    view,
+                    proj,
+                    eye,
+                    _mapSceneRuntime.SceneTimeSeconds,
+                    _model.PreviewViewMode,
+                    _model.EffectivePreviewWireOverlay);
+                if (_mapSceneRuntime.ShowStructures)
+                {
+                    _mapCharacterRenderer?.Render(
+                        _mapSceneRuntime.CharacterGroups,
+                        viewProj,
+                        eye,
+                        _mapSceneRuntime.CharacterTimeSeconds,
+                        _mapSceneRuntime.Hidden,
+                        viewMode: _model.PreviewViewMode,
+                        wireOverlay: _model.EffectivePreviewWireOverlay);
+                }
+                _mapPostEffectsRenderer?.CaptureSceneDepth(
+                    _mapSceneRuntime.Scene.PostEffects,
+                    _mapSceneRuntime.Scene.AmbientOcclusion,
+                    (uint)Math.Max(1d, OpenTkControl.ActualWidth),
+                    (uint)Math.Max(1d, OpenTkControl.ActualHeight));
+                if (_mapSceneRuntime.ShowParticles)
+                {
+                    _mapParticleRenderer?.Render(
+                        _mapSceneRuntime.Particles.VisibleRuntimes,
+                        viewProj,
+                        view,
+                        (uint)Math.Max(1d, OpenTkControl.ActualWidth),
+                        (uint)Math.Max(1d, OpenTkControl.ActualHeight));
+                }
+            }
+            else
+                _previewSurfaceRenderer?.Render(
+                    viewProj,
+                    _model.ShowPreviewGrid,
+                    _model.ShowPreviewGround,
+                    _model.ShowPreviewStage);
 
-            // Update Champion Animation & Bone Transforms for attached VFX
-            if (_model.IsPlaying && !_isUserSeeking && _vfxRenderer?.ActiveSystem != null)
+            // MAP character clips own the same VFX session clock themselves so their pose, cues
+            // and ParticleEventData stay on one timeline. Other previews keep the generic session clock.
+            if (!HasSelectedMapClipReady() &&
+                _model.IsPlaying && !_isUserSeeking && _vfxRenderer?.ActiveSystem != null)
             {
                 _vfxRenderer.ActiveSystem.Speed = _model.Speed;
                 _vfxRenderer.Update(dt);
@@ -663,7 +798,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
                 else if (_model.CurrentTime >= _model.TotalDuration) _model.IsPlaying = false;
             }
-            if (_championModel != null && _championAnimationService != null)
+            if (_activeMapCharacterClip == null &&
+                _championModel != null && _championAnimationService != null)
             {
                 ApplyAnimationClipCues(_model.CurrentTime);
                 if (_championModel.CurrentAnimation != null && _championModel.Skeleton != null)
@@ -700,7 +836,8 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             // Render Champion Mesh under VFX if available and enabled.
-            if (_model.ShowChampionMesh && _championModel != null && _championMeshRenderer != null)
+            if (_activeMapCharacterClip == null &&
+                _model.ShowChampionMesh && _championModel != null && _championMeshRenderer != null)
             {
                 var lighting = GlMeshRenderer.ReferenceCharacterLighting();
                 _championMeshRenderer.Render(
@@ -714,21 +851,33 @@ namespace AssetsManager.Views.Controls.Viewer
                     lighting.AmbientColor);
             }
 
-            if (_vfxRenderer == null)
+            if (_vfxRenderer != null)
+            {
+                _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
+                _vfxRenderer.Render(viewProj, view, _model.PreviewViewMode, _model.EffectivePreviewWireOverlay);
+                _model.LiveParticleCount = _vfxRenderer.LiveParticleCount;
+            }
+            else
             {
                 _model.LiveParticleCount = 0;
-                return;
             }
 
-            _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
-            _vfxRenderer.Render(viewProj, view, _model.PreviewWireframeMode);
-
-            _model.LiveParticleCount = _vfxRenderer.LiveParticleCount;
-
-            // Live active particle count per emitter lane (matches LTK Manager liveCount badge)
-            foreach (var emitter in _model.Emitters)
+            if (_mapSceneRuntime != null)
             {
-                emitter.ActiveParticleCount = _vfxRenderer.GetEmitterLiveCount(emitter.SourceOrder);
+                _mapPostEffectsRenderer?.Render(
+                    _mapSceneRuntime.Scene.PostEffects,
+                    _mapSceneRuntime.Scene.AmbientOcclusion,
+                    view,
+                    proj,
+                    (uint)Math.Max(1d, OpenTkControl.ActualWidth),
+                    (uint)Math.Max(1d, OpenTkControl.ActualHeight));
+            }
+
+            if (_vfxRenderer != null)
+            {
+                // Live active particle count per emitter lane (matches LTK Manager liveCount badge)
+                foreach (var emitter in _model.Emitters)
+                    emitter.ActiveParticleCount = _vfxRenderer.GetEmitterLiveCount(emitter.SourceOrder);
             }
 
             Dispatcher.InvokeAsync(UpdatePlayheadPosition);
@@ -919,10 +1068,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 PreviewShowPopup.IsOpen = !PreviewShowPopup.IsOpen;
         }
 
-        private void PreviewWireframe_Click(object sender, RoutedEventArgs e)
+        private void PreviewViewMode_Click(object sender, RoutedEventArgs e)
         {
-            if (PreviewWireframePopup != null)
-                PreviewWireframePopup.IsOpen = !PreviewWireframePopup.IsOpen;
+            if (PreviewViewModePopup != null)
+                PreviewViewModePopup.IsOpen = !PreviewViewModePopup.IsOpen;
         }
 
         private void PreviewCamera_Click(object sender, RoutedEventArgs e)
@@ -1149,6 +1298,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _scanCancellation?.Cancel();
             _binCancellation?.Cancel();
+            _mapClipCancellation?.Cancel();
+            _mapClipCancellation?.Dispose();
+            _mapClipCancellation = null;
+            ClearMapCharacterClipPreview();
             _championLoadGeneration++;
             _model.IsPlaying = false;
             _vfxRenderer?.Pause();
@@ -1187,6 +1340,15 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.Meshes.Clear();
             _model.DetectedSkins.Clear();
             _model.BrowserRoots.Clear();
+            _suppressMapVariantReload = true;
+            try
+            {
+                _model.SetMapVariants(Array.Empty<MapVariantData>());
+            }
+            finally
+            {
+                _suppressMapVariantReload = false;
+            }
             _model.LogMessages.Clear();
             _model.RootPath = string.Empty;
             _model.SearchQuery = string.Empty;
@@ -1210,30 +1372,40 @@ namespace AssetsManager.Views.Controls.Viewer
             };
 
             if (dialog.ShowDialog() == true)
-            {
-                _model.RootPath = dialog.FolderName;
-                ScanRootDirectory(dialog.FolderName);
-            }
+                LoadExtractedContainer(dialog.FolderName);
         }
 
         private void ReloadRoot_Click(object sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrWhiteSpace(_model.RootPath))
-                ScanRootDirectory(_model.RootPath);
+                LoadExtractedContainer(_model.RootPath);
         }
 
         private void RootPathTextBox_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter && !string.IsNullOrWhiteSpace(_model.RootPath))
-                ScanRootDirectory(_model.RootPath);
+                LoadExtractedContainer(_model.RootPath);
         }
 
-        private async void ScanRootDirectory(string rootFolder)
+        public void LoadExtractedContainer(string rootFolder)
         {
-            if (!Directory.Exists(rootFolder)) return;
+            if (string.IsNullOrWhiteSpace(rootFolder) || !Directory.Exists(rootFolder) || _isCleanedUp)
+                return;
+
+            string fullRoot = Path.GetFullPath(rootFolder);
+            _model.RootPath = fullRoot;
+            // Folder selection is discovery-only. MAP geometry is loaded exclusively from the
+            // unified VFX Studio browser through an explicit MapFile selection.
+            _ = ScanRootDirectoryAsync(fullRoot);
+        }
+
+        private async Task<bool> ScanRootDirectoryAsync(string rootFolder)
+        {
+            if (!Directory.Exists(rootFolder)) return false;
             _scanCancellation?.Cancel();
             _scanCancellation = new System.Threading.CancellationTokenSource();
             var operation = _scanCancellation;
+            CancelMapLoadAndClearScene();
 
             // A folder scan is discovery-only. Drop any previously loaded skin/model before
             // populating the new catalog so the project opens in a neutral, collapsed state.
@@ -1254,7 +1426,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         resolveBinEntry,
                         LogService),
                     operation.Token);
-                if (operation.IsCancellationRequested || _isCleanedUp) return;
+                if (operation.IsCancellationRequested || _isCleanedUp) return false;
                 _model.DetectedSkins.Clear();
                 _model.BrowserRoots.Clear();
                 foreach (VfxSkinItem entry in catalog.Entries)
@@ -1265,16 +1437,274 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
                 foreach (VfxBrowserFolder rootNode in catalog.Roots)
                     _model.BrowserRoots.Add(rootNode);
-                int characterCount = catalog.Roots.FirstOrDefault()?.Children.OfType<VfxBrowserFolder>().Count() ?? 0;
-                _model.StatusText = $"Found {catalog.Entries.Count} VFX BIN entries across {characterCount} characters.";
+
+                _suppressMapVariantReload = true;
+                try
+                {
+                    _model.SetMapVariants(catalog.MapVariants);
+                }
+                finally
+                {
+                    _suppressMapVariantReload = false;
+                }
+
+                VfxBrowserFolder charactersRoot = catalog.Roots.FirstOrDefault(root =>
+                    string.Equals(root.Title, "Characters", StringComparison.Ordinal));
+                int characterCount = charactersRoot?.Children.OfType<VfxBrowserFolder>().Count() ?? 0;
+                _model.StatusText = catalog.MapSources.Count > 0
+                    ? $"Found {catalog.MapSources.Count} MapGeometry assets and {catalog.Entries.Count} VFX BIN entries across {characterCount} characters. Select a MAP asset to load it."
+                    : $"Found {catalog.Entries.Count} VFX BIN entries across {characterCount} characters.";
+                return true;
             }
-            catch (OperationCanceledException) { }
-            catch (Exception ex) { LogService?.LogError(ex, "Failed to scan VFX folder."); }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to scan VFX folder.");
+                return false;
+            }
             finally
             {
                 if (ReferenceEquals(_scanCancellation, operation)) _scanCancellation = null;
                 operation.Dispose();
             }
+        }
+
+        private static string SelectedMapFileFor(MapPath map, string rootFolder)
+        {
+            if (map == null || string.IsNullOrWhiteSpace(rootFolder))
+                return null;
+
+            string geometry = Path.Combine(rootFolder, map.GeometryVirtualPath.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(geometry))
+                return Path.GetFullPath(geometry);
+
+            string materials = Path.Combine(rootFolder, map.MaterialsVirtualPath.Replace('/', Path.DirectorySeparatorChar));
+            return File.Exists(materials) ? Path.GetFullPath(materials) : null;
+        }
+
+        private async Task LoadDetectedMapAsync(MapSceneSource source)
+        {
+            if (source == null || MapViewerSceneService == null || _isCleanedUp)
+                return;
+
+            _mapCancellation?.Cancel();
+            _mapCancellation?.Dispose();
+            var operation = new System.Threading.CancellationTokenSource();
+            _mapCancellation = operation;
+            MapSceneRuntime staged = null;
+            MapSceneRuntime enriched = null;
+
+            try
+            {
+                // Match current LTK MAIN's backdrop flow: publish decoded geometry/material state first.
+                // Structure skins, placed VFX and texture waves must not hold the first visible frame.
+                staged = await MapViewerSceneService.LoadBackdropAsync(source, operation.Token);
+                operation.Token.ThrowIfCancellationRequested();
+                if (staged == null)
+                {
+                    _model.StatusText = $"Unable to load {Path.GetFileName(source.SelectedMapFilePath)}.";
+                    return;
+                }
+                if (_isCleanedUp || !ReferenceEquals(_mapCancellation, operation))
+                    return;
+
+                _mapClipCancellation?.Cancel();
+                ClearMapCharacterClipPreview();
+                MapSceneRuntime previous = _mapSceneRuntime;
+                _mapSceneRuntime = staged;
+                staged = null;
+                MapSceneRuntime backdrop = _mapSceneRuntime;
+                MapSceneData scene = backdrop.Scene;
+                _mapGpuSceneDirty = true;
+                _mapTexturesDirty = false;
+                previous?.Dispose();
+                ReplaceMapBrowserRoot(MapBrowserSemantics.Build(backdrop));
+                SnapMapCamera(scene);
+                _model.StatusText = $"Loaded {Path.GetFileName(source.SelectedMapFilePath)} backdrop. Loading scene resources...";
+                OpenTkControl?.InvalidateVisual();
+
+                Task<IReadOnlyDictionary<string, MapTextureImage>> previewTask =
+                    MapViewerSceneService.LoadPreviewTexturesAsync(backdrop, operation.Token);
+                Task<IReadOnlyDictionary<string, MapTextureImage>> previewProgramTask =
+                    MapViewerSceneService.LoadPreviewProgramTexturesAsync(backdrop, operation.Token);
+                Task<IReadOnlyDictionary<string, MapTextureImage>> previewLightmapTask =
+                    MapViewerSceneService.LoadPreviewLightmapsAsync(backdrop, operation.Token);
+                Task<MapSceneRuntime> runtimeTask =
+                    MapViewerSceneService.LoadRuntimeAssetsAsync(backdrop, operation.Token);
+
+                await Task.WhenAll(previewTask, previewProgramTask, previewLightmapTask);
+                operation.Token.ThrowIfCancellationRequested();
+                if (!_isCleanedUp && ReferenceEquals(_mapCancellation, operation) &&
+                    ReferenceEquals(_mapSceneRuntime?.Scene, scene))
+                {
+                    _mapSceneRuntime.SetBackdropTextures(await previewTask);
+                    _mapSceneRuntime.SetBackdropProgramTextures(await previewProgramTask);
+                    _mapSceneRuntime.SetBackdropLightmaps(await previewLightmapTask);
+                    _mapTexturesDirty = true;
+                    OpenTkControl?.InvalidateVisual();
+                }
+
+                Task<IReadOnlyDictionary<string, MapTextureImage>> fullTextureTask =
+                    MapViewerSceneService.LoadFullTexturesAsync(backdrop, operation.Token);
+                Task<IReadOnlyDictionary<string, MapTextureImage>> fullProgramTask =
+                    MapViewerSceneService.LoadFullProgramTexturesAsync(backdrop, operation.Token);
+                Task<IReadOnlyDictionary<string, MapTextureImage>> fullLightmapTask =
+                    MapViewerSceneService.LoadFullLightmapsAsync(backdrop, operation.Token);
+
+                enriched = await runtimeTask;
+                operation.Token.ThrowIfCancellationRequested();
+                if (_isCleanedUp || !ReferenceEquals(_mapCancellation, operation) ||
+                    !ReferenceEquals(_mapSceneRuntime?.Scene, scene))
+                {
+                    return;
+                }
+
+                if (enriched != null)
+                {
+                    enriched.SetBackdropTextures(_mapSceneRuntime.BackdropTextures);
+                    enriched.SetBackdropProgramTextures(_mapSceneRuntime.BackdropProgramTextures);
+                    enriched.SetBackdropLightmaps(_mapSceneRuntime.BackdropLightmaps);
+                    MapSceneRuntime shell = _mapSceneRuntime;
+                    _mapSceneRuntime = enriched;
+                    enriched = null;
+                    shell.Dispose();
+                    ReplaceMapBrowserRoot(MapBrowserSemantics.Build(_mapSceneRuntime));
+                }
+
+                _model.StatusText = $"Loaded map {scene.Source.Map.Value}.";
+                _model.LogMessages.Add(
+                    $"[MAP] Loaded {scene.Geometry.Meshes.Count} backdrop meshes, " +
+                    $"{scene.Characters.Count} characters and {scene.Particles.Count} particle placeables.");
+                OpenTkControl?.InvalidateVisual();
+
+                await Task.WhenAll(fullTextureTask, fullProgramTask, fullLightmapTask);
+                operation.Token.ThrowIfCancellationRequested();
+                if (!_isCleanedUp && ReferenceEquals(_mapCancellation, operation) &&
+                    ReferenceEquals(_mapSceneRuntime?.Scene, scene))
+                {
+                    _mapSceneRuntime.SetBackdropTextures(await fullTextureTask);
+                    _mapSceneRuntime.SetBackdropProgramTextures(await fullProgramTask);
+                    _mapSceneRuntime.SetBackdropLightmaps(await fullLightmapTask);
+                    _mapTexturesDirty = true;
+                    OpenTkControl?.InvalidateVisual();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                operation.Cancel();
+                LogService?.LogError(ex, "Failed to load selected MAP geometry in VFX Studio.");
+                _model.StatusText = "Unable to load the selected map scene.";
+                _model.LogMessages.Add($"[MAP ERROR] {ex.Message}");
+            }
+            finally
+            {
+                staged?.Dispose();
+                enriched?.Dispose();
+                if (ReferenceEquals(_mapCancellation, operation))
+                    _mapCancellation = null;
+                operation.Dispose();
+            }
+        }
+
+        private void CancelMapLoadAndClearScene()
+        {
+            _mapCancellation?.Cancel();
+            _mapCancellation = null;
+            _mapClipCancellation?.Cancel();
+            ClearMapCharacterClipPreview();
+
+            MapSceneRuntime previous = _mapSceneRuntime;
+            _mapSceneRuntime = null;
+            ReplaceMapBrowserRoot(null);
+            _mapGpuSceneDirty = true;
+            _mapTexturesDirty = false;
+            previous?.Dispose();
+        }
+
+        private void ReplaceMapBrowserRoot(MapBrowserNode root)
+        {
+            _model.SelectedMapNode = null;
+            if (_mapBrowserRoot != null)
+                _model.BrowserRoots.Remove(_mapBrowserRoot);
+
+            _mapBrowserRoot = root;
+            if (root != null)
+            {
+                _model.BrowserRoots.Insert(0, root);
+                RefreshMapBrowserVisibility(root);
+            }
+        }
+
+        private void ApplyPendingMapGpuState()
+        {
+            if (_mapGeometryRenderer == null)
+                return;
+
+            if (_mapGpuSceneDirty)
+            {
+                _mapCharacterRenderer?.Clear();
+                _mapParticleRenderer?.Clear();
+                if (_mapSceneRuntime != null)
+                {
+                    _mapGeometryRenderer.LoadScene(_mapSceneRuntime.Scene);
+                    bool needsPostEffects = MapPostEffectsRenderer.DrawsAnything(
+                        _mapSceneRuntime.Scene.PostEffects,
+                        _mapSceneRuntime.Scene.AmbientOcclusion);
+                    if (needsPostEffects && _mapPostEffectsRenderer == null)
+                    {
+                        _mapPostEffectsRenderer = new MapPostEffectsRenderer();
+                        _mapPostEffectsRenderer.Initialize(_gl);
+                    }
+                    else if (!needsPostEffects && _mapPostEffectsRenderer != null)
+                    {
+                        _mapPostEffectsRenderer.Dispose();
+                        _mapPostEffectsRenderer = null;
+                    }
+                }
+                else
+                {
+                    _mapGeometryRenderer.ClearScene();
+                    _mapPostEffectsRenderer?.Dispose();
+                    _mapPostEffectsRenderer = null;
+                }
+                _mapGpuSceneDirty = false;
+                _mapTexturesDirty = false;
+                return;
+            }
+
+            if (_mapTexturesDirty && _mapSceneRuntime != null)
+            {
+                _mapGeometryRenderer.UpdateTextures(_mapSceneRuntime.BackdropTextures);
+                _mapGeometryRenderer.UpdateProgramTextures(_mapSceneRuntime.BackdropProgramTextures);
+                _mapGeometryRenderer.UpdateLightmaps(_mapSceneRuntime.BackdropLightmaps);
+                _mapTexturesDirty = false;
+            }
+        }
+
+        private void SnapMapCamera(MapSceneData scene)
+        {
+            if (scene?.Origin is not Vector3 engineOrigin || _cameraController == null)
+                return;
+
+            if (_dummyViewport.Camera is not PerspectiveCamera)
+                _dummyViewport.Camera = _previewPerspectiveCamera;
+            _previewPerspectiveCamera.FieldOfView = 45d;
+
+            var target = new Point3D(-engineOrigin.X, engineOrigin.Y + 300f, engineOrigin.Z);
+            var direction = new Vector3D(280d, 150d, 400d);
+            direction.Normalize();
+            double radius = Math.Sqrt(1500d * 1500d + 300d * 300d + 1500d * 1500d);
+            double aspect = Math.Max(1d, OpenTkControl.ActualWidth) /
+                            Math.Max(1d, OpenTkControl.ActualHeight);
+            double distance = ViewerViewportControl.CalculateMapFrameDistance(radius, 45d, aspect);
+            Point3D position = target + direction * distance;
+            _cameraController.SnapTo(position, target - position, VfxCameraUpDirection);
         }
 
         private void BindBrowserSkin()
@@ -1306,8 +1736,18 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void VfxBrowser_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
+            if (e.NewValue is not MapBrowserNode)
+            {
+                _model.SelectedMapNode = null;
+                ClearMapCharacterClipPreview();
+            }
+
             switch (e.NewValue)
             {
+                case MapBrowserNode mapNode:
+                    _model.SelectedMapNode = mapNode;
+                    HandleMapBrowserSelection(mapNode);
+                    break;
                 case VfxSkinItem skin when !ReferenceEquals(_model.SelectedSkin, skin):
                     _model.SelectedSkin = skin;
                     break;
@@ -1337,6 +1777,478 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.IsAnimationMode = true;
                     _model.SelectedSpell = spell;
                     break;
+            }
+        }
+
+        private void MapBrowserEye_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if ((sender as FrameworkElement)?.DataContext is not MapBrowserNode node ||
+                !node.CanHide ||
+                _mapSceneRuntime == null)
+            {
+                return;
+            }
+
+            string id = MapBrowserVisibilityId(node);
+            if (string.IsNullOrWhiteSpace(id))
+                return;
+
+            bool hidden = IsMapBrowserNodeHidden(node, _mapSceneRuntime.Hidden);
+            _mapSceneRuntime.SetHidden(id, !hidden);
+            RefreshMapBrowserVisibility(_mapBrowserRoot);
+            OpenTkControl?.InvalidateVisual();
+        }
+
+        private void HandleMapBrowserSelection(MapBrowserNode node)
+        {
+            if (node == null)
+                return;
+
+            if (node.Kind == MapBrowserNodeKind.MapFile && node.Payload is MapSceneSource source)
+            {
+                if (_mapSceneRuntime?.Scene?.Source?.Map?.Equals(source.Map) == true &&
+                    string.Equals(
+                        _mapSceneRuntime.Scene.Source.SelectedMapFilePath,
+                        source.SelectedMapFilePath,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    SnapMapCamera(_mapSceneRuntime.Scene);
+                    OpenTkControl?.InvalidateVisual();
+                    return;
+                }
+
+                _model.StatusText = $"Loading {Path.GetFileName(source.SelectedMapFilePath)}...";
+                _ = LoadDetectedMapAsync(source);
+                return;
+            }
+
+            if (_mapSceneRuntime == null)
+                return;
+
+            string selectionSummary = !string.IsNullOrWhiteSpace(node.InspectorSummary)
+                ? node.InspectorSummary
+                : node.Subtitle;
+            _model.StatusText = string.IsNullOrWhiteSpace(selectionSummary)
+                ? node.Title
+                : $"{node.Title} · {selectionSummary}";
+
+            switch (node.Kind)
+            {
+                case MapBrowserNodeKind.Map:
+                case MapBrowserNodeKind.Geometry:
+                    _mapGpuSceneDirty = true;
+                    SnapMapCamera(_mapSceneRuntime.Scene);
+                    OpenTkControl?.InvalidateVisual();
+                    break;
+                case MapBrowserNodeKind.Chunk when node.Payload is MapOutlineChunkData chunk:
+                    MapOutlineItemData firstChunkItem = chunk.Items?.FirstOrDefault(item => item?.IsDrawable == true)
+                                                        ?? chunk.Items?.FirstOrDefault();
+                    if (firstChunkItem != null)
+                        FocusMapBrowserPosition(firstChunkItem.Position);
+                    break;
+                case MapBrowserNodeKind.Placeable when node.Payload is MapOutlineItemData item:
+                    FocusMapBrowserPosition(item.Position);
+                    break;
+                case MapBrowserNodeKind.CharacterSkin when node.Payload is MapCharacterRuntimeGroup group:
+                    if (_activeMapCharacterClip != null)
+                        ClearMapCharacterClipPreview(releaseResources: false);
+                    MapCharacterData firstPlacement = group.Placements?.FirstOrDefault();
+                    _activeMapCharacterPlacement = firstPlacement;
+                    if (firstPlacement != null)
+                        FocusMapBrowserPosition(firstPlacement.Placeable.Position);
+                    break;
+                case MapBrowserNodeKind.CharacterPlacement when node.Payload is MapCharacterData character:
+                    if (_activeMapCharacterClip != null)
+                        ClearMapCharacterClipPreview(releaseResources: false);
+                    _activeMapCharacterPlacement = character;
+                    FocusMapBrowserPosition(character.Placeable.Position);
+                    break;
+                case MapBrowserNodeKind.Clip when node.Payload is MapCharacterClipSelection selection:
+                    ConfigureMapAnimationParameterOptions(selection.Clip);
+                    _ = PlayMapCharacterClipAsync(selection);
+                    break;
+                case MapBrowserNodeKind.ParticleSystem when node.Payload is MapParticleSystemGroupData particleSystem:
+                    MapParticleData firstParticle = particleSystem.Particles?.FirstOrDefault(particle => particle?.StartDisabled == false)
+                                                    ?? particleSystem.Particles?.FirstOrDefault();
+                    if (firstParticle != null)
+                        FocusMapBrowserPosition(firstParticle.Position);
+                    break;
+                case MapBrowserNodeKind.ParticlePlacement when node.Payload is MapParticleData particle:
+                    FocusMapBrowserPosition(particle.Position);
+                    break;
+            }
+        }
+
+        private async Task PlayMapCharacterClipAsync(
+            MapCharacterClipSelection selection,
+            bool preservePlayhead = false)
+        {
+            if (selection?.Group?.Animation == null || selection.Clip == null || _mapSceneRuntime == null)
+                return;
+
+            _mapClipCancellation?.Cancel();
+            _mapClipCancellation?.Dispose();
+            var operation = new System.Threading.CancellationTokenSource();
+            _mapClipCancellation = operation;
+            MapSceneRuntime scene = _mapSceneRuntime;
+
+            try
+            {
+                bool prepared = await selection.Group.Animation.PrepareClipAsync(
+                    selection.Group.Asset,
+                    selection.Clip,
+                    _model.AnimationParameter,
+                    operation.Token);
+                operation.Token.ThrowIfCancellationRequested();
+                if (!prepared || _isCleanedUp ||
+                    !ReferenceEquals(_mapClipCancellation, operation) ||
+                    !ReferenceEquals(_mapSceneRuntime, scene))
+                {
+                    if (!prepared)
+                        _model.StatusText = $"{selection.Clip.ClipName ?? "Animation Clip"} · animation asset unavailable.";
+                    return;
+                }
+
+                MapCharacterData targetPlacement = ResolveMapCharacterPreviewPlacement(selection.Group);
+                if (targetPlacement == null)
+                    return;
+
+                if (_activeMapCharacterGroup != null && !ReferenceEquals(_activeMapCharacterGroup, selection.Group))
+                    _activeMapCharacterGroup.ClearPreviewClip();
+
+                _activeMapCharacterGroup = selection.Group;
+                _activeMapCharacterPlacement = targetPlacement;
+                _activeMapCharacterClip = selection.Clip;
+                selection.Group.SetPreviewClip(selection.Clip, targetPlacement);
+
+                _pendingSystem = null;
+                _pendingSpell = null;
+                _activeSpellPlan = null;
+                _model.SelectedSystem = null;
+                _model.SelectedAnimation = null;
+                _model.SelectedSpell = null;
+                ClearAnimationClipCues();
+                ClearCompositeDiagnostics();
+
+                double duration = selection.Group.Animation.PreparedClipDuration(selection.Clip);
+                if (!double.IsFinite(duration) || duration <= 0d)
+                    duration = Math.Max(0.05d, Math.Max(0f, selection.Clip.EndFrame - selection.Clip.StartFrame) * selection.Clip.TickDuration);
+                double resumeAt = preservePlayhead
+                    ? Math.Clamp(_model.CurrentTime, 0d, duration)
+                    : 0d;
+
+                MapCharacterVfxCatalog catalog = selection.Group.Asset?.Vfx ?? MapCharacterVfxCatalog.Empty;
+                IReadOnlyList<AnimationClipDefinition> playlist =
+                    selection.Group.Animation.PreparedClipPlaylist(selection.Clip);
+                VfxAbilityComposition composition = VfxAbilityCompositionBuilder.BuildTimedPlaylist(
+                    selection.Clip,
+                    playlist,
+                    selection.Group.Animation.PreparedClipStepDurations(selection.Clip),
+                    selection.Group.Animation.PreparedClipFrameSeconds(selection.Clip),
+                    catalog.Systems,
+                    catalog.ResourceMap);
+                bool hasSceneVfx = composition.ResolvedCount > 0 ||
+                                   (catalog.IdleEffects?.Count > 0 && catalog.Systems.Count > 0);
+
+                _vfxRenderer?.SetSystem(null);
+                if (hasSceneVfx)
+                {
+                    VfxSceneResourceContext resources = await EnsureMapClipVfxResourcesAsync(
+                        selection.Group,
+                        scene,
+                        operation.Token);
+                    operation.Token.ThrowIfCancellationRequested();
+                    if (_isCleanedUp || resources == null ||
+                        !ReferenceEquals(_mapClipCancellation, operation) ||
+                        !ReferenceEquals(_mapSceneRuntime, scene))
+                    {
+                        return;
+                    }
+
+                    EnsureVfxRenderSession();
+                    if (_vfxRenderer != null)
+                    {
+                        _vfxRenderer.SetWorldTransform(
+                            MapCharacterSemantics.VfxWorldTransform(targetPlacement.Transform));
+                        int seed = unchecked((int)(selection.Clip.OwnerPathHash ^ targetPlacement.KeyHash));
+                        bool sessionReady = _vfxRenderer.SetAnimationSession(
+                            composition,
+                            catalog.IdleEffects,
+                            catalog.Systems,
+                            catalog.ResourceMap,
+                            resources.SearchDirectory,
+                            seed,
+                            duration,
+                            catalog.OwnerSceneContext);
+                        if (sessionReady)
+                        {
+                            _vfxRenderer.Seek(resumeAt);
+                            _vfxRenderer.Play();
+                        }
+                    }
+                }
+                else
+                {
+                    _vfxRenderer?.SetWorldTransform(Matrix4x4.Identity);
+                    _vfxRenderer?.UpdateBoneTransforms(null);
+                    _vfxRenderer?.SetOwnerSkinningMatrices(null);
+                }
+
+                ResetPreviewLoopRange(duration);
+                _model.CurrentTime = resumeAt;
+                SyncMapCharacterClipTime(resumeAt);
+                _model.IsPlaying = true;
+
+                FocusMapBrowserPosition(targetPlacement.Placeable.Position);
+
+                string name = string.IsNullOrWhiteSpace(selection.Clip.ClipName)
+                    ? $"0x{selection.Clip.OwnerPathHash:x8}"
+                    : selection.Clip.ClipName;
+                string vfxSummary = composition.ResolvedCount > 0
+                    ? $" · {composition.ResolvedCount} VFX events"
+                    : string.Empty;
+                _model.StatusText = $"{name} ({duration:F2}s) · MAP character clip{vfxSummary}.";
+                _model.LogMessages.Add($"[MAP CLIP] {name} · {duration:F2}s{vfxSummary}.");
+                UpdateTimelineTrackMetrics();
+                UpdatePlayheadPosition();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to prepare MAP character animation clip.");
+                _model.StatusText = "Unable to play the selected MAP animation clip.";
+            }
+            finally
+            {
+                if (ReferenceEquals(_mapClipCancellation, operation))
+                    _mapClipCancellation = null;
+                operation.Dispose();
+            }
+        }
+
+        private MapCharacterData ResolveMapCharacterPreviewPlacement(MapCharacterRuntimeGroup group)
+        {
+            if (group?.Placements == null || group.Placements.Count == 0)
+                return null;
+
+            if (_activeMapCharacterPlacement != null)
+            {
+                MapCharacterData held = group.Placements.FirstOrDefault(placement =>
+                    ReferenceEquals(placement, _activeMapCharacterPlacement) ||
+                    (placement != null &&
+                     placement.ChunkHash == _activeMapCharacterPlacement.ChunkHash &&
+                     placement.KeyHash == _activeMapCharacterPlacement.KeyHash));
+                if (held != null)
+                    return held;
+            }
+
+            return group.Placements[0];
+        }
+
+        private async Task<VfxSceneResourceContext> EnsureMapClipVfxResourcesAsync(
+            MapCharacterRuntimeGroup group,
+            MapSceneRuntime scene,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            if (group == null || scene == null || MapViewerSceneService == null)
+                return null;
+            if (ReferenceEquals(_mapClipVfxResourceGroup, group) && _mapClipVfxResources != null)
+                return _mapClipVfxResources;
+
+            MapCharacterVfxCatalog catalog = group.Asset?.Vfx ?? MapCharacterVfxCatalog.Empty;
+            VfxSceneResourceContext created = await MapViewerSceneService.CreateVfxResourcesAsync(
+                catalog,
+                scene.Scene.Source?.ProjectRoot,
+                cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                VfxSceneResourceContext previous = _mapClipVfxResources;
+                _mapClipVfxResources = created;
+                _mapClipVfxResourceGroup = group;
+                created = null;
+                previous?.Dispose();
+                return _mapClipVfxResources;
+            }
+            finally
+            {
+                created?.Dispose();
+            }
+        }
+
+        private void ClearMapCharacterClipPreview(bool releaseResources = true)
+        {
+            _mapClipCancellation?.Cancel();
+            _activeMapCharacterGroup?.ClearPreviewClip();
+            _activeMapCharacterGroup = null;
+            _activeMapCharacterPlacement = null;
+            _activeMapCharacterClip = null;
+            _vfxRenderer?.SetSystem(null);
+            _vfxRenderer?.SetWorldTransform(Matrix4x4.Identity);
+            _vfxRenderer?.UpdateBoneTransforms(null);
+            _vfxRenderer?.SetOwnerSkinningMatrices(null);
+
+            if (!releaseResources)
+                return;
+
+            VfxSceneResourceContext resources = _mapClipVfxResources;
+            _mapClipVfxResources = null;
+            _mapClipVfxResourceGroup = null;
+            resources?.Dispose();
+        }
+
+        private void SyncMapCharacterClipTime(double timeSeconds)
+        {
+            if (_activeMapCharacterGroup == null || _activeMapCharacterClip == null)
+                return;
+
+            double safe = double.IsFinite(timeSeconds) ? Math.Max(0d, timeSeconds) : 0d;
+            if (_model.TotalDuration > 0d && double.IsFinite(_model.TotalDuration))
+                safe = Math.Min(safe, _model.TotalDuration);
+            _activeMapCharacterGroup.PreviewTimeSeconds = (float)safe;
+            _activeMapCharacterGroup.Animation.EvaluateClip(
+                _activeMapCharacterGroup.Asset,
+                _activeMapCharacterClip,
+                (float)safe);
+
+            IEnumerable<uint> initiallyHidden =
+                (_activeMapCharacterGroup.Asset?.Skin?.HiddenSubmeshes ?? Array.Empty<string>())
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(Fnv1a.HashLower);
+            IReadOnlySet<uint> hidden = VfxClipCueEvaluator.HiddenSubmeshesAt(
+                _activeMapCharacterGroup.Animation.PreparedClipCues(_activeMapCharacterClip),
+                initiallyHidden,
+                safe);
+            _activeMapCharacterGroup.SetPreviewHiddenSubmeshes(hidden);
+            _vfxRenderer?.SetOwnerHiddenSubmeshes(hidden);
+            UpdateMapCharacterClipVfxPose();
+        }
+
+        private void UpdateMapCharacterClipVfxPose()
+        {
+            if (_vfxRenderer?.ActiveSystem == null ||
+                _activeMapCharacterGroup?.Animation == null ||
+                _activeMapCharacterClip == null)
+            {
+                return;
+            }
+
+            _vfxRenderer.SetOwnerSkinningMatrices(
+                _activeMapCharacterGroup.Animation.PreparedClipSkinningMatrices(_activeMapCharacterClip));
+            _vfxRenderer.UpdateBoneTransforms((boneName, boneHash) =>
+                _activeMapCharacterGroup.Animation.TryGetPreparedClipBoneTransform(
+                    _activeMapCharacterClip,
+                    boneName,
+                    boneHash,
+                    out Matrix4x4 transform)
+                    ? transform
+                    : null);
+        }
+
+        private bool HasSelectedMapClipReady() =>
+            _model.SelectedMapNode?.Kind == MapBrowserNodeKind.Clip &&
+            _model.SelectedMapNode.Payload is MapCharacterClipSelection selection &&
+            ReferenceEquals(selection.Group, _activeMapCharacterGroup) &&
+            ReferenceEquals(selection.Clip, _activeMapCharacterClip) &&
+            ReferenceEquals(_activeMapCharacterGroup?.PreviewClip, _activeMapCharacterClip);
+
+        private void AdvanceMapCharacterClip(float deltaSeconds)
+        {
+            if (!HasSelectedMapClipReady())
+                return;
+
+            if (_model.IsPlaying && !_isUserSeeking)
+            {
+                double next;
+                if (_vfxRenderer?.ActiveSystem != null)
+                {
+                    _vfxRenderer.ActiveSystem.Speed = _model.Speed;
+                    _vfxRenderer.Update(Math.Max(0f, deltaSeconds));
+                    next = _vfxRenderer.PlaybackTime;
+                }
+                else
+                {
+                    next = _model.CurrentTime + Math.Max(0f, deltaSeconds) * _model.Speed;
+                }
+
+                if (ShouldRestartPreview(_model.IsPreviewLoopEnabled, next, _model.ActiveLoopDuration))
+                {
+                    next = ResolvePreviewLoopRestart(
+                        _model.ActiveLoopStart,
+                        _model.ActiveLoopDuration,
+                        _model.TotalDuration);
+                    _vfxRenderer?.Seek(next);
+                    _vfxRenderer?.Play();
+                }
+                else if (next >= _model.TotalDuration)
+                {
+                    next = _model.TotalDuration;
+                    _vfxRenderer?.Seek(next);
+                    _vfxRenderer?.Pause();
+                    _model.IsPlaying = false;
+                }
+                _model.CurrentTime = next;
+            }
+
+            SyncMapCharacterClipTime(_model.CurrentTime);
+        }
+
+        private void FocusMapBrowserPosition(Vector3 enginePosition)
+        {
+            if (_cameraController == null)
+                return;
+
+            if (_dummyViewport.Camera is not PerspectiveCamera camera)
+            {
+                _dummyViewport.Camera = _previewPerspectiveCamera;
+                camera = _previewPerspectiveCamera;
+            }
+
+            var pose = ViewerViewportControl.CalculateMapFocusPose(enginePosition, camera.LookDirection);
+            if (pose == null)
+                return;
+
+            _cameraController.FlyTo(
+                pose.Value.Position,
+                pose.Value.LookDirection,
+                camera.UpDirection);
+        }
+
+        private static string MapBrowserVisibilityId(MapBrowserNode node) =>
+            node?.Payload switch
+            {
+                MapOutlineChunkData chunk => chunk.Id,
+                MapOutlineItemData item => item.Id,
+                MapCharacterData character => MapOutlineSemantics.ItemId(character.ChunkHash, character.KeyHash),
+                MapParticleData particle => MapOutlineSemantics.ItemId(particle.ChunkHash, particle.KeyHash),
+                _ => null
+            };
+
+        private static bool IsMapBrowserNodeHidden(MapBrowserNode node, IReadOnlySet<string> hidden) =>
+            node?.Payload switch
+            {
+                MapOutlineChunkData chunk => hidden?.Contains(chunk.Id) == true,
+                MapOutlineItemData item => MapOutlineSemantics.IsHidden(hidden, item.ChunkHash, item.KeyHash),
+                MapCharacterData character => MapOutlineSemantics.IsHidden(hidden, character.ChunkHash, character.KeyHash),
+                MapParticleData particle => MapOutlineSemantics.IsHidden(hidden, particle.ChunkHash, particle.KeyHash),
+                _ => false
+            };
+
+        private void RefreshMapBrowserVisibility(MapBrowserNode node)
+        {
+            if (node == null || _mapSceneRuntime == null)
+                return;
+
+            if (node.CanHide)
+                node.IsHidden = IsMapBrowserNodeHidden(node, _mapSceneRuntime.Hidden);
+
+            foreach (object child in node.Children)
+            {
+                if (child is MapBrowserNode mapChild)
+                    RefreshMapBrowserVisibility(mapChild);
             }
         }
 
@@ -1807,6 +2719,25 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.SetAnimationParameterOptions(
                     values,
                     values.Count > 1 ? item?.ParameterValue : _model.AnimationParameter);
+            }
+            finally
+            {
+                _isUpdatingAnimationParameter = false;
+            }
+        }
+
+        private void ConfigureMapAnimationParameterOptions(AnimationClipDefinition clip)
+        {
+            _isUpdatingAnimationParameter = true;
+            try
+            {
+                IReadOnlyList<float> values = AnimationGraphPlayback.ParameterValues(clip);
+                float? selected = values.Count > 1
+                    ? AnimationGraphPlayback.NearestParameter(
+                        values,
+                        clip?.ParametricValues?.FirstOrDefault() ?? values[0])
+                    : null;
+                _model.SetAnimationParameterOptions(values, selected);
             }
             finally
             {
@@ -3745,6 +4676,7 @@ namespace AssetsManager.Views.Controls.Viewer
             double seekTime = ratio * _model.TotalDuration;
 
             _model.CurrentTime = seekTime;
+            SyncMapCharacterClipTime(seekTime);
             _vfxRenderer?.Seek(seekTime);
         }
 
@@ -3766,6 +4698,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 frames,
                 _model.TotalDuration);
             _model.CurrentTime = newTime;
+            SyncMapCharacterClipTime(newTime);
             _vfxRenderer?.Seek(newTime);
             UpdatePlayheadPosition();
         }
@@ -3835,6 +4768,7 @@ namespace AssetsManager.Views.Controls.Viewer
             bool wasPlaying = _model.IsPlaying;
             _vfxRenderer?.Seek(0d);
             _model.CurrentTime = 0d;
+            SyncMapCharacterClipTime(0d);
             if (wasPlaying) _vfxRenderer?.Play();
             UpdatePlayheadPosition();
         }
@@ -4116,6 +5050,25 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             bool ended = _model.CurrentTime >= _model.TotalDuration;
             bool restart = ended || (restartWhenPlaying && _model.IsPlaying);
+            if (_model.SelectedMapNode?.Kind == MapBrowserNodeKind.Clip &&
+                _model.SelectedMapNode.Payload is MapCharacterClipSelection mapClip)
+            {
+                if (!HasSelectedMapClipReady())
+                    _ = PlayMapCharacterClipAsync(mapClip);
+                else
+                {
+                    if (restart)
+                    {
+                        _model.CurrentTime = 0d;
+                        _vfxRenderer?.Seek(0d);
+                        SyncMapCharacterClipTime(0d);
+                    }
+                    _model.IsPlaying = true;
+                    _vfxRenderer?.Play();
+                }
+                return true;
+            }
+
             if (_model.SelectedSpell != null)
             {
                 if (!HasSelectedSpellReady())
@@ -4142,6 +5095,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (restartFromBeginning)
             {
                 _model.CurrentTime = 0d;
+                SyncMapCharacterClipTime(0d);
                 _vfxRenderer?.Seek(0d);
             }
             _model.IsPlaying = true;
@@ -4210,6 +5164,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (!_model.IsPlaying || _isUserSeeking)
             {
                 _model.CurrentTime = e.NewValue;
+                SyncMapCharacterClipTime(e.NewValue);
                 _vfxRenderer?.Seek(e.NewValue);
             }
         }

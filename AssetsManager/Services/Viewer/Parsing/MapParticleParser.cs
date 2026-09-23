@@ -7,7 +7,7 @@ using LeagueToolkit.Core.Meta.Properties;
 namespace AssetsManager.Services.Viewer.Parsing
 {
     /// <summary>
-    /// Resolves MapParticle placeables from the shared authored snapshot exactly as LTK Manager 1.20.0.
+    /// Resolves MapParticle placeables from the shared authored snapshot like current LTK Manager MAIN.
     /// </summary>
     internal sealed class MapParticleParser
     {

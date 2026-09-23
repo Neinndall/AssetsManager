@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
@@ -17,7 +18,9 @@ internal static class VfxFolderCatalog
 {
     internal sealed record BrowserCatalog(
         IReadOnlyList<VfxSkinItem> Entries,
-        IReadOnlyList<VfxBrowserFolder> Roots);
+        IReadOnlyList<VfxBrowserFolder> Roots,
+        IReadOnlyList<MapSceneSource> MapSources,
+        IReadOnlyList<MapVariantData> MapVariants);
 
     private sealed record SpellDiscovery(
         string Character,
@@ -27,9 +30,14 @@ internal static class VfxFolderCatalog
         string BinPath,
         VfxSpellPreview Preview);
 
+    private sealed record MapDeclaration(
+        uint ClassHash,
+        IReadOnlyList<MapVariantData> Variants);
+
     private sealed record ScanResult(
         IReadOnlyList<VfxSkinItem> Entries,
-        IReadOnlyList<SpellDiscovery> Spells);
+        IReadOnlyList<SpellDiscovery> Spells,
+        IReadOnlyList<MapVariantData> MapVariants);
 
     internal static IReadOnlyList<VfxSkinItem> Scan(string root, CancellationToken cancellationToken, LogService log = null)
         => ScanCore(root, cancellationToken, null, log).Entries;
@@ -41,7 +49,9 @@ internal static class VfxFolderCatalog
         LogService log = null)
     {
         ScanResult scan = ScanCore(root, cancellationToken, resolveBinEntry, log);
-        return new BrowserCatalog(scan.Entries, BuildBrowserTree(root, scan.Entries, scan.Spells));
+        IReadOnlyList<MapSceneSource> mapSources = DiscoverMapSources(root, cancellationToken);
+        IReadOnlyList<VfxBrowserFolder> roots = BuildBrowserTree(root, scan.Entries, scan.Spells, mapSources);
+        return new BrowserCatalog(scan.Entries, roots, mapSources, scan.MapVariants);
     }
 
     private static ScanResult ScanCore(
@@ -53,6 +63,8 @@ internal static class VfxFolderCatalog
         var skins = new List<VfxSkinItem>();
         var effects = new List<VfxSkinItem>();
         var spells = new List<SpellDiscovery>();
+        var mapDeclarations = new List<MapDeclaration>();
+        var mapVariantParser = new MapVariantParser();
         uint skinClass = Fnv1a.HashLower("SkinCharacterDataProperties");
         uint systemClass = Fnv1a.HashLower("VfxSystemDefinitionData");
         uint spellClass = Fnv1a.HashLower("SpellObject");
@@ -67,6 +79,16 @@ internal static class VfxFolderCatalog
                 bool skin = tree.Objects.Values.Any(item =>
                     item.ClassHash == skinClass && HasPreviewableSkin(item));
                 bool system = tree.Objects.Values.Any(item => item.ClassHash == systemClass);
+
+                foreach (BinTreeObject mapObject in tree.Objects.Values.Where(item =>
+                             item.ClassHash == MapVariantParser.MapClass ||
+                             item.ClassHash == MapVariantParser.MapSkinClass ||
+                             item.ClassHash == MapVariantParser.MapContainerClass))
+                {
+                    IReadOnlyList<MapVariantData> variants = mapVariantParser.Parse(tree, mapObject.PathHash);
+                    if (variants.Count > 0)
+                        mapDeclarations.Add(new MapDeclaration(mapObject.ClassHash, variants));
+                }
 
                 if (resolveBinEntry != null)
                 {
@@ -147,7 +169,52 @@ internal static class VfxFolderCatalog
             .ThenBy(item => item.SkinIndex)
             .ThenBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        return new ScanResult(entries, spells.ToArray());
+
+        int MapDeclarationScore(MapDeclaration declaration)
+        {
+            int score = declaration.ClassHash == MapVariantParser.MapClass
+                ? 0
+                : declaration.ClassHash == MapVariantParser.MapSkinClass ? 100 : 200;
+            MapVariantData opening = MapVariantData.Opening(declaration.Variants);
+            string logical = opening?.Map?.Value?.Replace('\\', '/').ToLowerInvariant() ?? string.Empty;
+            if (!string.IsNullOrEmpty(rootStem) &&
+                logical.Split('/', StringSplitOptions.RemoveEmptyEntries)
+                    .Any(segment => segment.Equals(rootStem, StringComparison.OrdinalIgnoreCase)))
+            {
+                score -= 50;
+            }
+            return score;
+        }
+
+        IReadOnlyList<MapVariantData> selectedVariants = mapDeclarations
+            .OrderBy(MapDeclarationScore)
+            .ThenBy(declaration => MapVariantData.Opening(declaration.Variants)?.Map?.Value, StringComparer.OrdinalIgnoreCase)
+            .Select(declaration => declaration.Variants)
+            .FirstOrDefault() ?? Array.Empty<MapVariantData>();
+
+        return new ScanResult(entries, spells.ToArray(), selectedVariants);
+    }
+
+    private static IReadOnlyList<MapSceneSource> DiscoverMapSources(
+        string root,
+        CancellationToken cancellationToken)
+    {
+        var sources = new Dictionary<string, MapSceneSource>(StringComparer.OrdinalIgnoreCase);
+        foreach (string path in Directory.EnumerateFiles(root, "*.mapgeo", SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!MapPath.TryFromGeometryFile(path, out MapPath map))
+                continue;
+
+            sources[map.Value] = new MapSceneSource(
+                map,
+                Path.GetFullPath(path),
+                Path.GetFullPath(root));
+        }
+
+        return sources.Values
+            .OrderBy(source => source.Map.Value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static bool HasPreviewableSkin(BinTreeObject skin)
@@ -181,9 +248,24 @@ internal static class VfxFolderCatalog
     private static IReadOnlyList<VfxBrowserFolder> BuildBrowserTree(
         string root,
         IReadOnlyList<VfxSkinItem> entries,
-        IReadOnlyList<SpellDiscovery> spellDiscoveries)
+        IReadOnlyList<SpellDiscovery> spellDiscoveries,
+        IReadOnlyList<MapSceneSource> mapSources)
     {
         string rootName = Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        var mapRoot = new VfxBrowserFolder("MapGeometry", VfxBrowserFolderKind.Root)
+        {
+            IsExpanded = true
+        };
+        foreach (MapSceneSource source in mapSources ?? Array.Empty<MapSceneSource>())
+        {
+            string title = Path.GetFileName(source.SelectedGeometryPath);
+            mapRoot.Children.Add(new MapBrowserNode(
+                string.IsNullOrWhiteSpace(title) ? source.Map.Value : title,
+                MapBrowserNodeKind.MapFile,
+                source.Map.Value,
+                source));
+        }
+
         var charactersRoot = new VfxBrowserFolder("Characters", VfxBrowserFolderKind.Root)
         {
             IsExpanded = true
@@ -318,9 +400,12 @@ internal static class VfxFolderCatalog
             charactersRoot.Children.Add(character);
         }
 
-        return charactersRoot.Children.Count == 0
-            ? Array.Empty<VfxBrowserFolder>()
-            : new[] { charactersRoot };
+        var roots = new List<VfxBrowserFolder>(2);
+        if (mapRoot.Children.Count > 0)
+            roots.Add(mapRoot);
+        if (charactersRoot.Children.Count > 0)
+            roots.Add(charactersRoot);
+        return roots;
     }
 
     private static void SortCharacterGroups(VfxBrowserFolder character)

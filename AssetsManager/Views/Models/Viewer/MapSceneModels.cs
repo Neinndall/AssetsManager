@@ -13,21 +13,41 @@ namespace AssetsManager.Views.Models.Viewer
 
     internal sealed record MapSceneSource(
         MapPath Map,
-        string SelectedGeometryPath,
+        string SelectedMapFilePath,
         string ProjectRoot)
     {
-        public static MapSceneSource FromGeometryFile(string geometryFilePath, string projectRoot)
+        public string SelectedGeometryPath =>
+            SelectedMapFilePath?.EndsWith(".mapgeo", StringComparison.OrdinalIgnoreCase) == true
+                ? SelectedMapFilePath
+                : null;
+
+        public string SelectedMaterialsPath =>
+            SelectedMapFilePath?.EndsWith(".materials.bin", StringComparison.OrdinalIgnoreCase) == true
+                ? SelectedMapFilePath
+                : null;
+
+        public static MapSceneSource FromMapFile(string mapFilePath, string projectRoot)
         {
-            if (!MapPath.TryFromGeometryFile(geometryFilePath, out MapPath mapPath))
+            if (!MapPath.TryFromMapFile(mapFilePath, out MapPath mapPath))
             {
                 throw new InvalidDataException(
-                    $"Could not derive a Riot MapPath from '{geometryFilePath}'.");
+                    $"Could not derive a Riot MapPath from '{mapFilePath}'.");
             }
 
             return new MapSceneSource(
                 mapPath,
-                Path.GetFullPath(geometryFilePath),
+                Path.GetFullPath(mapFilePath),
                 string.IsNullOrWhiteSpace(projectRoot) ? null : Path.GetFullPath(projectRoot));
+        }
+
+        public static MapSceneSource FromGeometryFile(string geometryFilePath, string projectRoot)
+        {
+            if (!MapPath.TryFromGeometryFile(geometryFilePath, out _))
+            {
+                throw new InvalidDataException(
+                    $"Could not derive a Riot MapPath from '{geometryFilePath}'.");
+            }
+            return FromMapFile(geometryFilePath, projectRoot);
         }
     }
 

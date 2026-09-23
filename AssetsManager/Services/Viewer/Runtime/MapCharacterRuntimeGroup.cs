@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Semantics;
@@ -40,6 +41,29 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal MapCharacterAnimationRuntime Animation { get; }
         internal IReadOnlyList<MapCharacterData> Placements { get; }
         internal IReadOnlyList<MapCharacterAnimationPlacementGroup> AnimationGroups { get; }
+        internal AnimationClipDefinition PreviewClip { get; private set; }
+        internal MapCharacterData PreviewPlacement { get; private set; }
+        internal float PreviewTimeSeconds { get; set; }
+        internal IReadOnlySet<uint> PreviewHiddenSubmeshes { get; private set; } = new HashSet<uint>();
+
+        internal void SetPreviewClip(AnimationClipDefinition clip, MapCharacterData placement = null)
+        {
+            PreviewClip = clip;
+            PreviewPlacement = placement ?? Placements?.FirstOrDefault();
+            PreviewTimeSeconds = 0f;
+            PreviewHiddenSubmeshes = new HashSet<uint>();
+        }
+
+        internal void SetPreviewHiddenSubmeshes(IReadOnlySet<uint> hidden)
+            => PreviewHiddenSubmeshes = hidden ?? new HashSet<uint>();
+
+        internal void ClearPreviewClip()
+        {
+            PreviewClip = null;
+            PreviewPlacement = null;
+            PreviewTimeSeconds = 0f;
+            PreviewHiddenSubmeshes = new HashSet<uint>();
+        }
 
         public void Dispose() => Animation?.Dispose();
 

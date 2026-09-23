@@ -10,7 +10,7 @@ using LeagueToolkit.Core.Meta.Properties;
 namespace AssetsManager.Services.Viewer.Parsing
 {
     /// <summary>
-    /// Reads MapPlaceableContainer chunks and their common placeable contract as LTK Manager 1.20.0 does.
+    /// Reads MapPlaceableContainer chunks and their common placeable contract like current LTK Manager MAIN.
     /// Class-specific interpretation belongs to the character/particle stages that consume this output.
     /// </summary>
     internal sealed class MapPlaceableParser

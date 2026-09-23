@@ -26,8 +26,6 @@ namespace AssetsManager.Views.Models.Viewer
         private double _fieldOfView = 45;
         private bool _isGroundVisible = false;
         private bool _isGridVisible = true;
-        private bool _isMapStructuresVisible = true;
-        private bool _isMapParticlesVisible = true;
         private string _sceneDisplayName = "No model loaded";
 
         public bool IsFpsVisible
@@ -77,18 +75,6 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _isGridVisible;
             set { if (_isGridVisible != value) { _isGridVisible = value; OnPropertyChanged(); } }
-        }
-
-        public bool IsMapStructuresVisible
-        {
-            get => _isMapStructuresVisible;
-            set { if (_isMapStructuresVisible != value) { _isMapStructuresVisible = value; OnPropertyChanged(); } }
-        }
-
-        public bool IsMapParticlesVisible
-        {
-            get => _isMapParticlesVisible;
-            set { if (_isMapParticlesVisible != value) { _isMapParticlesVisible = value; OnPropertyChanged(); } }
         }
 
         public string SceneDisplayName

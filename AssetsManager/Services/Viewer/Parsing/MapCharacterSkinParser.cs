@@ -10,7 +10,7 @@ namespace AssetsManager.Services.Viewer.Parsing
 {
     /// <summary>
     /// Reads the mesh, skeleton, scale, hidden submeshes and animation graph of one
-    /// SkinCharacterDataProperties object as LTK Manager 1.20.0 does.
+    /// SkinCharacterDataProperties object like current LTK Manager MAIN.
     /// </summary>
     internal sealed class MapCharacterSkinParser
     {

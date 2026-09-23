@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
@@ -16,9 +17,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [Fact]
         public void ReferenceForSeparatesWadHashesFromVirtualPaths()
         {
-            MapAssetReference hashed = MapParticleResourceContext.ReferenceFor("0123456789abcdef.dds");
-            MapAssetReference path = MapParticleResourceContext.ReferenceFor("assets/maps/test/fire.dds");
-            MapAssetReference truncated = MapParticleResourceContext.ReferenceFor("89abcdef.dds");
+            MapAssetReference hashed = VfxSceneResourceContext.ReferenceFor("0123456789abcdef.dds");
+            MapAssetReference path = VfxSceneResourceContext.ReferenceFor("assets/maps/test/fire.dds");
+            MapAssetReference truncated = VfxSceneResourceContext.ReferenceFor("89abcdef.dds");
 
             Assert.Null(hashed.VirtualPath);
             Assert.Equal(0x0123456789abcdefUL, hashed.PathHash);
@@ -35,8 +36,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             VfxEmitterDefinition emitter = Emitter(asset, asset);
             MapParticleSystemCatalog catalog = Catalog(emitter);
 
-            MapParticleResourceContext.ResourceRequest request =
-                Assert.Single(MapParticleResourceContext.CollectRequests(catalog));
+            VfxSceneResourceContext.ResourceRequest request =
+                Assert.Single(VfxSceneResourceContext.CollectRequests(catalog));
 
             Assert.Equal(asset, request.AuthoredPath);
             Assert.Contains(".tex", request.Extensions, StringComparer.OrdinalIgnoreCase);
@@ -45,6 +46,40 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Contains(".skn", request.Extensions, StringComparer.OrdinalIgnoreCase);
             Assert.Contains(".tmesh", request.Extensions, StringComparer.OrdinalIgnoreCase);
             Assert.Contains(".gmesh", request.Extensions, StringComparer.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void SharedSceneContextCollectsSkinnedVariantsEmissionSurfacesAndOwnerAssets()
+        {
+            VfxEmitterDefinition emitter = Emitter("assets/vfx/base.tex", "assets/vfx/mesh.skn") with
+            {
+                MeshSkeletonPath = "assets/vfx/mesh.skl",
+                MeshAnimationVariants = new[] { "assets/vfx/variant_a.anm", "assets/vfx/variant_b.anm" },
+                EmissionSurface = new VfxEmissionSurfaceDefinition(
+                    VfxEmissionSurfaceKind.Mesh,
+                    "assets/vfx/surface.skn",
+                    "assets/vfx/surface.skl",
+                    "assets/vfx/surface.anm",
+                    Array.Empty<uint>(),
+                    Array.Empty<uint>())
+            };
+            MapParticleSystemCatalog catalog = Catalog(emitter);
+            var owner = new VfxOwnerSceneContext(
+                "assets/characters/test/skin.skn",
+                "assets/characters/test/skin.skl",
+                1f);
+
+            string[] paths = VfxSceneResourceContext.CollectRequests(catalog.Systems, owner)
+                .Select(request => request.AuthoredPath)
+                .ToArray();
+
+            Assert.Contains("assets/vfx/variant_a.anm", paths);
+            Assert.Contains("assets/vfx/variant_b.anm", paths);
+            Assert.Contains("assets/vfx/surface.skn", paths);
+            Assert.Contains("assets/vfx/surface.skl", paths);
+            Assert.Contains("assets/vfx/surface.anm", paths);
+            Assert.Contains("assets/characters/test/skin.skn", paths);
+            Assert.Contains("assets/characters/test/skin.skl", paths);
         }
 
         [Fact]
@@ -65,7 +100,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 MapParticleSystemCatalog catalog = Catalog(first, second);
                 var resolver = new MapAssetResolver(null, null);
 
-                using MapParticleResourceContext context = await MapParticleResourceContext.CreateAsync(
+                using VfxSceneResourceContext context = await VfxSceneResourceContext.CreateAsync(
                     catalog,
                     root,
                     resolver,

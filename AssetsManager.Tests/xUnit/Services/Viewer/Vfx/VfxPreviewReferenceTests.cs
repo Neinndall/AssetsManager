@@ -104,14 +104,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void WireframeModesUseIndependentReferenceOpacity()
+        public void ViewModesUseIndependentWireOverlayLikeCurrentLtk()
         {
-            Assert.Equal((true, false, 1f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewWireframeMode.Off, true));
-            Assert.Equal((false, true, 1f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewWireframeMode.Only, true));
-            Assert.Equal((true, true, 0.35f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewWireframeMode.Overlay, true));
-            Assert.Equal((true, false, 1f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewWireframeMode.Only, false));
-            Assert.Equal(1f, VfxRenderSession.WireframeOpacity(VfxPreviewWireframeMode.Only));
-            Assert.Equal(0.35f, VfxRenderSession.WireframeOpacity(VfxPreviewWireframeMode.Overlay));
+            Assert.Equal((true, false, 0.35f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Lit, false, true));
+            Assert.Equal((true, true, 0.35f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Lit, true, true));
+            Assert.Equal((true, false, 0.35f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Unshaded, true, true));
+            Assert.Equal((true, true, 0.35f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Untextured, true, true));
+            Assert.Equal((false, true, 1f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Wireframe, false, true));
+            Assert.Equal((true, false, 1f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Wireframe, false, false));
+            Assert.Equal(1f, VfxRenderSession.WireframeOpacity(VfxPreviewViewMode.Wireframe));
+            Assert.Equal(0.35f, VfxRenderSession.WireframeOpacity(VfxPreviewViewMode.Lit, true));
 
             Assert.Contains("uniform int uWireframePass;", VfxShaderSource.ParticleFragment);
             Assert.Contains("uniform vec4 uWireframeColor;", VfxShaderSource.ParticleFragment);

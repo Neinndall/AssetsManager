@@ -9,6 +9,7 @@ using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Runtime
@@ -69,6 +70,19 @@ namespace AssetsManager.Services.Viewer.Runtime
                 throw;
             }
         }
+
+        internal Task<VfxSceneResourceContext> CreateVfxResourcesAsync(
+            MapCharacterVfxCatalog catalog,
+            string projectRoot,
+            CancellationToken cancellationToken = default)
+            => VfxSceneResourceContext.CreateAsync(
+                catalog?.Systems,
+                projectRoot,
+                _assetResolver,
+                _hashResolver,
+                _logService,
+                cancellationToken,
+                catalog?.OwnerSceneContext);
 
         private async Task<IReadOnlyList<MapCharacterRuntimeGroup>> LoadCharactersAsync(
             MapSceneData scene,

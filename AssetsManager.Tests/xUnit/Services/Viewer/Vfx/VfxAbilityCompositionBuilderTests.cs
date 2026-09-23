@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Views.Models.Viewer;
@@ -110,6 +111,83 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new Dictionary<uint, uint>(),
                 allowEffectNameFallback: false,
                 resolverOnly: true);
+
+            Assert.Equal(0, composition.ResolvedCount);
+            Assert.Null(Assert.Single(composition.Events).System);
+        }
+
+        [Fact]
+        public void TimedPlaylistPlacesParticleEventsOnTheRetimedSequencerClock()
+        {
+            var system = new VfxSystemDefinition(100, "Trail", "trail", Array.Empty<VfxEmitterDefinition>());
+            var first = new AnimationClipDefinition(
+                11,
+                1,
+                1f / 60f,
+                0f,
+                60f,
+                new[] { Event(1, 30f, 7) with { IsKillEvent = false } },
+                "First",
+                "first.anm",
+                0xAA);
+            var second = new AnimationClipDefinition(
+                12,
+                1,
+                1f / 30f,
+                0f,
+                30f,
+                new[] { Event(2, 15f, 7) with { IsKillEvent = false } },
+                "Second",
+                "second.anm",
+                0xAA);
+            var root = new AnimationClipDefinition(
+                10,
+                2,
+                1f / 30f,
+                0f,
+                0f,
+                Array.Empty<AnimationClipEventDefinition>(),
+                "Sequence",
+                null,
+                0xAA,
+                new[] { 11u, 12u });
+
+            VfxAbilityComposition composition = VfxAbilityCompositionBuilder.BuildTimedPlaylist(
+                root,
+                new[] { first, second },
+                new[] { 1f, 2f },
+                new[] { 1f / 60f, 1f / 30f },
+                new Dictionary<uint, VfxSystemDefinition> { [100] = system },
+                new Dictionary<uint, uint> { [7] = 100 });
+
+            Assert.Equal(2, composition.ResolvedCount);
+            Assert.Equal(0.5f, composition.Events[0].Event.StartFrame, 5);
+            Assert.Equal(1.5f, composition.Events[1].Event.StartFrame, 5);
+            Assert.Equal(3f, composition.EndFrame, 5);
+            Assert.All(composition.Events, cue => Assert.Same(system, cue.System));
+        }
+
+        [Fact]
+        public void TimedPlaylistKeepsResolverOnlySemanticsForMapClipEvents()
+        {
+            var direct = new VfxSystemDefinition(100, "Named", "named", Array.Empty<VfxEmitterDefinition>());
+            var atomic = new AnimationClipDefinition(
+                11,
+                1,
+                1f / 30f,
+                0f,
+                30f,
+                new[] { Event(1, 3f, 100) with { IsKillEvent = false } },
+                "Atomic",
+                "atomic.anm");
+
+            VfxAbilityComposition composition = VfxAbilityCompositionBuilder.BuildTimedPlaylist(
+                atomic,
+                new[] { atomic },
+                new[] { 1f },
+                new[] { 1f / 30f },
+                new Dictionary<uint, VfxSystemDefinition> { [100] = direct },
+                new Dictionary<uint, uint>());
 
             Assert.Equal(0, composition.ResolvedCount);
             Assert.Null(Assert.Single(composition.Events).System);

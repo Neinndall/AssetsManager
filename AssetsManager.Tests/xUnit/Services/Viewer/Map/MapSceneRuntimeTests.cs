@@ -52,7 +52,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 Scene(),
                 Array.Empty<MapCharacterRuntimeGroup>(),
                 new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>()));
-            var full = new Dictionary<string, System.Windows.Media.Imaging.BitmapSource>();
+            var full = new Dictionary<string, MapTextureImage>();
 
             runtime.SetBackdropTextures(full);
 
@@ -100,7 +100,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 geometry,
                 null,
                 Array.Empty<MapMaterialDefinition>(),
-                new Dictionary<string, System.Windows.Media.Imaging.BitmapSource>(),
+                new Dictionary<string, MapTextureImage>(),
                 Array.Empty<MapPlaceableChunkData>(),
                 Array.Empty<MapCharacterData>(),
                 Array.Empty<MapParticleData>(),

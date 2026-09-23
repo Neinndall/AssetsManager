@@ -54,6 +54,12 @@ namespace AssetsManager.Services.Viewer.Parsing
             if (uv != null && uv.Length != vertexCount)
                 throw new InvalidDataException("SKN UV buffer does not match its vertex count.");
 
+            Vector4[] tangents = mesh.VerticesView.TryGetAccessor(VertexElement.TANGENT.Name, out VertexElementAccessor tangentAccessor)
+                ? tangentAccessor.AsVector4Array().ToArray()
+                : null;
+            if (tangents != null && tangents.Length != vertexCount)
+                throw new InvalidDataException("SKN tangent buffer does not match its vertex count.");
+
             byte[] skinIndices = null;
             float[] skinWeights = null;
             bool hasIndices = mesh.VerticesView.TryGetAccessor(VertexElement.BLEND_INDEX.Name, out VertexElementAccessor blendIndexAccessor);
@@ -88,15 +94,114 @@ namespace AssetsManager.Services.Viewer.Parsing
                     ? DecodeVersionZeroIndices(mesh)
                     : DecodeRanges(mesh);
 
+            // LTK's Bake Tangents authoring action persists this stream into SKN. The MAP preview
+            // must not mutate extracted assets, so missing tangents are baked into the runtime mesh.
+            tangents ??= BakeTangents(positions, normals, uv, flattened);
+
             return new MapCharacterMeshData(
                 positions,
                 normals,
                 uv,
+                tangents,
                 skinIndices,
                 skinWeights,
                 flattened,
                 ranges);
         }
+
+        internal static Vector4[] BakeTangents(
+            Vector3[] positions,
+            Vector3[] normals,
+            Vector2[] uv,
+            uint[] indices)
+        {
+            int vertexCount = positions?.Length ?? 0;
+            if (vertexCount == 0 || uv == null || uv.Length != vertexCount || indices == null)
+                return null;
+
+            Vector3[] basisNormals = normals != null && normals.Length == vertexCount
+                ? normals
+                : BakeNormals(positions, indices);
+            var tangentSum = new Vector3[vertexCount];
+            var bitangentSum = new Vector3[vertexCount];
+
+            for (int index = 0; index + 2 < indices.Length; index += 3)
+            {
+                int a = checked((int)indices[index]);
+                int b = checked((int)indices[index + 1]);
+                int c = checked((int)indices[index + 2]);
+                if ((uint)a >= (uint)vertexCount || (uint)b >= (uint)vertexCount || (uint)c >= (uint)vertexCount)
+                    continue;
+
+                Vector3 edge1 = positions[b] - positions[a];
+                Vector3 edge2 = positions[c] - positions[a];
+                Vector2 duv1 = uv[b] - uv[a];
+                Vector2 duv2 = uv[c] - uv[a];
+                float determinant = duv1.X * duv2.Y - duv1.Y * duv2.X;
+                if (!float.IsFinite(determinant) || MathF.Abs(determinant) <= 1e-12f)
+                    continue;
+
+                float reciprocal = 1f / determinant;
+                Vector3 tangent = (edge1 * duv2.Y - edge2 * duv1.Y) * reciprocal;
+                Vector3 bitangent = (edge2 * duv1.X - edge1 * duv2.X) * reciprocal;
+                if (!IsFinite(tangent) || !IsFinite(bitangent))
+                    continue;
+
+                tangentSum[a] += tangent;
+                tangentSum[b] += tangent;
+                tangentSum[c] += tangent;
+                bitangentSum[a] += bitangent;
+                bitangentSum[b] += bitangent;
+                bitangentSum[c] += bitangent;
+            }
+
+            var result = new Vector4[vertexCount];
+            for (int vertex = 0; vertex < vertexCount; vertex++)
+            {
+                Vector3 normal = basisNormals[vertex];
+                if (!IsFinite(normal) || normal.LengthSquared() <= 1e-12f)
+                    normal = Vector3.UnitY;
+                else
+                    normal = Vector3.Normalize(normal);
+
+                Vector3 tangent = tangentSum[vertex] - normal * Vector3.Dot(normal, tangentSum[vertex]);
+                if (!IsFinite(tangent) || tangent.LengthSquared() <= 1e-12f)
+                {
+                    Vector3 axis = MathF.Abs(normal.Y) < 0.999f ? Vector3.UnitY : Vector3.UnitX;
+                    tangent = Vector3.Cross(axis, normal);
+                }
+                tangent = Vector3.Normalize(tangent);
+                float handedness = Vector3.Dot(Vector3.Cross(normal, tangent), bitangentSum[vertex]) < 0f ? -1f : 1f;
+                result[vertex] = new Vector4(tangent, handedness);
+            }
+            return result;
+        }
+
+        private static Vector3[] BakeNormals(Vector3[] positions, uint[] indices)
+        {
+            var normals = new Vector3[positions.Length];
+            for (int index = 0; index + 2 < indices.Length; index += 3)
+            {
+                int a = checked((int)indices[index]);
+                int b = checked((int)indices[index + 1]);
+                int c = checked((int)indices[index + 2]);
+                if ((uint)a >= (uint)positions.Length || (uint)b >= (uint)positions.Length || (uint)c >= (uint)positions.Length)
+                    continue;
+                Vector3 normal = Vector3.Cross(positions[b] - positions[a], positions[c] - positions[a]);
+                if (!IsFinite(normal) || normal.LengthSquared() <= 1e-12f) continue;
+                normals[a] += normal;
+                normals[b] += normal;
+                normals[c] += normal;
+            }
+            for (int index = 0; index < normals.Length; index++)
+                normals[index] = normals[index].LengthSquared() > 1e-12f && IsFinite(normals[index])
+                    ? Vector3.Normalize(normals[index])
+                    : Vector3.UnitY;
+            return normals;
+        }
+
+        private static bool IsFinite(Vector3 value) =>
+            float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 
         private static ushort ReadMajorVersion(Stream stream)
         {
@@ -124,8 +229,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             // LeagueToolkit C# synthesizes one Base range for v0 while LTK's preview contract
             // exposes no ranges and draws the entire index buffer as one implicit run.
             SkinnedMeshRange range = mesh.Ranges[0];
-            ValidateRange(mesh, range);
-            uint[] indices = AbsoluteIndices(mesh, range);
+            uint[] indices = SkinnedMeshIndexSemantics.AbsoluteIndices(mesh, range);
             return (indices, Array.Empty<MapCharacterMeshRange>());
         }
 
@@ -136,9 +240,8 @@ namespace AssetsManager.Services.Viewer.Parsing
             var ranges = new List<MapCharacterMeshRange>(mesh.Ranges.Count);
             foreach (SkinnedMeshRange range in mesh.Ranges)
             {
-                ValidateRange(mesh, range);
                 int start = indices.Count;
-                indices.AddRange(AbsoluteIndices(mesh, range));
+                indices.AddRange(SkinnedMeshIndexSemantics.AbsoluteIndices(mesh, range));
                 ranges.Add(new MapCharacterMeshRange(
                     range.Material?.TrimEnd('\0') ?? string.Empty,
                     start,
@@ -146,35 +249,6 @@ namespace AssetsManager.Services.Viewer.Parsing
             }
 
             return (indices.ToArray(), ranges);
-        }
-
-        private static uint[] AbsoluteIndices(SkinnedMesh mesh, SkinnedMeshRange range)
-        {
-            var result = new uint[range.IndexCount];
-            var source = mesh.Indices.Slice(range.StartIndex, range.IndexCount);
-            for (int index = 0; index < range.IndexCount; index++)
-                result[index] = checked((uint)range.StartVertex + source[index]);
-            return result;
-        }
-
-        private static void ValidateRange(SkinnedMesh mesh, SkinnedMeshRange range)
-        {
-            int vertexCount = mesh.VerticesView.VertexCount;
-            if (range.StartVertex < 0 || range.VertexCount < 0 ||
-                (long)range.StartVertex + range.VertexCount > vertexCount ||
-                range.StartIndex < 0 || range.IndexCount < 0 ||
-                (long)range.StartIndex + range.IndexCount > mesh.Indices.Count)
-            {
-                throw new InvalidDataException("SKN range extends beyond the mesh buffers.");
-            }
-
-            var source = mesh.Indices.Slice(range.StartIndex, range.IndexCount);
-            for (int index = 0; index < range.IndexCount; index++)
-            {
-                uint local = source[index];
-                if (local >= range.VertexCount || (long)range.StartVertex + local >= vertexCount)
-                    throw new InvalidDataException("SKN range index extends beyond the range vertices.");
-            }
         }
 
         private static VertexElementAccessor GetRequired(SkinnedMesh mesh, ElementName element)

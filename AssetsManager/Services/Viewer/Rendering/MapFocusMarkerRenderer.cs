@@ -8,7 +8,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 {
     /// <summary>
     /// Wireframe sphere used by the MAP outliner to mark the placeable the camera was sent to.
-    /// Matches LTK Manager 1.20.0's MapFocus marker: radius 60, 12x8 sphere segments and no depth test.
+    /// Matches current LTK Manager MAIN's MapFocus marker: radius 60, 12x8 sphere segments and no depth test.
     /// </summary>
     internal sealed class MapFocusMarkerRenderer : IDisposable
     {

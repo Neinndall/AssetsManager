@@ -247,6 +247,45 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             }
         }
 
+        internal VfxAnimatedMesh ResolveSkeletonAnimation(
+            string skeletonPath,
+            string animationPath,
+            string searchDirectory,
+            LogService log = null)
+        {
+            if (string.IsNullOrWhiteSpace(skeletonPath) || string.IsNullOrWhiteSpace(searchDirectory))
+                return null;
+
+            string animationKey = string.IsNullOrWhiteSpace(animationPath) ? "<bind>" : animationPath;
+            string key = CreateKey($"<skeleton>|{skeletonPath}|{animationKey}", searchDirectory);
+            if (_meshAnimations.TryGetValue(key, out VfxAnimatedMesh cached)) return cached;
+
+            string resolvedSkeleton = ResolvePath(skeletonPath, searchDirectory, SkeletonExtensions);
+            string resolvedAnimation = string.IsNullOrWhiteSpace(animationPath)
+                ? null
+                : ResolvePath(animationPath, searchDirectory, AnimationExtensions);
+            if (resolvedSkeleton == null ||
+                (!string.IsNullOrWhiteSpace(animationPath) && resolvedAnimation == null))
+            {
+                _meshAnimations[key] = null;
+                return null;
+            }
+
+            try
+            {
+                var animation = VfxAnimatedMesh.LoadSkeleton(resolvedSkeleton, resolvedAnimation);
+                _meshAnimations[key] = animation;
+                return animation;
+            }
+            catch (Exception ex)
+            {
+                log?.LogError(
+                    ex,
+                    $"Failed to load VFX emission skeleton pose: {resolvedAnimation ?? "bind pose"} (skeleton: {resolvedSkeleton}).");
+                _meshAnimations[key] = null;
+                return null;
+            }
+        }
         public IReadOnlyList<string> ResolveLinkedBins(
             string authoredPath,
             string wadRoot,

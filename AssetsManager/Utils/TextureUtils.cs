@@ -50,6 +50,47 @@ namespace AssetsManager.Utils
             return LoadTextureCore(textureStream, extension, null, null, logService, source);
         }
 
+        /// <summary>
+        /// Decodes the texture's authored mip chain from the smallest level at least
+        /// <paramref name="minWidth"/> pixels wide down to the file's last level.
+        /// This mirrors the current LTK MAIN map viewport path and preserves alpha-test coverage.
+        /// </summary>
+        public static IReadOnlyList<BitmapSource> LoadViewerTextureMipChain(
+            Stream textureStream,
+            string extension,
+            int minWidth)
+        {
+            if (textureStream == null)
+                return Array.Empty<BitmapSource>();
+            if (minWidth <= 0)
+                throw new ArgumentOutOfRangeException(nameof(minWidth));
+
+            try
+            {
+                if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
+                    return LoadTexMipChain(textureStream, minWidth);
+
+                if (extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    Texture texture = Texture.LoadDds(textureStream);
+                    return ConvertTextureMipChain(texture, minWidth);
+                }
+
+                BitmapSource image = LoadTextureCore(
+                    textureStream,
+                    extension,
+                    minWidth,
+                    minWidth,
+                    null,
+                    null);
+                return image == null ? Array.Empty<BitmapSource>() : new[] { image };
+            }
+            catch
+            {
+                return Array.Empty<BitmapSource>();
+            }
+        }
+
         public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
         {
             return LoadTextureCore(textureStream, extension, maxWidth, maxHeight, null, null);
@@ -170,9 +211,7 @@ namespace AssetsManager.Utils
             int? maxWidth,
             int? maxHeight)
         {
-            int mipCount = (header.Flags & 1) != 0
-                ? (int)Math.Floor(Math.Log2(Math.Max(Math.Max(header.Width, header.Height), Math.Max(header.Depth, (byte)1)))) + 1
-                : 1;
+            int mipCount = GetTexMipCount(header);
             int level = 0;
             if (maxWidth.HasValue && maxHeight.HasValue)
             {
@@ -188,6 +227,90 @@ namespace AssetsManager.Utils
                 }
             }
 
+            return DecodeCompatibleTexLevel(stream, start, header, mipCount, level);
+        }
+
+        private static IReadOnlyList<BitmapSource> LoadTexMipChain(Stream textureStream, int minWidth)
+        {
+            MemoryStream copy = null;
+            Stream stream = textureStream;
+            if (!stream.CanSeek)
+            {
+                copy = new MemoryStream();
+                stream.CopyTo(copy);
+                copy.Position = 0;
+                stream = copy;
+            }
+
+            try
+            {
+                long start = stream.Position;
+                TexHeader header = ReadTexHeader(stream);
+                int mipCount = GetTexMipCount(header);
+                int firstLevel = SelectFirstMipLevel(header.Width, mipCount, minWidth);
+                var levels = new List<BitmapSource>(mipCount - firstLevel);
+
+                if (RequiresCompatibleTexDecode(header.Format))
+                {
+                    for (int level = firstLevel; level < mipCount; level++)
+                        levels.Add(DecodeCompatibleTexLevel(stream, start, header, mipCount, level));
+                    return levels;
+                }
+
+                for (int level = firstLevel; level < mipCount; level++)
+                {
+                    stream.Position = start;
+                    int width = Math.Max(header.Width >> level, 1);
+                    int height = Math.Max(header.Height >> level, 1);
+                    Texture texture = Texture.LoadTex(stream, width, height);
+                    if (texture.Mips.Length == 0)
+                        break;
+                    levels.Add(ConvertTextureMipToBitmapSource(texture));
+                }
+
+                return levels;
+            }
+            finally
+            {
+                copy?.Dispose();
+            }
+        }
+
+        private static IReadOnlyList<BitmapSource> ConvertTextureMipChain(Texture texture, int minWidth)
+        {
+            if (texture?.Mips is not { Length: > 0 })
+                return Array.Empty<BitmapSource>();
+
+            int firstLevel = SelectFirstMipLevel(texture.Mips[0].Width, texture.Mips.Length, minWidth);
+            var levels = new List<BitmapSource>(texture.Mips.Length - firstLevel);
+            for (int level = firstLevel; level < texture.Mips.Length; level++)
+                levels.Add(ConvertTextureMipToBitmapSource(texture, level));
+            return levels;
+        }
+
+        private static int GetTexMipCount(TexHeader header) =>
+            (header.Flags & 1) != 0
+                ? (int)Math.Floor(Math.Log2(Math.Max(Math.Max(header.Width, header.Height), Math.Max(header.Depth, (byte)1)))) + 1
+                : 1;
+
+        private static int SelectFirstMipLevel(int width, int mipCount, int minWidth)
+        {
+            for (int level = mipCount - 1; level >= 0; level--)
+            {
+                int mipWidth = level >= 31 ? 1 : Math.Max(width >> level, 1);
+                if (mipWidth >= minWidth)
+                    return level;
+            }
+            return 0;
+        }
+
+        private static BitmapSource DecodeCompatibleTexLevel(
+            Stream stream,
+            long start,
+            TexHeader header,
+            int mipCount,
+            int level)
+        {
             int mipWidth = Math.Max(header.Width >> level, 1);
             int mipHeight = Math.Max(header.Height >> level, 1);
             long offset = 0;
@@ -361,9 +484,12 @@ namespace AssetsManager.Utils
             byte ResourceType,
             byte Flags);
 
-        private static BitmapSource ConvertTextureMipToBitmapSource(Texture texture)
+        private static BitmapSource ConvertTextureMipToBitmapSource(Texture texture) =>
+            ConvertTextureMipToBitmapSource(texture, 0);
+
+        private static BitmapSource ConvertTextureMipToBitmapSource(Texture texture, int level)
         {
-            var mip = texture.Mips[0];
+            var mip = texture.Mips[level];
             if (!mip.TryGetMemory(out Memory<ColorRgba32> colorMemory))
                 throw new InvalidOperationException("Texture mip memory must be contiguous.");
 

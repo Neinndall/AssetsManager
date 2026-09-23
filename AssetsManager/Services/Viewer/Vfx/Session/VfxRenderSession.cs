@@ -1271,7 +1271,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void Render(
             Matrix4x4 viewProjection,
             Matrix4x4 view,
-            VfxPreviewWireframeMode wireframeMode = VfxPreviewWireframeMode.Off)
+            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            bool wireOverlay = false)
         {
             if (!_ready || _graphs.Count == 0) return;
 
@@ -1304,7 +1305,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             VfxRenderQueue.BuildInto(_renderSources, _renderQueue, _renderGraphOrders);
 
             bool supportsWireframe = _renderer.SupportsWireframe;
-            var previewPasses = ResolvePreviewPasses(wireframeMode, supportsWireframe);
+            var previewPasses = ResolvePreviewPasses(viewMode, wireOverlay, supportsWireframe);
 
             _shadedRenderQueue.Clear();
             _distortionRenderQueue.Clear();
@@ -1345,17 +1346,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         internal static (bool Shaded, bool Wireframe, float WireOpacity) ResolvePreviewPasses(
-            VfxPreviewWireframeMode mode,
+            VfxPreviewViewMode mode,
+            bool wireOverlay,
             bool supportsWireframe)
         {
-            bool shaded = mode != VfxPreviewWireframeMode.Only || !supportsWireframe;
-            bool wireframe = mode != VfxPreviewWireframeMode.Off && supportsWireframe;
-            float opacity = mode == VfxPreviewWireframeMode.Overlay ? 0.35f : 1f;
+            bool wireframeOnly = mode == VfxPreviewViewMode.Wireframe;
+            bool overlayAllowed = mode == VfxPreviewViewMode.Lit || mode == VfxPreviewViewMode.Untextured;
+            bool shaded = !wireframeOnly || !supportsWireframe;
+            bool wireframe = supportsWireframe && (wireframeOnly || (wireOverlay && overlayAllowed));
+            float opacity = wireframeOnly ? 1f : 0.35f;
             return (shaded, wireframe, opacity);
         }
 
-        internal static float WireframeOpacity(VfxPreviewWireframeMode mode)
-            => ResolvePreviewPasses(mode, supportsWireframe: true).WireOpacity;
+        internal static float WireframeOpacity(VfxPreviewViewMode mode, bool wireOverlay = false)
+            => ResolvePreviewPasses(mode, wireOverlay, supportsWireframe: true).WireOpacity;
 
         public void Dispose()
         {

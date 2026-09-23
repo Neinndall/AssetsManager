@@ -49,5 +49,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 
             Assert.False(mesh.IsVisibleOnLayer(layer));
         }
+
+        [Fact]
+        public void LightmapsAreCollectedOnceAcrossBakedAndStationaryChannels()
+        {
+            var baked = new MapGeometryLightChannelData("maps/test/baked.tex", new Vector2(2f), new Vector2(0.25f));
+            var stationary = new MapGeometryLightChannelData("maps/test/stationary.tex", Vector2.One, Vector2.Zero);
+            var meshA = new MapGeometryMeshData(
+                Vector3.Zero, Vector3.One, 0xFF, 0, MapGeometryMeshFlags.None, 0, 0,
+                EnvironmentAssetMeshRenderFlags.Default, 0, 0, baked, stationary);
+            var meshB = meshA with { StationaryLight = baked };
+            var geometry = new MapGeometryData(
+                new[] { Vector3.Zero },
+                new[] { Vector3.UnitY },
+                new[] { Vector2.Zero },
+                new[] { Vector2.Zero },
+                new uint[] { 0 },
+                new[] { meshA, meshB },
+                System.Array.Empty<MapGeometrySubmeshData>(),
+                System.Array.Empty<string>());
+
+            Assert.Equal(new[] { "maps/test/baked.tex", "maps/test/stationary.tex" }, geometry.Lightmaps);
+        }
     }
 }

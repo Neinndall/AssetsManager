@@ -5,6 +5,7 @@
     <ApplicationIcon>Resources\Img\logo.ico</ApplicationIcon>
     <Version>4.1.0.0</Version>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <UseWPF>true</UseWPF>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
@@ -19,6 +20,7 @@
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
     <PackageReference Include="DiffPlex" Version="1.9.0" />
     <ProjectReference Include="..\..\LeagueToolkit-4.1.0-beta.53\src\LeagueToolkit\LeagueToolkit.csproj" />
+    <ProjectReference Include="..\AssetsManager.Shaders\AssetsManager.Shaders.csproj" />
     <PackageReference Include="Material.Icons.WPF" Version="2.4.1" />
     <PackageReference Include="Silk.NET.OpenGL" Version="2.21.0" />
     <PackageReference Include="OpenTK.GLWpfControl" Version="4.3.6" />

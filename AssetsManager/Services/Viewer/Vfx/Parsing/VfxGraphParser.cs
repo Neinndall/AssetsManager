@@ -37,8 +37,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             Func<uint, string> graphClassNameResolver = null,
             Func<ulong, string> wadChunkPathResolver = null,
             Func<uint, string> binEntryResolver = null)
+            => ParseDocument(
+                ParseTree(data),
+                graphHashNameResolver,
+                graphClassNameResolver,
+                wadChunkPathResolver,
+                binEntryResolver);
+
+        internal static VfxBinDocument ParseDocument(
+            BinTree tree,
+            Func<uint, string> graphHashNameResolver = null,
+            Func<uint, string> graphClassNameResolver = null,
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null)
         {
-            BinTree tree = ParseTree(data);
+            ArgumentNullException.ThrowIfNull(tree);
             IReadOnlyDictionary<uint, uint> resourceMap = VfxResourceParser.ExtractResourceMap(tree);
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems = VfxSystemParser.ExtractAll(tree)
                 .ToDictionary(

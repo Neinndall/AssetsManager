@@ -20,21 +20,37 @@ namespace AssetsManager.Services.Viewer.Animation
     {
         private const string BindKey = "\0bind";
 
-        private sealed record PoseState(IAnimationAsset Animation, AnimationService Evaluator);
+        private sealed record PreparedStep(
+            AnimationClipDefinition Clip,
+            float Duration,
+            float FrameSeconds);
+
+        private sealed record PoseState(
+            IAnimationAsset Animation,
+            AnimationService Evaluator,
+            IReadOnlyList<AnimationClipTimedCue> TimedCues,
+            IReadOnlyList<PreparedStep> Steps,
+            float? Parameter = null);
 
         private readonly MapAssetResolver _assetResolver;
         private readonly LogService _logService;
         private readonly Dictionary<string, IAnimationAsset> _sources = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<uint, PoseState> _states = new();
+        private readonly Dictionary<uint, PoseState> _previewStates = new();
         private readonly Dictionary<string, PoseState> _byRequested = new(StringComparer.OrdinalIgnoreCase);
         private readonly PoseState _bindState;
+        private string _projectRoot;
         private bool _disposed;
 
         internal MapCharacterAnimationRuntime(MapAssetResolver assetResolver, LogService logService)
         {
             _assetResolver = assetResolver;
             _logService = logService;
-            _bindState = new PoseState(BindPoseAnimationAsset.Instance, new AnimationService(logService));
+            _bindState = new PoseState(
+                BindPoseAnimationAsset.Instance,
+                new AnimationService(logService),
+                Array.Empty<AnimationClipTimedCue>(),
+                Array.Empty<PreparedStep>());
         }
 
         internal async Task PrepareAsync(
@@ -45,6 +61,7 @@ namespace AssetsManager.Services.Viewer.Animation
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             ArgumentNullException.ThrowIfNull(asset);
+            _projectRoot = projectRoot;
 
             string[] requested = (requestedAnimations ?? Enumerable.Empty<string>())
                 .Select(NormalizeRequested)
@@ -92,10 +109,140 @@ namespace AssetsManager.Services.Viewer.Animation
                 }
 
                 IAnimationAsset animation = AnimationGraphPlayback.CreatePlaylist(steps);
-                var state = new PoseState(animation, new AnimationService(_logService));
+                var state = new PoseState(
+                    animation,
+                    new AnimationService(_logService),
+                    Array.Empty<AnimationClipTimedCue>(),
+                    Array.Empty<PreparedStep>());
                 _states[clip.OwnerPathHash] = state;
                 _byRequested[key] = state;
             }
+        }
+
+        internal async Task<bool> PrepareClipAsync(
+            MapCharacterAssetData asset,
+            AnimationClipDefinition clip,
+            float? parameter = null,
+            CancellationToken cancellationToken = default)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ArgumentNullException.ThrowIfNull(asset);
+            if (clip == null) return false;
+            IReadOnlyList<float> values = AnimationGraphPlayback.ParameterValues(clip);
+            float? effectiveParameter = values.Count > 1
+                ? AnimationGraphPlayback.NearestParameter(
+                    values,
+                    parameter ?? clip.ParametricValues?.FirstOrDefault() ?? values[0])
+                : null;
+            if (_previewStates.TryGetValue(clip.OwnerPathHash, out PoseState held) &&
+                held.Parameter == effectiveParameter)
+            {
+                return true;
+            }
+
+            IReadOnlyList<AnimationClipDefinition> clips = asset.AnimationGraph?.Clips ??
+                                                           Array.Empty<AnimationClipDefinition>();
+            IReadOnlyList<AnimationClipDefinition> playlist =
+                AnimationGraphPlayback.ResolvePlaylist(clip, clips, effectiveParameter);
+            var steps = new List<IAnimationAsset>(playlist.Count);
+            var preparedSteps = new List<PreparedStep>(playlist.Count);
+            foreach (AnimationClipDefinition step in playlist)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                IAnimationAsset source = await LoadSourceAsync(
+                    step.AnimationFilePath,
+                    _projectRoot,
+                    cancellationToken);
+                if (source == null)
+                    continue;
+                IAnimationAsset timed = AnimationGraphPlayback.RetimeForGraph(source, step.TickDuration);
+                steps.Add(timed);
+                preparedSteps.Add(new PreparedStep(
+                    step,
+                    timed.Duration,
+                    timed.Fps > 0f && float.IsFinite(timed.Fps) ? 1f / timed.Fps : 1f / 30f));
+            }
+
+            if (steps.Count == 0)
+                return false;
+
+            IAnimationAsset animation = AnimationGraphPlayback.CreatePlaylist(steps);
+            IReadOnlyList<AnimationClipTimedCue> timedCues = BuildTimedCues(playlist, steps);
+            var evaluator = new AnimationService(_logService);
+            evaluator.SetJointSnapCues(timedCues.OfType<AnimationJointSnapCue>().ToArray());
+            if (_previewStates.Remove(clip.OwnerPathHash, out PoseState previous))
+            {
+                previous.Animation.Dispose();
+                previous.Evaluator.Dispose();
+            }
+            _previewStates[clip.OwnerPathHash] = new PoseState(
+                animation,
+                evaluator,
+                timedCues,
+                preparedSteps,
+                effectiveParameter);
+            return true;
+        }
+
+        internal float PreparedClipDuration(AnimationClipDefinition clip) =>
+            clip != null && _previewStates.TryGetValue(clip.OwnerPathHash, out PoseState state)
+                ? state.Animation.Duration
+                : 0f;
+
+        internal IReadOnlyList<AnimationClipTimedCue> PreparedClipCues(AnimationClipDefinition clip) =>
+            clip != null && _previewStates.TryGetValue(clip.OwnerPathHash, out PoseState state)
+                ? state.TimedCues
+                : Array.Empty<AnimationClipTimedCue>();
+
+        internal IReadOnlyList<AnimationClipDefinition> PreparedClipPlaylist(AnimationClipDefinition clip) =>
+            clip != null && _previewStates.TryGetValue(clip.OwnerPathHash, out PoseState state)
+                ? state.Steps.Select(step => step.Clip).ToArray()
+                : Array.Empty<AnimationClipDefinition>();
+
+        internal IReadOnlyList<float> PreparedClipStepDurations(AnimationClipDefinition clip) =>
+            clip != null && _previewStates.TryGetValue(clip.OwnerPathHash, out PoseState state)
+                ? state.Steps.Select(step => step.Duration).ToArray()
+                : Array.Empty<float>();
+
+        internal IReadOnlyList<float> PreparedClipFrameSeconds(AnimationClipDefinition clip) =>
+            clip != null && _previewStates.TryGetValue(clip.OwnerPathHash, out PoseState state)
+                ? state.Steps.Select(step => step.FrameSeconds).ToArray()
+                : Array.Empty<float>();
+
+        internal bool TryGetPreparedClipBoneTransform(
+            AnimationClipDefinition clip,
+            string boneName,
+            uint boneHash,
+            out Matrix4x4 transform)
+        {
+            transform = Matrix4x4.Identity;
+            if (clip == null || !_previewStates.TryGetValue(clip.OwnerPathHash, out PoseState state))
+                return false;
+            if (!string.IsNullOrWhiteSpace(boneName) && state.Evaluator.TryGetBoneTransform(boneName, out transform))
+                return true;
+            return boneHash != 0 && state.Evaluator.TryGetBoneTransform(boneHash, out transform);
+        }
+
+        internal Matrix4x4[] PreparedClipSkinningMatrices(AnimationClipDefinition clip) =>
+            clip != null && _previewStates.TryGetValue(clip.OwnerPathHash, out PoseState state)
+                ? state.Evaluator.FinalBoneTransforms ?? Array.Empty<Matrix4x4>()
+                : Array.Empty<Matrix4x4>();
+
+        internal Matrix4x4[] EvaluateClip(
+            MapCharacterAssetData asset,
+            AnimationClipDefinition clip,
+            float timeSeconds)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ArgumentNullException.ThrowIfNull(asset);
+
+            PoseState state = clip != null && _previewStates.TryGetValue(clip.OwnerPathHash, out PoseState prepared)
+                ? prepared
+                : _bindState;
+            return state.Evaluator.EvaluateSkinningTransforms(
+                timeSeconds,
+                state.Animation,
+                asset.Skeleton);
         }
 
         internal Matrix4x4[] Evaluate(
@@ -113,6 +260,65 @@ namespace AssetsManager.Services.Viewer.Animation
                 timeSeconds,
                 state.Animation,
                 asset.Skeleton);
+        }
+
+        internal static IReadOnlyList<AnimationClipTimedCue> BuildTimedCues(
+            IReadOnlyList<AnimationClipDefinition> playlist,
+            IReadOnlyList<IAnimationAsset> steps)
+        {
+            if (playlist == null || steps == null || playlist.Count == 0 || steps.Count == 0)
+                return Array.Empty<AnimationClipTimedCue>();
+
+            var cues = new List<AnimationClipTimedCue>();
+            double passTime = 0d;
+            int count = Math.Min(playlist.Count, steps.Count);
+            for (int index = 0; index < count; index++)
+            {
+                AnimationClipDefinition atomic = playlist[index];
+                IAnimationAsset timed = steps[index];
+                double tick = timed.Fps > 0f && float.IsFinite(timed.Fps)
+                    ? 1d / timed.Fps
+                    : 1d / 30d;
+                foreach (AnimationClipEventDefinition authoredEvent in atomic.Events ?? Array.Empty<AnimationClipEventDefinition>())
+                {
+                    double at = passTime + authoredEvent.StartFrame * tick;
+                    double? until = authoredEvent.EndFrame >= 0f
+                        ? passTime + authoredEvent.EndFrame * tick
+                        : null;
+                    if (until <= at) until = null;
+
+                    switch (authoredEvent)
+                    {
+                        case AnimationSubmeshVisibilityEventDefinition visibility:
+                            cues.Add(new AnimationSubmeshVisibilityCue(
+                                at,
+                                until,
+                                visibility.ShowSubmeshHashes,
+                                visibility.HideSubmeshHashes));
+                            break;
+                        case AnimationJointSnapEventDefinition snap:
+                            cues.Add(new AnimationJointSnapCue(
+                                at,
+                                until,
+                                snap.JointHash,
+                                snap.SnapToHash,
+                                snap.Offset));
+                            break;
+                        case AnimationConformToPathEventDefinition conform:
+                            cues.Add(new AnimationConformToPathCue(
+                                at,
+                                until,
+                                conform.MaskHash,
+                                conform.BlendInSeconds,
+                                conform.BlendOutSeconds));
+                            break;
+                    }
+                }
+
+                passTime += timed.Duration;
+            }
+
+            return cues.OrderBy(cue => cue.AtSeconds).ToArray();
         }
 
         internal static MapAssetReference ReferenceFromAnimation(string value)
@@ -188,6 +394,12 @@ namespace AssetsManager.Services.Viewer.Animation
                 state.Evaluator.Dispose();
             }
             _states.Clear();
+            foreach (PoseState state in _previewStates.Values)
+            {
+                state.Animation.Dispose();
+                state.Evaluator.Dispose();
+            }
+            _previewStates.Clear();
             _byRequested.Clear();
             _bindState.Evaluator.Dispose();
 

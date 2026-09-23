@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Parsing;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Memory;
 using LeagueToolkit.Core.Mesh;
@@ -138,9 +139,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 rangeHashes,
                 submeshesToDraw,
                 submeshesToDrawAlways);
-            // SKN stores each range's indices relative to that range's StartVertex. LTK always
-            // flattens them to one absolute vertex list before the GPU sees the mesh, even when
-            // every submesh is drawn. Do not bypass this normalization for the unfiltered case.
+            // LeagueToolkit C# exposes the SKN index buffer exactly as stored on disk: classic
+            // files use absolute indices while NORMALIZED_INDICES files use range-local indices.
+            // Convert both forms to the same absolute flat buffer exposed by current LTK preview.
             uint[] indices = FilterSkinnedMeshIndices(mesh, selected);
             if (indices.Length == 0) return null;
             float[] normals = ReadSkinnedNormals(mesh, positions, indices);
@@ -197,17 +198,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             for (int rangeIndex = 0; rangeIndex < mesh.Ranges.Count; rangeIndex++)
             {
                 SkinnedMeshRange range = mesh.Ranges[rangeIndex];
-                ValidateSkinnedMeshRange(mesh, range);
+                uint[] absoluteIndices = SkinnedMeshIndexSemantics.AbsoluteIndices(mesh, range);
                 if (!selected[rangeIndex] || range.IndexCount == 0) continue;
 
-                var subIndices = mesh.Indices.Slice(range.StartIndex, range.IndexCount);
-                for (int index = 0; index < range.IndexCount; index++)
-                {
-                    uint localIndex = subIndices[index];
-                    // Simple Skin stores indices relative to each range's StartVertex. LTK's
-                    // preview backend makes every one absolute before exposing the flat buffer.
-                    filtered.Add(checked((uint)range.StartVertex + localIndex));
-                }
+                filtered.AddRange(absoluteIndices);
             }
             return filtered.ToArray();
         }
@@ -225,43 +219,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             for (int rangeIndex = 0; rangeIndex < mesh.Ranges.Count; rangeIndex++)
             {
                 SkinnedMeshRange range = mesh.Ranges[rangeIndex];
-                ValidateSkinnedMeshRange(mesh, range);
+                uint[] absoluteIndices = SkinnedMeshIndexSemantics.AbsoluteIndices(mesh, range);
                 int start = flattened.Count;
-                if (range.IndexCount > 0)
-                {
-                    var subIndices = mesh.Indices.Slice(range.StartIndex, range.IndexCount);
-                    for (int index = 0; index < range.IndexCount; index++)
-                        flattened.Add(checked((uint)range.StartVertex + subIndices[index]));
-                }
+                flattened.AddRange(absoluteIndices);
                 builtRanges.Add(new VfxMeshRangeData(rangeHashes[rangeIndex], start, range.IndexCount));
             }
 
             ranges = builtRanges.ToArray();
             return flattened.ToArray();
-        }
-
-        private static void ValidateSkinnedMeshRange(SkinnedMesh mesh, SkinnedMeshRange range)
-        {
-            int vertexCount = mesh.VerticesView.VertexCount;
-            if (range.StartVertex < 0 || range.VertexCount < 0 ||
-                (long)range.StartVertex + range.VertexCount > vertexCount ||
-                range.StartIndex < 0 || range.IndexCount < 0 ||
-                (long)range.StartIndex + range.IndexCount > mesh.Indices.Count)
-            {
-                throw new InvalidDataException("SKN range extends beyond the mesh buffers.");
-            }
-
-            if (range.IndexCount == 0) return;
-            var subIndices = mesh.Indices.Slice(range.StartIndex, range.IndexCount);
-            for (int index = 0; index < range.IndexCount; index++)
-            {
-                uint localIndex = subIndices[index];
-                if (localIndex >= range.VertexCount ||
-                    (long)range.StartVertex + localIndex >= vertexCount)
-                {
-                    throw new InvalidDataException("SKN range index extends beyond the range vertices.");
-                }
-            }
         }
 
         internal static VfxMeshData? DecodeAttachedSkinnedMesh(

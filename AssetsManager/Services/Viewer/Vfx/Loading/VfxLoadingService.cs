@@ -383,6 +383,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 }
             }
 
+            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> emissionSurfaces =
+                PrepareEmissionSurfaces(new[] { definition }, searchDirectory, log);
+            if (emissionSurfaces.Count > 0)
+                runtime.SetEmissionSurfaces(emissionSurfaces, replayCurrentTime: false);
+
             runtime.ApplyRenderOrder();
 
             return runtime;
@@ -473,7 +478,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             else
                 resolvedSystems[resolvedDefinition.PathHash] = resolvedDefinition;
 
-            return new VfxPlaybackGraphRuntime(
+            var graph = new VfxPlaybackGraphRuntime(
                 resolvedDefinition,
                 transform,
                 seed,
@@ -487,8 +492,91 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     log,
                     ownerSceneContext,
                     applyDefinitionTransform: false));
+            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> emissionSurfaces =
+                PrepareEmissionSurfaces(resolvedSystems.Values, searchDirectory, log);
+            if (emissionSurfaces.Count > 0)
+                graph.SetEmissionSurfaces(emissionSurfaces);
+            return graph;
         }
 
+        private IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> PrepareEmissionSurfaces(
+            IEnumerable<VfxSystemDefinition> definitions,
+            string searchDirectory,
+            LogService log)
+        {
+            var surfaces = new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>(ReferenceEqualityComparer.Instance);
+            foreach (VfxSystemDefinition definition in definitions ?? Array.Empty<VfxSystemDefinition>())
+            {
+                foreach (VfxEmitterDefinition emitter in definition?.Emitters ?? Array.Empty<VfxEmitterDefinition>())
+                {
+                    VfxEmissionSurfaceDefinition surface = emitter?.EmissionSurface;
+                    if (surface is null) continue;
+                    IVfxEmissionSurfaceSampler sampler = PrepareEmissionSurface(surface, searchDirectory, log);
+                    if (sampler is not null) surfaces.TryAdd(emitter, sampler);
+                }
+            }
+            return surfaces;
+        }
+
+        private IVfxEmissionSurfaceSampler PrepareEmissionSurface(
+            VfxEmissionSurfaceDefinition surface,
+            string searchDirectory,
+            LogService log)
+        {
+            if (surface.Kind == VfxEmissionSurfaceKind.Skeleton)
+            {
+                if (string.IsNullOrWhiteSpace(surface.SkeletonPath)) return null;
+                VfxAnimatedMesh bind = _resources.ResolveSkeletonAnimation(
+                    surface.SkeletonPath,
+                    null,
+                    searchDirectory,
+                    log);
+                if (bind is null) return null;
+                VfxAnimatedMesh pose = string.IsNullOrWhiteSpace(surface.AnimationPath)
+                    ? bind
+                    : _resources.ResolveSkeletonAnimation(
+                        surface.SkeletonPath,
+                        surface.AnimationPath,
+                        searchDirectory,
+                        log) ?? bind;
+                return new VfxSkeletonEmissionSurfaceSampler(pose, surface.Joints, surface.Scale);
+            }
+
+            if (string.IsNullOrWhiteSpace(surface.MeshPath)) return null;
+            VfxMeshData? mesh = _resources.ResolveMesh(
+                surface.MeshPath,
+                surface.Submeshes,
+                Array.Empty<uint>(),
+                searchDirectory);
+            if (!mesh.HasValue) return null;
+
+            VfxAnimatedMesh meshPose = null;
+            if (!string.IsNullOrWhiteSpace(surface.SkeletonPath))
+            {
+                VfxAnimatedMesh bind = _resources.ResolveMeshAnimation(
+                    surface.MeshPath,
+                    surface.SkeletonPath,
+                    null,
+                    searchDirectory,
+                    log);
+                if (bind is not null)
+                {
+                    meshPose = string.IsNullOrWhiteSpace(surface.AnimationPath)
+                        ? bind
+                        : _resources.ResolveMeshAnimation(
+                            surface.MeshPath,
+                            surface.SkeletonPath,
+                            surface.AnimationPath,
+                            searchDirectory,
+                            log) ?? bind;
+                }
+            }
+            return new VfxMeshEmissionSurfaceSampler(
+                mesh.Value,
+                meshPose,
+                surface.Scale,
+                surface.MaxJointWeights);
+        }
         internal BitmapSource ResolveTexture(string authoredPath, string searchDirectory)
             => _resources.ResolveTexture(authoredPath, searchDirectory);
 

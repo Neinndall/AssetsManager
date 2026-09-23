@@ -202,6 +202,54 @@ namespace AssetsManager.Tests.xUnit.Utils
         }
 
         [Fact]
+        public void LoadViewerTextureMipChain_PreservesAuthoredTexLevels()
+        {
+            byte[] smallest = FloatPixel(1f, 0f, 0f, 1f);
+            byte[] largest = Enumerable.Repeat(FloatPixel(0f, 1f, 0f, 1f), 4)
+                .SelectMany(pixel => pixel)
+                .ToArray();
+            using MemoryStream stream = CreateTex(
+                2,
+                2,
+                22,
+                smallest.Concat(largest).ToArray(),
+                hasMipmaps: true);
+
+            IReadOnlyList<BitmapSource> levels = TextureUtils.LoadViewerTextureMipChain(stream, ".tex", 2);
+
+            Assert.Equal(2, levels.Count);
+            Assert.Equal((2, 2), (levels[0].PixelWidth, levels[0].PixelHeight));
+            Assert.Equal((1, 1), (levels[1].PixelWidth, levels[1].PixelHeight));
+
+            var top = new byte[4];
+            var last = new byte[4];
+            levels[0].CopyPixels(new System.Windows.Int32Rect(0, 0, 1, 1), top, 4, 0);
+            levels[1].CopyPixels(last, 4, 0);
+            Assert.Equal(new byte[] { 0, 255, 0, 255 }, top);
+            Assert.Equal(new byte[] { 0, 0, 255, 255 }, last);
+        }
+
+        [Fact]
+        public void LoadViewerTextureMipChain_StartsAtSmallestMipAtLeastRequestedWidth()
+        {
+            byte[] smallest = FloatPixel(1f, 0f, 0f, 1f);
+            byte[] largest = Enumerable.Repeat(FloatPixel(0f, 1f, 0f, 1f), 4)
+                .SelectMany(pixel => pixel)
+                .ToArray();
+            using MemoryStream stream = CreateTex(
+                2,
+                2,
+                22,
+                smallest.Concat(largest).ToArray(),
+                hasMipmaps: true);
+
+            IReadOnlyList<BitmapSource> levels = TextureUtils.LoadViewerTextureMipChain(stream, ".tex", 1);
+
+            BitmapSource level = Assert.Single(levels);
+            Assert.Equal((1, 1), (level.PixelWidth, level.PixelHeight));
+        }
+
+        [Fact]
         public void LoadViewerTexture_ReturnsNullForTruncatedCompatibleTex()
         {
             using MemoryStream stream = CreateTex(4, 4, 22, new byte[4]);

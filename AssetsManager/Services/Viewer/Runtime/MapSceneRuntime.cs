@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using System.Windows.Media.Imaging;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Views.Models.Viewer;
 
@@ -15,6 +14,7 @@ namespace AssetsManager.Services.Viewer.Runtime
     {
         private readonly HashSet<string> _hidden = new(StringComparer.OrdinalIgnoreCase);
         private bool _disposed;
+        private float _sceneTimeSeconds;
         private float _characterTimeSeconds;
         private bool _showStructures = true;
         private bool _showParticles = true;
@@ -25,16 +25,21 @@ namespace AssetsManager.Services.Viewer.Runtime
             MapParticleSceneRuntime particles)
         {
             Scene = scene ?? throw new ArgumentNullException(nameof(scene));
-            BackdropTextures = scene.Textures ?? new Dictionary<string, BitmapSource>();
+            BackdropTextures = scene.Textures ?? new Dictionary<string, MapTextureImage>();
+            BackdropProgramTextures = scene.ProgramTextures ?? new Dictionary<string, MapTextureImage>();
+            BackdropLightmaps = scene.Lightmaps ?? new Dictionary<string, MapTextureImage>(StringComparer.OrdinalIgnoreCase);
             CharacterGroups = characterGroups ?? Array.Empty<MapCharacterRuntimeGroup>();
             Particles = particles ?? new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>());
         }
 
         internal MapSceneData Scene { get; }
-        internal IReadOnlyDictionary<string, BitmapSource> BackdropTextures { get; private set; }
+        internal IReadOnlyDictionary<string, MapTextureImage> BackdropTextures { get; private set; }
+        internal IReadOnlyDictionary<string, MapTextureImage> BackdropProgramTextures { get; private set; }
+        internal IReadOnlyDictionary<string, MapTextureImage> BackdropLightmaps { get; private set; }
         internal IReadOnlyList<MapCharacterRuntimeGroup> CharacterGroups { get; }
         internal MapParticleSceneRuntime Particles { get; }
         internal IReadOnlySet<string> Hidden => _hidden;
+        internal float SceneTimeSeconds => _sceneTimeSeconds;
         internal float CharacterTimeSeconds => _characterTimeSeconds;
         internal bool ShowStructures
         {
@@ -62,18 +67,36 @@ namespace AssetsManager.Services.Viewer.Runtime
         {
             ThrowIfDisposed();
 
-            if (ShowStructures && float.IsFinite(deltaSeconds) && deltaSeconds > 0f)
-                _characterTimeSeconds += deltaSeconds;
+            if (float.IsFinite(deltaSeconds) && deltaSeconds > 0f)
+            {
+                _sceneTimeSeconds += deltaSeconds;
+                if (ShowStructures)
+                    _characterTimeSeconds += deltaSeconds;
+            }
 
             if (ShowParticles)
                 Particles.Update(viewProjection, deltaSeconds, _hidden);
         }
 
-        internal void SetBackdropTextures(IReadOnlyDictionary<string, BitmapSource> textures)
+        internal void SetBackdropTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
         {
             ThrowIfDisposed();
             if (textures != null)
                 BackdropTextures = textures;
+        }
+
+        internal void SetBackdropProgramTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
+        {
+            ThrowIfDisposed();
+            if (textures != null)
+                BackdropProgramTextures = textures;
+        }
+
+        internal void SetBackdropLightmaps(IReadOnlyDictionary<string, MapTextureImage> lightmaps)
+        {
+            ThrowIfDisposed();
+            if (lightmaps != null)
+                BackdropLightmaps = lightmaps;
         }
 
         internal void SetHidden(string id, bool hidden)

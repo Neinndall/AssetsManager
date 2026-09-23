@@ -241,11 +241,23 @@ namespace AssetsManager.Utils
                 if (jsonObject["VfxStudio"] == null && jsonObject["StudioParameters"] is JObject studioJson &&
                     (studioJson["VfxCameraPreset"] != null || studioJson["VfxWireframeMode"] != null))
                 {
+                    string legacyWire = studioJson.Value<string>("VfxWireframeMode") ?? "Off";
                     settings.VfxStudio = new VfxStudioSettings
                     {
                         CameraPreset = studioJson.Value<string>("VfxCameraPreset") ?? "Game",
-                        WireframeMode = studioJson.Value<string>("VfxWireframeMode") ?? "Off"
+                        ViewMode = LegacyVfxViewMode(legacyWire),
+                        WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase)
                     };
+                    needsResave = true;
+                }
+                else if (jsonObject["VfxStudio"] is JObject vfxStudioJson &&
+                         vfxStudioJson["ViewMode"] == null &&
+                         vfxStudioJson["WireframeMode"] != null)
+                {
+                    string legacyWire = vfxStudioJson.Value<string>("WireframeMode") ?? "Off";
+                    settings.VfxStudio ??= new VfxStudioSettings();
+                    settings.VfxStudio.ViewMode = LegacyVfxViewMode(legacyWire);
+                    settings.VfxStudio.WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase);
                     needsResave = true;
                 }
 
@@ -283,6 +295,13 @@ namespace AssetsManager.Utils
                 _saveSemaphore.Release();
             }
         }
+
+        private static string LegacyVfxViewMode(string legacyWireframeMode) =>
+            legacyWireframeMode?.ToLowerInvariant() switch
+            {
+                "only" => "Wireframe",
+                _ => "Lit"
+            };
 
         public static AppSettings GetDefaultSettings()
         {
@@ -327,7 +346,8 @@ namespace AssetsManager.Utils
                 VfxStudio = new VfxStudioSettings
                 {
                     CameraPreset = "Game",
-                    WireframeMode = "Off",
+                    ViewMode = "Lit",
+                    WireOverlay = false,
                     StageVisible = false
                 },
                 AudioExportFormat = AudioExportFormat.Ogg,
@@ -421,7 +441,8 @@ namespace AssetsManager.Utils
     public class VfxStudioSettings
     {
         public string CameraPreset { get; set; } = "Game";
-        public string WireframeMode { get; set; } = "Off";
+        public string ViewMode { get; set; } = "Lit";
+        public bool WireOverlay { get; set; }
         public bool StageVisible { get; set; }
     }
 

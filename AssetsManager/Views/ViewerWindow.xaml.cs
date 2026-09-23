@@ -50,7 +50,6 @@ namespace AssetsManager.Views
             ViewportControl.AppSettings = appSettings;
 
             PanelControl.SknLoadingService = sknLoadingService;
-            PanelControl.MapViewerSceneService = mapViewerSceneService;
             PanelControl.ChromaLoadingService = chromaLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = customMessageBoxService;
@@ -63,6 +62,7 @@ namespace AssetsManager.Views
             VfxInspectorControl.AppSettings = appSettings;
             VfxInspectorControl.SknLoadingService = sknLoadingService;
             VfxInspectorControl.VfxLoadingService = _vfxLoadingService;
+            VfxInspectorControl.MapViewerSceneService = mapViewerSceneService;
             VfxInspectorControl.ExitRequested += (_, _) => _viewModel.IsVfxStudioVisible = false;
 
             // Peer-to-Peer wiring between sub-controls
@@ -116,7 +116,6 @@ namespace AssetsManager.Views
         // Empty-state handlers: thin 1-liners that delegate to the Panel
         private async void OpenFile_Click(object sender, RoutedEventArgs e) => await PanelControl.OpenSknModel();
         private void OpenChromaFile_Click(object sender, RoutedEventArgs e) => PanelControl.OpenChromaFolder();
-        private async void OpenGeometryFile_Click(object sender, RoutedEventArgs e) => await PanelControl.OpenMapGeometry();
 
         private void OpenVfxInspector_Click(object sender, RoutedEventArgs e)
         {
@@ -154,19 +153,6 @@ namespace AssetsManager.Views
             else if (extension == ".anm")
             {
                 PanelControl.LoadAnimationDirectly(filePath);
-            }
-            else if (extension == ".mapgeo")
-            {
-                string gameDataPath = !string.IsNullOrEmpty(ProjectExplorer?.CurrentRootFolder)
-                    ? ProjectExplorer.CurrentRootFolder
-                    : System.IO.Path.GetDirectoryName(filePath);
-                _viewModel.LoadingTitle = ViewerWindowModel.MapGeoLoadingTitle;
-                _viewModel.LoadingDescription = ViewerWindowModel.MapGeoLoadingDescription;
-                _viewModel.IsLoadingVisible = true;
-
-                await PanelControl.LoadMapGeometry(filePath, gameDataPath);
-
-                _viewModel.IsLoadingVisible = false;
             }
             else
             {

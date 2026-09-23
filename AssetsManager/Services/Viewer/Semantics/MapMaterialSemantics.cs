@@ -14,7 +14,12 @@ namespace AssetsManager.Services.Viewer.Semantics
         MapTextureReference Texture,
         MapTextureWrap WrapU,
         MapTextureWrap WrapV,
-        bool UsesShaderDefaultTexture = false);
+        bool UsesShaderDefaultTexture = false,
+        MapTextureWrap WrapW = MapTextureWrap.Repeat,
+        bool FilterMin = true,
+        bool FilterMag = true,
+        string SharedSampler = null,
+        MapMaterialTextureSource TextureSource = MapMaterialTextureSource.Material);
 
     internal sealed record MapMaterialPassData(
         uint ShaderHash,
@@ -26,7 +31,19 @@ namespace AssetsManager.Services.Viewer.Semantics
         bool? CullEnabled,
         uint? WindingToCull,
         bool? DepthEnabled,
-        uint? WriteMask);
+        uint? WriteMask,
+        uint? SourceAlphaBlendFactor = null,
+        uint? DestinationAlphaBlendFactor = null,
+        uint? DepthCompareFunc = null);
+
+    internal sealed record MapShaderLogicalParameterData(string Name, uint Fields);
+
+    internal sealed record MapShaderPhysicalParameterData(
+        string Name,
+        Vector4 Data,
+        IReadOnlyList<MapShaderLogicalParameterData> LogicalParameters);
+
+    internal sealed record MapShaderSwitchData(bool OnByDefault, bool Runtime);
 
     internal sealed record MapShaderDefinitionData(
         string Path,
@@ -34,7 +51,9 @@ namespace AssetsManager.Services.Viewer.Semantics
         IReadOnlyDictionary<string, Vector4> DefaultParameters,
         IReadOnlyDictionary<string, bool> DefaultSwitches,
         IReadOnlyDictionary<string, string> FeatureDefines,
-        bool IsDeclared);
+        bool IsDeclared,
+        IReadOnlyList<MapShaderPhysicalParameterData> PhysicalParameters = null,
+        IReadOnlyDictionary<string, MapShaderSwitchData> SwitchDeclarations = null);
 
     internal static class MapMaterialSemantics
     {
@@ -209,7 +228,11 @@ namespace AssetsManager.Services.Viewer.Semantics
                     effective = authoredSampler with
                     {
                         Texture = fallback.Texture,
-                        UsesShaderDefaultTexture = false
+                        UsesShaderDefaultTexture = false,
+                        SharedSampler = fallback.SharedSampler,
+                        TextureSource = fallback.Texture != null
+                            ? MapMaterialTextureSource.ShaderDefault
+                            : MapMaterialTextureSource.Fallback
                     };
                 }
                 result.Add(effective);

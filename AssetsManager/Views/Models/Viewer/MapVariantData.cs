@@ -7,7 +7,7 @@ namespace AssetsManager.Views.Models.Viewer
     /// <summary>
     /// One map a Map, MapSkin, or MapContainer object draws, paired with the skin that names it.
     /// </summary>
-    internal sealed record MapVariantData(string Skin, MapPath Map)
+    public sealed record MapVariantData(string Skin, MapPath Map)
     {
         public string Label
         {

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>AssetsManager.Shaders</AssemblyName>
+    <RootNamespace>AssetsManager.Shaders</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ShadowDusk.HLSL" Version="0.20.0" />
+    <PackageReference Include="Vortice.SpirvCross" Version="1.5.4" />
+  </ItemGroup>
+</Project>

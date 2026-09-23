@@ -7,6 +7,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Runtime
@@ -47,7 +48,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             if (catalog?.Groups == null || catalog.Groups.Count == 0)
                 return new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>());
 
-            MapParticleResourceContext resources = await MapParticleResourceContext.CreateAsync(
+            VfxSceneResourceContext resources = await VfxSceneResourceContext.CreateAsync(
                 catalog,
                 scene.Source?.ProjectRoot,
                 assetResolver,
@@ -56,7 +57,7 @@ namespace AssetsManager.Services.Viewer.Runtime
                 cancellationToken);
             try
             {
-                IReadOnlyList<MapParticleRuntime> runtimes = resources.CreateRuntimes(catalog);
+                IReadOnlyList<MapParticleRuntime> runtimes = resources.CreateMapRuntimes(catalog);
                 return new MapParticleSceneRuntime(runtimes, resources);
             }
             catch

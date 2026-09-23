@@ -8,17 +8,20 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Viewer.Runtime
+namespace AssetsManager.Services.Viewer.Vfx.Resources
 {
     /// <summary>
-    /// Scene-scoped resource overlay for MAP VFX. Referenced assets are materialized once from
-    /// project/WAD into a temporary virtual-path tree so the audited VFX resolver can be reused unchanged.
+    /// Scene-scoped resource overlay for VFX whose assets live in project/WAD storage rather than
+    /// a directly browsable extraction. Referenced assets are materialized once into a temporary
+    /// virtual-path tree so every host (MAP placements, Animation Clip events, etc.) reuses the
+    /// audited VFX resolver/runtime unchanged.
     /// </summary>
-    internal sealed class MapParticleResourceContext : IDisposable
+    internal sealed class VfxSceneResourceContext : IDisposable
     {
         private static readonly string[] TextureExtensions = { ".tex", ".dds" };
         private static readonly string[] MeshExtensions = { ".scb", ".skn", ".tmesh", ".gmesh" };
@@ -31,7 +34,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         private readonly LogService _logService;
         private bool _disposed;
 
-        private MapParticleResourceContext(
+        private VfxSceneResourceContext(
             MapAssetResolver assetResolver,
             HashResolverService hashResolver,
             LogService logService,
@@ -45,30 +48,46 @@ namespace AssetsManager.Services.Viewer.Runtime
 
         internal string SearchDirectory { get; }
 
-        internal static async Task<MapParticleResourceContext> CreateAsync(
+        internal static Task<VfxSceneResourceContext> CreateAsync(
             MapParticleSystemCatalog catalog,
             string projectRoot,
             MapAssetResolver assetResolver,
             HashResolverService hashResolver,
             LogService logService,
             CancellationToken cancellationToken = default)
+            => CreateAsync(
+                catalog?.Systems,
+                projectRoot,
+                assetResolver,
+                hashResolver,
+                logService,
+                cancellationToken);
+
+        internal static async Task<VfxSceneResourceContext> CreateAsync(
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            string projectRoot,
+            MapAssetResolver assetResolver,
+            HashResolverService hashResolver,
+            LogService logService,
+            CancellationToken cancellationToken = default,
+            VfxOwnerSceneContext ownerSceneContext = null)
         {
             ArgumentNullException.ThrowIfNull(assetResolver);
 
             string tempRoot = Path.Combine(
                 Path.GetTempPath(),
                 "AssetsManager",
-                "MapVfx",
+                "SceneVfx",
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempRoot);
-            var context = new MapParticleResourceContext(
+            var context = new VfxSceneResourceContext(
                 assetResolver,
                 hashResolver,
                 logService,
                 tempRoot);
             try
             {
-                await context.MaterializeAsync(catalog, projectRoot, cancellationToken);
+                await context.MaterializeAsync(systems, ownerSceneContext, projectRoot, cancellationToken);
                 return context;
             }
             catch
@@ -78,26 +97,36 @@ namespace AssetsManager.Services.Viewer.Runtime
             }
         }
 
-        internal IReadOnlyList<MapParticleRuntime> CreateRuntimes(MapParticleSystemCatalog catalog)
+        internal IReadOnlyList<MapParticleRuntime> CreateMapRuntimes(MapParticleSystemCatalog catalog)
         {
             ThrowIfDisposed();
-            return MapParticleRuntime.CreateAll(
-                catalog,
-                (definition, worldTransform, seed) => _loadingService.PreparePlaybackAtWorldTransform(
-                    definition,
-                    SearchDirectory,
-                    worldTransform,
-                    seed,
-                    _logService));
+            return MapParticleRuntime.CreateAll(catalog, PreparePlaybackAtWorldTransform);
+        }
+
+        internal VfxPlaybackRuntime PreparePlaybackAtWorldTransform(
+            VfxSystemDefinition definition,
+            Matrix4x4 worldTransform,
+            int seed)
+        {
+            ThrowIfDisposed();
+            return _loadingService.PreparePlaybackAtWorldTransform(
+                definition,
+                SearchDirectory,
+                worldTransform,
+                seed,
+                _logService);
         }
 
         internal static IReadOnlyList<ResourceRequest> CollectRequests(MapParticleSystemCatalog catalog)
-        {
-            if (catalog?.Systems == null || catalog.Systems.Count == 0)
-                return Array.Empty<ResourceRequest>();
+            => CollectRequests(catalog?.Systems);
 
+        internal static IReadOnlyList<ResourceRequest> CollectRequests(
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            VfxOwnerSceneContext ownerSceneContext = null)
+        {
             var requests = new Dictionary<string, ResourceRequest>(StringComparer.OrdinalIgnoreCase);
-            foreach (VfxSystemDefinition system in catalog.Systems.Values)
+            if (systems != null)
+            foreach (VfxSystemDefinition system in systems.Values)
             {
                 if (system?.Emitters == null)
                     continue;
@@ -116,7 +145,21 @@ namespace AssetsManager.Services.Viewer.Runtime
                     Add(requests, emitter.MeshFallbackPath, MeshExtensions);
                     Add(requests, emitter.MeshSkeletonPath, SkeletonExtensions);
                     Add(requests, emitter.MeshAnimationPath, AnimationExtensions);
+                    foreach (string variant in emitter.MeshAnimationVariants ?? Array.Empty<string>())
+                        Add(requests, variant, AnimationExtensions);
+                    if (emitter.EmissionSurface is { } surface)
+                    {
+                        Add(requests, surface.MeshPath, MeshExtensions);
+                        Add(requests, surface.SkeletonPath, SkeletonExtensions);
+                        Add(requests, surface.AnimationPath, AnimationExtensions);
+                    }
                 }
+            }
+
+            if (ownerSceneContext != null)
+            {
+                Add(requests, ownerSceneContext.MeshPath, MeshExtensions);
+                Add(requests, ownerSceneContext.SkeletonPath, SkeletonExtensions);
             }
             return requests.Values.ToArray();
         }
@@ -143,11 +186,12 @@ namespace AssetsManager.Services.Viewer.Runtime
         }
 
         private async Task MaterializeAsync(
-            MapParticleSystemCatalog catalog,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            VfxOwnerSceneContext ownerSceneContext,
             string projectRoot,
             CancellationToken cancellationToken)
         {
-            IReadOnlyList<ResourceRequest> requests = CollectRequests(catalog);
+            IReadOnlyList<ResourceRequest> requests = CollectRequests(systems, ownerSceneContext);
             if (requests.Count == 0)
                 return;
 
@@ -299,7 +343,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         private void ThrowIfDisposed()
         {
             if (_disposed)
-                throw new ObjectDisposedException(nameof(MapParticleResourceContext));
+                throw new ObjectDisposedException(nameof(VfxSceneResourceContext));
         }
 
         public void Dispose()

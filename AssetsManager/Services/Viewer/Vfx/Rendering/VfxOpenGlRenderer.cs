@@ -4,6 +4,7 @@ using System.Numerics;
 using Silk.NET.OpenGL;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
@@ -39,7 +40,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _trailCapFloats;
         private bool _ready;
         private VfxTextureResourceCache _textures = null!;
-        private VfxSceneCapture _capture = null!;
+        private GlSceneCapture _capture = null!;
         private VfxMeshResourceCache _meshResources = null!;
         private float[] _groupedInstances = Array.Empty<float>();
         private float[] _sortedInstances = Array.Empty<float>();
@@ -216,7 +217,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     VfxTrailGeometry.VertexStride * sizeof(float), new IntPtr(offsets[attribute] * sizeof(float)));
             }
             gl.BindVertexArray(0);
-            _capture = new VfxSceneCapture(gl);
+            _capture = new GlSceneCapture(gl);
             _meshResources = new VfxMeshResourceCache(gl);
             _ready = true;
         }

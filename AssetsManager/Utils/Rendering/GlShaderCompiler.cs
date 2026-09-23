@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Silk.NET.OpenGL;
 
 namespace AssetsManager.Utils.Rendering
@@ -20,15 +21,32 @@ namespace AssetsManager.Utils.Rendering
             string fragmentHeader = embeddedProfile
                 ? "#version 300 es\nprecision highp float;\n"
                 : "#version 330 core\n";
+            return CreateRawProgram(gl, vertexHeader + vertexSource, fragmentHeader + fragmentSource);
+        }
 
-            uint vertexShader = Compile(gl, ShaderType.VertexShader, vertexHeader + vertexSource);
-            uint fragmentShader = Compile(gl, ShaderType.FragmentShader, fragmentHeader + fragmentSource);
+        public static uint CreateRawProgram(
+            GL gl,
+            string vertexSource,
+            string fragmentSource,
+            IReadOnlyDictionary<uint, string> attributes = null)
+        {
+            ArgumentNullException.ThrowIfNull(gl);
+            uint vertexShader = Compile(gl, ShaderType.VertexShader, vertexSource);
+            uint fragmentShader = Compile(gl, ShaderType.FragmentShader, fragmentSource);
 
             try
             {
                 uint program = gl.CreateProgram();
                 gl.AttachShader(program, vertexShader);
                 gl.AttachShader(program, fragmentShader);
+                if (attributes != null)
+                {
+                    foreach ((uint location, string name) in attributes)
+                    {
+                        if (!string.IsNullOrWhiteSpace(name))
+                            gl.BindAttribLocation(program, location, name);
+                    }
+                }
                 gl.LinkProgram(program);
                 gl.GetProgram(program, ProgramPropertyARB.LinkStatus, out int linked);
                 if (linked == 0)

@@ -208,6 +208,26 @@ namespace AssetsManager.Tests.Diagnostics
                 InspectSknDiagnostic.Run(targetPath);
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "map-environment-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                string targetPath = args.Length > 1 ? args[1] : null;
+                MapEnvironmentAuditDiagnostic.Run(targetPath);
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "map-flow-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                string targetPath = args.Length > 1 ? args[1] : null;
+                string mapEntry = args.Length > 2 ? args[2] : null;
+                await MapFlowAuditDiagnostic.Run(targetPath, mapEntry);
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "map-shader-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                string targetPath = args.Length > 1 ? args[1] : null;
+                string mapEntry = args.Length > 2 ? args[2] : null;
+                await MapShaderAuditDiagnostic.Run(targetPath, mapEntry);
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "champion-bin-audit", StringComparison.OrdinalIgnoreCase))
             {
                 ChampionSkinBinDiagnostic.Run(args.Skip(1).ToArray());

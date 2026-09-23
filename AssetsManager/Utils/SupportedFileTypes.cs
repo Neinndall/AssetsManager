@@ -11,7 +11,7 @@ namespace AssetsManager.Utils
         public static readonly HashSet<string> VectorImages = new(StringComparer.OrdinalIgnoreCase) { ".svg" };
         public static readonly HashSet<string> Media = new(StringComparer.OrdinalIgnoreCase) { ".ogg", ".wem", ".webm", ".mp3", ".wav", ".flac" };
         public static readonly HashSet<string> AudioBank = new(StringComparer.OrdinalIgnoreCase) { ".wpk", ".bnk" };
-        public static readonly HashSet<string> Viewer3D = new(StringComparer.OrdinalIgnoreCase) { ".skn", ".sco", ".scb", ".skl", ".anm", ".mapgeo" };
+        public static readonly HashSet<string> Viewer3D = new(StringComparer.OrdinalIgnoreCase) { ".skn", ".sco", ".scb", ".skl", ".anm" };
         public static readonly HashSet<string> Json = new(StringComparer.OrdinalIgnoreCase) { ".json" };
         public static readonly HashSet<string> JavaScript = new(StringComparer.OrdinalIgnoreCase) { ".js" };
         public static readonly HashSet<string> Css = new(StringComparer.OrdinalIgnoreCase) { ".css" };
