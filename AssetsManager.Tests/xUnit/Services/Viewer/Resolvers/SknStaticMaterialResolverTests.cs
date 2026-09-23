@@ -28,7 +28,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void Resolve_PreservesAuthoredAlphaBlendAndTextureCoverageWithoutOpacitySlot()
+        public void Resolve_NormalBlendWithoutAnAlphaReaderFallsBackToOpaque()
         {
             SknMaterialDefinition material = CreateMaterial(
                 samplers: new[] { Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex") },
@@ -40,13 +40,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialDefinition resolved = Resolve(material, new[] { "test_tx_cm" });
 
-            Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
+            Assert.Equal(ModelMaterialBlendMode.Opaque, resolved.RenderState.Blending);
             Assert.False(resolved.RenderState.DepthWrite);
-            Assert.True(resolved.UsesTextureAlpha);
+            Assert.False(resolved.UsesTextureAlpha);
         }
 
         [Fact]
-        public void Resolve_SeraphineCapeAlphaPassKeepsAuthoredBaseTextureCoverage()
+        public void Resolve_ColorMapAlphaAloneDoesNotImplyCoverage()
         {
             SknMaterialDefinition material = CreateMaterial(
                 samplers: new[]
@@ -64,8 +64,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             ModelMaterialDefinition resolved = Resolve(material, new[] { "seraphine_skin69_cape_tx_cm" });
 
             Assert.Equal("seraphine_skin69_cape_tx_cm", resolved.BaseTextureName);
-            Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
-            Assert.True(resolved.UsesTextureAlpha);
+            Assert.Equal(ModelMaterialBlendMode.Opaque, resolved.RenderState.Blending);
+            Assert.False(resolved.UsesTextureAlpha);
             Assert.False(resolved.RenderState.DepthWrite);
         }
 
@@ -370,6 +370,29 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             Assert.Equal(new Vector4(2f, 2f, 2f, 0.75f), resolved.Color);
             Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
+        }
+
+        [Fact]
+        public void Resolve_DefaultEnvDoublesAuthoredTintLikeStaticPreview()
+        {
+            SknShaderDefinition shader = new(
+                "Shaders/StaticMesh/DefaultEnv",
+                Array.Empty<SknMaterialSampler>(),
+                new Dictionary<string, Vector4>
+                {
+                    ["TintColor"] = Vector4.One
+                },
+                new Dictionary<string, bool>(),
+                new Dictionary<string, string>());
+            SknMaterialDefinition material = CreateMaterial(
+                parameters: new Dictionary<string, Vector4>
+                {
+                    ["TintColor"] = new Vector4(0.5f, 0.25f, 0.75f, 1f)
+                });
+
+            ModelMaterialDefinition resolved = Resolve(material, Array.Empty<string>(), shader: shader);
+
+            Assert.Equal(new Vector4(1f, 0.5f, 1.5f, 1f), resolved.Color);
         }
 
         [Fact]

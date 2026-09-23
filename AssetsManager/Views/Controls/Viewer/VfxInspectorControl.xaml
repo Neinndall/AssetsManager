@@ -952,6 +952,14 @@
                                     </Border>
                                 </Popup>
 
+                                <ToggleButton x:Name="PreviewShadersToggle"
+                                              Style="{StaticResource TransparentIconToggleButton}"
+                                              Height="26" Width="30" Margin="0,0,4,0"
+                                              ToolTip="Use game shaders for Lit meshes"
+                                              IsChecked="{Binding PreviewShaders, Mode=TwoWay}">
+                                    <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"/>
+                                </ToggleButton>
+
                                 <Button x:Name="PreviewViewModeButton"
                                         Click="PreviewViewMode_Click"
                                         Style="{StaticResource TransparentIconButton}"

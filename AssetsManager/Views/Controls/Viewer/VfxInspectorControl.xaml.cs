@@ -110,7 +110,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private VfxPreviewSurfaceRenderer _previewSurfaceRenderer;
         private PerspectiveCamera _previewPerspectiveCamera;
         private OrthographicCamera _previewOrthographicCamera;
-        private bool _previewPreferencesLoaded;
         private bool _isLoadingPreviewPreferences;
         private bool _suppressCameraPresetFit;
         private bool _deferOrbitProjectionSwap;
@@ -264,7 +263,8 @@ namespace AssetsManager.Views.Controls.Viewer
                      e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGround) ||
                      e.PropertyName == nameof(VfxInspectorModel.ShowPreviewStage) ||
                      e.PropertyName == nameof(VfxInspectorModel.PreviewViewMode) ||
-                     e.PropertyName == nameof(VfxInspectorModel.PreviewWireOverlay))
+                     e.PropertyName == nameof(VfxInspectorModel.PreviewWireOverlay) ||
+                     e.PropertyName == nameof(VfxInspectorModel.PreviewShaders))
             {
                 SavePreviewDisplayPreferences();
             }
@@ -282,9 +282,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void LoadPreviewDisplayPreferences()
         {
-            if (_previewPreferencesLoaded) return;
-            _previewPreferencesLoaded = true;
-
             StudioParametersSettings viewerSettings = AppSettings?.StudioParameters;
             VfxStudioSettings vfxSettings = AppSettings?.VfxStudio;
             if (viewerSettings == null || vfxSettings == null) return;
@@ -298,9 +295,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (Enum.TryParse(vfxSettings.CameraPreset, ignoreCase: true, out VfxPreviewCameraPreset cameraPreset))
                     _model.PreviewCameraPreset = cameraPreset;
-                if (Enum.TryParse(vfxSettings.ViewMode, ignoreCase: true, out VfxPreviewViewMode viewMode))
+                if (Enum.TryParse(viewerSettings.ViewMode, ignoreCase: true, out VfxPreviewViewMode viewMode))
                     _model.PreviewViewMode = viewMode;
-                _model.PreviewWireOverlay = vfxSettings.WireOverlay;
+                _model.PreviewWireOverlay = viewerSettings.WireOverlay;
+                _model.PreviewShaders = viewerSettings.ShadersEnabled;
             }
             finally
             {
@@ -317,10 +315,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
             AppSettings.StudioParameters.GridVisible = _model.ShowPreviewGrid;
             AppSettings.StudioParameters.GroundVisible = _model.ShowPreviewGround;
+            AppSettings.StudioParameters.ViewMode = _model.PreviewViewMode.ToString();
+            AppSettings.StudioParameters.WireOverlay = _model.PreviewWireOverlay;
+            AppSettings.StudioParameters.ShadersEnabled = _model.PreviewShaders;
             AppSettings.VfxStudio.StageVisible = _model.ShowPreviewStage;
             AppSettings.VfxStudio.CameraPreset = _model.PreviewCameraPreset.ToString();
-            AppSettings.VfxStudio.ViewMode = _model.PreviewViewMode.ToString();
-            AppSettings.VfxStudio.WireOverlay = _model.PreviewWireOverlay;
             _ = SavePreviewDisplayPreferencesAsync();
         }
 
@@ -360,6 +359,9 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_isCleanedUp) return;
 
             _isActive = true;
+            // Reload shared display state on every activation so changes made in Load Project or
+            // Chroma Library are reflected immediately when VFX Studio becomes visible.
+            LoadPreviewDisplayPreferences();
             // The reference preview starts a fresh RAF clock when content becomes visible, so the
             // first resumed frame advances by zero rather than consuming hidden-tab wall time.
             _discardNextSimulationDelta = true;
@@ -774,7 +776,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     eye,
                     _mapSceneRuntime.SceneTimeSeconds,
                     _model.PreviewViewMode,
-                    _model.EffectivePreviewWireOverlay);
+                    _model.EffectivePreviewWireOverlay,
+                    _model.PreviewShaders);
                 if (_mapSceneRuntime.ShowStructures)
                 {
                     _mapCharacterRenderer?.Render(
@@ -787,7 +790,8 @@ namespace AssetsManager.Views.Controls.Viewer
                         EffectiveMapSun(),
                         _mapSceneRuntime.Hidden,
                         viewMode: _model.PreviewViewMode,
-                        wireOverlay: _model.EffectivePreviewWireOverlay);
+                        wireOverlay: _model.EffectivePreviewWireOverlay,
+                        shadersEnabled: _model.PreviewShaders);
                 }
                 uint mapViewportWidth = (uint)Math.Max(1d, OpenTkControl.ActualWidth);
                 uint mapViewportHeight = (uint)Math.Max(1d, OpenTkControl.ActualHeight);
@@ -925,7 +929,10 @@ namespace AssetsManager.Views.Controls.Viewer
                     lighting.LightColor,
                     lighting.FillDirection,
                     lighting.FillColor,
-                    lighting.AmbientColor);
+                    lighting.AmbientColor,
+                    _model.PreviewViewMode,
+                    _model.EffectivePreviewWireOverlay,
+                    _model.PreviewShaders);
             }
 
             if (_vfxRenderer != null)

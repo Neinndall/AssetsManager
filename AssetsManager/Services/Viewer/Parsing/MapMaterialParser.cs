@@ -62,11 +62,22 @@ namespace AssetsManager.Services.Viewer.Parsing
         private static readonly uint RuntimeSwitch = 0x066e669c;
         private static readonly uint SamplerName = Fnv1a.HashLower("samplerName");
 
-        private readonly HashResolverService _hashResolver;
+        private readonly Func<ulong, string> _wadChunkPathResolver;
+        private readonly Func<uint, string> _binEntryResolver;
 
         public MapMaterialParser(HashResolverService hashResolver = null)
+            : this(
+                hashResolver == null ? null : hashResolver.ResolveHash,
+                hashResolver == null ? null : hashResolver.ResolveBinEntry)
         {
-            _hashResolver = hashResolver;
+        }
+
+        internal MapMaterialParser(
+            Func<ulong, string> wadChunkPathResolver,
+            Func<uint, string> binEntryResolver)
+        {
+            _wadChunkPathResolver = wadChunkPathResolver;
+            _binEntryResolver = binEntryResolver;
         }
 
         public IReadOnlyList<MapMaterialDefinition> Parse(
@@ -825,10 +836,10 @@ namespace AssetsManager.Services.Viewer.Parsing
 
         private string ResolveWadPath(ulong hash)
         {
-            if (_hashResolver == null || hash == 0)
+            if (_wadChunkPathResolver == null || hash == 0)
                 return null;
 
-            string resolved = _hashResolver.ResolveHash(hash);
+            string resolved = _wadChunkPathResolver(hash);
             if (string.IsNullOrWhiteSpace(resolved) ||
                 resolved.Equals(hash.ToString("x16"), StringComparison.OrdinalIgnoreCase))
             {
@@ -840,10 +851,10 @@ namespace AssetsManager.Services.Viewer.Parsing
 
         private string ResolveBinEntry(uint hash)
         {
-            if (_hashResolver == null || hash == 0)
+            if (_binEntryResolver == null || hash == 0)
                 return null;
 
-            string resolved = _hashResolver.ResolveBinEntry(hash);
+            string resolved = _binEntryResolver(hash);
             return string.IsNullOrWhiteSpace(resolved) ||
                    resolved.Equals(hash.ToString("x8"), StringComparison.OrdinalIgnoreCase)
                 ? null

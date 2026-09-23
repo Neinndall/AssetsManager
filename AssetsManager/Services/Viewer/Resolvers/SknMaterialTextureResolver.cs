@@ -132,10 +132,20 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         .Select(sampler => sampler.TexturePath)))
                 .Concat((DefaultMaterial?.Samplers ?? Array.Empty<SknMaterialSampler>())
                     .Select(sampler => sampler.TexturePath))
+                .Concat(ReferencedProgramTexturePaths())
                 .Concat(ReferencedShaderDefaultTextures())
                 .Prepend(DefaultTexturePath)
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        private IEnumerable<string> ReferencedProgramTexturePaths() =>
+            OverrideMaterials.Values
+                .Append(DefaultMaterial)
+                .Where(material => material?.Program?.Passes != null)
+                .SelectMany(material => material.Program.Passes)
+                .SelectMany(pass => pass.Textures ?? Array.Empty<GameMaterialTexture>())
+                .Select(texture => texture?.Texture?.VirtualPath)
+                .Where(path => !string.IsNullOrWhiteSpace(path));
 
         private IEnumerable<string> ReferencedShaderDefaultTextures()
         {
@@ -1247,7 +1257,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 {
                     material = material with
                     {
-                        Program = new MapMaterialParser().ParseProgram(obj, shaderTrees)
+                        Program = new MapMaterialParser(wadChunkPathResolver, binEntryResolver)
+                            .ParseProgram(obj, shaderTrees)
                     };
                 }
                 return material;

@@ -334,7 +334,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3 eye,
             float timeSeconds,
             VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
-            bool wireOverlay = false)
+            bool wireOverlay = false,
+            bool shadersEnabled = true)
         {
             if (!_ready || !HasScene)
                 return;
@@ -366,8 +367,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 {
                     _gl.UseProgram(_program);
                     _gl.Uniform1(_uWireframePass, 0);
-                    DrawGroups(_plan.OpaqueGroups, solidMode, in gameFrame);
-                    DrawGroups(_plan.TransparentGroups, solidMode, in gameFrame);
+                    DrawGroups(_plan.OpaqueGroups, solidMode, shadersEnabled, in gameFrame);
+                    DrawGroups(_plan.TransparentGroups, solidMode, shadersEnabled, in gameFrame);
                 }
 
                 if (wireframe)
@@ -442,6 +443,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private void DrawGroups(
             IReadOnlyList<DrawGroup> groups,
             VfxPreviewViewMode viewMode,
+            bool shadersEnabled,
             in GameShaderRuntime.Frame gameFrame)
         {
             _gl.UseProgram(_program);
@@ -460,7 +462,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 MapGeometryMeshData mesh = group.MeshIndex >= 0 && group.MeshIndex < _scene.Geometry.Meshes.Count
                     ? _scene.Geometry.Meshes[group.MeshIndex]
                     : null;
-                bool gameBound = viewMode == VfxPreviewViewMode.Lit &&
+                bool gameBound = shadersEnabled &&
+                                 viewMode == VfxPreviewViewMode.Lit &&
                                  _gameShaderRuntime?.TryBind(
                                      bound.Material,
                                      mesh,

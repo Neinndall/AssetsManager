@@ -251,6 +251,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform int uMaterialPremultipliedAlpha;
                     uniform int uMaterialSrgb;
                     uniform int uMaterialUsesTextureAlpha;
+                    uniform int uWireframePass;
+                    uniform vec4 uWireframeColor;
                     uniform vec3 uLightDir;
                     uniform vec3 uLightColor;
                     uniform vec3 uLightDir2;
@@ -314,6 +316,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                         return mix(mix(a, b, local.x), mix(c, d, local.x), local.y);
                     }
                     void main(){
+                            if (uWireframePass != 0)
+                            {
+                                fragColor = uWireframeColor;
+                                return;
+                            }
                             vec2 materialUv = vUv * uMaterialUvRepeat + uMaterialUvScroll * uEffectTime;
                             if ((uEffectKind & 1024) != 0 && uDistortionTexIndex >= 0 && abs(uDistortionStrength) > 0.0001)
                             {

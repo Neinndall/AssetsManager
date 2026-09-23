@@ -26,5 +26,9 @@
     <Content Include="Diagnostics\News\patch_26_15_body.html">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\AssetsManager.Shaders\runtimes\win-x64\native\dxbc_spv_lol.dll"
+             Link="dxbc_spv_lol.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>

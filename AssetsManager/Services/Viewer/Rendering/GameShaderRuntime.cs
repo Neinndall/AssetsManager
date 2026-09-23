@@ -128,6 +128,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _neutralGrey2D;
         private uint _neutralBlack2D;
         private uint _neutralWhite2D;
+        private uint _neutralBuffer2D;
         private readonly Dictionary<(GameShaderTranslator.TextureDimension Dimension, bool Black), uint> _neutralTypedTextures = new();
         private int _maxTextureUnits;
         private bool _disposed;
@@ -730,7 +731,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (name.EndsWith(SharedTextureSuffix, StringComparison.Ordinal))
                 {
                     (texture, target) = NeutralFor(sampler.Dimension, black: true);
-                    samplerObject = ResolveNeutralSampler(clamp: true);
+                    samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
                 }
                 else
                 {
@@ -757,7 +758,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     else
                     {
                         (texture, target) = NeutralFor(sampler.Dimension, black: false);
-                        samplerObject = ResolveNeutralSampler(clamp: true);
+                        samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
                     }
                 }
 
@@ -800,7 +801,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 else if (name.EndsWith(SharedTextureSuffix, StringComparison.Ordinal))
                 {
                     (texture, target) = NeutralFor(sampler.Dimension, black: true);
-                    samplerObject = ResolveNeutralSampler(clamp: true);
+                    samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
                 }
                 else
                 {
@@ -821,7 +822,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     else
                     {
                         (texture, target) = NeutralFor(sampler.Dimension, black: false);
-                        samplerObject = ResolveNeutralSampler(clamp: true);
+                        samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
                     }
                 }
 
@@ -886,24 +887,36 @@ namespace AssetsManager.Services.Viewer.Rendering
             return sampler;
         }
 
-        private uint ResolveNeutralSampler(bool clamp)
+        private uint ResolveNeutralSampler(
+            bool clamp,
+            GameShaderTranslator.TextureDimension dimension = GameShaderTranslator.TextureDimension.Texture2D)
         {
+            bool integerBuffer = RequiresIntegerNeutral(dimension);
             var key = (
                 clamp ? MapTextureWrap.Clamp : MapTextureWrap.Repeat,
                 clamp ? MapTextureWrap.Clamp : MapTextureWrap.Repeat,
-                true,
-                true,
-                "neutral-no-mip");
+                !integerBuffer,
+                !integerBuffer,
+                integerBuffer ? "neutral-buffer" : "neutral-no-mip");
             if (_samplers.TryGetValue(key, out uint sampler))
                 return sampler;
             sampler = _gl.GenSampler();
-            _gl.SamplerParameter(sampler, SamplerParameterI.MinFilter, (int)TextureMinFilter.Linear);
-            _gl.SamplerParameter(sampler, SamplerParameterI.MagFilter, (int)TextureMagFilter.Linear);
+            _gl.SamplerParameter(
+                sampler,
+                SamplerParameterI.MinFilter,
+                (int)(integerBuffer ? TextureMinFilter.Nearest : TextureMinFilter.Linear));
+            _gl.SamplerParameter(
+                sampler,
+                SamplerParameterI.MagFilter,
+                (int)(integerBuffer ? TextureMagFilter.Nearest : TextureMagFilter.Linear));
             _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)(clamp ? TextureWrapMode.ClampToEdge : TextureWrapMode.Repeat));
             _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)(clamp ? TextureWrapMode.ClampToEdge : TextureWrapMode.Repeat));
             _samplers[key] = sampler;
             return sampler;
         }
+
+        internal static bool RequiresIntegerNeutral(GameShaderTranslator.TextureDimension dimension) =>
+            dimension == GameShaderTranslator.TextureDimension.Buffer;
 
         private (uint Texture, TextureTarget Target) NeutralFor(
             GameShaderTranslator.TextureDimension dimension,
@@ -918,7 +931,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                     (NeutralTyped(dimension, black), TextureTarget.Texture3D),
                 GameShaderTranslator.TextureDimension.Cube =>
                     (NeutralTyped(dimension, black), TextureTarget.TextureCubeMap),
-                // The game-shader translation layer lowers texel buffers to sampler2D data textures.
+                // Hexshade lowers texel buffers to integer sampler2D data textures. Their neutral
+                // must therefore be R32UI/nearest rather than an RGBA colour texture.
+                GameShaderTranslator.TextureDimension.Buffer =>
+                    (NeutralBuffer2D(), TextureTarget.Texture2D),
                 // Unknown dimensions follow the neutral fallback rather than binding a real asset to a wrong target.
                 _ => (black ? NeutralBlack2D() : NeutralGrey2D(), TextureTarget.Texture2D)
             };
@@ -946,6 +962,30 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint NeutralGrey2D() => _neutralGrey2D != 0 ? _neutralGrey2D : (_neutralGrey2D = CreateNeutral(128, 128, 128, 255));
         private uint NeutralBlack2D() => _neutralBlack2D != 0 ? _neutralBlack2D : (_neutralBlack2D = CreateNeutral(0, 0, 0, 0));
         private uint NeutralWhite2D() => _neutralWhite2D != 0 ? _neutralWhite2D : (_neutralWhite2D = CreateNeutral(255, 255, 255, 255));
+
+        private uint NeutralBuffer2D()
+        {
+            if (_neutralBuffer2D != 0)
+                return _neutralBuffer2D;
+
+            _neutralBuffer2D = _gl.GenTexture();
+            _gl.BindTexture(TextureTarget.Texture2D, _neutralBuffer2D);
+            uint[] zero = { 0u };
+            _gl.TexImage2D(
+                TextureTarget.Texture2D,
+                0,
+                InternalFormat.R32ui,
+                1,
+                1,
+                0,
+                PixelFormat.RedInteger,
+                PixelType.UnsignedInt,
+                new ReadOnlySpan<uint>(zero));
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
+            return _neutralBuffer2D;
+        }
 
         private uint CreateNeutral(byte r, byte g, byte b, byte a)
         {
@@ -1055,6 +1095,11 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         internal void ResetBindings()
         {
+            // A translated pass owns color/depth comparison state. Restore the stock-preview
+            // defaults before another material or renderer takes over, just as the reference
+            // renderer reapplies material state on every draw.
+            _gl.ColorMask(true, true, true, true);
+            _gl.DepthFunc(DepthFunction.Lequal);
             for (uint unit = 0; unit < (uint)_maxTextureUnits; unit++)
             {
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
@@ -1088,11 +1133,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             else _gl.Disable(EnableCap.DepthTest);
             _gl.DepthFunc(ToDepth(state.DepthCompareFunc));
             _gl.DepthMask((state.WriteMask & WriteDepth) != 0);
-            _gl.ColorMask(
-                (state.WriteMask & 1) != 0,
-                (state.WriteMask & 2) != 0,
-                (state.WriteMask & 4) != 0,
-                (state.WriteMask & 8) != 0);
+            bool colorWrite = ColorWriteEnabled(state.WriteMask);
+            _gl.ColorMask(colorWrite, colorWrite, colorWrite, colorWrite);
 
             if (meshDoubleSided || !state.CullEnabled)
             {
@@ -1106,6 +1148,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                     : TriangleFace.Front);
             }
         }
+
+        internal static bool ColorWriteEnabled(uint writeMask) => (writeMask & 15u) != 0;
 
         private static BlendingFactor ToBlend(MapBlendFactor factor) =>
             factor switch
@@ -1268,11 +1312,12 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (_neutralGrey2D != 0) _gl.DeleteTexture(_neutralGrey2D);
             if (_neutralBlack2D != 0) _gl.DeleteTexture(_neutralBlack2D);
             if (_neutralWhite2D != 0) _gl.DeleteTexture(_neutralWhite2D);
+            if (_neutralBuffer2D != 0) _gl.DeleteTexture(_neutralBuffer2D);
             foreach (uint texture in _neutralTypedTextures.Values)
                 if (texture != 0)
                     _gl.DeleteTexture(texture);
             _neutralTypedTextures.Clear();
-            _neutralGrey2D = _neutralBlack2D = _neutralWhite2D = 0;
+            _neutralGrey2D = _neutralBlack2D = _neutralWhite2D = _neutralBuffer2D = 0;
         }
     }
 }

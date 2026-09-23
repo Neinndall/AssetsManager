@@ -179,7 +179,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3? untexturedLinear = null,
             Vector3? erroredLinear = null,
             VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
-            bool wireOverlay = false)
+            bool wireOverlay = false,
+            bool shadersEnabled = true)
         {
             if (!_ready || groups == null || groups.Count == 0)
                 return;
@@ -213,8 +214,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (solids)
                 {
                     _gl.Uniform1(_uWireframePass, 0);
-                    DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, wireframePass: false, ref activePalette, ref activeVao);
-                    DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, wireframePass: false, ref activePalette, ref activeVao);
+                    DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
+                    DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
                 }
 
                 if (wireframe)
@@ -231,8 +232,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                         wireOpacity);
                     ApplyWireframeState(wireOpacity);
                     UseStockProgram(viewProjection);
-                    DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, wireframePass: true, ref activePalette, ref activeVao);
-                    DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, wireframePass: true, ref activePalette, ref activeVao);
+                    DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
+                    DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
                 }
             }
             finally
@@ -374,6 +375,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3 untextured,
             Vector3 errored,
             VfxPreviewViewMode viewMode,
+            bool shadersEnabled,
             bool wireframePass,
             ref Matrix4x4[] activePalette,
             ref uint activeVao)
@@ -392,6 +394,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     : FrontFaceDirection.Ccw);
 
                 bool wantsGameProgram = !wireframePass &&
+                                        shadersEnabled &&
                                         viewMode == VfxPreviewViewMode.Lit &&
                                         command.Resources.HasSkin &&
                                         command.Range.Material?.Program != null;

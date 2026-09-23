@@ -123,6 +123,18 @@ namespace AssetsManager.Services.Viewer.Resolvers
             @"(?i)additive",
             RegexOptions.Compiled);
 
+        private static readonly Regex DoubledTintShader = new(
+            @"(?i)staticmesh[\\/]defaultenv",
+            RegexOptions.Compiled);
+
+        private static readonly string[] SwitchedAlphaSwitches =
+        {
+            "ALPHABLEND_MAIN",
+            "ALPHABLEND_BLENDMAT",
+            "USE_MAINTEXALPHA",
+            "ALPHACLIP_ON"
+        };
+
         internal static ModelMaterialDefinition Resolve(
             SknMaterialDefinition material,
             SknShaderDefinition shader,
@@ -186,7 +198,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ? null
                 : resolveTexture(baseSampler.TexturePath);
 
-            (Vector4 color, bool hasOpacity, bool hasTint) = ResolveColor(parameters, effect);
+            (Vector4 color, bool hasOpacity, bool hasTint) = ResolveColor(parameters, shaderPath);
             bool hasAuthoredAlphaTest = TryFirst(parameters, AlphaTestNames, out Vector4 authoredAlphaTest) &&
                 authoredAlphaTest.X > 0f && authoredAlphaTest.X < 1f;
             float alphaCutoff = ResolveAlphaCutoff(parameters, macros, shaderPath);
@@ -422,7 +434,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         private static (Vector4 Color, bool HasOpacity, bool HasTint) ResolveColor(
             IReadOnlyDictionary<string, Vector4> parameters,
-            ModelMaterialEffectDefinition effect)
+            string shaderPath)
         {
             Vector4 tint = Vector4.One;
             bool hasTint = TryFirst(parameters, TintNames, out Vector4 tintValue) &&
@@ -430,27 +442,21 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 tintValue.Y >= 0f && tintValue.Y <= 4f &&
                 tintValue.Z >= 0f && tintValue.Z <= 4f;
             if (hasTint)
-                tint = new Vector4(tintValue.X, tintValue.Y, tintValue.Z, 1f);
+            {
+                float scale = !string.IsNullOrWhiteSpace(shaderPath) && DoubledTintShader.IsMatch(shaderPath)
+                    ? 2f
+                    : 1f;
+                tint = new Vector4(
+                    tintValue.X * scale,
+                    tintValue.Y * scale,
+                    tintValue.Z * scale,
+                    1f);
+            }
 
             bool hasOpacity = TryFirst(parameters, OpacityNames, out Vector4 opacityValue) &&
                 opacityValue.X >= 0f && opacityValue.X <= 1f;
             if (hasOpacity)
                 tint.W = opacityValue.X;
-
-            // Specialized shader families can supply a base-color fallback that LTK's generic
-            // slot model does not describe. Generic authored tint/opacity always stay authoritative.
-            Vector4 specializedColor = effect?.MaterialTint ?? Vector4.One;
-            if (!hasTint && specializedColor != Vector4.One)
-            {
-                tint.X = specializedColor.X;
-                tint.Y = specializedColor.Y;
-                tint.Z = specializedColor.Z;
-            }
-            if (!hasOpacity && specializedColor.W < 0.9999f)
-            {
-                tint.W = specializedColor.W;
-                hasOpacity = true;
-            }
 
             return (tint, hasOpacity, hasTint);
         }
@@ -530,10 +536,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 blending = ModelMaterialBlendMode.Additive;
             }
 
-            // Preserve the pass's authored blend factors. LTK main does not demote an explicit
-            // SrcAlpha/OneMinusSrcAlpha pass merely because the material has no scalar Opacity
-            // parameter: the sampled base texture can itself carry authored coverage (for example
-            // Seraphine Skin69's cape gradient).
+            // A colour map's alpha is usually data/mask rather than coverage. The stock preview
+            // therefore keeps a normal blend opaque until the material explicitly demonstrates
+            // that it reads alpha through opacity, alpha-test, or the packed shader's alpha switches.
+            bool readsAlpha = hasOpacity ||
+                              alphaCutoff > 0f ||
+                              (switchedShader && SwitchedAlphaSwitches.Any(name => IsEnabled(switches, name)));
+            if (blending == ModelMaterialBlendMode.Normal && !readsAlpha)
+                blending = ModelMaterialBlendMode.Opaque;
+
             uint writeMask = pass?.WriteMask ?? DefaultWriteMask;
 
             bool cullEnabled = pass?.CullEnabled ?? true;

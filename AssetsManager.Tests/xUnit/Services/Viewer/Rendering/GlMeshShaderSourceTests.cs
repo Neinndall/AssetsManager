@@ -1,6 +1,7 @@
 using System.Numerics;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Rendering.Core;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
 using Xunit;
@@ -145,6 +146,56 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             Assert.True(part.UsesSrgbBaseTexture);
             Assert.True(part.UseBaseTextureAlpha);
             Assert.Null(part.MaterialDefinition);
+        }
+
+        [Fact]
+        public void GameShadersOnlyRunForTheLitMaterialSurface()
+        {
+            Assert.False(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Lit, shadersEnabled: false));
+            Assert.True(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Lit, shadersEnabled: true));
+            Assert.False(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Unshaded, shadersEnabled: true));
+            Assert.False(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Untextured, shadersEnabled: true));
+            Assert.False(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Wireframe, shadersEnabled: true));
+            Assert.False(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Lit, shadersEnabled: true, wireframePass: true));
+        }
+
+        [Fact]
+        public void ViewerDisplayDefaultsMatchTheReferencePreview()
+        {
+            AppSettings settings = AppSettings.GetDefaultSettings();
+
+            Assert.Equal("Lit", settings.StudioParameters.ViewMode);
+            Assert.False(settings.StudioParameters.WireOverlay);
+            Assert.False(settings.StudioParameters.ShadersEnabled);
+        }
+
+        [Fact]
+        public void ViewerViewModeKeepsWireOverlayIndependent()
+        {
+            var model = new ViewerViewportModel
+            {
+                PreviewWireOverlay = true,
+                PreviewViewMode = VfxPreviewViewMode.Unshaded
+            };
+
+            Assert.False(model.CanPreviewWireOverlay);
+            Assert.False(model.EffectivePreviewWireOverlay);
+
+            model.PreviewViewMode = VfxPreviewViewMode.Untextured;
+            Assert.True(model.CanPreviewWireOverlay);
+            Assert.True(model.EffectivePreviewWireOverlay);
+        }
+
+        [Fact]
+        public void Fragment_WireframeBypassesTheStockMaterialPath()
+        {
+            int wire = GlMeshShaderSource.Fragment.IndexOf("if (uWireframePass != 0)");
+            int materialUv = GlMeshShaderSource.Fragment.IndexOf(
+                "vec2 materialUv = vUv * uMaterialUvRepeat + uMaterialUvScroll * uEffectTime;");
+
+            Assert.Contains("uniform vec4 uWireframeColor;", GlMeshShaderSource.Fragment);
+            Assert.True(wire >= 0 && wire < materialUv);
+            Assert.Contains("fragColor = uWireframeColor;", GlMeshShaderSource.Fragment);
         }
 
         [Fact]

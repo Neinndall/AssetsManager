@@ -28,7 +28,7 @@ namespace AssetsManager.Tests.xUnit.Shaders
             InvalidOperationException error = Assert.Throws<InvalidOperationException>(() =>
                 GameShaderTranslator.CompileSpirv(new byte[] { 1, 2, 3, 4 }));
 
-            Assert.Contains("vkd3d-shader", error.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("dxbc-spirv", error.Message, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]

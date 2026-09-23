@@ -181,7 +181,7 @@ namespace AssetsManager.Shaders
 
         private readonly record struct SpirvInstruction(int At, uint Op, int Count);
 
-        public static uint[] CompileSpirv(byte[] dxbc) => Vkd3dSpirvCompiler.Compile(dxbc);
+        public static uint[] CompileSpirv(byte[] dxbc) => DxbcSpirvCompiler.Compile(dxbc);
 
         public static string Ident(string name)
         {
@@ -573,7 +573,7 @@ namespace AssetsManager.Shaders
                 .Select(resource =>
                 {
                     string image = Ident(resource.Name);
-                    samplersByImage.TryGetValue(image, out List<SamplerBinding> samplers);
+                    samplersByImage.Remove(image, out List<SamplerBinding> samplers);
                     return new TextureBinding(
                         resource.Name,
                         TextureDimensionOf(resource.Dimension),
@@ -587,14 +587,14 @@ namespace AssetsManager.Shaders
                     .Select(entry =>
                     {
                         string label = entry.Label;
-                        string expected = "a_" + Ident(BareLabel(entry));
                         string glslName = renames
                             .Where(rename => rename.To.StartsWith("a_", StringComparison.Ordinal))
                             .Where(rename =>
-                                string.Equals(rename.To, expected, StringComparison.Ordinal) ||
-                                string.Equals(rename.From, "v" + entry.Register, StringComparison.Ordinal) ||
-                                Ident(rename.From) == Ident(label) ||
-                                (entry.Index == 0 && Ident(rename.From) == Ident(entry.Semantic)))
+                            {
+                                string from = Ident(rename.From);
+                                return from == Ident(label) ||
+                                       (entry.Index == 0 && from == Ident(entry.Semantic));
+                            })
                             .Select(rename => rename.To)
                             .FirstOrDefault();
                         return glslName == null
