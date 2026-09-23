@@ -127,14 +127,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             @"(?i)staticmesh[\\/]defaultenv",
             RegexOptions.Compiled);
 
-        private static readonly string[] SwitchedAlphaSwitches =
-        {
-            "ALPHABLEND_MAIN",
-            "ALPHABLEND_BLENDMAT",
-            "USE_MAINTEXALPHA",
-            "ALPHACLIP_ON"
-        };
-
         internal static ModelMaterialDefinition Resolve(
             SknMaterialDefinition material,
             SknShaderDefinition shader,
@@ -198,7 +190,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ? null
                 : resolveTexture(baseSampler.TexturePath);
 
-            (Vector4 color, bool hasOpacity, bool hasTint) = ResolveColor(parameters, shaderPath);
+            (Vector4 color, bool hasOpacity, bool hasTint) = ResolveColor(parameters, effect, shaderPath);
             bool hasAuthoredAlphaTest = TryFirst(parameters, AlphaTestNames, out Vector4 authoredAlphaTest) &&
                 authoredAlphaTest.X > 0f && authoredAlphaTest.X < 1f;
             float alphaCutoff = ResolveAlphaCutoff(parameters, macros, shaderPath);
@@ -434,6 +426,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         private static (Vector4 Color, bool HasOpacity, bool HasTint) ResolveColor(
             IReadOnlyDictionary<string, Vector4> parameters,
+            ModelMaterialEffectDefinition effect,
             string shaderPath)
         {
             Vector4 tint = Vector4.One;
@@ -457,6 +450,22 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 opacityValue.X >= 0f && opacityValue.X <= 1f;
             if (hasOpacity)
                 tint.W = opacityValue.X;
+
+            // AssetsManager intentionally preserves specialized material fallbacks that the
+            // reference stock preview does not reproduce. These are used for authored glass,
+            // iridescence/gradient layers and other materials we already know how to evaluate.
+            Vector4 specializedColor = effect?.MaterialTint ?? Vector4.One;
+            if (!hasTint && specializedColor != Vector4.One)
+            {
+                tint.X = specializedColor.X;
+                tint.Y = specializedColor.Y;
+                tint.Z = specializedColor.Z;
+            }
+            if (!hasOpacity && specializedColor.W < 0.9999f)
+            {
+                tint.W = specializedColor.W;
+                hasOpacity = true;
+            }
 
             return (tint, hasOpacity, hasTint);
         }
@@ -536,15 +545,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 blending = ModelMaterialBlendMode.Additive;
             }
 
-            // A colour map's alpha is usually data/mask rather than coverage. The stock preview
-            // therefore keeps a normal blend opaque until the material explicitly demonstrates
-            // that it reads alpha through opacity, alpha-test, or the packed shader's alpha switches.
-            bool readsAlpha = hasOpacity ||
-                              alphaCutoff > 0f ||
-                              (switchedShader && SwitchedAlphaSwitches.Any(name => IsEnabled(switches, name)));
-            if (blending == ModelMaterialBlendMode.Normal && !readsAlpha)
-                blending = ModelMaterialBlendMode.Opaque;
-
+            // Preserve authored SrcAlpha/OneMinusSrcAlpha coverage even when there is no scalar
+            // Opacity slot. Some character materials (for example Seraphine skin69's cape) encode
+            // the actual coverage gradient in the base texture alpha channel.
             uint writeMask = pass?.WriteMask ?? DefaultWriteMask;
 
             bool cullEnabled = pass?.CullEnabled ?? true;

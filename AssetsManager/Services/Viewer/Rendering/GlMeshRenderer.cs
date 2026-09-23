@@ -692,9 +692,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                         _gl.Uniform1(_uMaterialUsesTextureAlpha, usesTextureAlpha ? 1 : 0);
                     }
 
-                    // The stock path is intentionally only the stock material contract. Game-specific
-                    // shader layers belong to the translated program and must not be partially emulated.
-                    UploadMaterialEffects(ModelMaterialEffectDefinition.None, null, resources);
+                    // AssetsManager intentionally retains the specialized material preview layer for
+                    // authored effects it knows how to evaluate (gradient pulse, iridescence, flow,
+                    // dissolve, fresnel, bloom, etc.). Hexshade still takes precedence when it binds.
+                    ModelMaterialEffectDefinition effect = material?.Effect ?? ModelMaterialEffectDefinition.None;
+                    UploadMaterialEffects(effect, material, resources);
                 }
 
                 _drawElements?.Invoke(
@@ -992,7 +994,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             ModelMaterialRenderState state = material.RenderState;
             bool runtimeForcesBlend =
                 state.Blending == ModelMaterialBlendMode.Opaque &&
-                part.ColorTint.W < 0.999f;
+                (part.ColorTint.W < 0.999f || material.Effect?.RequiresAlphaBlend == true);
             ModelMaterialBlendMode blending = runtimeForcesBlend
                 ? ModelMaterialBlendMode.Normal
                 : state.Cutout

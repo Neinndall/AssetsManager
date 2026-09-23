@@ -334,12 +334,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             SknMaterialDefinition material,
             IReadOnlyList<string> textureKeys)
         {
-            // Dynamic gradient layers are driven by gameplay/material animation state. Until
-            // that runtime is evaluated, applying their static slots makes P/R overlays
-            // permanently visible on neutral character previews.
-            if (material.IsAnimated)
-                return effect;
-
             string gradientTexture = FindSamplerKey(
                 material,
                 textureKeys,

@@ -28,7 +28,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void Resolve_NormalBlendWithoutAnAlphaReaderFallsBackToOpaque()
+        public void Resolve_PreservesAuthoredAlphaBlendAndTextureCoverageWithoutOpacitySlot()
         {
             SknMaterialDefinition material = CreateMaterial(
                 samplers: new[] { Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex") },
@@ -40,13 +40,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialDefinition resolved = Resolve(material, new[] { "test_tx_cm" });
 
-            Assert.Equal(ModelMaterialBlendMode.Opaque, resolved.RenderState.Blending);
+            Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
             Assert.False(resolved.RenderState.DepthWrite);
-            Assert.False(resolved.UsesTextureAlpha);
+            Assert.True(resolved.UsesTextureAlpha);
         }
 
         [Fact]
-        public void Resolve_ColorMapAlphaAloneDoesNotImplyCoverage()
+        public void Resolve_SeraphineCapeAlphaPassKeepsAuthoredBaseTextureCoverage()
         {
             SknMaterialDefinition material = CreateMaterial(
                 samplers: new[]
@@ -64,8 +64,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             ModelMaterialDefinition resolved = Resolve(material, new[] { "seraphine_skin69_cape_tx_cm" });
 
             Assert.Equal("seraphine_skin69_cape_tx_cm", resolved.BaseTextureName);
-            Assert.Equal(ModelMaterialBlendMode.Opaque, resolved.RenderState.Blending);
-            Assert.False(resolved.UsesTextureAlpha);
+            Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
+            Assert.True(resolved.UsesTextureAlpha);
             Assert.False(resolved.RenderState.DepthWrite);
         }
 

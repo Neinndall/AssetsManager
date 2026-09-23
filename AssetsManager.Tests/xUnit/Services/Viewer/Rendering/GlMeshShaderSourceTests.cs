@@ -207,15 +207,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
-        public void Fragment_PreservesGradientPulseCalibration()
+        public void Fragment_PreservesFullGradientPulseIntensity()
         {
             Assert.Contains(
-                "float bloom = clamp(uGradientBloomIntensity * 0.05, 0.0, 1.0);",
+                "mask * uGradientStrength * gradientStrength *",
                 GlMeshShaderSource.Fragment);
             Assert.Contains(
-                "mask * uGradientStrength * gradientStrength * 0.1 *",
+                "max(pulse + max(uGradientBloomIntensity, 0.0), 0.0)",
                 GlMeshShaderSource.Fragment);
-            Assert.Contains("vec3(2.0));", GlMeshShaderSource.Fragment);
+            Assert.Contains("vec3(4.0));", GlMeshShaderSource.Fragment);
         }
 
         [Fact]

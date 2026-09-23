@@ -373,16 +373,15 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                                     clamp(channelValue(gradientSample, uGradientTextureChannel), 0.0, 1.0),
                                     max(uGradientSharpness, 0.001));
                                 float pulse = 1.0 + sin((uEffectTime * uPulseRate + uPulseOffset) * 6.2831853) * uPulseMax;
-                                float bloom = clamp(uGradientBloomIntensity * 0.05, 0.0, 1.0);
                                 float amount = clamp(
-                                    mask * uGradientStrength * gradientStrength * 0.1 *
-                                    max(pulse + bloom, 0.0),
+                                    mask * uGradientStrength * gradientStrength *
+                                    max(pulse + max(uGradientBloomIntensity, 0.0), 0.0),
                                     0.0,
                                     1.0);
                                 vec3 gradientTint = gradientSample.rgb * uGradientColor.rgb;
                                 vec3 colorDodge = min(
                                     finalColor / max(vec3(1.0) - gradientTint, vec3(0.001)),
-                                    vec3(2.0));
+                                    vec3(4.0));
                                 finalColor = mix(finalColor, colorDodge, amount);
                             }
 

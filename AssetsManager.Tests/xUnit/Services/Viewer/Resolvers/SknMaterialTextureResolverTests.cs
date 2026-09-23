@@ -1141,7 +1141,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             ModelMaterialDefinition body = resolution.ResolveMaterialDefinition("body");
             Assert.Equal(ModelMaterialBlendMode.Opaque, body.RenderState.Blending);
             Assert.False(body.UsesTextureAlpha);
-            Assert.False(new ModelPart { MaterialDefinition = body }.IsAlphaBlended);
+            Assert.True(new ModelPart { MaterialDefinition = body }.IsAlphaBlended);
         }
 
         [Fact]
@@ -1599,7 +1599,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void Resolve_SkipsGradientPulseForDynamicMaterials()
+        public void Resolve_PreservesGradientPulseForDynamicMaterialsWhenAuthoredInputsAreComplete()
         {
             var material = new SknMaterialDefinition(
                 new[]
@@ -1622,7 +1622,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 new[] { "gradient_test_01", "aatrox_base_p_sword_mask" },
                 new[] { "Sword" });
 
-            Assert.Equal(ModelMaterialEffectKind.None, effect.Kind);
+            Assert.True((effect.Kind & ModelMaterialEffectKind.GradientPulse) != 0);
+            Assert.Equal("gradient_test_01", effect.GradientPulse.TextureName);
+            Assert.Equal("aatrox_base_p_sword_mask", effect.GradientPulse.MaskTextureName);
+            Assert.Equal(3f, effect.GradientPulse.PulseRate);
+            Assert.Equal(0.4f, effect.GradientPulse.PulseMax);
         }
 
         [Fact]
@@ -2931,14 +2935,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             ModelMaterialDefinition material = resolution.ResolveMaterialDefinition("glass");
             ModelMaterialEffectDefinition effect = material.Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
-            // The specialized effect metadata remains available for diagnostics/VFX reuse, but
-            // the normal Viewer stock material follows the reference preview contract only.
-            Assert.Equal(Vector4.One, material.Color);
+            Assert.True(material.Color.W < 0.1f);
+            Assert.Equal(0.31f, material.Color.X, 2);
             Assert.Equal(1f, effect.Fresnel.Color.X, 2);
             Assert.Equal(ModelMaterialBlendMode.Opaque, material.RenderState.Blending);
             Assert.False(material.UsesTextureAlpha);
             Assert.True(effect.RequiresAlphaBlend);
-            Assert.False(new ModelPart { MaterialDefinition = material }.IsAlphaBlended);
+            Assert.True(new ModelPart { MaterialDefinition = material }.IsAlphaBlended);
         }
 
         private static BinTree CreateSeraphineIridescentBodyTree(
