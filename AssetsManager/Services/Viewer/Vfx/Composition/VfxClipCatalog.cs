@@ -220,7 +220,7 @@ internal sealed class VfxClipCatalog : IDisposable
                 double? until = authoredEvent.EndFrame >= 0f
                     ? passTime + authoredEvent.EndFrame * tick
                     : null;
-                if (until <= at) until = null;
+                until = AnimationGraphPlayback.TimedEventEnd(authoredEvent, at, until);
 
                 switch (authoredEvent)
                 {

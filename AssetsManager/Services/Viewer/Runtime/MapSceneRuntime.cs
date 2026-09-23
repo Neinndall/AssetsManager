@@ -18,6 +18,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         private float _characterTimeSeconds;
         private bool _showStructures = true;
         private bool _showParticles = true;
+        private int _visibilityFlags;
 
         internal MapSceneRuntime(
             MapSceneData scene,
@@ -30,6 +31,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             BackdropLightmaps = scene.Lightmaps ?? new Dictionary<string, MapTextureImage>(StringComparer.OrdinalIgnoreCase);
             CharacterGroups = characterGroups ?? Array.Empty<MapCharacterRuntimeGroup>();
             Particles = particles ?? new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>());
+            _visibilityFlags = scene.OpeningVisibilityFlags;
         }
 
         internal MapSceneData Scene { get; }
@@ -41,6 +43,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal IReadOnlySet<string> Hidden => _hidden;
         internal float SceneTimeSeconds => _sceneTimeSeconds;
         internal float CharacterTimeSeconds => _characterTimeSeconds;
+        internal int VisibilityFlags => _visibilityFlags;
         internal bool ShowStructures
         {
             get => _showStructures;
@@ -76,6 +79,12 @@ namespace AssetsManager.Services.Viewer.Runtime
 
             if (ShowParticles)
                 Particles.Update(viewProjection, deltaSeconds, _hidden);
+        }
+
+        internal void SetVisibilityFlags(int flags)
+        {
+            ThrowIfDisposed();
+            _visibilityFlags = flags;
         }
 
         internal void SetBackdropTextures(IReadOnlyDictionary<string, MapTextureImage> textures)

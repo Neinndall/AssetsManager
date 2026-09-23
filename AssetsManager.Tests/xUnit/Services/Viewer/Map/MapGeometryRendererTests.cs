@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Environment;
 using Silk.NET.OpenGL;
@@ -32,6 +33,35 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             MapGeometryRenderer.DrawGroup group = Assert.Single(plan.OpaqueGroups);
             Assert.Equal(0, group.StartIndex);
             Assert.Empty(plan.TransparentGroups);
+        }
+
+        [Fact]
+        public void DrawPlanStacksEveryMeshWhoseVisibilitySharesAnActiveFlag()
+        {
+            MapSceneData scene = Scene(
+                meshes: new[]
+                {
+                    Mesh(visibility: 0b0000_0001, firstSubmesh: 0, submeshCount: 1),
+                    Mesh(visibility: 0b0000_0100, firstSubmesh: 1, submeshCount: 1),
+                    Mesh(visibility: 0b0000_1000, firstSubmesh: 2, submeshCount: 1),
+                    Mesh(visibility: 0b0000_0101, firstSubmesh: 3, submeshCount: 1)
+                },
+                submeshes: new[]
+                {
+                    new MapGeometrySubmeshData(0, 3, 0),
+                    new MapGeometrySubmeshData(3, 3, 0),
+                    new MapGeometrySubmeshData(6, 3, 0),
+                    new MapGeometrySubmeshData(9, 3, 0)
+                },
+                materials: new[] { Material("Maps/Test/Opaque") });
+
+            MapGeometryRenderer.DrawPlan plan = MapGeometryRenderer.BuildDrawPlan(scene, 0b0000_0101);
+
+            Assert.Equal(3, plan.OpaqueGroups.Count);
+            Assert.Contains(plan.OpaqueGroups, group => group.StartIndex == 0);
+            Assert.Contains(plan.OpaqueGroups, group => group.StartIndex == 3);
+            Assert.Contains(plan.OpaqueGroups, group => group.StartIndex == 9);
+            Assert.DoesNotContain(plan.OpaqueGroups, group => group.StartIndex == 6);
         }
 
         [Fact]
@@ -127,6 +157,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal(Vector3.One, light.SunColor);
             Assert.Equal(Vector3.One, light.SkyColor);
             Assert.Equal(Vector3.One, light.GroundColor);
+            Assert.Equal(Vector3.One, light.HorizonColor);
             Assert.True(light.Direction.X > 0f, "Viewport space mirrors the authored negative X direction.");
         }
 
@@ -148,6 +179,40 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.InRange(light.Direction.Length(), 0.9999f, 1.0001f);
             Assert.True(light.Direction.X > 0f);
             Assert.True(light.GroundColor.X < 0.02f, "Authored sun colours are converted from sRGB to linear light.");
+        }
+
+        [Fact]
+        public void PreviewSunOverrideUsesItsSharesWithoutRenormalizingThem()
+        {
+            var authored = new MapSunData(
+                new Vector3(-0.25f, 0.75f, -0.05f),
+                Vector4.One,
+                1f,
+                Vector4.One,
+                Vector4.One,
+                new Vector4(0.2f, 0.3f, 0.4f, 1f),
+                1.5f,
+                1.25f,
+                false,
+                Vector4.Zero,
+                Vector4.Zero,
+                Vector2.Zero,
+                0f);
+            var preview = new MapSunPreviewOverride(
+                Vector3.UnitY,
+                Vector4.One,
+                0.9f,
+                Vector4.One,
+                Vector4.One,
+                0.2f);
+            MapSunData effective = MapPreviewSemantics.EffectiveSun(authored, preview);
+
+            MapGeometryRenderer.LightState light = MapGeometryRenderer.ResolveLight(effective, preview);
+
+            Assert.Equal(0.9f, light.SunStrength, 4);
+            Assert.Equal(0.2f, light.AmbientStrength, 4);
+            Assert.Equal(1.25f, light.LightMapColorScale, 4);
+            Assert.True(light.HorizonColor.X < 0.04f, "Authored horizon stays carried through the preview override.");
         }
 
         [Fact]

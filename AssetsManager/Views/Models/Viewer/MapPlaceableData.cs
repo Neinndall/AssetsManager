@@ -29,6 +29,8 @@ namespace AssetsManager.Views.Models.Viewer
                 return false;
             return (Visibility & (1 << layer)) != 0;
         }
+
+        public bool IsVisibleForFlags(int flags) => (Visibility & flags) != 0;
     }
 
     /// <summary>

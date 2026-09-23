@@ -34,6 +34,7 @@ namespace AssetsManager.Services.Viewer.Loading
         private readonly LogService _logService;
         private readonly HashResolverService _hashResolverService;
         private readonly MapAssetResolver _assetResolver;
+        private readonly BinDocumentClosureLoader _binClosureLoader;
 
 
         public SknLoadingService(
@@ -47,6 +48,7 @@ namespace AssetsManager.Services.Viewer.Loading
             _assetResolver = wadContentProvider != null && appSettings != null
                 ? new MapAssetResolver(wadContentProvider, appSettings)
                 : null;
+            _binClosureLoader = _assetResolver == null ? null : new BinDocumentClosureLoader(_assetResolver);
         }
 
         // Loads an SKN model and its textures from a custom texture directory (for chromas).
@@ -99,7 +101,7 @@ namespace AssetsManager.Services.Viewer.Loading
 
         // Loads an SKN model and its textures from the SKN file directory (standard behavior).
         public Task<SceneModel> LoadModel(string filePath, CancellationToken cancellationToken = default)
-            => LoadModelCore(filePath, null, loadDirectoryTextures: true, cancellationToken);
+            => LoadModelCore(filePath, null, loadDirectoryTextures: true, null, cancellationToken);
 
         /// <summary>
         /// Loads an SKN while using the exact skin BIN already selected by the caller.
@@ -109,13 +111,15 @@ namespace AssetsManager.Services.Viewer.Loading
         public Task<SceneModel> LoadModelWithSkinBin(
             string filePath,
             string skinBinPath,
+            string projectRoot = null,
             CancellationToken cancellationToken = default)
-            => LoadModelCore(filePath, skinBinPath, loadDirectoryTextures: false, cancellationToken);
+            => LoadModelCore(filePath, skinBinPath, loadDirectoryTextures: false, projectRoot, cancellationToken);
 
         private async Task<SceneModel> LoadModelCore(
             string filePath,
             string explicitSkinBinPath,
             bool loadDirectoryTextures,
+            string projectRoot,
             CancellationToken cancellationToken)
         {
             if (_hashResolverService != null)
@@ -145,6 +149,7 @@ namespace AssetsManager.Services.Viewer.Loading
                         true,
                         explicitSkinBinPath,
                         filePath,
+                        projectRoot,
                         cancellationToken);
                     if (!loadDirectoryTextures)
                         selectableTextureKeys = loadedTextures.Keys.ToArray();
@@ -411,6 +416,7 @@ namespace AssetsManager.Services.Viewer.Loading
             bool loadReferencedTextures,
             string explicitSkinBinPath = null,
             string targetSknPath = null,
+            string projectRoot = null,
             CancellationToken cancellationToken = default)
         {
             string skinBinPath = !string.IsNullOrWhiteSpace(explicitSkinBinPath) && File.Exists(explicitSkinBinPath)
@@ -424,7 +430,10 @@ namespace AssetsManager.Services.Viewer.Loading
 
             try
             {
-                var binTrees = LoadMaterialBinTrees(skinBinPath).ToList();
+                var binTrees = (await LoadMaterialBinTreesAsync(
+                    skinBinPath,
+                    projectRoot,
+                    cancellationToken)).ToList();
                 if (binTrees.Count == 0)
                 {
                     return null;
@@ -551,6 +560,27 @@ namespace AssetsManager.Services.Viewer.Loading
                 _logService.LogError(ex, $"Failed to read skin material bin: {skinBinPath}");
                 return null;
             }
+        }
+
+        private async Task<IReadOnlyList<BinTree>> LoadMaterialBinTreesAsync(
+            string primaryBinPath,
+            string projectRoot,
+            CancellationToken cancellationToken)
+        {
+            if (_binClosureLoader == null)
+                return LoadMaterialBinTrees(primaryBinPath);
+
+            var primary = MapResolvedAsset.FromPhysical(
+                Path.GetFileName(primaryBinPath),
+                primaryBinPath,
+                MapAssetOrigin.SelectedFile);
+            return await _binClosureLoader.LoadAsync(
+                primary,
+                projectRoot,
+                MaximumLinkedMaterialBins,
+                cancellationToken,
+                (asset, ex) => _logService.LogDebug(
+                    $"Could not read skin material BIN dependency '{asset?.VirtualPath}': {ex.Message}"));
         }
 
         private IReadOnlyList<BinTree> LoadMaterialBinTrees(string primaryBinPath)

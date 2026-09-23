@@ -97,6 +97,49 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal(1d + 5d / 30d, snap.UntilSeconds!.Value, 5);
         }
 
+        [Fact]
+        public void VisibilityKeepsAuthoredNonForwardEndWhileJointSnapNormalizesIt()
+        {
+            var clip = new AnimationClipDefinition(
+                1,
+                Atomic,
+                1f / 30f,
+                0f,
+                30f,
+                new AnimationClipEventDefinition[]
+                {
+                    new AnimationSubmeshVisibilityEventDefinition(
+                        10,
+                        6f,
+                        6f,
+                        new[] { 0x1111u },
+                        new[] { 0x2222u }),
+                    new AnimationJointSnapEventDefinition(
+                        11,
+                        8f,
+                        4f,
+                        0x3333u,
+                        0x4444u,
+                        Vector3.Zero)
+                },
+                "A",
+                "a.anm");
+            var steps = new IAnimationAsset[]
+            {
+                new RecordingAnimationAsset(1f, 30f)
+            };
+
+            IReadOnlyList<AnimationClipTimedCue> cues =
+                MapCharacterAnimationRuntime.BuildTimedCues(new[] { clip }, steps);
+
+            AnimationSubmeshVisibilityCue visibility = Assert.IsType<AnimationSubmeshVisibilityCue>(cues[0]);
+            Assert.Equal(0.2d, visibility.AtSeconds, 5);
+            Assert.Equal(0.2d, visibility.UntilSeconds!.Value, 5);
+            AnimationJointSnapCue snap = Assert.IsType<AnimationJointSnapCue>(cues[1]);
+            Assert.Equal(8d / 30d, snap.AtSeconds, 5);
+            Assert.Null(snap.UntilSeconds);
+        }
+
         [Theory]
         [InlineData("1234567890abcdef.anm", 0x1234567890abcdeful)]
         [InlineData("1234567890abcdef", 0x1234567890abcdeful)]

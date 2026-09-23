@@ -125,7 +125,10 @@ namespace AssetsManager.Services.Viewer.Loading
                 characters,
                 particles,
                 _hashResolver);
-            IReadOnlyList<MapParticleData> playedParticles = MapParticleSemantics.PlayedOnLayer(particles, 0);
+            int openingVisibilityFlags = MapGeometrySemantics.OpeningFlags(geometry);
+            IReadOnlyList<MapParticleData> playedParticles = MapParticleSemantics.PlayedForFlags(
+                particles,
+                openingVisibilityFlags);
             MapParticleSystemCatalog particleSystems = _particleSystemParser.Parse(
                 materials,
                 MapParticleSemantics.GroupBySystem(playedParticles),
@@ -163,7 +166,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 $"materials={geometry.Materials.Count}, textures={textureStatus}, programTextures={programTextureStatus}, lightmaps={lightmapStatus}, " +
                 $"chunks={placeables.Count}, placeables={placeables.Sum(chunk => chunk.Items.Count)}, " +
                 $"characters={characters.Count}, particles={particles.Count}, " +
-                $"particleSystems={particleSystems.Groups.Count}, sun={(sun == null ? "default" : "authored")}, " +
+                $"openingFlags=0x{openingVisibilityFlags:x2}, particleSystems={particleSystems.Groups.Count}, sun={(sun == null ? "default" : "authored")}, " +
                 $"postEffects={(postEffects?.DrawsAnything == true ? "on" : "off")}, " +
                 $"ssao={(ambientOcclusion?.DrawsAnything == true ? "on" : "off")}.");
             return new MapSceneData(
@@ -177,13 +180,14 @@ namespace AssetsManager.Services.Viewer.Loading
                 characters,
                 particles,
                 particleSystems,
-                MapGeometrySemantics.CalculateOrigin(geometry),
+                MapGeometrySemantics.CalculateOriginForFlags(geometry, openingVisibilityFlags),
                 outline,
                 sun,
                 postEffects,
                 ambientOcclusion,
                 lightmaps,
-                programTextures);
+                programTextures,
+                openingVisibilityFlags);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewTexturesAsync(

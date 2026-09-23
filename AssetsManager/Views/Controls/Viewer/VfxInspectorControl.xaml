@@ -648,6 +648,269 @@
                                               Width="112" Height="24" FontSize="9.5"/>
                                 </StackPanel>
 
+                                <Button x:Name="MapLayersButton"
+                                        Click="MapLayers_Click"
+                                        Style="{StaticResource TransparentIconButton}"
+                                        Height="26" Padding="6,0" Margin="0,0,4,0"
+                                        ToolTip="MAP visibility layers"
+                                        Visibility="{Binding HasMapLayers, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="LayersOutline" Width="13" Height="13"
+                                                                    Foreground="#38BDF8" Margin="0,0,5,0"/>
+                                        <TextBlock Text="Layers" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimary}"/>
+                                        <TextBlock Text="{Binding ActiveMapLayerCount, StringFormat=' {0}'}" FontSize="10"
+                                                   FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+                                                                    Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <Popup x:Name="MapLayersPopup"
+                                       PlacementTarget="{Binding ElementName=MapLayersButton}"
+                                       Placement="Bottom" HorizontalOffset="-55" VerticalOffset="6"
+                                       AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True"
+                                       DataContext="{Binding DataContext, ElementName=MapLayersButton}">
+                                    <Border Width="205" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+                                            BorderThickness="1" CornerRadius="7" Padding="10">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.42"/>
+                                        </Border.Effect>
+                                        <StackPanel>
+                                            <TextBlock Text="MAP LAYERS" FontSize="10" FontWeight="Bold"
+                                                       Foreground="{StaticResource TextSecondary}" Margin="2,0,0,7"/>
+                                            <ItemsControl ItemsSource="{Binding MapLayers}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox Style="{StaticResource ModernCheckBox}"
+                                                                  IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                                  Click="MapLayerCheckBox_Click"
+                                                                  Margin="0,2,0,2">
+                                                            <Grid Width="165">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Text="{Binding Label}" FontSize="10.5"/>
+                                                                <TextBlock Grid.Column="1" Text="{Binding TriangleText}"
+                                                                           FontSize="9.5" Foreground="{StaticResource TextMuted}"
+                                                                           FontFamily="Consolas" Margin="8,0,0,0"/>
+                                                            </Grid>
+                                                        </CheckBox>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+
+                                <Button x:Name="MapSunButton"
+                                        Click="MapSun_Click"
+                                        Style="{StaticResource TransparentIconButton}"
+                                        Height="26" Padding="6,0" Margin="0,0,4,0"
+                                        ToolTip="MAP sun override"
+                                        Visibility="{Binding HasMapPreview, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="WhiteBalanceSunny" Width="13" Height="13"
+                                                                    Foreground="#FFD166" Margin="0,0,5,0"/>
+                                        <TextBlock Text="Sun" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimary}"/>
+                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+                                                                    Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <Popup x:Name="MapSunPopup"
+                                       PlacementTarget="{Binding ElementName=MapSunButton}"
+                                       Placement="Bottom" HorizontalOffset="-120" VerticalOffset="6"
+                                       AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+                                    <Border Width="310" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+                                            BorderThickness="1" CornerRadius="7" Padding="11">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.42"/>
+                                        </Border.Effect>
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,8">
+                                                <TextBlock Text="SUN OVERRIDE" FontSize="10" FontWeight="Bold"
+                                                           Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                <Button Content="Reset" HorizontalAlignment="Right" Padding="7,2"
+                                                        Style="{StaticResource TransparentIconButton}" Click="MapSunReset_Click"/>
+                                            </Grid>
+                                            <TextBlock Text="Azimuth" FontSize="9.5" Foreground="{StaticResource TextMuted}"/>
+                                            <Slider x:Name="MapSunAzimuthSlider" Minimum="-180" Maximum="180" TickFrequency="1"
+                                                    Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
+                                            <TextBlock Text="Elevation" FontSize="9.5" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0"/>
+                                            <Slider x:Name="MapSunElevationSlider" Minimum="0" Maximum="89" TickFrequency="1"
+                                                    Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
+                                            <Grid Margin="0,6,0,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="Sun strength" FontSize="9.5" Foreground="{StaticResource TextMuted}"/>
+                                                    <Slider x:Name="MapSunStrengthSlider" Minimum="0" Maximum="2" TickFrequency="0.01"
+                                                            Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="Ambient" FontSize="9.5" Foreground="{StaticResource TextMuted}"/>
+                                                    <Slider x:Name="MapSunAmbientSlider" Minimum="0" Maximum="2" TickFrequency="0.01"
+                                                            Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
+                                                </StackPanel>
+                                            </Grid>
+                                            <Grid Margin="0,7,0,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="Sun color" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                <TextBox x:Name="MapSunColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}"
+                                                         Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas"
+                                                         TextChanged="MapSunColor_TextChanged"/>
+                                            </Grid>
+                                            <Grid Margin="0,4,0,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="Sky color" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                <TextBox x:Name="MapSunSkyColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}"
+                                                         Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas"
+                                                         TextChanged="MapSunColor_TextChanged"/>
+                                            </Grid>
+                                            <Grid Margin="0,4,0,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="Ground" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                <TextBox x:Name="MapSunGroundColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}"
+                                                         Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas"
+                                                         TextChanged="MapSunColor_TextChanged"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+
+                                <Button x:Name="MapPostButton"
+                                        Click="MapPost_Click"
+                                        Style="{StaticResource TransparentIconButton}"
+                                        Height="26" Padding="6,0" Margin="0,0,4,0"
+                                        ToolTip="MAP post effects override"
+                                        Visibility="{Binding HasMapPreview, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Kind="ImageFilterVintage" Width="13" Height="13"
+                                                                    Foreground="#A78BFA" Margin="0,0,5,0"/>
+                                        <TextBlock Text="Post" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimary}"/>
+                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+                                                                    Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <Popup x:Name="MapPostPopup"
+                                       PlacementTarget="{Binding ElementName=MapPostButton}"
+                                       Placement="Bottom" HorizontalOffset="-220" VerticalOffset="6"
+                                       AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+                                    <Border Width="390" MaxHeight="620" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+                                            BorderThickness="1" CornerRadius="7" Padding="11">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.42"/>
+                                        </Border.Effect>
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <StackPanel Margin="0,0,5,0">
+                                                <Grid Margin="0,0,0,8">
+                                                    <TextBlock Text="POST EFFECTS" FontSize="10" FontWeight="Bold"
+                                                               Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                    <Button Content="Reset" HorizontalAlignment="Right" Padding="7,2"
+                                                            Style="{StaticResource TransparentIconButton}" Click="MapPostReset_Click"/>
+                                                </Grid>
+
+                                                <TextBlock Text="AMBIENT OCCLUSION" FontSize="9.5" FontWeight="Bold" Foreground="#A78BFA"/>
+                                                <CheckBox x:Name="MapSsaoEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}"
+                                                          Margin="0,4,0,4" Click="MapSsaoControl_Changed"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="Quality" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                        <ComboBox x:Name="MapSsaoQualityCombo" Style="{StaticResource ModernComboBox}" Height="24"
+                                                                  SelectionChanged="MapSsaoControl_Changed">
+                                                            <ComboBoxItem Content="4 samples"/>
+                                                            <ComboBoxItem Content="8 samples"/>
+                                                        </ComboBox>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Text="Radius" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                        <Slider x:Name="MapSsaoRadiusSlider" Minimum="0" Maximum="200" TickFrequency="1"
+                                                                Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                                <Grid Margin="0,4,0,0">
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="Power" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                        <Slider x:Name="MapSsaoPowerSlider" Minimum="0" Maximum="30" TickFrequency="0.5"
+                                                                Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Text="Intensity" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                        <Slider x:Name="MapSsaoIntensitySlider" Minimum="0" Maximum="1" TickFrequency="0.01"
+                                                                Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                                <Grid Margin="0,4,0,0">
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="Bias" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                        <Slider x:Name="MapSsaoBiasSlider" Minimum="0" Maximum="20" TickFrequency="0.5"
+                                                                Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Text="Buffer scale" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                        <Slider x:Name="MapSsaoBufferScaleSlider" Minimum="0.25" Maximum="1" TickFrequency="0.05"
+                                                                Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                                <CheckBox x:Name="MapSsaoEdgeAwareCheck" Content="Edge-aware blur" Style="{StaticResource ModernCheckBox}"
+                                                          Margin="0,4,0,7" Click="MapSsaoControl_Changed"/>
+
+                                                <Separator Margin="0,2,0,7"/>
+                                                <TextBlock Text="DEPTH FOG" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8"/>
+                                                <CheckBox x:Name="MapDepthFogEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}"
+                                                          Margin="0,4,0,4" Click="MapPostControl_Changed"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Color" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="MapDepthFogColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}"
+                                                             Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapPostControl_Changed"/>
+                                                </Grid>
+                                                <Grid Margin="0,4,0,0">
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                    <StackPanel><TextBlock Text="Start" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogStartSlider" Minimum="0" Maximum="20000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
+                                                    <StackPanel Grid.Column="2"><TextBlock Text="End" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogEndSlider" Minimum="0" Maximum="20000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
+                                                    <StackPanel Grid.Column="4"><TextBlock Text="Max" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogMaxSlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
+                                                </Grid>
+
+                                                <Separator Margin="0,7,0,7"/>
+                                                <TextBlock Text="HEIGHT FOG" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8"/>
+                                                <CheckBox x:Name="MapHeightFogEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}"
+                                                          Margin="0,4,0,4" Click="MapPostControl_Changed"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Color" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="MapHeightFogColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}"
+                                                             Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapPostControl_Changed"/>
+                                                </Grid>
+                                                <Grid Margin="0,4,0,0">
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                    <StackPanel><TextBlock Text="Start" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogStartSlider" Minimum="-1000" Maximum="1500" TickFrequency="10" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
+                                                    <StackPanel Grid.Column="2"><TextBlock Text="End" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogEndSlider" Minimum="-1000" Maximum="1500" TickFrequency="10" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
+                                                    <StackPanel Grid.Column="4"><TextBlock Text="Max" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogMaxSlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
+                                                </Grid>
+
+                                                <Separator Margin="0,7,0,7"/>
+                                                <TextBlock Text="DEPTH OF FIELD" FontSize="9.5" FontWeight="Bold" Foreground="#F59E0B"/>
+                                                <CheckBox x:Name="MapDofEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}"
+                                                          Margin="0,4,0,4" Click="MapPostControl_Changed"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                    <StackPanel><TextBlock Text="Focal" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofFocalSlider" Minimum="0" Maximum="10000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
+                                                    <StackPanel Grid.Column="2"><TextBlock Text="Focus width" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofWidthSlider" Minimum="0" Maximum="5000" TickFrequency="25" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
+                                                    <StackPanel Grid.Column="4"><TextBlock Text="CoC" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofCocSlider" Minimum="0" Maximum="30" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
+                                                </Grid>
+                                            </StackPanel>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Popup>
+
                                 <!-- Preview display controls mirror the VFX reference viewer. -->
                                 <Button x:Name="PreviewShowButton"
                                         Click="PreviewShow_Click"

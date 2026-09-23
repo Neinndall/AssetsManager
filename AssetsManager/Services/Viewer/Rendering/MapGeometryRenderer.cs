@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
@@ -20,7 +21,6 @@ namespace AssetsManager.Services.Viewer.Rendering
     /// </summary>
     internal sealed class MapGeometryRenderer : IDisposable
     {
-        private const int DefaultLayer = MapGeometryData.DefaultLayer;
         private const string IndicatorPattern = "indicator";
 
         private static readonly Vector3 StoneSrgb = new(154f / 255f, 149f / 255f, 140f / 255f);
@@ -111,6 +111,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private GL _gl;
         private DrawElementsDelegate _drawElements;
         private MapSceneData _scene;
+        private MapSunData _previewSun;
         private DrawPlan _plan;
         private uint _program;
         private uint _vao;
@@ -227,12 +228,24 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             ReleaseSceneResources();
             _scene = scene;
-            _plan = BuildDrawPlan(scene);
+            _previewSun = scene.Sun;
+            _plan = BuildDrawPlan(scene, scene.OpeningVisibilityFlags);
             _light = ResolveLight(scene.Sun);
             UploadGeometry(scene.Geometry);
             UpdateTextures(scene.Textures);
             UpdateProgramTextures(scene.ProgramTextures);
             UpdateLightmaps(scene.Lightmaps);
+        }
+
+        internal void SetPreviewSun(MapSunData effectiveSun, MapSunPreviewOverride? previewOverride)
+        {
+            if (!_ready || _scene == null)
+                return;
+
+            _previewSun = effectiveSun;
+            _light = previewOverride.HasValue
+                ? ResolveLight(effectiveSun, previewOverride.Value)
+                : ResolveLight(effectiveSun);
         }
 
         /// <summary>
@@ -336,7 +349,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 projection,
                 eye,
                 timeSeconds,
-                _scene.Sun);
+                _previewSun);
 
             PrepareStockFrame(viewProjection);
             _gl.ActiveTexture(TextureUnit.Texture0);
@@ -871,7 +884,17 @@ namespace AssetsManager.Services.Viewer.Rendering
             return sampler;
         }
 
+        internal void SetVisibilityFlags(int flags)
+        {
+            if (!_ready || _scene == null)
+                return;
+            _plan = BuildDrawPlan(_scene, flags);
+        }
+
         internal static DrawPlan BuildDrawPlan(MapSceneData scene)
+            => BuildDrawPlan(scene, scene?.OpeningVisibilityFlags ?? 0);
+
+        internal static DrawPlan BuildDrawPlan(MapSceneData scene, int visibilityFlags)
         {
             ArgumentNullException.ThrowIfNull(scene);
             MapGeometryData geometry = scene.Geometry;
@@ -885,7 +908,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             for (int meshIndex = 0; meshIndex < geometry.Meshes.Count; meshIndex++)
             {
                 MapGeometryMeshData mesh = geometry.Meshes[meshIndex];
-                if (!mesh.IsVisibleOnLayer(DefaultLayer) || mesh.SubmeshCount <= 0)
+                if (!mesh.IsVisibleForFlags(visibilityFlags) || mesh.SubmeshCount <= 0)
                     continue;
 
                 bool meshDoubleSided = (mesh.Flags & MapGeometryMeshFlags.CullDisabled) != 0;
@@ -982,7 +1005,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     0.4f,
                     Vector3.One,
                     Vector3.One,
-                    new Vector3(0.4f),
+                    Vector3.One,
                     0.6f,
                     1f);
             }
@@ -1016,6 +1039,26 @@ namespace AssetsManager.Services.Viewer.Rendering
                 SrgbToLinear(new Vector3(sun.HorizonColor.X, sun.HorizonColor.Y, sun.HorizonColor.Z)),
                 ambientStrength,
                 MathF.Max(sun.LightMapColorScale, 0f));
+        }
+
+        internal static LightState ResolveLight(MapSunData sun, MapSunPreviewOverride previewOverride)
+        {
+            LightState own = ResolveLight(sun);
+            Vector3 direction = previewOverride.Direction;
+            if (!IsFinite(direction) || direction.LengthSquared() <= 1e-12f)
+                direction = MapPreviewSemantics.DefaultSun.Direction;
+            direction = Vector3.Normalize(direction);
+            direction.X = -direction.X;
+
+            return own with
+            {
+                Direction = direction,
+                SunColor = SrgbToLinear(new Vector3(previewOverride.Color.X, previewOverride.Color.Y, previewOverride.Color.Z)),
+                SunStrength = MathF.Max(previewOverride.Strength, 0f),
+                SkyColor = SrgbToLinear(new Vector3(previewOverride.SkyColor.X, previewOverride.SkyColor.Y, previewOverride.SkyColor.Z)),
+                GroundColor = SrgbToLinear(new Vector3(previewOverride.GroundColor.X, previewOverride.GroundColor.Y, previewOverride.GroundColor.Z)),
+                AmbientStrength = MathF.Max(previewOverride.Ambient, 0f)
+            };
         }
 
         internal static Vector3 SrgbToLinear(Vector3 value) => new(
@@ -1078,6 +1121,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
 
             _scene = null;
+            _previewSun = null;
             _plan = null;
         }
 

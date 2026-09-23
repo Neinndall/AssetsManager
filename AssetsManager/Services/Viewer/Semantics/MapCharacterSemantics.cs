@@ -16,6 +16,11 @@ namespace AssetsManager.Services.Viewer.Semantics
         public static IReadOnlyList<MapCharacterData> StoodOnLayer(
             IEnumerable<MapCharacterData> characters,
             int layer)
+            => StoodForFlags(characters, 1 << layer);
+
+        public static IReadOnlyList<MapCharacterData> StoodForFlags(
+            IEnumerable<MapCharacterData> characters,
+            int flags)
         {
             if (characters == null)
                 return Array.Empty<MapCharacterData>();
@@ -23,7 +28,7 @@ namespace AssetsManager.Services.Viewer.Semantics
             return characters
                 .Where(character =>
                     character != null &&
-                    character.Placeable.IsVisibleOnLayer(layer) &&
+                    character.Placeable.IsVisibleForFlags(flags) &&
                     !character.VisibilityController.HasValue &&
                     character.Team != NeutralTeam)
                 .ToArray();

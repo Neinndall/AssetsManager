@@ -46,6 +46,8 @@ namespace AssetsManager.Views.Models.Viewer
 
             return (Visibility & (1 << layer)) != 0;
         }
+
+        public bool IsVisibleForFlags(int flags) => (Visibility & flags) != 0;
     }
 
     internal sealed record MapGeometrySubmeshData(
@@ -53,9 +55,17 @@ namespace AssetsManager.Views.Models.Viewer
         int IndexCount,
         int MaterialIndex);
 
+    internal sealed record MapGeometryLayerData(
+        int Index,
+        int Triangles)
+    {
+        public int Flag => 1 << Index;
+    }
+
     internal sealed class MapGeometryData
     {
         public const int DefaultLayer = 0;
+        public const int LayerCount = 8;
 
         public Vector3[] Positions { get; }
         public Vector3[] Normals { get; }

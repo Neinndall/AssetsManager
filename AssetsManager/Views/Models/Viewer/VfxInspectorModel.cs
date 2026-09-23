@@ -653,6 +653,36 @@ namespace AssetsManager.Views.Models.Viewer
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
     }
 
+    public sealed class MapVisibilityLayerOption : INotifyPropertyChanged
+    {
+        private bool _isEnabled;
+
+        internal MapVisibilityLayerOption(MapGeometryLayerData layer, bool isEnabled)
+        {
+            Index = layer?.Index ?? 0;
+            Triangles = layer?.Triangles ?? 0;
+            _isEnabled = isEnabled;
+        }
+
+        public int Index { get; }
+        public int Triangles { get; }
+        public string Label => $"Layer {Index + 1}";
+        public string TriangleText => $"{Triangles:N0} tris";
+
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                if (_isEnabled == value) return;
+                _isEnabled = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEnabled)));
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+    }
+
     /// <summary>
     /// Primary view model for the VFX Inspector & Diagnostic Studio window.
     /// Manages root directory scanning, system selection, emitter live controls, and diagnostics.
@@ -667,6 +697,7 @@ namespace AssetsManager.Views.Models.Viewer
         private VfxSpellBrowserItem _selectedSpell;
         private MapVariantData _selectedMapVariant;
         private MapBrowserNode _selectedMapNode;
+        private bool _hasMapPreview;
         private float? _animationParameter;
         private bool _isAnimationMode = true;
         private bool _isPlaying;
@@ -741,6 +772,7 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<AnimationClipCatalogItem> DetectedAnimations { get; } = new();
         public ObservableCollection<float> AnimationParameterValues { get; } = new();
         public ObservableCollection<MapVariantData> MapVariants { get; } = new();
+        public ObservableCollection<MapVisibilityLayerOption> MapLayers { get; } = new();
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxForceAuthoringItem> ForceAuthoringItems { get; } = new();
@@ -799,6 +831,18 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public bool HasMultipleMapVariants => MapVariants.Count > 1;
+        public bool HasMapLayers => MapLayers.Count > 0;
+        public int ActiveMapLayerCount => MapLayers.Count(layer => layer.IsEnabled);
+        public bool HasMapPreview
+        {
+            get => _hasMapPreview;
+            internal set
+            {
+                if (_hasMapPreview == value) return;
+                _hasMapPreview = value;
+                OnPropertyChanged();
+            }
+        }
 
         public MapBrowserNode SelectedMapNode
         {
@@ -837,6 +881,22 @@ namespace AssetsManager.Views.Models.Viewer
             _selectedMapVariant = MapVariantData.Opening(MapVariants);
             OnPropertyChanged(nameof(SelectedMapVariant));
             OnPropertyChanged(nameof(HasMultipleMapVariants));
+        }
+
+        internal void SetMapLayers(IEnumerable<MapGeometryLayerData> layers, int flags)
+        {
+            MapLayers.Clear();
+            foreach (MapGeometryLayerData layer in layers ?? Array.Empty<MapGeometryLayerData>())
+                MapLayers.Add(new MapVisibilityLayerOption(layer, (flags & layer.Flag) != 0));
+            OnPropertyChanged(nameof(HasMapLayers));
+            OnPropertyChanged(nameof(ActiveMapLayerCount));
+        }
+
+        internal void SetMapLayerFlags(int flags)
+        {
+            foreach (MapVisibilityLayerOption layer in MapLayers)
+                layer.IsEnabled = (flags & (1 << layer.Index)) != 0;
+            OnPropertyChanged(nameof(ActiveMapLayerCount));
         }
 
         public float? AnimationParameter

@@ -112,7 +112,16 @@ namespace AssetsManager.Services.Viewer.Loading
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(backdrop);
-            return _runtimeFactory.LoadCharactersAsync(backdrop.Scene, cancellationToken);
+            return _runtimeFactory.LoadCharactersAsync(backdrop.Scene, backdrop.VisibilityFlags, cancellationToken);
+        }
+
+        internal Task<IReadOnlyList<MapCharacterRuntimeGroup>> LoadCharacterAssetsAsync(
+            MapSceneRuntime backdrop,
+            int visibilityFlags,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(backdrop);
+            return _runtimeFactory.LoadCharactersAsync(backdrop.Scene, visibilityFlags, cancellationToken);
         }
 
         internal Task<MapParticleSceneRuntime> LoadParticleAssetsAsync(
@@ -120,7 +129,16 @@ namespace AssetsManager.Services.Viewer.Loading
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(backdrop);
-            return _runtimeFactory.LoadParticlesAsync(backdrop.Scene, cancellationToken);
+            return _runtimeFactory.LoadParticlesAsync(backdrop.Scene, backdrop.VisibilityFlags, cancellationToken);
+        }
+
+        internal Task<MapParticleSceneRuntime> LoadParticleAssetsAsync(
+            MapSceneRuntime backdrop,
+            int visibilityFlags,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(backdrop);
+            return _runtimeFactory.LoadParticlesAsync(backdrop.Scene, visibilityFlags, cancellationToken);
         }
 
         internal Task<MapSceneRuntime> LoadAsync(

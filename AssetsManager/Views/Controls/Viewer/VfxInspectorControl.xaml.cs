@@ -49,6 +49,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isCleanedUp;
         private bool _isActive;
         private bool _isGlStarted;
+        private bool _discardNextSimulationDelta;
         private bool _isExitPending;
         private bool _isBulkEmitterStateChange;
         private bool _isUpdatingRigControls;
@@ -60,16 +61,22 @@ namespace AssetsManager.Views.Controls.Viewer
         private GlMeshRenderer _championMeshRenderer;
         private SceneModel _championModel;
         private AnimationService _championAnimationService;
+        private LeagueToolkit.Core.Animation.RigResource _championBindSkeleton;
+        private Func<string, uint, Matrix4x4?> _championBindBoneTransformProvider;
+        private Matrix4x4[] _championBindSkinningMatrices = Array.Empty<Matrix4x4>();
         private VfxClipCatalog _clipCatalog;
         private AnimationClipCatalogItem _activeAnimationClip;
         private readonly Dictionary<ModelPart, bool> _animationBasePartVisibility = new();
         private readonly HashSet<uint> _animationBaseHiddenSubmeshes = new();
+        private IReadOnlyList<VfxClipCueEvaluator.VisibilityEntry> _animationVisibilityTimeline =
+            Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
         private VfxLoadingService.Bundle _championBundle;
         private string _animationSearchDirectory;
         private int _championLoadGeneration;
         private System.Threading.CancellationTokenSource _scanCancellation;
         private System.Threading.CancellationTokenSource _binCancellation;
         private System.Threading.CancellationTokenSource _mapCancellation;
+        private System.Threading.CancellationTokenSource _mapLayerCancellation;
         private System.Threading.CancellationTokenSource _mapClipCancellation;
         private System.Threading.CancellationTokenSource _animationClipCancellation;
         private MapSceneRuntime _mapSceneRuntime;
@@ -81,8 +88,18 @@ namespace AssetsManager.Views.Controls.Viewer
         private MapCharacterRuntimeGroup _activeMapCharacterGroup;
         private MapCharacterData _activeMapCharacterPlacement;
         private AnimationClipDefinition _activeMapCharacterClip;
+        private IReadOnlyList<VfxClipCueEvaluator.VisibilityEntry> _mapAnimationVisibilityTimeline =
+            Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
+        private double _mapAnimationVisibilityDuration;
         private bool _mapGpuSceneDirty;
+        private bool _mapVisibilityDirty;
+        private bool _mapLightingDirty;
         private bool _mapTexturesDirty;
+        private MapSunPreviewOverride? _mapSunPreviewOverride;
+        private bool _hasMapPostEffectsOverride;
+        private MapPostEffectsData _mapPostEffectsOverride;
+        private MapSsaoPreviewOverride? _mapSsaoPreviewOverride;
+        private bool _isUpdatingMapPreviewControls;
         private readonly object _mapTextureUpdateGate = new();
         private readonly Dictionary<string, MapTextureImage> _pendingMapTextureUpdates = new(StringComparer.Ordinal);
         private readonly Dictionary<string, MapTextureImage> _pendingMapProgramTextureUpdates = new(StringComparer.Ordinal);
@@ -199,6 +216,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (_model.SelectedAnimation != null)
                 {
+                    BeginExclusivePreviewSelection();
                     ConfigureAnimationParameterOptions(_model.SelectedAnimation);
                     _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
                 }
@@ -206,7 +224,10 @@ namespace AssetsManager.Views.Controls.Viewer
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedSpell))
             {
                 if (_model.SelectedSpell != null)
+                {
+                    BeginExclusivePreviewSelection();
                     RequestSpellPreview(_model.SelectedSpell);
+                }
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedMapVariant) &&
                      !_suppressMapVariantReload &&
@@ -339,6 +360,9 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_isCleanedUp) return;
 
             _isActive = true;
+            // The reference preview starts a fresh RAF clock when content becomes visible, so the
+            // first resumed frame advances by zero rather than consuming hidden-tab wall time.
+            _discardNextSimulationDelta = true;
             if (!HasSelectedSystemReady())
             {
                 RequestSystemInspection(_model.SelectedSystem);
@@ -557,11 +581,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private void RequestSystemInspection(VfxSystemDiagnosticItem systemItem)
         {
             if (_isCleanedUp) return;
-            if (systemItem != null)
-            {
-                ClearAnimationClipCues();
-                ResetChampionAnimationForStandaloneSystem();
-            }
             if (ReferenceEquals(_pendingSystem, systemItem)) return;
             if (ReferenceEquals(_model.SelectedSystem, systemItem) && HasSelectedSystemReady()) return;
 
@@ -570,6 +589,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _inspectedSystem = null;
             _pendingSystem = systemItem;
+            if (systemItem == null) return;
+
+            _pendingSpell = null;
+            ResetPreviewContextForSelection();
         }
 
         private void TryInspectPendingSystem()
@@ -675,7 +698,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (!_isActive || !IsVisible) return;
 
-            float dt = (float)Math.Max(0d, delta.TotalSeconds);
+            float dt = ResolveSimulationFrameDelta(delta, _discardNextSimulationDelta);
+            _discardNextSimulationDelta = false;
 
             // Update background clear color matching main viewer (Dark Studio)
             switch (_model.BgMode)
@@ -760,7 +784,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         proj,
                         eye,
                         _mapSceneRuntime.CharacterTimeSeconds,
-                        _mapSceneRuntime.Scene.Sun,
+                        EffectiveMapSun(),
                         _mapSceneRuntime.Hidden,
                         viewMode: _model.PreviewViewMode,
                         wireOverlay: _model.EffectivePreviewWireOverlay);
@@ -768,8 +792,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 uint mapViewportWidth = (uint)Math.Max(1d, OpenTkControl.ActualWidth);
                 uint mapViewportHeight = (uint)Math.Max(1d, OpenTkControl.ActualHeight);
                 _mapPostEffectsRenderer?.CaptureSceneDepth(
-                    _mapSceneRuntime.Scene.PostEffects,
-                    _mapSceneRuntime.Scene.AmbientOcclusion,
+                    EffectiveMapPostEffects(),
+                    EffectiveMapSsao(),
                     mapViewportWidth,
                     mapViewportHeight);
 
@@ -877,10 +901,10 @@ namespace AssetsManager.Views.Controls.Viewer
                         return null;
                     });
                 }
-                else
+                else if (_model.SelectedSystem == null)
                 {
-                    // A standalone System is its own preview in LTK. Do not keep feeding the
-                    // previously selected Clip pose into the champion or bone-attached VFX.
+                    // No standalone System owns this frame. Clear any pose left by an Animation
+                    // Clip; standalone Systems install their cached bind pose when selected.
                     _vfxRenderer?.SetOwnerSkinningMatrices(null);
                     _vfxRenderer?.UpdateBoneTransforms(null);
                 }
@@ -921,8 +945,8 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_mapSceneRuntime != null)
             {
                 _mapPostEffectsRenderer?.Render(
-                    _mapSceneRuntime.Scene.PostEffects,
-                    _mapSceneRuntime.Scene.AmbientOcclusion,
+                    EffectiveMapPostEffects(),
+                    EffectiveMapSsao(),
                     view,
                     proj,
                     (uint)Math.Max(1d, OpenTkControl.ActualWidth),
@@ -1116,6 +1140,197 @@ namespace AssetsManager.Views.Controls.Viewer
             return new VfxDefinitionBounds(
                 new Vector3(-reach, 0f, -reach),
                 new Vector3(reach, VfxRigMotion.ChampionHeight, reach));
+        }
+
+        private void MapSun_Click(object sender, RoutedEventArgs e)
+        {
+            if (MapSunPopup == null || _mapSceneRuntime == null) return;
+            SyncMapPreviewControls();
+            MapSunPopup.IsOpen = !MapSunPopup.IsOpen;
+        }
+
+        private void MapPost_Click(object sender, RoutedEventArgs e)
+        {
+            if (MapPostPopup == null || _mapSceneRuntime == null) return;
+            SyncMapPreviewControls();
+            MapPostPopup.IsOpen = !MapPostPopup.IsOpen;
+        }
+
+        private void MapSunReset_Click(object sender, RoutedEventArgs e)
+        {
+            _mapSunPreviewOverride = null;
+            SyncMapPreviewControls();
+            MarkMapLightingDirty();
+        }
+
+        private void MapPostReset_Click(object sender, RoutedEventArgs e)
+        {
+            _hasMapPostEffectsOverride = false;
+            _mapPostEffectsOverride = null;
+            _mapSsaoPreviewOverride = null;
+            SyncMapPreviewControls();
+            MarkMapLightingDirty();
+        }
+
+        private void MapSunControl_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+            CommitMapSunControls();
+
+        private void MapSunColor_TextChanged(object sender, TextChangedEventArgs e) =>
+            CommitMapSunControls();
+
+        private void MapSsaoControl_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingMapPreviewControls || _mapSceneRuntime == null || MapSsaoQualityCombo == null)
+                return;
+
+            _mapSsaoPreviewOverride = new MapSsaoPreviewOverride(
+                MapSsaoEnabledCheck.IsChecked == true,
+                new MapSsaoData(
+                    MapSsaoQualityCombo.SelectedIndex <= 0 ? 0u : 1u,
+                    (float)MapSsaoRadiusSlider.Value,
+                    (float)MapSsaoBiasSlider.Value,
+                    (float)MapSsaoPowerSlider.Value,
+                    (float)MapSsaoIntensitySlider.Value,
+                    (float)MapSsaoBufferScaleSlider.Value,
+                    MapSsaoEdgeAwareCheck.IsChecked == true));
+            MarkMapLightingDirty();
+        }
+
+        private void MapPostControl_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingMapPreviewControls || _mapSceneRuntime == null || MapDepthFogColorTextBox == null)
+                return;
+            if (!TryParseMapPreviewColor(MapDepthFogColorTextBox.Text, out Vector4 depthColor) ||
+                !TryParseMapPreviewColor(MapHeightFogColorTextBox.Text, out Vector4 heightColor))
+                return;
+
+            _hasMapPostEffectsOverride = true;
+            _mapPostEffectsOverride = new MapPostEffectsData(
+                new MapFogData(
+                    MapDepthFogEnabledCheck.IsChecked == true,
+                    depthColor,
+                    (float)MapDepthFogStartSlider.Value,
+                    (float)MapDepthFogEndSlider.Value,
+                    (float)MapDepthFogMaxSlider.Value),
+                new MapFogData(
+                    MapHeightFogEnabledCheck.IsChecked == true,
+                    heightColor,
+                    (float)MapHeightFogStartSlider.Value,
+                    (float)MapHeightFogEndSlider.Value,
+                    (float)MapHeightFogMaxSlider.Value),
+                new MapDepthOfFieldData(
+                    MapDofEnabledCheck.IsChecked == true,
+                    (float)MapDofFocalSlider.Value,
+                    (float)MapDofWidthSlider.Value,
+                    (float)MapDofCocSlider.Value));
+            MarkMapLightingDirty();
+        }
+
+        private void CommitMapSunControls()
+        {
+            if (_isUpdatingMapPreviewControls || _mapSceneRuntime == null || MapSunColorTextBox == null)
+                return;
+            if (!TryParseMapPreviewColor(MapSunColorTextBox.Text, out Vector4 color) ||
+                !TryParseMapPreviewColor(MapSunSkyColorTextBox.Text, out Vector4 sky) ||
+                !TryParseMapPreviewColor(MapSunGroundColorTextBox.Text, out Vector4 ground))
+                return;
+
+            _mapSunPreviewOverride = new MapSunPreviewOverride(
+                MapPreviewSemantics.SunDirection(
+                    (float)MapSunAzimuthSlider.Value,
+                    (float)MapSunElevationSlider.Value),
+                color,
+                (float)MapSunStrengthSlider.Value,
+                sky,
+                ground,
+                (float)MapSunAmbientSlider.Value);
+            MarkMapLightingDirty();
+        }
+
+        private void SyncMapPreviewControls()
+        {
+            if (_mapSceneRuntime == null || MapSunAzimuthSlider == null)
+                return;
+
+            _isUpdatingMapPreviewControls = true;
+            try
+            {
+                MapSunPreviewOverride sun = _mapSunPreviewOverride ??
+                    MapPreviewSemantics.OwnSun(_mapSceneRuntime.Scene.Sun);
+                (float azimuth, float elevation) = MapPreviewSemantics.SunAngles(sun.Direction);
+                MapSunAzimuthSlider.Value = azimuth;
+                MapSunElevationSlider.Value = elevation;
+                MapSunStrengthSlider.Value = sun.Strength;
+                MapSunAmbientSlider.Value = sun.Ambient;
+                MapSunColorTextBox.Text = FormatMapPreviewColor(sun.Color);
+                MapSunSkyColorTextBox.Text = FormatMapPreviewColor(sun.SkyColor);
+                MapSunGroundColorTextBox.Text = FormatMapPreviewColor(sun.GroundColor);
+
+                MapPostEffectsData post = _hasMapPostEffectsOverride
+                    ? _mapPostEffectsOverride ?? MapPreviewSemantics.NoPostEffects
+                    : MapPreviewSemantics.OwnPostEffects(_mapSceneRuntime.Scene.PostEffects);
+                MapDepthFogEnabledCheck.IsChecked = post.DepthFog.Enabled;
+                MapDepthFogColorTextBox.Text = FormatMapPreviewColor(post.DepthFog.Color);
+                MapDepthFogStartSlider.Value = post.DepthFog.Start;
+                MapDepthFogEndSlider.Value = post.DepthFog.End;
+                MapDepthFogMaxSlider.Value = post.DepthFog.MaxIntensity;
+                MapHeightFogEnabledCheck.IsChecked = post.HeightFog.Enabled;
+                MapHeightFogColorTextBox.Text = FormatMapPreviewColor(post.HeightFog.Color);
+                MapHeightFogStartSlider.Value = post.HeightFog.Start;
+                MapHeightFogEndSlider.Value = post.HeightFog.End;
+                MapHeightFogMaxSlider.Value = post.HeightFog.MaxIntensity;
+                MapDofEnabledCheck.IsChecked = post.DepthOfField.Enabled;
+                MapDofFocalSlider.Value = post.DepthOfField.FocalDistance;
+                MapDofWidthSlider.Value = post.DepthOfField.InFocusWidth;
+                MapDofCocSlider.Value = post.DepthOfField.Coc;
+
+                MapSsaoPreviewOverride ssao = _mapSsaoPreviewOverride ??
+                    MapPreviewSemantics.OwnSsao(_mapSceneRuntime.Scene.AmbientOcclusion);
+                MapSsaoEnabledCheck.IsChecked = ssao.Enabled;
+                MapSsaoQualityCombo.SelectedIndex = ssao.Settings.SampleQuality == 0 ? 0 : 1;
+                MapSsaoRadiusSlider.Value = ssao.Settings.SampleRadius;
+                MapSsaoBiasSlider.Value = ssao.Settings.Bias;
+                MapSsaoPowerSlider.Value = ssao.Settings.Power;
+                MapSsaoIntensitySlider.Value = ssao.Settings.Intensity;
+                MapSsaoBufferScaleSlider.Value = ssao.Settings.BufferScale;
+                MapSsaoEdgeAwareCheck.IsChecked = ssao.Settings.EdgeAwareBlur;
+            }
+            finally
+            {
+                _isUpdatingMapPreviewControls = false;
+            }
+        }
+
+        private static bool TryParseMapPreviewColor(string text, out Vector4 value)
+        {
+            value = Vector4.One;
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            try
+            {
+                object converted = ColorConverter.ConvertFromString(text.Trim());
+                if (converted is not System.Windows.Media.Color color) return false;
+                value = new Vector4(
+                    color.R / 255f,
+                    color.G / 255f,
+                    color.B / 255f,
+                    color.A / 255f);
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+            catch (NotSupportedException)
+            {
+                return false;
+            }
+        }
+
+        private static string FormatMapPreviewColor(Vector4 value)
+        {
+            static byte Channel(float channel) =>
+                (byte)Math.Round(Math.Clamp(channel, 0f, 1f) * 255f, MidpointRounding.AwayFromZero);
+            return $"#{Channel(value.X):X2}{Channel(value.Y):X2}{Channel(value.Z):X2}";
         }
 
         private void PreviewShow_Click(object sender, RoutedEventArgs e)
@@ -1580,6 +1795,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 staged = null;
                 MapSceneRuntime backdrop = _mapSceneRuntime;
                 MapSceneData scene = backdrop.Scene;
+                _model.HasMapPreview = true;
+                _model.SetMapLayers(MapGeometrySemantics.Layers(scene.Geometry), backdrop.VisibilityFlags);
                 _mapGpuSceneDirty = true;
                 _mapTexturesDirty = false;
                 previous?.Dispose();
@@ -1858,6 +2075,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _mapCancellation?.Cancel();
             _mapCancellation = null;
+            _mapLayerCancellation?.Cancel();
+            _mapLayerCancellation = null;
+            _model.HasMapPreview = false;
+            _model.SetMapLayers(Array.Empty<MapGeometryLayerData>(), 0);
             ClearPendingMapTextureUpdates();
             _mapClipCancellation?.Cancel();
             ClearMapCharacterClipPreview();
@@ -1896,6 +2117,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_mapSceneRuntime != null)
                 {
                     _mapGeometryRenderer.LoadScene(_mapSceneRuntime.Scene);
+                    _mapGeometryRenderer.SetVisibilityFlags(_mapSceneRuntime.VisibilityFlags);
+                    _mapGeometryRenderer.SetPreviewSun(EffectiveMapSun(), _mapSunPreviewOverride);
                     // Backdrop loads publish geometry before texture waves. A preview wave may finish
                     // before the first GL frame, so LoadScene's immutable scene dictionaries can still
                     // be empty here. Rebind the runtime's latest texture state immediately instead of
@@ -1903,19 +2126,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     _mapGeometryRenderer.UpdateTextures(_mapSceneRuntime.BackdropTextures);
                     _mapGeometryRenderer.UpdateProgramTextures(_mapSceneRuntime.BackdropProgramTextures);
                     _mapGeometryRenderer.UpdateLightmaps(_mapSceneRuntime.BackdropLightmaps);
-                    bool needsPostEffects = MapPostEffectsRenderer.DrawsAnything(
-                        _mapSceneRuntime.Scene.PostEffects,
-                        _mapSceneRuntime.Scene.AmbientOcclusion);
-                    if (needsPostEffects && _mapPostEffectsRenderer == null)
-                    {
-                        _mapPostEffectsRenderer = new MapPostEffectsRenderer();
-                        _mapPostEffectsRenderer.Initialize(_gl);
-                    }
-                    else if (!needsPostEffects && _mapPostEffectsRenderer != null)
-                    {
-                        _mapPostEffectsRenderer.Dispose();
-                        _mapPostEffectsRenderer = null;
-                    }
+                    EnsureMapPostEffectsRenderer();
                 }
                 else
                 {
@@ -1924,8 +2135,25 @@ namespace AssetsManager.Views.Controls.Viewer
                     _mapPostEffectsRenderer = null;
                 }
                 _mapGpuSceneDirty = false;
+                _mapVisibilityDirty = false;
+                _mapLightingDirty = false;
                 _mapTexturesDirty = false;
                 return;
+            }
+
+            if (_mapVisibilityDirty && _mapSceneRuntime != null)
+            {
+                _mapCharacterRenderer?.Clear();
+                _mapParticleRenderer?.Clear();
+                _mapGeometryRenderer.SetVisibilityFlags(_mapSceneRuntime.VisibilityFlags);
+                _mapVisibilityDirty = false;
+            }
+
+            if (_mapLightingDirty && _mapSceneRuntime != null)
+            {
+                _mapGeometryRenderer.SetPreviewSun(EffectiveMapSun(), _mapSunPreviewOverride);
+                EnsureMapPostEffectsRenderer();
+                _mapLightingDirty = false;
             }
 
             if (_mapTexturesDirty && _mapSceneRuntime != null)
@@ -1935,6 +2163,52 @@ namespace AssetsManager.Views.Controls.Viewer
                 _mapGeometryRenderer.UpdateLightmaps(_mapSceneRuntime.BackdropLightmaps);
                 _mapTexturesDirty = false;
             }
+        }
+
+        private MapSunData EffectiveMapSun() =>
+            _mapSceneRuntime == null
+                ? null
+                : MapPreviewSemantics.EffectiveSun(_mapSceneRuntime.Scene.Sun, _mapSunPreviewOverride);
+
+        private MapPostEffectsData EffectiveMapPostEffects() =>
+            _mapSceneRuntime == null
+                ? null
+                : MapPreviewSemantics.EffectivePostEffects(
+                    _mapSceneRuntime.Scene.PostEffects,
+                    _mapPostEffectsOverride,
+                    _hasMapPostEffectsOverride);
+
+        private MapSsaoData EffectiveMapSsao() =>
+            _mapSceneRuntime == null
+                ? null
+                : MapPreviewSemantics.EffectiveSsao(
+                    _mapSceneRuntime.Scene.AmbientOcclusion,
+                    _mapSsaoPreviewOverride);
+
+        private void EnsureMapPostEffectsRenderer()
+        {
+            if (_mapSceneRuntime == null)
+                return;
+
+            bool needsPostEffects = MapPostEffectsRenderer.DrawsAnything(
+                EffectiveMapPostEffects(),
+                EffectiveMapSsao());
+            if (needsPostEffects && _mapPostEffectsRenderer == null)
+            {
+                _mapPostEffectsRenderer = new MapPostEffectsRenderer();
+                _mapPostEffectsRenderer.Initialize(_gl);
+            }
+            else if (!needsPostEffects && _mapPostEffectsRenderer != null)
+            {
+                _mapPostEffectsRenderer.Dispose();
+                _mapPostEffectsRenderer = null;
+            }
+        }
+
+        private void MarkMapLightingDirty()
+        {
+            _mapLightingDirty = true;
+            OpenTkControl?.InvalidateVisual();
         }
 
         private void SnapMapCamera(MapSceneData scene)
@@ -1998,8 +2272,23 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.SelectedMapNode = mapNode;
                     HandleMapBrowserSelection(mapNode);
                     break;
-                case VfxSkinItem skin when !ReferenceEquals(_model.SelectedSkin, skin):
-                    _model.SelectedSkin = skin;
+                case VfxSkinItem skin:
+                    if (!ReferenceEquals(_model.SelectedSkin, skin))
+                    {
+                        _model.SelectedSkin = skin;
+                    }
+                    else
+                    {
+                        // Selecting the Skin node itself is a neutral owner-scene selection: keep
+                        // the already loaded Champion, but stand down any System/Clip/Spell that
+                        // was previously selected under it. This also prevents a prior System from
+                        // looking as though it auto-started merely because the user returned to Skin0.
+                        BeginExclusivePreviewSelection();
+                        _model.SelectedSystem = null;
+                        _model.SelectedAnimation = null;
+                        _model.SelectedSpell = null;
+                        _model.IsRawSystemsMode = true;
+                    }
                     break;
                 case VfxBrowserSection section:
                     if (!ReferenceEquals(_model.SelectedSkin, section.Owner)) _model.SelectedSkin = section.Owner;
@@ -2027,6 +2316,88 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.IsAnimationMode = true;
                     _model.SelectedSpell = spell;
                     break;
+            }
+        }
+
+        private void MapLayers_Click(object sender, RoutedEventArgs e)
+        {
+            MapLayersPopup.IsOpen = !MapLayersPopup.IsOpen;
+            e.Handled = true;
+        }
+
+        private void MapLayerCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as CheckBox)?.DataContext is not MapVisibilityLayerOption layer)
+                return;
+
+            layer.IsEnabled = (sender as CheckBox)?.IsChecked == true;
+            int flags = 0;
+            foreach (MapVisibilityLayerOption option in _model.MapLayers)
+            {
+                if (option.IsEnabled)
+                    flags |= 1 << option.Index;
+            }
+            _model.SetMapLayerFlags(flags);
+            _ = ApplyMapVisibilityFlagsAsync(flags);
+        }
+
+        private async Task ApplyMapVisibilityFlagsAsync(int flags)
+        {
+            MapSceneRuntime runtime = _mapSceneRuntime;
+            if (runtime == null || MapViewerSceneService == null || runtime.VisibilityFlags == flags || _isCleanedUp)
+                return;
+
+            _mapLayerCancellation?.Cancel();
+            var operation = new System.Threading.CancellationTokenSource();
+            _mapLayerCancellation = operation;
+            Task<IReadOnlyList<MapCharacterRuntimeGroup>> characterTask = null;
+            Task<MapParticleSceneRuntime> particleTask = null;
+            bool charactersAdopted = false;
+            bool particlesAdopted = false;
+
+            try
+            {
+                _model.StatusText = $"Switching MAP layers to 0x{flags:x2}...";
+                characterTask = MapViewerSceneService.LoadCharacterAssetsAsync(runtime, flags, operation.Token);
+                particleTask = MapViewerSceneService.LoadParticleAssetsAsync(runtime, flags, operation.Token);
+                await Task.WhenAll(characterTask, particleTask);
+                operation.Token.ThrowIfCancellationRequested();
+                if (_isCleanedUp || !ReferenceEquals(_mapLayerCancellation, operation) ||
+                    !ReferenceEquals(_mapSceneRuntime, runtime))
+                {
+                    return;
+                }
+
+                ClearMapCharacterClipPreview();
+                runtime.SetCharacterGroups(await characterTask);
+                charactersAdopted = true;
+                runtime.SetParticles(await particleTask);
+                particlesAdopted = true;
+                runtime.SetVisibilityFlags(flags);
+                _model.SetMapLayerFlags(flags);
+                ReplaceMapBrowserRoot(MapBrowserSemantics.Build(runtime));
+                _mapVisibilityDirty = true;
+                _model.StatusText = $"MAP layers 0x{flags:x2} · {runtime.CharacterGroups.Count} structure skins · {runtime.Particles.Runtimes.Count} VFX placements.";
+                OpenTkControl?.InvalidateVisual();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, $"Failed to switch MAP visibility layers to 0x{flags:x2}.");
+                _model.SetMapLayerFlags(runtime.VisibilityFlags);
+                _model.StatusText = "Unable to switch MAP visibility layers.";
+            }
+            finally
+            {
+                if (!charactersAdopted && characterTask?.IsCompletedSuccessfully == true)
+                    DisposeCharacterGroups(characterTask.Result);
+                if (!particlesAdopted && particleTask?.IsCompletedSuccessfully == true)
+                    particleTask.Result?.Dispose();
+                if (ReferenceEquals(_mapLayerCancellation, operation))
+                    _mapLayerCancellation = null;
+                operation.Dispose();
             }
         }
 
@@ -2187,6 +2558,14 @@ namespace AssetsManager.Views.Controls.Viewer
                 double resumeAt = preservePlayhead
                     ? Math.Clamp(_model.CurrentTime, 0d, duration)
                     : 0d;
+                IEnumerable<uint> initiallyHidden =
+                    (selection.Group.Asset?.Skin?.HiddenSubmeshes ?? Array.Empty<string>())
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Select(Fnv1a.HashLower);
+                _mapAnimationVisibilityTimeline = VfxClipCueEvaluator.BuildVisibilityTimeline(
+                    selection.Group.Animation.PreparedClipCues(selection.Clip),
+                    initiallyHidden);
+                _mapAnimationVisibilityDuration = duration;
 
                 MapCharacterVfxCatalog catalog = selection.Group.Asset?.Vfx ?? MapCharacterVfxCatalog.Empty;
                 IReadOnlyList<AnimationClipDefinition> playlist =
@@ -2380,6 +2759,8 @@ namespace AssetsManager.Views.Controls.Viewer
             _activeMapCharacterGroup = null;
             _activeMapCharacterPlacement = null;
             _activeMapCharacterClip = null;
+            _mapAnimationVisibilityTimeline = Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
+            _mapAnimationVisibilityDuration = 0d;
             _vfxRenderer?.SetSystem(null);
             _vfxRenderer?.SetWorldTransform(Matrix4x4.Identity);
             _vfxRenderer?.UpdateBoneTransforms(null);
@@ -2400,14 +2781,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 _activeMapCharacterClip,
                 (float)safe);
 
-            IEnumerable<uint> initiallyHidden =
-                (_activeMapCharacterGroup.Asset?.Skin?.HiddenSubmeshes ?? Array.Empty<string>())
-                .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Select(Fnv1a.HashLower);
+            double folded = VfxClipCueEvaluator.FoldedTime(safe, _mapAnimationVisibilityDuration);
             IReadOnlySet<uint> hidden = VfxClipCueEvaluator.HiddenSubmeshesAt(
-                _activeMapCharacterGroup.Animation.PreparedClipCues(_activeMapCharacterClip),
-                initiallyHidden,
-                safe);
+                _mapAnimationVisibilityTimeline,
+                folded);
             _activeMapCharacterGroup.SetPreviewHiddenSubmeshes(hidden);
             _vfxRenderer?.SetOwnerHiddenSubmeshes(hidden);
             UpdateMapCharacterClipVfxPose();
@@ -2570,6 +2947,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _championBundle = null;
+            InvalidateChampionBindPose();
             _model.HasChampionMesh = false;
             RunReleaseStep("Champion animation cache", () => _championAnimationService?.ClearCache());
 
@@ -2749,6 +3127,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.PlaybackSeed = playbackSeed;
             string playbackContext = "standalone system";
             _vfxRenderer?.SetVfxSystem(systemModel);
+            ApplyChampionBindPose();
             if (_vfxRenderer != null)
             {
                 _vfxRenderer.RigSettings = rigSettings;
@@ -2893,7 +3272,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     var loaded = await SknLoadingService.LoadModelWithSkinBin(
                         sknPath,
-                        bundle?.PrimaryBinPath);
+                        bundle?.PrimaryBinPath,
+                        searchDir);
                     if (generation != _championLoadGeneration || !ReferenceEquals(bundle, _activeBundle) || _isCleanedUp)
                     {
                         loaded?.Dispose();
@@ -2933,6 +3313,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
                         int boneCount = _championModel.Skeleton?.Joints?.Count ?? 0;
                         _model.LogMessages.Add($"[CHAMPION MESH] Model loaded for VFX studio: {Path.GetFileName(sknPath)} (Skeleton: {(boneCount > 0 ? $"{boneCount} bones" : "None")})");
+                        InvalidateChampionBindPose();
+                        if (_model.SelectedSystem != null && _model.SelectedAnimation == null && _model.SelectedSpell == null)
+                            ApplyChampionBindPose();
 
                         // The catalog may already be available from BIN load. Rebuild only when
                         // no animation asset resolved earlier, but leave playback unselected until
@@ -3070,7 +3453,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _animationClipCancellation?.Cancel();
-            _animationClipCancellation?.Dispose();
             var operation = new System.Threading.CancellationTokenSource();
             _animationClipCancellation = operation;
             VfxClipCatalog catalog = _clipCatalog;
@@ -3156,6 +3538,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (ReferenceEquals(selectedItem, _model.SelectedAnimation))
                     _model.StatusText = $"{selectedItem.DisplayName} · animation load failed.";
             }
+            finally
+            {
+                if (ReferenceEquals(_animationClipCancellation, operation))
+                    _animationClipCancellation = null;
+                operation.Dispose();
+            }
         }
 
         private static bool SameAnimationClip(AnimationClipCatalogItem left, AnimationClipCatalogItem right)
@@ -3172,6 +3560,52 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.Meshes.Clear();
             _model.HasAnySolo = false;
             _model.IsAllMuted = false;
+        }
+
+        private void CancelTimedPreviewPreparation()
+        {
+            _animationClipCancellation?.Cancel();
+            // The async owner disposes its CTS in finally. Clearing the shared slot here makes
+            // a stale continuation fail the ReferenceEquals guard without disposing its Token
+            // while PrepareAsync may still be unwinding on that token.
+            _animationClipCancellation = null;
+        }
+
+        private void ResetPreviewContextForSelection()
+        {
+            CancelTimedPreviewPreparation();
+            _activeSpellPlan = null;
+            _model.IsPlaying = false;
+            _vfxRenderer?.Pause();
+            _vfxRenderer?.SetSystem(null);
+            ClearAnimationClipCues();
+            ClearCompositeDiagnostics();
+            _model.CurrentTime = 0d;
+
+            _isUpdatingAnimationParameter = true;
+            try
+            {
+                _model.SetAnimationParameterOptions(Array.Empty<float>(), null);
+            }
+            finally
+            {
+                _isUpdatingAnimationParameter = false;
+            }
+
+            // A context switch must not leave the old Clip pose driving the owner. While the
+            // next Clip/Spell loads, on a neutral Skin selection, or for a standalone System,
+            // the Champion returns to bind pose and owner-joint attachments resolve from it.
+            ResetChampionToBindPose();
+        }
+
+        private void BeginExclusivePreviewSelection()
+        {
+            if (_inspectedSystem != null)
+                RememberStandaloneRun(_inspectedSystem);
+            _pendingSystem = null;
+            _inspectedSystem = null;
+            _pendingSpell = null;
+            ResetPreviewContextForSelection();
         }
 
         private string ResolvePreviewSearchDirectory()
@@ -3243,7 +3677,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _animationClipCancellation?.Cancel();
-            _animationClipCancellation?.Dispose();
             var operation = new System.Threading.CancellationTokenSource();
             _animationClipCancellation = operation;
             VfxClipCatalog catalog = _clipCatalog;
@@ -3372,6 +3805,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (ReferenceEquals(spell, _model.SelectedSpell))
                     _model.StatusText = $"{spell.Name} · preview load failed.";
             }
+            finally
+            {
+                if (ReferenceEquals(_animationClipCancellation, operation))
+                    _animationClipCancellation = null;
+                operation.Dispose();
+            }
         }
 
         private (Vector3 Origin, Vector3 Forward)? ResolveSpellLaunchFrame(
@@ -3460,6 +3899,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     _animationBaseHiddenSubmeshes.Add(Fnv1a.HashLower(part.Name));
             }
 
+            _animationVisibilityTimeline = VfxClipCueEvaluator.BuildVisibilityTimeline(
+                clip.TimedCues,
+                _animationBaseHiddenSubmeshes);
             _championAnimationService?.SetJointSnapCues(
                 clip.TimedCues.OfType<AnimationJointSnapCue>().ToArray());
             ApplyAnimationClipCues(0d);
@@ -3469,10 +3911,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_activeAnimationClip == null || _championModel == null) return;
 
+            double folded = VfxClipCueEvaluator.FoldedTime(time, _activeAnimationClip.Duration);
             IReadOnlySet<uint> hidden = VfxClipCueEvaluator.HiddenSubmeshesAt(
-                _activeAnimationClip.TimedCues,
-                _animationBaseHiddenSubmeshes,
-                time);
+                _animationVisibilityTimeline,
+                folded);
             ApplyOwnerSubmeshVisibility(hidden);
             _vfxRenderer?.SetOwnerHiddenSubmeshes(hidden);
         }
@@ -3503,21 +3945,56 @@ namespace AssetsManager.Views.Controls.Viewer
             _activeAnimationClip = null;
             _animationBasePartVisibility.Clear();
             _animationBaseHiddenSubmeshes.Clear();
+            _animationVisibilityTimeline = Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
             _championAnimationService?.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
             _vfxRenderer?.SetOwnerHiddenSubmeshes(
                 _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>());
         }
 
-        private void ResetChampionAnimationForStandaloneSystem()
+        private void ResetChampionToBindPose()
         {
-            if (_championModel == null) return;
+            _vfxRenderer?.SetBoneTransformSampler(null);
+            if (_championModel == null)
+            {
+                _vfxRenderer?.SetOwnerSkinningMatrices(null);
+                _vfxRenderer?.UpdateBoneTransforms(null);
+                return;
+            }
 
             _championModel.CurrentAnimation = null;
             _championModel.AnimationTime = 0d;
             _championModel.IsAnimationPaused = true;
-            _championModel.SkinningMatrices = null;
-            _vfxRenderer?.SetOwnerSkinningMatrices(null);
-            _vfxRenderer?.UpdateBoneTransforms(null);
+            ApplyChampionBindPose();
+        }
+
+        private void ApplyChampionBindPose()
+        {
+            var skeleton = _championModel?.Skeleton;
+            if (skeleton?.Joints == null || skeleton.Joints.Count == 0)
+            {
+                if (_championModel != null) _championModel.SkinningMatrices = null;
+                _vfxRenderer?.SetOwnerSkinningMatrices(null);
+                _vfxRenderer?.UpdateBoneTransforms(null);
+                return;
+            }
+
+            if (!ReferenceEquals(_championBindSkeleton, skeleton) || _championBindBoneTransformProvider == null)
+            {
+                _championBindSkeleton = skeleton;
+                _championBindBoneTransformProvider = AnimationService.CreateBindBoneTransformProvider(skeleton);
+                _championBindSkinningMatrices = AnimationService.CreateBindSkinningMatrices(skeleton);
+            }
+
+            _championModel.SkinningMatrices = _championBindSkinningMatrices;
+            _vfxRenderer?.SetOwnerSkinningMatrices(_championBindSkinningMatrices);
+            _vfxRenderer?.UpdateBoneTransforms(_championBindBoneTransformProvider);
+        }
+
+        private void InvalidateChampionBindPose()
+        {
+            _championBindSkeleton = null;
+            _championBindBoneTransformProvider = null;
+            _championBindSkinningMatrices = Array.Empty<Matrix4x4>();
         }
 
         private string ResolveSknPath(string authoredPath, string searchDir)
@@ -5620,6 +6097,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             }
         }
+
+        internal static float ResolveSimulationFrameDelta(TimeSpan delta, bool discard)
+            => discard ? 0f : (float)Math.Max(0d, delta.TotalSeconds);
 
         internal static double PlaybackSpeedDetent(double speed, int direction)
         {

@@ -22,6 +22,7 @@ namespace AssetsManager.Views.Models.Viewer
         public IReadOnlyList<MapParticleData> Particles { get; }
         public MapParticleSystemCatalog ParticleSystems { get; }
         public IReadOnlyList<MapOutlineChunkData> Outline { get; }
+        public int OpeningVisibilityFlags { get; }
         public Vector3? Origin { get; }
         public MapSunData Sun { get; }
         public MapPostEffectsData PostEffects { get; }
@@ -44,7 +45,8 @@ namespace AssetsManager.Views.Models.Viewer
             MapPostEffectsData postEffects = null,
             MapSsaoData ambientOcclusion = null,
             IReadOnlyDictionary<string, MapTextureImage> lightmaps = null,
-            IReadOnlyDictionary<string, MapTextureImage> programTextures = null)
+            IReadOnlyDictionary<string, MapTextureImage> programTextures = null,
+            int openingVisibilityFlags = 1)
         {
             Source = source;
             Assets = assets;
@@ -59,6 +61,7 @@ namespace AssetsManager.Views.Models.Viewer
             Particles = particles;
             ParticleSystems = particleSystems;
             Outline = outline ?? System.Array.Empty<MapOutlineChunkData>();
+            OpeningVisibilityFlags = openingVisibilityFlags;
             Origin = origin;
             Sun = sun;
             PostEffects = postEffects;

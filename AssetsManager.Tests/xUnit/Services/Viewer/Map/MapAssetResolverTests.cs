@@ -1,12 +1,14 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Hashing;
 using Xunit;
 
@@ -341,6 +343,52 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 Assert.Equal(MapAssetOrigin.ProjectFile, asset.Origin);
                 Assert.Equal(Path.GetFullPath(extracted), asset.PhysicalPath);
                 Assert.Equal(Path.GetFileName(extracted), asset.VirtualPath);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public async Task BinClosureDerivesDataRootAndFollowsLinkedProjectBinsWithinBudget()
+        {
+            string root = NewTempDirectory();
+            try
+            {
+                string primaryPath = Path.Combine(
+                    root,
+                    "data",
+                    "characters",
+                    "hero",
+                    "skins",
+                    "skin0.bin");
+                string linkedPath = Path.Combine(
+                    root,
+                    "data",
+                    "characters",
+                    "hero",
+                    "materials.bin");
+                Directory.CreateDirectory(Path.GetDirectoryName(primaryPath)!);
+                Directory.CreateDirectory(Path.GetDirectoryName(linkedPath)!);
+
+                using (var stream = File.Create(primaryPath))
+                    new BinTree(Array.Empty<BinTreeObject>(), new[] { "data/characters/hero/materials.bin" }).Write(stream);
+                using (var stream = File.Create(linkedPath))
+                    new BinTree(Array.Empty<BinTreeObject>(), Array.Empty<string>()).Write(stream);
+
+                var resolver = new MapAssetResolver(null, null);
+                var loader = new BinDocumentClosureLoader(resolver);
+                MapResolvedAsset primary = MapResolvedAsset.FromPhysical(
+                    "data/characters/hero/skins/skin0.bin",
+                    primaryPath,
+                    MapAssetOrigin.SelectedFile);
+
+                Assert.Equal(Path.GetFullPath(root), BinDocumentClosureLoader.ResolveProjectRoot(primary, null));
+                Assert.Equal(
+                    2,
+                    (await loader.LoadAsync(primary, null, 32, CancellationToken.None)).Count);
+                Assert.Single(await loader.LoadAsync(primary, null, 0, CancellationToken.None));
             }
             finally
             {

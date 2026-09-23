@@ -19,6 +19,11 @@ namespace AssetsManager.Services.Viewer.Semantics
         public static IReadOnlyList<MapParticleData> PlayedOnLayer(
             IEnumerable<MapParticleData> particles,
             int layer)
+            => PlayedForFlags(particles, 1 << layer);
+
+        public static IReadOnlyList<MapParticleData> PlayedForFlags(
+            IEnumerable<MapParticleData> particles,
+            int flags)
         {
             if (particles == null)
                 return Array.Empty<MapParticleData>();
@@ -26,7 +31,7 @@ namespace AssetsManager.Services.Viewer.Semantics
             return particles
                 .Where(particle =>
                     particle != null &&
-                    particle.Placeable.IsVisibleOnLayer(layer) &&
+                    particle.Placeable.IsVisibleForFlags(flags) &&
                     !particle.Transitional &&
                     !particle.StartDisabled &&
                     !particle.VisibilityController.HasValue)

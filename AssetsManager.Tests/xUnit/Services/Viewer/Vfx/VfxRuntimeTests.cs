@@ -11,6 +11,7 @@ using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Core.Animation.Builders;
 using LeagueToolkit.Hashing;
 using Xunit;
 
@@ -73,6 +74,32 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.True(AnimationService.CanApplyJointSnap(3, 3));
             Assert.False(AnimationService.CanApplyJointSnap(-1, 3));
             Assert.False(AnimationService.CanApplyJointSnap(3, -1));
+        }
+
+        [Fact]
+        public void BindPoseProviderResolvesOwnerJointsByNameAndHashWithoutAClip()
+        {
+            var builder = new RigResourceBuilder();
+            builder.CreateJoint("Root");
+            builder.CreateJoint("Hand");
+            var skeleton = builder.Build();
+
+            Func<string, uint, Matrix4x4?> provider = AnimationService.CreateBindBoneTransformProvider(skeleton);
+
+            Assert.NotNull(provider);
+            Matrix4x4? byName = provider("hand", 0);
+            Matrix4x4? byHash = provider(null, Fnv1a.HashLower("Hand"));
+            Assert.True(byName.HasValue);
+            Assert.True(byHash.HasValue);
+            Assert.Equal(byName.Value, byHash.Value);
+
+            Matrix4x4[] skinning = AnimationService.CreateBindSkinningMatrices(skeleton);
+            Assert.Equal(skeleton.Joints.Count, skinning.Length);
+            for (int index = 0; index < skeleton.Joints.Count; index++)
+            {
+                Matrix4x4 world = Assert.IsType<Matrix4x4>(provider(skeleton.Joints[index].Name, 0));
+                Assert.Equal(skeleton.Joints[index].InverseBindTransform * world, skinning[index]);
+            }
         }
 
         [Fact]
@@ -3462,6 +3489,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         public void PlaybackFrameTimeMatchesTheRunClockCap(float deltaTime, float expected)
         {
             Assert.Equal(expected, VfxRenderSession.NormalizeFrameTime(deltaTime), precision: 6);
+        }
+
+        [Fact]
+        public void FirstVisibleFrameDropsHiddenWallTimeLikeTheReferenceClock()
+        {
+            Assert.Equal(
+                0f,
+                VfxInspectorControl.ResolveSimulationFrameDelta(TimeSpan.FromSeconds(12), discard: true),
+                precision: 6);
+            Assert.Equal(
+                0.025f,
+                VfxInspectorControl.ResolveSimulationFrameDelta(TimeSpan.FromSeconds(0.025), discard: false),
+                precision: 6);
         }
 
         [Theory]

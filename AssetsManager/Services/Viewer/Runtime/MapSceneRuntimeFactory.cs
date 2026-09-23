@@ -7,6 +7,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Vfx.Resources;
@@ -44,9 +45,9 @@ namespace AssetsManager.Services.Viewer.Runtime
             ArgumentNullException.ThrowIfNull(scene);
 
             Task<IReadOnlyList<MapCharacterRuntimeGroup>> characters =
-                LoadCharactersAsync(scene, cancellationToken);
+                LoadCharactersAsync(scene, scene.OpeningVisibilityFlags, cancellationToken);
             Task<MapParticleSceneRuntime> particles =
-                LoadParticlesAsync(scene, cancellationToken);
+                LoadParticlesAsync(scene, scene.OpeningVisibilityFlags, cancellationToken);
 
             try
             {
@@ -80,13 +81,20 @@ namespace AssetsManager.Services.Viewer.Runtime
                 cancellationToken,
                 catalog?.OwnerSceneContext);
 
-        internal async Task<IReadOnlyList<MapCharacterRuntimeGroup>> LoadCharactersAsync(
+        internal Task<IReadOnlyList<MapCharacterRuntimeGroup>> LoadCharactersAsync(
             MapSceneData scene,
             CancellationToken cancellationToken)
+            => LoadCharactersAsync(scene, scene?.OpeningVisibilityFlags ?? 0, cancellationToken);
+
+        internal async Task<IReadOnlyList<MapCharacterRuntimeGroup>> LoadCharactersAsync(
+            MapSceneData scene,
+            int visibilityFlags,
+            CancellationToken cancellationToken)
         {
-            IReadOnlyList<MapCharacterData> stood = MapCharacterSemantics.StoodOnLayer(
+            ArgumentNullException.ThrowIfNull(scene);
+            IReadOnlyList<MapCharacterData> stood = MapCharacterSemantics.StoodForFlags(
                 scene.Characters,
-                MapGeometryData.DefaultLayer);
+                visibilityFlags);
             if (stood.Count == 0)
                 return Array.Empty<MapCharacterRuntimeGroup>();
 
@@ -117,10 +125,26 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal Task<MapParticleSceneRuntime> LoadParticlesAsync(
             MapSceneData scene,
             CancellationToken cancellationToken)
+            => LoadParticlesAsync(scene, scene?.OpeningVisibilityFlags ?? 0, cancellationToken);
+
+        internal Task<MapParticleSceneRuntime> LoadParticlesAsync(
+            MapSceneData scene,
+            int visibilityFlags,
+            CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(scene);
+            IReadOnlyList<MapParticleData> played = MapParticleSemantics.PlayedForFlags(
+                scene.Particles,
+                visibilityFlags);
+            var parser = new MapParticleSystemParser();
+            MapParticleSystemCatalog catalog = parser.Parse(
+                scene.MaterialsDocument,
+                MapParticleSemantics.GroupBySystem(played),
+                _hashResolver == null ? null : _hashResolver.ResolveHash,
+                _hashResolver == null ? null : _hashResolver.ResolveBinEntry);
             return MapParticleSceneRuntime.CreateAsync(
-                scene,
+                catalog,
+                scene.Source?.ProjectRoot,
                 _assetResolver,
                 _hashResolver,
                 _logService,

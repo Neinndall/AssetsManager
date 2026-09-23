@@ -240,6 +240,42 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ChangingStandaloneRigMotionKeepsTheCurrentRunAliveLikeSteer()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
+            {
+                Rate = VfxCurveF.Const(20f),
+                ParticleLifetime = VfxCurveF.Const(10f)
+            };
+            var definition = new VfxSystemDefinition(0x5A11u, "steer", "steer", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "steer",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [definition.PathHash] = definition },
+                ResourceMap = new Dictionary<uint, uint>()
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.Play();
+            session.Update(0.2f);
+
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            double time = session.ActiveSystem.CurrentTime;
+            float rootTime = root.CurrentTime;
+            int particles = Assert.Single(root.Emitters).Particles.Count;
+            Assert.True(particles > 0);
+
+            session.RigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Missile) with { IsLooping = false };
+
+            Assert.Equal(time, session.ActiveSystem.CurrentTime, precision: 6);
+            Assert.Equal(rootTime, root.CurrentTime, precision: 6);
+            Assert.Equal(particles, Assert.Single(root.Emitters).Particles.Count);
+            Assert.NotEqual(Vector3.Zero, root.WorldTransform.Translation);
+        }
+
+        [Fact]
         public void StandaloneLoopingRigKeepsPlayingAcrossItsRunBoundary()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with

@@ -34,7 +34,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal IReadOnlyList<MapParticleRuntime> Runtimes => _runtimes;
         internal IReadOnlyList<MapParticleRuntime> VisibleRuntimes => _visible;
 
-        internal static async Task<MapParticleSceneRuntime> CreateAsync(
+        internal static Task<MapParticleSceneRuntime> CreateAsync(
             MapSceneData scene,
             MapAssetResolver assetResolver,
             HashResolverService hashResolver,
@@ -42,15 +42,31 @@ namespace AssetsManager.Services.Viewer.Runtime
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(scene);
+            return CreateAsync(
+                scene.ParticleSystems,
+                scene.Source?.ProjectRoot,
+                assetResolver,
+                hashResolver,
+                logService,
+                cancellationToken);
+        }
+
+        internal static async Task<MapParticleSceneRuntime> CreateAsync(
+            MapParticleSystemCatalog catalog,
+            string projectRoot,
+            MapAssetResolver assetResolver,
+            HashResolverService hashResolver,
+            LogService logService,
+            CancellationToken cancellationToken = default)
+        {
             ArgumentNullException.ThrowIfNull(assetResolver);
 
-            MapParticleSystemCatalog catalog = scene.ParticleSystems;
             if (catalog?.Groups == null || catalog.Groups.Count == 0)
                 return new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>());
 
             VfxSceneResourceContext resources = await VfxSceneResourceContext.CreateAsync(
                 catalog,
-                scene.Source?.ProjectRoot,
+                projectRoot,
                 assetResolver,
                 hashResolver,
                 logService,

@@ -70,17 +70,17 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 }
 
                 int placeableCount = scene.Placeables.Sum(chunk => chunk.Items.Count);
-                var stoodCharacters = MapCharacterSemantics.StoodOnLayer(
+                var stoodCharacters = MapCharacterSemantics.StoodForFlags(
                     scene.Characters,
-                    MapGeometryData.DefaultLayer);
+                    scene.OpeningVisibilityFlags);
                 int uniqueStoodSkins = stoodCharacters
                     .Where(character => !string.IsNullOrWhiteSpace(character?.Skin))
                     .Select(character => character.Skin)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .Count();
-                var playedParticles = MapParticleSemantics.PlayedOnLayer(
+                var playedParticles = MapParticleSemantics.PlayedForFlags(
                     scene.Particles,
-                    MapGeometryData.DefaultLayer);
+                    scene.OpeningVisibilityFlags);
                 Console.WriteLine(
                     $"[MapFlow] backdrop meshes={scene.Geometry.Meshes.Count}, submeshes={scene.Geometry.Submeshes.Count}, " +
                     $"materials={scene.Materials.Count}, chunks={scene.Placeables.Count}, placeables={placeableCount}, " +

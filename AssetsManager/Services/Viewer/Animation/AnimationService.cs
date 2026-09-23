@@ -339,6 +339,47 @@ namespace AssetsManager.Services.Viewer.Animation
         internal static bool CanApplyJointSnap(int jointIndex, int targetIndex)
             => jointIndex >= 0 && targetIndex >= 0;
 
+        internal static Func<string, uint, Matrix4x4?> CreateBindBoneTransformProvider(RigResource skeleton)
+        {
+            if (skeleton?.Joints == null || skeleton.Joints.Count == 0)
+                return null;
+
+            Matrix4x4[] world = CreateBindWorldTransforms(skeleton);
+
+            var byName = new Dictionary<string, Matrix4x4>(StringComparer.OrdinalIgnoreCase);
+            var byHash = new Dictionary<uint, Matrix4x4>();
+            for (int index = 0; index < skeleton.Joints.Count; index++)
+            {
+                string name = skeleton.Joints[index].Name;
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                Matrix4x4 transform = world[index];
+                byName.TryAdd(name, transform);
+                byHash.TryAdd(Fnv1a.HashLower(name), transform);
+                byHash.TryAdd(Elf.HashLower(name), transform);
+            }
+
+            return (name, hash) =>
+            {
+                if (!string.IsNullOrWhiteSpace(name) && byName.TryGetValue(name, out Matrix4x4 named))
+                    return named;
+                return hash != 0 && byHash.TryGetValue(hash, out Matrix4x4 hashed)
+                    ? hashed
+                    : null;
+            };
+        }
+
+        internal static Matrix4x4[] CreateBindSkinningMatrices(RigResource skeleton)
+        {
+            if (skeleton?.Joints == null || skeleton.Joints.Count == 0)
+                return Array.Empty<Matrix4x4>();
+
+            Matrix4x4[] world = CreateBindWorldTransforms(skeleton);
+            var matrices = new Matrix4x4[skeleton.Joints.Count];
+            for (int index = 0; index < skeleton.Joints.Count; index++)
+                matrices[index] = skeleton.Joints[index].InverseBindTransform * world[index];
+            return matrices;
+        }
+
         internal static bool TryGetBindBoneTransform(
             RigResource skeleton,
             string boneName,
@@ -358,6 +399,12 @@ namespace AssetsManager.Services.Viewer.Animation
             }
             if (jointIndex < 0) return false;
 
+            transform = CreateBindWorldTransforms(skeleton)[jointIndex];
+            return true;
+        }
+
+        private static Matrix4x4[] CreateBindWorldTransforms(RigResource skeleton)
+        {
             (int[] order, int[] parents) = BuildHierarchy(
                 skeleton.Joints.Select(static joint => (int)joint.ParentId).ToArray());
             var world = new Matrix4x4[skeleton.Joints.Count];
@@ -367,8 +414,7 @@ namespace AssetsManager.Services.Viewer.Animation
                 int parent = parents[index];
                 world[index] = parent >= 0 ? local * world[parent] : local;
             }
-            transform = world[jointIndex];
-            return true;
+            return world;
         }
 
         internal static bool TryGetBindRootTransform(RigResource skeleton, out Matrix4x4 transform)

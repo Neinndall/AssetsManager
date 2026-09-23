@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Views.Models.Viewer;
@@ -70,6 +72,84 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 
             Assert.NotNull(origin);
             Assert.Equal(10f, origin.Value.Y);
+        }
+
+        [Fact]
+        public void LayersCountSharedMeshTrianglesOnEveryNamedLayer()
+        {
+            MapGeometryData geometry = Layered(
+                (0b0000_0100, 10),
+                (0b0100_0100, 5));
+
+            IReadOnlyList<MapGeometryLayerData> layers = MapGeometrySemantics.Layers(geometry);
+
+            Assert.Collection(
+                layers,
+                layer => Assert.Equal(new MapGeometryLayerData(2, 15), layer),
+                layer => Assert.Equal(new MapGeometryLayerData(6, 5), layer));
+        }
+
+        [Fact]
+        public void OpeningFlagsUseBaseLayerWhileItDrawsAtLeastHalfTheMap()
+        {
+            MapGeometryData geometry = Layered(
+                (0b0000_0001, 250),
+                (0b0000_1000, 180),
+                (0b1111_1111, 80));
+
+            Assert.Equal(0b0000_0001, MapGeometrySemantics.OpeningFlags(geometry));
+        }
+
+        [Fact]
+        public void OpeningFlagsUseFullestLayerForVariantBoards()
+        {
+            MapGeometryData geometry = Layered(
+                (0b0000_1000, 5860),
+                (0b0100_0000, 5995),
+                (0b1111_1111, 8));
+
+            Assert.Equal(0b0100_0000, MapGeometrySemantics.OpeningFlags(geometry));
+        }
+
+        [Fact]
+        public void OpeningFlagsBreakEqualTriangleTiesTowardTheLowerLayer()
+        {
+            MapGeometryData geometry = Layered(
+                (0b0000_0100, 100),
+                (0b0000_1000, 100));
+
+            Assert.Equal(0b0000_0100, MapGeometrySemantics.OpeningFlags(geometry));
+        }
+
+        [Fact]
+        public void OpeningFlagsAreZeroWhenNoMeshNamesALayer()
+        {
+            Assert.Equal(0, MapGeometrySemantics.OpeningFlags(Layered((0, 3))));
+        }
+
+        private static MapGeometryData Layered(params (byte Visibility, int Triangles)[] meshes)
+        {
+            var submeshes = new List<MapGeometrySubmeshData>();
+            var meshData = new List<MapGeometryMeshData>();
+            int start = 0;
+            foreach ((byte visibility, int triangles) in meshes)
+            {
+                int at = submeshes.Count;
+                int indices = triangles * 3;
+                submeshes.Add(new MapGeometrySubmeshData(start, indices, 0));
+                meshData.Add(Mesh(visibility, at, 1));
+                start += indices;
+            }
+
+            return new MapGeometryData(
+                Array.Empty<Vector3>(),
+                Array.Empty<Vector3>(),
+                Array.Empty<Vector2>(),
+                null,
+                new uint[start],
+                meshData,
+                submeshes,
+                new[] { "Maps/Test/Material" });
         }
 
         private static MapGeometryMeshData Mesh(

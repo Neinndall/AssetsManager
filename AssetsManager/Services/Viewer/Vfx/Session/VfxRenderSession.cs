@@ -168,17 +168,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             get => _rigSettings;
             set
             {
-                bool motionChanged = value.MotionKind != _rigSettings.MotionKind;
                 _rigSettings = value;
                 ClearCheckpoints();
                 if (_activeSystem?.Definition is { } definition)
                     _rigDuration = VfxRigMotion.RunLength(value, definition);
                 _lastRigOrigin = null;
 
-                if (motionChanged && _activeSystem != null)
-                    ResetSimulationToStart();
-                else
-                    ApplyRigTransform();
+                // Steering the preview rig changes only how the world carries the already-running
+                // system. Keep the current pool/playhead when switching Still/Missile/Trail just as
+                // the reference driver's steer() does; SetTransform applies the new carrier frame to
+                // emitters without replaying authored births from time zero.
+                ApplyRigTransform();
             }
         }
 

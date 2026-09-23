@@ -18,9 +18,14 @@ namespace AssetsManager.Services.Viewer.Semantics
         internal static Vector3? CalculateOrigin(
             MapGeometryData geometry,
             int layer = MapGeometryData.DefaultLayer)
+            => CalculateOriginForFlags(geometry, 1 << layer);
+
+        internal static Vector3? CalculateOriginForFlags(
+            MapGeometryData geometry,
+            int flags)
         {
             ArgumentNullException.ThrowIfNull(geometry);
-            List<Vector3> points = SampleDrawnPoints(geometry, layer);
+            List<Vector3> points = SampleDrawnPointsForFlags(geometry, flags);
             if (points.Count == 0)
                 return null;
 
@@ -45,15 +50,72 @@ namespace AssetsManager.Services.Viewer.Semantics
         internal static IEnumerable<MapGeometryMeshData> DrawnMeshes(
             MapGeometryData geometry,
             int layer = MapGeometryData.DefaultLayer)
+            => DrawnMeshesForFlags(geometry, 1 << layer);
+
+        internal static IEnumerable<MapGeometryMeshData> DrawnMeshesForFlags(
+            MapGeometryData geometry,
+            int flags)
         {
             ArgumentNullException.ThrowIfNull(geometry);
-            return geometry.Meshes.Where(mesh => mesh.IsVisibleOnLayer(layer));
+            return geometry.Meshes.Where(mesh => mesh.IsVisibleForFlags(flags));
         }
 
-        private static List<Vector3> SampleDrawnPoints(MapGeometryData geometry, int layer)
+        internal static IReadOnlyList<MapGeometryLayerData> Layers(MapGeometryData geometry)
+        {
+            ArgumentNullException.ThrowIfNull(geometry);
+            var triangles = new int[MapGeometryData.LayerCount];
+            int named = 0;
+            foreach (MapGeometryMeshData mesh in geometry.Meshes)
+            {
+                named |= mesh.Visibility;
+                int drawn = MeshTriangles(geometry, mesh);
+                for (int layer = 0; layer < MapGeometryData.LayerCount; layer++)
+                {
+                    if (mesh.IsVisibleOnLayer(layer))
+                        triangles[layer] = checked(triangles[layer] + drawn);
+                }
+            }
+
+            var layers = new List<MapGeometryLayerData>();
+            for (int layer = 0; layer < MapGeometryData.LayerCount; layer++)
+            {
+                if ((named & (1 << layer)) != 0)
+                    layers.Add(new MapGeometryLayerData(layer, triangles[layer]));
+            }
+            return layers;
+        }
+
+        internal static int OpeningFlags(MapGeometryData geometry)
+        {
+            ArgumentNullException.ThrowIfNull(geometry);
+            IReadOnlyList<MapGeometryLayerData> layers = Layers(geometry);
+            int total = geometry.Meshes.Sum(mesh => MeshTriangles(geometry, mesh));
+            MapGeometryLayerData baseLayer = layers.FirstOrDefault(layer => layer.Index == MapGeometryData.DefaultLayer);
+            if (baseLayer != null && baseLayer.Triangles * 2 >= total)
+                return 1 << MapGeometryData.DefaultLayer;
+
+            MapGeometryLayerData fullest = null;
+            foreach (MapGeometryLayerData layer in layers)
+            {
+                if (fullest == null || layer.Triangles > fullest.Triangles)
+                    fullest = layer;
+            }
+            return fullest?.Flag ?? 0;
+        }
+
+        private static int MeshTriangles(MapGeometryData geometry, MapGeometryMeshData mesh)
+        {
+            int indices = 0;
+            int end = Math.Min(mesh.FirstSubmesh + mesh.SubmeshCount, geometry.Submeshes.Count);
+            for (int at = Math.Max(mesh.FirstSubmesh, 0); at < end; at++)
+                indices = checked(indices + Math.Max(geometry.Submeshes[at].IndexCount, 0));
+            return indices / 3;
+        }
+
+        private static List<Vector3> SampleDrawnPointsForFlags(MapGeometryData geometry, int flags)
         {
             var points = new List<Vector3>();
-            foreach (MapGeometryMeshData mesh in DrawnMeshes(geometry, layer))
+            foreach (MapGeometryMeshData mesh in DrawnMeshesForFlags(geometry, flags))
             {
                 int submeshEnd = Math.Min(
                     mesh.FirstSubmesh + mesh.SubmeshCount,

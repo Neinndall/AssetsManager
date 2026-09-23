@@ -159,6 +159,20 @@ namespace AssetsManager.Services.Viewer.Animation
             return new RetimedAnimationAsset(asset, tickDuration);
         }
 
+        internal static double? TimedEventEnd(
+            AnimationClipEventDefinition authoredEvent,
+            double at,
+            double? until)
+        {
+            // LTK's visibility timeline always publishes the authored inverse change at mEndFrame,
+            // even when it is equal to or earlier than mStartFrame. Joint snaps instead normalize
+            // a non-forward end to "hold through the pass"; keep the legacy normalization for
+            // other non-rendered event kinds as well.
+            if (authoredEvent is AnimationSubmeshVisibilityEventDefinition)
+                return until;
+            return until.HasValue && until.Value > at ? until : null;
+        }
+
         internal static IAnimationAsset CreatePlaylist(IReadOnlyList<IAnimationAsset> steps) =>
             new AnimationPlaylistAsset(steps ?? Array.Empty<IAnimationAsset>());
 

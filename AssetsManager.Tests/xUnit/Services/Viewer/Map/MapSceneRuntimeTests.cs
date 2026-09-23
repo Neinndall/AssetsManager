@@ -13,6 +13,21 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
     public sealed class MapSceneRuntimeTests
     {
         [Fact]
+        public void RuntimeStartsOnTheSceneOpeningVisibilityFlagsAndCanSwitchMasks()
+        {
+            using var runtime = new MapSceneRuntime(
+                Scene(openingVisibilityFlags: 0b0100_0000),
+                Array.Empty<MapCharacterRuntimeGroup>(),
+                new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>()));
+
+            Assert.Equal(0b0100_0000, runtime.VisibilityFlags);
+
+            runtime.SetVisibilityFlags(0b0100_0100);
+
+            Assert.Equal(0b0100_0100, runtime.VisibilityFlags);
+        }
+
+        [Fact]
         public void UpdateAdvancesTheStructureClockIndependentlyOfParticles()
         {
             using var runtime = new MapSceneRuntime(
@@ -191,7 +206,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             return new MapTextureImage(new[] { bitmap });
         }
 
-        private static MapSceneData Scene()
+        private static MapSceneData Scene(int openingVisibilityFlags = 1)
         {
             MapPath path = MapPath.FromEntryPath("maps/mapgeometry/map11/base_srx");
             var source = new MapSceneSource(path, @"C:\map\base_srx.mapgeo", @"C:\map");
@@ -221,7 +236,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 Array.Empty<MapCharacterData>(),
                 Array.Empty<MapParticleData>(),
                 catalog,
-                null);
+                null,
+                openingVisibilityFlags: openingVisibilityFlags);
         }
     }
 }

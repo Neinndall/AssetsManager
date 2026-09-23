@@ -32,6 +32,7 @@ namespace AssetsManager.Services.Viewer.Loading
         private const int MaxConcurrentTextureLoads = 4;
 
         private readonly MapAssetResolver _assetResolver;
+        private readonly BinDocumentClosureLoader _binClosureLoader;
         private readonly MapCharacterSkinParser _skinParser;
         private readonly MapCharacterMeshDecoder _meshDecoder;
         private readonly HashResolverService _hashResolver;
@@ -45,6 +46,7 @@ namespace AssetsManager.Services.Viewer.Loading
             LogService logService)
         {
             _assetResolver = assetResolver;
+            _binClosureLoader = new BinDocumentClosureLoader(assetResolver);
             _skinParser = skinParser;
             _meshDecoder = meshDecoder;
             _hashResolver = hashResolver;
@@ -67,10 +69,13 @@ namespace AssetsManager.Services.Viewer.Loading
             if (skinAsset == null)
                 return null;
 
-            List<BinTree> documents = await LoadDocumentClosureAsync(
+            List<BinTree> documents = await _binClosureLoader.LoadAsync(
                 skinAsset,
                 projectRoot,
-                cancellationToken);
+                MaximumLinkedBins,
+                cancellationToken,
+                (asset, ex) => _logService?.LogWarning(
+                    $"MAP character BIN unavailable '{asset?.VirtualPath}': {ex.Message}"));
             if (documents.Count == 0)
                 return null;
 
@@ -232,83 +237,6 @@ namespace AssetsManager.Services.Viewer.Loading
                 ownerSceneContext);
         }
 
-        private async Task<List<BinTree>> LoadDocumentClosureAsync(
-            MapResolvedAsset primary,
-            string projectRoot,
-            CancellationToken cancellationToken)
-        {
-            var result = new List<BinTree>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var pending = new Queue<MapResolvedAsset>();
-            string primaryIdentity = AssetIdentity(primary);
-            int openedLinkedBins = 0;
-            pending.Enqueue(primary);
-
-            while (pending.Count > 0)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                MapResolvedAsset asset = pending.Dequeue();
-                string identity = AssetIdentity(asset);
-                if (!seen.Add(identity))
-                    continue;
-
-                bool isPrimary = string.Equals(identity, primaryIdentity, StringComparison.OrdinalIgnoreCase);
-                if (!isPrimary)
-                {
-                    if (openedLinkedBins >= MaximumLinkedBins)
-                        break;
-                    // Match LTK's walk: an attempted linked open consumes the budget even when
-                    // the file cannot be parsed/read.
-                    openedLinkedBins++;
-                }
-
-                BinTree tree = await ReadDocumentAsync(asset, cancellationToken);
-                if (tree == null)
-                    continue;
-                result.Add(tree);
-
-                string[] dependencies = tree.Dependencies
-                    .Where(dependency => !string.IsNullOrWhiteSpace(dependency))
-                    .ToArray();
-                var unresolved = new List<MapAssetReference>(dependencies.Length);
-                foreach (string dependency in dependencies)
-                {
-                    IReadOnlyList<MapResolvedAsset> projectMatches =
-                        _assetResolver.ResolveLinkedProjectBins(dependency, projectRoot);
-                    if (projectMatches.Count > 0)
-                    {
-                        foreach (MapResolvedAsset resolved in projectMatches)
-                        {
-                            if (!seen.Contains(AssetIdentity(resolved)))
-                                pending.Enqueue(resolved);
-                        }
-                        continue;
-                    }
-
-                    unresolved.Add(new MapAssetReference(dependency, 0));
-                }
-
-                if (unresolved.Count > 0)
-                {
-                    IReadOnlyDictionary<MapAssetReference, MapResolvedAsset> resolvedDependencies =
-                        await _assetResolver.ResolveReferencesAsync(
-                            unresolved,
-                            projectRoot,
-                            cancellationToken);
-                    foreach (MapAssetReference reference in unresolved)
-                    {
-                        if (resolvedDependencies.TryGetValue(reference, out MapResolvedAsset resolved) &&
-                            !seen.Contains(AssetIdentity(resolved)))
-                        {
-                            pending.Enqueue(resolved);
-                        }
-                    }
-                }
-            }
-
-            return result;
-        }
-
         private async Task<BinTree> LoadSingleDocumentAsync(
             MapAssetReference reference,
             string projectRoot,
@@ -431,9 +359,5 @@ namespace AssetsManager.Services.Viewer.Loading
             return new MapAssetReference(trimmed, 0);
         }
 
-        private static string AssetIdentity(MapResolvedAsset asset) =>
-            asset?.Origin == MapAssetOrigin.InstallationWad
-                ? $"wad:{asset.WadPath}|{asset.WadPathHash:x16}"
-                : $"file:{asset?.PhysicalPath ?? asset?.VirtualPath}";
     }
 }
