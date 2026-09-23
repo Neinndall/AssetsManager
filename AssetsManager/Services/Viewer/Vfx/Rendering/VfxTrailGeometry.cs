@@ -31,15 +31,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             // Trails therefore recover birth order from each particle serial before building the
             // ribbon. Include the physical slot as a tie-breaker for deterministic test/fallback data.
             if (_birthOrder.Length < count)
-                _birthOrder = new ulong[count];
+                _birthOrder = new ulong[VfxBufferGrowth.NextLength(_birthOrder.Length, count, 16)];
             for (int index = 0; index < count; index++)
                 _birthOrder[index] = ((ulong)state.Particles[index].Serial << 32) | (uint)index;
             Array.Sort(_birthOrder, 0, count);
 
             int needed = count * 2 * VertexStride;
-            if (_points.Length < needed) _points = new float[needed];
+            if (_points.Length < needed)
+                _points = new float[VfxBufferGrowth.NextLength(_points.Length, needed, VertexStride * 4)];
             needed = (count - 1) * 6 * VertexStride;
-            if (Vertices.Length < needed) Vertices = new float[needed];
+            if (Vertices.Length < needed)
+                Vertices = new float[VfxBufferGrowth.NextLength(Vertices.Length, needed, VertexStride * 6)];
             bool smoothed = trail.SmoothingMode > 0;
             int step = trail.SmoothingMode == 2 ? 1 : -1;
             int start = step == 1 ? 0 : count - 1;

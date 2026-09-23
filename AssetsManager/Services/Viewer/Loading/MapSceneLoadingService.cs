@@ -128,7 +128,9 @@ namespace AssetsManager.Services.Viewer.Loading
             IReadOnlyList<MapParticleData> playedParticles = MapParticleSemantics.PlayedOnLayer(particles, 0);
             MapParticleSystemCatalog particleSystems = _particleSystemParser.Parse(
                 materials,
-                MapParticleSemantics.GroupBySystem(playedParticles));
+                MapParticleSemantics.GroupBySystem(playedParticles),
+                _hashResolver == null ? null : _hashResolver.ResolveHash,
+                _hashResolver == null ? null : _hashResolver.ResolveBinEntry);
             MapSunData sun = MapSunParser.Parse(materials, source.Map);
             MapPostEffectsData postEffects = MapPostEffectsParser.Parse(materials, source.Map);
             MapSsaoData ambientOcclusion = MapSsaoParser.Parse(materials, source.Map);

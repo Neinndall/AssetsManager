@@ -7,6 +7,21 @@ using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
+    internal static class VfxBufferGrowth
+    {
+        internal static int NextLength(int currentLength, int requiredLength, int minimumLength = 64)
+        {
+            if (requiredLength <= currentLength) return currentLength;
+            int next = Math.Max(Math.Max(1, currentLength), minimumLength);
+            while (next < requiredLength)
+            {
+                if (next > int.MaxValue / 2) return requiredLength;
+                next *= 2;
+            }
+            return next;
+        }
+    }
+
     internal sealed class VfxTextureResourceCache : IDisposable
     {
         private readonly GL _gl;

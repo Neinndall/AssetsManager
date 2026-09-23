@@ -943,6 +943,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(VfxAuthoredDefaults.MeshRenderFlags, parsed.MeshRenderFlags);
             Assert.Equal(VfxAuthoredDefaults.Importance, parsed.Importance);
             Assert.Equal(VfxAuthoredDefaults.RenderPhaseOverride, parsed.RenderState.RenderPhase);
+            Assert.False(parsed.IsRotationEnabled);
             Assert.False(parsed.RenderState.HasStencil);
             Assert.False(parsed.RenderState.WriteAlphaOnly);
             Assert.False(parsed.RenderState.SortEmittersByPosition);

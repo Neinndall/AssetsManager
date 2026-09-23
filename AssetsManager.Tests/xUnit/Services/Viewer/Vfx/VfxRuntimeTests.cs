@@ -123,6 +123,29 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void InstancePackingReusesGeometricCapacityWhileParticleCountGrows()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Rate = VfxCurveF.Const(100f),
+                ParticleLifetime = VfxCurveF.Const(10f)
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "capacity", "capacity", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.1f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.True(state.InstanceCount >= 8);
+
+            _ = state.PrepareInstances(5);
+            int grownCapacity = state.InstanceBufferCapacity;
+            Assert.Equal(8 * VfxPlaybackRuntime.InstanceStride, grownCapacity);
+
+            _ = state.PrepareInstances(8);
+            Assert.Equal(grownCapacity, state.InstanceBufferCapacity);
+        }
+
+        [Fact]
         public void MeshInstancesPreserveAuthoredNonUniformScale()
         {
             var emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default);
@@ -3044,7 +3067,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void LegacySimpleBillboardIgnoresDirectionOrientedFlagLikeLtk()
+        public void OnlyLegacySimpleBillboardIgnoresDirectionOrientedFlagLikeLtk()
         {
             VfxEmitterDefinition directed = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -3052,7 +3075,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 IsDirectionOriented = true
             };
             Assert.True(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(directed));
-            Assert.False(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(
+            Assert.True(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(
                 directed with { IsSimpleEmitter = true }));
             Assert.False(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(
                 directed with { AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasLegacySimple: true) }));
@@ -3364,14 +3387,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void BirthScaleRangeAndRotationRateUseTheAuthoredSecondEndpoint()
+        public void BirthScaleAndRotationIgnoreAuthoredSecondEndpointsLikeLtk()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
                 BirthScale = VfxCurve3.Const(new Vector3(2f, 4f, 6f)),
-                BirthScale1 = VfxCurve3.Const(new Vector3(4f, 8f, 10f)),
+                BirthScale1 = VfxCurve3.Const(new Vector3(40f, 80f, 100f)),
                 RotationOverLife = VfxCurve3.Const(new Vector3(10f, 20f, 30f)),
-                Rotation1 = VfxCurve3.Const(new Vector3(20f, 40f, 50f)),
+                Rotation1 = VfxCurve3.Const(new Vector3(200f, 400f, 500f)),
                 ParticleLifetime = VfxCurveF.Const(2f)
             };
             var runtime = new VfxPlaybackRuntime(7);
@@ -3381,14 +3404,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
             VfxPlaybackRuntime.Particle particle = state.Particles[0];
-            float range = particle.RangeRandom;
-            float rotationRate = 10f + (20f - 10f) * range;
-            Assert.Equal(2f + (4f - 2f) * range, state.Instances[3], precision: 5);
-            Assert.Equal(rotationRate * 60f * particle.Age * MathF.PI / 180f, state.Instances[15], precision: 5);
+            Assert.Equal(2f, state.Instances[3], precision: 5);
+            Assert.Equal(10f * 60f * particle.Age * MathF.PI / 180f, state.Instances[15], precision: 5);
         }
 
         [Fact]
-        public void FlexShapeUsesTheLargestAttachedObjectExtentForScaleAndOffset()
+        public void FlexShapeIsAuthoredMetadataButDoesNotScaleRuntimeLikeLtk()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -3399,19 +3420,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     VfxCurve3.Const(new Vector3(1f, 0f, 0f)),
                     Array.Empty<Vector3>(),
                     Array.Empty<VfxCurveF>()),
-                FlexShape = new VfxFlexShapeDefinition(0.01f, 0.02f)
+                FlexShape = new VfxFlexShapeDefinition(10f, 20f)
             };
-            var runtime = new VfxPlaybackRuntime(7)
-            {
-                BoundObjectSize = new Vector3(10f, 25f, 5f)
-            };
+            var runtime = new VfxPlaybackRuntime(7);
             runtime.SetSystem(new VfxSystemDefinition(1, "flex", "flex", new[] { emitter }), Vector3.Zero);
 
             runtime.Update(0.02f);
 
             VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
-            Assert.Equal(new Vector3(12.5f, 25f, 37.5f), new Vector3(state.Instances[3], state.Instances[4], state.Instances[18]));
-            Assert.Equal(1.5f, state.Instances[0]);
+            Assert.Equal(new Vector3(10f, 20f, 30f), new Vector3(state.Instances[3], state.Instances[4], state.Instances[18]));
+            Assert.Equal(1f, state.Instances[0]);
         }
 
         [Fact]
@@ -4967,6 +4985,29 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void SimpleListEmitterWithoutLegacyBlockStillDirectionStretchesLikeLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
+            {
+                IsSimpleEmitter = true,
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+                IsDirectionOriented = true,
+                BirthVelocity = VfxCurve3.Const(new Vector3(10f, 0f, 0f)),
+                DirectionVelocityScale = 2f,
+                DirectionVelocityMinScale = 1f
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "simple-list", "simple-list", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.Equal(60f, state.Instances[4], precision: 4);
+        }
+
+        [Fact]
         public void DirectionStretchTreatsAnyNonZeroTravelAsOrientedLikeLtk()
         {
             VfxEmitterDefinition emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
@@ -5084,6 +5125,40 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(0.25f, geometry.Vertices[8], precision: 5);
             Assert.Equal(0.25f, geometry.Vertices[9], precision: 5);
             Assert.Equal(0.25f, geometry.Vertices[10], precision: 5);
+        }
+
+        [Fact]
+        public void BeamUvTransformsAlongAcrossBeforeTransposingLikeTheEngine()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.Beam,
+                Beam = new VfxBeamDefinition(
+                    0,
+                    0,
+                    0,
+                    VfxCurve3.Const(Vector3.One),
+                    VfxCurve4.Const(Vector4.One),
+                    false,
+                    Vector3.Zero,
+                    Vector3.Zero)
+            };
+            var state = BeamState(emitter, Vector3.Zero, new Vector3(0f, 0f, 4f), Vector3.Zero);
+            state.Instances[21] = 2f; // base U scale
+            state.Instances[22] = 3f; // base V scale
+
+            var geometry = new VfxBeamGeometry();
+            Assert.Equal(6, geometry.Build(state, new Vector3(0f, 5f, 5f)));
+
+            int stride = VfxBeamGeometry.VertexStride;
+            // The +width target corner enters the layer transform as (along=0, across=2),
+            // producing (0, 6), then the beam transposes it to (6, 0).
+            Assert.Equal(6f, geometry.Vertices[stride], precision: 5);
+            Assert.Equal(0f, geometry.Vertices[stride + 1], precision: 5);
+            // The +width source corner enters as (along=4, across=2): (8, 6) -> (6, 8).
+            Assert.Equal(6f, geometry.Vertices[stride * 2], precision: 5);
+            Assert.Equal(8f, geometry.Vertices[stride * 2 + 1], precision: 5);
         }
 
         [Fact]

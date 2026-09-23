@@ -74,7 +74,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 animationGraphs);
         }
 
-        private static VfxSystemDefinition ResolveCustomMaterials(
+        internal static VfxSystemDefinition ResolveCustomMaterials(
             VfxSystemDefinition system,
             BinTree tree,
             Func<ulong, string> wadChunkPathResolver,

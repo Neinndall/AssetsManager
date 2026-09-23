@@ -74,6 +74,97 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void ParserResolvesCustomMaterialForPlacedMapSystemsLikeVfxStudio()
+        {
+            const ulong customTextureHash = 0x1234567890abcdefUL;
+            const string systemPath = "Effects/CustomMaterial";
+            const string materialPath = "Effects/Materials/Particle";
+            const string customTexturePath = "ASSETS/Effects/MapParticle_TX_CM.tex";
+            const string fallbackTexturePath = "ASSETS/Effects/Fallback.tex";
+            uint systemHash = Fnv1a.HashLower(systemPath);
+            uint materialHash = Fnv1a.HashLower(materialPath);
+
+            var sampler = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("textureName"), "Diffuse_Texture"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), customTextureHash)
+                });
+            var pass = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialPassDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeBool(Fnv1a.HashLower("blendEnable"), true),
+                    new BinTreeU32(Fnv1a.HashLower("srcColorBlendFactor"), 6),
+                    new BinTreeU32(Fnv1a.HashLower("dstColorBlendFactor"), 7)
+                });
+            var technique = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialTechniqueDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "normal"),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("passes"),
+                        BinPropertyType.Embedded,
+                        new BinTreeProperty[] { pass })
+                });
+            var material = new BinTreeObject(
+                materialPath,
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new BinTreeProperty[] { sampler }),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("techniques"),
+                        BinPropertyType.Embedded,
+                        new BinTreeProperty[] { technique })
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("texture"), fallbackTexturePath),
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("CustomMaterial"),
+                        Fnv1a.HashLower("VfxMaterialDefinitionData"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeObjectLink(Fnv1a.HashLower("Material"), materialHash)
+                        })
+                });
+            var system = new BinTreeObject(
+                systemPath,
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+
+            MapParticleSystemCatalog catalog = new MapParticleSystemParser().Parse(
+                Tree(system, material),
+                new[] { new MapParticleGroupData(systemHash, new[] { Particle("Placement", systemHash) }) },
+                hash => hash == customTextureHash ? customTexturePath : null);
+
+            VfxEmitterDefinition parsed = Assert.Single(catalog.Systems[systemHash].Emitters);
+            Assert.Equal(materialHash, parsed.CustomMaterialPathHash);
+            Assert.True(parsed.HasResolvedCustomMaterial);
+            Assert.Equal(VfxCustomMaterialBlendFactor.SourceAlpha, parsed.CustomMaterialSourceBlendFactor);
+            Assert.Equal(VfxCustomMaterialBlendFactor.OneMinusSourceAlpha, parsed.CustomMaterialDestinationBlendFactor);
+            Assert.Equal(customTexturePath.ToLowerInvariant(), parsed.TexturePath);
+        }
+
+        [Fact]
         public void ParserDoesNotParseSystemsWhenNoRootPlacementIsPlayable()
         {
             const string path = "Effects/ChildOnly";

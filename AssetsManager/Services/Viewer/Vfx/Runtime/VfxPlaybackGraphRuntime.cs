@@ -48,6 +48,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private readonly Dictionary<(VfxPlaybackRuntime Parent, int SourceOrder, uint Serial), VfxPlaybackRuntime.ParticleLifecycleInfo> _deathSeen = new();
         private readonly Dictionary<VfxPlaybackRuntime, List<ChildSpawnRequest>> _spawnRequestsByParent =
             new(ReferenceEqualityComparer.Instance);
+        private readonly List<(VfxPlaybackRuntime Parent, int SourceOrder, uint Serial)> _particleKeyScratch = new();
         private readonly List<VfxPlaybackRuntime>[] _childStepScratch =
         {
             new(), new(), new(), new(), new()
@@ -571,24 +572,36 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             if (_childCapacities.Remove(runtime, out int capacity))
                 _heldChildParticleCapacity = Math.Max(0, _heldChildParticleCapacity - capacity);
 
-            foreach (var key in _carriedChildren.Keys.ToArray())
+            _particleKeyScratch.Clear();
+            foreach (KeyValuePair<(VfxPlaybackRuntime Parent, int SourceOrder, uint Serial), List<CarriedChildInfo>> pair in _carriedChildren)
             {
-                if (ReferenceEquals(key.Parent, runtime))
+                if (ReferenceEquals(pair.Key.Parent, runtime))
                 {
-                    _carriedChildren.Remove(key);
+                    _particleKeyScratch.Add(pair.Key);
                     continue;
                 }
 
-                List<CarriedChildInfo> children = _carriedChildren[key];
-                children.RemoveAll(child => ReferenceEquals(child.Runtime, runtime));
-                if (children.Count == 0) _carriedChildren.Remove(key);
+                List<CarriedChildInfo> children = pair.Value;
+                for (int index = children.Count - 1; index >= 0; index--)
+                {
+                    if (ReferenceEquals(children[index].Runtime, runtime))
+                        children.RemoveAt(index);
+                }
+                if (children.Count == 0)
+                    _particleKeyScratch.Add(pair.Key);
             }
+            foreach (var key in _particleKeyScratch)
+                _carriedChildren.Remove(key);
 
-            foreach (var key in _deathSeen.Keys.ToArray())
+            _particleKeyScratch.Clear();
+            foreach (var key in _deathSeen.Keys)
             {
                 if (ReferenceEquals(key.Parent, runtime))
-                    _deathSeen.Remove(key);
+                    _particleKeyScratch.Add(key);
             }
+            foreach (var key in _particleKeyScratch)
+                _deathSeen.Remove(key);
+            _particleKeyScratch.Clear();
         }
 
         public void Update(float deltaTime)

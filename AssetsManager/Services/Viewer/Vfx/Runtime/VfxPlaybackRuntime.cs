@@ -54,7 +54,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             /// <summary>GPU handle for particleColorTexture (0 = unavailable).</summary>
             public uint ColorGradientTexture;
             public object PendingColorGradient;
-            public float SpriteAspect = 1f;         // legacy scalar quads preserve one atlas cell's width/height
             internal float SharedRandom;
             internal bool SharedRandomRolled;
             internal float EmittedThrough;
@@ -219,11 +218,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         public bool IsStopped { get; set; }
         public int LiveParticleCount { get; private set; }
         public object UserTag { get; set; }
-        /// <summary>
-        /// Optional attached-object bounds in authored LoL units. The UI can provide this
-        /// when a champion scene is available; null keeps the standalone VFX preview neutral.
-        /// </summary>
-        public Vector3? BoundObjectSize { get; set; }
         public readonly record struct ParticleLifecycleInfo(
             Vector3 Position,
             Matrix4x4 Basis,
@@ -694,18 +688,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 : 0f;
         }
 
-        internal static bool IsLegacySimple(VfxEmitterDefinition definition)
+        internal static bool IsSimpleListEmitter(VfxEmitterDefinition definition)
             => definition?.IsSimpleEmitter == true;
 
         internal static float LingerSeconds(VfxEmitterDefinition definition)
         {
-            float lifetime = IsLegacySimple(definition) ? 0f : MathF.Max(0f, definition.ParticleLifetime.Constant);
+            float lifetime = IsSimpleListEmitter(definition) ? 0f : MathF.Max(0f, definition.ParticleLifetime.Constant);
             return MathF.Min(lifetime + 10f, MathF.Max(0f, definition.ParticleLinger));
         }
 
         internal static float StopWaitSeconds(VfxEmitterDefinition definition)
         {
-            float lifetime = IsLegacySimple(definition)
+            float lifetime = IsSimpleListEmitter(definition)
                 ? 0f
                 : definition.EmitterLifetime ?? float.PositiveInfinity;
             return MathF.Min(lifetime + 10f, MathF.Max(0f, definition.EmitterLinger));
@@ -1072,8 +1066,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 if (d.IsRotationEnabled && d.RotationOverLife is { } rotationCurve)
                 {
                     Vector3 rotationRate = rotationCurve.Sample(particleT);
-                    if (d.Rotation1 is { } rotationMax)
-                        rotationRate = Vector3.Lerp(rotationRate, rotationMax.Sample(particleT), p.RangeRandom);
                     if (s.FinishedAt >= 0f && d.Linger?.Rotation is { } lingerRotation)
                     {
                         // LTK samples LingerRotation on the particle's rewritten age01,
@@ -1275,7 +1267,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             float? sharedRoll = d.ParticlesShareRandomValue ? s.SharedRandom : _rng.NextUnitFloat();
 
             float life = d.ParticleLifetime.SampleBirth(emitterT, _rng, sharedRoll);
-            var rangeRandom = roll;
             var birthScale = d.BirthScale.SampleBirth(emitterT, _rng, sharedRoll);
             if (d.LegacyBirthScale is { } legacyBirthScale)
             {
@@ -1283,15 +1274,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector2 bias = d.LegacyScaleBias ?? Vector2.One;
                 birthScale = new Vector3(scalar * bias.X, scalar * bias.Y, scalar);
             }
-            else if (d.BirthScale1 is { } birthScale1)
-            {
-                birthScale = Vector3.Lerp(birthScale, birthScale1.SampleBirth(emitterT, _rng, sharedRoll), rangeRandom);
-            }
             // isUniformScale promotes the first authored component to every axis for all
             // particle kinds, not only mesh primitives.
             if (d.IsUniformScale)
                 birthScale = new Vector3(birthScale.X);
-            birthScale *= ResolveFlexMultiplier(d.FlexShape?.ScaleBirthScaleByBoundObjectSize);
             var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
             var birthOrbitalVelocity = d.BirthOrbitalVelocity?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
             var birthDrag = d.BirthDrag?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
@@ -1310,7 +1296,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             var localOffset = d.SpawnShape is { } shape
                 ? shape.SampleOffset(_rng, emitterT, sharedRoll, out spawnRotation)
                 : Vector3.Zero;
-            localOffset *= ResolveFlexMultiplier(d.FlexShape?.ScaleEmitOffsetByBoundObjectSize);
 
             bool onEmissionSurface = false;
             VfxSurfaceBirth surfaceBirth = default;
@@ -1366,7 +1351,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 RotationalAcceleration = rotationalAcceleration * (MathF.PI / 180f),
                 Rot = birthRotation.X * (MathF.PI / 180f),
                 RotVel = rotVel.X * (MathF.PI / 180f),
-                RangeRandom = rangeRandom,
+                RangeRandom = roll,
                 StartFrame = d.RandomStartFrame && d.NumFrames > 1 ? roll * d.NumFrames : 0f,
                 FrameRate = (d.FrameRate ?? 0f) *
                     (d.BirthFrameRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? 1f),
@@ -1393,8 +1378,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             var d = s.Def;
             int n = Math.Min(s.Particles.Count, Math.Max(0, maxCount));
-            if (s.InstanceBufferCapacity < n * InstanceStride)
-                s.ResetInstanceBuffer(Math.Max(n * InstanceStride, InstanceStride * 4));
+            int requiredLength = n * InstanceStride;
+            if (s.InstanceBufferCapacity < requiredLength)
+            {
+                int currentParticleCapacity = Math.Max(4, s.InstanceBufferCapacity / InstanceStride);
+                int nextParticleCapacity = currentParticleCapacity;
+                while (nextParticleCapacity < n)
+                {
+                    int doubled = nextParticleCapacity * 2;
+                    nextParticleCapacity = Math.Min(_particleCapacity, Math.Max(n, doubled));
+                    if (nextParticleCapacity >= n) break;
+                }
+                s.ResetInstanceBuffer(nextParticleCapacity * InstanceStride);
+            }
             var buf = s.RawInstances;
             float emitterT = EmitterTime(s);
             int k = 0;
@@ -1465,7 +1461,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 bool canDirectionStretch =
                     d.IsDirectionOriented &&
                     d.PrimitiveKind != VfxPrimitiveKind.Ray &&
-                    !d.IsSimpleEmitter &&
                     d.AuthoredFeatures?.HasLegacySimple != true &&
                     (d.DrawsAsQuad || d.PrimitiveKind == VfxPrimitiveKind.Mesh) &&
                     direction.LengthSquared() > 0f;
@@ -1475,7 +1470,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     if (d.PrimitiveKind == VfxPrimitiveKind.Mesh) sizeZ *= stretch;
                     else sizeY *= stretch;
                 }
-                if (d.UseTextureAspect) sizeX *= s.SpriteAspect;
                 buf[k++] = position.X; buf[k++] = position.Y; buf[k++] = position.Z;
                 buf[k++] = sizeX;
                 buf[k++] = sizeY;
@@ -1550,8 +1544,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 buf[k++] = textureMultUvOffset.X; buf[k++] = textureMultUvOffset.Y;
                 buf[k++] = textureMultUvScale.X; buf[k++] = textureMultUvScale.Y;
                 buf[k++] = textureMultUvRotationDegrees * (MathF.PI / 180f);
+                // Birth random drives ColorLookUpType=3 exactly like LTK's pool.roll.
                 buf[k++] = p.RangeRandom;
-                buf[k++] = d.PaletteDefinition?.PaletteSelector.Sample(0f).X ?? 0f;
+                // Palette selection is an emitter uniform sampled at t=0; keep this final lane
+                // as padding so basis attributes remain at offsets 36/39/42.
+                buf[k++] = 0f;
 
                 Matrix4x4 basis = ParticleBasis(p, s, direction, orbitalTurn, legacyRoll);
                 Vector3 basisX = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, basis), Vector3.UnitX);
@@ -1572,13 +1569,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             if (span <= 0f) return 0f;
             float wrapped = value % span;
             return wrapped < 0f ? wrapped + span : wrapped;
-        }
-
-        private float ResolveFlexMultiplier(float? coefficient)
-        {
-            if (coefficient is not { } value || BoundObjectSize is not { } bounds) return 1f;
-            float extent = MathF.Max(MathF.Abs(bounds.X), MathF.Max(MathF.Abs(bounds.Y), MathF.Abs(bounds.Z)));
-            return MathF.Max(0f, 1f + value * extent);
         }
 
         internal readonly record struct PreparedNoiseField(

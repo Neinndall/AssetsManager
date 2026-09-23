@@ -5682,7 +5682,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     var bs = d.BirthScale.Constant;
                     sb.AppendLine($"  - Escala Inicial (BirthScale): X={bs.X:F1}, Y={bs.Y:F1}, Z={bs.Z:F1}");
-                    sb.AppendLine($"  - Usa Relación Aspecto (UseTextureAspect): {d.UseTextureAspect}");
                     sb.AppendLine($"  - Bucle Infinito (IsLoop): {d.IsLoop}");
                     sb.AppendLine($"  - Emisor Único (IsSingleParticle): {d.IsSingleParticle}");
                     sb.AppendLine($"  - Flags Orientación: OrientadoDirección={d.IsDirectionOriented}, CuadriláteroArbitrario={d.IsArbitraryQuad}, Terreno={d.IsFollowingTerrain}, Suelo={d.IsGroundLayer}");

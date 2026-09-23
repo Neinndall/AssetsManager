@@ -89,9 +89,30 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
         }
 
+        private sealed class PassGlobals
+        {
+            internal readonly Dictionary<string, Vector4> Parameters = new(StringComparer.Ordinal);
+            internal readonly Dictionary<string, bool> RuntimeSwitches = new(StringComparer.Ordinal);
+
+            internal PassGlobals(GameMaterialPass pass)
+            {
+                foreach (GameMaterialParameter parameter in pass?.Parameters ?? Array.Empty<GameMaterialParameter>())
+                {
+                    if (!string.IsNullOrEmpty(parameter?.Name))
+                        Parameters[parameter.Name] = parameter.Value;
+                }
+                foreach (KeyValuePair<string, bool> pair in pass?.RuntimeSwitches ?? Array.Empty<KeyValuePair<string, bool>>())
+                {
+                    if (!string.IsNullOrEmpty(pair.Key))
+                        RuntimeSwitches[pair.Key] = pair.Value;
+                }
+            }
+        }
+
         private sealed record CacheEntry(
             ProgramRuntime Program,
             GameMaterialPass Pass,
+            PassGlobals Globals,
             string Failure);
 
         private readonly GL _gl;
@@ -148,7 +169,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             _gl.UseProgram(runtime.Program);
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.StaticMesh, hasTangents: false);
-            UpdateBlocks(runtime, entry.Pass, mesh, frame, null);
+            UpdateBlocks(runtime, entry, mesh, frame, null);
             BindTextures(runtime, entry.Pass, material, mesh, programTexture, lightmapTexture);
             ApplyPassState(entry.Pass.State, meshDoubleSided);
             return true;
@@ -172,7 +193,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             _gl.UseProgram(runtime.Program);
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents);
-            UpdateBlocks(runtime, entry.Pass, null, frame, new CharacterDraw(world, bones));
+            UpdateBlocks(runtime, entry, null, frame, new CharacterDraw(world, bones));
             BindSkinnedTextures(runtime, entry.Pass, programTexture);
             ApplyPassState(entry.Pass.State, material.RenderState.DoubleSided);
             return true;
@@ -201,6 +222,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     created = new CacheEntry(
                         null,
                         null,
+                        null,
                         string.IsNullOrWhiteSpace(_shaderCachePath)
                             ? "ShaderCache.dx11.wad.client was not found in the configured game installs."
                             : "ShaderCache.dx11.wad.client could not be opened.");
@@ -214,7 +236,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                             _shaderCachePath);
                     if (bytecodes == null)
                     {
-                        created = new CacheEntry(null, null, "Material has no resolved game program.");
+                        created = new CacheEntry(null, null, null, "Material has no resolved game program.");
                     }
                     else
                     {
@@ -265,14 +287,14 @@ namespace AssetsManager.Services.Viewer.Rendering
                         }
 
                         created = ready != null
-                            ? new CacheEntry(ready, readyPass, null)
-                            : new CacheEntry(null, null, failures.FirstOrDefault() ?? "No material pass translated and linked.");
+                            ? new CacheEntry(ready, readyPass, new PassGlobals(readyPass), null)
+                            : new CacheEntry(null, null, null, failures.FirstOrDefault() ?? "No material pass translated and linked.");
                     }
                 }
             }
             catch (Exception ex)
             {
-                created = new CacheEntry(null, null, ex.Message);
+                created = new CacheEntry(null, null, null, ex.Message);
             }
 
             if (owner != null)
@@ -463,7 +485,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UpdateBlocks(
             ProgramRuntime runtime,
-            GameMaterialPass pass,
+            CacheEntry entry,
             MapGeometryMeshData mesh,
             in Frame frame,
             CharacterDraw? character)
@@ -475,7 +497,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 switch (block.Block.Name)
                 {
                     case Globals:
-                        WriteGlobals(block.Data, block.Block, pass, mesh);
+                        WriteGlobals(block.Data, block.Block, entry.Globals, mesh);
                         break;
                     case "PerFrameVertexCB":
                         WritePerFrameVertex(block.Data, frame, skinned);
@@ -504,13 +526,11 @@ namespace AssetsManager.Services.Viewer.Rendering
         private static void WriteGlobals(
             float[] data,
             GameShaderTranslator.UniformBlock block,
-            GameMaterialPass pass,
+            PassGlobals globals,
             MapGeometryMeshData mesh)
         {
-            var parameters = (pass.Parameters ?? Array.Empty<GameMaterialParameter>())
-                .ToDictionary(parameter => parameter.Name, parameter => parameter.Value, StringComparer.Ordinal);
-            var switches = (pass.RuntimeSwitches ?? Array.Empty<KeyValuePair<string, bool>>())
-                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+            IReadOnlyDictionary<string, Vector4> parameters = globals?.Parameters;
+            IReadOnlyDictionary<string, bool> switches = globals?.RuntimeSwitches;
 
             foreach (GameShaderTranslator.BlockMember member in block.Members)
             {
@@ -533,14 +553,14 @@ namespace AssetsManager.Services.Viewer.Rendering
                     continue;
                 }
 
-                if (parameters.TryGetValue(member.Name, out Vector4 value))
+                if (parameters != null && parameters.TryGetValue(member.Name, out Vector4 value))
                 {
                     WriteVector4(data, at, count, value);
                     continue;
                 }
 
                 if (member.Name.StartsWith("switch_", StringComparison.Ordinal) &&
-                    switches.TryGetValue(member.Name[7..], out bool enabled) && at < data.Length)
+                    switches != null && switches.TryGetValue(member.Name[7..], out bool enabled) && at < data.Length)
                 {
                     data[at] = enabled ? 1f : 0f;
                 }

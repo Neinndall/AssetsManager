@@ -398,7 +398,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 TextureMultTexDiv: textureMultTexDiv,
                 TextureMultUvScrollRate: textureMultUvScroll,
                 StartFrame: GetU16(p, F_startFrame) ?? 0,
-                UseTextureAspect: legacy is not null,
                 Distortion: distortion,
                 ParticleColorTexturePath: ReadAsset(p, F_particleColorTex, ".tex"),
                 ColorLookUpTypeX: colorLookupX,

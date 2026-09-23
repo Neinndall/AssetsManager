@@ -35,6 +35,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 new(StringComparer.OrdinalIgnoreCase);
             internal readonly Dictionary<string, uint> ProgramTextures =
                 new(StringComparer.OrdinalIgnoreCase);
+            internal readonly Dictionary<string, string> ProgramTextureKeyByPath =
+                new(StringComparer.OrdinalIgnoreCase);
             internal readonly Dictionary<string, BitmapSource> LoadedProgramBitmaps =
                 new(StringComparer.OrdinalIgnoreCase);
             internal uint TangentVbo;
@@ -91,9 +93,13 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             if (part?.AllTextures == null || resources == null || string.IsNullOrWhiteSpace(authoredPath))
                 return null;
 
-            string key = SknMaterialTextureResolver.MatchTextureKey(
-                authoredPath,
-                part.AllTextures.Keys.ToArray());
+            if (!resources.ProgramTextureKeyByPath.TryGetValue(authoredPath, out string key))
+            {
+                key = SknMaterialTextureResolver.MatchTextureKey(
+                    authoredPath,
+                    part.AllTextures.Keys.ToArray());
+                resources.ProgramTextureKeyByPath[authoredPath] = key;
+            }
             if (string.IsNullOrWhiteSpace(key))
                 return null;
             if (resources.ProgramTextures.TryGetValue(key, out uint cached))
@@ -381,6 +387,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             foreach (BitmapSource bitmap in resources.LoadedProgramBitmaps.Values)
                 ReleaseSharedTexture(_sharedTextures, bitmap);
             resources.ProgramTextures.Clear();
+            resources.ProgramTextureKeyByPath.Clear();
             resources.LoadedProgramBitmaps.Clear();
         }
 

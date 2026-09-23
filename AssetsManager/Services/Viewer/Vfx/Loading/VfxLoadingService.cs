@@ -279,16 +279,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             {
                 BitmapSource texture = _resources.ResolveTexture(emitter.Def.TexturePath, searchDirectory);
                 if (texture != null)
-                {
                     emitter.PendingTexture = texture;
-                    if (emitter.Def.UseTextureAspect)
-                    {
-                        float cellWidth = texture.PixelWidth / Math.Max(1f, emitter.Def.TexDiv.X);
-                        float cellHeight = texture.PixelHeight / Math.Max(1f, emitter.Def.TexDiv.Y);
-                        if (cellHeight > 0f)
-                            emitter.SpriteAspect = Math.Clamp(cellWidth / cellHeight, 0.05f, 20f);
-                    }
-                }
                 emitter.PendingTextureMult = _resources.ResolveTexture(emitter.Def.TextureMultPath, searchDirectory);
                 emitter.PendingDistortionTexture = _resources.ResolveTexture(
                     emitter.Def.Distortion?.NormalMapTexturePath,

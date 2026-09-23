@@ -41,6 +41,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             internal bool HasSkin;
             internal int[] InfluenceJointSlots = Array.Empty<int>();
             internal IReadOnlyList<BoundRange> Ranges = Array.Empty<BoundRange>();
+            internal string[] TextureKeys = Array.Empty<string>();
+            internal readonly Dictionary<string, uint> ProgramTexturesByPath = new(StringComparer.OrdinalIgnoreCase);
             internal readonly Dictionary<string, Matrix4x4[]> Palettes = new(StringComparer.OrdinalIgnoreCase);
         }
 
@@ -74,6 +76,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly Dictionary<MapCharacterAssetData, SkinResources> _skins =
             new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<BitmapSource, uint> _textures =
+            new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<BitmapSource, uint> _rawProgramTextures =
             new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<(ModelMaterialWrapMode U, ModelMaterialWrapMode V), uint> _samplers = new();
         private readonly List<DrawCommand> _opaque = new();
@@ -471,17 +475,21 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             if (resources?.Asset?.Textures == null || string.IsNullOrWhiteSpace(authoredPath))
                 return null;
+            if (resources.ProgramTexturesByPath.TryGetValue(authoredPath, out uint cached))
+                return cached == 0 ? null : cached;
 
-            string key = SknMaterialTextureResolver.MatchTextureKey(
-                authoredPath,
-                resources.Asset.Textures.Keys.ToArray());
+            string key = SknMaterialTextureResolver.MatchTextureKey(authoredPath, resources.TextureKeys);
             if (string.IsNullOrWhiteSpace(key) ||
                 !resources.Asset.Textures.TryGetValue(key, out BitmapSource bitmap) ||
                 bitmap == null)
             {
+                resources.ProgramTexturesByPath[authoredPath] = 0;
                 return null;
             }
-            return AcquireTexture(bitmap);
+
+            uint texture = AcquireTexture(bitmap, _rawProgramTextures, ProgramTextureInternalFormat);
+            resources.ProgramTexturesByPath[authoredPath] = texture;
+            return texture;
         }
 
         private SkinResources EnsureResources(MapCharacterAssetData asset)
@@ -505,7 +513,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 Asset = asset,
                 Vao = _gl.GenVertexArray(),
                 HasSkin = mesh.HasSkin,
-                InfluenceJointSlots = BuildInfluenceJointSlots(asset.Skeleton)
+                InfluenceJointSlots = BuildInfluenceJointSlots(asset.Skeleton),
+                TextureKeys = asset.Textures?.Keys.ToArray() ?? Array.Empty<string>()
             };
             _gl.BindVertexArray(resources.Vao);
             resources.PositionVbo = UploadVector3Attribute(0, mesh.Positions);
@@ -591,7 +600,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             bool forceUntextured = viewMode == VfxPreviewViewMode.Untextured;
             bool forceUnshaded = viewMode == VfxPreviewViewMode.Unshaded;
             bool hasTexture = !forceUntextured && range.Texture != null;
-            uint textureId = hasTexture ? AcquireTexture(range.Texture) : _whiteTexture;
+            uint textureId = hasTexture
+                ? AcquireTexture(range.Texture, _textures, BaseTextureInternalFormat)
+                : _whiteTexture;
             Vector3 color;
             if (forceUntextured)
                 color = untextured;
@@ -693,6 +704,9 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         internal static Matrix4x4 CreateWorldMatrix(Matrix4x4 authoredTransform, float skinScale) =>
             MapCharacterSemantics.WorldTransform(authoredTransform, skinScale);
+
+        internal static InternalFormat BaseTextureInternalFormat => InternalFormat.Srgb8Alpha8;
+        internal static InternalFormat ProgramTextureInternalFormat => InternalFormat.Rgba8;
 
         internal static float ScrollAt(float rate, float timeSeconds)
         {
@@ -835,9 +849,12 @@ namespace AssetsManager.Services.Viewer.Rendering
             return buffer;
         }
 
-        private uint AcquireTexture(BitmapSource source)
+        private uint AcquireTexture(
+            BitmapSource source,
+            Dictionary<BitmapSource, uint> cache,
+            InternalFormat internalFormat)
         {
-            if (_textures.TryGetValue(source, out uint existing)) return existing;
+            if (cache.TryGetValue(source, out uint existing)) return existing;
 
             BitmapSource bitmap = source;
             if (bitmap.Format != PixelFormats.Bgra32)
@@ -862,7 +879,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.TexImage2D(
                 TextureTarget.Texture2D,
                 0,
-                InternalFormat.Srgb8Alpha8,
+                internalFormat,
                 (uint)width,
                 (uint)height,
                 0,
@@ -873,7 +890,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _textures[source] = texture;
+            cache[source] = texture;
             return texture;
         }
 
@@ -937,6 +954,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             foreach (uint texture in _textures.Values)
                 if (texture != 0) _gl.DeleteTexture(texture);
             _textures.Clear();
+            foreach (uint texture in _rawProgramTextures.Values)
+                if (texture != 0) _gl.DeleteTexture(texture);
+            _rawProgramTextures.Clear();
             _opaque.Clear();
             _transparent.Clear();
         }
@@ -969,6 +989,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                 foreach (uint texture in _textures.Values)
                     if (texture != 0) _gl.DeleteTexture(texture);
                 _textures.Clear();
+                foreach (uint texture in _rawProgramTextures.Values)
+                    if (texture != 0) _gl.DeleteTexture(texture);
+                _rawProgramTextures.Clear();
                 _gameShaderRuntime?.Dispose();
                 _gameShaderRuntime = null;
                 foreach (uint sampler in _samplers.Values)
@@ -988,6 +1011,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             {
                 _skins.Clear();
                 _textures.Clear();
+                _rawProgramTextures.Clear();
                 _samplers.Clear();
                 _gameShaderRuntime = null;
                 _boneBuffer = 0;

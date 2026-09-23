@@ -29,7 +29,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int _uPrimitiveKind;
         private int _uAlphaCutoff, _uAlphaTest, _uEmissiveStrength, _uFlipU, _uFlipV, _uClampUv;
         private int _uColorMap, _uHasColor, _uRampAtMult, _uUvMode, _uColorRenderFlags;
-        private int _uPaletteMap, _uHasPalette, _uPaletteCount, _uPaletteAddressMode, _uPaletteMixMask, _uPaletteScroll;
+        private int _uPaletteMap, _uHasPalette, _uPaletteCount, _uPaletteAddressMode, _uPaletteSelector, _uPaletteMixMask, _uPaletteScroll;
         private int _uColorLookUpTypeX, _uColorLookUpTypeY, _uColorLookUpScales, _uColorLookUpOffsets;
         private int _uErosionTex, _uHasErosion, _uHasErosionMap, _uErosionAddressMode, _uErosionDefault;
         private int _uErosionFeatherIn, _uErosionFeatherOut, _uErosionSliceWidth;
@@ -179,6 +179,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _uHasPalette = gl.GetUniformLocation(_program, "uHasPalette");
             _uPaletteCount = gl.GetUniformLocation(_program, "uPaletteCount");
             _uPaletteAddressMode = gl.GetUniformLocation(_program, "uPaletteAddressMode");
+            _uPaletteSelector = gl.GetUniformLocation(_program, "uPaletteSelector");
             _uPaletteMixMask = gl.GetUniformLocation(_program, "uPaletteMixMask");
             _uPaletteScroll = gl.GetUniformLocation(_program, "uPaletteScroll");
             _uColorLookUpTypeX = gl.GetUniformLocation(_program, "uColorLookUpTypeX");
@@ -664,6 +665,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform1(_uHasPalette, hasPalette ? 1 : 0);
                 _gl.Uniform1(_uPaletteCount, Math.Max(1, palette?.PaletteCount ?? 1));
                 _gl.Uniform1(_uPaletteAddressMode, palette?.AddressMode ?? 0);
+                _gl.Uniform1(_uPaletteSelector, PaletteSelectorAtZero(palette));
                 Vector4 paletteMask = palette?.PaletteSourceMixColor ?? Vector4.Zero;
                 _gl.Uniform4(_uPaletteMixMask, paletteMask.X, paletteMask.Y, paletteMask.Z, paletteMask.W);
                 Vector2 paletteScroll = new(
@@ -1433,6 +1435,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Uniform1(_muHasPalette, meshHasPalette ? 1 : 0);
             _gl.Uniform1(_muPaletteCount, Math.Max(1, meshPalette?.PaletteCount ?? 1));
             _gl.Uniform1(_muPaletteAddressMode, meshPalette?.AddressMode ?? 0);
+            _gl.Uniform1(_muPaletteSelector, PaletteSelectorAtZero(meshPalette));
             Vector4 meshPaletteMask = meshPalette?.PaletteSourceMixColor ?? Vector4.Zero;
             _gl.Uniform4(_muPaletteMixMask, meshPaletteMask.X, meshPaletteMask.Y, meshPaletteMask.Z, meshPaletteMask.W);
             Vector2 meshPaletteScroll = new(
@@ -1591,7 +1594,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.Uniform2(_muUvScaleMult, instances[o + 31], instances[o + 32]);
                 _gl.Uniform1(_muUvRotationMult, instances[o + 33]);
                 _gl.Uniform1(_muFrame, instances[o + 10]);
-                _gl.Uniform1(_muPaletteSelector, instances[o + 35]);
 
                 if (useParticleMeshSkinning && i < es.Particles.Count)
                     UploadMeshBonePalette(es.MeshAnimation.EvaluatePalette(es.Particles[i].Age));
@@ -1636,6 +1638,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.BindVertexArray(_vao);
         }
 
+        internal static float PaletteSelectorAtZero(VfxPaletteDefinition palette)
+            => palette is null ? 0f : palette.PaletteSelector.Sample(0f).X;
+
         internal static Vector3 ResolveCameraForward(Vector3 cameraRight, Vector3 cameraUp)
         {
             Vector3 forward = Vector3.Cross(cameraUp, cameraRight);
@@ -1645,7 +1650,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal static bool ShouldDirectionOrientBillboard(VfxEmitterDefinition definition)
         {
             if (definition is null || !definition.IsDirectionOriented) return false;
-            if (definition.AuthoredFeatures?.HasLegacySimple == true || definition.IsSimpleEmitter) return false;
+            if (definition.AuthoredFeatures?.HasLegacySimple == true) return false;
             return definition.PrimitiveKind is VfxPrimitiveKind.CameraQuad or VfxPrimitiveKind.CameraUnitQuad;
         }
 

@@ -255,7 +255,6 @@ out vec4 vErosionMixer;
 out vec2 vLocalUv;
 out vec2 vLocalUvMult;
 out vec2 vCornerUv;
-out float vPaletteSelector;
 out vec3 vColorDynamics;
 out vec2 vRibbonLookup;
 vec3 rotateEuler(vec3 p, vec3 r){
@@ -378,7 +377,6 @@ void main(){
         vRibbonLookup = vec2(0.0);
     }
     vColor = aColor;
-    vPaletteSelector = aUvMultDynamics.z;
     vErosionDrive = aUvErosion.y;
     vErosionMixer = vec4(aUvErosion.zw, aErosionMixerZW);
     vColorDynamics = vec3(aAgeVelX.x, length(aAgeVelX.yzw), aUvMultDynamics.y);
@@ -618,7 +616,6 @@ in vec4 vErosionMixer;
 in vec2 vLocalUv;
 in vec2 vLocalUvMult;
 in vec2 vCornerUv;
-in float vPaletteSelector;
 in vec3 vColorDynamics;
 in vec2 vRibbonLookup;
 uniform sampler2D uTex;
@@ -645,6 +642,7 @@ uniform sampler2D uPaletteMap;
 uniform int uHasPalette;
 uniform int uPaletteCount;
 uniform int uPaletteAddressMode;
+uniform float uPaletteSelector;
 uniform vec4 uPaletteMixMask;
 uniform vec2 uPaletteScroll;
 uniform int uColorLookUpTypeX;
@@ -737,7 +735,7 @@ void main(){
         float paletteCoverage = t.a;
         float paletteIndex = dot(t, uPaletteMixMask);
         float paletteU = clamp(paletteIndex, 0.0, 1.0);
-        float paletteV = (vPaletteSelector + 0.5) / max(float(uPaletteCount), 1.0);
+        float paletteV = (uPaletteSelector + 0.5) / max(float(uPaletteCount), 1.0);
         t.rgb = sampleAddressed(uPaletteMap, vec2(paletteU, paletteV) + uPaletteScroll, uPaletteAddressMode).rgb;
         t.a = paletteCoverage;
     }

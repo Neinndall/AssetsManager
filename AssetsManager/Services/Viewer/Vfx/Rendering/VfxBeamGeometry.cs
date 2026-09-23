@@ -25,7 +25,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
             int vertexCount = count * 6;
             int needed = vertexCount * VertexStride;
-            if (Vertices.Length < needed) Vertices = new float[needed];
+            if (Vertices.Length < needed)
+                Vertices = new float[VfxBufferGrowth.NextLength(Vertices.Length, needed, VertexStride * 6)];
 
             Vector3 source = state.SystemOrigin + beam.SourceOffset;
             Vector3 target = state.SystemTarget + beam.TargetOffset;
@@ -59,12 +60,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     ? beam.ColorByDistance.Sample(colorDistance)
                     : Vector4.One;
 
+                // The engine transforms (along, across) first and only then transposes the
+                // resulting coordinate pair for beam sampling. Supplying (across, along)
+                // here is not equivalent once a layer has non-uniform scale or rotation.
                 Write(state, instances, instance, ref written, end - half, 0f, 0f, distanceColor);
-                Write(state, instances, instance, ref written, end + half, across, 0f, distanceColor);
-                Write(state, instances, instance, ref written, start + half, across, along, distanceColor);
+                Write(state, instances, instance, ref written, end + half, 0f, across, distanceColor);
+                Write(state, instances, instance, ref written, start + half, along, across, distanceColor);
                 Write(state, instances, instance, ref written, end - half, 0f, 0f, distanceColor);
-                Write(state, instances, instance, ref written, start + half, across, along, distanceColor);
-                Write(state, instances, instance, ref written, start - half, 0f, along, distanceColor);
+                Write(state, instances, instance, ref written, start + half, along, across, distanceColor);
+                Write(state, instances, instance, ref written, start - half, along, 0f, distanceColor);
             }
 
             return written;

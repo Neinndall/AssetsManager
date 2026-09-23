@@ -1,6 +1,8 @@
 using System.Linq;
+using System.Numerics;
 using System.Text.RegularExpressions;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
+using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
@@ -51,6 +53,23 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Contains("float paletteCoverage = texel.a;", VfxShaderSource.MeshFragment);
             Assert.Contains("texel.a = paletteCoverage;", VfxShaderSource.MeshFragment);
             Assert.DoesNotContain("texel.a = max(texel.a, palette.a)", VfxShaderSource.MeshFragment);
+        }
+
+        [Fact]
+        public void PaletteSelectorIsAnEmitterUniformSampledAtZeroLikeLtk()
+        {
+            Assert.DoesNotContain("vPaletteSelector", VfxShaderSource.ParticleVertex);
+            Assert.DoesNotContain("vPaletteSelector", VfxShaderSource.ParticleFragment);
+            Assert.Contains("uniform float uPaletteSelector;", VfxShaderSource.ParticleFragment);
+            Assert.Contains("float paletteV = (uPaletteSelector + 0.5)", VfxShaderSource.ParticleFragment);
+
+            var selector = new VfxCurve3(
+                new Vector3(4f, 0f, 0f),
+                new[] { 0f, 1f },
+                new[] { new Vector3(4f, 0f, 0f), new Vector3(9f, 0f, 0f) });
+            var palette = new VfxPaletteDefinition(16, selector);
+
+            Assert.Equal(4f, VfxOpenGlRenderer.PaletteSelectorAtZero(palette));
         }
 
         [Fact]

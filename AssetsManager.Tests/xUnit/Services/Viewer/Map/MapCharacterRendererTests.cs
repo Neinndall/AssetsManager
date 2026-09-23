@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Rendering;
+using Silk.NET.OpenGL;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
@@ -29,6 +30,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         public void UvScrollUsesAbsoluteClockFoldedIntoOneTile(float rate, float time, float expected)
         {
             Assert.Equal(expected, MapCharacterRenderer.ScrollAt(rate, time), 5);
+        }
+
+        [Fact]
+        public void GameProgramTexturesStayRawWhileFallbackBaseTexturesUseSrgb()
+        {
+            Assert.Equal(InternalFormat.Srgb8Alpha8, MapCharacterRenderer.BaseTextureInternalFormat);
+            Assert.Equal(InternalFormat.Rgba8, MapCharacterRenderer.ProgramTextureInternalFormat);
         }
 
         [Fact]
