@@ -65,6 +65,61 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
         private bool _gles;
         private Vector2 _depthProjectionValue;
+        private int _renderBatchDepth;
+        private GlStateSnapshot _renderBatchState;
+
+        private sealed class GlStateSnapshot
+        {
+            internal bool DepthTest;
+            internal bool CullFace;
+            internal bool PolygonOffset;
+            internal bool Blend;
+            internal bool StencilTest;
+            internal int DepthWrite;
+            internal int DepthFunction;
+            internal int BlendSource;
+            internal int BlendDestination;
+            internal int BlendSourceAlpha;
+            internal int BlendDestinationAlpha;
+            internal int BlendEquation;
+            internal int BlendEquationAlpha;
+            internal int StencilFrontFunction;
+            internal int StencilFrontReference;
+            internal int StencilFrontValueMask;
+            internal int StencilFrontWriteMask;
+            internal int StencilFrontFail;
+            internal int StencilFrontDepthFail;
+            internal int StencilFrontDepthPass;
+            internal int StencilBackFunction;
+            internal int StencilBackReference;
+            internal int StencilBackValueMask;
+            internal int StencilBackWriteMask;
+            internal int StencilBackFail;
+            internal int StencilBackDepthFail;
+            internal int StencilBackDepthPass;
+            internal readonly int[] ColorWriteMask = new int[4];
+            internal int Program;
+            internal int VertexArray;
+            internal int ArrayBuffer;
+            internal int ActiveTexture;
+            internal readonly int[] TextureBindings = new int[9];
+            internal readonly int[] CubeBindings = new int[9];
+        }
+
+        private sealed class RenderBatchScope : IDisposable
+        {
+            private VfxOpenGlRenderer _owner;
+
+            internal RenderBatchScope(VfxOpenGlRenderer owner) => _owner = owner;
+
+            public void Dispose()
+            {
+                VfxOpenGlRenderer owner = _owner;
+                _owner = null;
+                owner?.EndRenderBatch();
+            }
+        }
+
         public void Initialize(GL gl)
         {
             _gl = gl;
@@ -222,7 +277,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _ready = true;
         }
 
-        public uint UploadTexture(byte[] bgra, int width, int height)
+        public uint UploadTexture(ReadOnlySpan<byte> bgra, int width, int height)
             => _textures.Upload(bgra, width, height);
 
         internal uint UploadCubeMap(VfxCubeMapData cube)
@@ -232,6 +287,135 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             => _capture.Capture(width, height, captureColor, captureDepth);
 
         internal bool SupportsWireframe => !_gles;
+
+        /// <summary>
+        /// Preserves the surrounding viewer GL state once for a group of VFX passes. Render() remains
+        /// self-contained outside a batch, while shaded/wire/distortion passes can avoid repeating
+        /// synchronous glGet state queries within the same frame.
+        /// </summary>
+        internal IDisposable BeginRenderBatch()
+        {
+            if (!_ready)
+                return new RenderBatchScope(null);
+            if (_renderBatchDepth++ == 0)
+                _renderBatchState = CaptureGlState();
+            return new RenderBatchScope(this);
+        }
+
+        private void EndRenderBatch()
+        {
+            if (_renderBatchDepth <= 0)
+                return;
+            _renderBatchDepth--;
+            if (_renderBatchDepth != 0)
+                return;
+
+            GlStateSnapshot state = _renderBatchState;
+            _renderBatchState = null;
+            if (state != null)
+                RestoreGlState(state);
+        }
+
+        private GlStateSnapshot CaptureGlState()
+        {
+            var state = new GlStateSnapshot
+            {
+                DepthTest = _gl.IsEnabled(EnableCap.DepthTest),
+                CullFace = _gl.IsEnabled(EnableCap.CullFace),
+                PolygonOffset = _gl.IsEnabled(EnableCap.PolygonOffsetFill),
+                Blend = _gl.IsEnabled(EnableCap.Blend),
+                StencilTest = _gl.IsEnabled(EnableCap.StencilTest)
+            };
+            _gl.GetInteger(GLEnum.DepthWritemask, out state.DepthWrite);
+            _gl.GetInteger(GLEnum.DepthFunc, out state.DepthFunction);
+            _gl.GetInteger(GLEnum.BlendSrcRgb, out state.BlendSource);
+            _gl.GetInteger(GLEnum.BlendDstRgb, out state.BlendDestination);
+            _gl.GetInteger(GLEnum.BlendSrcAlpha, out state.BlendSourceAlpha);
+            _gl.GetInteger(GLEnum.BlendDstAlpha, out state.BlendDestinationAlpha);
+            _gl.GetInteger(GLEnum.BlendEquationRgb, out state.BlendEquation);
+            _gl.GetInteger(GLEnum.BlendEquationAlpha, out state.BlendEquationAlpha);
+            _gl.GetInteger(GLEnum.StencilFunc, out state.StencilFrontFunction);
+            _gl.GetInteger(GLEnum.StencilRef, out state.StencilFrontReference);
+            _gl.GetInteger(GLEnum.StencilValueMask, out state.StencilFrontValueMask);
+            _gl.GetInteger(GLEnum.StencilWritemask, out state.StencilFrontWriteMask);
+            _gl.GetInteger(GLEnum.StencilFail, out state.StencilFrontFail);
+            _gl.GetInteger(GLEnum.StencilPassDepthFail, out state.StencilFrontDepthFail);
+            _gl.GetInteger(GLEnum.StencilPassDepthPass, out state.StencilFrontDepthPass);
+            _gl.GetInteger(GLEnum.StencilBackFunc, out state.StencilBackFunction);
+            _gl.GetInteger(GLEnum.StencilBackRef, out state.StencilBackReference);
+            _gl.GetInteger(GLEnum.StencilBackValueMask, out state.StencilBackValueMask);
+            _gl.GetInteger(GLEnum.StencilBackWritemask, out state.StencilBackWriteMask);
+            _gl.GetInteger(GLEnum.StencilBackFail, out state.StencilBackFail);
+            _gl.GetInteger(GLEnum.StencilBackPassDepthFail, out state.StencilBackDepthFail);
+            _gl.GetInteger(GLEnum.StencilBackPassDepthPass, out state.StencilBackDepthPass);
+            _gl.GetInteger(GLEnum.ColorWritemask, state.ColorWriteMask);
+            _gl.GetInteger(GLEnum.CurrentProgram, out state.Program);
+            _gl.GetInteger(GLEnum.VertexArrayBinding, out state.VertexArray);
+            _gl.GetInteger(GLEnum.ArrayBufferBinding, out state.ArrayBuffer);
+            _gl.GetInteger(GLEnum.ActiveTexture, out state.ActiveTexture);
+            for (int unit = 0; unit < state.TextureBindings.Length; unit++)
+            {
+                _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
+                _gl.GetInteger(GLEnum.TextureBinding2D, out state.TextureBindings[unit]);
+                _gl.GetInteger(GLEnum.TextureBindingCubeMap, out state.CubeBindings[unit]);
+            }
+            _gl.ActiveTexture((TextureUnit)state.ActiveTexture);
+            return state;
+        }
+
+        private void RestoreGlState(GlStateSnapshot state)
+        {
+            _gl.DepthMask(state.DepthWrite != 0);
+            _gl.DepthFunc((DepthFunction)state.DepthFunction);
+            _gl.BlendEquationSeparate((GLEnum)state.BlendEquation, (GLEnum)state.BlendEquationAlpha);
+            _gl.BlendFuncSeparate(
+                (BlendingFactor)state.BlendSource,
+                (BlendingFactor)state.BlendDestination,
+                (BlendingFactor)state.BlendSourceAlpha,
+                (BlendingFactor)state.BlendDestinationAlpha);
+            _gl.ColorMask(
+                state.ColorWriteMask[0] != 0,
+                state.ColorWriteMask[1] != 0,
+                state.ColorWriteMask[2] != 0,
+                state.ColorWriteMask[3] != 0);
+            _gl.StencilFuncSeparate(
+                TriangleFace.Front,
+                (StencilFunction)state.StencilFrontFunction,
+                state.StencilFrontReference,
+                (uint)state.StencilFrontValueMask);
+            _gl.StencilMaskSeparate(TriangleFace.Front, (uint)state.StencilFrontWriteMask);
+            _gl.StencilOpSeparate(
+                TriangleFace.Front,
+                (StencilOp)state.StencilFrontFail,
+                (StencilOp)state.StencilFrontDepthFail,
+                (StencilOp)state.StencilFrontDepthPass);
+            _gl.StencilFuncSeparate(
+                TriangleFace.Back,
+                (StencilFunction)state.StencilBackFunction,
+                state.StencilBackReference,
+                (uint)state.StencilBackValueMask);
+            _gl.StencilMaskSeparate(TriangleFace.Back, (uint)state.StencilBackWriteMask);
+            _gl.StencilOpSeparate(
+                TriangleFace.Back,
+                (StencilOp)state.StencilBackFail,
+                (StencilOp)state.StencilBackDepthFail,
+                (StencilOp)state.StencilBackDepthPass);
+            if (state.DepthTest) _gl.Enable(EnableCap.DepthTest); else _gl.Disable(EnableCap.DepthTest);
+            if (state.CullFace) _gl.Enable(EnableCap.CullFace); else _gl.Disable(EnableCap.CullFace);
+            if (state.PolygonOffset) _gl.Enable(EnableCap.PolygonOffsetFill); else _gl.Disable(EnableCap.PolygonOffsetFill);
+            if (state.Blend) _gl.Enable(EnableCap.Blend); else _gl.Disable(EnableCap.Blend);
+            if (state.StencilTest) _gl.Enable(EnableCap.StencilTest); else _gl.Disable(EnableCap.StencilTest);
+            for (int unit = 0; unit < state.TextureBindings.Length; unit++)
+            {
+                _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
+                _gl.BindTexture(TextureTarget.Texture2D, (uint)state.TextureBindings[unit]);
+                _gl.BindTexture(TextureTarget.TextureCubeMap, (uint)state.CubeBindings[unit]);
+            }
+            _gl.ActiveTexture((TextureUnit)state.ActiveTexture);
+            _gl.BindVertexArray((uint)state.VertexArray);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, (uint)state.ArrayBuffer);
+            _gl.UseProgram((uint)state.Program);
+        }
 
         public void Render(IReadOnlyList<VfxRenderQueueEntry> renderQueue, Matrix4x4 viewProj, Matrix4x4 view,
             bool wireframePass = false,
@@ -248,47 +432,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Matrix4x4 projection = inv * viewProj;
             _depthProjectionValue = new Vector2(projection.M33, projection.M43);
 
-            bool depthTest = _gl.IsEnabled(EnableCap.DepthTest);
-            bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
-            bool polygonOffset = _gl.IsEnabled(EnableCap.PolygonOffsetFill);
-            bool blend = _gl.IsEnabled(EnableCap.Blend);
-            bool stencilTest = _gl.IsEnabled(EnableCap.StencilTest);
-            _gl.GetInteger(GLEnum.DepthWritemask, out int depthWrite);
-            _gl.GetInteger(GLEnum.DepthFunc, out int depthFunction);
-            _gl.GetInteger(GLEnum.BlendSrcRgb, out int blendSource);
-            _gl.GetInteger(GLEnum.BlendDstRgb, out int blendDestination);
-            _gl.GetInteger(GLEnum.BlendSrcAlpha, out int blendSourceAlpha);
-            _gl.GetInteger(GLEnum.BlendDstAlpha, out int blendDestinationAlpha);
-            _gl.GetInteger(GLEnum.BlendEquationRgb, out int blendEquation);
-            _gl.GetInteger(GLEnum.BlendEquationAlpha, out int blendEquationAlpha);
-            _gl.GetInteger(GLEnum.StencilFunc, out int stencilFrontFunction);
-            _gl.GetInteger(GLEnum.StencilRef, out int stencilFrontReference);
-            _gl.GetInteger(GLEnum.StencilValueMask, out int stencilFrontValueMask);
-            _gl.GetInteger(GLEnum.StencilWritemask, out int stencilFrontWriteMask);
-            _gl.GetInteger(GLEnum.StencilFail, out int stencilFrontFail);
-            _gl.GetInteger(GLEnum.StencilPassDepthFail, out int stencilFrontDepthFail);
-            _gl.GetInteger(GLEnum.StencilPassDepthPass, out int stencilFrontDepthPass);
-            _gl.GetInteger(GLEnum.StencilBackFunc, out int stencilBackFunction);
-            _gl.GetInteger(GLEnum.StencilBackRef, out int stencilBackReference);
-            _gl.GetInteger(GLEnum.StencilBackValueMask, out int stencilBackValueMask);
-            _gl.GetInteger(GLEnum.StencilBackWritemask, out int stencilBackWriteMask);
-            _gl.GetInteger(GLEnum.StencilBackFail, out int stencilBackFail);
-            _gl.GetInteger(GLEnum.StencilBackPassDepthFail, out int stencilBackDepthFail);
-            _gl.GetInteger(GLEnum.StencilBackPassDepthPass, out int stencilBackDepthPass);
-            Span<int> colorWriteMask = stackalloc int[4];
-            _gl.GetInteger(GLEnum.ColorWritemask, colorWriteMask);
-            _gl.GetInteger(GLEnum.CurrentProgram, out int program);
-            _gl.GetInteger(GLEnum.VertexArrayBinding, out int vertexArray);
-            _gl.GetInteger(GLEnum.ArrayBufferBinding, out int arrayBuffer);
-            _gl.GetInteger(GLEnum.ActiveTexture, out int activeTexture);
-            Span<int> textureBindings = stackalloc int[9];
-            Span<int> cubeBindings = stackalloc int[9];
-            for (int unit = 0; unit < textureBindings.Length; unit++)
-            {
-                _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
-                _gl.GetInteger(GLEnum.TextureBinding2D, out textureBindings[unit]);
-                _gl.GetInteger(GLEnum.TextureBindingCubeMap, out cubeBindings[unit]);
-            }
+            GlStateSnapshot ownedState = _renderBatchDepth == 0 ? CaptureGlState() : null;
 
             ResetEmitterDrawScratch();
             try
@@ -402,7 +546,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     renderInstanceCount = ResolveEmitterDrawCount(es.Def, alreadyUsed, es.InstanceCount);
                     if (renderInstanceCount == 0) continue;
                     emitterUsed[emitterKey] = alreadyUsed + renderInstanceCount;
-                    instancesSpan = new ReadOnlySpan<float>(es.Instances, 0, renderInstanceCount * Stride);
+                    instancesSpan = es.PrepareInstances(renderInstanceCount);
                 }
 
                 bool attachedMesh = es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh;
@@ -437,17 +581,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 bool isDistortion = es.Def.DrawsAsDistortion && !useWireframe;
                 bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
                 if (warpsFrame && _capture.ColorTexture == 0) continue;
-
-                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _instVbo);
-                if (floats > _instCapFloats)
-                {
-                    _gl.BufferData(BufferTargetARB.ArrayBuffer, instancesSpan, BufferUsageARB.DynamicDraw);
-                    _instCapFloats = floats;
-                }
-                else
-                {
-                    _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, instancesSpan);
-                }
 
                 var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 _gl.Uniform2(_uTexDiv, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
@@ -664,7 +797,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     }
                 }
                 else
+                {
+                    _gl.BindVertexArray(_vao);
+                    _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _instVbo);
+                    if (floats > _instCapFloats)
+                    {
+                        _gl.BufferData(BufferTargetARB.ArrayBuffer, instancesSpan, BufferUsageARB.DynamicDraw);
+                        _instCapFloats = floats;
+                    }
+                    else
+                    {
+                        _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, instancesSpan);
+                    }
                     _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)renderInstanceCount);
+                }
             }
 
             }
@@ -674,56 +820,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (useWireframe)
                     _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
 
-                _gl.DepthMask(depthWrite != 0);
-                _gl.DepthFunc((DepthFunction)depthFunction);
-                _gl.BlendEquationSeparate((GLEnum)blendEquation, (GLEnum)blendEquationAlpha);
-                _gl.BlendFuncSeparate(
-                    (BlendingFactor)blendSource,
-                    (BlendingFactor)blendDestination,
-                    (BlendingFactor)blendSourceAlpha,
-                    (BlendingFactor)blendDestinationAlpha);
-                _gl.ColorMask(
-                    colorWriteMask[0] != 0,
-                    colorWriteMask[1] != 0,
-                    colorWriteMask[2] != 0,
-                    colorWriteMask[3] != 0);
-                _gl.StencilFuncSeparate(
-                    TriangleFace.Front,
-                    (StencilFunction)stencilFrontFunction,
-                    stencilFrontReference,
-                    (uint)stencilFrontValueMask);
-                _gl.StencilMaskSeparate(TriangleFace.Front, (uint)stencilFrontWriteMask);
-                _gl.StencilOpSeparate(
-                    TriangleFace.Front,
-                    (StencilOp)stencilFrontFail,
-                    (StencilOp)stencilFrontDepthFail,
-                    (StencilOp)stencilFrontDepthPass);
-                _gl.StencilFuncSeparate(
-                    TriangleFace.Back,
-                    (StencilFunction)stencilBackFunction,
-                    stencilBackReference,
-                    (uint)stencilBackValueMask);
-                _gl.StencilMaskSeparate(TriangleFace.Back, (uint)stencilBackWriteMask);
-                _gl.StencilOpSeparate(
-                    TriangleFace.Back,
-                    (StencilOp)stencilBackFail,
-                    (StencilOp)stencilBackDepthFail,
-                    (StencilOp)stencilBackDepthPass);
-                if (depthTest) _gl.Enable(EnableCap.DepthTest); else _gl.Disable(EnableCap.DepthTest);
-                if (cullFace) _gl.Enable(EnableCap.CullFace); else _gl.Disable(EnableCap.CullFace);
-                if (polygonOffset) _gl.Enable(EnableCap.PolygonOffsetFill); else _gl.Disable(EnableCap.PolygonOffsetFill);
-                if (blend) _gl.Enable(EnableCap.Blend); else _gl.Disable(EnableCap.Blend);
-                if (stencilTest) _gl.Enable(EnableCap.StencilTest); else _gl.Disable(EnableCap.StencilTest);
-                for (int unit = 0; unit < textureBindings.Length; unit++)
-                {
-                    _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
-                    _gl.BindTexture(TextureTarget.Texture2D, (uint)textureBindings[unit]);
-                    _gl.BindTexture(TextureTarget.TextureCubeMap, (uint)cubeBindings[unit]);
-                }
-                _gl.ActiveTexture((TextureUnit)activeTexture);
-                _gl.BindVertexArray((uint)vertexArray);
-                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, (uint)arrayBuffer);
-                _gl.UseProgram((uint)program);
+                if (ownedState != null)
+                    RestoreGlState(ownedState);
             }
         }
 
@@ -986,6 +1084,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (_meshBoneBuffer != 0) _gl.DeleteBuffer(_meshBoneBuffer);
             _meshBoneBuffer = 0;
             _ownerSkinningMatrices = null;
+            _ownerWorldTransform = Matrix4x4.Identity;
             _ownerSkinningCount = 0;
             if (_meshProgram != 0) _gl.DeleteProgram(_meshProgram);
             _meshProgram = 0;
@@ -1007,8 +1106,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private uint _meshProgram;
         private uint _meshBoneBuffer;
         private Matrix4x4[] _ownerSkinningMatrices;
+        private Matrix4x4 _ownerWorldTransform = Matrix4x4.Identity;
         private int _ownerSkinningCount;
-        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muCamPos, _muCamUp, _muAlignPitchToCamera, _muAlignYawToCamera, _muMeshSkinned, _muUseSkinning, _muIsGroundLayer, _muOrbitRotation, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
+        private int _muViewProj, _muWorldPos, _muOwnerWorld, _muScale, _muRotation, _muCamPos, _muCamUp, _muAlignPitchToCamera, _muAlignYawToCamera, _muMeshSkinned, _muUseSkinning, _muIsGroundLayer, _muOrbitRotation, _muColor, _muTex, _muHasTex, _muEmitterUvOffset;
         private int _muIsDistortion, _muDistortionTex, _muSceneTex, _muDistortionStrength;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
@@ -1032,6 +1132,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _meshProgram = GlShaderCompiler.CreateProgram(_gl, _gles, VfxShaderSource.MeshVertex, VfxShaderSource.MeshFragment);
                 _muViewProj = _gl.GetUniformLocation(_meshProgram, "uViewProj");
                 _muWorldPos = _gl.GetUniformLocation(_meshProgram, "uWorldPos");
+                _muOwnerWorld = _gl.GetUniformLocation(_meshProgram, "uOwnerWorld");
                 _muScale = _gl.GetUniformLocation(_meshProgram, "uScale");
                 _muRotation = _gl.GetUniformLocation(_meshProgram, "uRotation");
                 _muCamPos = _gl.GetUniformLocation(_meshProgram, "uCamPos");
@@ -1167,6 +1268,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             UploadMeshBonePalette(new ReadOnlySpan<Matrix4x4>(matrices, 0, _ownerSkinningCount));
         }
 
+        internal void SetOwnerWorldTransform(Matrix4x4 transform)
+            => _ownerWorldTransform = transform;
+
         private void UploadMeshBonePalette(ReadOnlySpan<Matrix4x4> matrices)
         {
             if (_meshBoneBuffer == 0 || matrices.Length == 0) return;
@@ -1215,6 +1319,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 Math.Clamp(wireframeOpacity, 0f, 1f));
             _gl.BindVertexArray(es.MeshVao);
             _gl.UniformMatrix4(_muViewProj, 1, false, in viewProj.M11);
+            _gl.UniformMatrix4(_muOwnerWorld, 1, false, in _ownerWorldTransform.M11);
             _gl.Uniform3(_muCamPos, camPos.X, camPos.Y, camPos.Z);
             _gl.Uniform3(_muCamUp, camUp.X, camUp.Y, camUp.Z);
             bool attachedMesh = es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh;

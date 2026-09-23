@@ -120,7 +120,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal(GameMaterialKind.StaticMesh, parsed.Program.Kind);
             Assert.Equal(2, parsed.Program.Passes.Count);
 
-            GameResolvedMaterialPassData first = parsed.Program.Passes[0];
+            GameMaterialPass first = parsed.Program.Passes[0];
             Assert.Equal(shaderPath, first.ShaderPath);
             Assert.Equal(new[] { "COMPILE_ON", "FEATURE_TEST", "MAT_DEFINE" }, first.Defines.Select(item => item.Name));
             Assert.Equal("0", first.Defines.Single(item => item.Name == "COMPILE_ON").Value);
@@ -129,7 +129,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.DoesNotContain(first.Defines, item => item.Name == "RUNTIME_ON");
             Assert.Equal(new KeyValuePair<string, bool>("RUNTIME_ON", false), Assert.Single(first.RuntimeSwitches));
 
-            GameMaterialPassTextureData resolvedTexture = Assert.Single(first.Textures);
+            GameMaterialTexture resolvedTexture = Assert.Single(first.Textures);
             Assert.Equal("assets/maps/test/default.tex", resolvedTexture.Texture.VirtualPath);
             Assert.Equal(GameMaterialTextureSource.ShaderDefault, resolvedTexture.Source);
             Assert.Equal("LinearShared", resolvedTexture.Sampler.SharedSampler);
@@ -139,7 +139,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.False(resolvedTexture.Sampler.FilterMin);
             Assert.True(resolvedTexture.Sampler.FilterMag);
 
-            GameMaterialPassParamData parameter = Assert.Single(first.Parameters);
+            GameMaterialParameter parameter = Assert.Single(first.Parameters);
             Assert.Equal("Globals0", parameter.Name);
             Assert.Equal(new Vector4(5f, 2f, 6f, 4f), parameter.Value);
             Assert.Equal(GameMaterialParamSource.Pass, parameter.Source);

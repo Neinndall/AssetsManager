@@ -13,6 +13,7 @@ layout(location=4) in vec4 aBoneIndices;
 layout(location=5) in vec4 aBoneWeights;
 uniform mat4 uViewProj;
 uniform vec3 uWorldPos;
+uniform mat4 uOwnerWorld;
 uniform vec3 uScale;
 uniform vec3 uRotation;
 uniform vec3 uCamPos;
@@ -128,10 +129,11 @@ void main(){
     vec3 p;
     vec3 worldSurface;
     if (uAttachedMesh != 0) {
-        // LTK's AttachedMesh is the owner's DetachedBindMode skin at the scene origin.
-        // A particle contributes scale/tint/UV/erosion, not its translation or rotation.
-        p = scaled;
-        worldSurface = scaledSurface;
+        // LTK's AttachedMesh shares the owner's live skeleton in DetachedBindMode. The skeleton
+        // supplies the pose, ownerWorld supplies the Character placement/mirror, and the particle
+        // contributes only its scale/tint/UV/erosion rather than its own translation or rotation.
+        p = (uOwnerWorld * vec4(scaled, 1.0)).xyz;
+        worldSurface = mat3(uOwnerWorld) * scaledSurface;
     } else {
         vec3 carried = cameraAimed ? local : scaled;
         vec3 carriedSurface = cameraAimed ? surface : scaledSurface;

@@ -117,6 +117,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ResolvedIdleCountRequiresTheSkinResourceResolverMapping()
+        {
+            var system = new VfxSystemDefinition(100, "Idle", "idle", new VfxEmitterDefinition[0]);
+            var idle = new VfxIdleEffectDefinition(
+                7,
+                "Idle",
+                string.Empty,
+                0,
+                string.Empty,
+                0,
+                System.Numerics.Vector3.Zero);
+            var systems = new Dictionary<uint, VfxSystemDefinition> { [100] = system };
+
+            Assert.Equal(0, VfxAbilityCompositionBuilder.CountResolvedIdleEffects(
+                new[] { idle },
+                systems,
+                new Dictionary<uint, uint>()));
+            Assert.Equal(0, VfxAbilityCompositionBuilder.CountResolvedIdleEffects(
+                new[] { idle },
+                systems,
+                new Dictionary<uint, uint> { [7] = 0 }));
+            Assert.Equal(1, VfxAbilityCompositionBuilder.CountResolvedIdleEffects(
+                new[] { idle },
+                systems,
+                new Dictionary<uint, uint> { [7] = 100 }));
+        }
+
+        [Fact]
         public void TimedPlaylistPlacesParticleEventsOnTheRetimedSequencerClock()
         {
             var system = new VfxSystemDefinition(100, "Trail", "trail", Array.Empty<VfxEmitterDefinition>());

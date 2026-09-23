@@ -114,7 +114,8 @@ namespace AssetsManager.Services.Viewer.Parsing
                         indices[indexBase++] = checked((uint)vertexBase + localIndex);
                     }
 
-                    string material = submesh.Material ?? EnvironmentAssetMeshPrimitive.MISSING_MATERIAL;
+                    string material = CanonicalMaterialPath(
+                        submesh.Material ?? EnvironmentAssetMeshPrimitive.MISSING_MATERIAL);
                     if (!materialIndices.TryGetValue(material, out int materialIndex))
                     {
                         materialIndex = materials.Count;
@@ -161,6 +162,14 @@ namespace AssetsManager.Services.Viewer.Parsing
                 submeshes,
                 materials);
         }
+
+        /// <summary>
+        /// MAPGEO material fields are fixed-size strings in some asset versions and may retain
+        /// trailing NUL padding. Material BIN lookup, texture binding and the renderer must all
+        /// address the same canonical path, matching LTK's decoded map string table.
+        /// </summary>
+        internal static string CanonicalMaterialPath(string material)
+            => (material ?? string.Empty).TrimEnd('\0');
 
         private static VertexElementAccessor GetRequiredAccessor(
             EnvironmentAssetMesh mesh,

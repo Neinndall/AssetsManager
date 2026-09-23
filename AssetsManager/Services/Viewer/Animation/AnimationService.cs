@@ -455,32 +455,37 @@ namespace AssetsManager.Services.Viewer.Animation
 
         private bool TryGetBoneTransform(string boneName, uint boneHash, out Matrix4x4 transform)
         {
-            if (!string.IsNullOrWhiteSpace(boneName) && TryGetBoneTransform(boneName, out transform))
+            if (!string.IsNullOrWhiteSpace(boneName) && TryGetBoneTransformExactName(boneName, out transform))
                 return true;
-            return TryGetBoneTransform(boneHash, out transform);
+            return TryGetBoneTransformFnv(boneHash, out transform);
         }
 
         public bool TryGetBoneTransform(string boneName, out Matrix4x4 transform)
+        {
+            if (TryGetBoneTransformExactName(boneName, out transform))
+                return true;
+
+            uint elf = Elf.HashLower(boneName);
+            uint fnv = Fnv1a.HashLower(boneName);
+            return TryGetBoneTransform(elf, out transform) || TryGetBoneTransform(fnv, out transform);
+        }
+
+        public bool TryGetBoneTransformExactName(string boneName, out Matrix4x4 transform)
         {
             transform = Matrix4x4.Identity;
             if (_lastSkeleton == null || _boneTransforms == null || string.IsNullOrWhiteSpace(boneName))
                 return false;
 
-            for (int i = 0; i < _lastSkeleton.Joints.Count; i++)
+            int count = Math.Min(_lastSkeleton.Joints.Count, _boneTransforms.Length);
+            for (int i = 0; i < count; i++)
             {
-                if (string.Equals(_lastSkeleton.Joints[i].Name, boneName, StringComparison.OrdinalIgnoreCase))
-                {
-                    if (i < _boneTransforms.Length)
-                    {
-                        transform = _boneTransforms[i];
-                        return true;
-                    }
-                }
+                if (!string.Equals(_lastSkeleton.Joints[i].Name, boneName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                transform = _boneTransforms[i];
+                return true;
             }
 
-            uint elf = Elf.HashLower(boneName);
-            uint fnv = Fnv1a.HashLower(boneName);
-            return TryGetBoneTransform(elf, out transform) || TryGetBoneTransform(fnv, out transform);
+            return false;
         }
 
         public bool TryGetBoneTransform(uint boneHash, out Matrix4x4 transform)
@@ -500,7 +505,7 @@ namespace AssetsManager.Services.Viewer.Animation
                     }
                 }
 
-                if (Fnv1a.HashLower(_lastSkeleton.Joints[i].Name) == boneHash)
+                if (_jointFnvHashes != null && i < _jointFnvHashes.Length && _jointFnvHashes[i] == boneHash)
                 {
                     if (i < _boneTransforms.Length)
                     {
@@ -508,6 +513,23 @@ namespace AssetsManager.Services.Viewer.Animation
                         return true;
                     }
                 }
+            }
+
+            return false;
+        }
+
+        public bool TryGetBoneTransformFnv(uint boneHash, out Matrix4x4 transform)
+        {
+            transform = Matrix4x4.Identity;
+            if (_lastSkeleton == null || _boneTransforms == null || boneHash == 0 || _jointFnvHashes == null)
+                return false;
+
+            int count = Math.Min(_lastSkeleton.Joints.Count, Math.Min(_boneTransforms.Length, _jointFnvHashes.Length));
+            for (int i = 0; i < count; i++)
+            {
+                if (_jointFnvHashes[i] != boneHash) continue;
+                transform = _boneTransforms[i];
+                return true;
             }
 
             return false;

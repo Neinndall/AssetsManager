@@ -35,53 +35,65 @@ namespace AssetsManager.Services.Viewer.Loading
         public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewAsync(
             IReadOnlyList<MapMaterialDefinition> materials,
             string projectRoot,
-            CancellationToken cancellationToken = default) =>
-            LoadWaveAsync(materials, projectRoot, PreviewTextureSize, cancellationToken);
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null) =>
+            LoadWaveAsync(materials, projectRoot, PreviewTextureSize, cancellationToken, onLoaded);
 
         public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullAsync(
             IReadOnlyList<MapMaterialDefinition> materials,
             string projectRoot,
-            CancellationToken cancellationToken = default) =>
-            LoadWaveAsync(materials, projectRoot, FullTextureSize, cancellationToken);
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null) =>
+            LoadWaveAsync(materials, projectRoot, FullTextureSize, cancellationToken, onLoaded);
 
         public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadProgramPreviewAsync(
             IReadOnlyList<MapMaterialDefinition> materials,
             string projectRoot,
-            CancellationToken cancellationToken = default) =>
-            LoadProgramWaveAsync(materials, projectRoot, PreviewTextureSize, cancellationToken);
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null) =>
+            LoadProgramWaveAsync(materials, projectRoot, PreviewTextureSize, cancellationToken, onLoaded);
 
         public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadProgramFullAsync(
             IReadOnlyList<MapMaterialDefinition> materials,
             string projectRoot,
-            CancellationToken cancellationToken = default) =>
-            LoadProgramWaveAsync(materials, projectRoot, FullTextureSize, cancellationToken);
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null) =>
+            LoadProgramWaveAsync(materials, projectRoot, FullTextureSize, cancellationToken, onLoaded);
 
         public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadLightmapsPreviewAsync(
             IEnumerable<string> virtualPaths,
             string projectRoot,
-            CancellationToken cancellationToken = default) =>
-            LoadVirtualPathsAsync(virtualPaths, projectRoot, PreviewTextureSize, cancellationToken);
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null) =>
+            LoadVirtualPathsAsync(virtualPaths, projectRoot, PreviewTextureSize, cancellationToken, onLoaded);
 
         public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadLightmapsFullAsync(
             IEnumerable<string> virtualPaths,
             string projectRoot,
-            CancellationToken cancellationToken = default) =>
-            LoadVirtualPathsAsync(virtualPaths, projectRoot, FullTextureSize, cancellationToken);
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null) =>
+            LoadVirtualPathsAsync(virtualPaths, projectRoot, FullTextureSize, cancellationToken, onLoaded);
 
         private async Task<IReadOnlyDictionary<string, MapTextureImage>> LoadWaveAsync(
             IReadOnlyList<MapMaterialDefinition> materials,
             string projectRoot,
             int maxTextureSize,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Action<string, MapTextureImage> onLoaded)
         {
             if (materials == null || materials.Count == 0)
                 return new Dictionary<string, MapTextureImage>(StringComparer.Ordinal);
 
-            MapTextureReference[] references = materials
-                .Select(material => material?.BaseTexture?.Texture)
-                .Where(reference => reference?.IsEmpty == false)
-                .Distinct()
-                .ToArray();
+            var materialKeys = materials
+                .Where(material => material?.BaseTexture?.Texture?.IsEmpty == false &&
+                                   !string.IsNullOrWhiteSpace(material.Name))
+                .GroupBy(material => material.BaseTexture.Texture)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(material => material.Name)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray());
+            MapTextureReference[] references = materialKeys.Keys.ToArray();
             if (references.Length == 0)
                 return new Dictionary<string, MapTextureImage>(StringComparer.Ordinal);
 
@@ -110,7 +122,13 @@ namespace AssetsManager.Services.Viewer.Loading
                             maxTextureSize),
                         cancellationToken);
                     if (levels.Count > 0)
-                        decoded[reference] = new MapTextureImage(levels);
+                    {
+                        var image = new MapTextureImage(levels);
+                        decoded[reference] = image;
+                        if (onLoaded != null && materialKeys.TryGetValue(reference, out string[] keys))
+                            foreach (string key in keys)
+                                onLoaded(key, image);
+                    }
                 }
                 finally
                 {
@@ -122,15 +140,12 @@ namespace AssetsManager.Services.Viewer.Loading
             cancellationToken.ThrowIfCancellationRequested();
 
             var byMaterial = new Dictionary<string, MapTextureImage>(StringComparer.Ordinal);
-            foreach (MapMaterialDefinition material in materials)
+            foreach ((MapTextureReference reference, string[] keys) in materialKeys)
             {
-                MapTextureReference reference = material?.BaseTexture?.Texture;
-                if (reference != null &&
-                    decoded.TryGetValue(reference, out MapTextureImage bitmap) &&
-                    !string.IsNullOrWhiteSpace(material.Name))
-                {
-                    byMaterial[material.Name] = bitmap;
-                }
+                if (!decoded.TryGetValue(reference, out MapTextureImage bitmap))
+                    continue;
+                foreach (string key in keys)
+                    byMaterial[key] = bitmap;
             }
 
             int unresolved = references.Length - decoded.Count;
@@ -150,12 +165,13 @@ namespace AssetsManager.Services.Viewer.Loading
             IReadOnlyList<MapMaterialDefinition> materials,
             string projectRoot,
             int maxTextureSize,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Action<string, MapTextureImage> onLoaded)
         {
             var requested = (materials ?? Array.Empty<MapMaterialDefinition>())
                 .Where(material => material?.Program?.Passes != null && !string.IsNullOrWhiteSpace(material.Name))
                 .SelectMany(material => material.Program.Passes.SelectMany(pass =>
-                    (pass.Textures ?? Array.Empty<GameMaterialPassTextureData>())
+                    (pass.Textures ?? Array.Empty<GameMaterialTexture>())
                         .Where(texture => texture?.Texture?.IsEmpty == false)
                         .Select(texture => new
                         {
@@ -168,10 +184,14 @@ namespace AssetsManager.Services.Viewer.Loading
             if (requested.Length == 0)
                 return new Dictionary<string, MapTextureImage>(StringComparer.Ordinal);
 
-            MapTextureReference[] references = requested
-                .Select(item => item.Texture)
-                .Distinct()
-                .ToArray();
+            var keysByReference = requested
+                .GroupBy(item => item.Texture)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(item => item.Key)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray());
+            MapTextureReference[] references = keysByReference.Keys.ToArray();
             IReadOnlyDictionary<MapTextureReference, MapResolvedAsset> assets =
                 await _assetResolver.ResolveTexturesAsync(references, projectRoot, cancellationToken);
             var decoded = new ConcurrentDictionary<MapTextureReference, MapTextureImage>();
@@ -194,7 +214,13 @@ namespace AssetsManager.Services.Viewer.Loading
                         () => TextureUtils.LoadViewerTextureMipChain(stream, extension, maxTextureSize),
                         cancellationToken);
                     if (levels.Count > 0)
-                        decoded[reference] = new MapTextureImage(levels);
+                    {
+                        var image = new MapTextureImage(levels);
+                        decoded[reference] = image;
+                        if (onLoaded != null && keysByReference.TryGetValue(reference, out string[] keys))
+                            foreach (string key in keys)
+                                onLoaded(key, image);
+                    }
                 }
                 finally
                 {
@@ -220,7 +246,8 @@ namespace AssetsManager.Services.Viewer.Loading
             IEnumerable<string> virtualPaths,
             string projectRoot,
             int maxTextureSize,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Action<string, MapTextureImage> onLoaded)
         {
             MapTextureReference[] references = (virtualPaths ?? Array.Empty<string>())
                 .Where(path => !string.IsNullOrWhiteSpace(path))
@@ -252,7 +279,11 @@ namespace AssetsManager.Services.Viewer.Loading
                         () => TextureUtils.LoadViewerTextureMipChain(stream, extension, maxTextureSize),
                         cancellationToken);
                     if (levels.Count > 0)
-                        decoded[reference.VirtualPath] = new MapTextureImage(levels);
+                    {
+                        var image = new MapTextureImage(levels);
+                        decoded[reference.VirtualPath] = image;
+                        onLoaded?.Invoke(reference.VirtualPath, image);
+                    }
                 }
                 finally
                 {

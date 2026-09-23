@@ -160,16 +160,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             if (string.IsNullOrWhiteSpace(authoredPath) || string.IsNullOrWhiteSpace(searchDirectory))
                 return null;
 
-            submeshesToDraw ??= Array.Empty<uint>();
-            submeshesToDrawAlways ??= Array.Empty<uint>();
-            hiddenSubmeshes ??= Array.Empty<uint>();
-            string drawKey = string.Join(",", submeshesToDraw.OrderBy(static value => value));
-            string alwaysKey = string.Join(",", submeshesToDrawAlways.OrderBy(static value => value));
-            string hiddenKey = string.Join(",", hiddenSubmeshes.OrderBy(static value => value));
+            // AttachedMesh shares the owner's complete Character geometry. Draw/always/hidden masks
+            // are live render state, not part of the decoded SKN resource, so they must not fragment
+            // the mesh cache when several emitters draw different ranges of the same owner.
             float resolvedScale = float.IsFinite(skinScale) && skinScale > 0f ? skinScale : 1f;
             string skeletonKey = string.IsNullOrWhiteSpace(skeletonPath) ? "none" : skeletonPath;
             string key = CreateKey(
-                $"{authoredPath}|attached|skeleton:{skeletonKey}|draw:{drawKey}|always:{alwaysKey}|hidden:{hiddenKey}|scale:{resolvedScale:R}",
+                $"{authoredPath}|attached|skeleton:{skeletonKey}|scale:{resolvedScale:R}",
                 searchDirectory);
             if (_meshes.TryGetValue(key, out var cached)) return cached;
 
@@ -184,9 +181,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 {
                     mesh = VfxMeshDecoder.DecodeAttachedSkinnedMesh(
                         resolvedPath,
-                        submeshesToDraw,
-                        submeshesToDrawAlways,
-                        hiddenSubmeshes,
                         resolvedScale,
                         resolvedSkeleton);
                 }

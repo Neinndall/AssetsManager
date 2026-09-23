@@ -36,8 +36,8 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal IReadOnlyDictionary<string, MapTextureImage> BackdropTextures { get; private set; }
         internal IReadOnlyDictionary<string, MapTextureImage> BackdropProgramTextures { get; private set; }
         internal IReadOnlyDictionary<string, MapTextureImage> BackdropLightmaps { get; private set; }
-        internal IReadOnlyList<MapCharacterRuntimeGroup> CharacterGroups { get; }
-        internal MapParticleSceneRuntime Particles { get; }
+        internal IReadOnlyList<MapCharacterRuntimeGroup> CharacterGroups { get; private set; }
+        internal MapParticleSceneRuntime Particles { get; private set; }
         internal IReadOnlySet<string> Hidden => _hidden;
         internal float SceneTimeSeconds => _sceneTimeSeconds;
         internal float CharacterTimeSeconds => _characterTimeSeconds;
@@ -85,6 +85,19 @@ namespace AssetsManager.Services.Viewer.Runtime
                 BackdropTextures = textures;
         }
 
+        internal void MergeBackdropTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
+        {
+            ThrowIfDisposed();
+            if (textures == null || textures.Count == 0)
+                return;
+
+            var merged = new Dictionary<string, MapTextureImage>(BackdropTextures, StringComparer.Ordinal);
+            foreach ((string key, MapTextureImage image) in textures)
+                if (!string.IsNullOrWhiteSpace(key) && image != null)
+                    merged[key] = image;
+            BackdropTextures = merged;
+        }
+
         internal void SetBackdropProgramTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
         {
             ThrowIfDisposed();
@@ -92,11 +105,62 @@ namespace AssetsManager.Services.Viewer.Runtime
                 BackdropProgramTextures = textures;
         }
 
+        internal void MergeBackdropProgramTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
+        {
+            ThrowIfDisposed();
+            if (textures == null || textures.Count == 0)
+                return;
+
+            var merged = new Dictionary<string, MapTextureImage>(BackdropProgramTextures, StringComparer.Ordinal);
+            foreach ((string key, MapTextureImage image) in textures)
+                if (!string.IsNullOrWhiteSpace(key) && image != null)
+                    merged[key] = image;
+            BackdropProgramTextures = merged;
+        }
+
         internal void SetBackdropLightmaps(IReadOnlyDictionary<string, MapTextureImage> lightmaps)
         {
             ThrowIfDisposed();
             if (lightmaps != null)
                 BackdropLightmaps = lightmaps;
+        }
+
+        internal void MergeBackdropLightmaps(IReadOnlyDictionary<string, MapTextureImage> lightmaps)
+        {
+            ThrowIfDisposed();
+            if (lightmaps == null || lightmaps.Count == 0)
+                return;
+
+            var merged = new Dictionary<string, MapTextureImage>(BackdropLightmaps, StringComparer.OrdinalIgnoreCase);
+            foreach ((string key, MapTextureImage image) in lightmaps)
+                if (!string.IsNullOrWhiteSpace(key) && image != null)
+                    merged[key] = image;
+            BackdropLightmaps = merged;
+        }
+
+        internal void SetCharacterGroups(IReadOnlyList<MapCharacterRuntimeGroup> characterGroups)
+        {
+            ThrowIfDisposed();
+            IReadOnlyList<MapCharacterRuntimeGroup> replacement =
+                characterGroups ?? Array.Empty<MapCharacterRuntimeGroup>();
+            if (ReferenceEquals(CharacterGroups, replacement))
+                return;
+
+            foreach (MapCharacterRuntimeGroup group in CharacterGroups)
+                group?.Dispose();
+            CharacterGroups = replacement;
+        }
+
+        internal void SetParticles(MapParticleSceneRuntime particles)
+        {
+            ThrowIfDisposed();
+            MapParticleSceneRuntime replacement =
+                particles ?? new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>());
+            if (ReferenceEquals(Particles, replacement))
+                return;
+
+            Particles?.Dispose();
+            Particles = replacement;
         }
 
         internal void SetHidden(string id, bool hidden)

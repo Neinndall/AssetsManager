@@ -21,6 +21,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             // The same primitive does not fall through to mesh rendering, so this is intentionally blank.
             int count = Math.Min(Math.Max(0, instanceCount), state.InstanceCount);
             if (beam is null || state.Def.SuppressesBeamRibbon || count == 0) return 0;
+            ReadOnlySpan<float> instances = state.PrepareInstances(count);
 
             int vertexCount = count * 6;
             int needed = vertexCount * VertexStride;
@@ -37,12 +38,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             for (int particle = 0; particle < count; particle++)
             {
                 int instance = particle * VfxPlaybackRuntime.InstanceStride;
-                float width = state.Instances[instance + 3];
-                float fromSource = state.Instances[instance + 4];
-                float fromTarget = state.Instances[instance + 18];
+                float width = instances[instance + 3];
+                float fromSource = instances[instance + 4];
+                float fromTarget = instances[instance + 18];
 
                 Vector3 wide = beam.Mode == 1
-                    ? ArbitraryWidth(state, particle, instance, axis)
+                    ? ArbitraryWidth(state, instances, particle, instance, axis)
                     : CameraWidth(cameraPosition, source, delta);
 
                 Vector3 start = source + delta * fromSource;
@@ -58,12 +59,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     ? beam.ColorByDistance.Sample(colorDistance)
                     : Vector4.One;
 
-                Write(state, instance, ref written, end - half, 0f, 0f, distanceColor);
-                Write(state, instance, ref written, end + half, across, 0f, distanceColor);
-                Write(state, instance, ref written, start + half, across, along, distanceColor);
-                Write(state, instance, ref written, end - half, 0f, 0f, distanceColor);
-                Write(state, instance, ref written, start + half, across, along, distanceColor);
-                Write(state, instance, ref written, start - half, 0f, along, distanceColor);
+                Write(state, instances, instance, ref written, end - half, 0f, 0f, distanceColor);
+                Write(state, instances, instance, ref written, end + half, across, 0f, distanceColor);
+                Write(state, instances, instance, ref written, start + half, across, along, distanceColor);
+                Write(state, instances, instance, ref written, end - half, 0f, 0f, distanceColor);
+                Write(state, instances, instance, ref written, start + half, across, along, distanceColor);
+                Write(state, instances, instance, ref written, start - half, 0f, along, distanceColor);
             }
 
             return written;
@@ -86,6 +87,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private static Vector3 ArbitraryWidth(
             VfxPlaybackRuntime.EmitterState state,
+            ReadOnlySpan<float> instances,
             int particle,
             int instance,
             Vector3 axis)
@@ -94,9 +96,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Matrix4x4 standing = VfxPlaybackRuntime.ResolveStandingBasisForRender(state, state.Particles[particle]);
             wide = Vector3.TransformNormal(wide, standing);
             Vector3 local = new Vector3(
-                state.Instances[instance],
-                state.Instances[instance + 1],
-                state.Instances[instance + 2]) - state.SystemOrigin;
+                instances[instance],
+                instances[instance + 1],
+                instances[instance + 2]) - state.SystemOrigin;
             // Riot adds the particle's position relative to the system origin, not the beam's
             // source after mLocalSpaceSourceOffset, and deliberately leaves the result unnormalised.
             wide += local;
@@ -105,6 +107,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private void Write(
             VfxPlaybackRuntime.EmitterState state,
+            ReadOnlySpan<float> instances,
             int instance,
             ref int vertex,
             Vector3 position,
@@ -113,11 +116,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector4 distanceColor)
         {
             int target = vertex * VertexStride;
-            Array.Copy(state.Instances, instance, Vertices, target + 2, VfxPlaybackRuntime.InstanceStride);
+            instances.Slice(instance, VfxPlaybackRuntime.InstanceStride)
+                .CopyTo(Vertices.AsSpan(target + 2, VfxPlaybackRuntime.InstanceStride));
             Vertices[target + 2] = position.X;
             Vertices[target + 3] = position.Y;
             Vertices[target + 4] = position.Z;
-            VfxRibbonVertexSemantics.Pack(state, instance, Vertices, target, u, v, transpose: true);
+            VfxRibbonVertexSemantics.Pack(state, instances, instance, Vertices, target, u, v, transpose: true);
             Vertices[target + 7] *= distanceColor.X;
             Vertices[target + 8] *= distanceColor.Y;
             Vertices[target + 9] *= distanceColor.Z;

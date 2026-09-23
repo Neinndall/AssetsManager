@@ -99,21 +99,23 @@ namespace AssetsManager.Services.Viewer.Loading
 
         // Loads an SKN model and its textures from the SKN file directory (standard behavior).
         public Task<SceneModel> LoadModel(string filePath, CancellationToken cancellationToken = default)
-            => LoadModelCore(filePath, null, cancellationToken);
+            => LoadModelCore(filePath, null, loadDirectoryTextures: true, cancellationToken);
 
         /// <summary>
         /// Loads an SKN while using the exact skin BIN already selected by the caller.
-        /// This avoids re-inferring the BIN from the SKN path when an extracted WAD is flat/hash-named.
+        /// VFX Studio follows the authored skin/material bindings, so unrelated textures beside
+        /// the SKN are not decoded eagerly. This mirrors LTK's Skin viewport resource ownership.
         /// </summary>
         public Task<SceneModel> LoadModelWithSkinBin(
             string filePath,
             string skinBinPath,
             CancellationToken cancellationToken = default)
-            => LoadModelCore(filePath, skinBinPath, cancellationToken);
+            => LoadModelCore(filePath, skinBinPath, loadDirectoryTextures: false, cancellationToken);
 
         private async Task<SceneModel> LoadModelCore(
             string filePath,
             string explicitSkinBinPath,
+            bool loadDirectoryTextures,
             CancellationToken cancellationToken)
         {
             if (_hashResolverService != null)
@@ -133,7 +135,9 @@ namespace AssetsManager.Services.Viewer.Loading
                         return null;
                     }
 
-                    var loadedTextures = LoadTexturesFromDirectory(modelDirectory, cancellationToken);
+                    var loadedTextures = loadDirectoryTextures
+                        ? LoadTexturesFromDirectory(modelDirectory, cancellationToken)
+                        : new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
                     string[] selectableTextureKeys = loadedTextures.Keys.ToArray();
                     var materialTextures = await LoadMaterialTexturesAsync(
                         filePath,
@@ -142,6 +146,8 @@ namespace AssetsManager.Services.Viewer.Loading
                         explicitSkinBinPath,
                         filePath,
                         cancellationToken);
+                    if (!loadDirectoryTextures)
+                        selectableTextureKeys = loadedTextures.Keys.ToArray();
 
                     _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
                     return await CreateSceneModel(

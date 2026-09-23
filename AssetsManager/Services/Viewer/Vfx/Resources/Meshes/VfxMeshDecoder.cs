@@ -231,9 +231,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
         internal static VfxMeshData? DecodeAttachedSkinnedMesh(
             string path,
-            IReadOnlyList<uint> submeshesToDraw,
-            IReadOnlyList<uint> submeshesToDrawAlways,
-            IReadOnlyList<uint> hiddenSubmeshes,
             float skinScale,
             string skeletonPath)
         {

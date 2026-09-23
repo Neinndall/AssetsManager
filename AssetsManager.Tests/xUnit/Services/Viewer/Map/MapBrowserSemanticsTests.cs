@@ -157,7 +157,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 null,
                 null,
                 new Dictionary<string, BitmapSource>(),
-                Array.Empty<BinTree>(),
                 graph);
             var characterGroup = new MapCharacterRuntimeGroup(
                 characterAsset,

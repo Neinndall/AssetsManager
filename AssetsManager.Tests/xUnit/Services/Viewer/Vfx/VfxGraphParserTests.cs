@@ -96,6 +96,45 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void IdleEffectsUseCharacterIdleEffectFieldNamesInsteadOfParticleEventFields()
+        {
+            const uint effectKey = 0x12345678;
+            var idle = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("SkinCharacterDataProperties_CharacterIdleEffect"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeHash(Fnv1a.HashLower("effectKey"), effectKey),
+                    new BinTreeString(Fnv1a.HashLower("effectName"), "IdleGlow"),
+                    new BinTreeString(Fnv1a.HashLower("boneName"), "R_Hand"),
+                    new BinTreeString(Fnv1a.HashLower("targetBoneName"), "Head"),
+                    new BinTreeVector3(Fnv1a.HashLower("Position"), new Vector3(1f, 2f, 3f))
+                });
+            var skin = new BinTreeObject(
+                "Characters/Test/Skins/Skin0",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("idleParticlesEffects"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { idle })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { skin }, System.Array.Empty<string>()).Write(stream);
+
+            VfxIdleEffectDefinition parsed = Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).IdleEffects);
+
+            Assert.Equal(effectKey, parsed.EffectKey);
+            Assert.Equal("IdleGlow", parsed.EffectName);
+            Assert.Equal("R_Hand", parsed.BoneName);
+            Assert.Equal(Fnv1a.HashLower("R_Hand"), parsed.BoneNameHash);
+            Assert.Equal("Head", parsed.TargetBoneName);
+            Assert.Equal(Fnv1a.HashLower("Head"), parsed.TargetBoneNameHash);
+            Assert.Equal(new Vector3(1f, 2f, 3f), parsed.Position);
+        }
+
+        [Fact]
         public void AppliesRiotEmitterDefaultsWhenOptionalBinFieldsAreAbsent()
         {
             uint textureMultHash = Fnv1a.HashLower("textureMult");

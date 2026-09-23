@@ -186,68 +186,80 @@ namespace AssetsManager.Services.Viewer.Loading
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewTexturesAsync(
             MapSceneData scene,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(scene);
             return _textureLoadingService.LoadPreviewAsync(
                 scene.Materials,
                 scene.Source.ProjectRoot,
-                cancellationToken);
+                cancellationToken,
+                onLoaded);
         }
 
         public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullTexturesAsync(
             MapSceneData scene,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(scene);
             return _textureLoadingService.LoadFullAsync(
                 scene.Materials,
                 scene.Source.ProjectRoot,
-                cancellationToken);
+                cancellationToken,
+                onLoaded);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewProgramTexturesAsync(
             MapSceneData scene,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(scene);
             return _textureLoadingService.LoadProgramPreviewAsync(
                 scene.Materials,
                 scene.Source.ProjectRoot,
-                cancellationToken);
+                cancellationToken,
+                onLoaded);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullProgramTexturesAsync(
             MapSceneData scene,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(scene);
             return _textureLoadingService.LoadProgramFullAsync(
                 scene.Materials,
                 scene.Source.ProjectRoot,
-                cancellationToken);
+                cancellationToken,
+                onLoaded);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewLightmapsAsync(
             MapSceneData scene,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(scene);
             return _textureLoadingService.LoadLightmapsPreviewAsync(
                 scene.Geometry.Lightmaps,
                 scene.Source.ProjectRoot,
-                cancellationToken);
+                cancellationToken,
+                onLoaded);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullLightmapsAsync(
             MapSceneData scene,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(scene);
             return _textureLoadingService.LoadLightmapsFullAsync(
                 scene.Geometry.Lightmaps,
                 scene.Source.ProjectRoot,
-                cancellationToken);
+                cancellationToken,
+                onLoaded);
         }
 
         private async Task<BinTree> OpenBinTreeAsync(

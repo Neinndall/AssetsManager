@@ -29,10 +29,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         public void StudioDefinesOnlyFillMissingValues()
         {
             var pass = Pass(
-                new GameMaterialDefineData("DISABLE_FOW", "0", GameMaterialDefineSource.Pass),
-                new GameMaterialDefineData("OWN", "7", GameMaterialDefineSource.Material));
+                new GameMaterialDefine("DISABLE_FOW", "0", GameMaterialDefineSource.Pass),
+                new GameMaterialDefine("OWN", "7", GameMaterialDefineSource.Material));
 
-            IReadOnlyList<GameMaterialDefineData> defines =
+            IReadOnlyList<GameMaterialDefine> defines =
                 GameShaderProgramResolver.BuildDefineList(pass, GameMaterialKind.SkinnedMesh, lowQuality: true);
 
             Assert.Equal("0", defines.Single(item => item.Name == "DISABLE_FOW").Value);
@@ -102,9 +102,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             var settings = AppSettings.GetDefaultSettings();
             settings.LolPbeDirectory = root;
             settings.LolLiveDirectory = null;
-            GameResolvedMaterialPassData ready = Pass();
-            GameResolvedMaterialPassData missing = Pass() with { ShaderHash = 0, ShaderPath = null };
-            var program = new GameResolvedMaterialProgramData(
+            GameMaterialPass ready = Pass();
+            GameMaterialPass missing = Pass() with { ShaderHash = 0, ShaderPath = null };
+            var program = new GameMaterialProgram(
                 GameMaterialKind.StaticMesh,
                 true,
                 new[] { ready, missing });
@@ -128,15 +128,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 }
                 .FirstOrDefault(candidate => File.Exists(Path.Combine(candidate, @"Game\DATA\FINAL\ShaderCache.dx11.wad.client")));
 
-        private static GameResolvedMaterialPassData Pass(params GameMaterialDefineData[] defines) =>
+        private static GameMaterialPass Pass(params GameMaterialDefine[] defines) =>
             new(
                 1,
                 "Shaders/StaticMesh/DefaultEnv_Flat",
                 defines,
                 Array.Empty<KeyValuePair<string, bool>>(),
-                Array.Empty<GameMaterialPassTextureData>(),
-                Array.Empty<GameMaterialPassParamData>(),
-                new GameMaterialPassStateData(
+                Array.Empty<GameMaterialTexture>(),
+                Array.Empty<GameMaterialParameter>(),
+                new GameMaterialPassState(
                     false,
                     MapBlendFactor.One,
                     MapBlendFactor.Zero,

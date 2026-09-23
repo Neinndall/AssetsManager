@@ -213,14 +213,10 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                                 uint target = groupVfx.ResourceMap[key];
                                 if (target == 0 || groupVfx.Systems.ContainsKey(target))
                                     continue;
-                                BinTreeObject declared = group.Asset.Documents
-                                    .Select(document => document.Objects.TryGetValue(target, out BinTreeObject obj) ? obj : null)
-                                    .FirstOrDefault(obj => obj != null);
                                 missingMappedTargets.Add(target);
                                 Console.WriteLine(
                                     $"[MapFlow] MAPPED SYSTEM MISSING skin={group.Asset?.Skin?.Skin} key=0x{key:x8} " +
-                                    $"target=0x{target:x8} documents={group.Asset.Documents.Count} " +
-                                    $"object={(declared == null ? "absent" : $"class=0x{declared.ClassHash:x8}")}.");
+                                    $"target=0x{target:x8} catalogSystem=absent.");
                             }
                         }
                     }

@@ -126,9 +126,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (source is null || source.InstanceCount <= 0) continue;
                 int take = Math.Min(source.InstanceCount, capacity - held);
                 if (take <= 0) break;
-                if (source.Instances.Length < take * stride)
+                ReadOnlySpan<float> sourceInstances = source.PrepareInstances(take);
+                if (sourceInstances.Length < take * stride)
                     throw new ArgumentException("A source instance buffer is shorter than its declared count.", nameof(sources));
-                Array.Copy(source.Instances, 0, groupedScratch, held * stride, take * stride);
+                sourceInstances.CopyTo(groupedScratch.AsSpan(held * stride, take * stride));
                 held += take;
                 if (held >= capacity) break;
             }

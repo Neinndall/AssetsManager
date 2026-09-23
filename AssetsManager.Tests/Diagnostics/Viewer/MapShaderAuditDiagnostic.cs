@@ -127,13 +127,13 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 
             foreach (MapMaterialDefinition material in scene.Materials)
             {
-                GameResolvedMaterialProgramData program = material?.Program;
+                GameMaterialProgram program = material?.Program;
                 if (program?.Passes is not { Count: > 0 })
                     continue;
 
                 materialPrograms++;
                 bool materialReady = false;
-                foreach (GameResolvedMaterialPassData pass in program.Passes)
+                foreach (GameMaterialPass pass in program.Passes)
                 {
                     passes++;
                     GameShaderProgramResolver.ShaderBytecodeRead read =

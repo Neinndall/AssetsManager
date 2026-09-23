@@ -62,6 +62,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_parametricPairClip = 0xca2b847d;
         private static readonly uint F_parametricPairValue = 0x24f2ec89;
         private static readonly uint F_idleParticlesEffects = 0x84186f3c;
+        // SkinCharacterDataProperties_CharacterIdleEffect does not use ParticleEventData's
+        // m-prefixed fields. Keep the two schemas separate, as LTK's skin reader does.
+        private static readonly uint F_idleEffectKey = VfxParsingHash.Fnv1a("effectKey");
+        private static readonly uint F_idleEffectName = VfxParsingHash.Fnv1a("effectName");
+        private static readonly uint F_idleBoneName = VfxParsingHash.Fnv1a("boneName");
+        private static readonly uint F_idleTargetBoneName = VfxParsingHash.Fnv1a("targetBoneName");
         private static readonly uint F_idlePosition = 0x934f4e0a;
         private static readonly uint F_animationResourceData = 0xb49f754e;
         private static readonly uint F_animationFilePath = 0x0329f1d7;
@@ -88,12 +94,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 if (prop is not BinTreeContainer container) continue;
                 foreach (var elem in container.Elements.OfType<BinTreeStruct>())
                 {
-                    uint effectKey = AsU32(Get(elem.Properties, F_eventEffectKey)) ?? 0u;
-                    string effectName = GetString(elem.Properties, F_eventEffectName) ?? string.Empty;
-                    string boneName = GetString(elem.Properties, F_eventSourceBone) ?? string.Empty;
-                    uint boneNameHash = AsU32(Get(elem.Properties, F_eventSourceBone)) ?? (string.IsNullOrEmpty(boneName) ? 0u : VfxParsingHash.Fnv1a(boneName));
-                    string targetBoneName = GetString(elem.Properties, F_eventTargetBone) ?? string.Empty;
-                    uint targetBoneNameHash = AsU32(Get(elem.Properties, F_eventTargetBone)) ?? (string.IsNullOrEmpty(targetBoneName) ? 0u : VfxParsingHash.Fnv1a(targetBoneName));
+                    uint effectKey = AsU32(Get(elem.Properties, F_idleEffectKey)) ?? 0u;
+                    string effectName = GetString(elem.Properties, F_idleEffectName) ?? string.Empty;
+                    string boneName = GetString(elem.Properties, F_idleBoneName) ?? string.Empty;
+                    uint boneNameHash = AsU32(Get(elem.Properties, F_idleBoneName)) ?? (string.IsNullOrEmpty(boneName) ? 0u : VfxParsingHash.Fnv1a(boneName));
+                    string targetBoneName = GetString(elem.Properties, F_idleTargetBoneName) ?? string.Empty;
+                    uint targetBoneNameHash = AsU32(Get(elem.Properties, F_idleTargetBoneName)) ?? (string.IsNullOrEmpty(targetBoneName) ? 0u : VfxParsingHash.Fnv1a(targetBoneName));
                     Vector3 position = AsVec3(Get(elem.Properties, F_idlePosition)) ?? Vector3.Zero;
 
                     idleEffects.Add(new VfxIdleEffectDefinition(

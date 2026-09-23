@@ -83,6 +83,62 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void ReachableSystemsKeepsOnlyTransitiveChildrenAndUsesTheParentResolverScope()
+        {
+            const uint rootHash = 1;
+            const uint directHash = 2;
+            const uint resolvedHash = 3;
+            const uint unrelatedHash = 4;
+            const uint effectKey = 77;
+
+            VfxEmitterDefinition rootEmitter = Emitter(null, null) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new VfxChildSystemReference[]
+                    {
+                        new("direct", directHash, 0),
+                        new("resolved", 0, effectKey)
+                    },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            VfxEmitterDefinition cycleEmitter = Emitter(null, null) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("root", rootHash, 0) },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var localResolver = new Dictionary<uint, uint> { [effectKey] = resolvedHash };
+            var root = new VfxSystemDefinition(rootHash, "root", "root", new[] { rootEmitter }, ResourceMap: localResolver);
+            var direct = new VfxSystemDefinition(directHash, "direct", "direct", new[] { cycleEmitter });
+            var resolved = new VfxSystemDefinition(resolvedHash, "resolved", "resolved", Array.Empty<VfxEmitterDefinition>());
+            var unrelated = new VfxSystemDefinition(unrelatedHash, "unrelated", "unrelated", Array.Empty<VfxEmitterDefinition>());
+            var systems = new Dictionary<uint, VfxSystemDefinition>
+            {
+                [rootHash] = root,
+                [directHash] = direct,
+                [resolvedHash] = resolved,
+                [unrelatedHash] = unrelated
+            };
+
+            IReadOnlyDictionary<uint, VfxSystemDefinition> reachable = VfxSceneResourceContext.ReachableSystems(
+                systems,
+                new Dictionary<uint, uint> { [effectKey] = unrelatedHash },
+                new[] { root });
+
+            Assert.Equal(3, reachable.Count);
+            Assert.Contains(rootHash, reachable.Keys);
+            Assert.Contains(directHash, reachable.Keys);
+            Assert.Contains(resolvedHash, reachable.Keys);
+            Assert.DoesNotContain(unrelatedHash, reachable.Keys);
+        }
+
+        [Fact]
         public async Task MaterializationUsesExactExplicitExtensionAndPreservesVirtualPath()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerTests", Guid.NewGuid().ToString("N"));

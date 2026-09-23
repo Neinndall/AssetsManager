@@ -5,6 +5,8 @@ using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer.Rendering
@@ -23,6 +25,13 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly List<VfxPlaybackGraphRuntime> _graphs = new();
         private readonly Dictionary<object, int> _graphOrders = new();
         private VfxOpenGlRenderer _renderer;
+        private Matrix4x4 _preparedViewProjection;
+        private Matrix4x4 _preparedView;
+        private uint _preparedViewportWidth;
+        private uint _preparedViewportHeight;
+        private bool _preparedShaded;
+        private bool _preparedWireframe;
+        private float _preparedWireOpacity;
         private bool _ready;
 
         internal void Initialize(GL gl)
@@ -39,10 +48,30 @@ namespace AssetsManager.Services.Viewer.Rendering
             Matrix4x4 viewProjection,
             Matrix4x4 view,
             uint viewportWidth,
-            uint viewportHeight)
+            uint viewportHeight,
+            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            bool wireOverlay = false)
+        {
+            if (!PrepareRenderFrame(runtimes, viewProjection, view, viewportWidth, viewportHeight, viewMode, wireOverlay))
+                return;
+
+            using IDisposable renderBatch = BeginPreparedRenderBatch();
+            RenderPreparedColorPass();
+            CapturePreparedDistortionFrame();
+            RenderPreparedDistortionPass();
+        }
+
+        internal bool PrepareRenderFrame(
+            IReadOnlyList<MapParticleRuntime> runtimes,
+            Matrix4x4 viewProjection,
+            Matrix4x4 view,
+            uint viewportWidth,
+            uint viewportHeight,
+            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            bool wireOverlay = false)
         {
             if (!_ready || runtimes == null || runtimes.Count == 0)
-                return;
+                return false;
 
             _sources.Clear();
             _graphs.Clear();
@@ -71,33 +100,62 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
 
             if (_sources.Count == 0)
-                return;
+                return false;
 
             _uploader.UploadPendingResources(_graphs, _renderer);
             _renderer.CaptureScene(viewportWidth, viewportHeight, false, needsSoftParticles);
             VfxRenderQueue.BuildInto(_sources, _queue, _graphOrders);
 
-            Matrix4x4 engineView = MapParticleSemantics.ViewportView(view);
-            Matrix4x4 engineViewProjection = MapParticleSemantics.ViewportViewProjection(viewProjection);
+            _preparedView = MapParticleSemantics.ViewportView(view);
+            _preparedViewProjection = MapParticleSemantics.ViewportViewProjection(viewProjection);
+            _preparedViewportWidth = viewportWidth;
+            _preparedViewportHeight = viewportHeight;
+            var previewPasses = VfxRenderSession.ResolvePreviewPasses(viewMode, wireOverlay, _renderer.SupportsWireframe);
+            _preparedShaded = previewPasses.Shaded;
+            _preparedWireframe = previewPasses.Wireframe;
+            _preparedWireOpacity = previewPasses.WireOpacity;
 
             _shaded.Clear();
             _distortion.Clear();
             foreach (VfxRenderQueueEntry entry in _queue)
             {
-                if (entry.Emitter.Def.Distortion != null)
+                if (entry.Emitter.Def.DrawsAsDistortion)
                     _distortion.Add(entry);
                 else
                     _shaded.Add(entry);
             }
+            return _queue.Count > 0;
+        }
 
-            if (_shaded.Count > 0)
-                _renderer.Render(_shaded, engineViewProjection, engineView);
+        internal IDisposable BeginPreparedRenderBatch() => _renderer.BeginRenderBatch();
 
-            if (_distortion.Count > 0)
+        internal void RenderPreparedColorPass()
+        {
+            if (_preparedShaded && _shaded.Count > 0)
+                _renderer.Render(_shaded, _preparedViewProjection, _preparedView);
+            if (_preparedWireframe && _queue.Count > 0)
             {
-                _renderer.CaptureScene(viewportWidth, viewportHeight, true, false);
-                _renderer.Render(_distortion, engineViewProjection, engineView);
+                _renderer.Render(
+                    _queue,
+                    _preparedViewProjection,
+                    _preparedView,
+                    wireframePass: true,
+                    wireframeOpacity: _preparedWireOpacity);
             }
+        }
+
+        internal bool HasPreparedDistortionPass => _preparedShaded && _distortion.Count > 0;
+
+        internal void CapturePreparedDistortionFrame()
+        {
+            if (HasPreparedDistortionPass)
+                _renderer.CaptureScene(_preparedViewportWidth, _preparedViewportHeight, true, false);
+        }
+
+        internal void RenderPreparedDistortionPass()
+        {
+            if (HasPreparedDistortionPass)
+                _renderer.Render(_distortion, _preparedViewProjection, _preparedView);
         }
 
         internal void Clear()

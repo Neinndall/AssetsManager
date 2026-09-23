@@ -32,6 +32,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         private readonly MapAssetResolver _assetResolver;
         private readonly VfxLoadingService _loadingService;
         private readonly LogService _logService;
+        private readonly SemaphoreSlim _materializeGate = new(1, 1);
+        private readonly object _materializedCandidatesGate = new();
+        private readonly HashSet<string> _materializedCandidates = new(StringComparer.OrdinalIgnoreCase);
         private bool _disposed;
 
         private VfxSceneResourceContext(
@@ -87,7 +90,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 tempRoot);
             try
             {
-                await context.MaterializeAsync(systems, ownerSceneContext, projectRoot, cancellationToken);
+                await context.EnsureMaterializedAsync(systems, ownerSceneContext, projectRoot, cancellationToken);
                 return context;
             }
             catch
@@ -101,6 +104,25 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         {
             ThrowIfDisposed();
             return MapParticleRuntime.CreateAll(catalog, PreparePlaybackAtWorldTransform);
+        }
+
+        internal async Task EnsureMaterializedAsync(
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            VfxOwnerSceneContext ownerSceneContext,
+            string projectRoot,
+            CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            await _materializeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                ThrowIfDisposed();
+                await MaterializeAsync(systems, ownerSceneContext, projectRoot, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _materializeGate.Release();
+            }
         }
 
         internal VfxPlaybackRuntime PreparePlaybackAtWorldTransform(
@@ -119,6 +141,43 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
         internal static IReadOnlyList<ResourceRequest> CollectRequests(MapParticleSystemCatalog catalog)
             => CollectRequests(catalog?.Systems);
+
+        internal static IReadOnlyDictionary<uint, VfxSystemDefinition> ReachableSystems(
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap,
+            IEnumerable<VfxSystemDefinition> roots)
+        {
+            if (systems == null || systems.Count == 0 || roots == null)
+                return new Dictionary<uint, VfxSystemDefinition>();
+
+            resourceMap ??= new Dictionary<uint, uint>();
+            var reachable = new Dictionary<uint, VfxSystemDefinition>();
+            var pending = new Queue<VfxSystemDefinition>(roots.Where(system => system != null));
+            while (pending.Count > 0)
+            {
+                VfxSystemDefinition system = pending.Dequeue();
+                if (system == null || !reachable.TryAdd(system.PathHash, system))
+                    continue;
+
+                IReadOnlyDictionary<uint, uint> resolver = system.ResourceMap ?? resourceMap;
+                foreach (VfxEmitterDefinition emitter in system.Emitters ?? Array.Empty<VfxEmitterDefinition>())
+                {
+                    foreach (VfxChildSystemReference child in emitter?.ChildParticleSet?.Children ?? Array.Empty<VfxChildSystemReference>())
+                    {
+                        if (child == null)
+                            continue;
+
+                        uint childHash = child.SystemHash;
+                        if (childHash == 0 && child.EffectKey != 0)
+                            resolver.TryGetValue(child.EffectKey, out childHash);
+                        if (childHash != 0 && systems.TryGetValue(childHash, out VfxSystemDefinition childSystem))
+                            pending.Enqueue(childSystem);
+                    }
+                }
+            }
+
+            return reachable;
+        }
 
         internal static IReadOnlyList<ResourceRequest> CollectRequests(
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
@@ -225,6 +284,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             Candidate[] copyCandidates = chosen.Values
                 .GroupBy(candidate => candidate.CandidatePath, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
+                .Where(candidate => !IsMaterialized(candidate.CandidatePath))
                 .ToArray();
             Task[] copies = copyCandidates.Select(async candidate =>
             {
@@ -243,6 +303,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                     if (!string.IsNullOrWhiteSpace(directory))
                         Directory.CreateDirectory(directory);
                     await File.WriteAllBytesAsync(destination, bytes, cancellationToken);
+                    MarkMaterialized(candidate.CandidatePath);
                 }
                 finally
                 {
@@ -306,6 +367,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             requests[authoredPath] = new ResourceRequest(
                 authoredPath,
                 (extensions ?? Array.Empty<string>()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
+        }
+
+        private bool IsMaterialized(string candidatePath)
+        {
+            lock (_materializedCandidatesGate)
+                return _materializedCandidates.Contains(candidatePath);
+        }
+
+        private void MarkMaterialized(string candidatePath)
+        {
+            lock (_materializedCandidatesGate)
+                _materializedCandidates.Add(candidatePath);
         }
 
         private static bool IsSyntheticHashAsset(string path)

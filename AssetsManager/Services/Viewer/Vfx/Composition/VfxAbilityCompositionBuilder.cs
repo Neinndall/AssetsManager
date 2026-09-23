@@ -155,6 +155,28 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
         /// Returns only compositions that explicitly resolve the selected system. Names and
         /// sibling prefixes are intentionally ignored because they do not encode timing or placement.
         /// </summary>
+        internal static int CountResolvedIdleEffects(
+            IReadOnlyList<VfxIdleEffectDefinition> idleEffects,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap)
+        {
+            if (idleEffects == null || systems == null || resourceMap == null)
+                return 0;
+
+            int count = 0;
+            foreach (VfxIdleEffectDefinition idle in idleEffects)
+            {
+                if (idle == null || idle.EffectKey == 0 ||
+                    !resourceMap.TryGetValue(idle.EffectKey, out uint systemHash) ||
+                    systemHash == 0 || !systems.ContainsKey(systemHash))
+                {
+                    continue;
+                }
+                count++;
+            }
+            return count;
+        }
+
         public static IReadOnlyList<VfxAbilityComposition> FindContainingSystem(
             uint systemHash,
             IEnumerable<VfxAbilityComposition> compositions)

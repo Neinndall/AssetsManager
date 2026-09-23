@@ -98,6 +98,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private bool _disposed;
         private uint _viewportWidth;
         private uint _viewportHeight;
+        private Matrix4x4 _preparedViewProjection;
+        private Matrix4x4 _preparedView;
+        private bool _preparedShaded;
+        private bool _preparedWireframe;
+        private float _preparedWireOpacity;
         private Func<string, uint, Matrix4x4?> _boneTransformProvider;
         private Func<double, string, uint, Matrix4x4?> _boneTransformSampler;
 
@@ -227,6 +232,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         {
             _renderer = new VfxOpenGlRenderer();
             _renderer.Initialize(gl);
+            _renderer.SetOwnerWorldTransform(_worldTransform);
             _ready = true;
         }
 
@@ -466,11 +472,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 _gpuResourceUploader.Clear();
             }
 
-            var systemsByName = systems
-                .Where(pair => !string.IsNullOrWhiteSpace(pair.Value.Name))
-                .GroupBy(pair => pair.Value.Name, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.First().Value, StringComparer.OrdinalIgnoreCase);
-
             double duration = Math.Max(0.1, animationDuration);
 
             // 1. Instantiate Idle Effects (continuous character-anchored auras)
@@ -478,24 +479,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             {
                 foreach (VfxIdleEffectDefinition idle in idleEffects)
                 {
-                    VfxSystemDefinition idleDef = null;
-                    uint mappedHash = 0u;
-                    bool resolverHit = idle.EffectKey != 0 && resourceMap.TryGetValue(idle.EffectKey, out mappedHash);
-                    if (resolverHit)
+                    // CharacterIdleEffect.effectKey is a ResourceResolver key, never a direct
+                    // VfxSystemDefinition object id. LTK drops an idle whose key is unmapped or
+                    // maps outside the systems in reach instead of guessing by hash/name.
+                    if (idle.EffectKey == 0 ||
+                        !resourceMap.TryGetValue(idle.EffectKey, out uint mappedHash) ||
+                        mappedHash == 0 ||
+                        !systems.TryGetValue(mappedHash, out VfxSystemDefinition idleDef))
                     {
-                        if (mappedHash != 0 && systems.TryGetValue(mappedHash, out var mappedSystem))
-                            idleDef = mappedSystem;
+                        continue;
                     }
-                    else if (idle.EffectKey != 0 && systems.TryGetValue(idle.EffectKey, out var sys))
-                    {
-                        idleDef = sys;
-                    }
-                    else if (!string.IsNullOrEmpty(idle.EffectName) && systemsByName.TryGetValue(idle.EffectName, out sys))
-                    {
-                        idleDef = sys;
-                    }
-
-                    if (idleDef == null) continue;
 
                     var idleGraph = _loadingService.PreparePlaybackGraph(
                         idleDef,
@@ -861,6 +854,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         {
             ClearCheckpoints();
             _worldTransform = transform;
+            if (_ready)
+                _renderer.SetOwnerWorldTransform(transform);
             if (_spellSteps.Count > 0)
             {
                 ApplySpellTransforms(_activeSystem?.CurrentTime ?? 0d);
@@ -1274,7 +1269,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
             bool wireOverlay = false)
         {
-            if (!_ready || _graphs.Count == 0) return;
+            if (!PrepareRenderFrame(viewProjection, view, viewMode, wireOverlay)) return;
+
+            using IDisposable renderBatch = BeginPreparedRenderBatch();
+            RenderPreparedColorPass();
+            CapturePreparedDistortionFrame();
+            RenderPreparedDistortionPass();
+        }
+
+        internal bool PrepareRenderFrame(
+            Matrix4x4 viewProjection,
+            Matrix4x4 view,
+            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            bool wireOverlay = false)
+        {
+            if (!_ready || _graphs.Count == 0)
+                return false;
 
             _gpuResourceUploader.UploadPendingResources(_graphs, _renderer);
             _renderSources.Clear();
@@ -1304,8 +1314,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 needsSoftParticles);
             VfxRenderQueue.BuildInto(_renderSources, _renderQueue, _renderGraphOrders);
 
-            bool supportsWireframe = _renderer.SupportsWireframe;
-            var previewPasses = ResolvePreviewPasses(viewMode, wireOverlay, supportsWireframe);
+            var previewPasses = ResolvePreviewPasses(viewMode, wireOverlay, _renderer.SupportsWireframe);
+            _preparedViewProjection = viewProjection;
+            _preparedView = view;
+            _preparedShaded = previewPasses.Shaded;
+            _preparedWireframe = previewPasses.Wireframe;
+            _preparedWireOpacity = previewPasses.WireOpacity;
 
             _shadedRenderQueue.Clear();
             _distortionRenderQueue.Clear();
@@ -1316,33 +1330,43 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 else
                     _shadedRenderQueue.Add(entry);
             }
+            return _renderQueue.Count > 0;
+        }
 
-            if (previewPasses.Shaded)
-            {
-                _renderer.Render(
-                    _shadedRenderQueue,
-                    viewProjection,
-                    view);
-            }
+        internal IDisposable BeginPreparedRenderBatch() => _renderer.BeginRenderBatch();
+
+        internal void RenderPreparedColorPass()
+        {
+            if (_preparedShaded && _shadedRenderQueue.Count > 0)
+                _renderer.Render(_shadedRenderQueue, _preparedViewProjection, _preparedView);
 
             // LTK keeps every wire twin on the particle colour layer, including the twin of a
             // distorting solid. Overlay wires therefore belong in the captured frame and the
             // distortion layer is drawn over them afterwards.
-            if (previewPasses.Wireframe)
+            if (_preparedWireframe && _renderQueue.Count > 0)
             {
                 _renderer.Render(
                     _renderQueue,
-                    viewProjection,
-                    view,
+                    _preparedViewProjection,
+                    _preparedView,
                     wireframePass: true,
-                    wireframeOpacity: previewPasses.WireOpacity);
+                    wireframeOpacity: _preparedWireOpacity);
             }
+        }
 
-            if (previewPasses.Shaded && _distortionRenderQueue.Count > 0)
-            {
+        internal bool HasPreparedDistortionPass =>
+            _preparedShaded && _distortionRenderQueue.Count > 0;
+
+        internal void CapturePreparedDistortionFrame()
+        {
+            if (HasPreparedDistortionPass)
                 _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
-                _renderer.Render(_distortionRenderQueue, viewProjection, view);
-            }
+        }
+
+        internal void RenderPreparedDistortionPass()
+        {
+            if (HasPreparedDistortionPass)
+                _renderer.Render(_distortionRenderQueue, _preparedViewProjection, _preparedView);
         }
 
         internal static (bool Shaded, bool Wireframe, float WireOpacity) ResolvePreviewPasses(

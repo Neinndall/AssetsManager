@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
@@ -60,6 +63,61 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void IncrementalBackdropTextureMergePreservesLandedEntriesAndReplacesOnlyTheMatchingKey()
+        {
+            using var runtime = new MapSceneRuntime(
+                Scene(),
+                Array.Empty<MapCharacterRuntimeGroup>(),
+                new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>()));
+            MapTextureImage first = Image(10);
+            MapTextureImage second = Image(20);
+            MapTextureImage sharpened = Image(30);
+
+            runtime.MergeBackdropTextures(new Dictionary<string, MapTextureImage>
+            {
+                ["material/a"] = first,
+                ["material/b"] = second
+            });
+            runtime.MergeBackdropTextures(new Dictionary<string, MapTextureImage>
+            {
+                ["material/a"] = sharpened
+            });
+
+            Assert.Equal(2, runtime.BackdropTextures.Count);
+            Assert.Same(sharpened, runtime.BackdropTextures["material/a"]);
+            Assert.Same(second, runtime.BackdropTextures["material/b"]);
+        }
+
+        [Fact]
+        public void IncrementalProgramAndLightmapMergesKeepTheirAuthoredKeyComparison()
+        {
+            using var runtime = new MapSceneRuntime(
+                Scene(),
+                Array.Empty<MapCharacterRuntimeGroup>(),
+                new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>()));
+            MapTextureImage raw = Image(40);
+            MapTextureImage firstLight = Image(50);
+            MapTextureImage replacementLight = Image(60);
+
+            runtime.MergeBackdropProgramTextures(new Dictionary<string, MapTextureImage>
+            {
+                ["program:Material:Diffuse"] = raw
+            });
+            runtime.MergeBackdropLightmaps(new Dictionary<string, MapTextureImage>
+            {
+                ["ASSETS/Maps/Light.TEX"] = firstLight
+            });
+            runtime.MergeBackdropLightmaps(new Dictionary<string, MapTextureImage>
+            {
+                ["assets/maps/light.tex"] = replacementLight
+            });
+
+            Assert.Same(raw, runtime.BackdropProgramTextures["program:Material:Diffuse"]);
+            Assert.Single(runtime.BackdropLightmaps);
+            Assert.Same(replacementLight, runtime.BackdropLightmaps["ASSETS/Maps/Light.TEX"]);
+        }
+
+        [Fact]
         public void HiddenIdsCanBeAddedAndRemovedWithoutRebuildingTheScene()
         {
             using var runtime = new MapSceneRuntime(
@@ -73,6 +131,64 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 
             runtime.SetHidden(id, false);
             Assert.DoesNotContain(id, runtime.Hidden);
+        }
+
+        [Fact]
+        public void ReplacingCharacterGroupsKeepsSceneIdentityAndDisposesPreviousOwners()
+        {
+            MapSceneData scene = Scene();
+            var previousAnimation = new MapCharacterAnimationRuntime(null, null);
+            var previous = new MapCharacterRuntimeGroup(
+                null,
+                previousAnimation,
+                Array.Empty<MapCharacterData>());
+            using var runtime = new MapSceneRuntime(
+                scene,
+                new[] { previous },
+                new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>()));
+            var replacement = new MapCharacterRuntimeGroup(
+                null,
+                new MapCharacterAnimationRuntime(null, null),
+                Array.Empty<MapCharacterData>());
+
+            runtime.SetCharacterGroups(new[] { replacement });
+
+            Assert.Same(scene, runtime.Scene);
+            Assert.Same(replacement, Assert.Single(runtime.CharacterGroups));
+            Assert.Throws<ObjectDisposedException>(() => previousAnimation.Evaluate(null, null, 0f));
+        }
+
+        [Fact]
+        public void ReplacingParticleRuntimeKeepsSceneIdentityAndDisposesPreviousOwner()
+        {
+            MapSceneData scene = Scene();
+            var previous = new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>());
+            using var runtime = new MapSceneRuntime(
+                scene,
+                Array.Empty<MapCharacterRuntimeGroup>(),
+                previous);
+            var replacement = new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>());
+
+            runtime.SetParticles(replacement);
+
+            Assert.Same(scene, runtime.Scene);
+            Assert.Same(replacement, runtime.Particles);
+            Assert.Throws<ObjectDisposedException>(() => previous.Restart());
+        }
+
+        private static MapTextureImage Image(byte value)
+        {
+            BitmapSource bitmap = BitmapSource.Create(
+                1,
+                1,
+                96,
+                96,
+                PixelFormats.Bgra32,
+                null,
+                new byte[] { value, value, value, 255 },
+                4);
+            bitmap.Freeze();
+            return new MapTextureImage(new[] { bitmap });
         }
 
         private static MapSceneData Scene()

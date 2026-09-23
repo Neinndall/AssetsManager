@@ -45,12 +45,8 @@ namespace AssetsManager.Services.Viewer.Runtime
 
             Task<IReadOnlyList<MapCharacterRuntimeGroup>> characters =
                 LoadCharactersAsync(scene, cancellationToken);
-            Task<MapParticleSceneRuntime> particles = MapParticleSceneRuntime.CreateAsync(
-                scene,
-                _assetResolver,
-                _hashResolver,
-                _logService,
-                cancellationToken);
+            Task<MapParticleSceneRuntime> particles =
+                LoadParticlesAsync(scene, cancellationToken);
 
             try
             {
@@ -84,7 +80,7 @@ namespace AssetsManager.Services.Viewer.Runtime
                 cancellationToken,
                 catalog?.OwnerSceneContext);
 
-        private async Task<IReadOnlyList<MapCharacterRuntimeGroup>> LoadCharactersAsync(
+        internal async Task<IReadOnlyList<MapCharacterRuntimeGroup>> LoadCharactersAsync(
             MapSceneData scene,
             CancellationToken cancellationToken)
         {
@@ -116,6 +112,19 @@ namespace AssetsManager.Services.Viewer.Runtime
                 DisposeCompletedCharacterLoads(loads);
                 throw;
             }
+        }
+
+        internal Task<MapParticleSceneRuntime> LoadParticlesAsync(
+            MapSceneData scene,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(scene);
+            return MapParticleSceneRuntime.CreateAsync(
+                scene,
+                _assetResolver,
+                _hashResolver,
+                _logService,
+                cancellationToken);
         }
 
         internal static void DisposeCompletedCharacterLoads(

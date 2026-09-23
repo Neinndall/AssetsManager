@@ -64,10 +64,82 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             internal bool InitialEmissionDone;
             internal readonly List<Particle> Particles = new();
 
-            /// <summary>Packed instance data for the renderer: position, color, motion, UV stages,
-            /// erosion state, and the authored palette selector.</summary>
-            public float[] Instances = System.Array.Empty<float>();
-            public int InstanceCount;
+            private VfxPlaybackRuntime _owner;
+            private float[] _instances = System.Array.Empty<float>();
+            private int _manualInstanceCount;
+            private int _preparedInstanceCount;
+            private bool _instancesDirty = true;
+
+            /// <summary>
+            /// Packed draw data. Runtime-owned emitters build this lazily so simulation does not pay
+            /// render preparation for particles the renderer will never consume. Directly-constructed
+            /// diagnostic/test states keep the legacy assignable buffer contract.
+            /// </summary>
+            public float[] Instances
+            {
+                get
+                {
+                    _owner?.EnsureInstances(this, Particles.Count);
+                    return _instances;
+                }
+                set
+                {
+                    _instances = value ?? System.Array.Empty<float>();
+                    _preparedInstanceCount = _instances.Length / InstanceStride;
+                    _instancesDirty = false;
+                }
+            }
+
+            /// <summary>Live particle rows for this emitter, independent of the prepared draw buffer.</summary>
+            public int InstanceCount
+            {
+                get => _owner != null ? Particles.Count : _manualInstanceCount;
+                set => _manualInstanceCount = Math.Max(0, value);
+            }
+
+            internal int PreparedInstanceCount => _owner != null ? _preparedInstanceCount : Math.Min(_manualInstanceCount, _preparedInstanceCount);
+            internal int InstanceBufferCapacity => _instances.Length;
+
+            internal void BindOwner(VfxPlaybackRuntime owner)
+            {
+                _owner = owner;
+                _instancesDirty = true;
+                _preparedInstanceCount = 0;
+            }
+
+            internal void InvalidateInstances()
+            {
+                if (_owner == null) return;
+                _instancesDirty = true;
+                _preparedInstanceCount = 0;
+            }
+
+            internal void ResetInstanceBuffer(int length)
+            {
+                _instances = length > 0 ? new float[length] : System.Array.Empty<float>();
+                _instancesDirty = true;
+                _preparedInstanceCount = 0;
+            }
+
+            internal ReadOnlySpan<float> PrepareInstances(int requestedCount)
+            {
+                int available = InstanceCount;
+                int wanted = Math.Clamp(requestedCount, 0, available);
+                if (_owner != null)
+                    _owner.EnsureInstances(this, wanted);
+                else
+                    wanted = Math.Min(wanted, _preparedInstanceCount);
+                return new ReadOnlySpan<float>(_instances, 0, wanted * InstanceStride);
+            }
+
+            internal float[] RawInstances => _instances;
+            internal bool InstancesDirty => _instancesDirty;
+            internal void MarkInstancesPrepared(int count)
+            {
+                _preparedInstanceCount = Math.Max(0, count);
+                _instancesDirty = false;
+            }
+
             internal float TrailDistance;
             internal Vector3? TrailSpawnedAt;
             internal float[] NoiseLast = Array.Empty<float>();
@@ -244,7 +316,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     state.InitialEmissionDone,
                     state.TrailDistance,
                     state.TrailSpawnedAt,
-                    state.Instances.Length,
+                    state.InstanceBufferCapacity,
                     noiseLast,
                     noiseFired,
                     particles);
@@ -317,11 +389,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 state.NoiseFired = (int[])saved.NoiseFired.Clone();
                 state.Particles.Clear();
                 state.Particles.AddRange(saved.Particles);
-                state.Instances = saved.InstanceBufferLength > 0
-                    ? new float[saved.InstanceBufferLength]
-                    : Array.Empty<float>();
-                BuildInstances(state);
-                live += state.InstanceCount;
+                state.ResetInstanceBuffer(saved.InstanceBufferLength);
+                state.RenderTime = CurrentTime;
+                live += state.Particles.Count;
             }
             LiveParticleCount = live;
         }
@@ -352,6 +422,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 es.PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, placement), Vector3.UnitX);
                 es.PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, placement), Vector3.UnitY);
                 es.PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, placement), Vector3.UnitZ);
+                es.InvalidateInstances();
             }
         }
 
@@ -432,7 +503,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             {
                 var e = system.Emitters[emitterIndex];
                 if (e.Disabled) continue;
-                _emitters.Add(new EmitterState
+                var emitterState = new EmitterState
                 {
                     Def = e,
                     SourceOrder = emitterIndex,
@@ -441,7 +512,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX),
                     PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY),
                     PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ),
-                });
+                };
+                emitterState.BindOwner(this);
+                _emitters.Add(emitterState);
             }
             Reset();
             SetTransform(worldTransform);
@@ -734,7 +807,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 s.BurstDone = false;
                 s.InitialEmissionDone = false;
                 s.SharedRandomRolled = false;
-                s.InstanceCount = 0;
+                s.RenderTime = 0f;
+                s.InvalidateInstances();
             }
             LiveParticleCount = 0;
         }
@@ -807,7 +881,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             foreach (EmitterState emitter in _emitters)
             {
                 emitter.Particles.Clear();
-                emitter.InstanceCount = 0;
+                emitter.InvalidateInstances();
             }
             LiveParticleCount = 0;
         }
@@ -866,8 +940,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         _stepContexts[index].FieldOrigin,
                         _newbornStarts[index]);
                 }
-                BuildInstances(state);
-                live += state.InstanceCount;
+                state.RenderTime = CurrentTime;
+                state.InvalidateInstances();
+                live += state.Particles.Count;
             }
             LiveParticleCount = live;
         }
@@ -1306,17 +1381,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             ParticleLifecycle?.Invoke(this, d, LifecycleInfo(s, s.Particles[^1], died: false));
         }
 
-        private void BuildInstances(EmitterState s)
+        private void EnsureInstances(EmitterState state, int requestedCount)
         {
-            // Standalone runtimes draw against their own clock. A graph runtime rewrites this
-            // after stepping so every live child source sees the root driver's global Source.time.
-            s.RenderTime = CurrentTime;
+            int wanted = Math.Clamp(requestedCount, 0, state.Particles.Count);
+            if (!state.InstancesDirty && state.PreparedInstanceCount >= wanted)
+                return;
+            BuildInstances(state, wanted);
+        }
+
+        private void BuildInstances(EmitterState s, int maxCount)
+        {
             var d = s.Def;
-            int n = s.Particles.Count;
-            int instanceCount = n;
-            if (s.Instances.Length < instanceCount * InstanceStride)
-                s.Instances = new float[Math.Max(instanceCount * InstanceStride, InstanceStride * 4)];
-            var buf = s.Instances;
+            int n = Math.Min(s.Particles.Count, Math.Max(0, maxCount));
+            if (s.InstanceBufferCapacity < n * InstanceStride)
+                s.ResetInstanceBuffer(Math.Max(n * InstanceStride, InstanceStride * 4));
+            var buf = s.RawInstances;
             float emitterT = EmitterTime(s);
             int k = 0;
             for (int i = 0; i < n; i++)
@@ -1482,7 +1561,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 buf[k++] = basisY.X; buf[k++] = basisY.Y; buf[k++] = basisY.Z;
                 buf[k++] = basisZ.X; buf[k++] = basisZ.Y; buf[k++] = basisZ.Z;
             }
-            s.InstanceCount = k / InstanceStride;
+            s.MarkInstancesPrepared(k / InstanceStride);
         }
 
         private static float ParticleAge01(float age, float lifetime)

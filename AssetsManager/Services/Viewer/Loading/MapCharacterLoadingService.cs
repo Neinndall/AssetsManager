@@ -27,6 +27,8 @@ namespace AssetsManager.Services.Viewer.Loading
     internal sealed class MapCharacterLoadingService
     {
         private const string ShadersPath = "data/shaders/shaders.bin";
+        // LTK bounds breadth-first linked BIN walks to 32 files beyond the primary skin document.
+        private const int MaximumLinkedBins = 32;
         private const int MaxConcurrentTextureLoads = 4;
 
         private readonly MapAssetResolver _assetResolver;
@@ -177,7 +179,6 @@ namespace AssetsManager.Services.Viewer.Loading
                 skeleton,
                 materials,
                 textures,
-                documents,
                 graph,
                 vfx);
         }
@@ -239,6 +240,8 @@ namespace AssetsManager.Services.Viewer.Loading
             var result = new List<BinTree>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var pending = new Queue<MapResolvedAsset>();
+            string primaryIdentity = AssetIdentity(primary);
+            int openedLinkedBins = 0;
             pending.Enqueue(primary);
 
             while (pending.Count > 0)
@@ -249,16 +252,27 @@ namespace AssetsManager.Services.Viewer.Loading
                 if (!seen.Add(identity))
                     continue;
 
+                bool isPrimary = string.Equals(identity, primaryIdentity, StringComparison.OrdinalIgnoreCase);
+                if (!isPrimary)
+                {
+                    if (openedLinkedBins >= MaximumLinkedBins)
+                        break;
+                    // Match LTK's walk: an attempted linked open consumes the budget even when
+                    // the file cannot be parsed/read.
+                    openedLinkedBins++;
+                }
+
                 BinTree tree = await ReadDocumentAsync(asset, cancellationToken);
                 if (tree == null)
                     continue;
                 result.Add(tree);
 
-                foreach (string dependency in tree.Dependencies)
+                string[] dependencies = tree.Dependencies
+                    .Where(dependency => !string.IsNullOrWhiteSpace(dependency))
+                    .ToArray();
+                var unresolved = new List<MapAssetReference>(dependencies.Length);
+                foreach (string dependency in dependencies)
                 {
-                    if (string.IsNullOrWhiteSpace(dependency))
-                        continue;
-
                     IReadOnlyList<MapResolvedAsset> projectMatches =
                         _assetResolver.ResolveLinkedProjectBins(dependency, projectRoot);
                     if (projectMatches.Count > 0)
@@ -271,12 +285,24 @@ namespace AssetsManager.Services.Viewer.Loading
                         continue;
                     }
 
-                    MapResolvedAsset fallback = await _assetResolver.ResolveReferenceAsync(
-                        new MapAssetReference(dependency, 0),
-                        projectRoot,
-                        cancellationToken);
-                    if (fallback != null && !seen.Contains(AssetIdentity(fallback)))
-                        pending.Enqueue(fallback);
+                    unresolved.Add(new MapAssetReference(dependency, 0));
+                }
+
+                if (unresolved.Count > 0)
+                {
+                    IReadOnlyDictionary<MapAssetReference, MapResolvedAsset> resolvedDependencies =
+                        await _assetResolver.ResolveReferencesAsync(
+                            unresolved,
+                            projectRoot,
+                            cancellationToken);
+                    foreach (MapAssetReference reference in unresolved)
+                    {
+                        if (resolvedDependencies.TryGetValue(reference, out MapResolvedAsset resolved) &&
+                            !seen.Contains(AssetIdentity(resolved)))
+                        {
+                            pending.Enqueue(resolved);
+                        }
+                    }
                 }
             }
 
@@ -327,46 +353,60 @@ namespace AssetsManager.Services.Viewer.Loading
             if (keys.Length == 0)
                 return new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
 
-            var loaded = new ConcurrentDictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
-            using var gate = new SemaphoreSlim(MaxConcurrentTextureLoads, MaxConcurrentTextureLoads);
-            Task[] tasks = keys.Select(async key =>
-            {
-                MapAssetReference reference = ReferenceFromAuthoredTexture(key);
-                MapResolvedAsset asset = await _assetResolver.ResolveReferenceAsync(
-                    reference,
+            var keyedReferences = keys
+                .Select(key => (Key: key, Reference: ReferenceFromAuthoredTexture(key)))
+                .Where(item => item.Reference?.IsEmpty == false)
+                .ToArray();
+            IReadOnlyDictionary<MapAssetReference, MapResolvedAsset> resolved =
+                await _assetResolver.ResolveReferencesAsync(
+                    keyedReferences.Select(item => item.Reference),
                     projectRoot,
                     cancellationToken);
-                if (asset == null)
-                    return;
 
-                await gate.WaitAsync(cancellationToken);
-                try
+            var loaded = new ConcurrentDictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
+            using var gate = new SemaphoreSlim(MaxConcurrentTextureLoads, MaxConcurrentTextureLoads);
+            Task[] tasks = keyedReferences
+                .GroupBy(item => item.Reference)
+                .Where(group => resolved.ContainsKey(group.Key))
+                .Select(async group =>
                 {
-                    await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
-                    if (stream == null)
-                        return;
-                    string extension = MapTextureLoadingService.DetectTextureExtension(
-                        stream,
-                        reference.VirtualPath ?? asset.VirtualPath);
-                    BitmapSource bitmap = await Task.Run(
-                        () => TextureUtils.LoadViewerTexture(stream, extension),
-                        cancellationToken);
-                    if (bitmap != null)
-                        loaded[key] = bitmap;
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logService?.LogDebug($"MAP structure texture unavailable '{key}': {ex.Message}");
-                }
-                finally
-                {
-                    gate.Release();
-                }
-            }).ToArray();
+                    MapAssetReference reference = group.Key;
+                    MapResolvedAsset asset = resolved[reference];
+                    string[] aliases = group.Select(item => item.Key).ToArray();
+
+                    await gate.WaitAsync(cancellationToken);
+                    try
+                    {
+                        await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
+                        if (stream == null)
+                            return;
+                        string extension = MapTextureLoadingService.DetectTextureExtension(
+                            stream,
+                            reference.VirtualPath ?? asset.VirtualPath);
+                        BitmapSource bitmap = await Task.Run(
+                            () => TextureUtils.LoadViewerTexture(stream, extension),
+                            cancellationToken);
+                        if (bitmap == null)
+                            return;
+
+                        foreach (string alias in aliases)
+                            loaded[alias] = bitmap;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService?.LogDebug(
+                            $"MAP structure texture unavailable '{aliases[0]}': {ex.Message}");
+                    }
+                    finally
+                    {
+                        gate.Release();
+                    }
+                })
+                .ToArray();
 
             await Task.WhenAll(tasks);
             cancellationToken.ThrowIfCancellationRequested();

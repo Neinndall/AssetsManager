@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Composition;
+using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Hashing;
@@ -48,6 +49,47 @@ public class VfxClipCatalogTests
             animationFilePath: "assets/characters/janna/animations/dance_in.anm");
 
         Assert.Equal("dance_in", VfxClipCatalog.DisplayNameFor(resolved));
+    }
+
+    [Fact]
+    public void MetadataCatalogDoesNotDecodeAnimationAssets()
+    {
+        var bundle = new VfxLoadingService.Bundle();
+        bundle.Clips.Add(Clip(0x10, 0x100, "idle", "missing-but-resolved.anm"));
+        bundle.OwnerSceneContext = new VfxOwnerSceneContext(
+            string.Empty,
+            string.Empty,
+            1f,
+            0x100,
+            Array.Empty<uint>());
+        using var catalog = new VfxClipCatalog();
+
+        AnimationClipCatalogItem item = Assert.Single(catalog.BuildMetadata(
+            bundle,
+            path => $"resolved/{path}"));
+
+        Assert.Null(item.AnimationAsset);
+        Assert.Equal(0f, item.Duration);
+        Assert.Equal("resolved/missing-but-resolved.anm", item.FilePath);
+    }
+
+    [Fact]
+    public void MetadataCatalogKeepsAuthoredClipWhenAnimationAssetIsUnavailable()
+    {
+        var bundle = new VfxLoadingService.Bundle();
+        bundle.Clips.Add(Clip(0x10, 0x100, "idle", "missing.anm"));
+        bundle.OwnerSceneContext = new VfxOwnerSceneContext(
+            string.Empty,
+            string.Empty,
+            1f,
+            0x100,
+            Array.Empty<uint>());
+        using var catalog = new VfxClipCatalog();
+
+        AnimationClipCatalogItem item = Assert.Single(catalog.BuildMetadata(bundle, _ => null));
+
+        Assert.Null(item.AnimationAsset);
+        Assert.Equal("missing.anm", item.FilePath);
     }
 
     [Fact]

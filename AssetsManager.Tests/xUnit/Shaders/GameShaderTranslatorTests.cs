@@ -41,14 +41,14 @@ namespace AssetsManager.Tests.xUnit.Shaders
             var settings = AppSettings.GetDefaultSettings();
             settings.LolPbeDirectory = root;
             settings.LolLiveDirectory = null;
-            var pass = new GameResolvedMaterialPassData(
+            var pass = new GameMaterialPass(
                 1,
                 "Shaders/StaticMesh/DefaultEnv_Flat",
-                Array.Empty<GameMaterialDefineData>(),
+                Array.Empty<GameMaterialDefine>(),
                 Array.Empty<System.Collections.Generic.KeyValuePair<string, bool>>(),
-                Array.Empty<GameMaterialPassTextureData>(),
-                Array.Empty<GameMaterialPassParamData>(),
-                new GameMaterialPassStateData(
+                Array.Empty<GameMaterialTexture>(),
+                Array.Empty<GameMaterialParameter>(),
+                new GameMaterialPassState(
                     false,
                     MapBlendFactor.One,
                     MapBlendFactor.Zero,

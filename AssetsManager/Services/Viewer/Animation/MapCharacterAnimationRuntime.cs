@@ -218,9 +218,33 @@ namespace AssetsManager.Services.Viewer.Animation
             transform = Matrix4x4.Identity;
             if (clip == null || !_previewStates.TryGetValue(clip.OwnerPathHash, out PoseState state))
                 return false;
-            if (!string.IsNullOrWhiteSpace(boneName) && state.Evaluator.TryGetBoneTransform(boneName, out transform))
+            if (!string.IsNullOrWhiteSpace(boneName) && state.Evaluator.TryGetBoneTransformExactName(boneName, out transform))
                 return true;
-            return boneHash != 0 && state.Evaluator.TryGetBoneTransform(boneHash, out transform);
+            return boneHash != 0 && state.Evaluator.TryGetBoneTransformFnv(boneHash, out transform);
+        }
+
+        internal bool TrySamplePreparedClipBoneTransform(
+            MapCharacterAssetData asset,
+            AnimationClipDefinition clip,
+            double timeSeconds,
+            string boneName,
+            uint boneHash,
+            out Matrix4x4 transform)
+        {
+            transform = Matrix4x4.Identity;
+            if (asset?.Skeleton == null || clip == null ||
+                !_previewStates.TryGetValue(clip.OwnerPathHash, out PoseState state))
+            {
+                return false;
+            }
+
+            float sampleTime = double.IsFinite(timeSeconds)
+                ? (float)Math.Max(0d, timeSeconds)
+                : 0f;
+            state.Evaluator.EvaluateSkinningTransforms(sampleTime, state.Animation, asset.Skeleton);
+            if (!string.IsNullOrWhiteSpace(boneName) && state.Evaluator.TryGetBoneTransformExactName(boneName, out transform))
+                return true;
+            return boneHash != 0 && state.Evaluator.TryGetBoneTransformFnv(boneHash, out transform);
         }
 
         internal Matrix4x4[] PreparedClipSkinningMatrices(AnimationClipDefinition clip) =>

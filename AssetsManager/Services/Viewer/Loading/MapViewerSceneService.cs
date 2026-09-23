@@ -27,50 +27,56 @@ namespace AssetsManager.Services.Viewer.Loading
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewTexturesAsync(
             MapSceneRuntime runtime,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(runtime);
-            return _sceneLoadingService.LoadPreviewTexturesAsync(runtime.Scene, cancellationToken);
+            return _sceneLoadingService.LoadPreviewTexturesAsync(runtime.Scene, cancellationToken, onLoaded);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullTexturesAsync(
             MapSceneRuntime runtime,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(runtime);
-            return _sceneLoadingService.LoadFullTexturesAsync(runtime.Scene, cancellationToken);
+            return _sceneLoadingService.LoadFullTexturesAsync(runtime.Scene, cancellationToken, onLoaded);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewProgramTexturesAsync(
             MapSceneRuntime runtime,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(runtime);
-            return _sceneLoadingService.LoadPreviewProgramTexturesAsync(runtime.Scene, cancellationToken);
+            return _sceneLoadingService.LoadPreviewProgramTexturesAsync(runtime.Scene, cancellationToken, onLoaded);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullProgramTexturesAsync(
             MapSceneRuntime runtime,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(runtime);
-            return _sceneLoadingService.LoadFullProgramTexturesAsync(runtime.Scene, cancellationToken);
+            return _sceneLoadingService.LoadFullProgramTexturesAsync(runtime.Scene, cancellationToken, onLoaded);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewLightmapsAsync(
             MapSceneRuntime runtime,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(runtime);
-            return _sceneLoadingService.LoadPreviewLightmapsAsync(runtime.Scene, cancellationToken);
+            return _sceneLoadingService.LoadPreviewLightmapsAsync(runtime.Scene, cancellationToken, onLoaded);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullLightmapsAsync(
             MapSceneRuntime runtime,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            Action<string, MapTextureImage> onLoaded = null)
         {
             ArgumentNullException.ThrowIfNull(runtime);
-            return _sceneLoadingService.LoadFullLightmapsAsync(runtime.Scene, cancellationToken);
+            return _sceneLoadingService.LoadFullLightmapsAsync(runtime.Scene, cancellationToken, onLoaded);
         }
 
         internal Task<VfxSceneResourceContext> CreateVfxResourcesAsync(
@@ -99,6 +105,22 @@ namespace AssetsManager.Services.Viewer.Loading
         {
             ArgumentNullException.ThrowIfNull(backdrop);
             return _runtimeFactory.CreateAsync(backdrop.Scene, cancellationToken);
+        }
+
+        internal Task<IReadOnlyList<MapCharacterRuntimeGroup>> LoadCharacterAssetsAsync(
+            MapSceneRuntime backdrop,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(backdrop);
+            return _runtimeFactory.LoadCharactersAsync(backdrop.Scene, cancellationToken);
+        }
+
+        internal Task<MapParticleSceneRuntime> LoadParticleAssetsAsync(
+            MapSceneRuntime backdrop,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(backdrop);
+            return _runtimeFactory.LoadParticlesAsync(backdrop.Scene, cancellationToken);
         }
 
         internal Task<MapSceneRuntime> LoadAsync(

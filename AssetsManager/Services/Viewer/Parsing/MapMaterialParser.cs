@@ -115,7 +115,7 @@ namespace AssetsManager.Services.Viewer.Parsing
                 ReadStringMap(material.Properties, ShaderMacros),
                 warnings);
 
-            GameResolvedMaterialProgramData program = ResolveProgram(
+            GameMaterialProgram program = ResolveProgram(
                 material.Properties,
                 shaders == null ? Array.Empty<BinTree>() : new[] { shaders },
                 passes,
@@ -519,7 +519,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             return result;
         }
 
-        internal GameResolvedMaterialProgramData ParseProgram(
+        internal GameMaterialProgram ParseProgram(
             BinTreeObject material,
             IEnumerable<BinTree> shaderTrees)
         {
@@ -533,7 +533,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             return ResolveProgram(material.Properties, shaderTrees, passes, animated, warnings);
         }
 
-        private GameResolvedMaterialProgramData ResolveProgram(
+        private GameMaterialProgram ResolveProgram(
             IReadOnlyDictionary<uint, BinTreeProperty> material,
             IEnumerable<BinTree> shaderTrees,
             IReadOnlyList<MapMaterialPassData> passes,
@@ -542,14 +542,14 @@ namespace AssetsManager.Services.Viewer.Parsing
         {
             IReadOnlyDictionary<string, Vector4> materialParameters = ReadParametersRaw(material);
             IReadOnlyDictionary<string, string> materialMacros = ReadStringMap(material, ShaderMacros);
-            var resolved = new List<GameResolvedMaterialPassData>();
+            var resolved = new List<GameMaterialPass>();
 
             foreach (MapMaterialPassData pass in passes ?? Array.Empty<MapMaterialPassData>())
             {
                 MapShaderDefinitionData shader = ReadShaderDefinition(shaderTrees, pass.ShaderHash, warnings);
                 IReadOnlyList<MapMaterialSamplerData> authoredSamplers = ReadMaterialSamplers(material, shader, warnings);
                 IReadOnlyDictionary<string, bool> switches = ResolveProgramSwitches(material, shader, warnings);
-                resolved.Add(new GameResolvedMaterialPassData(
+                resolved.Add(new GameMaterialPass(
                     pass.ShaderHash,
                     shader?.Path,
                     ResolveProgramDefines(materialMacros, pass.ShaderMacros, shader, switches),
@@ -559,7 +559,7 @@ namespace AssetsManager.Services.Viewer.Parsing
                     ResolveProgramState(pass)));
             }
 
-            return new GameResolvedMaterialProgramData(
+            return new GameMaterialProgram(
                 ResolveMaterialKind(ReadOptionalUInt(material, MaterialType)),
                 animated,
                 resolved);
@@ -581,17 +581,17 @@ namespace AssetsManager.Services.Viewer.Parsing
             return result;
         }
 
-        private static IReadOnlyList<GameMaterialDefineData> ResolveProgramDefines(
+        private static IReadOnlyList<GameMaterialDefine> ResolveProgramDefines(
             IReadOnlyDictionary<string, string> material,
             IReadOnlyDictionary<string, string> pass,
             MapShaderDefinitionData shader,
             IReadOnlyDictionary<string, bool> switches)
         {
-            var result = new Dictionary<string, GameMaterialDefineData>(StringComparer.Ordinal);
+            var result = new Dictionary<string, GameMaterialDefine>(StringComparer.Ordinal);
             void Set(string name, string value, GameMaterialDefineSource source)
             {
                 if (!string.IsNullOrWhiteSpace(name))
-                    result[name] = new GameMaterialDefineData(name, value ?? string.Empty, source);
+                    result[name] = new GameMaterialDefine(name, value ?? string.Empty, source);
             }
 
             foreach ((string name, string value) in material ?? EmptyStringMap)
@@ -627,7 +627,7 @@ namespace AssetsManager.Services.Viewer.Parsing
                 .ToArray();
         }
 
-        private static IReadOnlyList<GameMaterialPassTextureData> ResolveProgramTextures(
+        private static IReadOnlyList<GameMaterialTexture> ResolveProgramTextures(
             IReadOnlyList<MapMaterialSamplerData> authored,
             MapShaderDefinitionData shader)
         {
@@ -663,11 +663,11 @@ namespace AssetsManager.Services.Viewer.Parsing
                 .Select(name =>
                 {
                     MapMaterialSamplerData sampler = merged[name];
-                    return new GameMaterialPassTextureData(
+                    return new GameMaterialTexture(
                         name,
                         sampler.Texture,
                         sampler.TextureSource,
-                        new GameMaterialSamplerStateData(
+                        new GameMaterialSamplerState(
                             sampler.SharedSampler,
                             sampler.WrapU,
                             sampler.WrapV,
@@ -678,7 +678,7 @@ namespace AssetsManager.Services.Viewer.Parsing
                 .ToArray();
         }
 
-        private static IReadOnlyList<GameMaterialPassParamData> ResolveProgramParameters(
+        private static IReadOnlyList<GameMaterialParameter> ResolveProgramParameters(
             IReadOnlyDictionary<string, Vector4> material,
             IReadOnlyDictionary<string, Vector4> pass,
             MapShaderDefinitionData shader,
@@ -686,16 +686,16 @@ namespace AssetsManager.Services.Viewer.Parsing
         {
             if (shader?.IsDeclared != true || shader.PhysicalParameters == null)
             {
-                var values = new Dictionary<string, GameMaterialPassParamData>(StringComparer.Ordinal);
+                var values = new Dictionary<string, GameMaterialParameter>(StringComparer.Ordinal);
                 foreach ((string name, Vector4 value) in material ?? EmptyVectorMap)
-                    values[name] = new GameMaterialPassParamData(name, value, GameMaterialParamSource.Material);
+                    values[name] = new GameMaterialParameter(name, value, GameMaterialParamSource.Material);
                 foreach ((string name, Vector4 value) in pass ?? EmptyVectorMap)
-                    values[name] = new GameMaterialPassParamData(name, value, GameMaterialParamSource.Pass);
+                    values[name] = new GameMaterialParameter(name, value, GameMaterialParamSource.Pass);
                 return values.Values.ToArray();
             }
 
             var resolved = shader.PhysicalParameters
-                .Select(item => new GameMaterialPassParamData(item.Name, item.Data, GameMaterialParamSource.ShaderDefault))
+                .Select(item => new GameMaterialParameter(item.Name, item.Data, GameMaterialParamSource.ShaderDefault))
                 .ToArray();
             ApplyProgramParameters(resolved, material, GameMaterialParamSource.Material, shader, warnings);
             ApplyProgramParameters(resolved, pass, GameMaterialParamSource.Pass, shader, warnings);
@@ -703,7 +703,7 @@ namespace AssetsManager.Services.Viewer.Parsing
         }
 
         private static void ApplyProgramParameters(
-            GameMaterialPassParamData[] target,
+            GameMaterialParameter[] target,
             IReadOnlyDictionary<string, Vector4> values,
             GameMaterialParamSource source,
             MapShaderDefinitionData shader,
@@ -771,7 +771,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             return wrote;
         }
 
-        private static GameMaterialPassStateData ResolveProgramState(MapMaterialPassData pass) =>
+        private static GameMaterialPassState ResolveProgramState(MapMaterialPassData pass) =>
             new(
                 pass?.BlendEnabled ?? false,
                 ToBlendFactor(pass?.SourceBlendFactor, MapBlendFactor.One),

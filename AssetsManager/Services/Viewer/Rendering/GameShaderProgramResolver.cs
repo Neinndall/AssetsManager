@@ -23,7 +23,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private const string ShaderCacheRelativePath = @"Game\DATA\FINAL\ShaderCache.dx11.wad.client";
         private const int RecordsPerBundle = 100;
         internal sealed record ShaderBytecodeProgram(
-            IReadOnlyList<GameMaterialDefineData> Defines,
+            IReadOnlyList<GameMaterialDefine> Defines,
             byte[] Vertex,
             byte[] Pixel,
             ShaderReflectionData VertexReflection,
@@ -36,7 +36,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         internal sealed record ShaderBytecodePassRead(
-            GameResolvedMaterialPassData Pass,
+            GameMaterialPass Pass,
             ShaderBytecodeRead Bytecode);
 
         internal sealed record ShaderBytecodeMaterialProgram(
@@ -48,7 +48,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         internal static ShaderBytecodeRead Read(
-            GameResolvedMaterialPassData pass,
+            GameMaterialPass pass,
             GameMaterialKind kind,
             AppSettings settings,
             bool lowQuality = false)
@@ -72,7 +72,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         internal static ShaderBytecodeMaterialProgram ReadProgram(
-            GameResolvedMaterialProgramData program,
+            GameMaterialProgram program,
             AppSettings settings,
             bool lowQuality = false)
         {
@@ -99,7 +99,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         /// open for a scene instead of reopening the 300+ MB cache once per material.
         /// </summary>
         internal static ShaderBytecodeMaterialProgram ReadProgram(
-            GameResolvedMaterialProgramData program,
+            GameMaterialProgram program,
             WadFile wad,
             string cachePath,
             bool lowQuality = false)
@@ -107,7 +107,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (program == null)
                 return null;
 
-            IReadOnlyList<GameResolvedMaterialPassData> passes = program.Passes ?? Array.Empty<GameResolvedMaterialPassData>();
+            IReadOnlyList<GameMaterialPass> passes = program.Passes ?? Array.Empty<GameMaterialPass>();
             if (passes.Count == 0)
             {
                 return new ShaderBytecodeMaterialProgram(
@@ -123,7 +123,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 var reads = new ShaderBytecodePassRead[passes.Count];
                 for (int index = 0; index < passes.Count; index++)
                 {
-                    GameResolvedMaterialPassData pass = passes[index];
+                    GameMaterialPass pass = passes[index];
                     reads[index] = new ShaderBytecodePassRead(
                         pass,
                         ReadFromWad(pass, program.Kind, wad, cachePath, lowQuality));
@@ -137,10 +137,10 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         private static ShaderBytecodeMaterialProgram UnavailableProgram(
-            GameResolvedMaterialProgramData program,
+            GameMaterialProgram program,
             string failure)
         {
-            IReadOnlyList<GameResolvedMaterialPassData> passes = program?.Passes ?? Array.Empty<GameResolvedMaterialPassData>();
+            IReadOnlyList<GameMaterialPass> passes = program?.Passes ?? Array.Empty<GameMaterialPass>();
             return program == null
                 ? null
                 : new ShaderBytecodeMaterialProgram(
@@ -152,14 +152,14 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         private static ShaderBytecodeRead UnavailableRead(
-            GameResolvedMaterialPassData pass,
+            GameMaterialPass pass,
             string failure) =>
             pass == null || string.IsNullOrWhiteSpace(pass.ShaderPath)
                 ? new ShaderBytecodeRead(null, "The pass links no shader the defs declare.")
                 : new ShaderBytecodeRead(null, failure);
 
         private static ShaderBytecodeRead ReadFromWad(
-            GameResolvedMaterialPassData pass,
+            GameMaterialPass pass,
             GameMaterialKind kind,
             WadFile wad,
             string cachePath,
@@ -168,7 +168,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (pass == null || string.IsNullOrWhiteSpace(pass.ShaderPath))
                 return new ShaderBytecodeRead(null, "The pass links no shader the defs declare.");
 
-            IReadOnlyList<GameMaterialDefineData> defines = BuildDefineList(pass, kind, lowQuality);
+            IReadOnlyList<GameMaterialDefine> defines = BuildDefineList(pass, kind, lowQuality);
             try
             {
                 byte[] vertex = ReadStage(wad, pass.ShaderPath, "vs", defines);
@@ -191,19 +191,19 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
         }
 
-        internal static IReadOnlyList<GameMaterialDefineData> BuildDefineList(
-            GameResolvedMaterialPassData pass,
+        internal static IReadOnlyList<GameMaterialDefine> BuildDefineList(
+            GameMaterialPass pass,
             GameMaterialKind kind,
             bool lowQuality)
         {
-            var byName = new Dictionary<string, GameMaterialDefineData>(StringComparer.Ordinal);
-            foreach (GameMaterialDefineData define in pass?.Defines ?? Array.Empty<GameMaterialDefineData>())
+            var byName = new Dictionary<string, GameMaterialDefine>(StringComparer.Ordinal);
+            foreach (GameMaterialDefine define in pass?.Defines ?? Array.Empty<GameMaterialDefine>())
                 byName[define.Name] = define;
 
             void AddMissing(string name, string value)
             {
                 if (!byName.ContainsKey(name))
-                    byName[name] = new GameMaterialDefineData(name, value, GameMaterialDefineSource.Feature);
+                    byName[name] = new GameMaterialDefine(name, value, GameMaterialDefineSource.Feature);
             }
 
             AddMissing("DISABLE_FOW", "1");
@@ -237,7 +237,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             WadFile wad,
             string shaderObjectPath,
             string stage,
-            IReadOnlyList<GameMaterialDefineData> defines)
+            IReadOnlyList<GameMaterialDefine> defines)
         {
             string tocPath = TocPath(shaderObjectPath, stage);
             using var tocBytes = wad.LoadChunkDecompressed(XxHash64Ext.Hash(tocPath));

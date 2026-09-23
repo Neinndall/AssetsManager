@@ -21,7 +21,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal uint FallbackTransparentTexture { get; }
 
-        internal uint Upload(byte[] bgra, int width, int height)
+        internal uint Upload(ReadOnlySpan<byte> bgra, int width, int height)
         {
             uint texture = _gl.GenTexture();
             _gl.BindTexture(TextureTarget.Texture2D, texture);
@@ -34,7 +34,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 0,
                 PixelFormat.Bgra,
                 PixelType.UnsignedByte,
-                new ReadOnlySpan<byte>(bgra));
+                bgra);
             // League's particle samplers do not use mipmaps. Atlas mip levels blend neighbouring
             // cells and show up as rectangular halos around otherwise transparent particles.
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);

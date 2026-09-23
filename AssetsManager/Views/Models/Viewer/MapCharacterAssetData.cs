@@ -33,7 +33,6 @@ namespace AssetsManager.Views.Models.Viewer
         RigResource Skeleton,
         SknMaterialTextureResolution Materials,
         IReadOnlyDictionary<string, BitmapSource> Textures,
-        IReadOnlyList<BinTree> Documents,
         AnimationGraphDefinition AnimationGraph,
         MapCharacterVfxCatalog Vfx = null);
 }

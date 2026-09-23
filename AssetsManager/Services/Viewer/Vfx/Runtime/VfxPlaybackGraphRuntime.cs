@@ -27,11 +27,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private readonly IReadOnlyDictionary<uint, uint> _resourceMap;
         private readonly Func<VfxSystemDefinition, Matrix4x4, int, VfxPlaybackRuntime> _runtimeFactory;
         private readonly List<VfxPlaybackRuntime> _runtimes = new();
+        private readonly HashSet<VfxPlaybackRuntime> _activeRuntimes =
+            new(ReferenceEqualityComparer.Instance);
         private readonly List<VfxPlaybackRuntime> _pendingChildren = new();
         private readonly Dictionary<VfxPlaybackRuntime, int> _depth = new();
         private readonly Dictionary<VfxPlaybackRuntime, Matrix4x4> _localTransforms = new();
         private readonly Dictionary<VfxPlaybackRuntime, string> _paths = new();
         private readonly Dictionary<VfxPlaybackRuntime, VfxPlaybackRuntime> _parents = new();
+        // LTK's Children runtime owns its direct descendants. Keep the reverse parent map for
+        // snapshots, but also index children by parent so a frame never rediscovers the tree by
+        // scanning every live runtime for every node.
+        private readonly Dictionary<VfxPlaybackRuntime, List<VfxPlaybackRuntime>> _childrenByParent =
+            new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<VfxPlaybackRuntime, int> _childCapacities = new();
         private readonly Dictionary<VfxPlaybackRuntime, float> _looseChildStopAfter = new();
         private readonly Dictionary<(string Path, int SourceOrder), int> _renderRanks = new();
@@ -39,8 +46,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private readonly Dictionary<int, bool> _rootVisibility = new();
         private readonly Dictionary<(VfxPlaybackRuntime Parent, int SourceOrder, uint Serial), List<CarriedChildInfo>> _carriedChildren = new();
         private readonly Dictionary<(VfxPlaybackRuntime Parent, int SourceOrder, uint Serial), VfxPlaybackRuntime.ParticleLifecycleInfo> _deathSeen = new();
-        private readonly List<ChildSpawnRequest> _spawnRequests = new();
-        private readonly List<ChildSpawnRequest> _spawnBatch = new();
+        private readonly Dictionary<VfxPlaybackRuntime, List<ChildSpawnRequest>> _spawnRequestsByParent =
+            new(ReferenceEqualityComparer.Instance);
         private readonly List<VfxPlaybackRuntime>[] _childStepScratch =
         {
             new(), new(), new(), new(), new()
@@ -141,6 +148,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 seed,
                 particleCapacity: rootParticleCapacity);
             _runtimes.Add(Root);
+            _activeRuntimes.Add(Root);
             SyncRenderTimes();
         }
 
@@ -270,7 +278,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _pendingChildren.Clear();
             _carriedChildren.Clear();
             _deathSeen.Clear();
-            _spawnRequests.Clear();
+            _spawnRequestsByParent.Clear();
             for (int index = _runtimes.Count - 1; index > 0; index--)
             {
                 Forget(_runtimes[index]);
@@ -326,7 +334,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _pendingChildren.Clear();
             _carriedChildren.Clear();
             _deathSeen.Clear();
-            _spawnRequests.Clear();
+            _spawnRequestsByParent.Clear();
         }
 
         private void RebindRootCallbacks()
@@ -426,17 +434,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
 
             _runtimes.Clear();
+            _activeRuntimes.Clear();
             _pendingChildren.Clear();
             _depth.Clear();
             _localTransforms.Clear();
             _paths.Clear();
             _parents.Clear();
+            _childrenByParent.Clear();
             _childCapacities.Clear();
             _looseChildStopAfter.Clear();
             _heldChildParticleCapacity = 0;
             _carriedChildren.Clear();
             _deathSeen.Clear();
-            _spawnRequests.Clear();
+            _spawnRequestsByParent.Clear();
             _rootTransform = snapshot.RootTransform;
             _orientationRootTransform = snapshot.OrientationRootTransform;
             _sourceTime = snapshot.SourceTime;
@@ -453,6 +463,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             Root.ParticleUpdated += OnParticleUpdated;
             Root.RestoreSnapshot(rootSaved.State);
             _runtimes.Add(Root);
+            _activeRuntimes.Add(Root);
             _depth[Root] = rootSaved.Depth;
             _localTransforms[Root] = rootSaved.LocalTransform;
             _paths[Root] = rootSaved.Path;
@@ -465,15 +476,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 RuntimeSnapshot saved = snapshot.Runtimes[index];
                 VfxPlaybackRuntime runtime = RestoreRuntime(saved);
                 restored[index] = runtime;
-                if (saved.Pending) _pendingChildren.Add(runtime);
-                else _runtimes.Add(runtime);
+                if (saved.Pending)
+                {
+                    _pendingChildren.Add(runtime);
+                }
+                else
+                {
+                    _runtimes.Add(runtime);
+                    _activeRuntimes.Add(runtime);
+                }
             }
 
             for (int index = 1; index < snapshot.Runtimes.Length; index++)
             {
                 int parentIndex = snapshot.Runtimes[index].ParentIndex;
                 if ((uint)parentIndex < (uint)restored.Length)
-                    _parents[restored[index]] = restored[parentIndex];
+                    RegisterParent(restored[index], restored[parentIndex]);
             }
 
             foreach (CarriedSnapshot saved in snapshot.CarriedChildren)
@@ -536,10 +554,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         private void Forget(VfxPlaybackRuntime runtime)
         {
+            _activeRuntimes.Remove(runtime);
             _depth.Remove(runtime);
             _localTransforms.Remove(runtime);
             _paths.Remove(runtime);
-            _parents.Remove(runtime);
+            if (_parents.Remove(runtime, out VfxPlaybackRuntime parent) &&
+                _childrenByParent.TryGetValue(parent, out List<VfxPlaybackRuntime> siblings))
+            {
+                siblings.Remove(runtime);
+                if (siblings.Count == 0)
+                    _childrenByParent.Remove(parent);
+            }
+            _childrenByParent.Remove(runtime);
+            _spawnRequestsByParent.Remove(runtime);
             _looseChildStopAfter.Remove(runtime);
             if (_childCapacities.Remove(runtime, out int capacity))
                 _heldChildParticleCapacity = Math.Max(0, _heldChildParticleCapacity - capacity);
@@ -585,7 +612,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
             if (_pendingChildren.Count > 0)
             {
-                _runtimes.AddRange(_pendingChildren);
+                foreach (VfxPlaybackRuntime pending in _pendingChildren)
+                {
+                    _runtimes.Add(pending);
+                    _activeRuntimes.Add(pending);
+                }
                 _pendingChildren.Clear();
             }
 
@@ -597,10 +628,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             int parentDepth = _depth.TryGetValue(parent, out int depth) ? depth : 0;
             List<VfxPlaybackRuntime> children = _childStepScratch[Math.Clamp(parentDepth, 0, MaximumGraphDepth)];
             children.Clear();
-            foreach (VfxPlaybackRuntime runtime in _runtimes)
+            if (_childrenByParent.TryGetValue(parent, out List<VfxPlaybackRuntime> directChildren))
             {
-                if (_parents.TryGetValue(runtime, out VfxPlaybackRuntime owner) && ReferenceEquals(owner, parent))
-                    children.Add(runtime);
+                // Snapshot the direct list because descendants can be reaped while this depth is
+                // walking. Newly spawned children remain pending until the next graph step.
+                for (int index = 0; index < directChildren.Count; index++)
+                {
+                    VfxPlaybackRuntime child = directChildren[index];
+                    if (_activeRuntimes.Contains(child))
+                        children.Add(child);
+                }
             }
 
             for (int index = 0; index < children.Count; index++)
@@ -619,7 +656,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             for (int index = children.Count - 1; index >= 0; index--)
             {
                 VfxPlaybackRuntime child = children[index];
-                if (!_runtimes.Contains(child) || !child.IsComplete || HasLiveChildren(child)) continue;
+                if (!_activeRuntimes.Contains(child) || !child.IsComplete || HasLiveChildren(child)) continue;
                 child.ParticleLifecycle -= OnParticleLifecycle;
                 child.ParticleUpdated -= OnParticleUpdated;
                 Forget(child);
@@ -632,37 +669,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         private void ProcessSpawnRequests(VfxPlaybackRuntime parent)
         {
-            _spawnBatch.Clear();
-            int retained = 0;
-            for (int index = 0; index < _spawnRequests.Count; index++)
+            if (!_spawnRequestsByParent.TryGetValue(parent, out List<ChildSpawnRequest> requests) ||
+                requests.Count == 0)
             {
-                ChildSpawnRequest request = _spawnRequests[index];
-                if (ReferenceEquals(request.Parent, parent))
-                {
-                    _spawnBatch.Add(request);
-                    continue;
-                }
-
-                if (retained != index)
-                    _spawnRequests[retained] = request;
-                retained++;
+                return;
             }
-            if (retained < _spawnRequests.Count)
-                _spawnRequests.RemoveRange(retained, _spawnRequests.Count - retained);
-            if (_spawnBatch.Count == 0) return;
 
-            // Sequence is the previous LINQ stable-order tie break, but List.Sort avoids allocating
-            // an ordered enumerable and keeps large birth batches O(n log n).
-            _spawnBatch.Sort(CompareSpawnRequests);
-
+            // LTK keeps births local to one Children runtime. Preserve the same stable tie break
+            // while avoiding a global request scan for every parent in the graph.
+            requests.Sort(CompareSpawnRequests);
             try
             {
-                foreach (ChildSpawnRequest birth in _spawnBatch)
-                    SpawnChildren(birth.Parent, birth.Set, birth.Particle, birth.Carried);
+                foreach (ChildSpawnRequest birth in requests)
+                    SpawnChildren(parent, birth.Set, birth.Particle, birth.Carried);
             }
             finally
             {
-                _spawnBatch.Clear();
+                requests.Clear();
             }
         }
 
@@ -675,12 +698,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         }
 
         private bool HasLiveChildren(VfxPlaybackRuntime runtime)
+            => _childrenByParent.TryGetValue(runtime, out List<VfxPlaybackRuntime> children) && children.Count > 0;
+
+        private void RegisterParent(VfxPlaybackRuntime child, VfxPlaybackRuntime parent)
         {
-            foreach (VfxPlaybackRuntime parent in _parents.Values)
+            _parents[child] = parent;
+            if (!_childrenByParent.TryGetValue(parent, out List<VfxPlaybackRuntime> children))
             {
-                if (ReferenceEquals(parent, runtime)) return true;
+                children = new List<VfxPlaybackRuntime>();
+                _childrenByParent[parent] = children;
             }
-            return false;
+            children.Add(child);
         }
 
         private void SyncRenderTimes()
@@ -886,12 +914,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             VfxChildParticleSetDefinition childSet,
             VfxPlaybackRuntime.ParticleLifecycleInfo particle,
             bool carried)
-            => _spawnRequests.Add(new ChildSpawnRequest(
+        {
+            if (!_spawnRequestsByParent.TryGetValue(parentRuntime, out List<ChildSpawnRequest> requests))
+            {
+                requests = new List<ChildSpawnRequest>();
+                _spawnRequestsByParent[parentRuntime] = requests;
+            }
+            requests.Add(new ChildSpawnRequest(
                 parentRuntime,
                 childSet,
                 particle,
                 carried,
                 _nextSpawnRequestSequence++));
+        }
 
         private void OnParticleUpdated(
             VfxPlaybackRuntime parentRuntime,
@@ -1037,7 +1072,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 initialRandomState,
                 particleCapacity);
             RegisterChildCapacity(runtime, particleCapacity);
-            _parents[runtime] = parentRuntime;
+            RegisterParent(runtime, parentRuntime);
             _pendingChildren.Add(runtime);
 
             if (!carried)

@@ -46,7 +46,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private Silk.NET.OpenGL.GL _gl;
         private VfxRenderSession _vfxRenderer;
         private VfxLoadingService.Bundle _activeBundle;
-        private IReadOnlyList<VfxAbilityComposition> _abilityCompositions = Array.Empty<VfxAbilityComposition>();
         private bool _isCleanedUp;
         private bool _isActive;
         private bool _isGlStarted;
@@ -72,6 +71,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private System.Threading.CancellationTokenSource _binCancellation;
         private System.Threading.CancellationTokenSource _mapCancellation;
         private System.Threading.CancellationTokenSource _mapClipCancellation;
+        private System.Threading.CancellationTokenSource _animationClipCancellation;
         private MapSceneRuntime _mapSceneRuntime;
         private MapBrowserNode _mapBrowserRoot;
         private MapGeometryRenderer _mapGeometryRenderer;
@@ -81,10 +81,14 @@ namespace AssetsManager.Views.Controls.Viewer
         private MapCharacterRuntimeGroup _activeMapCharacterGroup;
         private MapCharacterData _activeMapCharacterPlacement;
         private AnimationClipDefinition _activeMapCharacterClip;
-        private VfxSceneResourceContext _mapClipVfxResources;
-        private MapCharacterRuntimeGroup _mapClipVfxResourceGroup;
         private bool _mapGpuSceneDirty;
         private bool _mapTexturesDirty;
+        private readonly object _mapTextureUpdateGate = new();
+        private readonly Dictionary<string, MapTextureImage> _pendingMapTextureUpdates = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, MapTextureImage> _pendingMapProgramTextureUpdates = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, MapTextureImage> _pendingMapLightmapUpdates = new(StringComparer.OrdinalIgnoreCase);
+        private MapSceneRuntime _pendingMapTextureRuntime;
+        private bool _mapTexturePublishQueued;
         private bool _suppressMapVariantReload;
         private VfxPreviewSurfaceRenderer _previewSurfaceRenderer;
         private PerspectiveCamera _previewPerspectiveCamera;
@@ -97,6 +101,13 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _hasTransientEmitterPreview;
         private Vector3? _authoringOriginalTranslation;
         private Vector3? _authoringOriginalRotation;
+
+        private enum MapTextureUpdateKind
+        {
+            Base,
+            Program,
+            Lightmap
+        }
 
         private sealed record StandaloneRunMemory(
             int Seed,
@@ -189,7 +200,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_model.SelectedAnimation != null)
                 {
                     ConfigureAnimationParameterOptions(_model.SelectedAnimation);
-                    PlaySelectedAnimation(_model.SelectedAnimation);
+                    _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
                 }
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedSpell))
@@ -405,6 +416,7 @@ namespace AssetsManager.Views.Controls.Viewer
             RunReleaseStep("VFX BIN load cancellation", () => _binCancellation?.Cancel());
             RunReleaseStep("MAP scene load cancellation", () => _mapCancellation?.Cancel());
             RunReleaseStep("MAP clip load cancellation", () => _mapClipCancellation?.Cancel());
+            RunReleaseStep("Animation clip load cancellation", () => _animationClipCancellation?.Cancel());
 
             var cameraController = _cameraController;
             _cameraController = null;
@@ -439,11 +451,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _mapPostEffectsRenderer = null;
             RunReleaseStep(nameof(MapPostEffectsRenderer), () => mapPostEffectsRenderer?.Dispose(), gpuBound: true);
 
-            var mapClipVfxResources = _mapClipVfxResources;
-            _mapClipVfxResources = null;
-            _mapClipVfxResourceGroup = null;
-            RunReleaseStep(nameof(VfxSceneResourceContext), () => mapClipVfxResources?.Dispose());
-
             var mapSceneRuntime = _mapSceneRuntime;
             _mapSceneRuntime = null;
             RunReleaseStep(nameof(MapSceneRuntime), () => mapSceneRuntime?.Dispose());
@@ -466,7 +473,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _activeBundle = null;
             _championBundle = null;
-            _abilityCompositions = Array.Empty<VfxAbilityComposition>();
             _pendingSystem = null;
             _inspectedSystem = null;
 
@@ -759,20 +765,62 @@ namespace AssetsManager.Views.Controls.Viewer
                         viewMode: _model.PreviewViewMode,
                         wireOverlay: _model.EffectivePreviewWireOverlay);
                 }
+                uint mapViewportWidth = (uint)Math.Max(1d, OpenTkControl.ActualWidth);
+                uint mapViewportHeight = (uint)Math.Max(1d, OpenTkControl.ActualHeight);
                 _mapPostEffectsRenderer?.CaptureSceneDepth(
                     _mapSceneRuntime.Scene.PostEffects,
                     _mapSceneRuntime.Scene.AmbientOcclusion,
-                    (uint)Math.Max(1d, OpenTkControl.ActualWidth),
-                    (uint)Math.Max(1d, OpenTkControl.ActualHeight));
-                if (_mapSceneRuntime.ShowParticles)
-                {
-                    _mapParticleRenderer?.Render(
+                    mapViewportWidth,
+                    mapViewportHeight);
+
+                // LTK has one global particle pass block for the scene. MAP placements and an
+                // inspected Character Clip use different coordinate spaces/render owners here, so
+                // keep their renderers separate but coordinate the phases: every soft-depth grab
+                // happens before particle colour, then all colour/wire draws land before either
+                // renderer captures the frame used by distortion.
+                bool mapParticlesPrepared = _mapSceneRuntime.ShowParticles &&
+                    _mapParticleRenderer?.PrepareRenderFrame(
                         _mapSceneRuntime.Particles.VisibleRuntimes,
                         viewProj,
                         view,
-                        (uint)Math.Max(1d, OpenTkControl.ActualWidth),
-                        (uint)Math.Max(1d, OpenTkControl.ActualHeight));
+                        mapViewportWidth,
+                        mapViewportHeight,
+                        _model.PreviewViewMode,
+                        _model.EffectivePreviewWireOverlay) == true;
+
+                bool mapClipVfxPrepared = false;
+                if (HasSelectedMapClipReady() && _vfxRenderer != null)
+                {
+                    _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
+                    mapClipVfxPrepared = _vfxRenderer.PrepareRenderFrame(
+                        viewProj,
+                        view,
+                        _model.PreviewViewMode,
+                        _model.EffectivePreviewWireOverlay);
                 }
+
+                using IDisposable mapParticleBatch = mapParticlesPrepared
+                    ? _mapParticleRenderer.BeginPreparedRenderBatch()
+                    : null;
+                using IDisposable mapClipVfxBatch = mapClipVfxPrepared
+                    ? _vfxRenderer.BeginPreparedRenderBatch()
+                    : null;
+
+                if (mapParticlesPrepared)
+                    _mapParticleRenderer.RenderPreparedColorPass();
+                if (mapClipVfxPrepared)
+                    _vfxRenderer.RenderPreparedColorPass();
+
+                // Both captures see the exact same completed colour frame, before any warp draw.
+                if (mapParticlesPrepared)
+                    _mapParticleRenderer.CapturePreparedDistortionFrame();
+                if (mapClipVfxPrepared)
+                    _vfxRenderer.CapturePreparedDistortionFrame();
+
+                if (mapParticlesPrepared)
+                    _mapParticleRenderer.RenderPreparedDistortionPass();
+                if (mapClipVfxPrepared)
+                    _vfxRenderer.RenderPreparedDistortionPass();
             }
             else
                 _previewSurfaceRenderer?.Render(
@@ -822,9 +870,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     _vfxRenderer?.SetOwnerSkinningMatrices(_championAnimationService.FinalBoneTransforms);
                     _vfxRenderer?.UpdateBoneTransforms((boneName, boneHash) =>
                     {
-                        if (!string.IsNullOrEmpty(boneName) && _championAnimationService.TryGetBoneTransform(boneName, out var m))
+                        if (!string.IsNullOrEmpty(boneName) && _championAnimationService.TryGetBoneTransformExactName(boneName, out var m))
                             return m;
-                        if (boneHash != 0 && _championAnimationService.TryGetBoneTransform(boneHash, out m))
+                        if (boneHash != 0 && _championAnimationService.TryGetBoneTransformFnv(boneHash, out m))
                             return m;
                         return null;
                     });
@@ -858,8 +906,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_vfxRenderer != null)
             {
-                _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
-                _vfxRenderer.Render(viewProj, view, _model.PreviewViewMode, _model.EffectivePreviewWireOverlay);
+                if (_mapSceneRuntime == null)
+                {
+                    _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
+                    _vfxRenderer.Render(viewProj, view, _model.PreviewViewMode, _model.EffectivePreviewWireOverlay);
+                }
                 _model.LiveParticleCount = _vfxRenderer.LiveParticleCount;
             }
             else
@@ -1306,6 +1357,9 @@ namespace AssetsManager.Views.Controls.Viewer
             _mapClipCancellation?.Cancel();
             _mapClipCancellation?.Dispose();
             _mapClipCancellation = null;
+            _animationClipCancellation?.Cancel();
+            _animationClipCancellation?.Dispose();
+            _animationClipCancellation = null;
             ClearMapCharacterClipPreview();
             _championLoadGeneration++;
             _model.IsPlaying = false;
@@ -1331,7 +1385,6 @@ namespace AssetsManager.Views.Controls.Viewer
             RunReleaseStep(nameof(VfxClipCatalog), () => clipCatalog?.Dispose());
             _activeBundle = null;
             _championBundle = null;
-            _abilityCompositions = Array.Empty<VfxAbilityComposition>();
 
             _model.SelectedAnimation = null;
             _model.SelectedSpell = null;
@@ -1497,10 +1550,14 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _mapCancellation?.Cancel();
             _mapCancellation?.Dispose();
+            ClearPendingMapTextureUpdates();
             var operation = new System.Threading.CancellationTokenSource();
             _mapCancellation = operation;
             MapSceneRuntime staged = null;
-            MapSceneRuntime enriched = null;
+            Task<IReadOnlyList<MapCharacterRuntimeGroup>> characterTask = null;
+            Task<MapParticleSceneRuntime> particleTask = null;
+            bool characterAssetsAdopted = false;
+            bool particleAssetsAdopted = false;
 
             try
             {
@@ -1532,51 +1589,110 @@ namespace AssetsManager.Views.Controls.Viewer
                 OpenTkControl?.InvalidateVisual();
 
                 Task<IReadOnlyDictionary<string, MapTextureImage>> previewTask =
-                    MapViewerSceneService.LoadPreviewTexturesAsync(backdrop, operation.Token);
+                    MapViewerSceneService.LoadPreviewTexturesAsync(
+                        backdrop,
+                        operation.Token,
+                        (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Base, key, image));
                 Task<IReadOnlyDictionary<string, MapTextureImage>> previewProgramTask =
-                    MapViewerSceneService.LoadPreviewProgramTexturesAsync(backdrop, operation.Token);
+                    MapViewerSceneService.LoadPreviewProgramTexturesAsync(
+                        backdrop,
+                        operation.Token,
+                        (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Program, key, image));
                 Task<IReadOnlyDictionary<string, MapTextureImage>> previewLightmapTask =
-                    MapViewerSceneService.LoadPreviewLightmapsAsync(backdrop, operation.Token);
-                Task<MapSceneRuntime> runtimeTask =
-                    MapViewerSceneService.LoadRuntimeAssetsAsync(backdrop, operation.Token);
+                    MapViewerSceneService.LoadPreviewLightmapsAsync(
+                        backdrop,
+                        operation.Token,
+                        (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Lightmap, key, image));
+                characterTask = MapViewerSceneService.LoadCharacterAssetsAsync(backdrop, operation.Token);
+                particleTask = MapViewerSceneService.LoadParticleAssetsAsync(backdrop, operation.Token);
 
-                await Task.WhenAll(previewTask, previewProgramTask, previewLightmapTask);
-                operation.Token.ThrowIfCancellationRequested();
-                if (!_isCleanedUp && ReferenceEquals(_mapCancellation, operation) &&
-                    ReferenceEquals(_mapSceneRuntime?.Scene, scene))
+                Task previewWaveTask = Task.WhenAll(previewTask, previewProgramTask, previewLightmapTask);
+                bool previewFinalized = false;
+                Task<IReadOnlyDictionary<string, MapTextureImage>> fullTextureTask = null;
+                Task<IReadOnlyDictionary<string, MapTextureImage>> fullProgramTask = null;
+                Task<IReadOnlyDictionary<string, MapTextureImage>> fullLightmapTask = null;
+
+                // LTK lets independent scene resources join as they land. Do not hold Characters or
+                // placed VFX behind the complete preview-texture wave; texture callbacks already make
+                // the backdrop progressively visible while these tasks finish in parallel.
+                while (!previewFinalized || !characterAssetsAdopted || !particleAssetsAdopted)
                 {
-                    _mapSceneRuntime.SetBackdropTextures(await previewTask);
-                    _mapSceneRuntime.SetBackdropProgramTextures(await previewProgramTask);
-                    _mapSceneRuntime.SetBackdropLightmaps(await previewLightmapTask);
-                    _mapTexturesDirty = true;
-                    OpenTkControl?.InvalidateVisual();
-                }
+                    var pending = new List<Task>(3);
+                    if (!previewFinalized) pending.Add(previewWaveTask);
+                    if (!characterAssetsAdopted) pending.Add(characterTask);
+                    if (!particleAssetsAdopted) pending.Add(particleTask);
+                    Task completed = await Task.WhenAny(pending);
 
-                Task<IReadOnlyDictionary<string, MapTextureImage>> fullTextureTask =
-                    MapViewerSceneService.LoadFullTexturesAsync(backdrop, operation.Token);
-                Task<IReadOnlyDictionary<string, MapTextureImage>> fullProgramTask =
-                    MapViewerSceneService.LoadFullProgramTexturesAsync(backdrop, operation.Token);
-                Task<IReadOnlyDictionary<string, MapTextureImage>> fullLightmapTask =
-                    MapViewerSceneService.LoadFullLightmapsAsync(backdrop, operation.Token);
+                    if (!previewFinalized && ReferenceEquals(completed, previewWaveTask))
+                    {
+                        await previewWaveTask;
+                        operation.Token.ThrowIfCancellationRequested();
+                        if (_isCleanedUp || !ReferenceEquals(_mapCancellation, operation) ||
+                            !ReferenceEquals(_mapSceneRuntime, backdrop))
+                        {
+                            return;
+                        }
 
-                enriched = await runtimeTask;
-                operation.Token.ThrowIfCancellationRequested();
-                if (_isCleanedUp || !ReferenceEquals(_mapCancellation, operation) ||
-                    !ReferenceEquals(_mapSceneRuntime?.Scene, scene))
-                {
-                    return;
-                }
+                        backdrop.SetBackdropTextures(await previewTask);
+                        backdrop.SetBackdropProgramTextures(await previewProgramTask);
+                        backdrop.SetBackdropLightmaps(await previewLightmapTask);
+                        _mapTexturesDirty = true;
+                        OpenTkControl?.InvalidateVisual();
+                        previewFinalized = true;
 
-                if (enriched != null)
-                {
-                    enriched.SetBackdropTextures(_mapSceneRuntime.BackdropTextures);
-                    enriched.SetBackdropProgramTextures(_mapSceneRuntime.BackdropProgramTextures);
-                    enriched.SetBackdropLightmaps(_mapSceneRuntime.BackdropLightmaps);
-                    MapSceneRuntime shell = _mapSceneRuntime;
-                    _mapSceneRuntime = enriched;
-                    enriched = null;
-                    shell.Dispose();
-                    ReplaceMapBrowserRoot(MapBrowserSemantics.Build(_mapSceneRuntime));
+                        // Like LTK, only start the sharpening wave once every preview request has
+                        // settled. Each full texture still publishes independently as it arrives.
+                        fullTextureTask = MapViewerSceneService.LoadFullTexturesAsync(
+                            backdrop,
+                            operation.Token,
+                            (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Base, key, image));
+                        fullProgramTask = MapViewerSceneService.LoadFullProgramTexturesAsync(
+                            backdrop,
+                            operation.Token,
+                            (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Program, key, image));
+                        fullLightmapTask = MapViewerSceneService.LoadFullLightmapsAsync(
+                            backdrop,
+                            operation.Token,
+                            (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Lightmap, key, image));
+                    }
+
+                    if (!characterAssetsAdopted && ReferenceEquals(completed, characterTask))
+                    {
+                        IReadOnlyList<MapCharacterRuntimeGroup> characters = await characterTask;
+                        operation.Token.ThrowIfCancellationRequested();
+                        if (_isCleanedUp || !ReferenceEquals(_mapCancellation, operation) ||
+                            !ReferenceEquals(_mapSceneRuntime, backdrop))
+                        {
+                            DisposeCharacterGroups(characters);
+                            characterAssetsAdopted = true;
+                            return;
+                        }
+
+                        backdrop.SetCharacterGroups(characters);
+                        characterAssetsAdopted = true;
+                        ReplaceMapBrowserRoot(MapBrowserSemantics.Build(backdrop));
+                        _model.StatusText = $"Loaded {backdrop.CharacterGroups.Count} MAP character skins. Loading remaining scene resources...";
+                        OpenTkControl?.InvalidateVisual();
+                    }
+
+                    if (!particleAssetsAdopted && ReferenceEquals(completed, particleTask))
+                    {
+                        MapParticleSceneRuntime particles = await particleTask;
+                        operation.Token.ThrowIfCancellationRequested();
+                        if (_isCleanedUp || !ReferenceEquals(_mapCancellation, operation) ||
+                            !ReferenceEquals(_mapSceneRuntime, backdrop))
+                        {
+                            particles?.Dispose();
+                            particleAssetsAdopted = true;
+                            return;
+                        }
+
+                        backdrop.SetParticles(particles);
+                        particleAssetsAdopted = true;
+                        ReplaceMapBrowserRoot(MapBrowserSemantics.Build(backdrop));
+                        _model.StatusText = $"Loaded {backdrop.Particles.Runtimes.Count} MAP VFX placements. Loading remaining scene resources...";
+                        OpenTkControl?.InvalidateVisual();
+                    }
                 }
 
                 _model.StatusText = $"Loaded map {scene.Source.Map.Value}.";
@@ -1585,16 +1701,19 @@ namespace AssetsManager.Views.Controls.Viewer
                     $"{scene.Characters.Count} characters and {scene.Particles.Count} particle placeables.");
                 OpenTkControl?.InvalidateVisual();
 
-                await Task.WhenAll(fullTextureTask, fullProgramTask, fullLightmapTask);
-                operation.Token.ThrowIfCancellationRequested();
-                if (!_isCleanedUp && ReferenceEquals(_mapCancellation, operation) &&
-                    ReferenceEquals(_mapSceneRuntime?.Scene, scene))
+                if (fullTextureTask != null && fullProgramTask != null && fullLightmapTask != null)
                 {
-                    _mapSceneRuntime.SetBackdropTextures(await fullTextureTask);
-                    _mapSceneRuntime.SetBackdropProgramTextures(await fullProgramTask);
-                    _mapSceneRuntime.SetBackdropLightmaps(await fullLightmapTask);
-                    _mapTexturesDirty = true;
-                    OpenTkControl?.InvalidateVisual();
+                    await Task.WhenAll(fullTextureTask, fullProgramTask, fullLightmapTask);
+                    operation.Token.ThrowIfCancellationRequested();
+                    if (!_isCleanedUp && ReferenceEquals(_mapCancellation, operation) &&
+                        ReferenceEquals(_mapSceneRuntime, backdrop))
+                    {
+                        backdrop.SetBackdropTextures(await fullTextureTask);
+                        backdrop.SetBackdropProgramTextures(await fullProgramTask);
+                        backdrop.SetBackdropLightmaps(await fullLightmapTask);
+                        _mapTexturesDirty = true;
+                        OpenTkControl?.InvalidateVisual();
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -1610,10 +1729,128 @@ namespace AssetsManager.Views.Controls.Viewer
             finally
             {
                 staged?.Dispose();
-                enriched?.Dispose();
+                if (!characterAssetsAdopted && characterTask != null)
+                {
+                    try
+                    {
+                        IReadOnlyList<MapCharacterRuntimeGroup> characters = await characterTask;
+                        DisposeCharacterGroups(characters);
+                    }
+                    catch (OperationCanceledException) { }
+                    catch (ObjectDisposedException) { }
+                }
+                if (!particleAssetsAdopted && particleTask != null)
+                {
+                    try
+                    {
+                        MapParticleSceneRuntime particles = await particleTask;
+                        particles?.Dispose();
+                    }
+                    catch (OperationCanceledException) { }
+                    catch (ObjectDisposedException) { }
+                }
                 if (ReferenceEquals(_mapCancellation, operation))
                     _mapCancellation = null;
                 operation.Dispose();
+            }
+        }
+
+        private static void DisposeCharacterGroups(IReadOnlyList<MapCharacterRuntimeGroup> groups)
+        {
+            if (groups == null) return;
+            foreach (MapCharacterRuntimeGroup group in groups)
+                group?.Dispose();
+        }
+
+        private void QueueMapTextureUpdate(
+            MapSceneRuntime runtime,
+            MapTextureUpdateKind kind,
+            string key,
+            MapTextureImage image)
+        {
+            if (runtime == null || string.IsNullOrWhiteSpace(key) || image == null || _isCleanedUp)
+                return;
+
+            bool schedule = false;
+            lock (_mapTextureUpdateGate)
+            {
+                if (!ReferenceEquals(_pendingMapTextureRuntime, runtime))
+                {
+                    _pendingMapTextureRuntime = runtime;
+                    _pendingMapTextureUpdates.Clear();
+                    _pendingMapProgramTextureUpdates.Clear();
+                    _pendingMapLightmapUpdates.Clear();
+                }
+
+                switch (kind)
+                {
+                    case MapTextureUpdateKind.Base:
+                        _pendingMapTextureUpdates[key] = image;
+                        break;
+                    case MapTextureUpdateKind.Program:
+                        _pendingMapProgramTextureUpdates[key] = image;
+                        break;
+                    case MapTextureUpdateKind.Lightmap:
+                        _pendingMapLightmapUpdates[key] = image;
+                        break;
+                }
+
+                if (!_mapTexturePublishQueued)
+                {
+                    _mapTexturePublishQueued = true;
+                    schedule = true;
+                }
+            }
+
+            if (schedule && !Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
+            {
+                Dispatcher.BeginInvoke(
+                    System.Windows.Threading.DispatcherPriority.Render,
+                    new Action(FlushPendingMapTextureUpdates));
+            }
+        }
+
+        private void FlushPendingMapTextureUpdates()
+        {
+            MapSceneRuntime runtime;
+            Dictionary<string, MapTextureImage> baseTextures;
+            Dictionary<string, MapTextureImage> programTextures;
+            Dictionary<string, MapTextureImage> lightmaps;
+
+            lock (_mapTextureUpdateGate)
+            {
+                runtime = _pendingMapTextureRuntime;
+                baseTextures = new Dictionary<string, MapTextureImage>(_pendingMapTextureUpdates, StringComparer.Ordinal);
+                programTextures = new Dictionary<string, MapTextureImage>(_pendingMapProgramTextureUpdates, StringComparer.Ordinal);
+                lightmaps = new Dictionary<string, MapTextureImage>(_pendingMapLightmapUpdates, StringComparer.OrdinalIgnoreCase);
+                _pendingMapTextureUpdates.Clear();
+                _pendingMapProgramTextureUpdates.Clear();
+                _pendingMapLightmapUpdates.Clear();
+                _mapTexturePublishQueued = false;
+            }
+
+            if (_isCleanedUp || runtime == null || !ReferenceEquals(runtime, _mapSceneRuntime))
+                return;
+
+            runtime.MergeBackdropTextures(baseTextures);
+            runtime.MergeBackdropProgramTextures(programTextures);
+            runtime.MergeBackdropLightmaps(lightmaps);
+            if (baseTextures.Count == 0 && programTextures.Count == 0 && lightmaps.Count == 0)
+                return;
+
+            _mapTexturesDirty = true;
+            OpenTkControl?.InvalidateVisual();
+        }
+
+        private void ClearPendingMapTextureUpdates()
+        {
+            lock (_mapTextureUpdateGate)
+            {
+                _pendingMapTextureRuntime = null;
+                _pendingMapTextureUpdates.Clear();
+                _pendingMapProgramTextureUpdates.Clear();
+                _pendingMapLightmapUpdates.Clear();
+                _mapTexturePublishQueued = false;
             }
         }
 
@@ -1621,6 +1858,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _mapCancellation?.Cancel();
             _mapCancellation = null;
+            ClearPendingMapTextureUpdates();
             _mapClipCancellation?.Cancel();
             ClearMapCharacterClipPreview();
 
@@ -1658,6 +1896,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_mapSceneRuntime != null)
                 {
                     _mapGeometryRenderer.LoadScene(_mapSceneRuntime.Scene);
+                    // Backdrop loads publish geometry before texture waves. A preview wave may finish
+                    // before the first GL frame, so LoadScene's immutable scene dictionaries can still
+                    // be empty here. Rebind the runtime's latest texture state immediately instead of
+                    // clearing _mapTexturesDirty and losing an already-completed preview wave.
+                    _mapGeometryRenderer.UpdateTextures(_mapSceneRuntime.BackdropTextures);
+                    _mapGeometryRenderer.UpdateProgramTextures(_mapSceneRuntime.BackdropProgramTextures);
+                    _mapGeometryRenderer.UpdateLightmaps(_mapSceneRuntime.BackdropLightmaps);
                     bool needsPostEffects = MapPostEffectsRenderer.DrawsAnything(
                         _mapSceneRuntime.Scene.PostEffects,
                         _mapSceneRuntime.Scene.AmbientOcclusion);
@@ -1857,7 +2102,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     break;
                 case MapBrowserNodeKind.CharacterSkin when node.Payload is MapCharacterRuntimeGroup group:
                     if (_activeMapCharacterClip != null)
-                        ClearMapCharacterClipPreview(releaseResources: false);
+                        ClearMapCharacterClipPreview();
                     MapCharacterData firstPlacement = group.Placements?.FirstOrDefault();
                     _activeMapCharacterPlacement = firstPlacement;
                     if (firstPlacement != null)
@@ -1865,7 +2110,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     break;
                 case MapBrowserNodeKind.CharacterPlacement when node.Payload is MapCharacterData character:
                     if (_activeMapCharacterClip != null)
-                        ClearMapCharacterClipPreview(releaseResources: false);
+                        ClearMapCharacterClipPreview();
                     _activeMapCharacterPlacement = character;
                     FocusMapBrowserPosition(character.Placeable.Position);
                     break;
@@ -1953,8 +2198,14 @@ namespace AssetsManager.Views.Controls.Viewer
                     selection.Group.Animation.PreparedClipFrameSeconds(selection.Clip),
                     catalog.Systems,
                     catalog.ResourceMap);
-                bool hasSceneVfx = composition.ResolvedCount > 0 ||
-                                   (catalog.IdleEffects?.Count > 0 && catalog.Systems.Count > 0);
+                int resolvedIdleVfx = VfxAbilityCompositionBuilder.CountResolvedIdleEffects(
+                    catalog.IdleEffects,
+                    catalog.Systems,
+                    catalog.ResourceMap);
+                bool hasSceneVfx = composition.ResolvedCount > 0 || resolvedIdleVfx > 0;
+                IReadOnlyDictionary<uint, VfxSystemDefinition> requiredSystems = hasSceneVfx
+                    ? RequiredMapClipSystems(catalog, composition)
+                    : new Dictionary<uint, VfxSystemDefinition>();
 
                 _vfxRenderer?.SetSystem(null);
                 if (hasSceneVfx)
@@ -1962,6 +2213,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     VfxSceneResourceContext resources = await EnsureMapClipVfxResourcesAsync(
                         selection.Group,
                         scene,
+                        requiredSystems,
                         operation.Token);
                     operation.Token.ThrowIfCancellationRequested();
                     if (_isCleanedUp || resources == null ||
@@ -1988,6 +2240,16 @@ namespace AssetsManager.Views.Controls.Viewer
                             catalog.OwnerSceneContext);
                         if (sessionReady)
                         {
+                            _vfxRenderer.SetBoneTransformSampler((time, boneName, boneHash) =>
+                                selection.Group.Animation.TrySamplePreparedClipBoneTransform(
+                                    selection.Group.Asset,
+                                    selection.Clip,
+                                    time,
+                                    boneName,
+                                    boneHash,
+                                    out Matrix4x4 transform)
+                                    ? transform
+                                    : null);
                             _vfxRenderer.Seek(resumeAt);
                             _vfxRenderer.Play();
                         }
@@ -2053,38 +2315,65 @@ namespace AssetsManager.Views.Controls.Viewer
             return group.Placements[0];
         }
 
-        private async Task<VfxSceneResourceContext> EnsureMapClipVfxResourcesAsync(
+        private static IReadOnlyDictionary<uint, VfxSystemDefinition> RequiredMapClipSystems(
+            MapCharacterVfxCatalog catalog,
+            VfxAbilityComposition composition)
+        {
+            if (catalog?.Systems == null || catalog.Systems.Count == 0)
+                return new Dictionary<uint, VfxSystemDefinition>();
+
+            var roots = new List<VfxSystemDefinition>();
+            foreach (VfxCompositionEvent cue in composition?.Events ?? Array.Empty<VfxCompositionEvent>())
+                if (cue?.System != null)
+                    roots.Add(cue.System);
+
+            foreach (VfxIdleEffectDefinition idle in catalog.IdleEffects ?? Array.Empty<VfxIdleEffectDefinition>())
+            {
+                if (idle == null || idle.EffectKey == 0 ||
+                    catalog.ResourceMap == null ||
+                    !catalog.ResourceMap.TryGetValue(idle.EffectKey, out uint systemHash) ||
+                    systemHash == 0 ||
+                    !catalog.Systems.TryGetValue(systemHash, out VfxSystemDefinition system))
+                {
+                    continue;
+                }
+                roots.Add(system);
+            }
+
+            return VfxSceneResourceContext.ReachableSystems(
+                catalog.Systems,
+                catalog.ResourceMap,
+                roots);
+        }
+
+        private Task<VfxSceneResourceContext> EnsureMapClipVfxResourcesAsync(
             MapCharacterRuntimeGroup group,
             MapSceneRuntime scene,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> requiredSystems,
             System.Threading.CancellationToken cancellationToken)
         {
             if (group == null || scene == null || MapViewerSceneService == null)
-                return null;
-            if (ReferenceEquals(_mapClipVfxResourceGroup, group) && _mapClipVfxResources != null)
-                return _mapClipVfxResources;
+                return Task.FromResult<VfxSceneResourceContext>(null);
 
             MapCharacterVfxCatalog catalog = group.Asset?.Vfx ?? MapCharacterVfxCatalog.Empty;
-            VfxSceneResourceContext created = await MapViewerSceneService.CreateVfxResourcesAsync(
-                catalog,
-                scene.Scene.Source?.ProjectRoot,
+            requiredSystems ??= new Dictionary<uint, VfxSystemDefinition>();
+            string projectRoot = scene.Scene.Source?.ProjectRoot;
+            var requiredCatalog = new MapCharacterVfxCatalog(
+                requiredSystems,
+                catalog.ResourceMap,
+                Array.Empty<VfxIdleEffectDefinition>(),
+                catalog.OwnerSceneContext);
+            return group.EnsureVfxResourcesAsync(
+                token => MapViewerSceneService.CreateVfxResourcesAsync(requiredCatalog, projectRoot, token),
+                (resources, token) => resources.EnsureMaterializedAsync(
+                    requiredSystems,
+                    catalog.OwnerSceneContext,
+                    projectRoot,
+                    token),
                 cancellationToken);
-            try
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                VfxSceneResourceContext previous = _mapClipVfxResources;
-                _mapClipVfxResources = created;
-                _mapClipVfxResourceGroup = group;
-                created = null;
-                previous?.Dispose();
-                return _mapClipVfxResources;
-            }
-            finally
-            {
-                created?.Dispose();
-            }
         }
 
-        private void ClearMapCharacterClipPreview(bool releaseResources = true)
+        private void ClearMapCharacterClipPreview()
         {
             _mapClipCancellation?.Cancel();
             _activeMapCharacterGroup?.ClearPreviewClip();
@@ -2095,14 +2384,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _vfxRenderer?.SetWorldTransform(Matrix4x4.Identity);
             _vfxRenderer?.UpdateBoneTransforms(null);
             _vfxRenderer?.SetOwnerSkinningMatrices(null);
-
-            if (!releaseResources)
-                return;
-
-            VfxSceneResourceContext resources = _mapClipVfxResources;
-            _mapClipVfxResources = null;
-            _mapClipVfxResourceGroup = null;
-            resources?.Dispose();
         }
 
         private void SyncMapCharacterClipTime(double timeSeconds)
@@ -2260,6 +2541,9 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ClearLoadedSkinState()
         {
             _binCancellation?.Cancel();
+            _animationClipCancellation?.Cancel();
+            _animationClipCancellation?.Dispose();
+            _animationClipCancellation = null;
             _model.IsPlaying = false;
             _vfxRenderer?.Pause();
             if (_inspectedSystem != null)
@@ -2301,7 +2585,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.Meshes.Clear();
             _model.HasAnySolo = false;
             _model.IsAllMuted = false;
-            _abilityCompositions = Array.Empty<VfxAbilityComposition>();
             _model.CurrentTime = 0;
             _model.TotalDuration = 5.0;
             _model.ActiveLoopStart = 0;
@@ -2324,9 +2607,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (operation.IsCancellationRequested || _isCleanedUp) return;
                 _activeBundle = bundle;
 
-                // AnimationGraph metadata and .anm headers are independent from the preview mesh.
-                // Load them as soon as the BIN is ready so missing SKN/SKL assets never hide
-                // otherwise valid graph rows or rate metadata.
+                // AnimationGraph metadata is independent from the preview mesh. Populate the
+                // picker immediately; ANM payloads are decoded only when a clip/spell needs one.
                 BindAnimationCatalog(_model.RootPath);
 
                 foreach (var (hash, sysDef) in _activeBundle.Systems)
@@ -2357,11 +2639,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.Systems.Add(item);
                 }
 
-                _abilityCompositions = VfxAbilityCompositionBuilder.BuildAll(
-                    _activeBundle.Clips,
-                    _activeBundle.Systems,
-                    _activeBundle.ResourceMap);
-
                 _model.LogMessages.Add($"[BIN SUCCESS] Extracted {_model.Systems.Count} VFX systems.");
                 _model.StatusText = $"Loaded {_model.Systems.Count} systems from {Path.GetFileName(binFilePath)}.";
 
@@ -2372,8 +2649,7 @@ namespace AssetsManager.Views.Controls.Viewer
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                _abilityCompositions = Array.Empty<VfxAbilityComposition>();
-                LogService?.LogError(ex, "Failed to load VFX BIN.");
+                    LogService?.LogError(ex, "Failed to load VFX BIN.");
                 _model.StatusText = "Unable to load this BIN.";
                 _model.LogMessages.Add($"[ERROR] Failed to load BIN: {ex.Message}");
             }
@@ -2663,7 +2939,10 @@ namespace AssetsManager.Views.Controls.Viewer
                         // the user explicitly chooses an Animation Clip in the browser.
                         if (_model.DetectedAnimations.Count == 0)
                             BindAnimationCatalog(searchDir);
-                        TryPlayPendingSpell();
+                        if (_model.SelectedAnimation != null)
+                            _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
+                        else
+                            TryPlayPendingSpell();
                         return;
                     }
                 }
@@ -2708,10 +2987,9 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_clipCatalog == null || _activeBundle == null || VfxLoadingService == null)
                 return Array.Empty<AnimationClipCatalogItem>();
 
-            return _clipCatalog.Build(
+            return _clipCatalog.BuildMetadata(
                 _activeBundle,
                 path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
-                LogService,
                 parameter);
         }
 
@@ -2760,7 +3038,8 @@ namespace AssetsManager.Views.Controls.Viewer
             IReadOnlyList<AnimationClipCatalogItem> rebuilt = BuildAnimationCatalog(parameter);
             if (rebuilt.Count == 0) return;
 
-            // VfxClipCatalog owns and caches the animation assets reused by rebuilt entries.
+            // Rebuilding parameter choices is metadata-only; the chosen playlist is decoded
+            // when the replacement selection starts playback.
             _model.DetectedAnimations.Clear();
             foreach (AnimationClipCatalogItem item in rebuilt)
                 _model.DetectedAnimations.Add(item);
@@ -2780,55 +3059,110 @@ namespace AssetsManager.Views.Controls.Viewer
             return File.Exists(sameName) ? sameName : null;
         }
 
-        private void PlaySelectedAnimation(AnimationClipCatalogItem animItem)
+        private async Task PlaySelectedAnimationAsync(AnimationClipCatalogItem selectedItem)
         {
-            if (animItem == null || _championModel == null) return;
-            _pendingSpell = null;
-            _activeSpellPlan = null;
-
-            // Animation Clip playback can trigger several VFX systems over time, so the
-            // standalone emitter audit from a previously selected System is not meaningful here.
-            ClearCompositeDiagnostics();
-
-            _championModel.CurrentAnimation = animItem.AnimationAsset;
-            _championModel.AnimationTime = 0;
-            _model.CurrentTime = 0;
-
-            double dur = animItem.Duration > 0 ? animItem.Duration : 3.0;
-            ResetPreviewLoopRange(dur);
-
-            string searchDir = ResolvePreviewSearchDirectory();
-
-            EnsureVfxRenderSession();
-            ConfigureAnimationClipCues(animItem);
-            if (_vfxRenderer != null && _activeBundle != null)
+            if (selectedItem == null || _activeBundle == null || _clipCatalog == null) return;
+            if (_championModel == null)
             {
-                _championAnimationService?.Update(0, animItem.AnimationAsset, _championModel.Skeleton,
-                    _championModel.SkinnedMesh, _championModel.Parts, _championModel.Name);
-                _vfxRenderer.SetBoneTransformSampler((time, name, hash) =>
-                    _championAnimationService != null &&
-                    _championAnimationService.TrySampleBoneTransform((float)time, name, hash, out var transform)
-                        ? transform : null);
-                int seed = HashCode.Combine(animItem.Name, _activeBundle.Systems.Count);
-                _vfxRenderer.SetAnimationSession(
-                    animItem.Composition,
-                    _activeBundle.IdleEffects,
-                    _activeBundle.Systems,
-                    _activeBundle.ResourceMap,
-                    searchDir,
-                    seed,
-                    dur,
-                    _activeBundle.OwnerSceneContext);
-                _vfxRenderer.SetOwnerSkinningMatrices(_championAnimationService?.FinalBoneTransforms);
-                _vfxRenderer.Play();
+                _model.StatusText = $"{selectedItem.DisplayName} · waiting for character model.";
+                TryLoadChampionModelAsync(_model.RootPath);
+                return;
             }
 
-            _model.IsPlaying = true;
-            _model.StatusText = $"{animItem.DisplayName} ({dur:F2}s) · {(animItem.HasVfx ? animItem.VfxSummary : "Idle VFX active")}";
-            _model.LogMessages.Add($"[PLAY ANIMATION] {animItem.DisplayName} ({dur:F2}s) with {(animItem.Composition?.ResolvedCount ?? 0)} VFX events & {(_activeBundle?.IdleEffects.Count ?? 0)} idle auras.");
-            UpdateTimelineTrackMetrics();
-            UpdatePlayheadPosition();
+            _animationClipCancellation?.Cancel();
+            _animationClipCancellation?.Dispose();
+            var operation = new System.Threading.CancellationTokenSource();
+            _animationClipCancellation = operation;
+            VfxClipCatalog catalog = _clipCatalog;
+            VfxLoadingService.Bundle bundle = _activeBundle;
+
+            try
+            {
+                _model.StatusText = $"{selectedItem.DisplayName} · loading animation...";
+                AnimationClipCatalogItem animItem = await catalog.PrepareAsync(
+                    selectedItem,
+                    bundle,
+                    path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
+                    LogService,
+                    operation.Token);
+                operation.Token.ThrowIfCancellationRequested();
+                if (_isCleanedUp || animItem == null ||
+                    !ReferenceEquals(operation, _animationClipCancellation) ||
+                    !ReferenceEquals(catalog, _clipCatalog) ||
+                    !ReferenceEquals(bundle, _activeBundle) ||
+                    !SameAnimationClip(selectedItem, _model.SelectedAnimation) ||
+                    _championModel == null)
+                {
+                    if (animItem == null && ReferenceEquals(selectedItem, _model.SelectedAnimation))
+                        _model.StatusText = $"{selectedItem.DisplayName} · animation asset unavailable.";
+                    return;
+                }
+
+                _pendingSpell = null;
+                _activeSpellPlan = null;
+
+                // Animation Clip playback can trigger several VFX systems over time, so the
+                // standalone emitter audit from a previously selected System is not meaningful here.
+                ClearCompositeDiagnostics();
+
+                _championModel.CurrentAnimation = animItem.AnimationAsset;
+                _championModel.AnimationTime = 0;
+                _model.CurrentTime = 0;
+
+                double dur = animItem.Duration > 0 ? animItem.Duration : 3.0;
+                ResetPreviewLoopRange(dur);
+
+                string searchDir = ResolvePreviewSearchDirectory();
+
+                EnsureVfxRenderSession();
+                ConfigureAnimationClipCues(animItem);
+                if (_vfxRenderer != null)
+                {
+                    _championAnimationService?.Update(0, animItem.AnimationAsset, _championModel.Skeleton,
+                        _championModel.SkinnedMesh, _championModel.Parts, _championModel.Name);
+                    _vfxRenderer.SetBoneTransformSampler((time, name, hash) =>
+                        _championAnimationService != null &&
+                        _championAnimationService.TrySampleBoneTransform((float)time, name, hash, out var transform)
+                            ? transform : null);
+                    int seed = HashCode.Combine(animItem.Name, bundle.Systems.Count);
+                    _vfxRenderer.SetAnimationSession(
+                        animItem.Composition,
+                        bundle.IdleEffects,
+                        bundle.Systems,
+                        bundle.ResourceMap,
+                        searchDir,
+                        seed,
+                        dur,
+                        bundle.OwnerSceneContext);
+                    _vfxRenderer.SetOwnerSkinningMatrices(_championAnimationService?.FinalBoneTransforms);
+                    _vfxRenderer.Play();
+                }
+
+                int resolvedIdleVfx = VfxAbilityCompositionBuilder.CountResolvedIdleEffects(
+                    bundle.IdleEffects,
+                    bundle.Systems,
+                    bundle.ResourceMap);
+                _model.IsPlaying = true;
+                _model.StatusText = $"{animItem.DisplayName} ({dur:F2}s) · {(animItem.HasVfx ? animItem.VfxSummary : "Animation only")}";
+                _model.LogMessages.Add($"[PLAY ANIMATION] {animItem.DisplayName} ({dur:F2}s) with {(animItem.Composition?.ResolvedCount ?? 0)} VFX events & {resolvedIdleVfx} resolved idle auras.");
+                UpdateTimelineTrackMetrics();
+                UpdatePlayheadPosition();
+            }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) when (_isCleanedUp || !ReferenceEquals(catalog, _clipCatalog)) { }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, $"Failed to prepare AnimationGraph clip: {selectedItem.DisplayName}");
+                if (ReferenceEquals(selectedItem, _model.SelectedAnimation))
+                    _model.StatusText = $"{selectedItem.DisplayName} · animation load failed.";
+            }
         }
+
+        private static bool SameAnimationClip(AnimationClipCatalogItem left, AnimationClipCatalogItem right)
+            => left?.Clip != null && right?.Clip != null &&
+               left.Clip.GraphPathHash == right.Clip.GraphPathHash &&
+               left.Clip.OwnerPathHash == right.Clip.OwnerPathHash &&
+               left.ParameterValue == right.ParameterValue;
 
         private void ClearCompositeDiagnostics()
         {
@@ -2876,7 +3210,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            PlaySelectedSpell(spell);
+            _ = PlaySelectedSpellAsync(spell);
         }
 
         private void TryPlayPendingSpell()
@@ -2891,10 +3225,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            PlaySelectedSpell(spell);
+            _ = PlaySelectedSpellAsync(spell);
         }
 
-        private void PlaySelectedSpell(VfxSpellBrowserItem spell)
+        private async Task PlaySelectedSpellAsync(VfxSpellBrowserItem spell)
         {
             if (spell == null || _activeBundle == null || _championModel == null) return;
             _pendingSpell = null;
@@ -2908,72 +3242,136 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            EnsureVfxRenderSession();
-            Func<uint, string> resolveSystemPath = VfxLoadingService == null
-                ? null
-                : hash => VfxLoadingService.ResolveBinEntryPath(hash);
-            VfxSpellPreviewPlan plan = VfxSpellPreviewComposer.Build(
-                spell,
-                _activeBundle,
-                _model.DetectedAnimations.ToArray(),
-                ResolveSpellLaunchFrame,
-                resolveSystemPath);
-            _activeSpellPlan = plan;
-            if (plan.Availability != VfxSpellAvailability.Supported)
+            _animationClipCancellation?.Cancel();
+            _animationClipCancellation?.Dispose();
+            var operation = new System.Threading.CancellationTokenSource();
+            _animationClipCancellation = operation;
+            VfxClipCatalog catalog = _clipCatalog;
+            VfxLoadingService.Bundle bundle = _activeBundle;
+
+            try
             {
-                _model.IsPlaying = false;
-                _vfxRenderer?.Pause();
-                _model.StatusText = $"{spell.Name} · {plan.Status}";
-                return;
+                AnimationClipCatalogItem[] clips = _model.DetectedAnimations.ToArray();
+                AnimationClipCatalogItem requestedAnimation =
+                    VfxSpellPreviewComposer.ResolveAnimation(spell.Preview?.AnimationName, clips);
+                if (requestedAnimation != null)
+                {
+                    if (catalog == null)
+                        return;
+                    _model.StatusText = $"{spell.Name} · loading cast animation...";
+                    AnimationClipCatalogItem prepared = await catalog.PrepareAsync(
+                        requestedAnimation,
+                        bundle,
+                        path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
+                        LogService,
+                        operation.Token);
+                    operation.Token.ThrowIfCancellationRequested();
+                    if (prepared == null)
+                    {
+                        _activeSpellPlan = null;
+                        _model.IsPlaying = false;
+                        _model.StatusText = $"{spell.Name} · cast animation unavailable.";
+                        return;
+                    }
+
+                    for (int index = 0; index < clips.Length; index++)
+                    {
+                        if (SameAnimationClip(clips[index], requestedAnimation))
+                        {
+                            clips[index] = prepared;
+                            break;
+                        }
+                    }
+                }
+
+                if (_isCleanedUp || operation.IsCancellationRequested ||
+                    !ReferenceEquals(operation, _animationClipCancellation) ||
+                    !ReferenceEquals(bundle, _activeBundle) ||
+                    !ReferenceEquals(spell, _model.SelectedSpell) ||
+                    _championModel == null)
+                {
+                    return;
+                }
+
+                EnsureVfxRenderSession();
+                Func<uint, string> resolveSystemPath = VfxLoadingService == null
+                    ? null
+                    : hash => VfxLoadingService.ResolveBinEntryPath(hash);
+                VfxSpellPreviewPlan plan = VfxSpellPreviewComposer.Build(
+                    spell,
+                    bundle,
+                    clips,
+                    ResolveSpellLaunchFrame,
+                    resolveSystemPath);
+                _activeSpellPlan = plan;
+                if (plan.Availability != VfxSpellAvailability.Supported)
+                {
+                    _model.IsPlaying = false;
+                    _vfxRenderer?.Pause();
+                    _model.StatusText = $"{spell.Name} · {plan.Status}";
+                    return;
+                }
+
+                ClearAnimationClipCues();
+                ClearCompositeDiagnostics();
+                _model.CurrentTime = 0d;
+
+                AnimationClipCatalogItem animation = plan.Animation;
+                _championModel.CurrentAnimation = animation?.AnimationAsset;
+                _championModel.AnimationTime = 0d;
+                if (animation?.AnimationAsset != null &&
+                    _championAnimationService != null &&
+                    _championModel.Skeleton != null)
+                {
+                    _championAnimationService.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
+                    _championAnimationService.Update(
+                        0f,
+                        animation.AnimationAsset,
+                        _championModel.Skeleton,
+                        _championModel.SkinnedMesh,
+                        _championModel.Parts,
+                        _championModel.Name);
+                    _championModel.SkinningMatrices = _championAnimationService.FinalBoneTransforms;
+                    _championModel.GpuSkinningData = _championAnimationService.SkinningData;
+                }
+                else
+                {
+                    _championModel.SkinningMatrices = null;
+                }
+
+                string searchDir = ResolvePreviewSearchDirectory();
+
+                bool ready = _vfxRenderer?.SetSpellSession(
+                    plan.Steps,
+                    bundle.Systems,
+                    bundle.ResourceMap,
+                    searchDir,
+                    animation?.Duration ?? 0d,
+                    bundle.OwnerSceneContext) == true;
+                if (_vfxRenderer != null)
+                {
+                    _vfxRenderer.SetOwnerSkinningMatrices(_championModel.SkinningMatrices);
+                    if (ready) _vfxRenderer.Play();
+                }
+
+                double duration = _vfxRenderer?.RigDuration ?? Math.Max(
+                    animation?.Duration ?? 0d,
+                    plan.Arrival + VfxSpellPreviewComposer.ImpactDuration);
+                ResetPreviewLoopRange(duration);
+                _model.IsPlaying = ready;
+                _model.StatusText = $"{spell.Name} · {plan.Status} · release {plan.Release:F2}s / arrival {plan.Arrival:F2}s";
+                _model.LogMessages.Add($"[PLAY SPELL] {spell.ObjectPath} · {plan.Status}.");
+                UpdateTimelineTrackMetrics();
+                UpdatePlayheadPosition();
             }
-
-            ClearAnimationClipCues();
-            ClearCompositeDiagnostics();
-            _model.CurrentTime = 0d;
-
-            AnimationClipCatalogItem animation = plan.Animation;
-            _championModel.CurrentAnimation = animation?.AnimationAsset;
-            _championModel.AnimationTime = 0d;
-            if (animation != null && _championAnimationService != null && _championModel.Skeleton != null)
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) when (_isCleanedUp || !ReferenceEquals(catalog, _clipCatalog)) { }
+            catch (Exception ex)
             {
-                _championAnimationService.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
-                _championAnimationService.Update(
-                    0f,
-                    animation.AnimationAsset,
-                    _championModel.Skeleton,
-                    _championModel.SkinnedMesh,
-                    _championModel.Parts,
-                    _championModel.Name);
-                _championModel.SkinningMatrices = _championAnimationService.FinalBoneTransforms;
-                _championModel.GpuSkinningData = _championAnimationService.SkinningData;
+                LogService?.LogError(ex, $"Failed to prepare spell preview: {spell.Name}");
+                if (ReferenceEquals(spell, _model.SelectedSpell))
+                    _model.StatusText = $"{spell.Name} · preview load failed.";
             }
-            else
-            {
-                _championModel.SkinningMatrices = null;
-            }
-
-            string searchDir = ResolvePreviewSearchDirectory();
-
-            bool ready = _vfxRenderer?.SetSpellSession(
-                plan.Steps,
-                _activeBundle.Systems,
-                _activeBundle.ResourceMap,
-                searchDir,
-                animation?.Duration ?? 0d,
-                _activeBundle.OwnerSceneContext) == true;
-            if (_vfxRenderer != null)
-            {
-                _vfxRenderer.SetOwnerSkinningMatrices(_championModel.SkinningMatrices);
-                if (ready) _vfxRenderer.Play();
-            }
-
-            double duration = _vfxRenderer?.RigDuration ?? Math.Max(animation?.Duration ?? 0d, plan.Arrival + VfxSpellPreviewComposer.ImpactDuration);
-            ResetPreviewLoopRange(duration);
-            _model.IsPlaying = ready;
-            _model.StatusText = $"{spell.Name} · {plan.Status} · release {plan.Release:F2}s / arrival {plan.Arrival:F2}s";
-            _model.LogMessages.Add($"[PLAY SPELL] {spell.ObjectPath} · {plan.Status}.");
-            UpdateTimelineTrackMetrics();
-            UpdatePlayheadPosition();
         }
 
         private (Vector3 Origin, Vector3 Forward)? ResolveSpellLaunchFrame(
@@ -5048,7 +5446,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool HasSelectedAnimationReady()
             => _model.IsAnimationMode &&
                _model.SelectedAnimation != null &&
-               ReferenceEquals(_activeAnimationClip, _model.SelectedAnimation) &&
+               SameAnimationClip(_activeAnimationClip, _model.SelectedAnimation) &&
+               _activeAnimationClip?.AnimationAsset != null &&
                _vfxRenderer?.ActiveSystem != null;
 
         private bool TryPlaySelectedTimedPreview(bool restartWhenPlaying)
@@ -5086,7 +5485,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_model.IsAnimationMode && _model.SelectedAnimation != null)
             {
                 if (!HasSelectedAnimationReady())
-                    PlaySelectedAnimation(_model.SelectedAnimation);
+                    _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
                 else
                     ResumeTimedPreview(restart);
                 return true;

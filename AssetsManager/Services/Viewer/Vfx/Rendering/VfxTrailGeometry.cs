@@ -25,6 +25,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 Math.Min(ResolvePointCount(state.InstanceCount), state.Particles.Count),
                 Math.Max(0, maxPoints));
             if (count < 2) return 0;
+            ReadOnlySpan<float> instances = state.PrepareInstances(count);
 
             // LTK's packed pool retires by swapping the final live particle into a freed slot.
             // Trails therefore recover birth order from each particle serial before building the
@@ -49,9 +50,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             {
                 int orderedAt = start + seen * step;
                 int at = ParticleIndex(orderedAt);
-                Vector3 point = Position(state, orderedAt, count, smoothed && seen != 0 && orderedAt != 0);
+                Vector3 point = Position(state, instances, orderedAt, count, smoothed && seen != 0 && orderedAt != 0);
                 Vector3 tangent = seen == 0
-                    ? Position(state, orderedAt + step, count, false) - point
+                    ? Position(state, instances, orderedAt + step, count, false) - point
                     : point - last;
                 if (seen > 0)
                 {
@@ -79,15 +80,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     across = miter.LengthSquared() > 0f ? Vector3.Normalize(miter) : rawAcross;
                 }
                 int source = at * VfxPlaybackRuntime.InstanceStride;
-                float halfWidth = state.Instances[source + 3];
+                float halfWidth = instances[source + 3];
                 var particle = state.Particles[at];
                 float tilingU = particle.TrailTiling.X, tilingV = particle.TrailTiling.Y;
                 float u = tilingU > 0f ? (trail?.Mode == 1 ? particle.TrailBirthDistance : walked) / tilingU : 0f;
                 if (seen == 0) uvBase = u - u % 2f;
                 u -= uvBase;
                 float span = tilingV > 0f ? halfWidth / tilingV : tilingV == 0f ? 1f : -tilingV;
-                WritePoint(state, source, held * 2, point + across * halfWidth, u, 0.5f - span * 0.5f);
-                WritePoint(state, source, held * 2 + 1, point - across * halfWidth, u, 0.5f + span * 0.5f);
+                WritePoint(state, instances, source, held * 2, point + across * halfWidth, u, 0.5f - span * 0.5f);
+                WritePoint(state, instances, source, held * 2 + 1, point - across * halfWidth, u, 0.5f + span * 0.5f);
                 if (held > 0)
                 {
                     // Riot still submits the two triangles when consecutive trail points land on
@@ -110,7 +111,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int ParticleIndex(int orderedIndex)
             => (int)(_birthOrder[orderedIndex] & uint.MaxValue);
 
-        private Vector3 Position(VfxPlaybackRuntime.EmitterState state, int orderedAt, int count, bool filtered)
+        private Vector3 Position(VfxPlaybackRuntime.EmitterState state, ReadOnlySpan<float> instances, int orderedAt, int count, bool filtered)
         {
             int first = filtered ? Math.Max(0, orderedAt - 3) : orderedAt;
             int last = filtered ? Math.Min(count - 1, orderedAt + 3) : orderedAt;
@@ -119,7 +120,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             {
                 int sourceIndex = ParticleIndex(orderedIndex);
                 int offset = sourceIndex * VfxPlaybackRuntime.InstanceStride;
-                sum += new Vector3(state.Instances[offset], state.Instances[offset + 1], state.Instances[offset + 2]);
+                sum += new Vector3(instances[offset], instances[offset + 1], instances[offset + 2]);
             }
             return sum / (last - first + 1);
         }
@@ -136,14 +137,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return side.LengthSquared() > 0f ? Vector3.Normalize(side) : axis;
         }
 
-        private void WritePoint(VfxPlaybackRuntime.EmitterState state, int source, int vertex, Vector3 position, float u, float v)
+        private void WritePoint(VfxPlaybackRuntime.EmitterState state, ReadOnlySpan<float> instances, int source, int vertex, Vector3 position, float u, float v)
         {
             int offset = vertex * VertexStride;
-            Array.Copy(state.Instances, source, _points, offset + 2, VfxPlaybackRuntime.InstanceStride);
+            instances.Slice(source, VfxPlaybackRuntime.InstanceStride)
+                .CopyTo(_points.AsSpan(offset + 2, VfxPlaybackRuntime.InstanceStride));
             _points[offset + 2] = position.X;
             _points[offset + 3] = position.Y;
             _points[offset + 4] = position.Z;
-            VfxRibbonVertexSemantics.Pack(state, source, _points, offset, u, v, transpose: false);
+            VfxRibbonVertexSemantics.Pack(state, instances, source, _points, offset, u, v, transpose: false);
         }
 
         private void Copy(int point, ref int vertices)

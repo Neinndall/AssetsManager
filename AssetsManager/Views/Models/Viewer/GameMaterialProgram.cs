@@ -21,7 +21,7 @@ namespace AssetsManager.Views.Models.Viewer
         Pass
     }
 
-    internal sealed record GameMaterialDefineData(
+    internal sealed record GameMaterialDefine(
         string Name,
         string Value,
         GameMaterialDefineSource Source);
@@ -33,7 +33,7 @@ namespace AssetsManager.Views.Models.Viewer
         Fallback
     }
 
-    internal sealed record GameMaterialSamplerStateData(
+    internal sealed record GameMaterialSamplerState(
         string SharedSampler,
         MapTextureWrap WrapU,
         MapTextureWrap WrapV,
@@ -41,11 +41,11 @@ namespace AssetsManager.Views.Models.Viewer
         bool FilterMin,
         bool FilterMag);
 
-    internal sealed record GameMaterialPassTextureData(
+    internal sealed record GameMaterialTexture(
         string Name,
         MapTextureReference Texture,
         GameMaterialTextureSource Source,
-        GameMaterialSamplerStateData Sampler);
+        GameMaterialSamplerState Sampler);
 
     internal enum GameMaterialParamSource
     {
@@ -54,7 +54,7 @@ namespace AssetsManager.Views.Models.Viewer
         Pass
     }
 
-    internal sealed record GameMaterialPassParamData(
+    internal sealed record GameMaterialParameter(
         string Name,
         Vector4 Value,
         GameMaterialParamSource Source);
@@ -65,7 +65,7 @@ namespace AssetsManager.Views.Models.Viewer
         CounterClockwise
     }
 
-    internal sealed record GameMaterialPassStateData(
+    internal sealed record GameMaterialPassState(
         bool BlendEnabled,
         MapBlendFactor SourceColor,
         MapBlendFactor DestinationColor,
@@ -77,17 +77,17 @@ namespace AssetsManager.Views.Models.Viewer
         uint DepthCompareFunc,
         uint WriteMask);
 
-    internal sealed record GameResolvedMaterialPassData(
+    internal sealed record GameMaterialPass(
         uint ShaderHash,
         string ShaderPath,
-        IReadOnlyList<GameMaterialDefineData> Defines,
+        IReadOnlyList<GameMaterialDefine> Defines,
         IReadOnlyList<KeyValuePair<string, bool>> RuntimeSwitches,
-        IReadOnlyList<GameMaterialPassTextureData> Textures,
-        IReadOnlyList<GameMaterialPassParamData> Parameters,
-        GameMaterialPassStateData State);
+        IReadOnlyList<GameMaterialTexture> Textures,
+        IReadOnlyList<GameMaterialParameter> Parameters,
+        GameMaterialPassState State);
 
-    internal sealed record GameResolvedMaterialProgramData(
+    internal sealed record GameMaterialProgram(
         GameMaterialKind Kind,
         bool Animated,
-        IReadOnlyList<GameResolvedMaterialPassData> Passes);
+        IReadOnlyList<GameMaterialPass> Passes);
 }

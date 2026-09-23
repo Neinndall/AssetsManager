@@ -13,7 +13,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
     public sealed class MapParticleSystemParserTests
     {
         [Fact]
-        public void ParserKeepsWholeSystemCatalogButOnlyResolvesPlacedRoots()
+        public void ParserKeepsPlacedRootsButDoesNotParseUnrelatedSystems()
         {
             const string rootPath = "Effects/Root";
             const string childPath = "Effects/Child";
@@ -36,9 +36,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 
             MapParticleSystemCatalog catalog = new MapParticleSystemParser().Parse(tree, groups);
 
-            Assert.Equal(2, catalog.Systems.Count);
+            Assert.Single(catalog.Systems);
             Assert.True(catalog.Systems.ContainsKey(rootHash));
-            Assert.True(catalog.Systems.ContainsKey(childHash));
+            Assert.False(catalog.Systems.ContainsKey(childHash));
             Assert.Equal(childHash, catalog.ResourceMap[resourceKey]);
             Assert.Equal(childHash, catalog.Systems[rootHash].ResourceMap[resourceKey]);
 
@@ -49,17 +49,41 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
-        public void ParserReturnsSystemsEvenWhenNoRootPlacementIsPlayable()
+        public void ParserKeepsResolverChildrenTransitivelyForPlacedRoots()
+        {
+            const string rootPath = "Effects/Root";
+            const string childPath = "Effects/Child";
+            const uint resourceKey = 0x11223344;
+            uint rootHash = Fnv1a.HashLower(rootPath);
+            uint childHash = Fnv1a.HashLower(childPath);
+            BinTree tree = Tree(
+                SystemWithChild(rootPath, "Root", resourceKey),
+                System(childPath, "Child"),
+                Resolver("Maps/Test/Resolver", resourceKey, childHash));
+
+            MapParticleSystemCatalog catalog = new MapParticleSystemParser().Parse(
+                tree,
+                new[] { new MapParticleGroupData(rootHash, new[] { Particle("RootPlacement", rootHash) }) });
+
+            Assert.Equal(2, catalog.Systems.Count);
+            Assert.True(catalog.Systems.ContainsKey(rootHash));
+            Assert.True(catalog.Systems.ContainsKey(childHash));
+            VfxChildSystemReference child = Assert.Single(
+                Assert.Single(catalog.Systems[rootHash].Emitters).ChildParticleSet.Children);
+            Assert.Equal(resourceKey, child.EffectKey);
+        }
+
+        [Fact]
+        public void ParserDoesNotParseSystemsWhenNoRootPlacementIsPlayable()
         {
             const string path = "Effects/ChildOnly";
-            uint hash = Fnv1a.HashLower(path);
             BinTree tree = Tree(System(path, "ChildOnly"));
 
             MapParticleSystemCatalog catalog = new MapParticleSystemParser().Parse(
                 tree,
                 Array.Empty<MapParticleGroupData>());
 
-            Assert.True(catalog.Systems.ContainsKey(hash));
+            Assert.Empty(catalog.Systems);
             Assert.Empty(catalog.Groups);
         }
 
@@ -84,6 +108,43 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                     new BinTreeString(Fnv1a.HashLower("particleName"), name),
                     new BinTreeString(Fnv1a.HashLower("particlePath"), path)
                 });
+
+        private static BinTreeObject SystemWithChild(string path, string name, uint effectKey)
+        {
+            var child = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxChildIdentifier"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeHash(Fnv1a.HashLower("effectKey"), effectKey)
+                });
+            var childSet = new BinTreeStruct(
+                Fnv1a.HashLower("childParticleSetDefinition"),
+                Fnv1a.HashLower("VfxChildParticleSetDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("childrenIdentifiers"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { child })
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { childSet });
+            return new BinTreeObject(
+                path,
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("particleName"), name),
+                    new BinTreeString(Fnv1a.HashLower("particlePath"), path),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+        }
 
         private static BinTreeObject Resolver(string path, uint key, uint target) =>
             new(

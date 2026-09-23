@@ -8,9 +8,10 @@ using LeagueToolkit.Core.Meta;
 namespace AssetsManager.Services.Viewer.Parsing
 {
     /// <summary>
-    /// Resolves the VFX systems a map places from the same open materials document.
-    /// The full system table is retained for child-system traversal while roots are limited
-    /// to systems actually referenced by playable MapParticle groups.
+    /// Resolves only the VFX systems a map can actually play from the open materials document.
+    /// Roots come from visible/playable MapParticle groups and child systems are followed transitively
+    /// through direct object links or the document ResourceResolver. Unplaced unrelated systems stay
+    /// unparsed and therefore never trigger resource materialization for this MAP runtime.
     /// </summary>
     internal sealed class MapParticleSystemParser
     {
@@ -22,13 +23,46 @@ namespace AssetsManager.Services.Viewer.Parsing
                 return Empty();
 
             IReadOnlyDictionary<uint, uint> resourceMap = VfxResourceParser.ExtractResourceMap(materials);
-            IReadOnlyDictionary<uint, VfxSystemDefinition> parsed = VfxSystemParser.ExtractAll(materials);
-            var systems = parsed.ToDictionary(
-                pair => pair.Key,
-                pair => pair.Value with { ResourceMap = resourceMap });
+            if (groups == null || groups.Count == 0)
+                return new MapParticleSystemCatalog(
+                    new Dictionary<uint, VfxSystemDefinition>(),
+                    resourceMap,
+                    Array.Empty<MapParticleSystemGroupData>());
 
-            if (groups == null || groups.Count == 0 || systems.Count == 0)
-                return new MapParticleSystemCatalog(systems, resourceMap, Array.Empty<MapParticleSystemGroupData>());
+            var systems = new Dictionary<uint, VfxSystemDefinition>();
+            var attempted = new HashSet<uint>();
+            var pending = new Queue<uint>(groups
+                .Where(group => group?.SystemHash != 0)
+                .Select(group => group.SystemHash)
+                .Distinct());
+
+            while (pending.Count > 0)
+            {
+                uint pathHash = pending.Dequeue();
+                if (!attempted.Add(pathHash))
+                    continue;
+
+                VfxSystemDefinition parsed = VfxSystemParser.Extract(materials, pathHash);
+                if (parsed == null)
+                    continue;
+
+                VfxSystemDefinition system = parsed with { ResourceMap = resourceMap };
+                systems[pathHash] = system;
+                foreach (VfxEmitterDefinition emitter in system.Emitters ?? Array.Empty<VfxEmitterDefinition>())
+                {
+                    foreach (VfxChildSystemReference child in emitter?.ChildParticleSet?.Children ?? Array.Empty<VfxChildSystemReference>())
+                    {
+                        if (child == null)
+                            continue;
+
+                        uint childHash = child.SystemHash;
+                        if (childHash == 0 && child.EffectKey != 0)
+                            resourceMap.TryGetValue(child.EffectKey, out childHash);
+                        if (childHash != 0 && !attempted.Contains(childHash))
+                            pending.Enqueue(childHash);
+                    }
+                }
+            }
 
             var resolved = new List<MapParticleSystemGroupData>(groups.Count);
             foreach (MapParticleGroupData group in groups)

@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Semantics;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Runtime
@@ -26,6 +29,9 @@ namespace AssetsManager.Services.Viewer.Runtime
     /// </summary>
     internal sealed class MapCharacterRuntimeGroup : IDisposable
     {
+        private readonly SemaphoreSlim _vfxResourcesGate = new(1, 1);
+        private VfxSceneResourceContext _vfxResources;
+        private bool _disposed;
         internal MapCharacterRuntimeGroup(
             MapCharacterAssetData asset,
             MapCharacterAnimationRuntime animation,
@@ -65,7 +71,59 @@ namespace AssetsManager.Services.Viewer.Runtime
             PreviewHiddenSubmeshes = new HashSet<uint>();
         }
 
-        public void Dispose() => Animation?.Dispose();
+        /// <summary>
+        /// Owns one lazily materialized VFX resource overlay for this MAP Skin. Every clip and
+        /// placement wearing the Skin reuses it; the overlay dies with the scene group, not with
+        /// a transient browser selection.
+        /// </summary>
+        internal async Task<VfxSceneResourceContext> EnsureVfxResourcesAsync(
+            Func<CancellationToken, Task<VfxSceneResourceContext>> create,
+            Func<VfxSceneResourceContext, CancellationToken, Task> ensure,
+            CancellationToken cancellationToken)
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(MapCharacterRuntimeGroup));
+            ArgumentNullException.ThrowIfNull(create);
+
+            await _vfxResourcesGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (_disposed)
+                    throw new ObjectDisposedException(nameof(MapCharacterRuntimeGroup));
+
+                if (_vfxResources == null)
+                {
+                    VfxSceneResourceContext created = await create(cancellationToken).ConfigureAwait(false);
+                    if (_disposed)
+                    {
+                        created?.Dispose();
+                        throw new ObjectDisposedException(nameof(MapCharacterRuntimeGroup));
+                    }
+                    _vfxResources = created;
+                }
+                else if (ensure != null)
+                {
+                    await ensure(_vfxResources, cancellationToken).ConfigureAwait(false);
+                    if (_disposed)
+                        throw new ObjectDisposedException(nameof(MapCharacterRuntimeGroup));
+                }
+
+                return _vfxResources;
+            }
+            finally
+            {
+                _vfxResourcesGate.Release();
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            Animation?.Dispose();
+            _vfxResources?.Dispose();
+            _vfxResources = null;
+        }
 
         internal static IReadOnlyList<MapCharacterAnimationPlacementGroup> GroupByAnimation(
             IReadOnlyList<MapCharacterData> placements,

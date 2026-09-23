@@ -97,6 +97,32 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void RuntimeDefersDrawPackingUntilAConsumerRequestsInstances()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Rate = VfxCurveF.Const(100f),
+                ParticleLifetime = VfxCurveF.Const(10f)
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "lazy", "lazy", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.1f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.True(state.InstanceCount > 4);
+            Assert.Equal(0, state.PreparedInstanceCount);
+
+            ReadOnlySpan<float> prepared = state.PrepareInstances(4);
+            Assert.Equal(4 * VfxPlaybackRuntime.InstanceStride, prepared.Length);
+            Assert.Equal(4, state.PreparedInstanceCount);
+            Assert.True(state.InstanceCount > state.PreparedInstanceCount);
+
+            _ = state.Instances;
+            Assert.Equal(state.InstanceCount, state.PreparedInstanceCount);
+        }
+
+        [Fact]
         public void MeshInstancesPreserveAuthoredNonUniformScale()
         {
             var emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default);
@@ -3797,6 +3823,32 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void UnmappedIdleEffectKeyDoesNotFallbackToSystemHashOrName()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var system = new VfxSystemDefinition(100, "idle", "idle", new[] { emitter });
+            var idle = new VfxIdleEffectDefinition(
+                EffectKey: 100,
+                EffectName: "idle",
+                BoneName: string.Empty,
+                BoneNameHash: 0,
+                TargetBoneName: string.Empty,
+                TargetBoneNameHash: 0,
+                Position: Vector3.Zero);
+            using var session = new VfxRenderSession();
+
+            Assert.False(session.SetAnimationSession(
+                composition: null,
+                idleEffects: new[] { idle },
+                systems: new Dictionary<uint, VfxSystemDefinition> { [100] = system },
+                resourceMap: new Dictionary<uint, uint>(),
+                searchDirectory: Path.GetTempPath(),
+                seed: 7,
+                animationDuration: 1d));
+            Assert.Empty(session.Graphs);
+        }
+
+        [Fact]
         public void IdleEffectsUseLtkDeterministicSeed()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
@@ -3815,7 +3867,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 composition: null,
                 idleEffects: new[] { idle },
                 systems: new Dictionary<uint, VfxSystemDefinition> { [100] = system },
-                resourceMap: new Dictionary<uint, uint>(),
+                resourceMap: new Dictionary<uint, uint> { [100] = 100 },
                 searchDirectory: Path.GetTempPath(),
                 seed: 987654,
                 animationDuration: 1d));
@@ -3855,7 +3907,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 composition: null,
                 idleEffects: new[] { idle },
                 systems: new Dictionary<uint, VfxSystemDefinition> { [100] = system },
-                resourceMap: new Dictionary<uint, uint>(),
+                resourceMap: new Dictionary<uint, uint> { [100] = 100 },
                 searchDirectory: Path.GetTempPath(),
                 seed: 7,
                 animationDuration: 1d));
@@ -3898,7 +3950,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 composition: null,
                 idleEffects: new[] { idle },
                 systems: new Dictionary<uint, VfxSystemDefinition> { [100] = system },
-                resourceMap: new Dictionary<uint, uint>(),
+                resourceMap: new Dictionary<uint, uint> { [100] = 100 },
                 searchDirectory: Path.GetTempPath(),
                 seed: 7,
                 animationDuration: 1d));
@@ -3930,6 +3982,46 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(1f, new Vector3(result.M11, result.M12, result.M13).Length(), precision: 5);
             Assert.Equal(1f, new Vector3(result.M21, result.M22, result.M23).Length(), precision: 5);
             Assert.Equal(1f, new Vector3(result.M31, result.M32, result.M33).Length(), precision: 5);
+        }
+
+        [Fact]
+        public void AnimationSessionSeekSamplesBonePoseAcrossReplaySteps()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var system = new VfxSystemDefinition(100, "seek-bone", "seek-bone", new[] { emitter });
+            var idle = new VfxIdleEffectDefinition(
+                EffectKey: 100,
+                EffectName: "seek-bone",
+                BoneName: "source",
+                BoneNameHash: 1,
+                TargetBoneName: string.Empty,
+                TargetBoneNameHash: 0,
+                Position: Vector3.Zero);
+            using var session = new VfxRenderSession();
+            Assert.True(session.SetAnimationSession(
+                composition: null,
+                idleEffects: new[] { idle },
+                systems: new Dictionary<uint, VfxSystemDefinition> { [100] = system },
+                resourceMap: new Dictionary<uint, uint> { [100] = 100 },
+                searchDirectory: Path.GetTempPath(),
+                seed: 7,
+                animationDuration: 1d));
+
+            var sampled = new List<double>();
+            session.SetBoneTransformSampler((time, name, hash) =>
+            {
+                sampled.Add(time);
+                return name == "source" || hash == 1
+                    ? Matrix4x4.CreateTranslation((float)time, 0f, 0f)
+                    : null;
+            });
+
+            session.Seek(0.5d);
+
+            Assert.True(sampled.Count > 2);
+            Assert.Equal(0.5d, sampled[^1], precision: 6);
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            Assert.Equal(0.5f, root.WorldTransform.Translation.X, precision: 5);
         }
 
         [Fact]

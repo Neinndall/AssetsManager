@@ -91,7 +91,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private sealed record CacheEntry(
             ProgramRuntime Program,
-            GameResolvedMaterialPassData Pass,
+            GameMaterialPass Pass,
             string Failure);
 
         private readonly GL _gl;
@@ -188,7 +188,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ? entry.Failure
                 : null;
 
-        private CacheEntry GetOrCreate(object owner, GameResolvedMaterialProgramData program)
+        private CacheEntry GetOrCreate(object owner, GameMaterialProgram program)
         {
             if (owner != null && _programs.TryGetValue(owner, out CacheEntry cached))
                 return cached;
@@ -219,7 +219,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     else
                     {
                         ProgramRuntime ready = null;
-                        GameResolvedMaterialPassData readyPass = null;
+                        GameMaterialPass readyPass = null;
                         var failures = new List<string>();
                         foreach (GameShaderProgramResolver.ShaderBytecodePassRead passRead in bytecodes.Passes)
                         {
@@ -390,13 +390,13 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         private static string ProgramKey(
-            GameResolvedMaterialPassData pass,
+            GameMaterialPass pass,
             GameShaderProgramResolver.ShaderBytecodeProgram bytecode)
         {
             string shader = pass?.ShaderPath ?? string.Empty;
             string defines = string.Join(
                 ";",
-                (bytecode?.Defines ?? Array.Empty<GameMaterialDefineData>())
+                (bytecode?.Defines ?? Array.Empty<GameMaterialDefine>())
                     .Select(define => define.Name + "=" + define.Value));
             return shader + "|" + defines;
         }
@@ -463,7 +463,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UpdateBlocks(
             ProgramRuntime runtime,
-            GameResolvedMaterialPassData pass,
+            GameMaterialPass pass,
             MapGeometryMeshData mesh,
             in Frame frame,
             CharacterDraw? character)
@@ -504,10 +504,10 @@ namespace AssetsManager.Services.Viewer.Rendering
         private static void WriteGlobals(
             float[] data,
             GameShaderTranslator.UniformBlock block,
-            GameResolvedMaterialPassData pass,
+            GameMaterialPass pass,
             MapGeometryMeshData mesh)
         {
-            var parameters = (pass.Parameters ?? Array.Empty<GameMaterialPassParamData>())
+            var parameters = (pass.Parameters ?? Array.Empty<GameMaterialParameter>())
                 .ToDictionary(parameter => parameter.Name, parameter => parameter.Value, StringComparer.Ordinal);
             var switches = (pass.RuntimeSwitches ?? Array.Empty<KeyValuePair<string, bool>>())
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
@@ -697,7 +697,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void BindSkinnedTextures(
             ProgramRuntime runtime,
-            GameResolvedMaterialPassData pass,
+            GameMaterialPass pass,
             Func<string, uint?> programTexture)
         {
             foreach (SamplerRuntime sampler in runtime.Samplers)
@@ -717,7 +717,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     string own = name.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
                         ? name[..^MaterialTextureSuffix.Length]
                         : name;
-                    GameMaterialPassTextureData declared = pass.Textures?
+                    GameMaterialTexture declared = pass.Textures?
                         .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
                     string authoredPath = declared?.Texture?.VirtualPath;
                     if (string.IsNullOrWhiteSpace(authoredPath) && declared?.Texture?.PathHash > 0)
@@ -750,7 +750,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void BindTextures(
             ProgramRuntime runtime,
-            GameResolvedMaterialPassData pass,
+            GameMaterialPass pass,
             MapMaterialDefinition material,
             MapGeometryMeshData mesh,
             Func<string, uint?> programTexture,
@@ -787,7 +787,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     string own = name.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
                         ? name[..^MaterialTextureSuffix.Length]
                         : name;
-                    GameMaterialPassTextureData declared = pass.Textures?
+                    GameMaterialTexture declared = pass.Textures?
                         .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
                     uint? loaded = sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D
                         ? programTexture?.Invoke(MapTextureLoadingService.ProgramTextureKey(material.Name, own))
@@ -817,7 +817,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Func<string, uint?> lookup) =>
             channel?.IsEmpty == false ? lookup?.Invoke(channel.Texture) : null;
 
-        private uint ResolveSampler(GameMaterialSamplerStateData state)
+        private uint ResolveSampler(GameMaterialSamplerState state)
         {
             if (state == null)
                 return ResolveNeutralSampler(clamp: false);
@@ -1047,7 +1047,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
 
-        private void ApplyPassState(GameMaterialPassStateData state, bool meshDoubleSided)
+        private void ApplyPassState(GameMaterialPassState state, bool meshDoubleSided)
         {
             if (state.BlendEnabled)
             {

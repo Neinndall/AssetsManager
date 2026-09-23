@@ -36,7 +36,7 @@ namespace AssetsManager.Views.Models.Viewer
         /// Full normal-technique program contract matching current LTK MAIN. The legacy preview
         /// fields above remain the first-pass fallback until translated game shaders are available.
         /// </summary>
-        public GameResolvedMaterialProgramData Program { get; init; }
+        public GameMaterialProgram Program { get; init; }
     }
 
     internal sealed record MapMaterialRenderState(

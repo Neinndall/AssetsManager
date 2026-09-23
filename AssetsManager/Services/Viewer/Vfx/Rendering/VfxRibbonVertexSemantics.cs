@@ -29,6 +29,25 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             float u,
             float v,
             bool transpose)
+            => Pack(
+                state,
+                state.PrepareInstances(state.InstanceCount),
+                instanceOffset,
+                vertex,
+                vertexOffset,
+                u,
+                v,
+                transpose);
+
+        internal static void Pack(
+            VfxPlaybackRuntime.EmitterState state,
+            ReadOnlySpan<float> instances,
+            int instanceOffset,
+            float[] vertex,
+            int vertexOffset,
+            float u,
+            float v,
+            bool transpose)
         {
             ArgumentNullException.ThrowIfNull(state);
             ArgumentNullException.ThrowIfNull(vertex);
@@ -38,15 +57,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector2 raw = new(u, v);
 
             Vector2 baseOffset = new(
-                state.Instances[instanceOffset + 19],
-                state.Instances[instanceOffset + 20]);
+                instances[instanceOffset + 19],
+                instances[instanceOffset + 20]);
             baseOffset = VfxUvSemantics.Periodic(
                 baseOffset + definition.EmitterUvScrollRate * state.RenderTime,
                 renderState.TextureAddressMode);
             Vector2 baseScale = new(
-                state.Instances[instanceOffset + 21],
-                state.Instances[instanceOffset + 22]);
-            float baseTurn = state.Instances[instanceOffset + 23];
+                instances[instanceOffset + 21],
+                instances[instanceOffset + 22]);
+            float baseTurn = instances[instanceOffset + 23];
             Vector2 baseUv = Transform(
                 raw,
                 definition.UvTransformCenter,
@@ -63,15 +82,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 renderState.FlipV);
 
             Vector2 multOffset = new(
-                state.Instances[instanceOffset + 29],
-                state.Instances[instanceOffset + 30]);
+                instances[instanceOffset + 29],
+                instances[instanceOffset + 30]);
             multOffset = VfxUvSemantics.Periodic(
                 multOffset + definition.TextureMultEmitterUvScrollRate * state.RenderTime,
                 definition.TextureMultAddressMode);
             Vector2 multScale = new(
-                state.Instances[instanceOffset + 31],
-                state.Instances[instanceOffset + 32]);
-            float multTurn = state.Instances[instanceOffset + 33];
+                instances[instanceOffset + 31],
+                instances[instanceOffset + 32]);
+            float multTurn = instances[instanceOffset + 33];
             Vector2 multUv = Transform(
                 raw,
                 definition.TextureMultTransformCenter,
@@ -95,7 +114,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             vertex[vertexOffset + AlphaUvOffset] = alphaUv.X;
             vertex[vertexOffset + AlphaUvOffset + 1] = alphaUv.Y;
 
-            float logicalFrame = state.Instances[instanceOffset + 10];
+            float logicalFrame = instances[instanceOffset + 10];
             Vector2 baseCell = Cell(logicalFrame, definition.TexDiv);
             Vector2 multCell = Cell(logicalFrame, definition.TextureMultTexDiv);
             vertex[vertexOffset + CellOffset] = baseCell.X;
@@ -105,12 +124,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             vertex[vertexOffset + MultUvOffset] = multUv.X;
             vertex[vertexOffset + MultUvOffset + 1] = multUv.Y;
 
-            float age01 = state.Instances[instanceOffset + 11];
+            float age01 = instances[instanceOffset + 11];
             float speed = new Vector3(
-                state.Instances[instanceOffset + 12],
-                state.Instances[instanceOffset + 13],
-                state.Instances[instanceOffset + 14]).Length();
-            float birthRandom = state.Instances[instanceOffset + 34];
+                instances[instanceOffset + 12],
+                instances[instanceOffset + 13],
+                instances[instanceOffset + 14]).Length();
+            float birthRandom = instances[instanceOffset + 34];
             Vector2 lookup = new(
                 LookupAxis(definition.ColorLookUpTypeX ?? VfxAuthoredDefaults.ColorLookUpTypeX,
                     definition.ColorLookUpScales.X, definition.ColorLookUpOffsets.X, age01, speed, birthRandom),

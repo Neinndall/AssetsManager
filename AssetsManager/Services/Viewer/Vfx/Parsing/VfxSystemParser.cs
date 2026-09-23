@@ -26,6 +26,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return map;
         }
 
+        internal static VfxSystemDefinition Extract(BinTree bin, uint pathHash)
+        {
+            if (bin?.Objects == null ||
+                pathHash == 0 ||
+                !bin.Objects.TryGetValue(pathHash, out BinTreeObject systemObject) ||
+                systemObject.ClassHash != SystemClass)
+            {
+                return null;
+            }
+
+            return ParseSystem(systemObject);
+        }
+
         private static VfxSystemDefinition ParseSystem(BinTreeObject o)
         {
             string name = GetString(o.Properties, F_particleName) ?? $"0x{o.PathHash:x8}";
