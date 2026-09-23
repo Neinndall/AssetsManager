@@ -19,7 +19,7 @@ namespace AssetsManager.Services.Viewer.Semantics
         bool FilterMin = true,
         bool FilterMag = true,
         string SharedSampler = null,
-        MapMaterialTextureSource TextureSource = MapMaterialTextureSource.Material);
+        GameMaterialTextureSource TextureSource = GameMaterialTextureSource.Material);
 
     internal sealed record MapMaterialPassData(
         uint ShaderHash,
@@ -231,8 +231,8 @@ namespace AssetsManager.Services.Viewer.Semantics
                         UsesShaderDefaultTexture = false,
                         SharedSampler = fallback.SharedSampler,
                         TextureSource = fallback.Texture != null
-                            ? MapMaterialTextureSource.ShaderDefault
-                            : MapMaterialTextureSource.Fallback
+                            ? GameMaterialTextureSource.ShaderDefault
+                            : GameMaterialTextureSource.Fallback
                     };
                 }
                 result.Add(effective);

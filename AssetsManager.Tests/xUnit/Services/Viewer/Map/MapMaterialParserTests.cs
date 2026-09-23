@@ -117,21 +117,21 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 materialPath);
 
             Assert.NotNull(parsed.Program);
-            Assert.Equal(MapMaterialKind.StaticMesh, parsed.Program.Kind);
+            Assert.Equal(GameMaterialKind.StaticMesh, parsed.Program.Kind);
             Assert.Equal(2, parsed.Program.Passes.Count);
 
-            MapResolvedMaterialPassData first = parsed.Program.Passes[0];
+            GameResolvedMaterialPassData first = parsed.Program.Passes[0];
             Assert.Equal(shaderPath, first.ShaderPath);
             Assert.Equal(new[] { "COMPILE_ON", "FEATURE_TEST", "MAT_DEFINE" }, first.Defines.Select(item => item.Name));
             Assert.Equal("0", first.Defines.Single(item => item.Name == "COMPILE_ON").Value);
             Assert.Equal("pass", first.Defines.Single(item => item.Name == "MAT_DEFINE").Value);
-            Assert.Equal(MapMaterialDefineSource.Pass, first.Defines.Single(item => item.Name == "MAT_DEFINE").Source);
+            Assert.Equal(GameMaterialDefineSource.Pass, first.Defines.Single(item => item.Name == "MAT_DEFINE").Source);
             Assert.DoesNotContain(first.Defines, item => item.Name == "RUNTIME_ON");
             Assert.Equal(new KeyValuePair<string, bool>("RUNTIME_ON", false), Assert.Single(first.RuntimeSwitches));
 
-            MapMaterialPassTextureData resolvedTexture = Assert.Single(first.Textures);
+            GameMaterialPassTextureData resolvedTexture = Assert.Single(first.Textures);
             Assert.Equal("assets/maps/test/default.tex", resolvedTexture.Texture.VirtualPath);
-            Assert.Equal(MapMaterialTextureSource.ShaderDefault, resolvedTexture.Source);
+            Assert.Equal(GameMaterialTextureSource.ShaderDefault, resolvedTexture.Source);
             Assert.Equal("LinearShared", resolvedTexture.Sampler.SharedSampler);
             Assert.Equal(MapTextureWrap.Clamp, resolvedTexture.Sampler.WrapU);
             Assert.Equal(MapTextureWrap.Mirror, resolvedTexture.Sampler.WrapV);
@@ -139,15 +139,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.False(resolvedTexture.Sampler.FilterMin);
             Assert.True(resolvedTexture.Sampler.FilterMag);
 
-            MapMaterialPassParamData parameter = Assert.Single(first.Parameters);
+            GameMaterialPassParamData parameter = Assert.Single(first.Parameters);
             Assert.Equal("Globals0", parameter.Name);
             Assert.Equal(new Vector4(5f, 2f, 6f, 4f), parameter.Value);
-            Assert.Equal(MapMaterialParamSource.Pass, parameter.Source);
+            Assert.Equal(GameMaterialParamSource.Pass, parameter.Source);
 
             Assert.True(first.State.BlendEnabled);
             Assert.Equal(MapBlendFactor.SourceAlpha, first.State.SourceColor);
             Assert.Equal(MapBlendFactor.OneMinusSourceAlpha, first.State.DestinationColor);
-            Assert.Equal(MapMaterialWinding.Clockwise, first.State.WindingToCull);
+            Assert.Equal(GameMaterialWinding.Clockwise, first.State.WindingToCull);
             Assert.False(first.State.CullEnabled);
             Assert.Equal((uint)15, first.State.WriteMask);
         }

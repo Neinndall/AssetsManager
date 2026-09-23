@@ -29,11 +29,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         public void StudioDefinesOnlyFillMissingValues()
         {
             var pass = Pass(
-                new MapMaterialDefineData("DISABLE_FOW", "0", MapMaterialDefineSource.Pass),
-                new MapMaterialDefineData("OWN", "7", MapMaterialDefineSource.Material));
+                new GameMaterialDefineData("DISABLE_FOW", "0", GameMaterialDefineSource.Pass),
+                new GameMaterialDefineData("OWN", "7", GameMaterialDefineSource.Material));
 
-            IReadOnlyList<MapMaterialDefineData> defines =
-                GameShaderProgramResolver.BuildDefineList(pass, MapMaterialKind.SkinnedMesh, lowQuality: true);
+            IReadOnlyList<GameMaterialDefineData> defines =
+                GameShaderProgramResolver.BuildDefineList(pass, GameMaterialKind.SkinnedMesh, lowQuality: true);
 
             Assert.Equal("0", defines.Single(item => item.Name == "DISABLE_FOW").Value);
             Assert.Equal("1", defines.Single(item => item.Name == "DISABLE_SHADOWS").Value);
@@ -81,7 +81,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             pass = pass with { ShaderPath = "Shaders/StaticMesh/DefaultEnv_Flat" };
 
             GameShaderProgramResolver.ShaderBytecodeRead read =
-                GameShaderProgramResolver.Read(pass, MapMaterialKind.StaticMesh, settings);
+                GameShaderProgramResolver.Read(pass, GameMaterialKind.StaticMesh, settings);
 
             Assert.True(read.Ready, read.Failure);
             Assert.StartsWith("DXBC", System.Text.Encoding.ASCII.GetString(read.Program.Vertex, 0, 4));
@@ -102,10 +102,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             var settings = AppSettings.GetDefaultSettings();
             settings.LolPbeDirectory = root;
             settings.LolLiveDirectory = null;
-            MapResolvedMaterialPassData ready = Pass();
-            MapResolvedMaterialPassData missing = Pass() with { ShaderHash = 0, ShaderPath = null };
-            var program = new MapResolvedMaterialProgramData(
-                MapMaterialKind.StaticMesh,
+            GameResolvedMaterialPassData ready = Pass();
+            GameResolvedMaterialPassData missing = Pass() with { ShaderHash = 0, ShaderPath = null };
+            var program = new GameResolvedMaterialProgramData(
+                GameMaterialKind.StaticMesh,
                 true,
                 new[] { ready, missing });
 
@@ -128,22 +128,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 }
                 .FirstOrDefault(candidate => File.Exists(Path.Combine(candidate, @"Game\DATA\FINAL\ShaderCache.dx11.wad.client")));
 
-        private static MapResolvedMaterialPassData Pass(params MapMaterialDefineData[] defines) =>
+        private static GameResolvedMaterialPassData Pass(params GameMaterialDefineData[] defines) =>
             new(
                 1,
                 "Shaders/StaticMesh/DefaultEnv_Flat",
                 defines,
                 Array.Empty<KeyValuePair<string, bool>>(),
-                Array.Empty<MapMaterialPassTextureData>(),
-                Array.Empty<MapMaterialPassParamData>(),
-                new MapMaterialPassStateData(
+                Array.Empty<GameMaterialPassTextureData>(),
+                Array.Empty<GameMaterialPassParamData>(),
+                new GameMaterialPassStateData(
                     false,
                     MapBlendFactor.One,
                     MapBlendFactor.Zero,
                     MapBlendFactor.One,
                     MapBlendFactor.Zero,
                     true,
-                    MapMaterialWinding.CounterClockwise,
+                    GameMaterialWinding.CounterClockwise,
                     true,
                     3,
                     31));

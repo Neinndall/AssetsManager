@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace AssetsManager.Views.Models.Viewer
 {
-    internal enum MapMaterialKind
+    internal enum GameMaterialKind
     {
         StaticMesh,
         SkinnedMesh,
@@ -13,7 +13,7 @@ namespace AssetsManager.Views.Models.Viewer
         Unknown
     }
 
-    internal enum MapMaterialDefineSource
+    internal enum GameMaterialDefineSource
     {
         Material,
         Feature,
@@ -21,19 +21,19 @@ namespace AssetsManager.Views.Models.Viewer
         Pass
     }
 
-    internal sealed record MapMaterialDefineData(
+    internal sealed record GameMaterialDefineData(
         string Name,
         string Value,
-        MapMaterialDefineSource Source);
+        GameMaterialDefineSource Source);
 
-    internal enum MapMaterialTextureSource
+    internal enum GameMaterialTextureSource
     {
         Material,
         ShaderDefault,
         Fallback
     }
 
-    internal sealed record MapMaterialSamplerStateData(
+    internal sealed record GameMaterialSamplerStateData(
         string SharedSampler,
         MapTextureWrap WrapU,
         MapTextureWrap WrapV,
@@ -41,53 +41,53 @@ namespace AssetsManager.Views.Models.Viewer
         bool FilterMin,
         bool FilterMag);
 
-    internal sealed record MapMaterialPassTextureData(
+    internal sealed record GameMaterialPassTextureData(
         string Name,
         MapTextureReference Texture,
-        MapMaterialTextureSource Source,
-        MapMaterialSamplerStateData Sampler);
+        GameMaterialTextureSource Source,
+        GameMaterialSamplerStateData Sampler);
 
-    internal enum MapMaterialParamSource
+    internal enum GameMaterialParamSource
     {
         ShaderDefault,
         Material,
         Pass
     }
 
-    internal sealed record MapMaterialPassParamData(
+    internal sealed record GameMaterialPassParamData(
         string Name,
         Vector4 Value,
-        MapMaterialParamSource Source);
+        GameMaterialParamSource Source);
 
-    internal enum MapMaterialWinding
+    internal enum GameMaterialWinding
     {
         Clockwise,
         CounterClockwise
     }
 
-    internal sealed record MapMaterialPassStateData(
+    internal sealed record GameMaterialPassStateData(
         bool BlendEnabled,
         MapBlendFactor SourceColor,
         MapBlendFactor DestinationColor,
         MapBlendFactor SourceAlpha,
         MapBlendFactor DestinationAlpha,
         bool CullEnabled,
-        MapMaterialWinding WindingToCull,
+        GameMaterialWinding WindingToCull,
         bool DepthEnabled,
         uint DepthCompareFunc,
         uint WriteMask);
 
-    internal sealed record MapResolvedMaterialPassData(
+    internal sealed record GameResolvedMaterialPassData(
         uint ShaderHash,
         string ShaderPath,
-        IReadOnlyList<MapMaterialDefineData> Defines,
+        IReadOnlyList<GameMaterialDefineData> Defines,
         IReadOnlyList<KeyValuePair<string, bool>> RuntimeSwitches,
-        IReadOnlyList<MapMaterialPassTextureData> Textures,
-        IReadOnlyList<MapMaterialPassParamData> Parameters,
-        MapMaterialPassStateData State);
+        IReadOnlyList<GameMaterialPassTextureData> Textures,
+        IReadOnlyList<GameMaterialPassParamData> Parameters,
+        GameMaterialPassStateData State);
 
-    internal sealed record MapResolvedMaterialProgramData(
-        MapMaterialKind Kind,
+    internal sealed record GameResolvedMaterialProgramData(
+        GameMaterialKind Kind,
         bool Animated,
-        IReadOnlyList<MapResolvedMaterialPassData> Passes);
+        IReadOnlyList<GameResolvedMaterialPassData> Passes);
 }

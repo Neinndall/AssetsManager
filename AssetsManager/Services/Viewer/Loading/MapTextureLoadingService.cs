@@ -155,7 +155,7 @@ namespace AssetsManager.Services.Viewer.Loading
             var requested = (materials ?? Array.Empty<MapMaterialDefinition>())
                 .Where(material => material?.Program?.Passes != null && !string.IsNullOrWhiteSpace(material.Name))
                 .SelectMany(material => material.Program.Passes.SelectMany(pass =>
-                    (pass.Textures ?? Array.Empty<MapMaterialPassTextureData>())
+                    (pass.Textures ?? Array.Empty<GameMaterialPassTextureData>())
                         .Where(texture => texture?.Texture?.IsEmpty == false)
                         .Select(texture => new
                         {

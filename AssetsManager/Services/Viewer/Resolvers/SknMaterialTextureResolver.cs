@@ -61,7 +61,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal bool IsAnimated { get; init; }
         internal uint ShaderHash { get; init; }
         internal string ShaderPath { get; init; }
-        internal MapResolvedMaterialProgramData Program { get; init; }
+        internal GameResolvedMaterialProgramData Program { get; init; }
 
         private Dictionary<string, SknMaterialSampler> _normalizedSamplers;
 

@@ -41,27 +41,27 @@ namespace AssetsManager.Tests.xUnit.Shaders
             var settings = AppSettings.GetDefaultSettings();
             settings.LolPbeDirectory = root;
             settings.LolLiveDirectory = null;
-            var pass = new MapResolvedMaterialPassData(
+            var pass = new GameResolvedMaterialPassData(
                 1,
                 "Shaders/StaticMesh/DefaultEnv_Flat",
-                Array.Empty<MapMaterialDefineData>(),
+                Array.Empty<GameMaterialDefineData>(),
                 Array.Empty<System.Collections.Generic.KeyValuePair<string, bool>>(),
-                Array.Empty<MapMaterialPassTextureData>(),
-                Array.Empty<MapMaterialPassParamData>(),
-                new MapMaterialPassStateData(
+                Array.Empty<GameMaterialPassTextureData>(),
+                Array.Empty<GameMaterialPassParamData>(),
+                new GameMaterialPassStateData(
                     false,
                     MapBlendFactor.One,
                     MapBlendFactor.Zero,
                     MapBlendFactor.One,
                     MapBlendFactor.Zero,
                     true,
-                    MapMaterialWinding.CounterClockwise,
+                    GameMaterialWinding.CounterClockwise,
                     true,
                     3,
                     31));
 
             GameShaderProgramResolver.ShaderBytecodeRead read =
-                GameShaderProgramResolver.Read(pass, MapMaterialKind.StaticMesh, settings);
+                GameShaderProgramResolver.Read(pass, GameMaterialKind.StaticMesh, settings);
             Assert.True(read.Ready, read.Failure);
 
             GameShaderTranslator.TranslationRead translated =

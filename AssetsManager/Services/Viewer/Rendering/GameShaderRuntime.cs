@@ -91,7 +91,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private sealed record CacheEntry(
             ProgramRuntime Program,
-            MapResolvedMaterialPassData Pass,
+            GameResolvedMaterialPassData Pass,
             string Failure);
 
         private readonly GL _gl;
@@ -138,7 +138,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Func<string, uint?> programTexture,
             Func<string, uint?> lightmapTexture)
         {
-            if (_disposed || material?.Program == null || material.Program.Kind != MapMaterialKind.StaticMesh)
+            if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.StaticMesh)
                 return false;
 
             CacheEntry entry = GetOrCreate(material, material.Program);
@@ -147,7 +147,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 return false;
 
             _gl.UseProgram(runtime.Program);
-            ApplyGenericAttributeDefaults(runtime.Attributes, MapMaterialKind.StaticMesh, hasTangents: false);
+            ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.StaticMesh, hasTangents: false);
             UpdateBlocks(runtime, entry.Pass, mesh, frame, null);
             BindTextures(runtime, entry.Pass, material, mesh, programTexture, lightmapTexture);
             ApplyPassState(entry.Pass.State, meshDoubleSided);
@@ -162,7 +162,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             in Frame frame,
             Func<string, uint?> programTexture)
         {
-            if (_disposed || material?.Program == null || material.Program.Kind != MapMaterialKind.SkinnedMesh)
+            if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.SkinnedMesh)
                 return false;
 
             CacheEntry entry = GetOrCreate(material, material.Program);
@@ -171,7 +171,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 return false;
 
             _gl.UseProgram(runtime.Program);
-            ApplyGenericAttributeDefaults(runtime.Attributes, MapMaterialKind.SkinnedMesh, hasTangents);
+            ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents);
             UpdateBlocks(runtime, entry.Pass, null, frame, new CharacterDraw(world, bones));
             BindSkinnedTextures(runtime, entry.Pass, programTexture);
             ApplyPassState(entry.Pass.State, material.RenderState.DoubleSided);
@@ -188,7 +188,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ? entry.Failure
                 : null;
 
-        private CacheEntry GetOrCreate(object owner, MapResolvedMaterialProgramData program)
+        private CacheEntry GetOrCreate(object owner, GameResolvedMaterialProgramData program)
         {
             if (owner != null && _programs.TryGetValue(owner, out CacheEntry cached))
                 return cached;
@@ -219,7 +219,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     else
                     {
                         ProgramRuntime ready = null;
-                        MapResolvedMaterialPassData readyPass = null;
+                        GameResolvedMaterialPassData readyPass = null;
                         var failures = new List<string>();
                         foreach (GameShaderProgramResolver.ShaderBytecodePassRead passRead in bytecodes.Passes)
                         {
@@ -282,7 +282,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private ProgramRuntime CreateProgram(
             GameShaderTranslator.TranslatedProgram translated,
-            MapMaterialKind kind)
+            GameMaterialKind kind)
         {
             IReadOnlyDictionary<uint, string> attributes = AttributeLocations(translated.Vertex.Sidecar.Attributes, kind);
             string vertex = SourceForProfile(translated.Vertex.Glsl, vertexStage: true);
@@ -390,27 +390,27 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         private static string ProgramKey(
-            MapResolvedMaterialPassData pass,
+            GameResolvedMaterialPassData pass,
             GameShaderProgramResolver.ShaderBytecodeProgram bytecode)
         {
             string shader = pass?.ShaderPath ?? string.Empty;
             string defines = string.Join(
                 ";",
-                (bytecode?.Defines ?? Array.Empty<MapMaterialDefineData>())
+                (bytecode?.Defines ?? Array.Empty<GameMaterialDefineData>())
                     .Select(define => define.Name + "=" + define.Value));
             return shader + "|" + defines;
         }
 
         private static IReadOnlyDictionary<uint, string> AttributeLocations(
             IReadOnlyList<GameShaderTranslator.AttributeBinding> attributes,
-            MapMaterialKind kind)
+            GameMaterialKind kind)
         {
             var result = new Dictionary<uint, string>();
-            uint next = kind == MapMaterialKind.SkinnedMesh ? 7u : 7u;
+            uint next = kind == GameMaterialKind.SkinnedMesh ? 7u : 7u;
             foreach (GameShaderTranslator.AttributeBinding attribute in attributes ?? Array.Empty<GameShaderTranslator.AttributeBinding>())
             {
                 string semantic = attribute.Semantic.ToUpperInvariant();
-                uint location = kind == MapMaterialKind.SkinnedMesh
+                uint location = kind == GameMaterialKind.SkinnedMesh
                     ? (semantic, attribute.Index) switch
                     {
                         ("POSITION", _) => 0,
@@ -440,12 +440,12 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void ApplyGenericAttributeDefaults(
             IReadOnlyDictionary<uint, string> attributes,
-            MapMaterialKind kind,
+            GameMaterialKind kind,
             bool hasTangents)
         {
             foreach ((uint location, string name) in attributes)
             {
-                bool provided = kind == MapMaterialKind.SkinnedMesh
+                bool provided = kind == GameMaterialKind.SkinnedMesh
                     ? location is 0 or 1 or 2 or 5 or 6 || (location == 3 && hasTangents)
                     : location <= 3;
                 if (provided)
@@ -463,7 +463,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UpdateBlocks(
             ProgramRuntime runtime,
-            MapResolvedMaterialPassData pass,
+            GameResolvedMaterialPassData pass,
             MapGeometryMeshData mesh,
             in Frame frame,
             CharacterDraw? character)
@@ -504,10 +504,10 @@ namespace AssetsManager.Services.Viewer.Rendering
         private static void WriteGlobals(
             float[] data,
             GameShaderTranslator.UniformBlock block,
-            MapResolvedMaterialPassData pass,
+            GameResolvedMaterialPassData pass,
             MapGeometryMeshData mesh)
         {
-            var parameters = (pass.Parameters ?? Array.Empty<MapMaterialPassParamData>())
+            var parameters = (pass.Parameters ?? Array.Empty<GameMaterialPassParamData>())
                 .ToDictionary(parameter => parameter.Name, parameter => parameter.Value, StringComparer.Ordinal);
             var switches = (pass.RuntimeSwitches ?? Array.Empty<KeyValuePair<string, bool>>())
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
@@ -697,7 +697,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void BindSkinnedTextures(
             ProgramRuntime runtime,
-            MapResolvedMaterialPassData pass,
+            GameResolvedMaterialPassData pass,
             Func<string, uint?> programTexture)
         {
             foreach (SamplerRuntime sampler in runtime.Samplers)
@@ -717,7 +717,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     string own = name.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
                         ? name[..^MaterialTextureSuffix.Length]
                         : name;
-                    MapMaterialPassTextureData declared = pass.Textures?
+                    GameMaterialPassTextureData declared = pass.Textures?
                         .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
                     string authoredPath = declared?.Texture?.VirtualPath;
                     if (string.IsNullOrWhiteSpace(authoredPath) && declared?.Texture?.PathHash > 0)
@@ -750,7 +750,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void BindTextures(
             ProgramRuntime runtime,
-            MapResolvedMaterialPassData pass,
+            GameResolvedMaterialPassData pass,
             MapMaterialDefinition material,
             MapGeometryMeshData mesh,
             Func<string, uint?> programTexture,
@@ -787,7 +787,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     string own = name.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
                         ? name[..^MaterialTextureSuffix.Length]
                         : name;
-                    MapMaterialPassTextureData declared = pass.Textures?
+                    GameMaterialPassTextureData declared = pass.Textures?
                         .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
                     uint? loaded = sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D
                         ? programTexture?.Invoke(MapTextureLoadingService.ProgramTextureKey(material.Name, own))
@@ -817,7 +817,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Func<string, uint?> lookup) =>
             channel?.IsEmpty == false ? lookup?.Invoke(channel.Texture) : null;
 
-        private uint ResolveSampler(MapMaterialSamplerStateData state)
+        private uint ResolveSampler(GameMaterialSamplerStateData state)
         {
             if (state == null)
                 return ResolveNeutralSampler(clamp: false);
@@ -1047,7 +1047,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
 
-        private void ApplyPassState(MapMaterialPassStateData state, bool meshDoubleSided)
+        private void ApplyPassState(GameMaterialPassStateData state, bool meshDoubleSided)
         {
             if (state.BlendEnabled)
             {
@@ -1081,7 +1081,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             else
             {
                 _gl.Enable(EnableCap.CullFace);
-                _gl.CullFace(state.WindingToCull == MapMaterialWinding.CounterClockwise
+                _gl.CullFace(state.WindingToCull == GameMaterialWinding.CounterClockwise
                     ? TriangleFace.Back
                     : TriangleFace.Front);
             }
