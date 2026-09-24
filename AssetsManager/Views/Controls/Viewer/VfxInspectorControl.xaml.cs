@@ -101,6 +101,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private MapPostEffectsData _mapPostEffectsOverride;
         private MapSsaoPreviewOverride? _mapSsaoPreviewOverride;
         private bool _isUpdatingMapPreviewControls;
+        private bool _isSwitchingWorkspaceTab;
+        private VfxWorkspaceTab _pendingWorkspaceRestoreTab;
         private readonly object _mapTextureUpdateGate = new();
         private readonly Dictionary<string, MapTextureImage> _pendingMapTextureUpdates = new(StringComparer.Ordinal);
         private readonly Dictionary<string, MapTextureImage> _pendingMapProgramTextureUpdates = new(StringComparer.Ordinal);
@@ -198,10 +200,298 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private VfxSkinItem _browserSkin;
 
+        private VfxWorkspaceTab EnsureSkinWorkspaceTab(VfxSkinItem skin, bool select = true)
+        {
+            if (skin == null || string.IsNullOrWhiteSpace(skin.BinPath)) return null;
+            string key = $"skin:{Path.GetFullPath(skin.BinPath)}";
+            VfxWorkspaceTab tab = _model.WorkspaceTabs.FirstOrDefault(item =>
+                string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase));
+            if (tab == null)
+            {
+                string title = string.IsNullOrWhiteSpace(skin.OwnerName)
+                    ? skin.Title
+                    : $"{skin.OwnerName} · {skin.Title}";
+                tab = new VfxWorkspaceTab
+                {
+                    Key = key,
+                    Title = title,
+                    Subtitle = skin.DisplayName ?? skin.BinPath,
+                    Kind = VfxWorkspaceTabKind.Skin,
+                    Payload = skin
+                };
+                _model.WorkspaceTabs.Add(tab);
+                _model.NotifyWorkspaceTabsChanged();
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    WorkspaceTabsScrollViewer?.ScrollToRightEnd();
+                    UpdateWorkspaceTabScrollButtons();
+                }));
+            }
+
+            if (select)
+                SelectWorkspaceTab(tab);
+            return tab;
+        }
+
+        private VfxWorkspaceTab EnsureMapWorkspaceTab(MapBrowserNode node, bool select = true)
+        {
+            if (node?.Kind != MapBrowserNodeKind.MapFile || node.Payload is not MapSceneSource source)
+                return null;
+            string sourcePath = source.SelectedMapFilePath ?? node.Title ?? string.Empty;
+            string key = $"map:{sourcePath}";
+            VfxWorkspaceTab tab = _model.WorkspaceTabs.FirstOrDefault(item =>
+                string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase));
+            if (tab == null)
+            {
+                string title = Path.GetFileNameWithoutExtension(source.SelectedMapFilePath);
+                if (string.IsNullOrWhiteSpace(title)) title = node.Title;
+                tab = new VfxWorkspaceTab
+                {
+                    Key = key,
+                    Title = title,
+                    Subtitle = source.SelectedMapFilePath ?? node.Subtitle,
+                    Kind = VfxWorkspaceTabKind.Map,
+                    Payload = node
+                };
+                _model.WorkspaceTabs.Add(tab);
+                _model.NotifyWorkspaceTabsChanged();
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    WorkspaceTabsScrollViewer?.ScrollToRightEnd();
+                    UpdateWorkspaceTabScrollButtons();
+                }));
+            }
+
+            if (select)
+                SelectWorkspaceTab(tab);
+            return tab;
+        }
+
+        private void CaptureWorkspaceSelection(VfxWorkspaceTab tab)
+        {
+            if (tab?.Kind != VfxWorkspaceTabKind.Skin || tab.Payload is not VfxSkinItem)
+                return;
+
+            // The tree changes SelectedSkin before PropertyChanged reaches us, while the current
+            // System/Clip/Spell collections still belong to the previously active tab. Capture those
+            // live selections here instead of keying the snapshot off SelectedSkin identity.
+            tab.SelectedSystemPathHash = _model.SelectedSystem?.PathHash;
+            tab.SelectedAnimationFilePath = _model.SelectedAnimation?.FilePath;
+            tab.SelectedAnimationGraphPathHash = _model.SelectedAnimation?.Clip?.GraphPathHash;
+            tab.SelectedAnimationOwnerPathHash = _model.SelectedAnimation?.Clip?.OwnerPathHash;
+            tab.SelectedSpellPathHash = _model.SelectedSpell?.PathHash;
+            tab.AnimationParameter = _model.AnimationParameter;
+        }
+
+        private void RestoreWorkspaceSelection(VfxWorkspaceTab tab, string loadedBinPath)
+        {
+            if (tab?.Kind != VfxWorkspaceTabKind.Skin ||
+                tab.Payload is not VfxSkinItem skin ||
+                !ReferenceEquals(_model.SelectedWorkspaceTab, tab) ||
+                !ReferenceEquals(_model.SelectedSkin, skin) ||
+                !string.Equals(Path.GetFullPath(skin.BinPath), Path.GetFullPath(loadedBinPath), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (tab.SelectedSystemPathHash is uint systemHash)
+            {
+                VfxSystemDiagnosticItem system = _model.Systems.FirstOrDefault(item => item.PathHash == systemHash);
+                if (system != null)
+                {
+                    _model.IsRawSystemsMode = true;
+                    _model.SelectedSystem = system;
+                    return;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(tab.SelectedAnimationFilePath) ||
+                tab.SelectedAnimationOwnerPathHash.HasValue)
+            {
+                AnimationClipCatalogItem animation = _model.DetectedAnimations.FirstOrDefault(item =>
+                    (!tab.SelectedAnimationGraphPathHash.HasValue || item.Clip?.GraphPathHash == tab.SelectedAnimationGraphPathHash) &&
+                    (!tab.SelectedAnimationOwnerPathHash.HasValue || item.Clip?.OwnerPathHash == tab.SelectedAnimationOwnerPathHash) &&
+                    (string.IsNullOrWhiteSpace(tab.SelectedAnimationFilePath) ||
+                     string.Equals(item.FilePath, tab.SelectedAnimationFilePath, StringComparison.OrdinalIgnoreCase)));
+                if (animation != null)
+                {
+                    _model.IsAnimationMode = true;
+                    _model.SelectedAnimation = animation;
+                    if (tab.AnimationParameter.HasValue &&
+                        (_model.AnimationParameter != tab.AnimationParameter || animation.HasParameterValues))
+                    {
+                        _model.AnimationParameter = tab.AnimationParameter;
+                    }
+                    return;
+                }
+            }
+
+            if (tab.SelectedSpellPathHash is uint spellHash)
+            {
+                VfxSpellBrowserItem spell = FindSpellByPathHash(skin.SpellItems, spellHash);
+                if (spell != null)
+                {
+                    _model.IsAnimationMode = true;
+                    _model.SelectedSpell = spell;
+                }
+            }
+        }
+
+        private static VfxSpellBrowserItem FindSpellByPathHash(IEnumerable<object> items, uint pathHash)
+        {
+            foreach (object item in items ?? Array.Empty<object>())
+            {
+                if (item is VfxSpellBrowserItem spell && spell.PathHash == pathHash)
+                    return spell;
+                if (item is VfxBrowserFolder folder)
+                {
+                    VfxSpellBrowserItem nested = FindSpellByPathHash(folder.Children, pathHash);
+                    if (nested != null) return nested;
+                }
+            }
+            return null;
+        }
+
+        private void SelectWorkspaceTab(VfxWorkspaceTab tab)
+        {
+            if (tab == null) return;
+            VfxWorkspaceTab previous = _model.SelectedWorkspaceTab;
+            if (!ReferenceEquals(previous, tab))
+                CaptureWorkspaceSelection(previous);
+            _model.SelectedWorkspaceTab = tab;
+        }
+
+        private void ActivateWorkspaceTab(VfxWorkspaceTab tab)
+        {
+            if (tab == null || _isCleanedUp || ReferenceEquals(_model.SelectedWorkspaceTab, tab)) return;
+            _isSwitchingWorkspaceTab = true;
+            try
+            {
+                SelectWorkspaceTab(tab);
+                switch (tab.Kind)
+                {
+                    case VfxWorkspaceTabKind.Skin when tab.Payload is VfxSkinItem skin:
+                        _pendingWorkspaceRestoreTab = tab;
+                        if (_mapSceneRuntime != null)
+                            CancelMapLoadAndClearScene();
+                        _model.SelectedMapNode = null;
+                        if (!ReferenceEquals(_model.SelectedSkin, skin))
+                            _model.SelectedSkin = skin;
+                        else if (_browserSkin == null)
+                            BindBrowserSkin();
+                        break;
+
+                    case VfxWorkspaceTabKind.Map when tab.Payload is MapBrowserNode mapNode:
+                        _pendingWorkspaceRestoreTab = null;
+                        if (_model.SelectedSkin != null || _championModel != null)
+                        {
+                            ClearLoadedSkinState();
+                            _model.SelectedSkin = null;
+                        }
+                        _model.SelectedMapNode = mapNode;
+                        HandleMapBrowserSelection(mapNode);
+                        break;
+                }
+            }
+            finally
+            {
+                _isSwitchingWorkspaceTab = false;
+            }
+        }
+
+        private void WorkspaceTab_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Left ||
+                (sender as FrameworkElement)?.DataContext is not VfxWorkspaceTab tab)
+                return;
+            ActivateWorkspaceTab(tab);
+            e.Handled = true;
+        }
+
+        private void CloseWorkspaceTab_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if ((sender as FrameworkElement)?.DataContext is not VfxWorkspaceTab tab) return;
+
+            int index = _model.WorkspaceTabs.IndexOf(tab);
+            bool wasSelected = ReferenceEquals(_model.SelectedWorkspaceTab, tab);
+            if (index < 0) return;
+            _model.WorkspaceTabs.RemoveAt(index);
+            _model.NotifyWorkspaceTabsChanged();
+            Dispatcher.BeginInvoke(new Action(UpdateWorkspaceTabScrollButtons));
+
+            if (!wasSelected) return;
+            VfxWorkspaceTab next = _model.WorkspaceTabs.Count == 0
+                ? null
+                : _model.WorkspaceTabs[Math.Max(0, Math.Min(index, _model.WorkspaceTabs.Count - 1))];
+            if (next != null)
+            {
+                ActivateWorkspaceTab(next);
+                return;
+            }
+
+            _isSwitchingWorkspaceTab = true;
+            try
+            {
+                _model.SelectedWorkspaceTab = null;
+                CancelMapLoadAndClearScene();
+                ClearLoadedSkinState();
+                _model.SelectedSkin = null;
+                _model.SelectedMapNode = null;
+            }
+            finally
+            {
+                _isSwitchingWorkspaceTab = false;
+            }
+        }
+
+        private void WorkspaceTabsScrollLeft_Click(object sender, RoutedEventArgs e)
+            => WorkspaceTabsScrollViewer?.ScrollToHorizontalOffset(
+                Math.Max(0, WorkspaceTabsScrollViewer.HorizontalOffset - 180));
+
+        private void WorkspaceTabsScrollRight_Click(object sender, RoutedEventArgs e)
+            => WorkspaceTabsScrollViewer?.ScrollToHorizontalOffset(
+                WorkspaceTabsScrollViewer.HorizontalOffset + 180);
+
+        private void WorkspaceTabsScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+            => UpdateWorkspaceTabScrollButtons();
+
+        private void UpdateWorkspaceTabScrollButtons()
+        {
+            if (WorkspaceTabsScrollViewer == null ||
+                WorkspaceTabsScrollLeftButton == null ||
+                WorkspaceTabsScrollRightButton == null)
+                return;
+
+            const double epsilon = 0.5;
+            bool overflows = WorkspaceTabsScrollViewer.ScrollableWidth > epsilon;
+            WorkspaceTabsScrollLeftButton.Visibility = overflows && WorkspaceTabsScrollViewer.HorizontalOffset > epsilon
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            WorkspaceTabsScrollRightButton.Visibility = overflows &&
+                                                          WorkspaceTabsScrollViewer.HorizontalOffset < WorkspaceTabsScrollViewer.ScrollableWidth - epsilon
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void ClearWorkspaceTabs()
+        {
+            _model.SelectedWorkspaceTab = null;
+            _model.WorkspaceTabs.Clear();
+            _model.NotifyWorkspaceTabsChanged();
+            Dispatcher.BeginInvoke(new Action(UpdateWorkspaceTabScrollButtons));
+        }
+
         private void OnModelPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(VfxInspectorModel.SelectedSkin))
             {
+                if (_model.SelectedSkin != null && !_isSwitchingWorkspaceTab)
+                {
+                    if (_mapSceneRuntime != null)
+                        CancelMapLoadAndClearScene();
+                    _pendingWorkspaceRestoreTab = EnsureSkinWorkspaceTab(_model.SelectedSkin);
+                }
                 BindBrowserSkin();
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedSystem))
@@ -1586,6 +1876,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _scanCancellation?.Cancel();
             _binCancellation?.Cancel();
+            ClearWorkspaceTabs();
             CancelMapLoadAndClearScene();
             _mapClipCancellation?.Dispose();
             _mapClipCancellation = null;
@@ -1696,8 +1987,9 @@ namespace AssetsManager.Views.Controls.Viewer
             var operation = _scanCancellation;
             CancelMapLoadAndClearScene();
 
-            // A folder scan is discovery-only. Drop any previously loaded skin/model before
+            // A folder scan is discovery-only. Drop any previously loaded workspace before
             // populating the new catalog so the project opens in a neutral, collapsed state.
+            ClearWorkspaceTabs();
             ClearLoadedSkinState();
             _model.SelectedSkin = null;
             _model.DetectedSkins.Clear();
@@ -2444,6 +2736,16 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (node.Kind == MapBrowserNodeKind.MapFile && node.Payload is MapSceneSource source)
             {
+                if (!_isSwitchingWorkspaceTab)
+                {
+                    EnsureMapWorkspaceTab(node);
+                    if (_model.SelectedSkin != null || _championModel != null)
+                    {
+                        ClearLoadedSkinState();
+                        _model.SelectedSkin = null;
+                    }
+                }
+
                 if (_mapSceneRuntime?.Scene?.Source?.Map?.Equals(source.Map) == true &&
                     string.Equals(
                         _mapSceneRuntime.Scene.Source.SelectedMapFilePath,
@@ -2992,6 +3294,7 @@ namespace AssetsManager.Views.Controls.Viewer
             ClearLoadedSkinState();
             _binCancellation = new System.Threading.CancellationTokenSource();
             var operation = _binCancellation;
+            VfxWorkspaceTab restoreTab = _pendingWorkspaceRestoreTab;
 
             try
             {
@@ -3035,6 +3338,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 _model.LogMessages.Add($"[BIN SUCCESS] Extracted {_model.Systems.Count} VFX systems.");
                 _model.StatusText = $"Loaded {_model.Systems.Count} systems from {Path.GetFileName(binFilePath)}.";
+
+                if (restoreTab != null && ReferenceEquals(_pendingWorkspaceRestoreTab, restoreTab))
+                {
+                    _pendingWorkspaceRestoreTab = null;
+                    RestoreWorkspaceSelection(restoreTab, binFilePath);
+                }
 
                 // Selecting a skin loads its owner model and browser data only. A VFX system
                 // starts exclusively from an explicit System selection in the browser.

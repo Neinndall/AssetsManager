@@ -304,6 +304,7 @@ internal static class VfxFolderCatalog
             string area = areaAt >= 0 && areaAt < segments.Length
                 ? segments[areaAt].ToLowerInvariant()
                 : string.Empty;
+            entry.OwnerName = PrettyCharacterName(character);
 
             switch (area)
             {

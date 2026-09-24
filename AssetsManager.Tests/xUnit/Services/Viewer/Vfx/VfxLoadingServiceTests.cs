@@ -1193,6 +1193,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 VfxBrowserFolder skins = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[0]);
                 VfxSkinItem skin = Assert.IsType<VfxSkinItem>(Assert.Single(skins.Children));
                 Assert.Equal("Skin 1", skin.Title);
+                Assert.Equal("PetChibiYunara", skin.OwnerName);
                 Assert.Equal(new[] { "Systems", "Clips", "Spells" }, skin.Sections.Select(section => section.Title));
 
                 VfxBrowserFolder spellGroup = Assert.IsType<VfxBrowserFolder>(Assert.Single(skin.SpellItems));

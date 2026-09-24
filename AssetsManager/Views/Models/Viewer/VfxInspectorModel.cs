@@ -615,6 +615,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         private string _displayName;
         private string _browserTitle;
+        private string _ownerName;
         private string _binPath;
         private int _skinIndex;
 
@@ -634,6 +635,12 @@ namespace AssetsManager.Views.Models.Viewer
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Title));
             }
+        }
+
+        public string OwnerName
+        {
+            get => _ownerName;
+            set { if (_ownerName == value) return; _ownerName = value; OnPropertyChanged(); }
         }
 
         public string BinPath
@@ -691,6 +698,7 @@ namespace AssetsManager.Views.Models.Viewer
     {
         private string _rootPath;
         private VfxSkinItem _selectedSkin;
+        private VfxWorkspaceTab _selectedWorkspaceTab;
         private string _searchQuery;
         private VfxSystemDiagnosticItem _selectedSystem;
         private AnimationClipCatalogItem _selectedAnimation;
@@ -769,6 +777,7 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsTrailRig => _rigPreset == VfxRigPreset.Trail;
 
         public ObservableCollection<object> BrowserRoots { get; } = new();
+        public ObservableCollection<VfxWorkspaceTab> WorkspaceTabs { get; } = new();
         public ObservableCollection<VfxSkinItem> DetectedSkins { get; } = new();
         public ObservableCollection<AnimationClipCatalogItem> DetectedAnimations { get; } = new();
         public ObservableCollection<float> AnimationParameterValues { get; } = new();
@@ -1001,7 +1010,48 @@ namespace AssetsManager.Views.Models.Viewer
         public string RootPath
         {
             get => _rootPath;
-            set { _rootPath = value; OnPropertyChanged(); }
+            set
+            {
+                if (string.Equals(_rootPath, value, StringComparison.OrdinalIgnoreCase)) return;
+                _rootPath = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ProjectName));
+                OnPropertyChanged(nameof(ProjectPath));
+                OnPropertyChanged(nameof(HasProject));
+            }
+        }
+
+        public string ProjectName
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(_rootPath)) return "No project";
+                string trimmed = _rootPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+                string name = System.IO.Path.GetFileName(trimmed);
+                return string.IsNullOrWhiteSpace(name) ? trimmed : name;
+            }
+        }
+
+        public string ProjectPath => _rootPath ?? string.Empty;
+        public bool HasProject => !string.IsNullOrWhiteSpace(_rootPath);
+        public bool HasWorkspaceTabs => WorkspaceTabs.Count > 0;
+
+        public VfxWorkspaceTab SelectedWorkspaceTab
+        {
+            get => _selectedWorkspaceTab;
+            set
+            {
+                if (ReferenceEquals(_selectedWorkspaceTab, value)) return;
+                if (_selectedWorkspaceTab != null) _selectedWorkspaceTab.IsSelected = false;
+                _selectedWorkspaceTab = value;
+                if (_selectedWorkspaceTab != null) _selectedWorkspaceTab.IsSelected = true;
+                OnPropertyChanged();
+            }
+        }
+
+        public void NotifyWorkspaceTabsChanged()
+        {
+            OnPropertyChanged(nameof(HasWorkspaceTabs));
         }
 
         public VfxSkinItem SelectedSkin

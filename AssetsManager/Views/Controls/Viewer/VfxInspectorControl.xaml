@@ -154,91 +154,59 @@
 
     <Grid Background="{StaticResource SidebarBackground}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- 0: Top Toolbar / ROOT Selector -->
-            <RowDefinition Height="*"/>    <!-- 1: Main Management Area -->
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- 0. TOP TOOLBAR: Extracted asset folder -->
-        <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="20,9">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/> <!-- Title / Metadata -->
-                    <ColumnDefinition Width="*"/>    <!-- Tools Capsule -->
-                </Grid.ColumnDefinitions>
-
-                <!-- Left: Title & Subtitle -->
-                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="VFX STUDIO" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
-                    <TextBlock Text="Browse maps, skins, effects and animations" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
-                </StackPanel>
-
-                <!-- Right: asset folder selection -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,4"
-                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <WrapPanel VerticalAlignment="Center">
-                            <!-- ROOT Path Group -->
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="FolderSearchOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Folder:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBox x:Name="RootPathTextBox" Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource ModernTextBox}" Height="32" Padding="10,0" VerticalContentAlignment="Center" FontSize="11" Width="220"
-                                         VerticalAlignment="Center" KeyDown="RootPathTextBox_KeyDown"/>
-                                <Button Click="BrowseRoot_Click"
-                                        Style="{StaticResource BrowseButtonStyle}" Width="32" Height="32" Padding="0" Margin="6,0,0,0" ToolTip="Browse ROOT Directory">
-                                    <materialIcons:MaterialIcon Kind="FolderOpen" Width="16" Height="16"/>
-                                </Button>
-                            </StackPanel>
-                        </WrapPanel>
-                    </Border>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- 1. MAIN MANAGEMENT WORKSPACE -->
-        <Grid Grid.Row="1" Margin="16,12">
+        <!-- VFX STUDIO WORKSPACE -->
+        <Grid Grid.Row="0" Margin="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="340"/> <!-- Left: Systems List -->
-                <ColumnDefinition Width="8"/>   <!-- Splitter -->
+                <ColumnDefinition Width="320"/> <!-- Left: Project asset browser -->
+                <ColumnDefinition Width="6"/>   <!-- Splitter -->
                 <ColumnDefinition Width="*"/>   <!-- Right: 3D Viewport & Systems Breakdown -->
             </Grid.ColumnDefinitions>
 
-            <!-- LEFT PANEL: VFX Systems List -->
-            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="10" 
-                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                <Grid Margin="12">
+            <!-- LEFT PANEL: project browser, intentionally structural rather than a nested card -->
+            <Border Grid.Column="0" Background="{StaticResource SidebarBackground}"
+                    BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0">
+                <Grid Margin="12,10,10,10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/> <!-- Header -->
                         <RowDefinition Height="Auto"/> <!-- Search Box -->
                         <RowDefinition Height="*"/>    <!-- Systems ListView -->
                     </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                    <Grid Grid.Row="0" Margin="0,0,0,9">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0"
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="LayersOutline" Width="15" Height="15"
+                                                    Foreground="{StaticResource AccentBrush}" Margin="0,0,7,0"
+                                                    VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" ToolTip="{Binding ProjectPath}">
+                            <TextBlock Text="ASSETS" FontSize="12.5" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimary}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                <materialIcons:MaterialIcon Kind="FolderOutline" Width="12" Height="12"
+                                                            Foreground="{StaticResource TextMuted}" Margin="0,0,4,0"/>
+                                <TextBlock Text="{Binding ProjectName}" FontSize="9.5" Foreground="{StaticResource TextMuted}"
+                                           MaxWidth="205" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Button Grid.Column="2"
                                 Click="ExitStudio_Click"
                                 Style="{StaticResource TransparentIconButton}"
-                                Width="24" Height="24"
-                                Padding="0"
-                                Margin="0,0,6,0"
+                                Width="30" Height="30" Padding="0" Margin="0,0,4,0"
                                 ToolTip="Exit VFX Studio">
-                            <materialIcons:MaterialIcon Kind="ArrowLeft" Width="15" Height="15"/>
+                            <materialIcons:MaterialIcon Kind="ExitToApp" Width="16" Height="16"/>
                         </Button>
-                        <materialIcons:MaterialIcon Grid.Column="1" Kind="LayersOutline" Width="14" Height="14"
-                                                    Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"
-                                                    VerticalAlignment="Center"/>
-                        <TextBlock Grid.Column="2" Text="ASSETS" FontSize="13" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                        <Border Grid.Column="3" Background="#0FFFFFFF" BorderBrush="{StaticResource BorderColor}"
-                                BorderThickness="1" CornerRadius="5" Padding="7,2" VerticalAlignment="Center">
-                            <TextBlock Text="PROJECT"
-                                       FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}"/>
-                        </Border>
+                        <Button Grid.Column="3" Click="BrowseRoot_Click"
+                                Style="{StaticResource TransparentIconButton}" Width="30" Height="30" Padding="0"
+                                ToolTip="Open another project folder">
+                            <materialIcons:MaterialIcon Kind="FolderOpen" Width="16" Height="16"/>
+                        </Button>
                     </Grid>
 
                     <!-- Search Filter (visible for both modes) -->
@@ -260,16 +228,88 @@
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="Transparent"/>
 
-            <!-- RIGHT PANEL: 3D Viewport & Independent Timeline Deck (Split Vertically) -->
-            <Grid Grid.Column="2">
+            <!-- RIGHT PANEL: workspace tabs + 3D viewport + independent timeline deck -->
+            <Grid Grid.Column="2" Margin="6,8,10,10">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>               <!-- Workspace tabs -->
                     <RowDefinition Height="3*" MinHeight="220"/> <!-- 3D Viewport Card -->
                     <RowDefinition Height="6"/>                  <!-- Resize Splitter -->
                     <RowDefinition Height="2*" MinHeight="170"/> <!-- Timeline Deck Card -->
                 </Grid.RowDefinitions>
 
+                <!-- Open Skin / MAP workspaces. Mirrors Explorer tab interaction without coupling to FileSystemNodeModel. -->
+                <Border Grid.Row="0" Margin="0,0,0,6" Padding="0,0,0,1"
+                        BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1"
+                        Visibility="{Binding HasWorkspaceTabs, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid Height="34">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="WorkspaceTabsScrollLeftButton" Grid.Column="0" Click="WorkspaceTabsScrollLeft_Click"
+                                Style="{StaticResource TransparentIconButton}" Width="24" Height="28" Padding="0"
+                                Visibility="Collapsed" ToolTip="Scroll tabs left">
+                            <materialIcons:MaterialIcon Kind="ChevronLeft" Width="14" Height="14"/>
+                        </Button>
+                        <ScrollViewer x:Name="WorkspaceTabsScrollViewer" Grid.Column="1"
+                                      HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                      ScrollChanged="WorkspaceTabsScrollViewer_ScrollChanged">
+                            <ItemsControl ItemsSource="{Binding WorkspaceTabs}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type models:VfxWorkspaceTab}">
+                                        <Border x:Name="WorkspaceTabBorder" Margin="2,0" MinHeight="30"
+                                                Background="Transparent" BorderBrush="Transparent" BorderThickness="0,2,0,0"
+                                                CornerRadius="4,4,0,0" MouseLeftButtonDown="WorkspaceTab_MouseLeftButtonDown">
+                                            <StackPanel Orientation="Horizontal" Margin="8,4,4,4" VerticalAlignment="Center">
+                                                <materialIcons:MaterialIcon x:Name="WorkspaceTabIcon" Kind="PaletteOutline" Width="14" Height="14"
+                                                                            Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"/>
+                                                <TextBlock Text="{Binding Title}" FontSize="10.5" Foreground="{StaticResource TextPrimary}"
+                                                           VerticalAlignment="Center" MaxWidth="190" TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding Subtitle}"/>
+                                                <Button x:Name="WorkspaceTabCloseButton" Click="CloseWorkspaceTab_Click"
+                                                        Margin="8,0,0,0" Visibility="Hidden"
+                                                        Style="{StaticResource SmallCloseButtonStyle}"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:VfxWorkspaceTabKind.Map}">
+                                                <Setter TargetName="WorkspaceTabIcon" Property="Kind" Value="Map"/>
+                                                <Setter TargetName="WorkspaceTabIcon" Property="Foreground" Value="#38BDF8"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter TargetName="WorkspaceTabBorder" Property="Background" Value="{StaticResource CardBackground}"/>
+                                                <Setter TargetName="WorkspaceTabBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                <Setter TargetName="WorkspaceTabCloseButton" Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
+                                                    <Condition Binding="{Binding IsSelected}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter TargetName="WorkspaceTabBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                                <Setter TargetName="WorkspaceTabCloseButton" Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <Button x:Name="WorkspaceTabsScrollRightButton" Grid.Column="2" Click="WorkspaceTabsScrollRight_Click"
+                                Style="{StaticResource TransparentIconButton}" Width="24" Height="28" Padding="0"
+                                Visibility="Collapsed" ToolTip="Scroll tabs right">
+                            <materialIcons:MaterialIcon Kind="ChevronRight" Width="14" Height="14"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
                 <!-- 1. 3D REAL-TIME VIEWPORT CARD (Edge-to-Edge) -->
-                <Grid Grid.Row="0">
+                <Grid Grid.Row="1">
                     <!-- Base background with rounded corners -->
                     <Border Background="#0A0A0E" CornerRadius="10"/>
 
@@ -1179,11 +1219,11 @@
                 </Grid>
 
                 <!-- SPLITTER (Seamless Viewport vs Timeline height adjust) -->
-                <GridSplitter Grid.Row="1" Height="8" HorizontalAlignment="Stretch" VerticalAlignment="Center" 
+                <GridSplitter Grid.Row="2" Height="8" HorizontalAlignment="Stretch" VerticalAlignment="Center"
                               Background="Transparent" Cursor="SizeNS" ShowsPreview="False"/>
 
                 <!-- 2. TIMELINE & TRANSPORT DECK (Independent Card outside Viewport, LTK-Manager / DAW Studio Style) -->
-                <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="10"
+                <Border Grid.Row="3" Background="{StaticResource CardBackground}" CornerRadius="10"
                         BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,8">
                     <Grid>
                         <Grid>

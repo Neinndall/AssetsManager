@@ -82,6 +82,41 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void InspectorProjectIdentityAndWorkspaceTabsNotifyBindings()
+        {
+            var model = new VfxInspectorModel();
+            var changed = new List<string>();
+            model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+            model.RootPath = @"C:\mods\AatroxProject";
+
+            Assert.Equal("AatroxProject", model.ProjectName);
+            Assert.Equal(@"C:\mods\AatroxProject", model.ProjectPath);
+            Assert.True(model.HasProject);
+            Assert.Contains(nameof(VfxInspectorModel.ProjectName), changed);
+            Assert.Contains(nameof(VfxInspectorModel.ProjectPath), changed);
+            Assert.Contains(nameof(VfxInspectorModel.HasProject), changed);
+
+            var first = new VfxWorkspaceTab { Key = "skin:0", Title = "Aatrox · Skin 0", Kind = VfxWorkspaceTabKind.Skin };
+            var second = new VfxWorkspaceTab { Key = "skin:1", Title = "Aatrox · Skin 1", Kind = VfxWorkspaceTabKind.Skin };
+            model.WorkspaceTabs.Add(first);
+            model.WorkspaceTabs.Add(second);
+            model.NotifyWorkspaceTabsChanged();
+            Assert.True(model.HasWorkspaceTabs);
+
+            model.SelectedWorkspaceTab = first;
+            Assert.True(first.IsSelected);
+            Assert.False(second.IsSelected);
+
+            model.SelectedWorkspaceTab = second;
+            Assert.False(first.IsSelected);
+            Assert.True(second.IsSelected);
+            Assert.Same(second, model.SelectedWorkspaceTab);
+            Assert.Contains(nameof(VfxInspectorModel.HasWorkspaceTabs), changed);
+            Assert.Contains(nameof(VfxInspectorModel.SelectedWorkspaceTab), changed);
+        }
+
+        [Fact]
         public void InspectorEmitterSelectionMovesTheSelectedMarker()
         {
             var model = new VfxInspectorModel();
