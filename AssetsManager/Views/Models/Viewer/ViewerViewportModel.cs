@@ -242,7 +242,7 @@ namespace AssetsManager.Views.Models.Viewer
             ShowSkybox = false;
             PreviewViewMode = VfxPreviewViewMode.Lit;
             PreviewWireOverlay = false;
-            ShadersEnabled = false;
+            ShadersEnabled = true;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

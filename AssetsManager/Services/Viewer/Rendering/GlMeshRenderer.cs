@@ -93,6 +93,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uFresnelColor;
         private int _uFresnelPower;
         private int _uFresnelStrength;
+        private int _uFresnelMode;
         private int _uFresnelNoiseTiling;
         private int _uFresnelNoiseSpeed;
         private int _uFresnelMaskChannel;
@@ -124,6 +125,12 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uIridescenceAlphaMinMax;
         private int _uIridescenceDiffuseFadeMask;
         private int _uIridescenceMaskChannel;
+        private int _uCustomAlphaMaskIndex;
+        private int _uCustomAlphaUvScale;
+        private int _uCustomAlphaScrollSpeed;
+        private int _uCustomAlphaBlueUvScale;
+        private int _uCustomAlphaBlueScrollSpeed;
+        private int _uCustomAlphaBias;
         private int _uWaveDirection;
         private int _uWaveSpeed;
         private int _uWaveFrequency;
@@ -419,6 +426,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uFresnelColor = gl.GetUniformLocation(_program, "uFresnelColor");
             _uFresnelPower = gl.GetUniformLocation(_program, "uFresnelPower");
             _uFresnelStrength = gl.GetUniformLocation(_program, "uFresnelStrength");
+            _uFresnelMode = gl.GetUniformLocation(_program, "uFresnelMode");
             _uFresnelNoiseTiling = gl.GetUniformLocation(_program, "uFresnelNoiseTiling");
             _uFresnelNoiseSpeed = gl.GetUniformLocation(_program, "uFresnelNoiseSpeed");
             _uFresnelMaskChannel = gl.GetUniformLocation(_program, "uFresnelMaskChannel");
@@ -450,6 +458,12 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uIridescenceAlphaMinMax = gl.GetUniformLocation(_program, "uIridescenceAlphaMinMax");
             _uIridescenceDiffuseFadeMask = gl.GetUniformLocation(_program, "uIridescenceDiffuseFadeMask");
             _uIridescenceMaskChannel = gl.GetUniformLocation(_program, "uIridescenceMaskChannel");
+            _uCustomAlphaMaskIndex = gl.GetUniformLocation(_program, "uCustomAlphaMaskIndex");
+            _uCustomAlphaUvScale = gl.GetUniformLocation(_program, "uCustomAlphaUvScale");
+            _uCustomAlphaScrollSpeed = gl.GetUniformLocation(_program, "uCustomAlphaScrollSpeed");
+            _uCustomAlphaBlueUvScale = gl.GetUniformLocation(_program, "uCustomAlphaBlueUvScale");
+            _uCustomAlphaBlueScrollSpeed = gl.GetUniformLocation(_program, "uCustomAlphaBlueScrollSpeed");
+            _uCustomAlphaBias = gl.GetUniformLocation(_program, "uCustomAlphaBias");
             _uWaveDirection = gl.GetUniformLocation(_program, "uWaveDirection");
             _uWaveSpeed = gl.GetUniformLocation(_program, "uWaveSpeed");
             _uWaveFrequency = gl.GetUniformLocation(_program, "uWaveFrequency");
@@ -780,6 +794,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             SetVector4(_uFresnelColor, fresnel?.Color ?? Vector4.One);
             _gl.Uniform1(_uFresnelPower, fresnel?.Power ?? 2f);
             _gl.Uniform1(_uFresnelStrength, fresnel?.Strength ?? 0f);
+            _gl.Uniform1(_uFresnelMode, (int)(fresnel?.Mode ?? ModelFresnelMode.Additive));
             SetVector2(_uFresnelNoiseTiling, fresnel?.NoiseTiling ?? Vector2.One);
             SetVector2(_uFresnelNoiseSpeed, fresnel?.NoiseSpeed ?? Vector2.Zero);
             _gl.Uniform1(_uFresnelMaskChannel, fresnel?.MaskChannel ?? 0);
@@ -831,6 +846,14 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _uIridescenceDiffuseFadeMask,
                 applyIridescenceAlpha ? iridescence.DiffuseFadeMaskValue : 0f);
             _gl.Uniform1(_uIridescenceMaskChannel, iridescence?.MaskChannel ?? 0);
+
+            ModelScrollingCustomAlphaDefinition customAlpha = effect.ScrollingCustomAlpha;
+            _gl.Uniform1(_uCustomAlphaMaskIndex, TextureIndex(textureBindings, customAlpha?.MaskTextureName));
+            SetVector2(_uCustomAlphaUvScale, customAlpha?.UvScale ?? Vector2.One);
+            SetVector2(_uCustomAlphaScrollSpeed, customAlpha?.ScrollSpeed ?? Vector2.Zero);
+            SetVector2(_uCustomAlphaBlueUvScale, customAlpha?.BlueUvScale ?? Vector2.One);
+            SetVector2(_uCustomAlphaBlueScrollSpeed, customAlpha?.BlueScrollSpeed ?? Vector2.Zero);
+            _gl.Uniform1(_uCustomAlphaBias, customAlpha?.AlphaBias ?? 0f);
 
             ModelWaveDefinition wave = effect.Wave;
             _gl.Uniform3(_uWaveDirection, wave?.Direction ?? Vector3.UnitY);

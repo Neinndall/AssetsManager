@@ -212,6 +212,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform vec4 uFresnelColor;
                     uniform float uFresnelPower;
                     uniform float uFresnelStrength;
+                    uniform int uFresnelMode;
                     uniform vec2 uFresnelNoiseTiling;
                     uniform vec2 uFresnelNoiseSpeed;
                     uniform int uFresnelMaskChannel;
@@ -243,6 +244,12 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform vec2 uIridescenceAlphaMinMax;
                     uniform float uIridescenceDiffuseFadeMask;
                     uniform int uIridescenceMaskChannel;
+                    uniform int uCustomAlphaMaskIndex;
+                    uniform vec2 uCustomAlphaUvScale;
+                    uniform vec2 uCustomAlphaScrollSpeed;
+                    uniform vec2 uCustomAlphaBlueUvScale;
+                    uniform vec2 uCustomAlphaBlueScrollSpeed;
+                    uniform float uCustomAlphaBias;
                     uniform vec4 uColorTint;
                     uniform float uAlphaCutoff;
                     uniform vec2 uMaterialUvRepeat;
@@ -338,8 +345,25 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             }
 
                             vec4 texColor = readBaseTexture(materialUv);
-                            float coverageAlpha = uMaterialUsesTextureAlpha != 0 ? texColor.a : 1.0;
-                            coverageAlpha *= uColorTint.a;
+                            float coverageAlpha;
+                            if ((uEffectKind & 4096) != 0 && uCustomAlphaMaskIndex >= 0)
+                            {
+                                vec4 customAlphaBase = sampleAux(uCustomAlphaMaskIndex, vUv);
+                                vec2 customAlphaUv = vUv * uCustomAlphaUvScale + uCustomAlphaScrollSpeed * uEffectTime;
+                                vec2 customAlphaBlueUv = vUv * uCustomAlphaBlueUvScale + uCustomAlphaBlueScrollSpeed * uEffectTime;
+                                vec4 customAlphaScrolled = sampleAux(uCustomAlphaMaskIndex, customAlphaUv);
+                                vec4 customAlphaBlue = sampleAux(uCustomAlphaMaskIndex, customAlphaBlueUv);
+                                float redCoverage = customAlphaBase.r;
+                                coverageAlpha = clamp(
+                                    (redCoverage * (customAlphaBlue.b * customAlphaScrolled.g) + uCustomAlphaBias) * redCoverage,
+                                    0.0,
+                                    1.0) * uColorTint.a;
+                            }
+                            else
+                            {
+                                coverageAlpha = (uMaterialUsesTextureAlpha != 0 ? texColor.a : 1.0) * uColorTint.a;
+                            }
+                            if (coverageAlpha <= 0.0) discard;
                             if (uAlphaCutoff > 0.0 && coverageAlpha < uAlphaCutoff) discard;
                             vec3 tintRgb = uMaterialSrgb != 0
                                 ? srgbToLinear(uColorTint.rgb)
@@ -372,16 +396,26 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                                 float gradientStrength = pow(
                                     clamp(channelValue(gradientSample, uGradientTextureChannel), 0.0, 1.0),
                                     max(uGradientSharpness, 0.001));
-                                float pulse = 1.0 + sin((uEffectTime * uPulseRate + uPulseOffset) * 6.2831853) * uPulseMax;
+                                bool hasPulseDriver = abs(uPulseRate) > 0.0001 ||
+                                    abs(uPulseMax) > 0.0001 || abs(uPulseOffset) > 0.0001;
+                                // Riot's pulse contract is sin(rate * time) * max + offset. Materials that only
+                                // scroll a gradient (and have no Pulse_* driver) keep a neutral multiplier of one.
+                                float pulse = hasPulseDriver
+                                    ? max(sin(uEffectTime * uPulseRate) * uPulseMax + uPulseOffset, 0.0)
+                                    : 1.0;
+                                // Authored bloom values are shader-space controls (Aatrox uses values as high as 10),
+                                // not a direct additive RGB multiplier. Keep the pulse, but normalize the preview
+                                // contribution so masked gradient materials do not clamp to full color-dodge every frame.
+                                float bloom = clamp(uGradientBloomIntensity * 0.05, 0.0, 1.0);
                                 float amount = clamp(
-                                    mask * uGradientStrength * gradientStrength *
-                                    max(pulse + max(uGradientBloomIntensity, 0.0), 0.0),
+                                    mask * uGradientStrength * gradientStrength * 0.1 *
+                                    max(pulse + bloom, 0.0),
                                     0.0,
                                     1.0);
                                 vec3 gradientTint = gradientSample.rgb * uGradientColor.rgb;
                                 vec3 colorDodge = min(
                                     finalColor / max(vec3(1.0) - gradientTint, vec3(0.001)),
-                                    vec3(4.0));
+                                    vec3(2.0));
                                 finalColor = mix(finalColor, colorDodge, amount);
                             }
 
@@ -478,7 +512,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             {
                                 vec3 viewDirection = normalize(uCameraPosition - vWorldPosition);
                                 float facing = max(dot(normalize(vNormal), viewDirection), 0.0);
-                                float fresnel = pow(1.0 - facing, max(uFresnelPower, 0.01));
                                 float mask = uFresnelMaskIndex >= 0
                                     ? channelValue(sampleAux(uFresnelMaskIndex, vUv), uFresnelMaskChannel)
                                     : 1.0;
@@ -492,7 +525,22 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                                         : effectNoise(uv);
                                     noise = mix(0.6, 1.2, clamp(noise, 0.0, 1.0));
                                 }
-                                finalColor += uFresnelColor.rgb * fresnel * uFresnelStrength * noise * mask;
+                                if (uFresnelMode == 1)
+                                {
+                                    // Fresnel_Basic from ShaderCache: mask * (1 - facing^size), then lerp
+                                    // both diffuse color and alpha toward Fresnel_Color.
+                                    float fresnel = max(
+                                        1.0 - pow(max(facing, 0.0001), max(uFresnelPower, 0.01)),
+                                        0.0);
+                                    float amount = clamp(mask * fresnel * uFresnelStrength * noise, 0.0, 1.0);
+                                    finalColor = mix(finalColor, uFresnelColor.rgb, amount);
+                                    texColor.a = mix(texColor.a, uFresnelColor.a, amount);
+                                }
+                                else
+                                {
+                                    float fresnel = pow(1.0 - facing, max(uFresnelPower, 0.01));
+                                    finalColor += uFresnelColor.rgb * fresnel * uFresnelStrength * noise * mask;
+                                }
                             }
 
                             if ((uEffectKind & 16) != 0)

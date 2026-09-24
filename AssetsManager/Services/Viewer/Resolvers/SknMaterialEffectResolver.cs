@@ -14,6 +14,10 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private const float Epsilon = 0.0001f;
         private static readonly uint ScrollingMaskedDiffuseBloomShader =
             Fnv1a.HashLower("Shaders/SkinnedMesh/ScrollingMaskedDiffuseBloom");
+        private static readonly uint ScrollingCustomAlphaShader =
+            Fnv1a.HashLower("Shaders/SkinnedMesh/ScrollingCustomAlpha");
+        private static readonly uint FresnelBasicShader =
+            Fnv1a.HashLower("Shaders/SkinnedMesh/Fresnel_Basic");
         private static readonly string[] MaterialMaskSamplerNames =
         {
             "Mask",
@@ -65,10 +69,38 @@ namespace AssetsManager.Services.Viewer.Resolvers
             effect = ApplyIridescence(effect, material, textureKeys);
             effect = ApplyVertexDeformation(effect, material, textureKeys);
             effect = ApplySimpleWave(effect, material);
+            effect = ApplyScrollingCustomAlpha(effect, material, textureKeys);
             effect = ApplySpecializedBaseColor(effect, material);
             return ApplyTextureSampling(effect, material, textureKeys);
         }
 
+        private static ModelMaterialEffectDefinition ApplyScrollingCustomAlpha(
+            ModelMaterialEffectDefinition effect,
+            SknMaterialDefinition material,
+            IReadOnlyList<string> textureKeys)
+        {
+            if (material.ShaderHash != ScrollingCustomAlphaShader ||
+                !material.HasSwitch("USE_RED_TO_ALPHA") ||
+                !material.HasSwitch("USE_BLUE_CHANNEL"))
+            {
+                return effect;
+            }
+
+            string maskTexture = FindSamplerKey(material, textureKeys, "Mask_Texture", "Mask");
+            if (maskTexture == null)
+                return effect;
+
+            return effect with
+            {
+                ScrollingCustomAlpha = new ModelScrollingCustomAlphaDefinition(
+                    maskTexture,
+                    ReadVector2(material.Parameters, Vector2.One, "UV_Scale"),
+                    ReadVector2(material.Parameters, Vector2.Zero, "Scroll_Speed"),
+                    ReadVector2(material.Parameters, Vector2.One, "UV_Scale_BLUE"),
+                    ReadVector2(material.Parameters, Vector2.Zero, "Scroll_Speed_BLUE"),
+                    ReadFloat(material.Parameters, 0f, "Alpha_Bias", "AlphaBias"))
+            };
+        }
         private static ModelMaterialEffectDefinition ApplySpecializedBaseColor(
             ModelMaterialEffectDefinition effect,
             SknMaterialDefinition material)
@@ -78,9 +110,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 material.Parameters.ContainsKey("GlassColor1") ||
                 material.Parameters.ContainsKey("Glass_Color") ||
                 material.Parameters.ContainsKey("GlassColor");
+            bool customAlphaOwnsBias = effect.ScrollingCustomAlpha != null;
             bool hasGlassAlpha =
-                material.Parameters.ContainsKey("Alpha_Bias") ||
-                material.Parameters.ContainsKey("AlphaBias") ||
+                (!customAlphaOwnsBias &&
+                 (material.Parameters.ContainsKey("Alpha_Bias") ||
+                  material.Parameters.ContainsKey("AlphaBias"))) ||
                 material.Parameters.ContainsKey("Glass_Alpha") ||
                 material.Parameters.ContainsKey("Transparency");
             if (!hasGlassColor && !hasGlassAlpha)
@@ -473,14 +507,18 @@ namespace AssetsManager.Services.Viewer.Resolvers
             SknMaterialDefinition material,
             IReadOnlyList<string> textureKeys)
         {
-            float strength = ReadFloat(
-                material.Parameters,
-                0f,
-                "FresnelIntensity",
-                "Fresnel_Strength",
-                "Fresnel",
-                "Fresnel_Color_Intensity",
-                "Fresnel_Size_Outer");
+            bool isBasicLerp = material.ShaderHash == FresnelBasicShader ||
+                string.Equals(material.ShaderPath, "Shaders/SkinnedMesh/Fresnel_Basic", StringComparison.OrdinalIgnoreCase);
+            float strength = isBasicLerp
+                ? 1f
+                : ReadFloat(
+                    material.Parameters,
+                    0f,
+                    "FresnelIntensity",
+                    "Fresnel_Strength",
+                    "Fresnel",
+                    "Fresnel_Color_Intensity",
+                    "Fresnel_Size_Outer");
             if (strength <= Epsilon)
                 return effect;
 
@@ -541,12 +579,14 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         "FresnelPower",
                         "Fresnel_Power",
                         "FresnelExponent",
-                        "Fresnel_Size_Inner"),
+                        "Fresnel_Size_Inner",
+                        "Fresnel_Size"),
                     strength,
                     noiseTiling,
                     noiseSpeed,
                     maskBinding?.Channel ?? inheritedMaskChannel,
-                    noiseBinding?.Channel ?? 0)
+                    noiseBinding?.Channel ?? 0,
+                    isBasicLerp ? ModelFresnelMode.LerpToColor : ModelFresnelMode.Additive)
             };
         }
 

@@ -63,6 +63,12 @@ namespace AssetsManager.Views.Models.Viewer
         int PatternChannel = 0,
         int MaskChannel = 0);
 
+    public enum ModelFresnelMode
+    {
+        Additive = 0,
+        LerpToColor = 1
+    }
+
     public sealed record ModelFresnelDefinition(
         string MaskTextureName,
         string NoiseTextureName,
@@ -72,7 +78,8 @@ namespace AssetsManager.Views.Models.Viewer
         Vector2 NoiseTiling,
         Vector2 NoiseSpeed,
         int MaskChannel = 0,
-        int NoiseChannel = 0);
+        int NoiseChannel = 0,
+        ModelFresnelMode Mode = ModelFresnelMode.Additive);
 
     public sealed record ModelBloomDefinition(
         string MaskTextureName,
@@ -119,6 +126,17 @@ namespace AssetsManager.Views.Models.Viewer
         int NoiseChannel = 0,
         int MaskChannel = 0);
 
+    public sealed record ModelScrollingCustomAlphaDefinition(
+        string MaskTextureName,
+        Vector2 UvScale,
+        Vector2 ScrollSpeed,
+        Vector2 BlueUvScale,
+        Vector2 BlueScrollSpeed,
+        float AlphaBias,
+        int BaseChannel = 0,
+        int ScrolledChannel = 1,
+        int BlueChannel = 2);
+
     public sealed record ModelIridescenceDefinition(
         string LutTextureName,
         string MaskTextureName,
@@ -151,7 +169,8 @@ namespace AssetsManager.Views.Models.Viewer
         GradientPulse = 256,
         Iridescence = 512,
         Distortion = 1024,
-        VertexDeformation = 2048
+        VertexDeformation = 2048,
+        ScrollingCustomAlpha = 4096
     }
 
     public sealed record ModelMaterialEffectDefinition
@@ -167,6 +186,7 @@ namespace AssetsManager.Views.Models.Viewer
         public ModelWaveDefinition Wave { get; init; }
         public ModelVertexDeformationDefinition VertexDeformation { get; init; }
         public ModelIridescenceDefinition Iridescence { get; init; }
+        public ModelScrollingCustomAlphaDefinition ScrollingCustomAlpha { get; init; }
         public IReadOnlyDictionary<string, ModelEffectTextureSamplingDefinition> TextureSampling { get; init; } =
             new Dictionary<string, ModelEffectTextureSamplingDefinition>(StringComparer.OrdinalIgnoreCase);
         public Vector4 MaterialTint { get; init; } = Vector4.One;
@@ -195,6 +215,7 @@ namespace AssetsManager.Views.Models.Viewer
                 if (Iridescence != null) kind |= ModelMaterialEffectKind.Iridescence;
                 if (Distortion != null) kind |= ModelMaterialEffectKind.Distortion;
                 if (VertexDeformation != null) kind |= ModelMaterialEffectKind.VertexDeformation;
+                if (ScrollingCustomAlpha != null) kind |= ModelMaterialEffectKind.ScrollingCustomAlpha;
                 return kind;
             }
         }
@@ -203,7 +224,9 @@ namespace AssetsManager.Views.Models.Viewer
         // the transparent pass so sorting/depth state match the fragment coverage.
         public bool RequiresAlphaBlend =>
             MaterialTint.W < 0.999f ||
-            Iridescence?.RequiresAlphaBlend == true;
+            Iridescence?.RequiresAlphaBlend == true ||
+            (Fresnel?.Mode == ModelFresnelMode.LerpToColor && Fresnel.Color.W < 0.999f) ||
+            ScrollingCustomAlpha != null;
 
         public IEnumerable<string> EnumerateTextureNames()
         {
@@ -227,6 +250,7 @@ namespace AssetsManager.Views.Models.Viewer
             yield return VertexDeformation?.MaskTextureName;
             yield return Iridescence?.LutTextureName;
             yield return Iridescence?.MaskTextureName;
+            yield return ScrollingCustomAlpha?.MaskTextureName;
         }
 
         public static ModelMaterialEffectDefinition None { get; } = new();

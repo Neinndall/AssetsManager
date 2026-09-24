@@ -194,8 +194,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
             bool hasAuthoredAlphaTest = TryFirst(parameters, AlphaTestNames, out Vector4 authoredAlphaTest) &&
                 authoredAlphaTest.X > 0f && authoredAlphaTest.X < 1f;
             float alphaCutoff = ResolveAlphaCutoff(parameters, macros, shaderPath);
-            Vector2 uvRepeat = baseSampler == null ? Vector2.One : ResolveUvRepeat(parameters);
-            Vector2 uvScroll = ResolveUvScroll(parameters);
+            Vector2 uvRepeat = baseSampler == null ? Vector2.One : ResolveUvRepeat(parameters, shaderPath);
+            Vector2 uvScroll = ResolveUvScroll(parameters, shaderPath);
             ModelMaterialRenderState renderState = ResolveRenderState(
                 material,
                 shaderPath,
@@ -483,8 +483,18 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return masked ? MaskedAlphaCutoff : 0f;
         }
 
-        private static Vector2 ResolveUvRepeat(IReadOnlyDictionary<string, Vector4> parameters)
+        private static Vector2 ResolveUvRepeat(
+            IReadOnlyDictionary<string, Vector4> parameters,
+            string shaderPath)
         {
+            if (IsShader(shaderPath, "Shaders/SkinnedMesh/Diffuse_Scrolling") &&
+                parameters.TryGetValue("UV_Scale", out Vector4 diffuseScrollingScale))
+            {
+                var authored = new Vector2(diffuseScrollingScale.X, diffuseScrollingScale.Y);
+                if (MathF.Abs(authored.X) > 0f && MathF.Abs(authored.Y) > 0f)
+                    return authored;
+            }
+
             if (!TryFirst(parameters, UvRepeatNames, out Vector4 value))
                 return Vector2.One;
 
@@ -494,8 +504,18 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 : Vector2.One;
         }
 
-        private static Vector2 ResolveUvScroll(IReadOnlyDictionary<string, Vector4> parameters)
+        private static Vector2 ResolveUvScroll(
+            IReadOnlyDictionary<string, Vector4> parameters,
+            string shaderPath)
         {
+            if (IsShader(shaderPath, "Shaders/SkinnedMesh/Diffuse_Scrolling"))
+            {
+                float x = parameters.TryGetValue("XScroll_Rate", out Vector4 xRate) ? xRate.X : 0f;
+                float y = parameters.TryGetValue("YScroll_Rate", out Vector4 yRate) ? yRate.X : 0f;
+                if (MathF.Abs(x) > 0f || MathF.Abs(y) > 0f)
+                    return new Vector2(x, y);
+            }
+
             if (!TryFirst(parameters, UvScrollNames, out Vector4 value))
                 return Vector2.Zero;
 
@@ -504,6 +524,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ? uv
                 : Vector2.Zero;
         }
+
+        private static bool IsShader(string shaderPath, string expected) =>
+            string.Equals(shaderPath, expected, StringComparison.OrdinalIgnoreCase);
 
         private static ModelMaterialRenderState ResolveRenderState(
             SknMaterialDefinition material,

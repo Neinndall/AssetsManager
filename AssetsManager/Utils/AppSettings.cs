@@ -287,7 +287,7 @@ namespace AssetsManager.Utils
                 }
                 if (sharedDisplayJson?["ShadersEnabled"] == null)
                 {
-                    settings.StudioParameters.ShadersEnabled = false;
+                    settings.StudioParameters.ShadersEnabled = true;
                     needsResave = true;
                 }
                 settings.MonitoredAssets ??= new SafeList<MonitoredAsset>();
@@ -371,7 +371,7 @@ namespace AssetsManager.Utils
                     TransparentBackground = false,
                     ViewMode = "Lit",
                     WireOverlay = false,
-                    ShadersEnabled = false
+                    ShadersEnabled = true
                 },
                 VfxStudio = new VfxStudioSettings
                 {
@@ -466,7 +466,7 @@ namespace AssetsManager.Utils
         public bool TransparentBackground { get; set; }
         public string ViewMode { get; set; } = "Lit";
         public bool WireOverlay { get; set; }
-        public bool ShadersEnabled { get; set; }
+        public bool ShadersEnabled { get; set; } = true;
     }
 
     public class VfxStudioSettings

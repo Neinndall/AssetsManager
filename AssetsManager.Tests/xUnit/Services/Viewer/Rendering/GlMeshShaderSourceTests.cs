@@ -160,13 +160,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
-        public void ViewerDisplayDefaultsMatchTheReferencePreview()
+        public void ViewerDisplayDefaultsPreferRealGameShaders()
         {
             AppSettings settings = AppSettings.GetDefaultSettings();
 
             Assert.Equal("Lit", settings.StudioParameters.ViewMode);
             Assert.False(settings.StudioParameters.WireOverlay);
-            Assert.False(settings.StudioParameters.ShadersEnabled);
+            Assert.True(settings.StudioParameters.ShadersEnabled);
         }
 
         [Fact]
@@ -207,17 +207,51 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
-        public void Fragment_PreservesFullGradientPulseIntensity()
+        public void Fragment_CalibratesAuthoredGradientPulseWithoutDisablingThePulse()
         {
+            Assert.Contains("bool hasPulseDriver = abs(uPulseRate) > 0.0001", GlMeshShaderSource.Fragment);
             Assert.Contains(
-                "mask * uGradientStrength * gradientStrength *",
+                "? max(sin(uEffectTime * uPulseRate) * uPulseMax + uPulseOffset, 0.0)",
                 GlMeshShaderSource.Fragment);
             Assert.Contains(
-                "max(pulse + max(uGradientBloomIntensity, 0.0), 0.0)",
+                ": 1.0;",
                 GlMeshShaderSource.Fragment);
-            Assert.Contains("vec3(4.0));", GlMeshShaderSource.Fragment);
+            Assert.Contains(
+                "float bloom = clamp(uGradientBloomIntensity * 0.05, 0.0, 1.0);",
+                GlMeshShaderSource.Fragment);
+            Assert.Contains(
+                "mask * uGradientStrength * gradientStrength * 0.1 *",
+                GlMeshShaderSource.Fragment);
+            Assert.Contains("max(pulse + bloom, 0.0)", GlMeshShaderSource.Fragment);
+            Assert.Contains("vec3(2.0));", GlMeshShaderSource.Fragment);
         }
 
+        [Fact]
+        public void Fragment_FresnelBasicMatchesShaderCacheLerpContract()
+        {
+            Assert.Contains("uniform int uFresnelMode;", GlMeshShaderSource.Fragment);
+            Assert.Contains("if (uFresnelMode == 1)", GlMeshShaderSource.Fragment);
+            Assert.Contains(
+                "1.0 - pow(max(facing, 0.0001), max(uFresnelPower, 0.01))",
+                GlMeshShaderSource.Fragment);
+            Assert.Contains("finalColor = mix(finalColor, uFresnelColor.rgb, amount);", GlMeshShaderSource.Fragment);
+            Assert.Contains("texColor.a = mix(texColor.a, uFresnelColor.a, amount);", GlMeshShaderSource.Fragment);
+        }
+
+        [Fact]
+        public void Fragment_ScrollingCustomAlphaMatchesRealAatroxBannerChannelEquation()
+        {
+            Assert.Contains("if ((uEffectKind & 4096) != 0 && uCustomAlphaMaskIndex >= 0)", GlMeshShaderSource.Fragment);
+            Assert.Contains(
+                "vec2 customAlphaUv = vUv * uCustomAlphaUvScale + uCustomAlphaScrollSpeed * uEffectTime;",
+                GlMeshShaderSource.Fragment);
+            Assert.Contains(
+                "vec2 customAlphaBlueUv = vUv * uCustomAlphaBlueUvScale + uCustomAlphaBlueScrollSpeed * uEffectTime;",
+                GlMeshShaderSource.Fragment);
+            Assert.Contains(
+                "(redCoverage * (customAlphaBlue.b * customAlphaScrolled.g) + uCustomAlphaBias) * redCoverage",
+                GlMeshShaderSource.Fragment);
+        }
         [Fact]
         public void Fragment_UsesSrgbCharacterMaterialPath()
         {
@@ -255,7 +289,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         {
             Assert.Contains("uniform int uMaterialUsesTextureAlpha;", GlMeshShaderSource.Fragment);
             Assert.Contains(
-                "float coverageAlpha = uMaterialUsesTextureAlpha != 0 ? texColor.a : 1.0;",
+                "coverageAlpha = (uMaterialUsesTextureAlpha != 0 ? texColor.a : 1.0) * uColorTint.a;",
                 GlMeshShaderSource.Fragment);
             Assert.Contains("texColor.a *= mix(1.0, fresnelAlpha, fadeMask);", GlMeshShaderSource.Fragment);
             Assert.DoesNotContain(

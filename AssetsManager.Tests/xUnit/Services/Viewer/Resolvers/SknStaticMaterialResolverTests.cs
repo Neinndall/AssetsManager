@@ -546,6 +546,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_DiffuseScrollingUsesItsAuthoredUvScaleAndSplitScrollRates()
+        {
+            SknMaterialDefinition material = CreateMaterial(
+                samplers: new[]
+                {
+                    Sampler("Diffuse_Texture", "ASSETS/Characters/Test/Test_TX_CM.tex")
+                },
+                parameters: new Dictionary<string, Vector4>
+                {
+                    ["UV_Scale"] = new Vector4(2f, 3f, 0f, 0f),
+                    ["XScroll_Rate"] = new Vector4(0.25f, 0f, 0f, 0f),
+                    ["YScroll_Rate"] = new Vector4(-0.5f, 0f, 0f, 0f)
+                },
+                shaderPath: "Shaders/SkinnedMesh/Diffuse_Scrolling");
+
+            ModelMaterialDefinition resolved = Resolve(material, new[] { "test_tx_cm" });
+
+            Assert.Equal(new Vector2(2f, 3f), resolved.UvRepeat);
+            Assert.Equal(new Vector2(0.25f, -0.5f), resolved.UvScroll);
+        }
+
+        [Fact]
         public void Resolve_DoesNotApplyGenericUvScaleToBaseDiffuse()
         {
             SknMaterialDefinition material = CreateMaterial(

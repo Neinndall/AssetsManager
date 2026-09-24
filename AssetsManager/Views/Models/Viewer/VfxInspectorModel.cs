@@ -715,7 +715,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _showPreviewStage;
         private VfxPreviewViewMode _previewViewMode = VfxPreviewViewMode.Lit;
         private bool _previewWireOverlay;
-        private bool _previewShaders;
+        private bool _previewShaders = true;
         private VfxPreviewCameraPreset _previewCameraPreset = VfxPreviewCameraPreset.Game;
         private VfxEmitterDiagnosticItem _selectedEmitter;
         private VfxCurveAuthoringItem _selectedCurveAuthoringItem;

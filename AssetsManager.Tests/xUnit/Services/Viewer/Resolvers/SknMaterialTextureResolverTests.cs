@@ -1396,6 +1396,40 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_FresnelBasicUsesShaderCacheLerpContract()
+        {
+            const string shaderPath = "Shaders/SkinnedMesh/Fresnel_Basic";
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("Mask", "ASSETS/Test/fresnel_basic_mask.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Fresnel_Color"] = new Vector4(0.25f, 0.5f, 0.75f, 0.4f),
+                    ["Fresnel_Size"] = new Vector4(3f, 0f, 0f, 0f)
+                })
+            {
+                ShaderHash = Fnv1a.HashLower(shaderPath),
+                ShaderPath = shaderPath
+            };
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "fresnel_basic_mask" },
+                new[] { "Body" });
+
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
+            Assert.Equal(ModelFresnelMode.LerpToColor, effect.Fresnel.Mode);
+            Assert.Equal("fresnel_basic_mask", effect.Fresnel.MaskTextureName);
+            Assert.Equal(new Vector4(0.25f, 0.5f, 0.75f, 0.4f), effect.Fresnel.Color);
+            Assert.Equal(3f, effect.Fresnel.Power);
+            Assert.Equal(1f, effect.Fresnel.Strength);
+            Assert.True(effect.RequiresAlphaBlend);
+        }
+
+        [Fact]
         public void Resolve_UsesWhiteFresnelWhenMaskIsAbsent()
         {
             const string materialPath = "Characters/Test/Skins/Base/Materials/Fresnel";
@@ -1416,6 +1450,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialEffectDefinition effect = resolution.ResolveMaterialDefinition("body").Effect;
             Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
+            Assert.Equal(ModelFresnelMode.Additive, effect.Fresnel.Mode);
             Assert.Null(effect.Fresnel.MaskTextureName);
         }
 
@@ -1629,6 +1664,50 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal(0.4f, effect.GradientPulse.PulseMax);
         }
 
+        [Fact]
+        public void Resolve_RecognizesScrollingCustomAlphaWithoutTurningBiasIntoUniformOpacity()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler(
+                        "Mask_Texture",
+                        "ASSETS/Characters/Aatrox/Skins/Base/Particles/Aatrox_Base_I_Banner.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Alpha_Bias"] = new Vector4(0.3f, 0f, 0f, 0f),
+                    ["UV_Scale"] = new Vector4(1f, 1f, 0f, 0f),
+                    ["Scroll_Speed"] = new Vector4(0f, -0.3f, 0f, 0f),
+                    ["UV_Scale_BLUE"] = new Vector4(1f, 1f, 0f, 0f),
+                    ["Scroll_Speed_BLUE"] = new Vector4(0f, -0.2f, 0f, 0f)
+                })
+            {
+                ShaderHash = Fnv1a.HashLower("Shaders/SkinnedMesh/ScrollingCustomAlpha"),
+                SwitchStates = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["USE_RED_TO_ALPHA"] = true,
+                    ["USE_BLUE_CHANNEL"] = true
+                }
+            };
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Banner",
+                new[] { "aatrox_base_i_banner" },
+                new[] { "Banner" });
+
+            Assert.True((effect.Kind & ModelMaterialEffectKind.ScrollingCustomAlpha) != 0);
+            Assert.NotNull(effect.ScrollingCustomAlpha);
+            Assert.Equal("aatrox_base_i_banner", effect.ScrollingCustomAlpha.MaskTextureName);
+            Assert.Equal(new Vector2(1f, 1f), effect.ScrollingCustomAlpha.UvScale);
+            Assert.Equal(new Vector2(0f, -0.3f), effect.ScrollingCustomAlpha.ScrollSpeed);
+            Assert.Equal(new Vector2(1f, 1f), effect.ScrollingCustomAlpha.BlueUvScale);
+            Assert.Equal(new Vector2(0f, -0.2f), effect.ScrollingCustomAlpha.BlueScrollSpeed);
+            Assert.Equal(0.3f, effect.ScrollingCustomAlpha.AlphaBias);
+            Assert.Equal(Vector4.One, effect.MaterialTint);
+            Assert.True(effect.RequiresAlphaBlend);
+        }
         [Fact]
         public void Resolve_RecognizesGradientScrollEnabledByMaterialSwitch()
         {
