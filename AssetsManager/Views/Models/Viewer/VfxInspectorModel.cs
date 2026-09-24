@@ -1238,7 +1238,7 @@ namespace AssetsManager.Views.Models.Viewer
             VfxPreviewViewMode.Unshaded => "Unshaded",
             VfxPreviewViewMode.Untextured => "Untextured",
             VfxPreviewViewMode.Wireframe => "Wireframe",
-            _ => "Lit"
+            _ => "Shaded"
         };
 
         public bool IsPreviewViewLit

@@ -1662,6 +1662,38 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal("aatrox_base_p_sword_mask", effect.GradientPulse.MaskTextureName);
             Assert.Equal(3f, effect.GradientPulse.PulseRate);
             Assert.Equal(0.4f, effect.GradientPulse.PulseMax);
+            Assert.Equal(ModelGradientPulseOutputMode.MainColor, effect.GradientPulse.OutputMode);
+        }
+
+        [Fact]
+        public void Resolve_AatroxVfxBaseKeepsPulseOutOfMainColorFallback()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler("Gradient_Texture", "ASSETS/Shared/Materials/Gradient_test_01.tex"),
+                    new SknMaterialSampler("Mask_Texture", "ASSETS/Characters/Aatrox/Skins/Base/Particles/Aatrox_Base_R_body_mask.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Pulse_Rate"] = new Vector4(3f, 0f, 0f, 0f),
+                    ["Pulse_Max"] = new Vector4(0.4f, 0f, 0f, 0f),
+                    ["Pulse_Offset"] = new Vector4(0.3f, 0f, 0f, 0f),
+                    ["Bloom_Intensity"] = new Vector4(10f, 0f, 0f, 0f)
+                })
+            {
+                ShaderHash = Fnv1a.HashLower("Shaders/SkinnedMesh/Aatrox_VFXBase"),
+                ShaderPath = "Shaders/SkinnedMesh/Aatrox_VFXBase"
+            };
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "gradient_test_01", "aatrox_base_r_body_mask" },
+                new[] { "Body" });
+
+            Assert.True((effect.Kind & ModelMaterialEffectKind.GradientPulse) != 0);
+            Assert.Equal(ModelGradientPulseOutputMode.BloomOnly, effect.GradientPulse.OutputMode);
         }
 
         [Fact]

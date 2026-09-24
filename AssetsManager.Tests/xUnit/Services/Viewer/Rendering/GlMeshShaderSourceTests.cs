@@ -223,6 +223,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 "mask * uGradientStrength * gradientStrength * 0.1 *",
                 GlMeshShaderSource.Fragment);
             Assert.Contains("max(pulse + bloom, 0.0)", GlMeshShaderSource.Fragment);
+            Assert.Contains("uniform int uGradientOutputMode;", GlMeshShaderSource.Fragment);
+            Assert.Contains("if (uGradientOutputMode == 0)", GlMeshShaderSource.Fragment);
             Assert.Contains("vec3(2.0));", GlMeshShaderSource.Fragment);
         }
 

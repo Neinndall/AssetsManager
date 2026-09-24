@@ -194,6 +194,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform float uPulseOffset;
                     uniform float uGradientSharpness;
                     uniform float uGradientBloomIntensity;
+                    uniform int uGradientOutputMode;
                     uniform float uGradientMaskThreshold;
                     uniform float uGradientMaskSoftness;
                     uniform int uGradientTextureChannel;
@@ -412,11 +413,17 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                                     max(pulse + bloom, 0.0),
                                     0.0,
                                     1.0);
-                                vec3 gradientTint = gradientSample.rgb * uGradientColor.rgb;
-                                vec3 colorDodge = min(
-                                    finalColor / max(vec3(1.0) - gradientTint, vec3(0.001)),
-                                    vec3(2.0));
-                                finalColor = mix(finalColor, colorDodge, amount);
+                                // Some Riot shaders use the pulse exclusively for SV_Target1 bloom/emission.
+                                // The stock fallback has no MRT bloom target, so never leak that secondary
+                                // output into the visible main color. Hexshade still executes the real shader.
+                                if (uGradientOutputMode == 0)
+                                {
+                                    vec3 gradientTint = gradientSample.rgb * uGradientColor.rgb;
+                                    vec3 colorDodge = min(
+                                        finalColor / max(vec3(1.0) - gradientTint, vec3(0.001)),
+                                        vec3(2.0));
+                                    finalColor = mix(finalColor, colorDodge, amount);
+                                }
                             }
 
                             if ((uEffectKind & 1) != 0 && uAdditiveTexIndex >= 0)

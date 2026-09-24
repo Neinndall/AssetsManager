@@ -271,7 +271,7 @@
                                 <StackPanel Orientation="Horizontal">
                                     <ToggleButton x:Name="ShadersToggleButton"
                                                   Style="{StaticResource TransparentIconToggleButton}"
-                                                  ToolTip="Shaders: use translated game shaders in Lit mode"
+                                                  ToolTip="Shaders: use translated game shaders in Shaded mode"
                                                   IsChecked="{Binding ShadersEnabled, Mode=TwoWay}"
                                                   Width="30" Height="30">
                                         <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"/>
@@ -295,7 +295,7 @@
                                         <Border Width="190" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
                                                 BorderThickness="1" CornerRadius="7" Padding="7">
                                             <StackPanel>
-                                                <RadioButton GroupName="ViewerPreviewViewMode" Content="Lit"
+                                                <RadioButton GroupName="ViewerPreviewViewMode" Content="Shaded"
                                                              Style="{StaticResource SegmentedRadioButtonStyle}"
                                                              IsChecked="{Binding IsPreviewViewLit, Mode=TwoWay}"/>
                                                 <RadioButton GroupName="ViewerPreviewViewMode" Content="Unshaded"

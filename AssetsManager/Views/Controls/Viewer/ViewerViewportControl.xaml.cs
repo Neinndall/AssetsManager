@@ -887,6 +887,9 @@ namespace AssetsManager.Views.Controls.Viewer
             model.CurrentAnimation = null;
             model.AnimationTime = 0d;
             model.IsAnimationPaused = true;
+            // Clearing the live palette returns the SKN to its authored bind/T-pose without
+            // forcing GPU bind-pose skinning (and therefore without changing the idle Lit pipeline).
+            model.SkinningMatrices = null;
         }
 
         public void RemoveAnimation(AnimationModel animationModel)

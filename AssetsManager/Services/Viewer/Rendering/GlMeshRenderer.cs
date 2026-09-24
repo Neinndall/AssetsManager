@@ -75,6 +75,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uPulseOffset;
         private int _uGradientSharpness;
         private int _uGradientBloomIntensity;
+        private int _uGradientOutputMode;
         private int _uGradientMaskThreshold;
         private int _uGradientMaskSoftness;
         private int _uGradientTextureChannel;
@@ -408,6 +409,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uPulseOffset = gl.GetUniformLocation(_program, "uPulseOffset");
             _uGradientSharpness = gl.GetUniformLocation(_program, "uGradientSharpness");
             _uGradientBloomIntensity = gl.GetUniformLocation(_program, "uGradientBloomIntensity");
+            _uGradientOutputMode = gl.GetUniformLocation(_program, "uGradientOutputMode");
             _uGradientMaskThreshold = gl.GetUniformLocation(_program, "uGradientMaskThreshold");
             _uGradientMaskSoftness = gl.GetUniformLocation(_program, "uGradientMaskSoftness");
             _uGradientTextureChannel = gl.GetUniformLocation(_program, "uGradientTextureChannel");
@@ -772,6 +774,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform1(_uPulseOffset, gradient?.PulseOffset ?? 0f);
             _gl.Uniform1(_uGradientSharpness, gradient?.Sharpness ?? 1f);
             _gl.Uniform1(_uGradientBloomIntensity, gradient?.BloomIntensity ?? 0f);
+            _gl.Uniform1(_uGradientOutputMode, (int)(gradient?.OutputMode ?? ModelGradientPulseOutputMode.MainColor));
             _gl.Uniform1(_uGradientMaskThreshold, gradient?.MaskThreshold ?? 0f);
             _gl.Uniform1(_uGradientMaskSoftness, gradient?.MaskSoftness ?? 0.05f);
             _gl.Uniform1(_uGradientTextureChannel, gradient?.TextureChannel ?? 0);

@@ -35,6 +35,12 @@ namespace AssetsManager.Views.Models.Viewer
         float Intensity,
         int MaskChannel = 0);
 
+    public enum ModelGradientPulseOutputMode
+    {
+        MainColor = 0,
+        BloomOnly = 1
+    }
+
     public sealed record ModelGradientPulseDefinition(
         string TextureName,
         string MaskTextureName,
@@ -50,7 +56,8 @@ namespace AssetsManager.Views.Models.Viewer
         float MaskThreshold,
         float MaskSoftness,
         int TextureChannel = 0,
-        int MaskChannel = 0);
+        int MaskChannel = 0,
+        ModelGradientPulseOutputMode OutputMode = ModelGradientPulseOutputMode.MainColor);
 
     public sealed record ModelDissolveDefinition(
         string PatternTextureName,

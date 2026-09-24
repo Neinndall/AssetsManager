@@ -18,6 +18,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
             Fnv1a.HashLower("Shaders/SkinnedMesh/ScrollingCustomAlpha");
         private static readonly uint FresnelBasicShader =
             Fnv1a.HashLower("Shaders/SkinnedMesh/Fresnel_Basic");
+        private static readonly uint AatroxVfxBaseShader =
+            Fnv1a.HashLower("Shaders/SkinnedMesh/Aatrox_VFXBase");
         private static readonly string[] MaterialMaskSamplerNames =
         {
             "Mask",
@@ -416,9 +418,20 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     ReadFloat(parameters, 0f, "Dissolve_Bias", "DissolveBias"),
                     ReadDissolveSoftness(parameters),
                     0,
-                    ResolveSamplerChannel(material, maskTexture, 0))
+                    ResolveSamplerChannel(material, maskTexture, 0),
+                    IsAatroxVfxBaseShader(material)
+                        ? ModelGradientPulseOutputMode.BloomOnly
+                        : ModelGradientPulseOutputMode.MainColor)
             };
         }
+
+        private static bool IsAatroxVfxBaseShader(SknMaterialDefinition material) =>
+            material != null &&
+            (material.ShaderHash == AatroxVfxBaseShader ||
+             string.Equals(
+                 material.ShaderPath,
+                 "Shaders/SkinnedMesh/Aatrox_VFXBase",
+                 StringComparison.OrdinalIgnoreCase));
 
         private static ModelMaterialEffectDefinition ApplyTransition(
             ModelMaterialEffectDefinition effect,

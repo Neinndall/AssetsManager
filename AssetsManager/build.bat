@@ -1,1 +1,12 @@
 dotnet build AssetsManager.csproj
+
+
+
+# Debugs/Publish types
+
+textSharp
+dotnet build -c Release
+
+AssetsManager
+dotnet publish -c Release -r win-x64 -p:PublishSingleFile=false
+
