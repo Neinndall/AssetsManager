@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
+using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
@@ -32,6 +33,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly List<ModelPart> _alphaRenderQueue = new();
         private readonly Dictionary<(ModelMaterialWrapMode U, ModelMaterialWrapMode V), uint> _auxiliarySamplers = new();
         private readonly Dictionary<SceneModel, long> _materialTimeOrigins = new();
+        private readonly Dictionary<SceneModel, Matrix4x4[]> _bindSkinningPalettes = new();
         private int _uViewProj;
         private int _uWorld;
         private int _uUseSkinning;
@@ -261,12 +263,20 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3 ambientColor,
             VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
             bool wireOverlay = false,
-            bool shadersEnabled = true)
+            bool shadersEnabled = false,
+            bool mirrorCharacterX = false)
         {
             if (!_ready || model == null || !model.IsVisible) return;
 
-            Matrix4x4 world = CreateWorldMatrix(model);
+            Matrix4x4 world = CreateWorldMatrix(model, mirrorCharacterX);
             UploadBoneTransforms(model.SkinningMatrices);
+            IReadOnlyList<Matrix4x4> gameSkinningMatrices = model.SkinningMatrices;
+            if ((gameSkinningMatrices == null || gameSkinningMatrices.Count == 0) &&
+                UsesGameShaders(viewMode, shadersEnabled) &&
+                model.GpuSkinningData != null)
+            {
+                gameSkinningMatrices = GetBindSkinningPalette(model);
+            }
             long now = Stopwatch.GetTimestamp();
             if (!_materialTimeOrigins.TryGetValue(model, out long materialTimeOrigin))
             {
@@ -304,6 +314,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.DepthMask(true);
             _gl.Disable(EnableCap.Blend);
             _gl.Disable(EnableCap.CullFace);
+            _gl.FrontFace(world.GetDeterminant() < 0f
+                ? FrontFaceDirection.CW
+                : FrontFaceDirection.Ccw);
             try
             {
                 if (solids)
@@ -311,10 +324,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gl.Uniform1(_uWireframePass, 0);
                     RenderParts(model, false, cameraPosition, world, viewProj, in gameFrame,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
-                        solidMode, shadersEnabled, wireframePass: false);
+                        solidMode, shadersEnabled, wireframePass: false, gameSkinningMatrices);
                     RenderParts(model, true, cameraPosition, world, viewProj, in gameFrame,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
-                        solidMode, shadersEnabled, wireframePass: false);
+                        solidMode, shadersEnabled, wireframePass: false, gameSkinningMatrices);
                 }
 
                 if (wireframe)
@@ -341,10 +354,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                     ApplyWireframeState(wireOpacity);
                     RenderParts(model, false, cameraPosition, world, viewProj, in gameFrame,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
-                        solidMode, shadersEnabled: false, wireframePass: true);
+                        solidMode, shadersEnabled: false, wireframePass: true, gameSkinningMatrices);
                     RenderParts(model, true, cameraPosition, world, viewProj, in gameFrame,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
-                        solidMode, shadersEnabled: false, wireframePass: true);
+                        solidMode, shadersEnabled: false, wireframePass: true, gameSkinningMatrices);
                 }
             }
             finally
@@ -566,7 +579,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             float materialTimeSeconds,
             VfxPreviewViewMode viewMode,
             bool shadersEnabled,
-            bool wireframePass)
+            bool wireframePass,
+            IReadOnlyList<Matrix4x4> gameSkinningMatrices)
         {
             IEnumerable<ModelPart> parts = model.Parts;
             if (alphaBlended)
@@ -598,7 +612,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ModelMaterialDefinition material = part.MaterialDefinition;
                 bool wantsGameProgram = UsesGameShaders(viewMode, shadersEnabled, wireframePass) &&
                                         resources.IsGpuSkinned &&
-                                        model.SkinningMatrices != null &&
+                                        gameSkinningMatrices is { Count: > 0 } &&
                                         material?.Program != null;
                 if (wantsGameProgram)
                     ConfigureSkinIndexAttribute(resources, integer: true);
@@ -607,7 +621,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                                  _gameShaderRuntime?.TryBindSkinned(
                                      material,
                                      world,
-                                     model.SkinningMatrices,
+                                     gameSkinningMatrices,
                                      hasTangents: resources.TangentVbo != 0,
                                      in gameFrame,
                                      path => _resources.ResolveProgramTexture(part, resources, path)) == true;
@@ -1239,12 +1253,31 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
         }
 
-        private static Matrix4x4 CreateWorldMatrix(SceneModel model)
+        private Matrix4x4[] GetBindSkinningPalette(SceneModel model)
+        {
+            int jointCount = model?.Skeleton?.Joints?.Count ?? 0;
+            if (jointCount == 0)
+                return Array.Empty<Matrix4x4>();
+
+            if (_bindSkinningPalettes.TryGetValue(model, out Matrix4x4[] cached) &&
+                cached?.Length == jointCount)
+            {
+                return cached;
+            }
+
+            Matrix4x4[] palette = AnimationService.CreateBindSkinningMatrices(model.Skeleton);
+            _bindSkinningPalettes[model] = palette;
+            return palette;
+        }
+
+        internal static Matrix4x4 CreateWorldMatrix(SceneModel model, bool mirrorCharacterX = false)
         {
             float pitch = (float)(model.RotationX * (Math.PI / 180.0));
             float yaw = (float)(model.RotationY * (Math.PI / 180.0));
             float roll = (float)(model.RotationZ * (Math.PI / 180.0));
-            return Matrix4x4.CreateScale((float)model.Scale) *
+            float scale = (float)model.Scale;
+            float scaleX = mirrorCharacterX ? -scale : scale;
+            return Matrix4x4.CreateScale(scaleX, scale, scale) *
                    Matrix4x4.CreateFromYawPitchRoll(yaw, pitch, roll) *
                    Matrix4x4.CreateTranslation(
                        (float)model.PositionX,
@@ -1275,7 +1308,10 @@ namespace AssetsManager.Services.Viewer.Rendering
         public void QueueRelease(SceneModel model)
         {
             if (model != null)
+            {
                 _materialTimeOrigins.Remove(model);
+                _bindSkinningPalettes.Remove(model);
+            }
             _resources?.QueueRelease(model);
         }
 
@@ -1301,6 +1337,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 }
                 _auxiliarySamplers.Clear();
                 _materialTimeOrigins.Clear();
+                _bindSkinningPalettes.Clear();
                 if (_boneBuffer != 0)
                     _gl?.DeleteBuffer(_boneBuffer);
                 _boneBuffer = 0;

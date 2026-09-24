@@ -236,19 +236,19 @@ namespace AssetsManager.Utils
                     }
                 }
 
-                // Ground, Grid and mesh display are shared Viewer preferences. VFX-specific state
-                // retains only controls that do not exist in the normal Viewer.
+                // The normal Viewer owns only its ordinary scene preferences. View mode, wire overlay
+                // and translated game shaders belong to VFX Studio, matching the reference viewport.
                 if (jsonObject["VfxStudio"] == null && jsonObject["StudioParameters"] is JObject studioJson &&
                     (studioJson["VfxCameraPreset"] != null || studioJson["VfxWireframeMode"] != null))
                 {
                     string legacyWire = studioJson.Value<string>("VfxWireframeMode") ?? "Off";
                     settings.VfxStudio = new VfxStudioSettings
                     {
-                        CameraPreset = studioJson.Value<string>("VfxCameraPreset") ?? "Game"
+                        CameraPreset = studioJson.Value<string>("VfxCameraPreset") ?? "Game",
+                        ViewMode = LegacyVfxViewMode(legacyWire),
+                        WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase),
+                        ShadersEnabled = false
                     };
-                    settings.StudioParameters ??= new StudioParametersSettings();
-                    settings.StudioParameters.ViewMode = LegacyVfxViewMode(legacyWire);
-                    settings.StudioParameters.WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase);
                     needsResave = true;
                 }
                 else if (jsonObject["VfxStudio"] is JObject vfxStudioJson &&
@@ -256,38 +256,39 @@ namespace AssetsManager.Utils
                          vfxStudioJson["WireframeMode"] != null)
                 {
                     string legacyWire = vfxStudioJson.Value<string>("WireframeMode") ?? "Off";
-                    settings.StudioParameters ??= new StudioParametersSettings();
-                    settings.StudioParameters.ViewMode = LegacyVfxViewMode(legacyWire);
-                    settings.StudioParameters.WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase);
+                    settings.VfxStudio ??= new VfxStudioSettings();
+                    settings.VfxStudio.ViewMode = LegacyVfxViewMode(legacyWire);
+                    settings.VfxStudio.WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase);
                     needsResave = true;
                 }
 
                 settings.StudioParameters ??= GetDefaultSettings().StudioParameters;
                 settings.VfxStudio ??= GetDefaultSettings().VfxStudio;
 
-                // ViewMode/WireOverlay lived under VfxStudio until the normal Viewer gained the
-                // same controls. Migrate them once so Load Project, Chroma Library and VFX Studio
-                // all read one authoritative display state. Shaders intentionally defaults off,
-                // matching the reference viewport's previewShaders default.
+                // A previous AssetsManager build temporarily shared these controls through
+                // StudioParameters. Carry those saved choices back into VFX Studio once, then keep
+                // both viewers independent. Shaders defaults off, like reference previewShaders.
                 JObject sharedDisplayJson = jsonObject["StudioParameters"] as JObject;
-                JObject previousVfxJson = jsonObject["VfxStudio"] as JObject;
-                if (sharedDisplayJson?["ViewMode"] == null)
+                JObject savedVfxJson = jsonObject["VfxStudio"] as JObject;
+                if (savedVfxJson?["ViewMode"] == null)
                 {
-                    string previousViewMode = previousVfxJson?.Value<string>("ViewMode");
-                    if (!string.IsNullOrWhiteSpace(previousViewMode))
-                        settings.StudioParameters.ViewMode = previousViewMode;
+                    string sharedViewMode = sharedDisplayJson?.Value<string>("ViewMode");
+                    if (!string.IsNullOrWhiteSpace(sharedViewMode))
+                        settings.VfxStudio.ViewMode = sharedViewMode;
                     needsResave = true;
                 }
-                if (sharedDisplayJson?["WireOverlay"] == null)
+                if (savedVfxJson?["WireOverlay"] == null)
                 {
-                    bool? previousWireOverlay = previousVfxJson?.Value<bool?>("WireOverlay");
-                    if (previousWireOverlay.HasValue)
-                        settings.StudioParameters.WireOverlay = previousWireOverlay.Value;
+                    bool? sharedWireOverlay = sharedDisplayJson?.Value<bool?>("WireOverlay");
+                    if (sharedWireOverlay.HasValue)
+                        settings.VfxStudio.WireOverlay = sharedWireOverlay.Value;
                     needsResave = true;
                 }
-                if (sharedDisplayJson?["ShadersEnabled"] == null)
+                if (savedVfxJson?["ShadersEnabled"] == null)
                 {
-                    settings.StudioParameters.ShadersEnabled = true;
+                    // Do not inherit the short-lived shared Viewer default: reference VFX previews
+                    // opt into translated game shaders explicitly.
+                    settings.VfxStudio.ShadersEnabled = false;
                     needsResave = true;
                 }
                 settings.MonitoredAssets ??= new SafeList<MonitoredAsset>();
@@ -368,15 +369,15 @@ namespace AssetsManager.Utils
                     GroundVisible = false,
                     GridVisible = true,
                     SkyboxVisible = false,
-                    TransparentBackground = false,
-                    ViewMode = "Lit",
-                    WireOverlay = false,
-                    ShadersEnabled = true
+                    TransparentBackground = false
                 },
                 VfxStudio = new VfxStudioSettings
                 {
                     CameraPreset = "Game",
-                    StageVisible = false
+                    StageVisible = false,
+                    ViewMode = "Lit",
+                    WireOverlay = false,
+                    ShadersEnabled = false
                 },
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
@@ -464,15 +465,15 @@ namespace AssetsManager.Utils
         public bool GridVisible { get; set; } = true;
         public bool SkyboxVisible { get; set; }
         public bool TransparentBackground { get; set; }
-        public string ViewMode { get; set; } = "Lit";
-        public bool WireOverlay { get; set; }
-        public bool ShadersEnabled { get; set; } = true;
     }
 
     public class VfxStudioSettings
     {
         public string CameraPreset { get; set; } = "Game";
         public bool StageVisible { get; set; }
+        public string ViewMode { get; set; } = "Lit";
+        public bool WireOverlay { get; set; }
+        public bool ShadersEnabled { get; set; }
     }
 
     public class ReportGenerationSettings

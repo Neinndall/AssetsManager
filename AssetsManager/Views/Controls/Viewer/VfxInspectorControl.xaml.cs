@@ -295,10 +295,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (Enum.TryParse(vfxSettings.CameraPreset, ignoreCase: true, out VfxPreviewCameraPreset cameraPreset))
                     _model.PreviewCameraPreset = cameraPreset;
-                if (Enum.TryParse(viewerSettings.ViewMode, ignoreCase: true, out VfxPreviewViewMode viewMode))
+                if (Enum.TryParse(vfxSettings.ViewMode, ignoreCase: true, out VfxPreviewViewMode viewMode))
                     _model.PreviewViewMode = viewMode;
-                _model.PreviewWireOverlay = viewerSettings.WireOverlay;
-                _model.PreviewShaders = viewerSettings.ShadersEnabled;
+                _model.PreviewWireOverlay = vfxSettings.WireOverlay;
+                _model.PreviewShaders = vfxSettings.ShadersEnabled;
             }
             finally
             {
@@ -315,9 +315,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
             AppSettings.StudioParameters.GridVisible = _model.ShowPreviewGrid;
             AppSettings.StudioParameters.GroundVisible = _model.ShowPreviewGround;
-            AppSettings.StudioParameters.ViewMode = _model.PreviewViewMode.ToString();
-            AppSettings.StudioParameters.WireOverlay = _model.PreviewWireOverlay;
-            AppSettings.StudioParameters.ShadersEnabled = _model.PreviewShaders;
+            AppSettings.VfxStudio.ViewMode = _model.PreviewViewMode.ToString();
+            AppSettings.VfxStudio.WireOverlay = _model.PreviewWireOverlay;
+            AppSettings.VfxStudio.ShadersEnabled = _model.PreviewShaders;
             AppSettings.VfxStudio.StageVisible = _model.ShowPreviewStage;
             AppSettings.VfxStudio.CameraPreset = _model.PreviewCameraPreset.ToString();
             _ = SavePreviewDisplayPreferencesAsync();
@@ -932,7 +932,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     lighting.AmbientColor,
                     _model.PreviewViewMode,
                     _model.EffectivePreviewWireOverlay,
-                    _model.PreviewShaders);
+                    _model.PreviewShaders,
+                    mirrorCharacterX: true);
             }
 
             if (_vfxRenderer != null)
@@ -3315,6 +3316,22 @@ namespace AssetsManager.Views.Controls.Viewer
                             {
                                 using var sklStream = File.OpenRead(sklPath);
                                 _championModel.Skeleton = new LeagueToolkit.Core.Animation.RigResource(sklStream);
+                            }
+                        }
+
+                        if (_championModel.GpuSkinningData == null &&
+                            _championModel.Skeleton != null &&
+                            _championModel.SkinnedMesh != null)
+                        {
+                            _championModel.GpuSkinningData = GpuSkinningData.TryCreate(
+                                _championModel.Skeleton,
+                                _championModel.SkinnedMesh,
+                                _championModel.Parts,
+                                out string skinningFailure);
+                            if (_championModel.GpuSkinningData == null)
+                            {
+                                _model.LogMessages.Add(
+                                    $"[CHAMPION MESH] GPU skinning unavailable: {skinningFailure ?? "Unsupported skin data."}");
                             }
                         }
 

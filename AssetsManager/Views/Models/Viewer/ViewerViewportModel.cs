@@ -18,9 +18,6 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isAutoRotateActive = false;
         private bool _isMaximized = false;
         private bool _isToolbarVisible = false;
-        private VfxPreviewViewMode _previewViewMode = VfxPreviewViewMode.Lit;
-        private bool _previewWireOverlay;
-        private bool _shadersEnabled;
 
         // --- Studio Lighting Properties ---
         private double _ambientIntensity = DefaultAmbientIntensity;
@@ -66,80 +63,6 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _isToolbarVisible;
             set { if (_isToolbarVisible != value) { _isToolbarVisible = value; OnPropertyChanged(); } }
-        }
-
-        public VfxPreviewViewMode PreviewViewMode
-        {
-            get => _previewViewMode;
-            set
-            {
-                if (_previewViewMode == value) return;
-                _previewViewMode = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(PreviewViewModeText));
-                OnPropertyChanged(nameof(IsPreviewViewLit));
-                OnPropertyChanged(nameof(IsPreviewViewUnshaded));
-                OnPropertyChanged(nameof(IsPreviewViewUntextured));
-                OnPropertyChanged(nameof(IsPreviewViewWireframe));
-                OnPropertyChanged(nameof(CanPreviewWireOverlay));
-                OnPropertyChanged(nameof(EffectivePreviewWireOverlay));
-            }
-        }
-
-        public bool PreviewWireOverlay
-        {
-            get => _previewWireOverlay;
-            set
-            {
-                if (_previewWireOverlay == value) return;
-                _previewWireOverlay = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(EffectivePreviewWireOverlay));
-            }
-        }
-
-        public bool ShadersEnabled
-        {
-            get => _shadersEnabled;
-            set { if (_shadersEnabled != value) { _shadersEnabled = value; OnPropertyChanged(); } }
-        }
-
-        public bool CanPreviewWireOverlay =>
-            _previewViewMode == VfxPreviewViewMode.Lit ||
-            _previewViewMode == VfxPreviewViewMode.Untextured;
-
-        public bool EffectivePreviewWireOverlay => _previewWireOverlay && CanPreviewWireOverlay;
-
-        public string PreviewViewModeText => _previewViewMode switch
-        {
-            VfxPreviewViewMode.Unshaded => "Unshaded",
-            VfxPreviewViewMode.Untextured => "Untextured",
-            VfxPreviewViewMode.Wireframe => "Wireframe",
-            _ => "Shaded"
-        };
-
-        public bool IsPreviewViewLit
-        {
-            get => _previewViewMode == VfxPreviewViewMode.Lit;
-            set { if (value) PreviewViewMode = VfxPreviewViewMode.Lit; }
-        }
-
-        public bool IsPreviewViewUnshaded
-        {
-            get => _previewViewMode == VfxPreviewViewMode.Unshaded;
-            set { if (value) PreviewViewMode = VfxPreviewViewMode.Unshaded; }
-        }
-
-        public bool IsPreviewViewUntextured
-        {
-            get => _previewViewMode == VfxPreviewViewMode.Untextured;
-            set { if (value) PreviewViewMode = VfxPreviewViewMode.Untextured; }
-        }
-
-        public bool IsPreviewViewWireframe
-        {
-            get => _previewViewMode == VfxPreviewViewMode.Wireframe;
-            set { if (value) PreviewViewMode = VfxPreviewViewMode.Wireframe; }
         }
 
         public bool IsGroundVisible
@@ -240,9 +163,6 @@ namespace AssetsManager.Views.Models.Viewer
             IsGridVisible = true;
             IsTransparentBg = false;
             ShowSkybox = false;
-            PreviewViewMode = VfxPreviewViewMode.Lit;
-            PreviewWireOverlay = false;
-            ShadersEnabled = true;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

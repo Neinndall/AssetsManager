@@ -955,7 +955,7 @@
                                 <ToggleButton x:Name="PreviewShadersToggle"
                                               Style="{StaticResource TransparentIconToggleButton}"
                                               Height="26" Width="30" Margin="0,0,4,0"
-                                              ToolTip="Use game shaders for Shaded meshes"
+                                              ToolTip="Use game shaders for Lit meshes"
                                               IsChecked="{Binding PreviewShaders, Mode=TwoWay}">
                                     <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"/>
                                 </ToggleButton>
@@ -983,7 +983,7 @@
                                     <Border Width="190" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
                                             BorderThickness="1" CornerRadius="7" Padding="7">
                                         <StackPanel>
-                                            <RadioButton GroupName="VfxPreviewViewMode" Content="Shaded"
+                                            <RadioButton GroupName="VfxPreviewViewMode" Content="Lit"
                                                          Style="{StaticResource SegmentedRadioButtonStyle}"
                                                          IsChecked="{Binding IsPreviewViewLit, Mode=TwoWay}"/>
                                             <RadioButton GroupName="VfxPreviewViewMode" Content="Unshaded"

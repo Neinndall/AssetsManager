@@ -188,10 +188,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     lightColor1,
                     lightDir2,
                     lightColor2,
-                    ambientColor,
-                    _viewModel.PreviewViewMode,
-                    _viewModel.EffectivePreviewWireOverlay,
-                    _viewModel.ShadersEnabled);
+                    ambientColor);
             }
             foreach (var model in _auxiliaryModels)
             {
@@ -205,10 +202,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     lightColor1,
                     lightDir2,
                     lightColor2,
-                    ambientColor,
-                    _viewModel.PreviewViewMode,
-                    _viewModel.EffectivePreviewWireOverlay,
-                    _viewModel.ShadersEnabled);
+                    ambientColor);
             }
 
             // Render skybox if visible
@@ -257,7 +251,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private ViewportModelInteractionController _modelInteractionController;
         private bool _isCleanedUp;
         private bool _isOpenTkStarted;
-        private bool _isApplyingStudioParameters;
         private TaskCompletionSource<bool> _firstRenderedFrame = CreateFrameCompletionSource();
 
         private struct ModelUpdateKey
@@ -331,11 +324,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     break;
                 case nameof(ViewerViewportModel.ShowSkybox):
                     SetSkyboxVisibility(_viewModel.ShowSkybox);
-                    break;
-                case nameof(ViewerViewportModel.PreviewViewMode):
-                case nameof(ViewerViewportModel.PreviewWireOverlay):
-                case nameof(ViewerViewportModel.ShadersEnabled):
-                    SaveSharedDisplayPreferences();
                     break;
             }
         }
@@ -607,50 +595,10 @@ namespace AssetsManager.Views.Controls.Viewer
             StudioParametersSettings studioParameters = AppSettings?.StudioParameters;
             if (studioParameters == null) return;
 
-            _isApplyingStudioParameters = true;
-            try
-            {
-                _viewModel.IsGroundVisible = studioParameters.GroundVisible;
-                _viewModel.IsGridVisible = studioParameters.GridVisible;
-                _viewModel.IsTransparentBg = studioParameters.TransparentBackground;
-                _viewModel.ShowSkybox = studioParameters.SkyboxVisible && !studioParameters.TransparentBackground;
-                if (Enum.TryParse(
-                        studioParameters.ViewMode,
-                        ignoreCase: true,
-                        out VfxPreviewViewMode viewMode))
-                {
-                    _viewModel.PreviewViewMode = viewMode;
-                }
-                _viewModel.PreviewWireOverlay = studioParameters.WireOverlay;
-                _viewModel.ShadersEnabled = studioParameters.ShadersEnabled;
-            }
-            finally
-            {
-                _isApplyingStudioParameters = false;
-            }
-        }
-
-        private void SaveSharedDisplayPreferences()
-        {
-            if (_isApplyingStudioParameters || AppSettings == null) return;
-
-            AppSettings.StudioParameters ??= new StudioParametersSettings();
-            AppSettings.StudioParameters.ViewMode = _viewModel.PreviewViewMode.ToString();
-            AppSettings.StudioParameters.WireOverlay = _viewModel.PreviewWireOverlay;
-            AppSettings.StudioParameters.ShadersEnabled = _viewModel.ShadersEnabled;
-            _ = SaveSharedDisplayPreferencesAsync();
-        }
-
-        private async Task SaveSharedDisplayPreferencesAsync()
-        {
-            try
-            {
-                await AppSettings.SaveAsync();
-            }
-            catch (Exception ex)
-            {
-                LogService?.LogError(ex, "Failed to save Viewer display preferences.");
-            }
+            _viewModel.IsGroundVisible = studioParameters.GroundVisible;
+            _viewModel.IsGridVisible = studioParameters.GridVisible;
+            _viewModel.IsTransparentBg = studioParameters.TransparentBackground;
+            _viewModel.ShowSkybox = studioParameters.SkyboxVisible && !studioParameters.TransparentBackground;
         }
 
 
@@ -1542,12 +1490,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ViewportSnapshotButton_Click(object sender, RoutedEventArgs e)
         {
             InitiateHighDefinitionSnapshot();
-        }
-
-        private void ViewerViewMode_Click(object sender, RoutedEventArgs e)
-        {
-            if (ViewerViewModePopup != null)
-                ViewerViewModePopup.IsOpen = !ViewerViewModePopup.IsOpen;
         }
 
         // --- Diff Mode support ---

@@ -266,60 +266,6 @@
 
                             <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
 
-                            <!-- Group 3: Mesh display -->
-                            <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <ToggleButton x:Name="ShadersToggleButton"
-                                                  Style="{StaticResource TransparentIconToggleButton}"
-                                                  ToolTip="Shaders: use translated game shaders in Shaded mode"
-                                                  IsChecked="{Binding ShadersEnabled, Mode=TwoWay}"
-                                                  Width="30" Height="30">
-                                        <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"/>
-                                    </ToggleButton>
-                                    <Button x:Name="ViewerViewModeButton"
-                                            Style="{StaticResource TransparentIconButton}"
-                                            ToolTip="Viewport view mode"
-                                            Click="ViewerViewMode_Click"
-                                            Height="30" Padding="7,0" Margin="2,0,0,0">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="13" Height="13" Margin="0,0,5,0"/>
-                                            <TextBlock Text="{Binding PreviewViewModeText}" FontSize="10.5" FontWeight="SemiBold"/>
-                                            <materialIcons:MaterialIcon Kind="ChevronDown" Width="11" Height="11" Margin="4,0,0,0"/>
-                                        </StackPanel>
-                                    </Button>
-                                    <Popup x:Name="ViewerViewModePopup"
-                                           PlacementTarget="{Binding ElementName=ViewerViewModeButton}"
-                                           Placement="Top" VerticalOffset="-6"
-                                           AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False"
-                                           DataContext="{Binding DataContext, ElementName=ViewerViewModeButton}">
-                                        <Border Width="190" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
-                                                BorderThickness="1" CornerRadius="7" Padding="7">
-                                            <StackPanel>
-                                                <RadioButton GroupName="ViewerPreviewViewMode" Content="Shaded"
-                                                             Style="{StaticResource SegmentedRadioButtonStyle}"
-                                                             IsChecked="{Binding IsPreviewViewLit, Mode=TwoWay}"/>
-                                                <RadioButton GroupName="ViewerPreviewViewMode" Content="Unshaded"
-                                                             Style="{StaticResource SegmentedRadioButtonStyle}"
-                                                             IsChecked="{Binding IsPreviewViewUnshaded, Mode=TwoWay}"/>
-                                                <RadioButton GroupName="ViewerPreviewViewMode" Content="Untextured"
-                                                             Style="{StaticResource SegmentedRadioButtonStyle}"
-                                                             IsChecked="{Binding IsPreviewViewUntextured, Mode=TwoWay}"/>
-                                                <RadioButton GroupName="ViewerPreviewViewMode" Content="Wireframe"
-                                                             Style="{StaticResource SegmentedRadioButtonStyle}"
-                                                             IsChecked="{Binding IsPreviewViewWireframe, Mode=TwoWay}"/>
-                                                <Separator Margin="0,6,0,5"/>
-                                                <CheckBox Content="Wire overlay"
-                                                          Style="{StaticResource ModernCheckBox}"
-                                                          IsChecked="{Binding PreviewWireOverlay, Mode=TwoWay}"
-                                                          IsEnabled="{Binding CanPreviewWireOverlay}"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </Popup>
-                                </StackPanel>
-                            </Border>
-
-                            <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
-
                             <!-- Group 4: Model interaction -->
                             <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0">
                                 <StackPanel Orientation="Horizontal">

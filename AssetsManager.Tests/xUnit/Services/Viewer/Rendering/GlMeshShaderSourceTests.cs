@@ -1,4 +1,5 @@
 using System.Numerics;
+using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Utils;
@@ -160,19 +161,44 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
-        public void ViewerDisplayDefaultsPreferRealGameShaders()
+        public void VfxStudioDisplayDefaultsMatchReferenceGameShadersOptIn()
         {
             AppSettings settings = AppSettings.GetDefaultSettings();
 
-            Assert.Equal("Lit", settings.StudioParameters.ViewMode);
-            Assert.False(settings.StudioParameters.WireOverlay);
-            Assert.True(settings.StudioParameters.ShadersEnabled);
+            Assert.Equal("Lit", settings.VfxStudio.ViewMode);
+            Assert.False(settings.VfxStudio.WireOverlay);
+            Assert.False(settings.VfxStudio.ShadersEnabled);
+            Assert.False(new VfxInspectorModel().PreviewShaders);
         }
 
         [Fact]
-        public void ViewerViewModeKeepsWireOverlayIndependent()
+        public void VfxStudioCharacterSpaceMirrorsXWithoutChangingTheNormalViewerSpace()
         {
-            var model = new ViewerViewportModel
+            var model = new SceneModel
+            {
+                Scale = 2d,
+                PositionX = 3d,
+                PositionY = 4d,
+                PositionZ = 5d
+            };
+
+            Matrix4x4 viewerWorld = GlMeshRenderer.CreateWorldMatrix(model);
+            Matrix4x4 interactionWorld = ViewerInteractionService.CreateWorldMatrix(model);
+            Matrix4x4 vfxWorld = GlMeshRenderer.CreateWorldMatrix(model, mirrorCharacterX: true);
+            Vector3 viewerXAxis = Vector3.TransformNormal(Vector3.UnitX, viewerWorld);
+            Vector3 vfxXAxis = Vector3.TransformNormal(Vector3.UnitX, vfxWorld);
+
+            Assert.Equal(viewerWorld, interactionWorld);
+            Assert.Equal(2f, viewerXAxis.X, 6);
+            Assert.Equal(-2f, vfxXAxis.X, 6);
+            Assert.True(viewerWorld.GetDeterminant() > 0f);
+            Assert.True(vfxWorld.GetDeterminant() < 0f);
+        }
+
+        [Fact]
+        public void VfxStudioViewModeKeepsWireOverlayIndependent()
+        {
+            var model = new VfxInspectorModel
             {
                 PreviewWireOverlay = true,
                 PreviewViewMode = VfxPreviewViewMode.Unshaded
