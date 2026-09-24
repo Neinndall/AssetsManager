@@ -741,7 +741,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _characterAutoRotate;
         private bool _characterTransformGizmoEnabled = true;
         private bool _inspectorVisible = true;
-        private bool _viewportToolbarVisible = true;
+        private bool _viewportToolbarVisible;
         private bool _characterBackdropEnabled;
         private bool _mapParticlesVisible = true;
         private bool _mapStructuresVisible = true;

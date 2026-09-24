@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="AssetsManager.Views.Controls.Viewer.VfxInspectorControl"
+<UserControl x:Class="AssetsManager.Views.Controls.Viewer.VfxInspectorControl"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -161,8 +161,10 @@
         <Grid Grid.Row="0" Margin="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="320"/> <!-- Left: Project asset browser -->
-                <ColumnDefinition Width="6"/>   <!-- Splitter -->
-                <ColumnDefinition Width="*"/>   <!-- Right: 3D Viewport & Systems Breakdown -->
+                <ColumnDefinition Width="4"/>   <!-- Assets splitter -->
+                <ColumnDefinition Width="*"/>   <!-- Center: workspace tabs, viewport and timeline -->
+                <ColumnDefinition Width="Auto"/> <!-- Inspector splitter; collapses with the panel -->
+                <ColumnDefinition Width="Auto"/> <!-- Right: contextual Inspector -->
             </Grid.ColumnDefinitions>
 
             <!-- LEFT PANEL: project browser, intentionally structural rather than a nested card -->
@@ -173,8 +175,6 @@
                         <RowDefinition Height="Auto"/> <!-- Header -->
                         <RowDefinition Height="Auto"/> <!-- Search Box -->
                         <RowDefinition Height="*"/>    <!-- Asset tree -->
-                        <RowDefinition Height="Auto"/> <!-- Context splitter -->
-                        <RowDefinition Height="Auto"/> <!-- Context inspector -->
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="0" Margin="0,0,0,9">
@@ -246,209 +246,6 @@
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                               VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"/>
 
-                    <GridSplitter Grid.Row="3" Height="6" HorizontalAlignment="Stretch" Background="Transparent" Cursor="SizeNS"
-                                  Visibility="{Binding IsInspectorPanelVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
-
-                    <Border Grid.Row="4" MaxHeight="330" MinHeight="150"
-                            Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}"
-                            BorderThickness="1" CornerRadius="10" Padding="6"
-                            Visibility="{Binding IsInspectorPanelVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel Margin="2">
-                                <Grid Margin="4,2,4,7">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                    <Border Width="28" Height="28" CornerRadius="8" Background="#15FFFFFF" Margin="0,0,8,0">
-                                        <materialIcons:MaterialIcon Kind="TuneVariant" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="INSPECTOR" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="Scene / Transform / Geometry" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
-                                    </StackPanel>
-                                </Grid>
-
-                                <!-- CHARACTER / BACKDROP -->
-                                <StackPanel Visibility="{Binding IsSkinWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <ToggleButton x:Name="VfxCharacterSceneSection" IsChecked="True" Style="{StaticResource CollapsibleSectionHeaderStyle}">
-                                        <Grid Margin="8,7">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Kind="AccountBoxOutline" Width="15" Height="15" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
-                                            <StackPanel Grid.Column="1"><TextBlock Text="CHARACTER" FontSize="10.5" FontWeight="Bold"/><TextBlock Text="Backdrop and authored effects" FontSize="8.5" Foreground="{StaticResource TextMuted}"/></StackPanel>
-                                            <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
-                                        </Grid>
-                                    </ToggleButton>
-                                    <Border Margin="0,3,0,6" Padding="9" CornerRadius="8" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                            Visibility="{Binding IsChecked, ElementName=VfxCharacterSceneSection, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <StackPanel>
-                                            <CheckBox Content="Enable MAP backdrop" IsChecked="{Binding CharacterBackdropEnabled, Mode=TwoWay}" IsEnabled="{Binding HasCharacterBackdropOptions}" Style="{StaticResource ModernCheckBox}"/>
-                                            <ComboBox ItemsSource="{Binding CharacterBackdrops}" SelectedItem="{Binding SelectedCharacterBackdrop, Mode=TwoWay}" DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}" Height="26" Margin="0,6,0,6"/>
-                                            <UniformGrid Columns="3">
-                                                <ToggleButton IsChecked="{Binding MapParticlesVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="28" ToolTip="Authored MAP VFX">
-                                                    <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="AutoAwesome" Width="13" Height="13" Margin="0,0,4,0"/><TextBlock Text="VFX" FontSize="9.5"/></StackPanel>
-                                                </ToggleButton>
-                                                <ToggleButton IsChecked="{Binding MapStructuresVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="28" ToolTip="Authored MAP structures">
-                                                    <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="HomeOutline" Width="13" Height="13" Margin="0,0,4,0"/><TextBlock Text="MAP" FontSize="9.5"/></StackPanel>
-                                                </ToggleButton>
-                                                <ToggleButton IsChecked="{Binding CharacterEffectsEnabled, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="28" ToolTip="Skin / Clip / Spell effects">
-                                                    <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="Sparkles" Width="13" Height="13" Margin="0,0,4,0"/><TextBlock Text="FX" FontSize="9.5"/></StackPanel>
-                                                </ToggleButton>
-                                            </UniformGrid>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <ToggleButton x:Name="VfxCharacterTransformSection" IsChecked="True" Style="{StaticResource CollapsibleSectionHeaderStyle}">
-                                        <Grid Margin="8,7">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Kind="AxisArrow" Width="15" Height="15" Foreground="{StaticResource AccentTeal}" Margin="0,0,8,0"/>
-                                            <StackPanel Grid.Column="1"><TextBlock Text="TRANSFORM" FontSize="10.5" FontWeight="Bold"/><TextBlock Text="Position, rotation and scale" FontSize="8.5" Foreground="{StaticResource TextMuted}"/></StackPanel>
-                                            <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
-                                        </Grid>
-                                    </ToggleButton>
-                                    <Border Margin="0,3,0,6" Padding="9" CornerRadius="8" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                            Visibility="{Binding IsChecked, ElementName=VfxCharacterTransformSection, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <StackPanel>
-                                            <Grid Margin="0,0,0,6"><TextBlock Text="POSITION" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/><Button Content="Reset" HorizontalAlignment="Right" Style="{StaticResource SmallTextButtonStyle}" Padding="6,1" Click="ResetCharacterPlacement_Click"/></Grid>
-                                            <UniformGrid Columns="3">
-                                                <TextBox Text="{Binding CharacterPositionX, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="0,0,3,0" ToolTip="X"/>
-                                                <TextBox Text="{Binding CharacterPositionY, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="2,0" ToolTip="Y"/>
-                                                <TextBox Text="{Binding CharacterPositionZ, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="3,0,0,0" ToolTip="Z"/>
-                                            </UniformGrid>
-                                            <TextBlock Text="ROTATION" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,7,0,4"/>
-                                            <UniformGrid Columns="3">
-                                                <TextBox Text="{Binding CharacterRotationX, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="0,0,3,0" ToolTip="Pitch X"/>
-                                                <TextBox Text="{Binding CharacterRotationY, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="2,0" ToolTip="Yaw Y"/>
-                                                <TextBox Text="{Binding CharacterRotationZ, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="3,0,0,0" ToolTip="Roll Z"/>
-                                            </UniformGrid>
-                                            <Grid Margin="0,7,0,2"><TextBlock Text="SCALE" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/><TextBlock Text="{Binding CharacterScaleMultiplier, StringFormat={}{0:F2}x}" HorizontalAlignment="Right" FontSize="9" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}"/></Grid>
-                                            <Slider Minimum="0.05" Maximum="4" Value="{Binding CharacterScaleMultiplier, Mode=TwoWay}" Style="{StaticResource HUDSliderStyle}" TickFrequency="0.05"/>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <ToggleButton x:Name="VfxCharacterGeometrySection" IsChecked="True" Style="{StaticResource CollapsibleSectionHeaderStyle}">
-                                        <Grid Margin="8,7">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Kind="LayersOutline" Width="15" Height="15" Foreground="{StaticResource AccentPurple}" Margin="0,0,8,0"/>
-                                            <StackPanel Grid.Column="1"><TextBlock Text="GEOMETRY" FontSize="10.5" FontWeight="Bold"/><TextBlock Text="Armature and submeshes" FontSize="8.5" Foreground="{StaticResource TextMuted}"/></StackPanel>
-                                            <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
-                                        </Grid>
-                                    </ToggleButton>
-                                    <Border Margin="0,3,0,2" Padding="9" CornerRadius="8" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                            Visibility="{Binding IsChecked, ElementName=VfxCharacterGeometrySection, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <StackPanel>
-                                            <CheckBox Content="Show armature" IsChecked="{Binding ShowCharacterArmature, Mode=TwoWay}" IsEnabled="{Binding HasCharacterSkeleton}" Style="{StaticResource ModernCheckBox}"/>
-                                            <CheckBox Content="Joint names" IsChecked="{Binding ShowCharacterJointNames, Mode=TwoWay}" IsEnabled="{Binding ShowCharacterArmature}" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,6"/>
-                                            <Grid Margin="0,2,0,4"><TextBlock Text="SUBMESHES" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/><Button Content="Reset" HorizontalAlignment="Right" Style="{StaticResource SmallTextButtonStyle}" Padding="6,1" Click="ResetCharacterSubmeshOverrides_Click"/></Grid>
-                                            <ItemsControl ItemsSource="{Binding CharacterSubmeshes}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Border Margin="0,1" Padding="5,3" CornerRadius="5" Background="#0CFFFFFF">
-                                                            <CheckBox IsChecked="{Binding IsVisible, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}">
-                                                                <TextBlock Text="{Binding Name}" FontSize="9.5" TextTrimming="CharacterEllipsis" MaxWidth="235"/>
-                                                            </CheckBox>
-                                                        </Border>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-                                    </Border>
-                                </StackPanel>
-
-                                <!-- MAP SCENE -->
-                                <StackPanel Visibility="{Binding IsMapWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <ToggleButton x:Name="VfxMapSceneSection" IsChecked="True" Style="{StaticResource CollapsibleSectionHeaderStyle}">
-                                        <Grid Margin="8,7">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Kind="Map" Width="15" Height="15" Foreground="#38BDF8" Margin="0,0,8,0"/>
-                                            <StackPanel Grid.Column="1"><TextBlock Text="MAP SCENE" FontSize="10.5" FontWeight="Bold"/><TextBlock Text="Variant, content and layers" FontSize="8.5" Foreground="{StaticResource TextMuted}"/></StackPanel>
-                                            <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
-                                        </Grid>
-                                    </ToggleButton>
-                                    <Border Margin="0,3,0,6" Padding="9" CornerRadius="8" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                            Visibility="{Binding IsChecked, ElementName=VfxMapSceneSection, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <StackPanel>
-                                            <StackPanel Visibility="{Binding CanSelectMapVariant, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                <TextBlock Text="VARIANT" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                                                <ComboBox ItemsSource="{Binding MapVariants}" SelectedItem="{Binding SelectedMapVariant, Mode=TwoWay}" DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}" Height="26" Margin="0,4,0,7"/>
-                                            </StackPanel>
-                                            <UniformGrid Columns="2" Margin="0,0,0,6">
-                                                <ToggleButton IsChecked="{Binding MapParticlesVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="28"><StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="AutoAwesome" Width="13" Height="13" Margin="0,0,5,0"/><TextBlock Text="VFX" FontSize="9.5"/></StackPanel></ToggleButton>
-                                                <ToggleButton IsChecked="{Binding MapStructuresVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="28"><StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="HomeOutline" Width="13" Height="13" Margin="0,0,5,0"/><TextBlock Text="Structures" FontSize="9.5"/></StackPanel></ToggleButton>
-                                            </UniformGrid>
-                                            <TextBlock Text="LAYERS" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,2,0,3" Visibility="{Binding HasMapLayers, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                            <ItemsControl ItemsSource="{Binding MapLayers}" Visibility="{Binding HasMapLayers, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Click="MapLayerCheckBox_Click" Margin="0,1">
-                                                            <Grid Width="240"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Label}" FontSize="9.5"/><TextBlock Grid.Column="1" Text="{Binding TriangleText}" FontSize="8.5" Foreground="{StaticResource TextMuted}" FontFamily="Consolas"/></Grid>
-                                                        </CheckBox>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <ToggleButton x:Name="VfxMapLookSection" IsChecked="False" Style="{StaticResource CollapsibleSectionHeaderStyle}">
-                                        <Grid Margin="8,7">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Kind="WhiteBalanceSunny" Width="15" Height="15" Foreground="#FFD166" Margin="0,0,8,0"/>
-                                            <StackPanel Grid.Column="1"><TextBlock Text="MAP LOOK" FontSize="10.5" FontWeight="Bold"/><TextBlock Text="Lighting and post processing" FontSize="8.5" Foreground="{StaticResource TextMuted}"/></StackPanel>
-                                            <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
-                                        </Grid>
-                                    </ToggleButton>
-                                    <Border Margin="0,3,0,2" Padding="9" CornerRadius="8" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                            Visibility="{Binding IsChecked, ElementName=VfxMapLookSection, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <Grid>
-                                        <UniformGrid Columns="2">
-                                            <Button x:Name="MapSunButton" Click="MapSun_Click" Style="{StaticResource TransparentIconButton}" Height="30" ToolTip="MAP sun override"><StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="WhiteBalanceSunny" Width="13" Height="13" Foreground="#FFD166" Margin="0,0,5,0"/><TextBlock Text="Sun" FontSize="9.5"/></StackPanel></Button>
-                                            <Button x:Name="MapPostButton" Click="MapPost_Click" Style="{StaticResource TransparentIconButton}" Height="30" ToolTip="MAP post effects"><StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="ImageFilterVintage" Width="13" Height="13" Foreground="#A78BFA" Margin="0,0,5,0"/><TextBlock Text="Post" FontSize="9.5"/></StackPanel></Button>
-                                        </UniformGrid>
-                                        <Popup x:Name="MapSunPopup" PlacementTarget="{Binding ElementName=MapSunButton}"
-                                               Placement="Right" HorizontalOffset="8" AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
-                                            <Border Width="310" Background="#FF161822" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="7" Padding="11">
-                                                <Border.Effect><DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.42"/></Border.Effect>
-                                                <StackPanel>
-                                                    <Grid Margin="0,0,0,8"><TextBlock Text="SUN OVERRIDE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/><Button Content="Reset" HorizontalAlignment="Right" Padding="7,2" Style="{StaticResource TransparentIconButton}" Click="MapSunReset_Click"/></Grid>
-                                                    <TextBlock Text="Azimuth" FontSize="9.5" Foreground="{StaticResource TextMuted}"/>
-                                                    <Slider x:Name="MapSunAzimuthSlider" Minimum="-180" Maximum="180" TickFrequency="1" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
-                                                    <TextBlock Text="Elevation" FontSize="9.5" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0"/>
-                                                    <Slider x:Name="MapSunElevationSlider" Minimum="0" Maximum="89" TickFrequency="1" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
-                                                    <Grid Margin="0,6,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Sun strength" FontSize="9.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSunStrengthSlider" Minimum="0" Maximum="2" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Ambient" FontSize="9.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSunAmbientSlider" Minimum="0" Maximum="2" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/></StackPanel></Grid>
-                                                    <Grid Margin="0,7,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Sun color" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/><TextBox x:Name="MapSunColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/></Grid>
-                                                    <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Sky color" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/><TextBox x:Name="MapSunSkyColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/></Grid>
-                                                    <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Ground" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/><TextBox x:Name="MapSunGroundColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/></Grid>
-                                                </StackPanel>
-                                            </Border>
-                                        </Popup>
-                                        <Popup x:Name="MapPostPopup" PlacementTarget="{Binding ElementName=MapPostButton}"
-                                               Placement="Right" HorizontalOffset="8" AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
-                                            <Border Width="390" MaxHeight="620" Background="#FF161822" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="7" Padding="11">
-                                                <Border.Effect><DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.42"/></Border.Effect>
-                                                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                                    <StackPanel Margin="0,0,5,0">
-                                                        <Grid Margin="0,0,0,8"><TextBlock Text="POST EFFECTS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/><Button Content="Reset" HorizontalAlignment="Right" Padding="7,2" Style="{StaticResource TransparentIconButton}" Click="MapPostReset_Click"/></Grid>
-                                                        <TextBlock Text="AMBIENT OCCLUSION" FontSize="9.5" FontWeight="Bold" Foreground="#A78BFA"/>
-                                                        <CheckBox x:Name="MapSsaoEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,4" Click="MapSsaoControl_Changed"/>
-                                                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Quality" FontSize="9" Foreground="{StaticResource TextMuted}"/><ComboBox x:Name="MapSsaoQualityCombo" Style="{StaticResource ModernComboBox}" Height="24" SelectionChanged="MapSsaoControl_Changed"><ComboBoxItem Content="4 samples"/><ComboBoxItem Content="8 samples"/></ComboBox></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Radius" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoRadiusSlider" Minimum="0" Maximum="200" TickFrequency="1" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel></Grid>
-                                                        <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Power" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoPowerSlider" Minimum="0" Maximum="30" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Intensity" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoIntensitySlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel></Grid>
-                                                        <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Bias" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoBiasSlider" Minimum="0" Maximum="20" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Buffer scale" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoBufferScaleSlider" Minimum="0.25" Maximum="1" TickFrequency="0.05" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel></Grid>
-                                                        <CheckBox x:Name="MapSsaoEdgeAwareCheck" Content="Edge-aware blur" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,7" Click="MapSsaoControl_Changed"/>
-                                                        <Separator Margin="0,2,0,7"/><TextBlock Text="DEPTH FOG" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8"/><CheckBox x:Name="MapDepthFogEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,4" Click="MapPostControl_Changed"/>
-                                                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Color" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/><TextBox x:Name="MapDepthFogColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapPostControl_Changed"/></Grid>
-                                                        <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Start" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogStartSlider" Minimum="0" Maximum="20000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="End" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogEndSlider" Minimum="0" Maximum="20000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="4"><TextBlock Text="Max" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogMaxSlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel></Grid>
-                                                        <Separator Margin="0,7,0,7"/><TextBlock Text="HEIGHT FOG" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8"/><CheckBox x:Name="MapHeightFogEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,4" Click="MapPostControl_Changed"/>
-                                                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Color" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/><TextBox x:Name="MapHeightFogColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapPostControl_Changed"/></Grid>
-                                                        <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Start" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogStartSlider" Minimum="-1000" Maximum="1500" TickFrequency="10" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="End" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogEndSlider" Minimum="-1000" Maximum="1500" TickFrequency="10" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="4"><TextBlock Text="Max" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogMaxSlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel></Grid>
-                                                        <Separator Margin="0,7,0,7"/><TextBlock Text="DEPTH OF FIELD" FontSize="9.5" FontWeight="Bold" Foreground="#F59E0B"/><CheckBox x:Name="MapDofEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,4" Click="MapPostControl_Changed"/>
-                                                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Focal" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofFocalSlider" Minimum="0" Maximum="10000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Focus width" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofWidthSlider" Minimum="0" Maximum="5000" TickFrequency="25" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="4"><TextBlock Text="CoC" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofCocSlider" Minimum="0" Maximum="30" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel></Grid>
-                                                    </StackPanel>
-                                                </ScrollViewer>
-                                            </Border>
-                                        </Popup>
-                                        </Grid>
-                                    </Border>
-                                </StackPanel>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Border>
                 </Grid>
             </Border>
 
@@ -1779,6 +1576,211 @@
                     </Grid>
                 </Border>
             </Grid>
+
+            <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                          Background="Transparent" Cursor="SizeWE" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
+                          Visibility="{Binding IsInspectorPanelVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+            <Border Grid.Column="4" Width="340"
+                    Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1,0,0,0" Padding="10,10,12,10"
+                    Visibility="{Binding IsInspectorPanelVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="2">
+                        <Grid Margin="4,2,4,7">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Width="28" Height="28" CornerRadius="8" Background="#15FFFFFF" Margin="0,0,8,0">
+                                <materialIcons:MaterialIcon Kind="TuneVariant" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="INSPECTOR" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Scene / Transform / Geometry" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- CHARACTER / BACKDROP -->
+                        <StackPanel Visibility="{Binding IsSkinWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <ToggleButton x:Name="VfxCharacterSceneSection" IsChecked="True" Style="{StaticResource CollapsibleSectionHeaderStyle}">
+                                <Grid Margin="8,7">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="AccountBoxOutline" Width="15" Height="15" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
+                                    <StackPanel Grid.Column="1"><TextBlock Text="CHARACTER" FontSize="10.5" FontWeight="Bold"/><TextBlock Text="Backdrop and authored effects" FontSize="8.5" Foreground="{StaticResource TextMuted}"/></StackPanel>
+                                    <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
+                                </Grid>
+                            </ToggleButton>
+                            <Border Margin="0,3,0,6" Padding="9" CornerRadius="8" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                    Visibility="{Binding IsChecked, ElementName=VfxCharacterSceneSection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <CheckBox Content="Enable MAP backdrop" IsChecked="{Binding CharacterBackdropEnabled, Mode=TwoWay}" IsEnabled="{Binding HasCharacterBackdropOptions}" Style="{StaticResource ModernCheckBox}"/>
+                                    <ComboBox ItemsSource="{Binding CharacterBackdrops}" SelectedItem="{Binding SelectedCharacterBackdrop, Mode=TwoWay}" DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}" Height="26" Margin="0,6,0,6"/>
+                                    <UniformGrid Columns="3">
+                                        <ToggleButton IsChecked="{Binding MapParticlesVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="28" ToolTip="Authored MAP VFX">
+                                            <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="AutoAwesome" Width="13" Height="13" Margin="0,0,4,0"/><TextBlock Text="VFX" FontSize="9.5"/></StackPanel>
+                                        </ToggleButton>
+                                        <ToggleButton IsChecked="{Binding MapStructuresVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="28" ToolTip="Authored MAP structures">
+                                            <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="HomeOutline" Width="13" Height="13" Margin="0,0,4,0"/><TextBlock Text="MAP" FontSize="9.5"/></StackPanel>
+                                        </ToggleButton>
+                                        <ToggleButton IsChecked="{Binding CharacterEffectsEnabled, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="28" ToolTip="Skin / Clip / Spell effects">
+                                            <StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="Sparkles" Width="13" Height="13" Margin="0,0,4,0"/><TextBlock Text="FX" FontSize="9.5"/></StackPanel>
+                                        </ToggleButton>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+
+                            <ToggleButton x:Name="VfxCharacterTransformSection" IsChecked="True" Style="{StaticResource CollapsibleSectionHeaderStyle}">
+                                <Grid Margin="8,7">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="AxisArrow" Width="15" Height="15" Foreground="{StaticResource AccentTeal}" Margin="0,0,8,0"/>
+                                    <StackPanel Grid.Column="1"><TextBlock Text="TRANSFORM" FontSize="10.5" FontWeight="Bold"/><TextBlock Text="Position, rotation and scale" FontSize="8.5" Foreground="{StaticResource TextMuted}"/></StackPanel>
+                                    <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
+                                </Grid>
+                            </ToggleButton>
+                            <Border Margin="0,3,0,6" Padding="9" CornerRadius="8" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                    Visibility="{Binding IsChecked, ElementName=VfxCharacterTransformSection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,6"><TextBlock Text="POSITION" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/><Button Content="Reset" HorizontalAlignment="Right" Style="{StaticResource SmallTextButtonStyle}" Padding="6,1" Click="ResetCharacterPlacement_Click"/></Grid>
+                                    <UniformGrid Columns="3">
+                                        <TextBox Text="{Binding CharacterPositionX, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="0,0,3,0" ToolTip="X"/>
+                                        <TextBox Text="{Binding CharacterPositionY, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="2,0" ToolTip="Y"/>
+                                        <TextBox Text="{Binding CharacterPositionZ, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="3,0,0,0" ToolTip="Z"/>
+                                    </UniformGrid>
+                                    <TextBlock Text="ROTATION" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,7,0,4"/>
+                                    <UniformGrid Columns="3">
+                                        <TextBox Text="{Binding CharacterRotationX, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="0,0,3,0" ToolTip="Pitch X"/>
+                                        <TextBox Text="{Binding CharacterRotationY, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="2,0" ToolTip="Yaw Y"/>
+                                        <TextBox Text="{Binding CharacterRotationZ, Mode=TwoWay, StringFormat={}{0:F1}}" Style="{StaticResource ModernTextBox}" Height="25" Margin="3,0,0,0" ToolTip="Roll Z"/>
+                                    </UniformGrid>
+                                    <Grid Margin="0,7,0,2"><TextBlock Text="SCALE" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/><TextBlock Text="{Binding CharacterScaleMultiplier, StringFormat={}{0:F2}x}" HorizontalAlignment="Right" FontSize="9" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}"/></Grid>
+                                    <Slider Minimum="0.05" Maximum="4" Value="{Binding CharacterScaleMultiplier, Mode=TwoWay}" Style="{StaticResource HUDSliderStyle}" TickFrequency="0.05"/>
+                                </StackPanel>
+                            </Border>
+
+                            <ToggleButton x:Name="VfxCharacterGeometrySection" IsChecked="True" Style="{StaticResource CollapsibleSectionHeaderStyle}">
+                                <Grid Margin="8,7">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="LayersOutline" Width="15" Height="15" Foreground="{StaticResource AccentPurple}" Margin="0,0,8,0"/>
+                                    <StackPanel Grid.Column="1"><TextBlock Text="GEOMETRY" FontSize="10.5" FontWeight="Bold"/><TextBlock Text="Armature and submeshes" FontSize="8.5" Foreground="{StaticResource TextMuted}"/></StackPanel>
+                                    <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
+                                </Grid>
+                            </ToggleButton>
+                            <Border Margin="0,3,0,2" Padding="9" CornerRadius="8" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                    Visibility="{Binding IsChecked, ElementName=VfxCharacterGeometrySection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <CheckBox Content="Show armature" IsChecked="{Binding ShowCharacterArmature, Mode=TwoWay}" IsEnabled="{Binding HasCharacterSkeleton}" Style="{StaticResource ModernCheckBox}"/>
+                                    <CheckBox Content="Joint names" IsChecked="{Binding ShowCharacterJointNames, Mode=TwoWay}" IsEnabled="{Binding ShowCharacterArmature}" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,6"/>
+                                    <Grid Margin="0,2,0,4"><TextBlock Text="SUBMESHES" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/><Button Content="Reset" HorizontalAlignment="Right" Style="{StaticResource SmallTextButtonStyle}" Padding="6,1" Click="ResetCharacterSubmeshOverrides_Click"/></Grid>
+                                    <ItemsControl ItemsSource="{Binding CharacterSubmeshes}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,1" Padding="5,3" CornerRadius="5" Background="#0CFFFFFF">
+                                                    <CheckBox IsChecked="{Binding IsVisible, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}">
+                                                        <TextBlock Text="{Binding Name}" FontSize="9.5" TextTrimming="CharacterEllipsis" MaxWidth="235"/>
+                                                    </CheckBox>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- MAP SCENE -->
+                        <StackPanel Visibility="{Binding IsMapWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <ToggleButton x:Name="VfxMapSceneSection" IsChecked="True" Style="{StaticResource CollapsibleSectionHeaderStyle}">
+                                <Grid Margin="8,7">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="Map" Width="15" Height="15" Foreground="#38BDF8" Margin="0,0,8,0"/>
+                                    <StackPanel Grid.Column="1"><TextBlock Text="MAP SCENE" FontSize="10.5" FontWeight="Bold"/><TextBlock Text="Variant, content and layers" FontSize="8.5" Foreground="{StaticResource TextMuted}"/></StackPanel>
+                                    <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
+                                </Grid>
+                            </ToggleButton>
+                            <Border Margin="0,3,0,6" Padding="9" CornerRadius="8" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                    Visibility="{Binding IsChecked, ElementName=VfxMapSceneSection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <StackPanel Visibility="{Binding CanSelectMapVariant, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="VARIANT" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                                        <ComboBox ItemsSource="{Binding MapVariants}" SelectedItem="{Binding SelectedMapVariant, Mode=TwoWay}" DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}" Height="26" Margin="0,4,0,7"/>
+                                    </StackPanel>
+                                    <UniformGrid Columns="2" Margin="0,0,0,6">
+                                        <ToggleButton IsChecked="{Binding MapParticlesVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="28"><StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="AutoAwesome" Width="13" Height="13" Margin="0,0,5,0"/><TextBlock Text="VFX" FontSize="9.5"/></StackPanel></ToggleButton>
+                                        <ToggleButton IsChecked="{Binding MapStructuresVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="28"><StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="HomeOutline" Width="13" Height="13" Margin="0,0,5,0"/><TextBlock Text="Structures" FontSize="9.5"/></StackPanel></ToggleButton>
+                                    </UniformGrid>
+                                    <TextBlock Text="LAYERS" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,2,0,3" Visibility="{Binding HasMapLayers, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <ItemsControl ItemsSource="{Binding MapLayers}" Visibility="{Binding HasMapLayers, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Click="MapLayerCheckBox_Click" Margin="0,1">
+                                                    <Grid Width="240"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Label}" FontSize="9.5"/><TextBlock Grid.Column="1" Text="{Binding TriangleText}" FontSize="8.5" Foreground="{StaticResource TextMuted}" FontFamily="Consolas"/></Grid>
+                                                </CheckBox>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <ToggleButton x:Name="VfxMapLookSection" IsChecked="False" Style="{StaticResource CollapsibleSectionHeaderStyle}">
+                                <Grid Margin="8,7">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <materialIcons:MaterialIcon Kind="WhiteBalanceSunny" Width="15" Height="15" Foreground="#FFD166" Margin="0,0,8,0"/>
+                                    <StackPanel Grid.Column="1"><TextBlock Text="MAP LOOK" FontSize="10.5" FontWeight="Bold"/><TextBlock Text="Lighting and post processing" FontSize="8.5" Foreground="{StaticResource TextMuted}"/></StackPanel>
+                                    <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
+                                </Grid>
+                            </ToggleButton>
+                            <Border Margin="0,3,0,2" Padding="9" CornerRadius="8" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                    Visibility="{Binding IsChecked, ElementName=VfxMapLookSection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid>
+                                <UniformGrid Columns="2">
+                                    <Button x:Name="MapSunButton" Click="MapSun_Click" Style="{StaticResource TransparentIconButton}" Height="30" ToolTip="MAP sun override"><StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="WhiteBalanceSunny" Width="13" Height="13" Foreground="#FFD166" Margin="0,0,5,0"/><TextBlock Text="Sun" FontSize="9.5"/></StackPanel></Button>
+                                    <Button x:Name="MapPostButton" Click="MapPost_Click" Style="{StaticResource TransparentIconButton}" Height="30" ToolTip="MAP post effects"><StackPanel Orientation="Horizontal"><materialIcons:MaterialIcon Kind="ImageFilterVintage" Width="13" Height="13" Foreground="#A78BFA" Margin="0,0,5,0"/><TextBlock Text="Post" FontSize="9.5"/></StackPanel></Button>
+                                </UniformGrid>
+                                <Popup x:Name="MapSunPopup" PlacementTarget="{Binding ElementName=MapSunButton}"
+                                       Placement="Right" HorizontalOffset="8" AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+                                    <Border Width="310" Background="#FF161822" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="7" Padding="11">
+                                        <Border.Effect><DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.42"/></Border.Effect>
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,8"><TextBlock Text="SUN OVERRIDE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/><Button Content="Reset" HorizontalAlignment="Right" Padding="7,2" Style="{StaticResource TransparentIconButton}" Click="MapSunReset_Click"/></Grid>
+                                            <TextBlock Text="Azimuth" FontSize="9.5" Foreground="{StaticResource TextMuted}"/>
+                                            <Slider x:Name="MapSunAzimuthSlider" Minimum="-180" Maximum="180" TickFrequency="1" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
+                                            <TextBlock Text="Elevation" FontSize="9.5" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0"/>
+                                            <Slider x:Name="MapSunElevationSlider" Minimum="0" Maximum="89" TickFrequency="1" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
+                                            <Grid Margin="0,6,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Sun strength" FontSize="9.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSunStrengthSlider" Minimum="0" Maximum="2" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Ambient" FontSize="9.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSunAmbientSlider" Minimum="0" Maximum="2" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/></StackPanel></Grid>
+                                            <Grid Margin="0,7,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Sun color" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/><TextBox x:Name="MapSunColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/></Grid>
+                                            <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Sky color" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/><TextBox x:Name="MapSunSkyColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/></Grid>
+                                            <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Ground" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/><TextBox x:Name="MapSunGroundColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/></Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+                                <Popup x:Name="MapPostPopup" PlacementTarget="{Binding ElementName=MapPostButton}"
+                                       Placement="Right" HorizontalOffset="8" AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+                                    <Border Width="390" MaxHeight="620" Background="#FF161822" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="7" Padding="11">
+                                        <Border.Effect><DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.42"/></Border.Effect>
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <StackPanel Margin="0,0,5,0">
+                                                <Grid Margin="0,0,0,8"><TextBlock Text="POST EFFECTS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/><Button Content="Reset" HorizontalAlignment="Right" Padding="7,2" Style="{StaticResource TransparentIconButton}" Click="MapPostReset_Click"/></Grid>
+                                                <TextBlock Text="AMBIENT OCCLUSION" FontSize="9.5" FontWeight="Bold" Foreground="#A78BFA"/>
+                                                <CheckBox x:Name="MapSsaoEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,4" Click="MapSsaoControl_Changed"/>
+                                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Quality" FontSize="9" Foreground="{StaticResource TextMuted}"/><ComboBox x:Name="MapSsaoQualityCombo" Style="{StaticResource ModernComboBox}" Height="24" SelectionChanged="MapSsaoControl_Changed"><ComboBoxItem Content="4 samples"/><ComboBoxItem Content="8 samples"/></ComboBox></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Radius" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoRadiusSlider" Minimum="0" Maximum="200" TickFrequency="1" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel></Grid>
+                                                <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Power" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoPowerSlider" Minimum="0" Maximum="30" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Intensity" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoIntensitySlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel></Grid>
+                                                <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Bias" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoBiasSlider" Minimum="0" Maximum="20" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Buffer scale" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoBufferScaleSlider" Minimum="0.25" Maximum="1" TickFrequency="0.05" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel></Grid>
+                                                <CheckBox x:Name="MapSsaoEdgeAwareCheck" Content="Edge-aware blur" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,7" Click="MapSsaoControl_Changed"/>
+                                                <Separator Margin="0,2,0,7"/><TextBlock Text="DEPTH FOG" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8"/><CheckBox x:Name="MapDepthFogEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,4" Click="MapPostControl_Changed"/>
+                                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Color" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/><TextBox x:Name="MapDepthFogColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapPostControl_Changed"/></Grid>
+                                                <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Start" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogStartSlider" Minimum="0" Maximum="20000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="End" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogEndSlider" Minimum="0" Maximum="20000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="4"><TextBlock Text="Max" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogMaxSlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel></Grid>
+                                                <Separator Margin="0,7,0,7"/><TextBlock Text="HEIGHT FOG" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8"/><CheckBox x:Name="MapHeightFogEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,4" Click="MapPostControl_Changed"/>
+                                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Color" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/><TextBox x:Name="MapHeightFogColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapPostControl_Changed"/></Grid>
+                                                <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Start" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogStartSlider" Minimum="-1000" Maximum="1500" TickFrequency="10" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="End" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogEndSlider" Minimum="-1000" Maximum="1500" TickFrequency="10" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="4"><TextBlock Text="Max" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogMaxSlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel></Grid>
+                                                <Separator Margin="0,7,0,7"/><TextBlock Text="DEPTH OF FIELD" FontSize="9.5" FontWeight="Bold" Foreground="#F59E0B"/><CheckBox x:Name="MapDofEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,4" Click="MapPostControl_Changed"/>
+                                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Focal" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofFocalSlider" Minimum="0" Maximum="10000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Focus width" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofWidthSlider" Minimum="0" Maximum="5000" TickFrequency="25" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel><StackPanel Grid.Column="4"><TextBlock Text="CoC" FontSize="9" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofCocSlider" Minimum="0" Maximum="30" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel></Grid>
+                                            </StackPanel>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Popup>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>
