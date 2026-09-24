@@ -28,7 +28,7 @@ namespace AssetsManager.Services.Viewer.Interaction
         private readonly Line _yAxis;
         private readonly Line _zAxis;
         private readonly Ellipse _originMarker;
-        private readonly Func<PerspectiveCamera> _cameraProvider;
+        private readonly Func<ProjectionCamera> _cameraProvider;
         private readonly IReadOnlyList<SceneModel> _sceneModels;
         private readonly List<SceneModel> _selectedModels = new();
         private readonly List<(SceneModel Model, Vector3 Position)> _dragStartPositions = new();
@@ -50,7 +50,7 @@ namespace AssetsManager.Services.Viewer.Interaction
             Line yAxis,
             Line zAxis,
             Ellipse originMarker,
-            Func<PerspectiveCamera> cameraProvider,
+            Func<ProjectionCamera> cameraProvider,
             IReadOnlyList<SceneModel> sceneModels)
         {
             _inputSurface = inputSurface ?? throw new ArgumentNullException(nameof(inputSurface));
@@ -68,6 +68,13 @@ namespace AssetsManager.Services.Viewer.Interaction
         }
 
         public event Action<SceneModel, ModifierKeys> SelectionRequested;
+
+        /// <summary>
+        /// Raised while the active selection is translated through the shared viewport gizmo.
+        /// Consumers with their own placement ViewModel can mirror the SceneModel transform without
+        /// duplicating the interaction controller.
+        /// </summary>
+        public event Action<SceneModel> TransformChanged;
 
         public bool IsEnabled
         {
@@ -91,7 +98,7 @@ namespace AssetsManager.Services.Viewer.Interaction
 
         public void Update(Matrix4x4 viewProjection)
         {
-            PerspectiveCamera camera = _cameraProvider();
+            ProjectionCamera camera = _cameraProvider();
             if (!_isEnabled ||
                 _activeModel == null ||
                 !_activeModel.IsVisible ||
@@ -107,7 +114,9 @@ namespace AssetsManager.Services.Viewer.Interaction
                 (float)_activeModel.PositionX,
                 (float)_activeModel.PositionY,
                 (float)_activeModel.PositionZ);
-            _axisWorldLength = Math.Max(35, camera.LookDirection.Length * 0.12);
+            _axisWorldLength = camera is OrthographicCamera orthographic
+                ? Math.Max(35, orthographic.Width * 0.12)
+                : Math.Max(35, camera.LookDirection.Length * 0.12);
             if (!ViewerInteractionService.TryProject(
                     origin,
                     viewProjection,
@@ -204,6 +213,7 @@ namespace AssetsManager.Services.Viewer.Interaction
                         break;
                 }
             }
+            TransformChanged?.Invoke(_activeModel);
             e.Handled = true;
         }
 
@@ -222,8 +232,8 @@ namespace AssetsManager.Services.Viewer.Interaction
                 return;
             }
 
-            PerspectiveCamera camera = _cameraProvider();
-            if (!_isEnabled || _pointerMoved || camera == null) return;
+            ProjectionCamera projectionCamera = _cameraProvider();
+            if (!_isEnabled || _pointerMoved || projectionCamera is not PerspectiveCamera camera) return;
 
             SceneModel picked = ViewerInteractionService.PickModel(
                 _sceneModels,

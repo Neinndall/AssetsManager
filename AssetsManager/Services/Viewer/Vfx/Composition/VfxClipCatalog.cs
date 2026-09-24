@@ -130,6 +130,15 @@ internal sealed class VfxClipCatalog : IDisposable
     }
 
     /// <summary>
+    /// The clip a Skin preview opens on: the first playable authored clip whose name starts
+    /// with "idle", preserving AnimationGraph order and ignoring case. No idle means bind pose.
+    /// </summary>
+    internal static AnimationClipCatalogItem OpeningClip(IEnumerable<AnimationClipCatalogItem> clips)
+        => clips?.FirstOrDefault(item =>
+            !string.IsNullOrWhiteSpace(item?.Name) &&
+            item.Name.StartsWith("idle", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     /// Decodes only the selected clip's reachable atomic playlist and builds its exact event
     /// timeline on the ANM clock. Source ANMs are cached until the catalog is disposed.
     /// </summary>

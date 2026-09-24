@@ -739,7 +739,8 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _showCharacterArmature;
         private bool _showCharacterJointNames;
         private bool _characterAutoRotate;
-        private bool _characterControlsVisible = true;
+        private bool _characterTransformGizmoEnabled = true;
+        private bool _characterInspectorVisible = true;
         private bool _characterBackdropEnabled;
         private bool _mapParticlesVisible = true;
         private bool _mapStructuresVisible = true;
@@ -1049,13 +1050,24 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        public bool CharacterControlsVisible
+        public bool CharacterTransformGizmoEnabled
         {
-            get => _characterControlsVisible;
+            get => _characterTransformGizmoEnabled;
             set
             {
-                if (_characterControlsVisible == value) return;
-                _characterControlsVisible = value;
+                if (_characterTransformGizmoEnabled == value) return;
+                _characterTransformGizmoEnabled = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool CharacterInspectorVisible
+        {
+            get => _characterInspectorVisible;
+            set
+            {
+                if (_characterInspectorVisible == value) return;
+                _characterInspectorVisible = value;
                 OnPropertyChanged();
             }
         }

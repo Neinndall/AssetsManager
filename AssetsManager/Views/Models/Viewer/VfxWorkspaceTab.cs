@@ -84,7 +84,8 @@ namespace AssetsManager.Views.Models.Viewer
         internal bool CharacterJointNamesVisible { get; set; }
         internal bool CharacterAutoRotate { get; set; }
         internal double CharacterAutoRotateDegrees { get; set; }
-        internal bool CharacterControlsVisible { get; set; } = true;
+        internal bool CharacterTransformGizmoEnabled { get; set; } = true;
+        internal bool CharacterInspectorVisible { get; set; } = true;
         internal bool CharacterBackdropEnabled { get; set; }
         internal bool BackdropParticlesVisible { get; set; } = true;
         internal bool BackdropStructuresVisible { get; set; } = true;

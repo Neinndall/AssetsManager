@@ -93,6 +93,48 @@ public class VfxClipCatalogTests
     }
 
     [Fact]
+    public void OpeningClipUsesFirstIdleInAuthoredOrderIgnoringCase()
+    {
+        var bundle = new VfxLoadingService.Bundle();
+        bundle.Clips.Add(Clip(0x10, 0x100, "Run", "run.anm"));
+        bundle.Clips.Add(Clip(0x20, 0x100, "IDLE_Base", "idle_base.anm"));
+        bundle.Clips.Add(Clip(0x30, 0x100, "idle2", "idle2.anm"));
+        bundle.OwnerSceneContext = new VfxOwnerSceneContext(
+            string.Empty,
+            string.Empty,
+            1f,
+            0x100,
+            Array.Empty<uint>());
+        using var catalog = new VfxClipCatalog();
+
+        IReadOnlyList<AnimationClipCatalogItem> clips = catalog.BuildMetadata(bundle, path => path);
+        AnimationClipCatalogItem opening = VfxClipCatalog.OpeningClip(clips);
+
+        Assert.NotNull(opening);
+        Assert.Equal(0x20u, opening.Clip.OwnerPathHash);
+        Assert.Equal("IDLE_Base", opening.Name);
+    }
+
+    [Fact]
+    public void OpeningClipUsesBindPoseWhenThereIsNoIdle()
+    {
+        var bundle = new VfxLoadingService.Bundle();
+        bundle.Clips.Add(Clip(0x10, 0x100, "Presentation", "presentation.anm"));
+        bundle.Clips.Add(Clip(0x20, 0x100, "Run", "run.anm"));
+        bundle.OwnerSceneContext = new VfxOwnerSceneContext(
+            string.Empty,
+            string.Empty,
+            1f,
+            0x100,
+            Array.Empty<uint>());
+        using var catalog = new VfxClipCatalog();
+
+        IReadOnlyList<AnimationClipCatalogItem> clips = catalog.BuildMetadata(bundle, path => path);
+
+        Assert.Null(VfxClipCatalog.OpeningClip(clips));
+    }
+
+    [Fact]
     public void ParametricPlaylistUsesTheNearestAuthoredValue()
     {
         AnimationClipDefinition first = Clip(0x01, 0x100, "first", "first.anm");

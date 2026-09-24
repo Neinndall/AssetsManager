@@ -330,18 +330,17 @@ namespace AssetsManager.Services.Viewer.Resolvers
             if (settings == null)
                 return Array.Empty<string>();
 
-            string preferred = settings.PreferredClient == PreferredClient.PBE
+            // Viewer resources must stay on the explicitly selected client. A PBE preview must never
+            // silently resolve a missing MAP/texture/shader from LIVE (or vice versa), because that can
+            // produce a scene assembled from different game builds without the user knowing it.
+            string selected = settings.PreferredClient == PreferredClient.PBE
                 ? settings.LolPbeDirectory
                 : settings.LolLiveDirectory;
-            string alternate = settings.PreferredClient == PreferredClient.PBE
-                ? settings.LolLiveDirectory
-                : settings.LolPbeDirectory;
 
-            return new[] { preferred, alternate }
-                .Where(root => !string.IsNullOrWhiteSpace(root) && Directory.Exists(root))
-                .Select(Path.GetFullPath)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            if (string.IsNullOrWhiteSpace(selected) || !Directory.Exists(selected))
+                return Array.Empty<string>();
+
+            return new[] { Path.GetFullPath(selected) };
         }
 
         private Task<MapResolvedAsset> ResolveGeometryAsync(

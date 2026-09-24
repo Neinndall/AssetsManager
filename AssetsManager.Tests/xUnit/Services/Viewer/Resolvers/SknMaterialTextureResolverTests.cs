@@ -2808,6 +2808,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void MatchTextureKey_PreservesFullPathDictionaryKeyWhenBasenameMatches()
+        {
+            const string authored = "ASSETS/Characters/Turret/Skins/Base/Turret_Base_TX_CM.tex";
+            const string available = "assets/characters/turret/skins/base/turret_base_tx_cm.tex";
+
+            Assert.Equal(
+                available,
+                SknResolver.MatchTextureKey(authored, new[] { available }),
+                ignoreCase: true);
+        }
+
+        [Fact]
         public void ResolveTextureDirectory_UsesCompanionThemeParent()
         {
             string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-companion-textures-{Guid.NewGuid():N}");

@@ -97,6 +97,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private VfxCubeMapData _mapSkyCube;
         private bool _skyCubeDirty;
         private double _characterAutoRotateDegrees;
+        private readonly List<SceneModel> _characterInteractionModels = new();
+        private ViewportModelInteractionController _characterInteractionController;
         private MapCharacterRuntimeGroup _activeMapCharacterGroup;
         private MapCharacterData _activeMapCharacterPlacement;
         private AnimationClipDefinition _activeMapCharacterClip;
@@ -426,7 +428,8 @@ namespace AssetsManager.Views.Controls.Viewer
             tab.CharacterJointNamesVisible = _model.ShowCharacterJointNames;
             tab.CharacterAutoRotate = _model.CharacterAutoRotate;
             tab.CharacterAutoRotateDegrees = _characterAutoRotateDegrees;
-            tab.CharacterControlsVisible = _model.CharacterControlsVisible;
+            tab.CharacterTransformGizmoEnabled = _model.CharacterTransformGizmoEnabled;
+            tab.CharacterInspectorVisible = _model.CharacterInspectorVisible;
             tab.CharacterBackdropEnabled = _model.CharacterBackdropEnabled;
             tab.BackdropParticlesVisible = _model.MapParticlesVisible;
             tab.BackdropStructuresVisible = _model.MapStructuresVisible;
@@ -453,7 +456,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.ShowCharacterJointNames = tab.CharacterJointNamesVisible;
                 _model.CharacterAutoRotate = tab.CharacterAutoRotate;
                 _characterAutoRotateDegrees = tab.CharacterAutoRotateDegrees;
-                _model.CharacterControlsVisible = tab.CharacterControlsVisible;
+                _model.CharacterTransformGizmoEnabled = tab.CharacterTransformGizmoEnabled;
+                _model.CharacterInspectorVisible = tab.CharacterInspectorVisible;
                 _model.MapParticlesVisible = tab.BackdropParticlesVisible;
                 _model.MapStructuresVisible = tab.BackdropStructuresVisible;
                 _model.CharacterPositionX = tab.CharacterPositionX;
@@ -474,6 +478,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             ApplyCharacterPlacement();
             ApplyEffectiveCharacterSubmeshes();
+            RefreshCharacterInteractionTarget();
             EnsureCharacterBackdropRuntime(tab);
         }
 
@@ -844,10 +849,13 @@ namespace AssetsManager.Views.Controls.Viewer
                      e.PropertyName == nameof(VfxInspectorModel.ShowCharacterArmature) ||
                      e.PropertyName == nameof(VfxInspectorModel.ShowCharacterJointNames) ||
                      e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate) ||
-                     e.PropertyName == nameof(VfxInspectorModel.CharacterControlsVisible))
+                     e.PropertyName == nameof(VfxInspectorModel.CharacterTransformGizmoEnabled) ||
+                     e.PropertyName == nameof(VfxInspectorModel.CharacterInspectorVisible))
             {
                 if (e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate))
                     ApplyCharacterPlacement();
+                if (e.PropertyName == nameof(VfxInspectorModel.CharacterTransformGizmoEnabled))
+                    RefreshCharacterInteractionTarget();
                 OpenTkControl?.InvalidateVisual();
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.PreviewCameraPreset))
@@ -1058,6 +1066,61 @@ namespace AssetsManager.Views.Controls.Viewer
             OpenTkControl?.InvalidateVisual();
         }
 
+        private void RefreshCharacterInteractionTarget()
+        {
+            _characterInteractionModels.Clear();
+            if (_championModel != null && _model.IsSkinWorkspace)
+                _characterInteractionModels.Add(_championModel);
+
+            if (_characterInteractionController == null)
+                return;
+
+            _characterInteractionController.IsEnabled =
+                _model.IsSkinWorkspace && _model.CharacterTransformGizmoEnabled;
+            _characterInteractionController.SetSelection(
+                _characterInteractionModels,
+                _characterInteractionModels.FirstOrDefault());
+        }
+
+        private void CharacterInteraction_TransformChanged(SceneModel model)
+        {
+            if (_isApplyingCharacterViewportState ||
+                model == null ||
+                !ReferenceEquals(model, _championModel) ||
+                !_model.IsSkinWorkspace)
+            {
+                return;
+            }
+
+            _isApplyingCharacterViewportState = true;
+            try
+            {
+                _model.CharacterPositionX = model.PositionX;
+                _model.CharacterPositionY = model.PositionY;
+                _model.CharacterPositionZ = model.PositionZ;
+
+                if (_model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
+                {
+                    VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+                    tab.CharacterPositionX = model.PositionX;
+                    tab.CharacterPositionY = model.PositionY;
+                    tab.CharacterPositionZ = model.PositionZ;
+                    tab.CharacterPlacementCustomized = true;
+                    tab.CharacterPlacedOnKey = _model.HasActiveCharacterBackdrop
+                        ? VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source)
+                        : null;
+                }
+            }
+            finally
+            {
+                _isApplyingCharacterViewportState = false;
+            }
+
+            // The shared gizmo owns the SceneModel translation. Re-applying through the Studio placement
+            // path keeps attached clip/idle VFX and the per-tab placement in the same world frame.
+            ApplyCharacterPlacement();
+        }
+
         private void AdvanceCharacterAutoRotate(float deltaSeconds)
         {
             if (!_model.IsSkinWorkspace || !_model.CharacterAutoRotate || _championModel == null || deltaSeconds <= 0f)
@@ -1082,7 +1145,6 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (CharacterArmatureCanvas == null ||
                 !_model.IsSkinWorkspace ||
-                !_model.CharacterControlsVisible ||
                 !_model.ShowCharacterArmature ||
                 _championModel?.Skeleton?.Joints == null ||
                 _championModel.Skeleton.Joints.Count == 0)
@@ -1467,6 +1529,15 @@ namespace AssetsManager.Views.Controls.Viewer
             _championAnimationService = null;
             RunReleaseStep(nameof(AnimationService), () => championAnimationService?.Dispose());
 
+            var characterInteractionController = _characterInteractionController;
+            _characterInteractionController = null;
+            if (characterInteractionController != null)
+            {
+                characterInteractionController.TransformChanged -= CharacterInteraction_TransformChanged;
+                RunReleaseStep(nameof(ViewportModelInteractionController), characterInteractionController.Dispose);
+            }
+            _characterInteractionModels.Clear();
+
             var championModel = _championModel;
             _championModel = null;
             RunReleaseStep("Champion SceneModel", () => championModel?.Dispose());
@@ -1644,9 +1715,24 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
                 _championAnimationService ??= new AnimationService(LogService);
 
+                if (_characterInteractionController == null)
+                {
+                    _characterInteractionController = new ViewportModelInteractionController(
+                        CameraInputSurface,
+                        CharacterTransformGizmoCanvas,
+                        CharacterGizmoXAxis,
+                        CharacterGizmoYAxis,
+                        CharacterGizmoZAxis,
+                        CharacterGizmoOrigin,
+                        () => _dummyViewport.Camera as ProjectionCamera,
+                        _characterInteractionModels);
+                    _characterInteractionController.TransformChanged += CharacterInteraction_TransformChanged;
+                    RefreshCharacterInteractionTarget();
+                }
+
                 if (_cameraController == null)
                 {
-                    _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
+                    _cameraController = new CustomCameraController(_dummyViewport, CameraInputSurface);
                     _cameraController.RotationStarted += CameraController_RotationStarted;
                     _cameraController.RotationEnded += CameraController_RotationEnded;
                     ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
@@ -1749,6 +1835,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _ => Matrix4x4.Identity
             };
             var viewProj = view * proj;
+            _characterInteractionController?.Update(viewProj);
 
             // OpenTK has the current context here, so deferred session creation and resource
             // preparation are safe even when WPF selected the system before the GL control was ready.
@@ -2434,34 +2521,6 @@ namespace AssetsManager.Views.Controls.Viewer
             static byte Channel(float channel) =>
                 (byte)Math.Round(Math.Clamp(channel, 0f, 1f) * 255f, MidpointRounding.AwayFromZero);
             return $"#{Channel(value.X):X2}{Channel(value.Y):X2}{Channel(value.Z):X2}";
-        }
-
-        private void CharacterBackdrop_Click(object sender, RoutedEventArgs e)
-        {
-            if (CharacterBackdropPopup != null)
-                CharacterBackdropPopup.IsOpen = !CharacterBackdropPopup.IsOpen;
-            e.Handled = true;
-        }
-
-        private void CharacterPlacement_Click(object sender, RoutedEventArgs e)
-        {
-            if (CharacterPlacementPopup != null)
-                CharacterPlacementPopup.IsOpen = !CharacterPlacementPopup.IsOpen;
-            e.Handled = true;
-        }
-
-        private void CharacterArmature_Click(object sender, RoutedEventArgs e)
-        {
-            if (CharacterArmaturePopup != null)
-                CharacterArmaturePopup.IsOpen = !CharacterArmaturePopup.IsOpen;
-            e.Handled = true;
-        }
-
-        private void CharacterSubmeshes_Click(object sender, RoutedEventArgs e)
-        {
-            if (CharacterSubmeshesPopup != null)
-                CharacterSubmeshesPopup.IsOpen = !CharacterSubmeshesPopup.IsOpen;
-            e.Handled = true;
         }
 
         private void ResetCharacterPlacement_Click(object sender, RoutedEventArgs e)
@@ -3652,15 +3711,16 @@ namespace AssetsManager.Views.Controls.Viewer
                     }
                     else
                     {
-                        // Selecting the Skin node itself is a neutral owner-scene selection: keep
-                        // the already loaded Champion, but stand down any System/Clip/Spell that
-                        // was previously selected under it. This also prevents a prior System from
-                        // looking as though it auto-started merely because the user returned to Skin0.
+                        // Returning to the Skin itself clears every explicit child preview. The owner
+                        // scene then opens exactly like the Skin viewport: first playable Idle in authored
+                        // AnimationGraph order, or bind pose when the graph has no Idle. A standalone
+                        // System is never selected implicitly by this path.
                         BeginExclusivePreviewSelection();
                         _model.SelectedSystem = null;
                         _model.SelectedAnimation = null;
                         _model.SelectedSpell = null;
-                        _model.IsRawSystemsMode = true;
+                        _model.IsAnimationMode = true;
+                        TrySelectOpeningSkinAnimation();
                     }
                     break;
                 case VfxBrowserSection section:
@@ -3690,12 +3750,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.SelectedSpell = spell;
                     break;
             }
-        }
-
-        private void MapLayers_Click(object sender, RoutedEventArgs e)
-        {
-            MapLayersPopup.IsOpen = !MapLayersPopup.IsOpen;
-            e.Handled = true;
         }
 
         private void MapLayerCheckBox_Click(object sender, RoutedEventArgs e)
@@ -4393,6 +4447,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 SceneModel championModel = _championModel;
                 _championModel = null;
+                RefreshCharacterInteractionTarget();
                 _championMeshRenderer?.QueueRelease(championModel);
                 RunReleaseStep("Champion SceneModel", championModel.Dispose);
             }
@@ -4747,6 +4802,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         var oldModel = _championModel;
                         _championModel = loaded;
                         _championBundle = bundle;
+                        RefreshCharacterInteractionTarget();
                         // Keep the owner mesh and its joint anchors in authored skinScale space. User
                         // placement is an outer multiplier so attached VFX do not receive skinScale twice.
                         _championAuthoredScale = _activeBundle?.OwnerSceneContext is { SkinScale: > 0f } owner
@@ -4800,15 +4856,23 @@ namespace AssetsManager.Views.Controls.Viewer
                         if (_model.SelectedSystem != null && _model.SelectedAnimation == null && _model.SelectedSpell == null)
                             ApplyChampionBindPose();
 
-                        // The catalog may already be available from BIN load. Rebuild only when
-                        // no animation asset resolved earlier, but leave playback unselected until
-                        // the user explicitly chooses an Animation Clip in the browser.
+                        // The catalog may already be available from BIN load. Rebuild only when needed.
+                        // A restored explicit System/Clip/Spell keeps ownership; otherwise the Skin opens
+                        // on its first playable Idle, matching the authored AnimationGraph order.
                         if (_model.DetectedAnimations.Count == 0)
                             BindAnimationCatalog(searchDir);
                         if (_model.SelectedAnimation != null)
+                        {
                             _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
+                        }
+                        else if (_model.SelectedSystem == null && _model.SelectedSpell == null)
+                        {
+                            TrySelectOpeningSkinAnimation();
+                        }
                         else
+                        {
                             TryPlayPendingSpell();
+                        }
                         return;
                     }
                 }
@@ -4857,6 +4921,25 @@ namespace AssetsManager.Views.Controls.Viewer
                 _activeBundle,
                 path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
                 parameter);
+        }
+
+        private bool TrySelectOpeningSkinAnimation()
+        {
+            // Explicit child previews always win. This method only owns the unclaimed Skin scene.
+            if (_model.SelectedSystem != null ||
+                _model.SelectedAnimation != null ||
+                _model.SelectedSpell != null)
+            {
+                return false;
+            }
+
+            AnimationClipCatalogItem opening = VfxClipCatalog.OpeningClip(_model.DetectedAnimations);
+            if (opening == null)
+                return false;
+
+            _model.IsAnimationMode = true;
+            _model.SelectedAnimation = opening;
+            return true;
         }
 
         private void ConfigureAnimationParameterOptions(AnimationClipCatalogItem item)

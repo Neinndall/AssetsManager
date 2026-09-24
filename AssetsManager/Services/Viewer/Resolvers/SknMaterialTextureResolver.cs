@@ -1610,11 +1610,19 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return null;
             }
 
-            string fileName = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(
-                texturePath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar)));
+            static string FileKey(string value)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    return string.Empty;
+                string normalized = value.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
+                return PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(normalized));
+            }
+
+            string fileName = FileKey(texturePath);
 
             string directMatch = availableKeys.FirstOrDefault(key =>
-                key.Equals(fileName, StringComparison.OrdinalIgnoreCase));
+                key.Equals(fileName, StringComparison.OrdinalIgnoreCase) ||
+                FileKey(key).Equals(fileName, StringComparison.OrdinalIgnoreCase));
             if (directMatch != null)
             {
                 return directMatch;

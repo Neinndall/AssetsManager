@@ -416,7 +416,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
-        public void InstallationRootsHonorPreferredClientAndRemoveDuplicates()
+        public void InstallationRootsUseOnlyPreferredClientWithoutFallback()
         {
             string pbe = NewTempDirectory();
             string live = NewTempDirectory();
@@ -424,19 +424,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             {
                 var settings = new AppSettings
                 {
-                    PreferredClient = PreferredClient.LIVE,
+                    PreferredClient = PreferredClient.PBE,
                     LolPbeDirectory = pbe,
                     LolLiveDirectory = live
                 };
 
                 string[] roots = MapAssetResolver.GetInstallationRoots(settings).ToArray();
+                Assert.Equal(new[] { Path.GetFullPath(pbe) }, roots);
 
-                Assert.Equal(Path.GetFullPath(live), roots[0]);
-                Assert.Equal(Path.GetFullPath(pbe), roots[1]);
-
-                settings.LolPbeDirectory = live;
+                settings.PreferredClient = PreferredClient.LIVE;
                 roots = MapAssetResolver.GetInstallationRoots(settings).ToArray();
-                Assert.Single(roots);
+                Assert.Equal(new[] { Path.GetFullPath(live) }, roots);
+
+                settings.PreferredClient = PreferredClient.PBE;
+                settings.LolPbeDirectory = Path.Combine(pbe, "missing");
+                roots = MapAssetResolver.GetInstallationRoots(settings).ToArray();
+                Assert.Empty(roots);
             }
             finally
             {
