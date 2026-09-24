@@ -154,6 +154,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl = gl;
         }
 
+        internal bool Contains(float[] positions, bool skinning)
+            => positions is not null && _meshes.ContainsKey((positions, skinning));
+
         internal void Upload(
             VfxPlaybackRuntime.EmitterState emitter,
             float[] positions,

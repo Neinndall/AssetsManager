@@ -806,9 +806,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             new Vector3(curve.Constant, curve.Constant, curve.Constant), curve.Times,
             curve.Values?.Select(static v => new Vector3(v, v, v)).ToArray());
 
-        private static VfxCurve3 ScalarRotationCurve(VfxCurveF curve) => new(
-            new Vector3(0f, 0f, curve.Constant), curve.Times,
-            curve.Values?.Select(static v => new Vector3(0f, 0f, v)).ToArray());
+        private static VfxCurve3 ScalarRotationCurve(VfxCurveF curve)
+        {
+            VfxProbTable[] probability = null;
+            if (curve.Prob is { Length: > 0 } && !curve.Prob[0].IsEmpty)
+            {
+                probability = new VfxProbTable[3];
+                probability[2] = curve.Prob[0];
+            }
+
+            return new VfxCurve3(
+                new Vector3(0f, 0f, curve.Constant),
+                curve.Times,
+                curve.Values?.Select(static v => new Vector3(0f, 0f, v)).ToArray(),
+                probability);
+        }
 
         private static IReadOnlyList<Vector3> ReadVector3Container(BinTreeProperty prop)
         {

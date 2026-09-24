@@ -1337,6 +1337,27 @@
                                     <ComboBoxItem Content="1.5x" Tag="1.5"/>
                                     <ComboBoxItem Content="2.0x" Tag="2.0"/>
                                 </ComboBox>
+
+                                <!-- Probability-table inspection chance belongs to a standalone run. -->
+                                <StackPanel x:Name="ChancePinPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0"
+                                            Visibility="{Binding HasStandaloneSystem, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Text="Chance" FontSize="10.5" Foreground="{StaticResource TextMuted}"
+                                               VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <Slider x:Name="ChancePinSlider" Width="86" Minimum="0" Maximum="1" Value="0.5"
+                                            TickFrequency="0.01" IsSnapToTickEnabled="True" Opacity="0.5"
+                                            Style="{StaticResource HUDSliderStyle}"
+                                            ValueChanged="ChancePinSlider_ValueChanged"
+                                            PreviewMouseDown="ChancePinSlider_PreviewMouseDown"/>
+                                    <TextBlock x:Name="ChancePinValueText" Width="34" Text="" FontSize="10" FontFamily="Consolas"
+                                               Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"
+                                               TextAlignment="Right" Margin="4,0,2,0"/>
+                                    <Button x:Name="ChancePinClearButton" Click="ChancePinClear_Click"
+                                            Style="{StaticResource TransparentIconButton}" Width="22" Height="22" Padding="0"
+                                            Visibility="Collapsed" ToolTip="Unpin probability chance">
+                                        <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12"/>
+                                    </Button>
+                                </StackPanel>
+
                                 <!-- One timeline loop control is shared by Systems, Clips, and Spells. -->
                                 <ToggleButton x:Name="TimelineLoopToggleButton"
                                               Click="TimelineLoopToggleButton_Click"

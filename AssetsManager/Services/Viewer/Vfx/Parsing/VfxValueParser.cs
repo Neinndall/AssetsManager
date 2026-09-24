@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
@@ -21,6 +22,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_keyTimes      = VfxParsingHash.Fnv1a("keyTimes");
         private static readonly uint F_keyValues     = VfxParsingHash.Fnv1a("keyValues");
         private static readonly uint F_singleValue   = VfxParsingHash.Fnv1a("singleValue");
+        private static readonly uint C_valueColorRgb = VfxParsingHash.Fnv1a("ValueColorRgb");
 
         internal static VfxCurveF? ReadCurveF(
             IReadOnlyDictionary<uint, BinTreeProperty> p,
@@ -57,22 +59,42 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             if (!p.TryGetValue(field, out var prop)) return null;
             if (prop is BinTreeStruct value)
             {
-                var constant = AsVec2(Get(value.Properties, F_constantValue)) ?? structFallback ?? Vector2.Zero;
-                var (times, values) = ReadDynamics(value.Properties, AsVec2);
-                return new VfxCurve2(constant, times, values, ReadNestedProbTables(value.Properties));
+                AuthoredValue<Vector2>? held = ReadCurveVector2(Get(value.Properties, F_constantValue));
+                Vector2 constant = held?.Value ?? structFallback ?? Vector2.Zero;
+                byte constantWidth = held?.Width ?? 2;
+                var (times, values, widths) = ReadDynamicsWithWidths(value.Properties, ReadCurveVector2);
+                return new VfxCurve2(
+                    constant,
+                    times,
+                    values,
+                    ReadNestedProbTables(value.Properties),
+                    constantWidth,
+                    widths);
             }
-            return AsVec2(prop) is { } vector ? VfxCurve2.Const(vector) : null;
+            if (ReadCurveVector2(prop) is { } direct)
+                return new VfxCurve2(direct.Value, null, null, null, direct.Width);
+            return null;
         }
 
         internal static VfxCurve3? ReadCurve3Property(BinTreeProperty prop, Vector3? structFallback = null)
         {
             if (prop is BinTreeStruct v)
             {
-                var c = AsVec3(Get(v.Properties, F_constantValue)) ?? structFallback ?? Vector3.Zero;
-                var (times, vals) = ReadDynamics(v.Properties, AsVec3);
-                return new VfxCurve3(c, times, vals, ReadNestedProbTables(v.Properties));
+                AuthoredValue<Vector3>? held = ReadCurveVector3(Get(v.Properties, F_constantValue));
+                Vector3 constant = held?.Value ?? structFallback ?? Vector3.Zero;
+                byte constantWidth = held?.Width ?? 3;
+                var (times, vals, widths) = ReadDynamicsWithWidths(v.Properties, ReadCurveVector3);
+                return new VfxCurve3(
+                    constant,
+                    times,
+                    vals,
+                    ReadNestedProbTables(v.Properties),
+                    constantWidth,
+                    widths);
             }
-            return AsVec3(prop) is { } vector ? VfxCurve3.Const(vector) : null;
+            if (ReadCurveVector3(prop) is { } direct)
+                return new VfxCurve3(direct.Value, null, null, null, direct.Width);
+            return null;
         }
 
         internal static VfxCurve4? ReadCurve4(
@@ -83,11 +105,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             if (!p.TryGetValue(field, out var prop)) return null;
             if (prop is BinTreeStruct v)
             {
-                var c = AsVec4(Get(v.Properties, F_constantValue)) ?? structFallback ?? Vector4.One;
-                var (times, vals) = ReadDynamics(v.Properties, AsVec4);
-                return new VfxCurve4(c, times, vals, ReadNestedProbTables(v.Properties));
+                Func<BinTreeProperty, AuthoredValue<Vector4>?> reader =
+                    v.ClassHash == C_valueColorRgb ? ReadCurveColorRgb : ReadCurveVector4;
+                AuthoredValue<Vector4>? held = reader(Get(v.Properties, F_constantValue));
+                Vector4 constant = held?.Value ?? structFallback ?? Vector4.One;
+                byte constantWidth = held?.Width ?? 4;
+                var (times, vals, widths) = ReadDynamicsWithWidths(v.Properties, reader);
+                return new VfxCurve4(
+                    constant,
+                    times,
+                    vals,
+                    ReadNestedProbTables(v.Properties),
+                    constantWidth,
+                    widths);
             }
-            return AsVec4(prop) is { } vector ? VfxCurve4.Const(vector) : null;
+            if (ReadCurveVector4(prop) is { } direct)
+                return new VfxCurve4(direct.Value, null, null, null, direct.Width);
+            return null;
         }
 
         internal static VfxProbTable[] ReadProbTables(IReadOnlyDictionary<uint, BinTreeProperty> valueProps)
@@ -138,10 +172,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 
         internal static VfxProbTable[] ReadNestedProbTables(IReadOnlyDictionary<uint, BinTreeProperty> valueProps)
         {
-            if (Get(valueProps, F_dynamics) is BinTreeStruct dynamics &&
-                ReadProbTables(dynamics.Properties) is { } nested)
-                return nested;
-            return ReadProbTables(valueProps);
+            if (Get(valueProps, F_dynamics) is not BinTreeStruct dynamics) return null;
+            return ReadProbTables(dynamics.Properties);
         }
 
         internal static (float[], T[]) ReadDynamics<T>(IReadOnlyDictionary<uint, BinTreeProperty> valueProps, Func<BinTreeProperty, T?> conv)
@@ -164,6 +196,78 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 vals.Add(value.Value);
             }
             return times.Count > 0 ? (times.ToArray(), vals.ToArray()) : (null, null);
+        }
+
+        private readonly record struct AuthoredValue<T>(T Value, byte Width) where T : struct;
+
+        private static (float[], T[], byte[]) ReadDynamicsWithWidths<T>(
+            IReadOnlyDictionary<uint, BinTreeProperty> valueProps,
+            Func<BinTreeProperty, AuthoredValue<T>?> conv)
+            where T : struct
+        {
+            if (Get(valueProps, F_dynamics) is not BinTreeStruct dyn) return (null, null, null);
+            if (Get(dyn.Properties, F_times) is not BinTreeContainer tc) return (null, null, null);
+            if (Get(dyn.Properties, F_values) is not BinTreeContainer vc) return (null, null, null);
+
+            int n = Math.Min(tc.Elements.Count, vc.Elements.Count);
+            if (n == 0) return (null, null, null);
+            var times = new List<float>(n);
+            var values = new List<T>(n);
+            var widths = new List<byte>(n);
+            for (int i = 0; i < n; i++)
+            {
+                float? time = AsF32(tc.Elements[i]);
+                AuthoredValue<T>? value = conv(vc.Elements[i]);
+                if (!time.HasValue || !value.HasValue) continue;
+                times.Add(time.Value);
+                values.Add(value.Value.Value);
+                widths.Add(value.Value.Width);
+            }
+            return times.Count > 0
+                ? (times.ToArray(), values.ToArray(), widths.ToArray())
+                : (null, null, null);
+        }
+
+        private static AuthoredValue<Vector2>? ReadCurveVector2(BinTreeProperty property)
+        {
+            if (property is BinTreeVector2 v2) return new AuthoredValue<Vector2>(v2.Value, 2);
+            if (property is BinTreeVector3 v3) return new AuthoredValue<Vector2>(new Vector2(v3.Value.X, v3.Value.Y), 2);
+            return AsF32(property) is { } scalar
+                ? new AuthoredValue<Vector2>(new Vector2(scalar, 0f), 1)
+                : null;
+        }
+
+        private static AuthoredValue<Vector3>? ReadCurveVector3(BinTreeProperty property)
+        {
+            if (property is BinTreeVector3 v3) return new AuthoredValue<Vector3>(v3.Value, 3);
+            if (property is BinTreeVector2 v2) return new AuthoredValue<Vector3>(new Vector3(v2.Value, 0f), 2);
+            return AsF32(property) is { } scalar
+                ? new AuthoredValue<Vector3>(new Vector3(scalar, 0f, 0f), 1)
+                : null;
+        }
+
+        private static AuthoredValue<Vector4>? ReadCurveVector4(BinTreeProperty property)
+        {
+            if (property is BinTreeVector4 v4) return new AuthoredValue<Vector4>(v4.Value, 4);
+            if (property is BinTreeColor color) return new AuthoredValue<Vector4>(color.Value, 4);
+            if (property is BinTreeVector3 v3) return new AuthoredValue<Vector4>(new Vector4(v3.Value, 0f), 3);
+            if (property is BinTreeVector2 v2) return new AuthoredValue<Vector4>(new Vector4(v2.Value, 0f, 0f), 2);
+            return AsF32(property) is { } scalar
+                ? new AuthoredValue<Vector4>(new Vector4(scalar, 0f, 0f, 0f), 1)
+                : null;
+        }
+
+        private static AuthoredValue<Vector4>? ReadCurveColorRgb(BinTreeProperty property)
+        {
+            AuthoredValue<Vector4>? held = ReadCurveVector4(property);
+            if (held is not { } value) return null;
+            if (value.Width != 3) return value;
+
+            // ValueColorRgb is authored as RGB but is semantically a colour, not a generic Vec3.
+            // LTK reads its missing alpha as fully opaque while keeping only three authored/table slots.
+            return new AuthoredValue<Vector4>(
+                new Vector4(value.Value.X, value.Value.Y, value.Value.Z, 1f),
+                value.Width);
         }
 
         internal static BinTreeProperty Get(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
@@ -212,13 +316,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         }
 
         internal static bool IsSupportedSimpleMeshPath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return false;
-            string extension = Path.GetExtension(path);
-            return extension.Equals(".scb", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".tmesh", StringComparison.OrdinalIgnoreCase) ||
-                   extension.Equals(".gmesh", StringComparison.OrdinalIgnoreCase);
-        }
+            => VfxMeshFormatSemantics.IsAuthoredSimplePath(path);
 
         internal static byte NormalizeEnumByte(int? value, int maxInclusive, byte fallback)
             => value is >= 0 && value <= maxInclusive ? (byte)value.Value : fallback;

@@ -754,6 +754,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void NarrowVectorCurvesOnlyOverwriteAuthoredChannels()
+        {
+            var constant = new VfxCurve3(
+                new Vector3(5f, 0f, 0f),
+                null,
+                null,
+                null,
+                ConstantWidth: 1);
+            Assert.Equal(new Vector3(5f, 3f, 4f), constant.SampleOver(0.5f, new Vector3(2f, 3f, 4f)));
+
+            var keyed = new VfxCurve3(
+                Vector3.Zero,
+                new[] { 0f, 1f },
+                new[]
+                {
+                    new Vector3(1f, 2f, 3f),
+                    new Vector3(5f, 0f, 0f)
+                },
+                ValueWidths: new byte[] { 3, 1 });
+
+            // The lower key owns the sampled width. Missing channels in the upper key keep
+            // the lower key's value instead of being invented as zero.
+            Assert.Equal(new Vector3(3f, 2f, 3f), keyed.SampleOver(0.5f, new Vector3(9f)));
+            // At the second key only X is authored, so Y/Z remain the caller's baseline.
+            Assert.Equal(new Vector3(5f, 8f, 7f), keyed.SampleOver(1f, new Vector3(9f, 8f, 7f)));
+        }
+
+        [Fact]
         public void BirthProbabilityTablesShareOneChanceAcrossAllChannelsLikeLtk()
         {
             var curve = new VfxCurve3(
@@ -776,6 +804,59 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(chance * 2f, drawn.Y, precision: 6);
             Assert.Equal(chance * 4f, drawn.Z, precision: 6);
             Assert.Equal(expected.State, rng.State);
+        }
+
+        [Fact]
+        public void ProbabilityOutsideAuthoredWidthDoesNotConsumeRandomChance()
+        {
+            var curve = new VfxCurve3(
+                new Vector3(2f, 0f, 0f),
+                null,
+                null,
+                new[]
+                {
+                    default,
+                    default,
+                    new VfxProbTable(new[] { 0f, 1f }, new[] { 0f, 2f })
+                },
+                ConstantWidth: 1);
+            var rng = new VfxLtkRandom(42);
+            uint before = rng.State;
+
+            Vector3 sampled = curve.SampleBirthOver(0f, rng, new Vector3(1f, 3f, 4f));
+
+            Assert.Equal(before, rng.State);
+            Assert.Equal(new Vector3(2f, 3f, 4f), sampled);
+        }
+
+        [Fact]
+        public void PinnedBirthChanceKeepsTheUnpinnedRandomStream()
+        {
+            var probability = new[]
+            {
+                new VfxProbTable(new[] { 0f, 1f }, new[] { 0f, 2f }),
+                new VfxProbTable(new[] { 0f, 1f }, new[] { 0f, 2f }),
+                new VfxProbTable(new[] { 0f, 1f }, new[] { 0f, 2f })
+            };
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                BirthScale = new VfxCurve3(Vector3.One, null, null, probability)
+            };
+            var system = new VfxSystemDefinition(1, "pin", "pin", new[] { emitter });
+
+            var unpinned = new VfxPlaybackRuntime(1337);
+            unpinned.SetSystem(system, Vector3.Zero);
+            unpinned.Update(0.1f);
+
+            var pinned = new VfxPlaybackRuntime(1337);
+            pinned.SetPinnedBirthChance(0.25f);
+            pinned.SetSystem(system, Vector3.Zero);
+            pinned.Update(0.1f);
+
+            Assert.Equal(unpinned.RandomState, pinned.RandomState);
+            Assert.Equal(0.25f, pinned.PinnedBirthChance);
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(pinned.Emitters).Particles);
+            Assert.Equal(new Vector3(0.5f), particle.BirthSize);
         }
 
         [Fact]
@@ -4129,6 +4210,210 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxPlaybackRuntime restoredRoot = Assert.Single(throughCheckpoint.Graphs).Root;
             Assert.Equal(expectedTime, restoredRoot.CurrentTime);
             Assert.Equal(expectedInstances, restoredRoot.Emitters[0].Instances);
+        }
+
+        [Fact]
+        public void ChangingPinnedChanceKeepsLiveStateButInvalidatesSeekCheckpoints()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(20f),
+                EmitterLifetime = 2f,
+                ParticleLifetime = VfxCurveF.Const(2f)
+            };
+            var definition = new VfxSystemDefinition(1, "pin-checkpoint", "pin-checkpoint", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "pin-checkpoint",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [1] = definition },
+                ResourceMap = new Dictionary<uint, uint>(),
+                SearchDirectory = Path.GetTempPath(),
+                PlaybackSeed = 17,
+                TotalDuration = 2d
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.Seek(1d);
+            Assert.True(session.CheckpointCount > 0);
+            int liveBefore = session.LiveParticleCount;
+            double timeBefore = model.CurrentTime;
+
+            session.SetPinnedBirthChance(0.25f);
+
+            Assert.Equal(0, session.CheckpointCount);
+            Assert.Equal(0.25f, session.PinnedBirthChance);
+            Assert.Equal(0.25f, Assert.Single(session.Graphs).Root.PinnedBirthChance);
+            Assert.Equal(liveBefore, session.LiveParticleCount);
+            Assert.Equal(timeBefore, model.CurrentTime);
+
+            session.Seek(0.62d);
+            Assert.Equal(0d, session.LastSeekRestoreTime, precision: 6);
+            Assert.Equal(0.25f, Assert.Single(session.Graphs).Root.PinnedBirthChance);
+        }
+
+        [Fact]
+        public void StandaloneAuthoringSwapKeepsLiveParticlesWhenEmitterAddressMatchesLtk()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Name = "edited",
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(20f),
+                EmitterLifetime = 2f,
+                ParticleLifetime = VfxCurveF.Const(2f),
+                BirthColor = VfxCurve4.Const(Vector4.One)
+            };
+            var definition = new VfxSystemDefinition(1, "swap", "swap", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "swap",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [1] = definition },
+                ResourceMap = new Dictionary<uint, uint>(),
+                SearchDirectory = Path.GetTempPath(),
+                PlaybackSeed = 17,
+                TotalDuration = 2d
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.Seek(0.2d);
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(root.Emitters);
+            int before = state.Particles.Count;
+            Assert.True(before > 0);
+            Assert.All(state.Particles, particle => Assert.Equal(Vector4.One, particle.BirthColor));
+
+            Vector4 red = new(1f, 0f, 0f, 1f);
+            VfxEmitterDefinition editedEmitter = emitter with { BirthColor = VfxCurve4.Const(red) };
+            VfxSystemDefinition edited = definition with { Emitters = new[] { editedEmitter } };
+
+            Assert.True(session.SwapStandaloneDefinition(edited));
+
+            Assert.Same(root, Assert.Single(session.Graphs).Root);
+            Assert.Equal(before, state.Particles.Count);
+            Assert.All(state.Particles, particle => Assert.Equal(Vector4.One, particle.BirthColor));
+            Assert.Same(editedEmitter, state.Def);
+
+            session.Seek(0.3d);
+            Assert.True(state.Particles.Count > before);
+            Assert.Contains(state.Particles, particle => particle.BirthColor == red);
+        }
+
+        [Fact]
+        public void CompatibleSwapCanDisableEmitterWithoutLosingItsLivePoolSlot()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Name = "toggle",
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(20f),
+                EmitterLifetime = 2f,
+                ParticleLifetime = VfxCurveF.Const(10f)
+            };
+            var definition = new VfxSystemDefinition(1, "toggle", "toggle", new[] { emitter });
+            var runtime = new VfxPlaybackRuntime(17);
+            runtime.SetSystem(definition, Vector3.Zero);
+            runtime.Update(0.2f);
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            int live = state.Particles.Count;
+            Assert.True(live > 0);
+
+            VfxSystemDefinition disabled = definition with
+            {
+                Emitters = new[] { emitter with { Disabled = true } }
+            };
+            Assert.True(runtime.TrySwapDefinition(disabled));
+            Assert.Same(state, Assert.Single(runtime.Emitters));
+
+            runtime.Update(0.1f);
+            Assert.Equal(live, state.Particles.Count);
+            Assert.True(state.Def.Disabled);
+        }
+
+        [Fact]
+        public void GraphSwapCarriesInheritanceEditToAnAlreadyLiveChildLikeLtk()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Name = "child",
+                EmitterLifetime = 10f,
+                ParticleLifetime = VfxCurveF.Const(10f)
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+
+            VfxChildParticleSetDefinition Set(float x) => new(
+                new[] { new VfxChildSystemReference("child", 2, 0) },
+                false,
+                VfxCurveF.Zero,
+                VfxCurve3.Const(new Vector3(x, 0f, 0f)),
+                1);
+
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Name = "parent",
+                ParticleLifetime = VfxCurveF.Const(10f),
+                ChildParticleSet = Set(0f)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            VfxPlaybackGraphRuntime graph = CreateGraph(parent, child);
+            graph.Update(0.02f);
+            graph.Update(0.02f);
+
+            VfxPlaybackRuntime liveChild = Assert.Single(graph.Runtimes.Skip(1));
+            Assert.Equal(0f, Assert.Single(liveChild.Emitters).BasePos.X, precision: 4);
+
+            VfxSystemDefinition edited = parent with
+            {
+                Emitters = new[] { parentEmitter with { ChildParticleSet = Set(10f) } }
+            };
+            Assert.True(graph.TrySwapRootDefinition(edited));
+            graph.Update(0.02f);
+
+            Assert.Same(liveChild, Assert.Single(graph.Runtimes.Skip(1)));
+            Assert.Equal(10f, Assert.Single(liveChild.Emitters).BasePos.X, precision: 4);
+        }
+
+        [Fact]
+        public void StandaloneAuthoringSwapRebuildsWhenEmitterAddressChanges()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Name = "before",
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(20f),
+                EmitterLifetime = 2f,
+                ParticleLifetime = VfxCurveF.Const(2f)
+            };
+            var definition = new VfxSystemDefinition(1, "swap-structural", "swap-structural", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = "swap-structural",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [1] = definition },
+                ResourceMap = new Dictionary<uint, uint>(),
+                SearchDirectory = Path.GetTempPath(),
+                PlaybackSeed = 17,
+                TotalDuration = 2d
+            };
+
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.Seek(0.2d);
+            VfxPlaybackRuntime beforeRoot = Assert.Single(session.Graphs).Root;
+            double time = model.CurrentTime;
+
+            VfxSystemDefinition edited = definition with
+            {
+                Emitters = new[] { emitter with { Name = "after" } }
+            };
+            Assert.True(session.SwapStandaloneDefinition(edited));
+
+            Assert.NotSame(beforeRoot, Assert.Single(session.Graphs).Root);
+            Assert.Equal(time, model.CurrentTime, precision: 6);
         }
 
         [Fact]

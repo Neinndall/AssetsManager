@@ -11,6 +11,7 @@ using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Resources
@@ -24,7 +25,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
     internal sealed class VfxSceneResourceContext : IDisposable
     {
         private static readonly string[] TextureExtensions = { ".tex", ".dds" };
-        private static readonly string[] MeshExtensions = { ".scb", ".skn", ".tmesh", ".gmesh" };
         private static readonly string[] SkeletonExtensions = { ".skl" };
         private static readonly string[] AnimationExtensions = { ".anm" };
         private const int MaximumConcurrentCopies = 4;
@@ -200,15 +200,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                     Add(requests, emitter.Reflection?.TexturePath, TextureExtensions);
                     Add(requests, emitter.PaletteDefinition?.PaletteTexturePath, TextureExtensions);
                     Add(requests, emitter.ParticleColorTexturePath, TextureExtensions);
-                    Add(requests, emitter.MeshPath, MeshExtensions);
-                    Add(requests, emitter.MeshFallbackPath, MeshExtensions);
+                    Add(requests, emitter.MeshPath, VfxMeshFormatSemantics.SceneExtensions);
+                    Add(requests, emitter.MeshFallbackPath, VfxMeshFormatSemantics.SceneExtensions);
                     Add(requests, emitter.MeshSkeletonPath, SkeletonExtensions);
                     Add(requests, emitter.MeshAnimationPath, AnimationExtensions);
                     foreach (string variant in emitter.MeshAnimationVariants ?? Array.Empty<string>())
                         Add(requests, variant, AnimationExtensions);
                     if (emitter.EmissionSurface is { } surface)
                     {
-                        Add(requests, surface.MeshPath, MeshExtensions);
+                        Add(requests, surface.MeshPath, VfxMeshFormatSemantics.SceneExtensions);
                         Add(requests, surface.SkeletonPath, SkeletonExtensions);
                         Add(requests, surface.AnimationPath, AnimationExtensions);
                     }
@@ -217,7 +217,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
             if (ownerSceneContext != null)
             {
-                Add(requests, ownerSceneContext.MeshPath, MeshExtensions);
+                Add(requests, ownerSceneContext.MeshPath, VfxMeshFormatSemantics.SceneExtensions);
                 Add(requests, ownerSceneContext.SkeletonPath, SkeletonExtensions);
             }
             return requests.Values.ToArray();

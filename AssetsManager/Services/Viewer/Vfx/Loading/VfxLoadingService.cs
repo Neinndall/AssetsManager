@@ -24,8 +24,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
     {
         // LTK bounds every breadth-first linked BIN search to 32 files beyond the primary document.
         private const int MaximumLinkedBins = 32;
-        private static readonly string[] SkinnedMeshExtensions = { ".skn" };
-        private static readonly string[] SimpleMeshExtensions = { ".scb", ".tmesh", ".gmesh" };
         private readonly VfxResourceResolver _resources = new();
         private readonly HashResolverService _hashResolverService;
         private readonly SemaphoreSlim _catalogGate = new(1, 1);
@@ -275,11 +273,33 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 : transform;
             runtime.SetSystem(definition, resolvedTransform);
 
-            foreach (var emitter in runtime.Emitters)
+            PrepareRuntimeResources(runtime, searchDirectory, log, ownerSceneContext, resetResolved: false);
+
+            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> emissionSurfaces =
+                PrepareEmissionSurfaces(new[] { definition }, searchDirectory, log);
+            if (emissionSurfaces.Count > 0)
+                runtime.SetEmissionSurfaces(emissionSurfaces, replayCurrentTime: false);
+
+            runtime.ApplyRenderOrder();
+
+            return runtime;
+        }
+
+        private void PrepareRuntimeResources(
+            VfxPlaybackRuntime runtime,
+            string searchDirectory,
+            LogService log,
+            VfxOwnerSceneContext ownerSceneContext,
+            bool resetResolved)
+        {
+            if (runtime?.Emitters is null) return;
+
+            foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
             {
-                BitmapSource texture = _resources.ResolveTexture(emitter.Def.TexturePath, searchDirectory);
-                if (texture != null)
-                    emitter.PendingTexture = texture;
+                if (resetResolved)
+                    emitter.ResetResolvedResources();
+
+                emitter.PendingTexture = _resources.ResolveTexture(emitter.Def.TexturePath, searchDirectory);
                 emitter.PendingTextureMult = _resources.ResolveTexture(emitter.Def.TextureMultPath, searchDirectory);
                 emitter.PendingDistortionTexture = _resources.ResolveTexture(
                     emitter.Def.Distortion?.NormalMapTexturePath,
@@ -293,11 +313,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 emitter.PendingPaletteTexture = _resources.ResolveTexture(
                     emitter.Def.PaletteDefinition?.PaletteTexturePath,
                     searchDirectory);
-
-                BitmapSource gradient = _resources.ResolveTexture(
+                emitter.PendingColorGradient = _resources.ResolveTexture(
                     emitter.Def.ParticleColorTexturePath,
                     searchDirectory);
-                if (gradient != null) emitter.PendingColorGradient = gradient;
 
                 if (emitter.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh)
                 {
@@ -312,76 +330,153 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                             searchDirectory,
                             ownerSceneContext.SkinScale);
                     }
+                    continue;
                 }
-                else if (emitter.Def.IsMeshPrimitive)
-                {
-                    if (!string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
-                    {
-                        VfxMeshData? mesh = _resources.ResolveMesh(
-                            emitter.Def.MeshPath,
-                            emitter.Def.SubmeshesToDraw,
-                            emitter.Def.SubmeshesToDrawAlways,
-                            searchDirectory);
 
-                        // Current LTK main poses a skinned VFX mesh independently for every live
-                        // particle. Resolve the skeleton even when no ANM is authored so bind-pose
-                        // skinning and boneToSpawnAt children share the same joint table.
-                        if (mesh.HasValue && emitter.Def.MeshIsSkinned &&
-                            !string.IsNullOrWhiteSpace(emitter.Def.MeshSkeletonPath))
+                if (!emitter.Def.IsMeshPrimitive || string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
+                    continue;
+
+                VfxMeshData? mesh = _resources.ResolveMesh(
+                    emitter.Def.MeshPath,
+                    emitter.Def.SubmeshesToDraw,
+                    emitter.Def.SubmeshesToDrawAlways,
+                    searchDirectory);
+
+                // Current LTK main poses a skinned VFX mesh independently for every live
+                // particle. Resolve the skeleton even when no ANM is authored so bind-pose
+                // skinning and boneToSpawnAt children share the same joint table.
+                if (mesh.HasValue && emitter.Def.MeshIsSkinned &&
+                    !string.IsNullOrWhiteSpace(emitter.Def.MeshSkeletonPath))
+                {
+                    VfxAnimatedMesh bindPose = _resources.ResolveMeshAnimation(
+                        emitter.Def.MeshPath,
+                        emitter.Def.MeshSkeletonPath,
+                        null,
+                        searchDirectory,
+                        log);
+                    if (bindPose is not null)
+                    {
+                        mesh = mesh.Value with
                         {
-                            VfxAnimatedMesh bindPose = _resources.ResolveMeshAnimation(
+                            BoneIndices = bindPose.BoneIndices,
+                            BoneWeights = bindPose.BoneWeights
+                        };
+
+                        emitter.MeshBaseAnimation = string.IsNullOrWhiteSpace(emitter.Def.MeshAnimationPath)
+                            ? bindPose
+                            : _resources.ResolveMeshAnimation(
                                 emitter.Def.MeshPath,
                                 emitter.Def.MeshSkeletonPath,
-                                null,
+                                emitter.Def.MeshAnimationPath,
                                 searchDirectory,
-                                log);
-                            if (bindPose is not null)
+                                log) ?? bindPose;
+
+                        IReadOnlyList<string> variants = emitter.Def.MeshAnimationVariants ?? Array.Empty<string>();
+                        if (variants.Count > 0)
+                        {
+                            emitter.MeshAnimationVariants = new VfxAnimatedMesh[variants.Count];
+                            for (int variant = 0; variant < variants.Count; variant++)
                             {
-                                mesh = mesh.Value with
-                                {
-                                    BoneIndices = bindPose.BoneIndices,
-                                    BoneWeights = bindPose.BoneWeights
-                                };
-
-                                emitter.MeshBaseAnimation = string.IsNullOrWhiteSpace(emitter.Def.MeshAnimationPath)
-                                    ? bindPose
-                                    : _resources.ResolveMeshAnimation(
-                                        emitter.Def.MeshPath,
-                                        emitter.Def.MeshSkeletonPath,
-                                        emitter.Def.MeshAnimationPath,
-                                        searchDirectory,
-                                        log) ?? bindPose;
-
-                                IReadOnlyList<string> variants = emitter.Def.MeshAnimationVariants ?? Array.Empty<string>();
-                                if (variants.Count > 0)
-                                {
-                                    emitter.MeshAnimationVariants = new VfxAnimatedMesh[variants.Count];
-                                    for (int variant = 0; variant < variants.Count; variant++)
-                                    {
-                                        emitter.MeshAnimationVariants[variant] = _resources.ResolveMeshAnimation(
-                                            emitter.Def.MeshPath,
-                                            emitter.Def.MeshSkeletonPath,
-                                            variants[variant],
-                                            searchDirectory,
-                                            log);
-                                    }
-                                }
-                                emitter.MeshAnimation = emitter.MeshBaseAnimation;
+                                emitter.MeshAnimationVariants[variant] = _resources.ResolveMeshAnimation(
+                                    emitter.Def.MeshPath,
+                                    emitter.Def.MeshSkeletonPath,
+                                    variants[variant],
+                                    searchDirectory,
+                                    log);
                             }
                         }
-                        emitter.PendingMesh = mesh;
+                        emitter.MeshAnimation = emitter.MeshBaseAnimation;
                     }
                 }
+                emitter.PendingMesh = mesh;
             }
+        }
+
+        internal static bool UsesSameResolvedAssets(
+            VfxSystemDefinition before,
+            VfxSystemDefinition after)
+        {
+            if (before is null || after is null || before.Emitters?.Count != after.Emitters?.Count)
+                return false;
+
+            for (int index = 0; index < (before.Emitters?.Count ?? 0); index++)
+            {
+                if (!UsesSameResolvedAssets(before.Emitters[index], after.Emitters[index]))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool UsesSameResolvedAssets(VfxEmitterDefinition before, VfxEmitterDefinition after)
+        {
+            if (before is null || after is null) return before is null && after is null;
+            return string.Equals(before.TexturePath, after.TexturePath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.TextureMultPath, after.TextureMultPath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.ParticleColorTexturePath, after.ParticleColorTexturePath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.AlphaErosion?.TexturePath, after.AlphaErosion?.TexturePath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.Distortion?.NormalMapTexturePath, after.Distortion?.NormalMapTexturePath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.Reflection?.TexturePath, after.Reflection?.TexturePath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.PaletteDefinition?.PaletteTexturePath, after.PaletteDefinition?.PaletteTexturePath, StringComparison.OrdinalIgnoreCase) &&
+                   before.PrimitiveKind == after.PrimitiveKind &&
+                   before.IsMeshPrimitive == after.IsMeshPrimitive &&
+                   before.MeshIsSkinned == after.MeshIsSkinned &&
+                   string.Equals(before.MeshPath, after.MeshPath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.MeshFallbackPath, after.MeshFallbackPath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.MeshSkeletonPath, after.MeshSkeletonPath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.MeshAnimationPath, after.MeshAnimationPath, StringComparison.OrdinalIgnoreCase) &&
+                   SequenceEqual(before.MeshAnimationVariants, after.MeshAnimationVariants, StringComparer.OrdinalIgnoreCase) &&
+                   SequenceEqual(before.SubmeshesToDraw, after.SubmeshesToDraw) &&
+                   SequenceEqual(before.SubmeshesToDrawAlways, after.SubmeshesToDrawAlways) &&
+                   SameEmissionSurface(before.EmissionSurface, after.EmissionSurface);
+        }
+
+        private static bool SameEmissionSurface(
+            VfxEmissionSurfaceDefinition before,
+            VfxEmissionSurfaceDefinition after)
+        {
+            if (before is null || after is null) return before is null && after is null;
+            return before.Kind == after.Kind &&
+                   string.Equals(before.MeshPath, after.MeshPath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.SkeletonPath, after.SkeletonPath, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(before.AnimationPath, after.AnimationPath, StringComparison.OrdinalIgnoreCase) &&
+                   SequenceEqual(before.Submeshes, after.Submeshes) &&
+                   SequenceEqual(before.Joints, after.Joints) &&
+                   before.Scale.Equals(after.Scale) &&
+                   before.MaxJointWeights == after.MaxJointWeights;
+        }
+
+        private static bool SequenceEqual<T>(IReadOnlyList<T> before, IReadOnlyList<T> after)
+            => SequenceEqual(before, after, EqualityComparer<T>.Default);
+
+        private static bool SequenceEqual<T>(
+            IReadOnlyList<T> before,
+            IReadOnlyList<T> after,
+            IEqualityComparer<T> comparer)
+        {
+            before ??= Array.Empty<T>();
+            after ??= Array.Empty<T>();
+            if (before.Count != after.Count) return false;
+            for (int index = 0; index < before.Count; index++)
+            {
+                if (!comparer.Equals(before[index], after[index])) return false;
+            }
+            return true;
+        }
+
+        internal void RefreshPlaybackGraphResources(
+            VfxPlaybackGraphRuntime graph,
+            string searchDirectory,
+            LogService log,
+            VfxOwnerSceneContext ownerSceneContext)
+        {
+            ArgumentNullException.ThrowIfNull(graph);
+            foreach (VfxPlaybackRuntime runtime in graph.ResourceRuntimes)
+                PrepareRuntimeResources(runtime, searchDirectory, log, ownerSceneContext, resetResolved: true);
 
             IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> emissionSurfaces =
-                PrepareEmissionSurfaces(new[] { definition }, searchDirectory, log);
-            if (emissionSurfaces.Count > 0)
-                runtime.SetEmissionSurfaces(emissionSurfaces, replayCurrentTime: false);
-
-            runtime.ApplyRenderOrder();
-
-            return runtime;
+                PrepareEmissionSurfaces(graph.ResourceDefinitions, searchDirectory, log);
+            graph.SetEmissionSurfaces(emissionSurfaces);
+            graph.RefreshResolvedResourceBindings();
         }
 
         /// <summary>
@@ -413,12 +508,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     meshAvailable = _resources.ResolvePath(
                         emitter.MeshPath,
                         searchDirectory,
-                        SkinnedMeshExtensions) is not null;
+                        VfxMeshFormatSemantics.SkinnedExtensions) is not null;
                     if (!meshAvailable)
                     {
                         string fallback = emitter.MeshFallbackPath;
                         bool fallbackAvailable = !string.IsNullOrWhiteSpace(fallback) &&
-                            _resources.ResolvePath(fallback, searchDirectory, SimpleMeshExtensions) is not null;
+                            _resources.ResolvePath(fallback, searchDirectory, VfxMeshFormatSemantics.AuthoredSimpleExtensions) is not null;
                         resolved = emitter with
                         {
                             MeshPath = fallbackAvailable ? fallback : null,
@@ -433,7 +528,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     meshAvailable = _resources.ResolvePath(
                         emitter.MeshPath,
                         searchDirectory,
-                        SimpleMeshExtensions) is not null;
+                        VfxMeshFormatSemantics.AuthoredSimpleExtensions) is not null;
                     if (!meshAvailable)
                         resolved = emitter with { MeshPath = null };
                 }

@@ -53,6 +53,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isExitPending;
         private bool _isBulkEmitterStateChange;
         private bool _isUpdatingRigControls;
+        private bool _isUpdatingChancePinControls;
         private bool _isUpdatingAnimationParameter;
         private VfxSystemDiagnosticItem _pendingSystem;
         private VfxSystemDiagnosticItem _inspectedSystem;
@@ -767,6 +768,7 @@ namespace AssetsManager.Views.Controls.Viewer
             // OpenTK has the current context here, so deferred session creation and resource
             // preparation are safe even when WPF selected the system before the GL control was ready.
             TryInspectPendingSystem();
+            _vfxRenderer?.ProcessPendingGpuState();
             ApplyPendingMapGpuState();
             _mapGeometryRenderer?.ProcessRetainedResources();
 
@@ -6098,6 +6100,66 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 SetPlaybackSpeed(speed, updateControl: false);
             }
+        }
+
+        private void ChancePinSlider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_isUpdatingChancePinControls ||
+                _model?.HasStandaloneSystem != true ||
+                _vfxRenderer == null ||
+                ChancePinSlider == null)
+            {
+                return;
+            }
+
+            // Clicking the slider at its neutral 0.50 position must still create a pin even when
+            // ValueChanged does not fire because the thumb was already resting there.
+            ApplyPinnedBirthChance((float)ChancePinSlider.Value);
+        }
+
+        private void ChancePinSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingChancePinControls ||
+                !IsLoaded ||
+                _model?.HasStandaloneSystem != true ||
+                _vfxRenderer == null)
+            {
+                return;
+            }
+
+            ApplyPinnedBirthChance((float)e.NewValue);
+        }
+
+        private void ChancePinClear_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vfxRenderer == null) return;
+            _vfxRenderer.SetPinnedBirthChance(null);
+
+            _isUpdatingChancePinControls = true;
+            try
+            {
+                if (ChancePinSlider != null)
+                {
+                    ChancePinSlider.Value = 0.5d;
+                    ChancePinSlider.Opacity = 0.5d;
+                }
+                if (ChancePinValueText != null) ChancePinValueText.Text = string.Empty;
+                if (ChancePinClearButton != null) ChancePinClearButton.Visibility = Visibility.Collapsed;
+            }
+            finally
+            {
+                _isUpdatingChancePinControls = false;
+            }
+        }
+
+        private void ApplyPinnedBirthChance(float chance)
+        {
+            chance = Math.Clamp(chance, 0f, 1f);
+            _vfxRenderer?.SetPinnedBirthChance(chance);
+            if (ChancePinSlider != null) ChancePinSlider.Opacity = 1d;
+            if (ChancePinValueText != null)
+                ChancePinValueText.Text = chance.ToString("F2", CultureInfo.InvariantCulture);
+            if (ChancePinClearButton != null) ChancePinClearButton.Visibility = Visibility.Visible;
         }
 
         private void SetPlaybackSpeed(double speed, bool updateControl = true)

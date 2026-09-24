@@ -17,7 +17,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         /// <summary>Per-emitter live state + drawable output. One batch renders with one texture/blend.</summary>
         public sealed class EmitterState
         {
-            public required VfxEmitterDefinition Def { get; init; }
+            public required VfxEmitterDefinition Def { get; set; }
             public int SourceOrder { get; init; }
             /// <summary>
             /// Render identity of the authored emitter path. LTK groups every live source of the
@@ -159,6 +159,47 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             internal VfxAnimatedMesh MeshAnimation;
             internal VfxAnimatedMesh MeshBaseAnimation;
             internal VfxAnimatedMesh[] MeshAnimationVariants = Array.Empty<VfxAnimatedMesh>();
+
+            /// <summary>
+            /// Detaches resolved CPU/GPU appearance resources without touching the simulation pool.
+            /// Renderer caches keep ownership of old handles, so a live definition swap can repoint
+            /// the emitter and reuse any unchanged resource on the next deferred upload.
+            /// </summary>
+            internal void ResetResolvedResources()
+            {
+                Texture = 0;
+                TextureWidth = 0;
+                TextureHeight = 0;
+                TextureMult = 0;
+                TextureMultWidth = 0;
+                TextureMultHeight = 0;
+                DistortionTexture = 0;
+                ErosionTexture = 0;
+                ReflectionTexture = 0;
+                PaletteTexture = 0;
+                ColorGradientTexture = 0;
+                PendingTexture = null;
+                PendingTextureMult = null;
+                PendingDistortionTexture = null;
+                PendingErosionTexture = null;
+                PendingReflectionTexture = null;
+                PendingPaletteTexture = null;
+                PendingColorGradient = null;
+                PendingMesh = null;
+                MeshVao = 0;
+                MeshVbo = 0;
+                MeshEbo = 0;
+                MeshVertexCount = 0;
+                MeshIndexCount = 0;
+                MeshInterleaved = null;
+                MeshHasSkinning = false;
+                MeshOwnerScale = 1f;
+                MeshRanges = Array.Empty<VfxMeshRangeData>();
+                MeshAnimation = null;
+                MeshBaseAnimation = null;
+                MeshAnimationVariants = Array.Empty<VfxAnimatedMesh>();
+            }
+
             /// <summary>Emitter-local age in seconds; drives emitter-phase curves and mesh animation time.</summary>
             public float EmitterAge => Age;
             /// <summary>
@@ -205,6 +246,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> _emissionSurfaces = EmptyEmissionSurfaces;
         private uint _initialRandomState;
         private VfxLtkRandom _rng;
+        private float? _pinnedBirthChance;
         private uint _particleSerial;
         public float CurrentTime { get; private set; }
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
@@ -242,6 +284,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         internal VfxSystemDefinition Definition => _definition;
         internal int Seed => _seed;
         internal uint InitialRandomState => _initialRandomState;
+        internal uint RandomState => _rng.State;
+        internal float? PinnedBirthChance => _pinnedBirthChance;
         internal int ParticleCapacity => _particleCapacity;
 
         internal sealed record EmitterSnapshot(
@@ -444,6 +488,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _rng.State = _initialRandomState;
         }
 
+        internal void SetPinnedBirthChance(float? chance)
+            => _pinnedBirthChance = chance;
+
         /// <summary>
         /// Sets the shared particle capacity for this runtime. The root keeps 32768 while
         /// LTK child systems receive a smaller lineage capacity before their build-up runs.
@@ -496,7 +543,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             for (int emitterIndex = 0; emitterIndex < system.Emitters.Count; emitterIndex++)
             {
                 var e = system.Emitters[emitterIndex];
-                if (e.Disabled) continue;
                 var emitterState = new EmitterState
                 {
                     Def = e,
@@ -512,6 +558,49 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
             Reset();
             SetTransform(worldTransform);
+        }
+
+        /// <summary>
+        /// Repoints an already-running system at an edited definition when every pool emitter index
+        /// still addresses the same authored emitter. LTK's driver.swap keeps live particles in this
+        /// case: birth values stay on the particles while appearance/integration reads the new model.
+        /// </summary>
+        internal bool TrySwapDefinition(VfxSystemDefinition next)
+        {
+            if (!AddressesSameEmitters(_definition, next)) return false;
+
+            _definition = next;
+            _dragMotion = next.DragMotion;
+            _buildUpTime = MathF.Max(0f, next.BuildUpTime);
+            foreach (EmitterState state in _emitters)
+            {
+                if ((uint)state.SourceOrder >= (uint)next.Emitters.Count) return false;
+                state.Def = next.Emitters[state.SourceOrder];
+                state.InvalidateInstances();
+            }
+
+            // Re-read emitter placement immediately without touching the particles already alive.
+            SetTransform(_worldTransform, _orientationRootTransform);
+            return true;
+        }
+
+        internal static bool AddressesSameEmitters(VfxSystemDefinition held, VfxSystemDefinition next)
+        {
+            if (held?.Emitters is null || next?.Emitters is null || held.Emitters.Count != next.Emitters.Count)
+                return false;
+
+            for (int index = 0; index < held.Emitters.Count; index++)
+            {
+                VfxEmitterDefinition before = held.Emitters[index];
+                VfxEmitterDefinition after = next.Emitters[index];
+                if (before is null || after is null ||
+                    before.IsSimpleEmitter != after.IsSimpleEmitter ||
+                    !string.Equals(before.Name, after.Name, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         public bool SetEmitterVisibility(int sourceOrder, bool isVisible)
@@ -835,7 +924,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         public bool IsComplete
             => _isKilled || _emitters.Count == 0 || _emitters.TrueForAll(state =>
-                (IsStopped || state.BurstDone || (state.Def.EmitterLifetime is { } lifetime && state.Age > lifetime)) &&
+                (state.Def.Disabled || IsStopped || state.BurstDone ||
+                 (state.Def.EmitterLifetime is { } lifetime && state.Age > lifetime)) &&
                 state.Particles.Count == 0);
 
         /// <summary>
@@ -1101,7 +1191,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             VfxEmitterDefinition d = s.Def;
             float emitterT = context.EmitterT;
-            bool emitting = !IsStopped
+            bool emitting = !d.Disabled
+                            && !IsStopped
                             && s.Age >= d.TimeBeforeFirstEmission
                             && (d.EmitterLifetime is not { } life || s.Age <= life);
             if (!emitting || (d.IsSingleParticle && s.BurstDone)) return -1;
@@ -1264,10 +1355,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 s.SharedRandomRolled = true;
             }
             float roll = _rng.NextUnitFloat();
-            float? sharedRoll = d.ParticlesShareRandomValue ? s.SharedRandom : _rng.NextUnitFloat();
+            // The ordinary chance is drawn even while inspection pins a replacement value. This
+            // keeps every later RNG draw on the same stream as the unpinned run.
+            float drawnChance = d.ParticlesShareRandomValue ? s.SharedRandom : _rng.NextUnitFloat();
+            float sharedRoll = _pinnedBirthChance ?? drawnChance;
 
             float life = d.ParticleLifetime.SampleBirth(emitterT, _rng, sharedRoll);
-            var birthScale = d.BirthScale.SampleBirth(emitterT, _rng, sharedRoll);
+            var birthScale = d.BirthScale.SampleBirthOver(emitterT, _rng, Vector3.One, sharedRoll);
             if (d.LegacyBirthScale is { } legacyBirthScale)
             {
                 float scalar = legacyBirthScale.SampleBirth(emitterT, _rng, sharedRoll);
@@ -1410,12 +1504,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         : 1f;
                 }
                 var scaleMul = lingering && d.Linger?.Scale is { } lingerScale
-                    ? lingerScale.Sample(particleLingerT)
-                    : d.ScaleOverLife?.Sample(t) ?? Vector3.One;
+                    ? lingerScale.SampleOver(particleLingerT, Vector3.One)
+                    : d.ScaleOverLife?.SampleOver(t, Vector3.One) ?? Vector3.One;
                 if (d.IsUniformScale)
                     scaleMul = new Vector3(scaleMul.X);
                 Vector4 col = lingering && d.Linger?.Color is { } lingerColor
-                    ? p.BirthColor * lingerColor.Sample(particleLingerT)
+                    ? p.BirthColor * lingerColor.SampleOver(particleLingerT, Vector4.One)
                     : VfxColorSemantics.ResolveParticle(p.BirthColor, d.ColorOverLife, t);
                 col = VfxColorSemantics.PremultiplyForAddOrSubtract(
                     col,
@@ -1516,7 +1610,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector2 uvOffset = VfxUvSemantics.Periodic(
                     uvRamp + p.IntegratedUvOffset,
                     renderState.TextureAddressMode);
-                Vector2 uvScale = d.UvScale?.Sample(t) ?? Vector2.One;
+                Vector2 uvScale = d.UvScale?.SampleOver(t, Vector2.One) ?? Vector2.One;
                 float uvRotationDegrees = (d.UvRotation?.Sample(t) ?? 0f) + p.BirthUvRotateRate * p.Age
                     + p.IntegratedUvRotation;
                 float uvRotation = uvRotationDegrees * (MathF.PI / 180f);
@@ -1536,7 +1630,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector2 textureMultUvOffset = VfxUvSemantics.Periodic(
                     textureMultRamp + p.IntegratedTextureMultUvOffset,
                     d.TextureMultAddressMode);
-                Vector2 textureMultUvScale = d.TextureMultUvScale?.Sample(t) ?? Vector2.One;
+                Vector2 textureMultUvScale = d.TextureMultUvScale?.SampleOver(t, Vector2.One) ?? Vector2.One;
 
                 float textureMultUvRotationDegrees = (d.TextureMultUvRotation?.Sample(t) ?? 0f)
                     + p.TextureMultBirthUvRotateRate * p.Age

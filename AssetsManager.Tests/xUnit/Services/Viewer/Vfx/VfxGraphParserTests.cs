@@ -350,6 +350,55 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void NarrowVectorValuePreservesAuthoredWidthAndIgnoresRootProbabilityTables()
+        {
+            var rootTable = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxProbabilityTableData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeF32(Fnv1a.HashLower("singleValue"), 0.25f)
+                });
+            var birthScale = new BinTreeStruct(
+                Fnv1a.HashLower("birthScale0"),
+                Fnv1a.HashLower("ValueVector3"),
+                new BinTreeProperty[]
+                {
+                    // A malformed-but-readable value class can carry fewer components than its
+                    // declared family. Only the authored component is allowed to overwrite the
+                    // caller's initialized scale.
+                    new BinTreeF32(Fnv1a.HashLower("constantValue"), 5f),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("probabilityTables"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { rootTable })
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { birthScale });
+            var system = new BinTreeObject(
+                "Effects/NarrowVector",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal((byte)1, parsed.BirthScale.ConstantWidth);
+            Assert.Null(parsed.BirthScale.Prob);
+            Assert.Equal(new Vector3(5f, 3f, 4f), parsed.BirthScale.SampleOver(0f, new Vector3(2f, 3f, 4f)));
+        }
+
+        [Fact]
         public void CurveDynamicsDropsInvalidPairsInsteadOfInventingZeroKeys()
         {
             var dynamics = new BinTreeStruct(
@@ -990,6 +1039,72 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             Assert.Equal(new Vector3(0f, 0f, -30.7f), parsed.BirthRotation.Value.Constant);
             Assert.Equal(new Vector3(0f, 0f, 40f), parsed.BirthRotationalVelocity.Value.Constant);
+        }
+
+        [Fact]
+        public void LegacySimpleRotationProbabilityAppliesToZOnly()
+        {
+            static BinTreeStruct ValueFloat(string field, float value, float multiplier)
+            {
+                var table = new BinTreeStruct(
+                    0,
+                    Fnv1a.HashLower("VfxProbabilityTableData"),
+                    new BinTreeProperty[]
+                    {
+                        new BinTreeF32(Fnv1a.HashLower("singleValue"), multiplier)
+                    });
+                var dynamics = new BinTreeStruct(
+                    Fnv1a.HashLower("dynamics"),
+                    Fnv1a.HashLower("VfxAnimatedFloatVariableData"),
+                    new BinTreeProperty[]
+                    {
+                        new BinTreeContainer(
+                            Fnv1a.HashLower("probabilityTables"),
+                            BinPropertyType.Struct,
+                            new BinTreeProperty[] { table })
+                    });
+                return new BinTreeStruct(
+                    Fnv1a.HashLower(field),
+                    Fnv1a.HashLower("ValueFloat"),
+                    new BinTreeProperty[]
+                    {
+                        new BinTreeF32(Fnv1a.HashLower("constantValue"), value),
+                        dynamics
+                    });
+            }
+
+            var legacy = new BinTreeStruct(
+                Fnv1a.HashLower("LegacySimple"),
+                Fnv1a.HashLower("VfxEmitterLegacySimple"),
+                new BinTreeProperty[]
+                {
+                    ValueFloat("birthRotation", 40f, 0.25f),
+                    ValueFloat("birthRotationalVelocity", 20f, 0.5f)
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { legacy });
+            var system = new BinTreeObject(
+                "Effects/LegacyRotationProbability",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+            Vector3 rotation = parsed.BirthRotation.Value.SampleBirth(0f, new System.Random(1), sharedRoll: 0.5f);
+            Vector3 velocity = parsed.BirthRotationalVelocity.Value.SampleBirth(0f, new System.Random(1), sharedRoll: 0.5f);
+
+            Assert.Equal(new Vector3(0f, 0f, 10f), rotation);
+            Assert.Equal(new Vector3(0f, 0f, 10f), velocity);
         }
 
         [Fact]

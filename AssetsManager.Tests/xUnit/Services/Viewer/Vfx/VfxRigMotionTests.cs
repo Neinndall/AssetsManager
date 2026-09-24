@@ -218,7 +218,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void ChangingStandaloneRigSettingsRepositionsTheLoadedGraphImmediately()
         {
-            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One);
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
+            {
+                Rate = VfxCurveF.Const(20f),
+                ParticleLifetime = VfxCurveF.Const(10f)
+            };
             var definition = new VfxSystemDefinition(0xA11CEu, "tuned", "tuned", new[] { emitter });
             var model = new VfxSystemModel
             {
@@ -232,15 +236,24 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             session.SetSystem(model);
             VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
             Assert.Equal(VfxRigMotion.StandHeight, root.WorldTransform.Translation.Y, precision: 4);
+            session.Play();
+            session.Update(0.2f);
+            double time = session.ActiveSystem.CurrentTime;
+            float rootTime = root.CurrentTime;
+            int particles = Assert.Single(root.Emitters).Particles.Count;
+            Assert.True(particles > 0);
 
             session.RigSettings = session.RigSettings with { Height = 275f };
 
+            Assert.Equal(time, session.ActiveSystem.CurrentTime, precision: 6);
+            Assert.Equal(rootTime, root.CurrentTime, precision: 6);
+            Assert.Equal(particles, Assert.Single(root.Emitters).Particles.Count);
             Assert.Equal(275f, root.WorldTransform.Translation.Y, precision: 4);
             Assert.Equal(275f, Assert.Single(root.Emitters).SystemTarget.Y, precision: 4);
         }
 
         [Fact]
-        public void ChangingStandaloneRigMotionKeepsTheCurrentRunAliveLikeSteer()
+        public void ChangingStandaloneRigMotionRestartsTheRunLikeSteer()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
             {
@@ -262,16 +275,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             session.Update(0.2f);
 
             VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
-            double time = session.ActiveSystem.CurrentTime;
-            float rootTime = root.CurrentTime;
-            int particles = Assert.Single(root.Emitters).Particles.Count;
-            Assert.True(particles > 0);
+            Assert.True(session.ActiveSystem.CurrentTime > 0d);
+            Assert.True(root.CurrentTime > 0f);
+            Assert.True(Assert.Single(root.Emitters).Particles.Count > 0);
 
             session.RigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Missile) with { IsLooping = false };
 
-            Assert.Equal(time, session.ActiveSystem.CurrentTime, precision: 6);
-            Assert.Equal(rootTime, root.CurrentTime, precision: 6);
-            Assert.Equal(particles, Assert.Single(root.Emitters).Particles.Count);
+            Assert.Equal(0d, session.ActiveSystem.CurrentTime, precision: 6);
+            Assert.Equal(0f, root.CurrentTime, precision: 6);
+            Assert.Empty(Assert.Single(root.Emitters).Particles);
             Assert.NotEqual(Vector3.Zero, root.WorldTransform.Translation);
         }
 

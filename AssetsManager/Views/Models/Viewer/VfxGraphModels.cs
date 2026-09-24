@@ -562,96 +562,124 @@ namespace AssetsManager.Views.Models.Viewer
         public static VfxCurveF Const(float v) => new(v, null, null);
     }
 
-    public readonly record struct VfxCurve2(Vector2 Constant, float[] Times, Vector2[] Values, VfxProbTable[] Prob = null)
+    public readonly record struct VfxCurve2(
+        Vector2 Constant,
+        float[] Times,
+        Vector2[] Values,
+        VfxProbTable[] Prob = null,
+        byte ConstantWidth = 2,
+        byte[] ValueWidths = null)
     {
         public Vector2 Sample(float t)
-        {
-            if (Times is null || Values is null || Times.Length == 0) return Constant;
-            return VfxCurve.Interp(Times, Values, t, static (a, b, f) => Vector2.Lerp(a, b, f));
-        }
+            => SampleOver(t, Vector2.Zero);
+
+        public Vector2 SampleOver(float t, Vector2 baseline)
+            => VfxCurve.SampleVector2(Constant, ConstantWidth, Times, Values, ValueWidths, t, baseline);
 
         public Vector2 SampleBirth(Random rng)
             => SampleBirth(0f, rng);
 
         public Vector2 SampleBirth(float t, Random rng, float? sharedRoll = null)
+            => SampleBirthOver(t, rng, Vector2.Zero, sharedRoll);
+
+        public Vector2 SampleBirthOver(float t, Random rng, Vector2 baseline, float? sharedRoll = null)
         {
-            var value = Sample(t);
-            if (Prob is not { Length: > 0 } || !Prob.Any(static table => !table.IsEmpty)) return value;
+            int width = VfxCurve.SampleWidth(ConstantWidth, Times, Values?.Length ?? 0, ValueWidths, t, 2);
+            Vector2 value = SampleOver(t, baseline);
+            if (!VfxCurve.HasProbability(Prob, width)) return value;
             float roll = sharedRoll ?? (float)rng.NextDouble();
-            return new Vector2(
-                Prob.Length > 0 && !Prob[0].IsEmpty ? value.X * Prob[0].Sample(roll) : value.X,
-                Prob.Length > 1 && !Prob[1].IsEmpty ? value.Y * Prob[1].Sample(roll) : value.Y);
+            if (width > 0 && Prob.Length > 0 && !Prob[0].IsEmpty) value.X *= Prob[0].Sample(roll);
+            if (width > 1 && Prob.Length > 1 && !Prob[1].IsEmpty) value.Y *= Prob[1].Sample(roll);
+            return value;
         }
 
         public static VfxCurve2 Const(Vector2 value) => new(value, null, null);
     }
 
     /// <summary>A Vector3 value that is either constant or an animation curve over normalised age.</summary>
-    public readonly record struct VfxCurve3(Vector3 Constant, float[] Times, Vector3[] Values, VfxProbTable[] Prob = null)
+    public readonly record struct VfxCurve3(
+        Vector3 Constant,
+        float[] Times,
+        Vector3[] Values,
+        VfxProbTable[] Prob = null,
+        byte ConstantWidth = 3,
+        byte[] ValueWidths = null)
     {
         public Vector3 Sample(float t)
-        {
-            if (Times is null || Values is null || Times.Length == 0) return Constant;
-            return VfxCurve.Interp(Times, Values, t, static (a, b, f) => Vector3.Lerp(a, b, f));
-        }
+            => SampleOver(t, Vector3.Zero);
+
+        public Vector3 SampleOver(float t, Vector3 baseline)
+            => VfxCurve.SampleVector3(Constant, ConstantWidth, Times, Values, ValueWidths, t, baseline);
+
         /// <summary>Birth-time value with every probability-table channel sampled at one shared chance.</summary>
         public Vector3 SampleBirth(Random rng)
             => SampleBirth(0f, rng);
 
         public Vector3 SampleBirth(float t, Random rng, float? sharedRoll = null)
+            => SampleBirthOver(t, rng, Vector3.Zero, sharedRoll);
+
+        public Vector3 SampleBirthOver(float t, Random rng, Vector3 baseline, float? sharedRoll = null)
         {
-            var v = Sample(t);
-            if (Prob is not { Length: > 0 } || !Prob.Any(static table => !table.IsEmpty)) return v;
+            int width = VfxCurve.SampleWidth(ConstantWidth, Times, Values?.Length ?? 0, ValueWidths, t, 3);
+            Vector3 value = SampleOver(t, baseline);
+            if (!VfxCurve.HasProbability(Prob, width)) return value;
             float roll = sharedRoll ?? (float)rng.NextDouble();
-            return new Vector3(
-                Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample(roll) : v.X,
-                Prob.Length > 1 && !Prob[1].IsEmpty ? v.Y * Prob[1].Sample(roll) : v.Y,
-                Prob.Length > 2 && !Prob[2].IsEmpty ? v.Z * Prob[2].Sample(roll) : v.Z);
+            if (width > 0 && Prob.Length > 0 && !Prob[0].IsEmpty) value.X *= Prob[0].Sample(roll);
+            if (width > 1 && Prob.Length > 1 && !Prob[1].IsEmpty) value.Y *= Prob[1].Sample(roll);
+            if (width > 2 && Prob.Length > 2 && !Prob[2].IsEmpty) value.Z *= Prob[2].Sample(roll);
+            return value;
         }
+
         public bool HasProb => Prob is { Length: > 0 } && Prob.Any(static p => !p.IsEmpty);
         public static VfxCurve3 Const(Vector3 v) => new(v, null, null);
     }
 
     /// <summary>A Vector4/colour value that is either constant or an animation curve over normalised age.</summary>
-    public readonly record struct VfxCurve4(Vector4 Constant, float[] Times, Vector4[] Values, VfxProbTable[] Prob = null)
+    public readonly record struct VfxCurve4(
+        Vector4 Constant,
+        float[] Times,
+        Vector4[] Values,
+        VfxProbTable[] Prob = null,
+        byte ConstantWidth = 4,
+        byte[] ValueWidths = null)
     {
         public Vector4 Sample(float t)
-        {
-            if (Times is null || Values is null || Times.Length == 0) return Constant;
-            return VfxCurve.Interp(Times, Values, t, static (a, b, f) => Vector4.Lerp(a, b, f));
-        }
+            => SampleOver(t, Vector4.Zero);
+
+        public Vector4 SampleOver(float t, Vector4 baseline)
+            => VfxCurve.SampleVector4(Constant, ConstantWidth, Times, Values, ValueWidths, t, baseline);
+
         public Vector4 SampleBirth(Random rng)
             => SampleBirth(0f, rng);
 
         public Vector4 SampleBirth(float t, Random rng, float? sharedRoll = null)
+            => SampleBirthOver(t, rng, Vector4.Zero, sharedRoll);
+
+        public Vector4 SampleBirthOver(float t, Random rng, Vector4 baseline, float? sharedRoll = null)
         {
-            var v = Sample(t);
-            if (Prob is not { Length: > 0 } || !Prob.Any(static table => !table.IsEmpty)) return v;
+            int width = VfxCurve.SampleWidth(ConstantWidth, Times, Values?.Length ?? 0, ValueWidths, t, 4);
+            Vector4 value = SampleOver(t, baseline);
+            if (!VfxCurve.HasProbability(Prob, width)) return value;
             float roll = sharedRoll ?? (float)rng.NextDouble();
-            return new Vector4(
-                Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample(roll) : v.X,
-                Prob.Length > 1 && !Prob[1].IsEmpty ? v.Y * Prob[1].Sample(roll) : v.Y,
-                Prob.Length > 2 && !Prob[2].IsEmpty ? v.Z * Prob[2].Sample(roll) : v.Z,
-                Prob.Length > 3 && !Prob[3].IsEmpty ? v.W * Prob[3].Sample(roll) : v.W);
+            if (width > 0 && Prob.Length > 0 && !Prob[0].IsEmpty) value.X *= Prob[0].Sample(roll);
+            if (width > 1 && Prob.Length > 1 && !Prob[1].IsEmpty) value.Y *= Prob[1].Sample(roll);
+            if (width > 2 && Prob.Length > 2 && !Prob[2].IsEmpty) value.Z *= Prob[2].Sample(roll);
+            if (width > 3 && Prob.Length > 3 && !Prob[3].IsEmpty) value.W *= Prob[3].Sample(roll);
+            return value;
         }
+
         public static VfxCurve4 Const(Vector4 v) => new(v, null, null);
     }
 
     internal static class VfxCurve
     {
-        /// <summary>Piecewise-linear sample using LTK's last-key-at-or-before lookup.</summary>
+        /// <summary>Piecewise-linear sample using the last-key-at-or-before lookup.</summary>
         public static T Interp<T>(float[] times, T[] values, float t, Func<T, T, float, T> lerp)
         {
             int n = Math.Min(times.Length, values.Length);
             if (n == 0) return default!;
 
-            int under = -1;
-            for (int i = 0; i < n; i++)
-            {
-                if (times[i] > t) break;
-                under = i;
-            }
-
+            int under = LowerKey(times, n, t);
             int loIndex = Math.Max(under, 0);
             T from = values[loIndex];
             int hiIndex = under + 1;
@@ -662,6 +690,154 @@ namespace AssetsManager.Views.Models.Viewer
             float f = (t - times[loIndex]) / span;
             return lerp(from, values[hiIndex], f);
         }
+
+        public static int SampleWidth(
+            byte constantWidth,
+            float[] times,
+            int valueCount,
+            byte[] valueWidths,
+            float t,
+            int maximumWidth)
+        {
+            int n = Math.Min(times?.Length ?? 0, valueCount);
+            if (n == 0) return Math.Clamp(constantWidth, (byte)0, (byte)maximumWidth);
+            int loIndex = Math.Max(LowerKey(times, n, t), 0);
+            return WidthAt(valueWidths, loIndex, maximumWidth);
+        }
+
+        public static bool HasProbability(VfxProbTable[] probability, int width)
+        {
+            if (probability is not { Length: > 0 } || width <= 0) return false;
+            int count = Math.Min(width, probability.Length);
+            for (int i = 0; i < count; i++)
+                if (!probability[i].IsEmpty) return true;
+            return false;
+        }
+
+        public static Vector2 SampleVector2(
+            Vector2 constant,
+            byte constantWidth,
+            float[] times,
+            Vector2[] values,
+            byte[] valueWidths,
+            float t,
+            Vector2 baseline)
+        {
+            int n = Math.Min(times?.Length ?? 0, values?.Length ?? 0);
+            if (n == 0)
+            {
+                int width = Math.Clamp(constantWidth, (byte)0, (byte)2);
+                if (width > 0) baseline.X = constant.X;
+                if (width > 1) baseline.Y = constant.Y;
+                return baseline;
+            }
+
+            Span(times, valueWidths, n, t, 2, out int lo, out int hi, out float factor, out int loWidth, out int hiWidth);
+            Vector2 from = values[lo];
+            Vector2 to = values[hi];
+            if (loWidth > 0) baseline.X = Blend(from.X, hiWidth > 0 ? to.X : from.X, factor);
+            if (loWidth > 1) baseline.Y = Blend(from.Y, hiWidth > 1 ? to.Y : from.Y, factor);
+            return baseline;
+        }
+
+        public static Vector3 SampleVector3(
+            Vector3 constant,
+            byte constantWidth,
+            float[] times,
+            Vector3[] values,
+            byte[] valueWidths,
+            float t,
+            Vector3 baseline)
+        {
+            int n = Math.Min(times?.Length ?? 0, values?.Length ?? 0);
+            if (n == 0)
+            {
+                int width = Math.Clamp(constantWidth, (byte)0, (byte)3);
+                if (width > 0) baseline.X = constant.X;
+                if (width > 1) baseline.Y = constant.Y;
+                if (width > 2) baseline.Z = constant.Z;
+                return baseline;
+            }
+
+            Span(times, valueWidths, n, t, 3, out int lo, out int hi, out float factor, out int loWidth, out int hiWidth);
+            Vector3 from = values[lo];
+            Vector3 to = values[hi];
+            if (loWidth > 0) baseline.X = Blend(from.X, hiWidth > 0 ? to.X : from.X, factor);
+            if (loWidth > 1) baseline.Y = Blend(from.Y, hiWidth > 1 ? to.Y : from.Y, factor);
+            if (loWidth > 2) baseline.Z = Blend(from.Z, hiWidth > 2 ? to.Z : from.Z, factor);
+            return baseline;
+        }
+
+        public static Vector4 SampleVector4(
+            Vector4 constant,
+            byte constantWidth,
+            float[] times,
+            Vector4[] values,
+            byte[] valueWidths,
+            float t,
+            Vector4 baseline)
+        {
+            int n = Math.Min(times?.Length ?? 0, values?.Length ?? 0);
+            if (n == 0)
+            {
+                int width = Math.Clamp(constantWidth, (byte)0, (byte)4);
+                if (width > 0) baseline.X = constant.X;
+                if (width > 1) baseline.Y = constant.Y;
+                if (width > 2) baseline.Z = constant.Z;
+                if (width > 3) baseline.W = constant.W;
+                return baseline;
+            }
+
+            Span(times, valueWidths, n, t, 4, out int lo, out int hi, out float factor, out int loWidth, out int hiWidth);
+            Vector4 from = values[lo];
+            Vector4 to = values[hi];
+            if (loWidth > 0) baseline.X = Blend(from.X, hiWidth > 0 ? to.X : from.X, factor);
+            if (loWidth > 1) baseline.Y = Blend(from.Y, hiWidth > 1 ? to.Y : from.Y, factor);
+            if (loWidth > 2) baseline.Z = Blend(from.Z, hiWidth > 2 ? to.Z : from.Z, factor);
+            if (loWidth > 3) baseline.W = Blend(from.W, hiWidth > 3 ? to.W : from.W, factor);
+            return baseline;
+        }
+
+        private static void Span(
+            float[] times,
+            byte[] widths,
+            int count,
+            float t,
+            int maximumWidth,
+            out int loIndex,
+            out int hiIndex,
+            out float factor,
+            out int loWidth,
+            out int hiWidth)
+        {
+            int under = LowerKey(times, count, t);
+            loIndex = Math.Max(under, 0);
+            hiIndex = under + 1;
+            if ((uint)hiIndex >= (uint)count) hiIndex = loIndex;
+            loWidth = WidthAt(widths, loIndex, maximumWidth);
+            hiWidth = WidthAt(widths, hiIndex, maximumWidth);
+            float span = times[hiIndex] - times[loIndex];
+            factor = hiIndex != loIndex && span > 0f ? (t - times[loIndex]) / span : 0f;
+        }
+
+        private static int LowerKey(float[] times, int count, float t)
+        {
+            int under = -1;
+            for (int i = 0; i < count; i++)
+            {
+                if (times[i] > t) break;
+                under = i;
+            }
+            return under;
+        }
+
+        private static int WidthAt(byte[] widths, int index, int maximumWidth)
+            => widths is { Length: > 0 } && (uint)index < (uint)widths.Length
+                ? Math.Clamp(widths[index], (byte)0, (byte)maximumWidth)
+                : maximumWidth;
+
+        private static float Blend(float from, float to, float factor)
+            => from + (to - from) * factor;
     }
 
     public sealed record VfxOwnerSceneContext(

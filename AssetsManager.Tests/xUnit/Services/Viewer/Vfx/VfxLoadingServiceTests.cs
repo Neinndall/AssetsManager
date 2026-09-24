@@ -11,6 +11,7 @@ using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Memory;
 using LeagueToolkit.Core.Mesh;
@@ -418,6 +419,104 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ResourceIdentityIgnoresTransformEditsButDetectsAppearanceAssets()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(VfxPrimitiveKind.CameraQuad) with
+            {
+                TexturePath = "spark.dds",
+                TextureMultPath = "detail.dds",
+                TranslationOverride = Vector3.Zero
+            };
+            var definition = new VfxSystemDefinition(1, "assets", "assets", new[] { emitter });
+
+            VfxSystemDefinition transformOnly = definition with
+            {
+                Emitters = new[] { emitter with { TranslationOverride = new Vector3(10f, 20f, 30f) } }
+            };
+            Assert.True(VfxLoadingService.UsesSameResolvedAssets(definition, transformOnly));
+
+            VfxSystemDefinition textureEdit = definition with
+            {
+                Emitters = new[] { emitter with { TexturePath = "other.dds" } }
+            };
+            Assert.False(VfxLoadingService.UsesSameResolvedAssets(definition, textureEdit));
+
+            VfxSystemDefinition meshEdit = definition with
+            {
+                Emitters = new[] { emitter with { IsMeshPrimitive = true, MeshPath = "shape.scb" } }
+            };
+            Assert.False(VfxLoadingService.UsesSameResolvedAssets(definition, meshEdit));
+        }
+
+        [Fact]
+        public void CompatibleSwapRefreshDetachesStaleGpuBindingsWithoutRebuildingThePool()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxSwapResources", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                VfxEmitterDefinition emitter = CreateEmitter(VfxPrimitiveKind.CameraQuad) with
+                {
+                    TexturePath = "old.dds"
+                };
+                var definition = new VfxSystemDefinition(1, "swap", "swap", new[] { emitter });
+                using var logger = new LoggerConfiguration().CreateLogger();
+                using var service = new VfxLoadingService();
+                VfxPlaybackGraphRuntime graph = service.PreparePlaybackGraph(
+                    definition,
+                    new Dictionary<uint, VfxSystemDefinition> { [1] = definition },
+                    new Dictionary<uint, uint>(),
+                    root,
+                    Matrix4x4.Identity,
+                    17,
+                    new LogService(logger));
+
+                VfxPlaybackRuntime.EmitterState state = Assert.Single(graph.Root.Emitters);
+                state.Texture = 101;
+                state.TextureMult = 102;
+                state.ColorGradientTexture = 103;
+                state.MeshVao = 201;
+                state.MeshVbo = 202;
+                state.MeshEbo = 203;
+                state.MeshVertexCount = 9;
+                state.MeshIndexCount = 9;
+
+                VfxSystemDefinition edited = definition with
+                {
+                    Emitters = new[]
+                    {
+                        emitter with
+                        {
+                            TexturePath = "new.dds",
+                            TextureMultPath = null,
+                            ParticleColorTexturePath = null,
+                            MeshPath = null,
+                            IsMeshPrimitive = false
+                        }
+                    }
+                };
+                Assert.True(graph.TrySwapRootDefinition(edited));
+                service.RefreshPlaybackGraphResources(graph, root, new LogService(logger), ownerSceneContext: null);
+
+                Assert.Same(state, Assert.Single(graph.Root.Emitters));
+                Assert.Equal("new.dds", state.Def.TexturePath);
+                Assert.Equal(0u, state.Texture);
+                Assert.Equal(0u, state.TextureMult);
+                Assert.Equal(0u, state.ColorGradientTexture);
+                Assert.Null(state.PendingTexture);
+                Assert.Equal(0u, state.MeshVao);
+                Assert.Equal(0u, state.MeshVbo);
+                Assert.Equal(0u, state.MeshEbo);
+                Assert.Equal(0, state.MeshVertexCount);
+                Assert.Equal(0, state.MeshIndexCount);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void ResourceIndexLocatesLtkSimpleMeshExtensions()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxMeshExtensions", Guid.NewGuid().ToString("N"));
@@ -442,22 +541,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             }
         }
 
-        [Fact]
-        public void UnsupportedSimpleMeshFailsLocallyLikeLtk()
+        [Theory]
+        [InlineData("unsupported.gmesh", "GMSH")]
+        [InlineData("unsupported.tmesh", "TMSH")]
+        public void UnsupportedSimpleMeshIsResolvedThenFailsLocallyLikeLtk(string fileName, string magic)
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxUnsupportedMesh", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
-            string meshPath = Path.Combine(root, "unsupported.gmesh");
-            File.WriteAllBytes(meshPath, new byte[] { (byte)'G', (byte)'M', (byte)'S', (byte)'H', 1, 0, 0, 0 });
+            string meshPath = Path.Combine(root, fileName);
+            byte[] marker = System.Text.Encoding.ASCII.GetBytes(magic);
+            File.WriteAllBytes(meshPath, marker.Concat(new byte[] { 1, 0, 0, 0 }).ToArray());
 
             try
             {
                 using var resolver = new VfxResourceResolver();
 
-                Assert.Null(resolver.ResolveMesh("unsupported.gmesh", root));
+                // The BIN accepts TMESH/GMESH names even though the current decoder, like LTK's,
+                // cannot turn either format into geometry. Resolution must still reach the asset.
+                Assert.Equal(meshPath, resolver.ResolvePath(fileName, root, VfxMeshFormatSemantics.ResolverExtensions));
+                Assert.Null(resolver.ResolveMesh(fileName, root));
                 // The failed decode is cached just like an unresolved asset, so repeated draws
                 // cannot repeatedly throw or reparse the same unsupported resource.
-                Assert.Null(resolver.ResolveMesh("unsupported.gmesh", root));
+                Assert.Null(resolver.ResolveMesh(fileName, root));
             }
             finally
             {

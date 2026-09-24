@@ -1244,6 +1244,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             }
         }
 
+        internal bool HasEmitterMesh(float[] positions, bool skinning)
+            => _ready && _meshResources?.Contains(positions, skinning) == true;
+
         public void UploadEmitterMesh(
             VfxPlaybackRuntime.EmitterState es,
             float[] positions,

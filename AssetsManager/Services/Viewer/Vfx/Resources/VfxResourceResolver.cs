@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Viewer.Vfx.Resources
@@ -12,7 +13,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
     internal sealed class VfxResourceResolver : IDisposable
     {
         private static readonly string[] TextureExtensions = { ".tex", ".dds" };
-        private static readonly string[] MeshExtensions = { ".scb", ".sco", ".skn" };
         private static readonly string[] SkeletonExtensions = { ".skl" };
         private static readonly string[] AnimationExtensions = { ".anm" };
         private static readonly string[] BinExtensions = { ".bin" };
@@ -99,7 +99,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             string key = CreateKey($"{authoredPath}|draw:{drawKey}|always:{alwaysKey}", searchDirectory);
             if (_meshes.TryGetValue(key, out var cached)) return cached;
 
-            string resolvedPath = ResolvePath(authoredPath, searchDirectory, MeshExtensions);
+            string resolvedPath = ResolvePath(authoredPath, searchDirectory, VfxMeshFormatSemantics.ResolverExtensions);
             VfxMeshData? mesh = null;
             if (resolvedPath != null)
             {
@@ -111,7 +111,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 {
                     // LTK reports unsupported/corrupt geometry as a failed asset load instead
                     // of aborting the VFX system. This also covers authored .tmesh/.gmesh files,
-                    // which LTK 1.19.6 recognizes but does not decode.
+                    // which current LTK main recognizes but does not decode.
                     mesh = null;
                 }
             }
@@ -170,7 +170,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 searchDirectory);
             if (_meshes.TryGetValue(key, out var cached)) return cached;
 
-            string resolvedPath = ResolvePath(authoredPath, searchDirectory, new[] { ".skn" });
+            string resolvedPath = ResolvePath(authoredPath, searchDirectory, VfxMeshFormatSemantics.SkinnedExtensions);
             string resolvedSkeleton = string.IsNullOrWhiteSpace(skeletonPath)
                 ? null
                 : ResolvePath(skeletonPath, searchDirectory, SkeletonExtensions);
@@ -213,7 +213,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             string key = CreateKey($"{meshPath}|{skeletonPath}|{animationKey}", searchDirectory);
             if (_meshAnimations.TryGetValue(key, out VfxAnimatedMesh cached)) return cached;
 
-            string resolvedMesh = ResolvePath(meshPath, searchDirectory, new[] { ".skn" });
+            string resolvedMesh = ResolvePath(meshPath, searchDirectory, VfxMeshFormatSemantics.SkinnedExtensions);
             string resolvedSkeleton = ResolvePath(skeletonPath, searchDirectory, SkeletonExtensions);
             string resolvedAnimation = string.IsNullOrWhiteSpace(animationPath)
                 ? null

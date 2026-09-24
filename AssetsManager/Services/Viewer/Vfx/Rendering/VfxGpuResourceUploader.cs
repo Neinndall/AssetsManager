@@ -23,7 +23,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<VfxCubeMapData, uint> _cubeMaps =
             new(ReferenceEqualityComparer.Instance);
-        private readonly HashSet<(float[] Positions, bool Skinning)> _meshes = new();
 
         internal void UploadPendingResources(
             IEnumerable<VfxPlaybackGraphRuntime> graphs,
@@ -100,9 +99,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
             if (emitter.PendingMesh is { } mesh)
             {
-                bool skinning = mesh.BoneIndices is { Length: > 0 } && mesh.BoneWeights is { Length: > 0 };
-                var meshKey = (mesh.Positions, skinning);
-                bool cached = _meshes.Contains(meshKey);
+                bool skinning = mesh.HasSkinning;
+                bool cached = renderer.HasEmitterMesh(mesh.Positions, skinning);
                 if (!cached && !budget.TryTake(EstimateMeshBytes(mesh)))
                     return;
 
@@ -119,8 +117,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     mesh.Indices,
                     mesh.BoneIndices,
                     mesh.BoneWeights);
-                if (!cached)
-                    _meshes.Add(meshKey);
                 emitter.PendingMesh = null;
             }
         }
@@ -211,7 +207,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             _textures.Clear();
             _cubeMaps.Clear();
-            _meshes.Clear();
         }
 
         internal struct UploadBudget

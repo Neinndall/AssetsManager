@@ -32,6 +32,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private readonly VfxGpuResourceUploader _gpuResourceUploader = new();
         private VfxOpenGlRenderer _renderer;
         private VfxPlaybackGraphRuntime _graph;
+        private bool _purgeGpuResourcesBeforeNextFrame;
         private sealed class GraphAttachmentInfo
         {
             public string BoneName { get; set; }
@@ -92,6 +93,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private Vector3? _lastRigOrigin;
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private VfxOwnerSceneContext _ownerSceneContext;
+        private float? _pinnedBirthChance;
         private bool _isPlaying;
         private bool _usesStandaloneRig;
         private bool _ready;
@@ -134,6 +136,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public VfxSystemModel ActiveSystem => _activeSystem;
         public IReadOnlyList<VfxPlaybackGraphRuntime> Graphs => _graphs;
+        public float? PinnedBirthChance => _pinnedBirthChance;
         public double CurrentTime => _activeSystem?.CurrentTime ?? 0d;
         public double RigDuration => _activeSystem?.Definition is null ? _activeSystem?.TotalDuration ?? 0d : _rigDuration;
 
@@ -168,16 +171,25 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             get => _rigSettings;
             set
             {
+                VfxRigMotionKind previousMotion = _rigSettings.MotionKind;
                 _rigSettings = value;
                 ClearCheckpoints();
                 if (_activeSystem?.Definition is { } definition)
                     _rigDuration = VfxRigMotion.RunLength(value, definition);
                 _lastRigOrigin = null;
 
-                // Steering the preview rig changes only how the world carries the already-running
-                // system. Keep the current pool/playhead when switching Still/Missile/Trail just as
-                // the reference driver's steer() does; SetTransform applies the new carrier frame to
-                // emitters without replaying authored births from time zero.
+                // LTK driver.steer preserves a live run while tuning the same motion (including
+                // lifecycle changes), but a different motion kind describes a different preview and
+                // rewinds it to zero. Keep that distinction so seek/play reach the same seeded run.
+                if (_usesStandaloneRig &&
+                    _activeSystem != null &&
+                    _graphs.Count > 0 &&
+                    previousMotion != value.MotionKind)
+                {
+                    ResetSimulationToStart();
+                    return;
+                }
+
                 ApplyRigTransform();
             }
         }
@@ -268,10 +280,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             }
 
             if (_ready)
-            {
-                _renderer.ClearTextures();
-                _gpuResourceUploader.Clear();
-            }
+                QueueGpuResourcePurge();
 
             if (system?.Definition != null)
             {
@@ -284,6 +293,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     system.PlaybackSeed,
                     _logService,
                     system.OwnerSceneContext);
+                _graph.SetPinnedBirthChance(_pinnedBirthChance);
                 _graphs.Add(_graph);
                 _graphPlacements[_graph] = Matrix4x4.Identity;
                 ApplyRigTransform();
@@ -291,9 +301,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         /// <summary>
-        /// Rebuilds only the standalone simulation around an edited definition while preserving
-        /// playback time, rig settings, seed and GPU caches. This mirrors LTK's driver.swap + seek
-        /// authoring path without reloading unchanged textures or meshes.
+        /// Applies an edited standalone definition like LTK driver.swap. Address-compatible emitter
+        /// edits repoint the live run in place; structural edits rebuild deterministically at the
+        /// current playhead. Appearance-resource edits are released on the next GL frame, while
+        /// transform/curve-only edits keep their existing GPU bindings.
         /// </summary>
         public bool SwapStandaloneDefinition(VfxSystemDefinition definition)
         {
@@ -308,7 +319,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             double restoreTime = _activeSystem.CurrentTime;
             bool restorePlaying = _isPlaying;
             ClearCheckpoints();
-            _isPlaying = false;
 
             var catalog = new Dictionary<uint, VfxSystemDefinition>(
                 _activeSystem.SystemCatalog ?? new Dictionary<uint, VfxSystemDefinition>());
@@ -318,6 +328,31 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _activeSystem.TotalDuration = VfxDurationCalculator.SystemSpan(definition);
             _rigDuration = VfxRigMotion.RunLength(_rigSettings, definition);
 
+            VfxSystemDefinition playbackDefinition = _loadingService.ResolveMeshAvailability(
+                definition,
+                _activeSystem.SearchDirectory);
+            bool hadEmissionSurfaces = _graph?.HasEmissionSurfaceDefinitions == true;
+            bool resourcesChanged = _graph is null ||
+                !VfxLoadingService.UsesSameResolvedAssets(_graph.Root.Definition, playbackDefinition);
+            if (_graph?.TrySwapRootDefinition(playbackDefinition) == true)
+            {
+                if (resourcesChanged)
+                {
+                    _loadingService.RefreshPlaybackGraphResources(
+                        _graph,
+                        _activeSystem.SearchDirectory,
+                        _logService,
+                        _activeSystem.OwnerSceneContext);
+                    _purgeGpuResourcesBeforeNextFrame = true;
+                }
+                _lastRigOrigin = null;
+                ApplyRigTransform();
+                if (hadEmissionSurfaces || _graph.HasEmissionSurfaceDefinitions)
+                    ReplayAfterLineageResourceChange();
+                return true;
+            }
+
+            _isPlaying = false;
             _graph = null;
             _graphs.Clear();
             _graphPlacements.Clear();
@@ -336,7 +371,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 _activeSystem.PlaybackSeed,
                 _logService,
                 _activeSystem.OwnerSceneContext);
+            _graph.SetPinnedBirthChance(_pinnedBirthChance);
             _graphs.Add(_graph);
+            _purgeGpuResourcesBeforeNextFrame = true;
             _graphPlacements[_graph] = Matrix4x4.Identity;
             _activeSystem.CurrentTime = 0d;
             ApplyRigTransform();
@@ -392,8 +429,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             {
                 _renderer.SetOwnerSkinningMatrices(null);
                 _renderer.SetOwnerHiddenSubmeshes(_ownerSceneContext?.InitialHiddenSubmeshHashes);
-                _renderer.ClearTextures();
-                _gpuResourceUploader.Clear();
+                QueueGpuResourcePurge();
             }
 
             double duration = Math.Max(0.1d, animationDuration);
@@ -467,10 +503,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _spellSteps.Clear();
 
             if (_ready)
-            {
-                _renderer.ClearTextures();
-                _gpuResourceUploader.Clear();
-            }
+                QueueGpuResourcePurge();
 
             double duration = Math.Max(0.1, animationDuration);
 
@@ -932,6 +965,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             return (float)Math.Clamp(speed, 0.05d, 2d);
         }
 
+        public void SetPinnedBirthChance(float? chance)
+        {
+            if (!_usesStandaloneRig) return;
+            if (chance.HasValue && !float.IsFinite(chance.Value)) return;
+            if (_pinnedBirthChance == chance) return;
+
+            _pinnedBirthChance = chance;
+            foreach (VfxPlaybackGraphRuntime graph in _graphs)
+                graph.SetPinnedBirthChance(chance);
+
+            // Existing particles stay as they were. Only future births use the new chance, while
+            // clearing checkpoints guarantees a later backward seek cannot restore births sampled
+            // under the previous pin.
+            ClearCheckpoints();
+        }
+
         public void Seek(double seconds)
         {
             if (_activeSystem == null || !double.IsFinite(seconds)) return;
@@ -1277,12 +1326,29 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             RenderPreparedDistortionPass();
         }
 
+        private void QueueGpuResourcePurge()
+            => _purgeGpuResourcesBeforeNextFrame = true;
+
+        /// <summary>
+        /// Performs queued GL resource teardown. Call only from the viewport render callback while
+        /// its OpenGL context is current. This also handles a cleared/empty session that has no graph
+        /// left to enter PrepareRenderFrame.
+        /// </summary>
+        internal void ProcessPendingGpuState()
+        {
+            if (!_ready || !_purgeGpuResourcesBeforeNextFrame) return;
+            _renderer.ClearTextures();
+            _gpuResourceUploader.Clear();
+            _purgeGpuResourcesBeforeNextFrame = false;
+        }
+
         internal bool PrepareRenderFrame(
             Matrix4x4 viewProjection,
             Matrix4x4 view,
             VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
             bool wireOverlay = false)
         {
+            ProcessPendingGpuState();
             if (!_ready || _graphs.Count == 0)
                 return false;
 
