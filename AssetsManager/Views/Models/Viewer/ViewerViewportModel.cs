@@ -123,7 +123,6 @@ namespace AssetsManager.Views.Models.Viewer
 
         // --- Environment Properties ---
         private bool _isTransparentBg = false;
-        private bool _showSkybox = false;
 
         public bool IsTransparentBg
         {
@@ -133,21 +132,6 @@ namespace AssetsManager.Views.Models.Viewer
                 if (_isTransparentBg != value) 
                 { 
                     _isTransparentBg = value; 
-                    if (_isTransparentBg) ShowSkybox = false;
-                    OnPropertyChanged(); 
-                } 
-            }
-        }
-
-        public bool ShowSkybox
-        {
-            get => _showSkybox;
-            set 
-            { 
-                if (_showSkybox != value) 
-                { 
-                    _showSkybox = value; 
-                    if (_showSkybox) IsTransparentBg = false;
                     OnPropertyChanged(); 
                 } 
             }
@@ -162,7 +146,6 @@ namespace AssetsManager.Views.Models.Viewer
             IsGroundVisible = false;
             IsGridVisible = true;
             IsTransparentBg = false;
-            ShowSkybox = false;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

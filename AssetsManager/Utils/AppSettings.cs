@@ -215,7 +215,8 @@ namespace AssetsManager.Utils
                         {
                             GroundVisible = viewerEnvironmentJson.Value<bool?>("GroundVisible") ?? false,
                             GridVisible = viewerEnvironmentJson.Value<bool?>("GridVisible") ?? true,
-                            SkyboxVisible = viewerEnvironmentJson.Value<bool?>("SkyboxVisible") ?? false,
+                            SkyVisible = viewerEnvironmentJson.Value<bool?>("SkyVisible") ??
+                                         viewerEnvironmentJson.Value<bool?>("SkyboxVisible") ?? false,
                             TransparentBackground = viewerEnvironmentJson.Value<bool?>("TransparentBackground") ?? false
                         };
                         needsResave = true;
@@ -229,7 +230,7 @@ namespace AssetsManager.Utils
                         {
                             GroundVisible = jsonObject.Value<bool?>("StudioGroundVisible") ?? false,
                             GridVisible = jsonObject.Value<bool?>("StudioGridVisible") ?? true,
-                            SkyboxVisible = jsonObject.Value<bool?>("StudioSkyboxVisible") ?? false,
+                            SkyVisible = jsonObject.Value<bool?>("StudioSkyboxVisible") ?? false,
                             TransparentBackground = jsonObject.Value<bool?>("StudioTransparentBackground") ?? false
                         };
                         needsResave = true;
@@ -264,6 +265,14 @@ namespace AssetsManager.Utils
 
                 settings.StudioParameters ??= GetDefaultSettings().StudioParameters;
                 settings.VfxStudio ??= GetDefaultSettings().VfxStudio;
+
+                if (jsonObject["StudioParameters"] is JObject currentStudioJson &&
+                    currentStudioJson["SkyVisible"] == null &&
+                    currentStudioJson["SkyboxVisible"] != null)
+                {
+                    settings.StudioParameters.SkyVisible = currentStudioJson.Value<bool?>("SkyboxVisible") ?? false;
+                    needsResave = true;
+                }
 
                 // A previous AssetsManager build temporarily shared these controls through
                 // StudioParameters. Carry those saved choices back into VFX Studio once, then keep
@@ -368,7 +377,7 @@ namespace AssetsManager.Utils
                 {
                     GroundVisible = false,
                     GridVisible = true,
-                    SkyboxVisible = false,
+                    SkyVisible = false,
                     TransparentBackground = false
                 },
                 VfxStudio = new VfxStudioSettings
@@ -463,7 +472,7 @@ namespace AssetsManager.Utils
     {
         public bool GroundVisible { get; set; }
         public bool GridVisible { get; set; } = true;
-        public bool SkyboxVisible { get; set; }
+        public bool SkyVisible { get; set; }
         public bool TransparentBackground { get; set; }
     }
 

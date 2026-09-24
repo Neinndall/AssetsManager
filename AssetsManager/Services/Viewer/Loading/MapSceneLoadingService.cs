@@ -9,6 +9,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 
@@ -20,6 +21,7 @@ namespace AssetsManager.Services.Viewer.Loading
     internal sealed class MapSceneLoadingService
     {
         private const string ShaderDefinitionsPath = "data/shaders/shaders.bin";
+        internal const string BackdropSkyPath = "assets/maps/skyboxes/riots_sru_skybox_cubemap.dds";
 
         private readonly MapAssetResolver _assetResolver;
         private readonly MapGeometryDecoder _geometryDecoder;
@@ -54,6 +56,21 @@ namespace AssetsManager.Services.Viewer.Loading
             _textureLoadingService = textureLoadingService;
             _hashResolver = hashResolver;
             _logService = logService;
+        }
+
+        internal async Task<VfxCubeMapData> LoadBackdropSkyAsync(
+            string projectRoot,
+            CancellationToken cancellationToken = default)
+        {
+            MapResolvedAsset sky = await _assetResolver.ResolveVirtualAsync(
+                BackdropSkyPath,
+                projectRoot,
+                cancellationToken);
+            if (sky == null) return null;
+
+            await using Stream stream = await _assetResolver.OpenReadAsync(sky, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return stream == null ? null : VfxCubeMapDecoder.Decode(stream);
         }
 
         public Task<MapSceneData> LoadAsync(

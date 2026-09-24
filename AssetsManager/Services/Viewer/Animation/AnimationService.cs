@@ -47,6 +47,7 @@ namespace AssetsManager.Services.Viewer.Animation
         }
 
         internal Matrix4x4[] FinalBoneTransforms => _finalBoneTransforms;
+        internal IReadOnlyList<Matrix4x4> WorldBoneTransforms => _boneTransforms ?? Array.Empty<Matrix4x4>();
         internal GpuSkinningData SkinningData => _gpuSkinningData;
 
         /// <summary>
@@ -403,7 +404,7 @@ namespace AssetsManager.Services.Viewer.Animation
             return true;
         }
 
-        private static Matrix4x4[] CreateBindWorldTransforms(RigResource skeleton)
+        internal static Matrix4x4[] CreateBindWorldTransforms(RigResource skeleton)
         {
             (int[] order, int[] parents) = BuildHierarchy(
                 skeleton.Joints.Select(static joint => (int)joint.ParentId).ToArray());

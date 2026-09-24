@@ -319,6 +319,12 @@
                                              Ready="OpenTkControl_Ready" 
                                              Render="OpenTkControl_Render"/>
 
+                        <!-- Character/Skin armature and optional joint labels follow the same pose as the SKN. -->
+                        <Canvas x:Name="CharacterArmatureCanvas"
+                                Panel.ZIndex="6"
+                                IsHitTestVisible="False"
+                                ClipToBounds="True"/>
+
                         <!-- Selected-emitter authoring. Text edits preview immediately; Save BIN commits atomically. -->
                         <Border x:Name="EmitterAuthoringPanel"
                                 VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="12"
@@ -674,18 +680,237 @@
                         </Border>
 
                         <!-- Viewport Quick Toolbar (Top-Right: preview, rig, mesh and camera controls) -->
-                        <Border VerticalAlignment="Top" HorizontalAlignment="Right" Margin="12" 
-                                Background="#CC12131A" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
-                                CornerRadius="6" Padding="4,3">
+                        <Border VerticalAlignment="Top" HorizontalAlignment="Right" Margin="12"
+                                Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                CornerRadius="12" Padding="6,4">
+                            <Border.Effect>
+                                <DropShadowEffect Color="Black" BlurRadius="18" ShadowDepth="3" Opacity="0.35"/>
+                            </Border.Effect>
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsSkinWorkspace}" Value="True"/>
+                                                <Condition Binding="{Binding CharacterControlsVisible}" Value="False"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
                             <StackPanel Orientation="Horizontal">
+                                <!-- Character/Skin tools live in VFX Studio's shared viewport. MAP controls
+                                     below are reused automatically when this Skin enables a backdrop. -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                            Visibility="{Binding IsSkinWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="0,0,4,0">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="CharacterBackdropButton"
+                                            Click="CharacterBackdrop_Click"
+                                            Style="{StaticResource TransparentIconButton}"
+                                            Height="26" Padding="6,0" Margin="0,0,4,0"
+                                            ToolTip="Character backdrop MAP">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="Map" Width="13" Height="13" Foreground="#38BDF8" Margin="0,0,5,0"/>
+                                            <TextBlock Text="Backdrop" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                            <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Popup x:Name="CharacterBackdropPopup"
+                                           PlacementTarget="{Binding ElementName=CharacterBackdropButton}"
+                                           Placement="Bottom" HorizontalOffset="-125" VerticalOffset="6"
+                                           AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+                                        <Border Width="305" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+                                                BorderThickness="1" CornerRadius="7" Padding="11">
+                                            <Border.Effect>
+                                                <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.42"/>
+                                            </Border.Effect>
+                                            <StackPanel>
+                                                <TextBlock Text="CHARACTER BACKDROP" FontSize="10" FontWeight="Bold"
+                                                           Foreground="{StaticResource TextSecondary}" Margin="0,0,0,8"/>
+                                                <CheckBox Content="Enable MAP backdrop"
+                                                          IsChecked="{Binding CharacterBackdropEnabled, Mode=TwoWay}"
+                                                          IsEnabled="{Binding HasCharacterBackdropOptions}"
+                                                          Style="{StaticResource ModernCheckBox}"/>
+                                                <TextBlock Text="MAP" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,8,0,3"/>
+                                                <ComboBox ItemsSource="{Binding CharacterBackdrops}"
+                                                          SelectedItem="{Binding SelectedCharacterBackdrop, Mode=TwoWay}"
+                                                          DisplayMemberPath="Label"
+                                                          Style="{StaticResource ModernComboBox}" Height="26"/>
+                                                <TextBlock Text="The selected Skin remains the preview subject; the MAP is not modified."
+                                                           TextWrapping="Wrap" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,9,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Popup>
+
+                                    <ToggleButton IsChecked="{Binding MapParticlesVisible, Mode=TwoWay}"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  Width="30" Height="26" Margin="0,0,4,0"
+                                                  ToolTip="Show authored MAP VFX / particles"
+                                                  Visibility="{Binding HasActiveCharacterBackdrop, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <materialIcons:MaterialIcon Kind="AutoAwesome" Width="14" Height="14"/>
+                                    </ToggleButton>
+
+                                    <ToggleButton IsChecked="{Binding MapStructuresVisible, Mode=TwoWay}"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  Width="30" Height="26" Margin="0,0,4,0"
+                                                  ToolTip="Show authored MAP structures / characters"
+                                                  Visibility="{Binding HasActiveCharacterBackdrop, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <materialIcons:MaterialIcon Kind="HomeOutline" Width="14" Height="14"/>
+                                    </ToggleButton>
+
+                                    <Button x:Name="CharacterPlacementButton"
+                                            Click="CharacterPlacement_Click"
+                                            Style="{StaticResource TransparentIconButton}"
+                                            Width="30" Height="26" Margin="0,0,4,0"
+                                            ToolTip="Character placement">
+                                        <materialIcons:MaterialIcon Kind="AxisArrow" Width="14" Height="14"/>
+                                    </Button>
+                                    <Popup x:Name="CharacterPlacementPopup"
+                                           PlacementTarget="{Binding ElementName=CharacterPlacementButton}"
+                                           Placement="Bottom" HorizontalOffset="-210" VerticalOffset="6"
+                                           AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+                                        <Border Width="350" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+                                                BorderThickness="1" CornerRadius="7" Padding="11">
+                                            <StackPanel>
+                                                <Grid Margin="0,0,0,8">
+                                                    <TextBlock Text="CHARACTER PLACEMENT" FontSize="10" FontWeight="Bold"
+                                                               Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                    <Button Content="Reset" HorizontalAlignment="Right" Padding="7,2"
+                                                            Style="{StaticResource TransparentIconButton}" Click="ResetCharacterPlacement_Click"/>
+                                                </Grid>
+                                                <TextBlock Text="Position" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                <UniformGrid Columns="3" Margin="0,3,0,7">
+                                                    <TextBox Text="{Binding CharacterPositionX, Mode=TwoWay, StringFormat=F1}" Style="{StaticResource ModernTextBox}" Height="25" Margin="0,0,4,0" ToolTip="X"/>
+                                                    <TextBox Text="{Binding CharacterPositionY, Mode=TwoWay, StringFormat=F1}" Style="{StaticResource ModernTextBox}" Height="25" Margin="2,0" ToolTip="Y"/>
+                                                    <TextBox Text="{Binding CharacterPositionZ, Mode=TwoWay, StringFormat=F1}" Style="{StaticResource ModernTextBox}" Height="25" Margin="4,0,0,0" ToolTip="Z"/>
+                                                </UniformGrid>
+                                                <TextBlock Text="Rotation" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                <UniformGrid Columns="3" Margin="0,3,0,7">
+                                                    <TextBox Text="{Binding CharacterRotationX, Mode=TwoWay, StringFormat=F1}" Style="{StaticResource ModernTextBox}" Height="25" Margin="0,0,4,0" ToolTip="Pitch X"/>
+                                                    <TextBox Text="{Binding CharacterRotationY, Mode=TwoWay, StringFormat=F1}" Style="{StaticResource ModernTextBox}" Height="25" Margin="2,0" ToolTip="Yaw Y"/>
+                                                    <TextBox Text="{Binding CharacterRotationZ, Mode=TwoWay, StringFormat=F1}" Style="{StaticResource ModernTextBox}" Height="25" Margin="4,0,0,0" ToolTip="Roll Z"/>
+                                                </UniformGrid>
+                                                <TextBlock Text="Scale multiplier" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                <Slider Minimum="0.05" Maximum="4" Value="{Binding CharacterScaleMultiplier, Mode=TwoWay}"
+                                                        Style="{StaticResource HUDSliderStyle}" TickFrequency="0.05"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Popup>
+
+                                    <ToggleButton IsChecked="{Binding CharacterEffectsEnabled, Mode=TwoWay}"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  Width="30" Height="26" Margin="0,0,4,0"
+                                                  ToolTip="Show Skin Animation Clip / Spell VFX">
+                                        <materialIcons:MaterialIcon Kind="Sparkles" Width="14" Height="14"/>
+                                    </ToggleButton>
+
+                                    <ToggleButton IsChecked="{Binding CharacterAutoRotate, Mode=TwoWay}"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  Width="30" Height="26" Margin="0,0,4,0"
+                                                  ToolTip="Auto-Rotate Character">
+                                        <materialIcons:MaterialIcon Kind="Autorenew" Width="14" Height="14"/>
+                                    </ToggleButton>
+
+                                    <Button x:Name="CharacterArmatureButton"
+                                            Click="CharacterArmature_Click"
+                                            Style="{StaticResource TransparentIconButton}"
+                                            Width="30" Height="26" Margin="0,0,4,0"
+                                            IsEnabled="{Binding HasCharacterSkeleton}"
+                                            ToolTip="Armature and joint names">
+                                        <materialIcons:MaterialIcon Kind="VectorPoint" Width="14" Height="14"/>
+                                    </Button>
+                                    <Popup x:Name="CharacterArmaturePopup"
+                                           PlacementTarget="{Binding ElementName=CharacterArmatureButton}"
+                                           Placement="Bottom" HorizontalOffset="-120" VerticalOffset="6"
+                                           AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False">
+                                        <Border Width="205" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+                                                BorderThickness="1" CornerRadius="7" Padding="10">
+                                            <StackPanel>
+                                                <TextBlock Text="ARMATURE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,7"/>
+                                                <CheckBox Content="Show skeleton" IsChecked="{Binding ShowCharacterArmature, Mode=TwoWay}"
+                                                          Style="{StaticResource ModernCheckBox}"/>
+                                                <CheckBox Content="Joint names" IsChecked="{Binding ShowCharacterJointNames, Mode=TwoWay}"
+                                                          IsEnabled="{Binding ShowCharacterArmature}"
+                                                          Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Popup>
+
+                                    <Button x:Name="CharacterSubmeshesButton"
+                                            Click="CharacterSubmeshes_Click"
+                                            Style="{StaticResource TransparentIconButton}"
+                                            Width="30" Height="26" Margin="0,0,4,0"
+                                            IsEnabled="{Binding HasCharacterSubmeshes}"
+                                            ToolTip="Character submeshes">
+                                        <materialIcons:MaterialIcon Kind="LayersOutline" Width="14" Height="14"/>
+                                    </Button>
+                                    <Popup x:Name="CharacterSubmeshesPopup"
+                                           PlacementTarget="{Binding ElementName=CharacterSubmeshesButton}"
+                                           Placement="Bottom" HorizontalOffset="-180" VerticalOffset="6"
+                                           AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+                                        <Border Width="260" MaxHeight="390" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+                                                BorderThickness="1" CornerRadius="7" Padding="10">
+                                            <DockPanel LastChildFill="True">
+                                                <Grid DockPanel.Dock="Top" Margin="0,0,0,7">
+                                                    <TextBlock Text="SUBMESHES" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                    <Button Content="Reset" HorizontalAlignment="Right" Padding="7,2"
+                                                            Style="{StaticResource TransparentIconButton}" Click="ResetCharacterSubmeshOverrides_Click"/>
+                                                </Grid>
+                                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                    <ItemsControl ItemsSource="{Binding CharacterSubmeshes}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                                          Style="{StaticResource ModernCheckBox}" Margin="0,2">
+                                                                    <TextBlock Text="{Binding Name}" FontSize="10.5" TextTrimming="CharacterEllipsis" MaxWidth="205"/>
+                                                                </CheckBox>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </ScrollViewer>
+                                            </DockPanel>
+                                        </Border>
+                                    </Popup>
+
+                                    <Button Click="FitCharacter_Click"
+                                            Style="{StaticResource TransparentIconButton}"
+                                            Width="30" Height="26" Margin="0,0,5,0"
+                                            ToolTip="Fit Character in viewport">
+                                        <materialIcons:MaterialIcon Kind="FitToPageOutline" Width="14" Height="14"/>
+                                    </Button>
+
+                                    <Border Width="1" Height="16" Background="{StaticResource BorderColor}" Margin="0,0,5,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,6,0"
-                                            Visibility="{Binding HasMultipleMapVariants, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            Visibility="{Binding CanSelectMapVariant, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <TextBlock Text="VARIANT:" Foreground="{StaticResource TextMuted}" FontSize="9.5"
                                                FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,4,0"/>
                                     <ComboBox ItemsSource="{Binding MapVariants}"
                                               SelectedItem="{Binding SelectedMapVariant, Mode=TwoWay}"
                                               DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}"
                                               Width="112" Height="24" FontSize="9.5"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                            Visibility="{Binding IsMapWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <ToggleButton IsChecked="{Binding MapParticlesVisible, Mode=TwoWay}"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  Width="30" Height="26" Margin="0,0,4,0"
+                                                  ToolTip="Show authored MAP VFX / particles">
+                                        <materialIcons:MaterialIcon Kind="AutoAwesome" Width="14" Height="14"/>
+                                    </ToggleButton>
+                                    <ToggleButton IsChecked="{Binding MapStructuresVisible, Mode=TwoWay}"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  Width="30" Height="26" Margin="0,0,4,0"
+                                                  ToolTip="Show authored MAP structures / characters">
+                                        <materialIcons:MaterialIcon Kind="HomeOutline" Width="14" Height="14"/>
+                                    </ToggleButton>
                                 </StackPanel>
 
                                 <Button x:Name="MapLayersButton"
@@ -982,10 +1207,12 @@
                                         <StackPanel>
                                             <TextBlock Text="SHOW" FontSize="10" FontWeight="Bold"
                                                        Foreground="{StaticResource TextSecondary}" Margin="2,0,0,7"/>
-                                            <CheckBox Content="Grid" Style="{StaticResource ModernCheckBox}"
-                                                      IsChecked="{Binding ShowPreviewGrid, Mode=TwoWay}"/>
+                                            <CheckBox Content="Sky" Style="{StaticResource ModernCheckBox}"
+                                                      IsChecked="{Binding ShowPreviewSky, Mode=TwoWay}"/>
                                             <CheckBox Content="Ground" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
                                                       IsChecked="{Binding ShowPreviewGround, Mode=TwoWay}"/>
+                                            <CheckBox Content="Grid" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
+                                                      IsChecked="{Binding ShowPreviewGrid, Mode=TwoWay}"/>
                                             <CheckBox Content="Stage" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
                                                       IsChecked="{Binding ShowPreviewStage, Mode=TwoWay}"/>
                                         </StackPanel>
@@ -1212,6 +1439,38 @@
 
                             </StackPanel>
                         </Border>
+
+                        <!-- Same compact show/hide affordance used by the normal Viewer. It remains
+                             available while the Character toolbar itself is collapsed. -->
+                        <ToggleButton IsChecked="{Binding CharacterControlsVisible, Mode=TwoWay}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                      Margin="0,0,12,12" Cursor="Hand" Panel.ZIndex="30"
+                                      ToolTip="Show / Hide Character Viewport Toolbar"
+                                      Visibility="{Binding IsSkinWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="border" Width="36" Height="36" CornerRadius="18"
+                                            Background="#E618181B" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1.5">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.4"/>
+                                        </Border.Effect>
+                                        <materialIcons:MaterialIcon x:Name="Icon" Kind="TuneVariant" Width="16" Height="16"
+                                                                    Foreground="{StaticResource AccentBrush}"
+                                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="border" Property="Background" Value="#FF1E2233"/>
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="False">
+                                            <Setter TargetName="border" Property="Opacity" Value="0.7"/>
+                                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                            <Setter TargetName="Icon" Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
                     </Grid>
 
                     <!-- Rounded Border Stroke Overlay (crisp 1px outline, unclipped, hit-test transparent) -->

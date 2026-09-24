@@ -18,6 +18,7 @@ using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Semantics;
@@ -65,10 +66,14 @@ namespace AssetsManager.Views.Controls.Viewer
         private LeagueToolkit.Core.Animation.RigResource _championBindSkeleton;
         private Func<string, uint, Matrix4x4?> _championBindBoneTransformProvider;
         private Matrix4x4[] _championBindSkinningMatrices = Array.Empty<Matrix4x4>();
+        private Matrix4x4[] _championBindWorldTransforms = Array.Empty<Matrix4x4>();
         private VfxClipCatalog _clipCatalog;
         private AnimationClipCatalogItem _activeAnimationClip;
         private readonly Dictionary<ModelPart, bool> _animationBasePartVisibility = new();
         private readonly HashSet<uint> _animationBaseHiddenSubmeshes = new();
+        private readonly HashSet<uint> _characterAuthoredHiddenSubmeshes = new();
+        private double _championAuthoredScale = 1d;
+        private bool _isApplyingCharacterViewportState;
         private IReadOnlyList<VfxClipCueEvaluator.VisibilityEntry> _animationVisibilityTimeline =
             Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
         private VfxLoadingService.Bundle _championBundle;
@@ -81,11 +86,17 @@ namespace AssetsManager.Views.Controls.Viewer
         private System.Threading.CancellationTokenSource _mapClipCancellation;
         private System.Threading.CancellationTokenSource _animationClipCancellation;
         private MapSceneRuntime _mapSceneRuntime;
+        private bool _mapSceneIsCharacterBackdrop;
         private MapBrowserNode _mapBrowserRoot;
         private MapGeometryRenderer _mapGeometryRenderer;
         private MapCharacterRenderer _mapCharacterRenderer;
         private MapParticleRenderer _mapParticleRenderer;
         private MapPostEffectsRenderer _mapPostEffectsRenderer;
+        private SkyRenderer _skyRenderer;
+        private VfxCubeMapData _genericSkyCube;
+        private VfxCubeMapData _mapSkyCube;
+        private bool _skyCubeDirty;
+        private double _characterAutoRotateDegrees;
         private MapCharacterRuntimeGroup _activeMapCharacterGroup;
         private MapCharacterData _activeMapCharacterPlacement;
         private AnimationClipDefinition _activeMapCharacterClip;
@@ -103,6 +114,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isUpdatingMapPreviewControls;
         private bool _isSwitchingWorkspaceTab;
         private VfxWorkspaceTab _pendingWorkspaceRestoreTab;
+        private readonly List<System.Windows.Shapes.Line> _characterArmatureLines = new();
+        private readonly List<TextBlock> _characterJointLabels = new();
         private readonly object _mapTextureUpdateGate = new();
         private readonly Dictionary<string, MapTextureImage> _pendingMapTextureUpdates = new(StringComparer.Ordinal);
         private readonly Dictionary<string, MapTextureImage> _pendingMapProgramTextureUpdates = new(StringComparer.Ordinal);
@@ -200,7 +213,50 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private VfxSkinItem _browserSkin;
 
-        private VfxWorkspaceTab EnsureSkinWorkspaceTab(VfxSkinItem skin, bool select = true)
+        private sealed record CharacterBackdropSeed(
+            MapSceneSource Source,
+            int? VisibilityFlags,
+            bool ShowParticles,
+            bool ShowStructures);
+
+        private CharacterBackdropSeed CaptureActiveBackdropSeed()
+        {
+            if (_mapSceneRuntime?.Scene?.Source is MapSceneSource loadedSource)
+            {
+                return new CharacterBackdropSeed(
+                    loadedSource,
+                    _mapSceneRuntime.VisibilityFlags,
+                    _mapSceneRuntime.ShowParticles,
+                    _mapSceneRuntime.ShowStructures);
+            }
+
+            if (_model.CharacterBackdropEnabled &&
+                _model.SelectedCharacterBackdrop?.Source is MapSceneSource selectedBackdrop)
+            {
+                return new CharacterBackdropSeed(
+                    selectedBackdrop,
+                    null,
+                    _model.MapParticlesVisible,
+                    _model.MapStructuresVisible);
+            }
+
+            if (_model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Map &&
+                _model.SelectedWorkspaceTab.Payload is MapBrowserNode { Kind: MapBrowserNodeKind.MapFile, Payload: MapSceneSource pendingMap })
+            {
+                return new CharacterBackdropSeed(
+                    pendingMap,
+                    null,
+                    _model.MapParticlesVisible,
+                    _model.MapStructuresVisible);
+            }
+
+            return null;
+        }
+
+        private VfxWorkspaceTab EnsureSkinWorkspaceTab(
+            VfxSkinItem skin,
+            bool select = true,
+            CharacterBackdropSeed inheritedBackdrop = null)
         {
             if (skin == null || string.IsNullOrWhiteSpace(skin.BinPath)) return null;
             string key = $"skin:{Path.GetFullPath(skin.BinPath)}";
@@ -219,6 +275,18 @@ namespace AssetsManager.Views.Controls.Viewer
                     Kind = VfxWorkspaceTabKind.Skin,
                     Payload = skin
                 };
+                if (inheritedBackdrop?.Source != null)
+                {
+                    string backdropKey = VfxInstallationMapCatalog.BackdropKey(inheritedBackdrop.Source);
+                    if (!string.IsNullOrWhiteSpace(backdropKey))
+                    {
+                        tab.CharacterBackdropEnabled = true;
+                        tab.CharacterBackdropKey = backdropKey;
+                        tab.CharacterBackdropVisibilityFlags = inheritedBackdrop.VisibilityFlags;
+                        tab.BackdropParticlesVisible = inheritedBackdrop.ShowParticles;
+                        tab.BackdropStructuresVisible = inheritedBackdrop.ShowStructures;
+                    }
+                }
                 _model.WorkspaceTabs.Add(tab);
                 _model.NotifyWorkspaceTabsChanged();
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -233,22 +301,46 @@ namespace AssetsManager.Views.Controls.Viewer
             return tab;
         }
 
+        private static string MapWorkspaceKey(MapSceneSource source)
+        {
+            string logical = VfxInstallationMapCatalog.BackdropKey(source);
+            if (!string.IsNullOrWhiteSpace(logical))
+                return $"map:{logical}";
+            return $"map:{source?.SelectedMapFilePath ?? string.Empty}";
+        }
+
+        private static string MapWorkspaceTitle(MapSceneSource source, string fallback = null)
+        {
+            string title = Path.GetFileNameWithoutExtension(source?.SelectedMapFilePath);
+            if (!string.IsNullOrWhiteSpace(title))
+                return title;
+            if (!string.IsNullOrWhiteSpace(fallback))
+                return fallback;
+            string path = source?.Map?.Value ?? "MAP";
+            int slash = path.LastIndexOf('/');
+            return slash >= 0 ? path[(slash + 1)..] : path;
+        }
+
+        private static MapBrowserNode CreateMapFileNode(MapSceneSource source, string fallbackTitle = null) =>
+            new(
+                MapWorkspaceTitle(source, fallbackTitle),
+                MapBrowserNodeKind.MapFile,
+                source?.Map?.Value,
+                source);
+
         private VfxWorkspaceTab EnsureMapWorkspaceTab(MapBrowserNode node, bool select = true)
         {
             if (node?.Kind != MapBrowserNodeKind.MapFile || node.Payload is not MapSceneSource source)
                 return null;
-            string sourcePath = source.SelectedMapFilePath ?? node.Title ?? string.Empty;
-            string key = $"map:{sourcePath}";
+            string key = MapWorkspaceKey(source);
             VfxWorkspaceTab tab = _model.WorkspaceTabs.FirstOrDefault(item =>
                 string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase));
             if (tab == null)
             {
-                string title = Path.GetFileNameWithoutExtension(source.SelectedMapFilePath);
-                if (string.IsNullOrWhiteSpace(title)) title = node.Title;
                 tab = new VfxWorkspaceTab
                 {
                     Key = key,
-                    Title = title,
+                    Title = MapWorkspaceTitle(source, node.Title),
                     Subtitle = source.SelectedMapFilePath ?? node.Subtitle,
                     Kind = VfxWorkspaceTabKind.Map,
                     Payload = node
@@ -267,6 +359,48 @@ namespace AssetsManager.Views.Controls.Viewer
             return tab;
         }
 
+        private MapSceneSource ResolveMapVariantSource(MapVariantData variant)
+        {
+            if (variant?.Map == null)
+                return null;
+
+            string wantedKey = variant.Map.Value?.Trim().ToLowerInvariant();
+            VfxCharacterBackdropOption option = _model.CharacterBackdrops.FirstOrDefault(candidate =>
+                string.Equals(
+                    VfxInstallationMapCatalog.BackdropKey(candidate?.Source),
+                    wantedKey,
+                    StringComparison.OrdinalIgnoreCase));
+            if (option?.Source != null)
+                return option.Source;
+
+            string selectedFile = SelectedMapFileFor(variant.Map, _model.RootPath);
+            return new MapSceneSource(variant.Map, selectedFile, _model.RootPath);
+        }
+
+        private void RetargetMapWorkspaceTab(VfxWorkspaceTab tab, MapSceneSource source)
+        {
+            if (tab?.Kind != VfxWorkspaceTabKind.Map || source == null)
+                return;
+
+            string targetKey = MapWorkspaceKey(source);
+            VfxWorkspaceTab duplicate = _model.WorkspaceTabs.FirstOrDefault(candidate =>
+                !ReferenceEquals(candidate, tab) &&
+                candidate.Kind == VfxWorkspaceTabKind.Map &&
+                string.Equals(candidate.Key, targetKey, StringComparison.OrdinalIgnoreCase));
+            if (duplicate != null)
+            {
+                _model.WorkspaceTabs.Remove(duplicate);
+                _model.NotifyWorkspaceTabsChanged();
+            }
+
+            MapBrowserNode node = CreateMapFileNode(source);
+            tab.Key = targetKey;
+            tab.Title = MapWorkspaceTitle(source, node.Title);
+            tab.Subtitle = source.SelectedMapFilePath ?? source.Map?.Value;
+            tab.Payload = node;
+            _model.SelectedMapNode = node;
+        }
+
         private void CaptureWorkspaceSelection(VfxWorkspaceTab tab)
         {
             if (tab?.Kind != VfxWorkspaceTabKind.Skin || tab.Payload is not VfxSkinItem)
@@ -281,6 +415,123 @@ namespace AssetsManager.Views.Controls.Viewer
             tab.SelectedAnimationOwnerPathHash = _model.SelectedAnimation?.Clip?.OwnerPathHash;
             tab.SelectedSpellPathHash = _model.SelectedSpell?.PathHash;
             tab.AnimationParameter = _model.AnimationParameter;
+            CaptureCharacterWorkspaceState(tab);
+        }
+
+        private void CaptureCharacterWorkspaceState(VfxWorkspaceTab tab)
+        {
+            if (tab?.Kind != VfxWorkspaceTabKind.Skin) return;
+            tab.CharacterEffectsEnabled = _model.CharacterEffectsEnabled;
+            tab.CharacterArmatureVisible = _model.ShowCharacterArmature;
+            tab.CharacterJointNamesVisible = _model.ShowCharacterJointNames;
+            tab.CharacterAutoRotate = _model.CharacterAutoRotate;
+            tab.CharacterAutoRotateDegrees = _characterAutoRotateDegrees;
+            tab.CharacterControlsVisible = _model.CharacterControlsVisible;
+            tab.CharacterBackdropEnabled = _model.CharacterBackdropEnabled;
+            tab.BackdropParticlesVisible = _model.MapParticlesVisible;
+            tab.BackdropStructuresVisible = _model.MapStructuresVisible;
+            tab.CharacterBackdropKey = VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source);
+            if (_mapSceneIsCharacterBackdrop && _mapSceneRuntime != null)
+                tab.CharacterBackdropVisibilityFlags = _mapSceneRuntime.VisibilityFlags;
+            tab.CharacterPositionX = _model.CharacterPositionX;
+            tab.CharacterPositionY = _model.CharacterPositionY;
+            tab.CharacterPositionZ = _model.CharacterPositionZ;
+            tab.CharacterRotationX = _model.CharacterRotationX;
+            tab.CharacterRotationY = _model.CharacterRotationY;
+            tab.CharacterRotationZ = _model.CharacterRotationZ;
+            tab.CharacterScaleMultiplier = _model.CharacterScaleMultiplier;
+        }
+
+        private void RestoreCharacterWorkspaceState(VfxWorkspaceTab tab)
+        {
+            if (tab?.Kind != VfxWorkspaceTabKind.Skin) return;
+            _isApplyingCharacterViewportState = true;
+            try
+            {
+                _model.CharacterEffectsEnabled = tab.CharacterEffectsEnabled;
+                _model.ShowCharacterArmature = tab.CharacterArmatureVisible;
+                _model.ShowCharacterJointNames = tab.CharacterJointNamesVisible;
+                _model.CharacterAutoRotate = tab.CharacterAutoRotate;
+                _characterAutoRotateDegrees = tab.CharacterAutoRotateDegrees;
+                _model.CharacterControlsVisible = tab.CharacterControlsVisible;
+                _model.MapParticlesVisible = tab.BackdropParticlesVisible;
+                _model.MapStructuresVisible = tab.BackdropStructuresVisible;
+                _model.CharacterPositionX = tab.CharacterPositionX;
+                _model.CharacterPositionY = tab.CharacterPositionY;
+                _model.CharacterPositionZ = tab.CharacterPositionZ;
+                _model.CharacterRotationX = tab.CharacterRotationX;
+                _model.CharacterRotationY = tab.CharacterRotationY;
+                _model.CharacterRotationZ = tab.CharacterRotationZ;
+                _model.CharacterScaleMultiplier = tab.CharacterScaleMultiplier;
+                _model.SelectedCharacterBackdrop = _model.CharacterBackdrops.FirstOrDefault(option =>
+                    !string.IsNullOrWhiteSpace(tab.CharacterBackdropKey) &&
+                    string.Equals(VfxInstallationMapCatalog.BackdropKey(option.Source), tab.CharacterBackdropKey, StringComparison.OrdinalIgnoreCase));
+                _model.CharacterBackdropEnabled = tab.CharacterBackdropEnabled && _model.SelectedCharacterBackdrop != null;
+            }
+            finally
+            {
+                _isApplyingCharacterViewportState = false;
+            }
+            ApplyCharacterPlacement();
+            ApplyEffectiveCharacterSubmeshes();
+            EnsureCharacterBackdropRuntime(tab);
+        }
+
+        private bool TryAdoptLoadedMapAsCharacterBackdrop(VfxWorkspaceTab tab)
+        {
+            if (tab?.Kind != VfxWorkspaceTabKind.Skin || _mapSceneRuntime?.Scene?.Source == null)
+                return false;
+
+            string loadedKey = VfxInstallationMapCatalog.BackdropKey(_mapSceneRuntime.Scene.Source);
+            if (!VfxCharacterViewportSemantics.CanAdoptLoadedBackdrop(
+                    tab.CharacterBackdropEnabled,
+                    tab.CharacterBackdropKey,
+                    loadedKey))
+            {
+                return false;
+            }
+
+            ClearMapCharacterClipPreview();
+            _mapSceneIsCharacterBackdrop = true;
+            _mapSceneRuntime.ShowParticles = tab.BackdropParticlesVisible;
+            _mapSceneRuntime.ShowStructures = tab.BackdropStructuresVisible;
+            _model.HasMapPreview = true;
+            _model.SetMapLayers(
+                MapGeometrySemantics.Layers(_mapSceneRuntime.Scene.Geometry),
+                _mapSceneRuntime.VisibilityFlags);
+            ReplaceMapBrowserRoot(null);
+            _mapGpuSceneDirty = true;
+
+            if (tab.CharacterBackdropVisibilityFlags is int wantedFlags &&
+                wantedFlags != _mapSceneRuntime.VisibilityFlags)
+            {
+                _model.SetMapLayerFlags(wantedFlags);
+                _ = ApplyMapVisibilityFlagsAsync(wantedFlags);
+            }
+            else
+            {
+                ApplyCharacterBackdropOrigin(_mapSceneRuntime.Scene, _mapSceneRuntime.Scene.Source);
+            }
+
+            OpenTkControl?.InvalidateVisual();
+            return true;
+        }
+
+        private void EnsureCharacterBackdropRuntime(VfxWorkspaceTab tab)
+        {
+            if (tab?.Kind != VfxWorkspaceTabKind.Skin ||
+                !_model.CharacterBackdropEnabled ||
+                _model.SelectedCharacterBackdrop?.Source == null)
+            {
+                if (_mapSceneIsCharacterBackdrop)
+                    CancelMapLoadAndClearScene();
+                return;
+            }
+
+            if (TryAdoptLoadedMapAsCharacterBackdrop(tab))
+                return;
+
+            _ = LoadCharacterBackdropAsync(_model.SelectedCharacterBackdrop);
         }
 
         private void RestoreWorkspaceSelection(VfxWorkspaceTab tab, string loadedBinPath)
@@ -293,6 +544,8 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 return;
             }
+
+            RestoreCharacterWorkspaceState(tab);
 
             if (tab.SelectedSystemPathHash is uint systemHash)
             {
@@ -372,7 +625,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     case VfxWorkspaceTabKind.Skin when tab.Payload is VfxSkinItem skin:
                         _pendingWorkspaceRestoreTab = tab;
-                        if (_mapSceneRuntime != null)
+                        bool adoptedBackdrop = _mapSceneRuntime != null && TryAdoptLoadedMapAsCharacterBackdrop(tab);
+                        if (!adoptedBackdrop)
                             CancelMapLoadAndClearScene();
                         _model.SelectedMapNode = null;
                         if (!ReferenceEquals(_model.SelectedSkin, skin))
@@ -488,9 +742,14 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (_model.SelectedSkin != null && !_isSwitchingWorkspaceTab)
                 {
-                    if (_mapSceneRuntime != null)
+                    CharacterBackdropSeed inheritedBackdrop = CaptureActiveBackdropSeed();
+                    VfxWorkspaceTab skinTab = EnsureSkinWorkspaceTab(
+                        _model.SelectedSkin,
+                        inheritedBackdrop: inheritedBackdrop);
+                    _pendingWorkspaceRestoreTab = skinTab;
+                    bool adoptedBackdrop = _mapSceneRuntime != null && TryAdoptLoadedMapAsCharacterBackdrop(skinTab);
+                    if (!adoptedBackdrop)
                         CancelMapLoadAndClearScene();
-                    _pendingWorkspaceRestoreTab = EnsureSkinWorkspaceTab(_model.SelectedSkin);
                 }
                 BindBrowserSkin();
             }
@@ -522,13 +781,9 @@ namespace AssetsManager.Views.Controls.Viewer
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedMapVariant) &&
                      !_suppressMapVariantReload &&
                      _mapSceneRuntime != null &&
-                     _model.SelectedMapVariant != null &&
-                     !string.IsNullOrWhiteSpace(_model.RootPath))
+                     _model.SelectedMapVariant != null)
             {
-                _ = LoadDetectedMapAsync(new MapSceneSource(
-                    _model.SelectedMapVariant.Map,
-                    SelectedMapFileFor(_model.SelectedMapVariant.Map, _model.RootPath),
-                    _model.RootPath));
+                ReloadSelectedMapVariant();
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.AnimationParameter) &&
                      !_isUpdatingAnimationParameter &&
@@ -544,21 +799,444 @@ namespace AssetsManager.Views.Controls.Viewer
                     RebuildAnimationsForParameter(_model.AnimationParameter.Value);
                 }
             }
+            else if (e.PropertyName == nameof(VfxInspectorModel.CharacterBackdropEnabled) ||
+                     e.PropertyName == nameof(VfxInspectorModel.SelectedCharacterBackdrop))
+            {
+                if (!_isApplyingCharacterViewportState)
+                    RefreshCharacterBackdrop();
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.MapStructuresVisible) ||
+                     e.PropertyName == nameof(VfxInspectorModel.MapParticlesVisible))
+            {
+                if (_mapSceneRuntime != null)
+                {
+                    _mapSceneRuntime.ShowStructures = _model.MapStructuresVisible;
+                    _mapSceneRuntime.ShowParticles = _model.MapParticlesVisible;
+                    if (_mapSceneIsCharacterBackdrop && _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
+                    {
+                        _model.SelectedWorkspaceTab.BackdropStructuresVisible = _model.MapStructuresVisible;
+                        _model.SelectedWorkspaceTab.BackdropParticlesVisible = _model.MapParticlesVisible;
+                    }
+                    OpenTkControl?.InvalidateVisual();
+                }
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.CharacterPositionX) ||
+                     e.PropertyName == nameof(VfxInspectorModel.CharacterPositionY) ||
+                     e.PropertyName == nameof(VfxInspectorModel.CharacterPositionZ) ||
+                     e.PropertyName == nameof(VfxInspectorModel.CharacterRotationX) ||
+                     e.PropertyName == nameof(VfxInspectorModel.CharacterRotationY) ||
+                     e.PropertyName == nameof(VfxInspectorModel.CharacterRotationZ) ||
+                     e.PropertyName == nameof(VfxInspectorModel.CharacterScaleMultiplier))
+            {
+                if (!_isApplyingCharacterViewportState)
+                {
+                    if (_model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
+                    {
+                        _model.SelectedWorkspaceTab.CharacterPlacementCustomized = true;
+                        _model.SelectedWorkspaceTab.CharacterPlacedOnKey = _model.HasActiveCharacterBackdrop
+                            ? VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source)
+                            : null;
+                    }
+                    ApplyCharacterPlacement();
+                }
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.CharacterEffectsEnabled) ||
+                     e.PropertyName == nameof(VfxInspectorModel.ShowCharacterArmature) ||
+                     e.PropertyName == nameof(VfxInspectorModel.ShowCharacterJointNames) ||
+                     e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate) ||
+                     e.PropertyName == nameof(VfxInspectorModel.CharacterControlsVisible))
+            {
+                if (e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate))
+                    ApplyCharacterPlacement();
+                OpenTkControl?.InvalidateVisual();
+            }
             else if (e.PropertyName == nameof(VfxInspectorModel.PreviewCameraPreset))
             {
                 if (!_suppressCameraPresetFit)
                     ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
                 SavePreviewDisplayPreferences();
             }
-            else if (e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGrid) ||
+            else if (e.PropertyName == nameof(VfxInspectorModel.ShowPreviewSky) ||
+                     e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGrid) ||
                      e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGround) ||
                      e.PropertyName == nameof(VfxInspectorModel.ShowPreviewStage) ||
                      e.PropertyName == nameof(VfxInspectorModel.PreviewViewMode) ||
                      e.PropertyName == nameof(VfxInspectorModel.PreviewWireOverlay) ||
                      e.PropertyName == nameof(VfxInspectorModel.PreviewShaders))
             {
+                OpenTkControl?.InvalidateVisual();
                 SavePreviewDisplayPreferences();
             }
+        }
+
+        private void SyncSelectedMapVariant(MapSceneSource source)
+        {
+            if (source?.Map == null || _model.MapVariants.Count == 0)
+                return;
+
+            MapVariantData variant = _model.MapVariants.FirstOrDefault(candidate =>
+                candidate?.Map?.Equals(source.Map) == true ||
+                string.Equals(candidate?.Map?.Value, source.Map.Value, StringComparison.OrdinalIgnoreCase));
+            if (variant == null || ReferenceEquals(_model.SelectedMapVariant, variant))
+                return;
+
+            _suppressMapVariantReload = true;
+            try
+            {
+                _model.SelectedMapVariant = variant;
+            }
+            finally
+            {
+                _suppressMapVariantReload = false;
+            }
+        }
+
+        private void ReloadSelectedMapVariant()
+        {
+            MapSceneSource source = ResolveMapVariantSource(_model.SelectedMapVariant);
+            if (source == null)
+                return;
+
+            bool asCharacterBackdrop = _mapSceneIsCharacterBackdrop && _model.IsSkinWorkspace;
+            if (asCharacterBackdrop && _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
+            {
+                VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+                string key = VfxInstallationMapCatalog.BackdropKey(source);
+                VfxCharacterBackdropOption option = _model.CharacterBackdrops.FirstOrDefault(candidate =>
+                    string.Equals(
+                        VfxInstallationMapCatalog.BackdropKey(candidate?.Source),
+                        key,
+                        StringComparison.OrdinalIgnoreCase));
+                if (option == null)
+                {
+                    option = new VfxCharacterBackdropOption(
+                        VfxInstallationMapCatalog.Label(
+                            source,
+                            projectSource: !string.IsNullOrWhiteSpace(source.SelectedMapFilePath)),
+                        source);
+                    _model.CharacterBackdrops.Add(option);
+                }
+
+                tab.CharacterBackdropEnabled = true;
+                tab.CharacterBackdropKey = key;
+                tab.CharacterBackdropVisibilityFlags = null;
+                _isApplyingCharacterViewportState = true;
+                try
+                {
+                    _model.SelectedCharacterBackdrop = option;
+                    _model.CharacterBackdropEnabled = true;
+                }
+                finally
+                {
+                    _isApplyingCharacterViewportState = false;
+                }
+            }
+            else if (_model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Map)
+            {
+                RetargetMapWorkspaceTab(_model.SelectedWorkspaceTab, source);
+            }
+
+            _ = LoadDetectedMapAsync(source, asCharacterBackdrop);
+        }
+
+        private void RefreshCharacterBackdrop()
+        {
+            if (!_model.IsSkinWorkspace || !_model.CharacterBackdropEnabled)
+            {
+                if (_mapSceneIsCharacterBackdrop)
+                    CancelMapLoadAndClearScene();
+                return;
+            }
+
+            if (_model.SelectedCharacterBackdrop == null && _model.CharacterBackdrops.Count > 0)
+            {
+                _model.SelectedCharacterBackdrop = _model.CharacterBackdrops[0];
+                return;
+            }
+
+            if (_model.SelectedCharacterBackdrop != null)
+                _ = LoadCharacterBackdropAsync(_model.SelectedCharacterBackdrop);
+        }
+
+        private Task LoadCharacterBackdropAsync(VfxCharacterBackdropOption option)
+        {
+            if (option?.Source == null || !_model.IsSkinWorkspace)
+                return Task.CompletedTask;
+
+            int? visibilityFlags = null;
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            if (tab?.Kind == VfxWorkspaceTabKind.Skin &&
+                string.Equals(
+                    tab.CharacterBackdropKey,
+                    VfxInstallationMapCatalog.BackdropKey(option.Source),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                visibilityFlags = tab.CharacterBackdropVisibilityFlags;
+            }
+
+            return LoadDetectedMapAsync(
+                option.Source,
+                asCharacterBackdrop: true,
+                initialVisibilityFlags: visibilityFlags);
+        }
+
+        private void ApplyCharacterBackdropOrigin(MapSceneData scene, MapSceneSource source)
+        {
+            if (!_model.IsSkinWorkspace || scene?.Geometry == null ||
+                _model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin)
+            {
+                return;
+            }
+
+            int visibilityFlags = _mapSceneRuntime?.VisibilityFlags ?? scene.OpeningVisibilityFlags;
+            Vector3? calculatedOrigin = MapGeometrySemantics.CalculateOriginForFlags(scene.Geometry, visibilityFlags);
+            if (calculatedOrigin is not Vector3 origin)
+                return;
+
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            string sourceKey = VfxInstallationMapCatalog.BackdropKey(source);
+            bool hasPinnedPlacement = tab.CharacterPlacementCustomized &&
+                string.Equals(tab.CharacterPlacedOnKey, sourceKey, StringComparison.OrdinalIgnoreCase);
+            if (hasPinnedPlacement) return;
+
+            _isApplyingCharacterViewportState = true;
+            try
+            {
+                // MAP geometry is mirrored on X by the renderer. Convert the authored engine origin to
+                // the same preview-space point before standing the independently rendered Character on it.
+                _model.CharacterPositionX = -origin.X;
+                _model.CharacterPositionY = origin.Y;
+                _model.CharacterPositionZ = origin.Z;
+                _model.CharacterRotationX = 0d;
+                _model.CharacterRotationY = 0d;
+                _model.CharacterRotationZ = 0d;
+                tab.CharacterPositionX = _model.CharacterPositionX;
+                tab.CharacterPositionY = _model.CharacterPositionY;
+                tab.CharacterPositionZ = _model.CharacterPositionZ;
+                tab.CharacterRotationX = 0d;
+                tab.CharacterRotationY = 0d;
+                tab.CharacterRotationZ = 0d;
+                tab.CharacterPlacementCustomized = false;
+                tab.CharacterPlacedOnKey = sourceKey;
+            }
+            finally
+            {
+                _isApplyingCharacterViewportState = false;
+            }
+            ApplyCharacterPlacement();
+        }
+
+        private void ApplyCharacterPlacement()
+        {
+            if (_championModel == null || !_model.IsSkinWorkspace) return;
+
+            double autoYaw = _model.CharacterAutoRotate ? _characterAutoRotateDegrees : 0d;
+            _championModel.PositionX = _model.CharacterPositionX;
+            _championModel.PositionY = _model.CharacterPositionY;
+            _championModel.PositionZ = _model.CharacterPositionZ;
+            _championModel.RotationX = _model.CharacterRotationX;
+            _championModel.RotationY = _model.CharacterRotationY + autoYaw;
+            _championModel.RotationZ = _model.CharacterRotationZ;
+            _championModel.Scale = _championAuthoredScale * _model.CharacterScaleMultiplier;
+
+            // The owner scene already applies authored skinScale to bones/attachment offsets. Only the
+            // user placement multiplier belongs in the outer VFX transform, otherwise scale is doubled.
+            if (_model.SelectedSystem == null)
+            {
+                float pitch = (float)(_model.CharacterRotationX * Math.PI / 180d);
+                float yaw = (float)((_model.CharacterRotationY + autoYaw) * Math.PI / 180d);
+                float roll = (float)(_model.CharacterRotationZ * Math.PI / 180d);
+                float scale = (float)_model.CharacterScaleMultiplier;
+                Matrix4x4 placement = Matrix4x4.CreateScale(scale) *
+                                      Matrix4x4.CreateFromYawPitchRoll(yaw, pitch, roll) *
+                                      Matrix4x4.CreateTranslation(
+                                          (float)_model.CharacterPositionX,
+                                          (float)_model.CharacterPositionY,
+                                          (float)_model.CharacterPositionZ);
+                _vfxRenderer?.SetWorldTransform(placement);
+            }
+            OpenTkControl?.InvalidateVisual();
+        }
+
+        private void AdvanceCharacterAutoRotate(float deltaSeconds)
+        {
+            if (!_model.IsSkinWorkspace || !_model.CharacterAutoRotate || _championModel == null || deltaSeconds <= 0f)
+                return;
+
+            // Match the normal Viewer: one calm 30-degree/second orbit. This is a transient layer over
+            // the user's authored placement, so disabling Auto Rotate restores the exact manual yaw.
+            _characterAutoRotateDegrees = VfxCharacterViewportSemantics.AdvanceAutoRotation(
+                _characterAutoRotateDegrees,
+                deltaSeconds);
+            ApplyCharacterPlacement();
+        }
+
+        private void ClearCharacterArmatureOverlay()
+        {
+            _characterArmatureLines.Clear();
+            _characterJointLabels.Clear();
+            CharacterArmatureCanvas?.Children.Clear();
+        }
+
+        private void UpdateCharacterArmatureOverlay(Matrix4x4 viewProjection)
+        {
+            if (CharacterArmatureCanvas == null ||
+                !_model.IsSkinWorkspace ||
+                !_model.CharacterControlsVisible ||
+                !_model.ShowCharacterArmature ||
+                _championModel?.Skeleton?.Joints == null ||
+                _championModel.Skeleton.Joints.Count == 0)
+            {
+                if (CharacterArmatureCanvas != null)
+                    CharacterArmatureCanvas.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var skeleton = _championModel.Skeleton;
+            IReadOnlyList<Matrix4x4> pose =
+                _championModel.CurrentAnimation != null &&
+                _championAnimationService?.WorldBoneTransforms?.Count == skeleton.Joints.Count
+                    ? _championAnimationService.WorldBoneTransforms
+                    : EnsureChampionBindWorldTransforms(skeleton);
+            if (pose == null || pose.Count != skeleton.Joints.Count)
+            {
+                CharacterArmatureCanvas.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            CharacterArmatureCanvas.Visibility = Visibility.Visible;
+            Matrix4x4 modelWorld = GlMeshRenderer.CreateWorldMatrix(_championModel, mirrorCharacterX: true);
+            double width = Math.Max(1d, OpenTkControl.ActualWidth);
+            double height = Math.Max(1d, OpenTkControl.ActualHeight);
+            int lineIndex = 0;
+            int labelIndex = 0;
+
+            for (int index = 0; index < skeleton.Joints.Count; index++)
+            {
+                Matrix4x4 bone = pose[index];
+                Vector3 world = Vector3.Transform(new Vector3(bone.M41, bone.M42, bone.M43), modelWorld);
+                bool childVisible = TryProjectToViewport(world, viewProjection, width, height, out Point child);
+
+                int parentIndex = (int)skeleton.Joints[index].ParentId;
+                if (parentIndex >= 0 && parentIndex < skeleton.Joints.Count)
+                {
+                    Matrix4x4 parentBone = pose[parentIndex];
+                    Vector3 parentWorld = Vector3.Transform(
+                        new Vector3(parentBone.M41, parentBone.M42, parentBone.M43),
+                        modelWorld);
+                    bool parentVisible = TryProjectToViewport(parentWorld, viewProjection, width, height, out Point parent);
+                    System.Windows.Shapes.Line line = EnsureCharacterArmatureLine(lineIndex++);
+                    if (childVisible && parentVisible)
+                    {
+                        line.X1 = parent.X;
+                        line.Y1 = parent.Y;
+                        line.X2 = child.X;
+                        line.Y2 = child.Y;
+                        line.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        line.Visibility = Visibility.Collapsed;
+                    }
+                }
+
+                if (_model.ShowCharacterJointNames)
+                {
+                    TextBlock label = EnsureCharacterJointLabel(labelIndex++);
+                    if (childVisible)
+                    {
+                        label.Text = skeleton.Joints[index].Name ?? $"joint {index}";
+                        Canvas.SetLeft(label, child.X + 4d);
+                        Canvas.SetTop(label, child.Y - 8d);
+                        label.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        label.Visibility = Visibility.Collapsed;
+                    }
+                }
+            }
+
+            for (int index = lineIndex; index < _characterArmatureLines.Count; index++)
+                _characterArmatureLines[index].Visibility = Visibility.Collapsed;
+            for (int index = labelIndex; index < _characterJointLabels.Count; index++)
+                _characterJointLabels[index].Visibility = Visibility.Collapsed;
+        }
+
+        private IReadOnlyList<Matrix4x4> EnsureChampionBindWorldTransforms(LeagueToolkit.Core.Animation.RigResource skeleton)
+        {
+            if (!ReferenceEquals(_championBindSkeleton, skeleton) ||
+                _championBindWorldTransforms.Length != skeleton.Joints.Count)
+            {
+                _championBindSkeleton = skeleton;
+                _championBindBoneTransformProvider = AnimationService.CreateBindBoneTransformProvider(skeleton);
+                _championBindSkinningMatrices = AnimationService.CreateBindSkinningMatrices(skeleton);
+                _championBindWorldTransforms = AnimationService.CreateBindWorldTransforms(skeleton);
+            }
+            return _championBindWorldTransforms;
+        }
+
+        private System.Windows.Shapes.Line EnsureCharacterArmatureLine(int index)
+        {
+            while (_characterArmatureLines.Count <= index)
+            {
+                var line = new System.Windows.Shapes.Line
+                {
+                    Stroke = new SolidColorBrush(Color.FromRgb(56, 189, 248)),
+                    StrokeThickness = 1.25,
+                    Opacity = 0.9,
+                    SnapsToDevicePixels = true
+                };
+                _characterArmatureLines.Add(line);
+                CharacterArmatureCanvas.Children.Add(line);
+            }
+            return _characterArmatureLines[index];
+        }
+
+        private TextBlock EnsureCharacterJointLabel(int index)
+        {
+            while (_characterJointLabels.Count <= index)
+            {
+                var label = new TextBlock
+                {
+                    FontSize = 8.5,
+                    FontFamily = new FontFamily("Consolas"),
+                    Foreground = new SolidColorBrush(Color.FromRgb(224, 242, 254)),
+                    Background = new SolidColorBrush(Color.FromArgb(160, 12, 16, 24)),
+                    Padding = new Thickness(2, 0, 2, 0),
+                    IsHitTestVisible = false
+                };
+                _characterJointLabels.Add(label);
+                CharacterArmatureCanvas.Children.Add(label);
+            }
+            return _characterJointLabels[index];
+        }
+
+        private static bool TryProjectToViewport(
+            Vector3 world,
+            Matrix4x4 viewProjection,
+            double width,
+            double height,
+            out Point point)
+        {
+            Vector4 clip = Vector4.Transform(new Vector4(world, 1f), viewProjection);
+            if (!float.IsFinite(clip.X) || !float.IsFinite(clip.Y) || !float.IsFinite(clip.W) ||
+                clip.W <= 1e-5f)
+            {
+                point = default;
+                return false;
+            }
+
+            float x = clip.X / clip.W;
+            float y = clip.Y / clip.W;
+            if (x < -1.15f || x > 1.15f || y < -1.15f || y > 1.15f)
+            {
+                point = default;
+                return false;
+            }
+
+            point = new Point((x * 0.5d + 0.5d) * width, (1d - (y * 0.5d + 0.5d)) * height);
+            return true;
         }
 
         private void OnControlLoaded(object sender, RoutedEventArgs e)
@@ -580,6 +1258,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _isLoadingPreviewPreferences = true;
             try
             {
+                _model.ShowPreviewSky = viewerSettings.SkyVisible;
                 _model.ShowPreviewGrid = viewerSettings.GridVisible;
                 _model.ShowPreviewGround = viewerSettings.GroundVisible;
                 _model.ShowPreviewStage = vfxSettings.StageVisible;
@@ -604,6 +1283,7 @@ namespace AssetsManager.Views.Controls.Viewer
             AppSettings.StudioParameters ??= new StudioParametersSettings();
             AppSettings.VfxStudio ??= new VfxStudioSettings();
 
+            AppSettings.StudioParameters.SkyVisible = _model.ShowPreviewSky;
             AppSettings.StudioParameters.GridVisible = _model.ShowPreviewGrid;
             AppSettings.StudioParameters.GroundVisible = _model.ShowPreviewGround;
             AppSettings.VfxStudio.ViewMode = _model.PreviewViewMode.ToString();
@@ -767,6 +1447,13 @@ namespace AssetsManager.Views.Controls.Viewer
             var mapPostEffectsRenderer = _mapPostEffectsRenderer;
             _mapPostEffectsRenderer = null;
             RunReleaseStep(nameof(MapPostEffectsRenderer), () => mapPostEffectsRenderer?.Dispose(), gpuBound: true);
+
+            var skyRenderer = _skyRenderer;
+            _skyRenderer = null;
+            RunReleaseStep(nameof(SkyRenderer), () => skyRenderer?.Dispose(), gpuBound: true);
+            _genericSkyCube = null;
+            _mapSkyCube = null;
+            _skyCubeDirty = false;
 
             var mapSceneRuntime = _mapSceneRuntime;
             _mapSceneRuntime = null;
@@ -938,6 +1625,13 @@ namespace AssetsManager.Views.Controls.Viewer
                     _mapGeometryRenderer = new MapGeometryRenderer(AppSettings);
                     _mapGeometryRenderer.Initialize(_gl);
                 }
+                if (_skyRenderer == null)
+                {
+                    _skyRenderer = new SkyRenderer();
+                    _skyRenderer.Initialize(_gl);
+                    _genericSkyCube ??= SkyCubeMapFactory.LoadGeneric(LogService);
+                    _skyCubeDirty = true;
+                }
                 if (_mapCharacterRenderer == null)
                 {
                     _mapCharacterRenderer = new MapCharacterRenderer(AppSettings);
@@ -999,6 +1693,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             float dt = ResolveSimulationFrameDelta(delta, _discardNextSimulationDelta);
             _discardNextSimulationDelta = false;
+            AdvanceCharacterAutoRotate(dt);
 
             // Update background clear color matching main viewer (Dark Studio)
             switch (_model.BgMode)
@@ -1059,11 +1754,24 @@ namespace AssetsManager.Views.Controls.Viewer
             // preparation are safe even when WPF selected the system before the GL control was ready.
             TryInspectPendingSystem();
             _vfxRenderer?.ProcessPendingGpuState();
+            ApplyPendingSkyGpuState();
             ApplyPendingMapGpuState();
             _mapGeometryRenderer?.ProcessRetainedResources();
 
-            // A detected map container owns the world backdrop. VFX helper surfaces are only a
-            // standalone-effect aid and must not be layered over authored MAP geometry.
+            bool characterBackdrop = _mapSceneIsCharacterBackdrop && _model.IsSkinWorkspace;
+            if (characterBackdrop)
+            {
+                AdvanceCurrentVfxPlayback(dt);
+                UpdateChampionPoseForFrame();
+            }
+
+            // Sky is one Studio display element. MAP scenes supply their authored cubemap when available;
+            // otherwise the same renderer falls back to the generic AssetsManager environment.
+            if (_model.ShowPreviewSky)
+                _skyRenderer?.Render(view, proj);
+
+            // A MAP scene owns the world backdrop. In Character-backdrop mode the selected Skin remains
+            // the subject and is composited into the same depth/particle/post-processing frame.
             if (_mapSceneRuntime != null)
             {
                 AdvanceMapCharacterClip(dt);
@@ -1092,6 +1800,11 @@ namespace AssetsManager.Views.Controls.Viewer
                         wireOverlay: _model.EffectivePreviewWireOverlay,
                         shadersEnabled: _model.PreviewShaders);
                 }
+                if (characterBackdrop)
+                {
+                    RenderChampionMesh(viewProj, view, proj, eye);
+                    UpdateCharacterArmatureOverlay(viewProj);
+                }
                 uint mapViewportWidth = (uint)Math.Max(1d, OpenTkControl.ActualWidth);
                 uint mapViewportHeight = (uint)Math.Max(1d, OpenTkControl.ActualHeight);
                 _mapPostEffectsRenderer?.CaptureSceneDepth(
@@ -1115,11 +1828,13 @@ namespace AssetsManager.Views.Controls.Viewer
                         _model.PreviewViewMode,
                         _model.EffectivePreviewWireOverlay) == true;
 
-                bool mapClipVfxPrepared = false;
-                if (HasSelectedMapClipReady() && _vfxRenderer != null)
+                bool sceneVfxPrepared = false;
+                bool shouldDrawSceneVfx = HasSelectedMapClipReady() ||
+                    (characterBackdrop && ShouldRenderCharacterVfx());
+                if (shouldDrawSceneVfx && _vfxRenderer?.ActiveSystem != null)
                 {
                     _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
-                    mapClipVfxPrepared = _vfxRenderer.PrepareRenderFrame(
+                    sceneVfxPrepared = _vfxRenderer.PrepareRenderFrame(
                         viewProj,
                         view,
                         _model.PreviewViewMode,
@@ -1129,24 +1844,24 @@ namespace AssetsManager.Views.Controls.Viewer
                 using IDisposable mapParticleBatch = mapParticlesPrepared
                     ? _mapParticleRenderer.BeginPreparedRenderBatch()
                     : null;
-                using IDisposable mapClipVfxBatch = mapClipVfxPrepared
+                using IDisposable sceneVfxBatch = sceneVfxPrepared
                     ? _vfxRenderer.BeginPreparedRenderBatch()
                     : null;
 
                 if (mapParticlesPrepared)
                     _mapParticleRenderer.RenderPreparedColorPass();
-                if (mapClipVfxPrepared)
+                if (sceneVfxPrepared)
                     _vfxRenderer.RenderPreparedColorPass();
 
                 // Both captures see the exact same completed colour frame, before any warp draw.
                 if (mapParticlesPrepared)
                     _mapParticleRenderer.CapturePreparedDistortionFrame();
-                if (mapClipVfxPrepared)
+                if (sceneVfxPrepared)
                     _vfxRenderer.CapturePreparedDistortionFrame();
 
                 if (mapParticlesPrepared)
                     _mapParticleRenderer.RenderPreparedDistortionPass();
-                if (mapClipVfxPrepared)
+                if (sceneVfxPrepared)
                     _vfxRenderer.RenderPreparedDistortionPass();
             }
             else
@@ -1156,88 +1871,17 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.ShowPreviewGround,
                     _model.ShowPreviewStage);
 
-            // MAP character clips own the same VFX session clock themselves so their pose, cues
-            // and ParticleEventData stay on one timeline. Other previews keep the generic session clock.
-            if (!HasSelectedMapClipReady() &&
-                _model.IsPlaying && !_isUserSeeking && _vfxRenderer?.ActiveSystem != null)
+            if (!characterBackdrop)
             {
-                _vfxRenderer.ActiveSystem.Speed = _model.Speed;
-                _vfxRenderer.Update(dt);
-                _model.CurrentTime = _vfxRenderer.PlaybackTime;
-                if (ShouldRestartPreview(_model.IsPreviewLoopEnabled, _model.CurrentTime, _model.ActiveLoopDuration))
-                {
-                    double loopStart = ResolvePreviewLoopRestart(
-                        _model.ActiveLoopStart,
-                        _model.ActiveLoopDuration,
-                        _model.TotalDuration);
-                    _vfxRenderer.Seek(loopStart);
-                    _vfxRenderer.Play();
-                    _model.CurrentTime = loopStart;
-                }
-                else if (_model.CurrentTime >= _model.TotalDuration) _model.IsPlaying = false;
-            }
-            if (_activeMapCharacterClip == null &&
-                _championModel != null && _championAnimationService != null)
-            {
-                ApplyAnimationClipCues(_model.CurrentTime);
-                if (_championModel.CurrentAnimation != null && _championModel.Skeleton != null)
-                {
-                    float animationTime = _activeSpellPlan?.Animation != null
-                        ? SpellAnimationTime(_model.CurrentTime, _activeSpellPlan.Animation.Duration)
-                        : (float)_model.CurrentTime;
-                    _championAnimationService.Update(
-                        animationTime,
-                        _championModel.CurrentAnimation,
-                        _championModel.Skeleton,
-                        _championModel.SkinnedMesh,
-                        _championModel.Parts,
-                        _championModel.Name);
-                    _championModel.SkinningMatrices = _championAnimationService.FinalBoneTransforms;
-                    _championModel.GpuSkinningData = _championAnimationService.SkinningData;
-                    _vfxRenderer?.SetOwnerSkinningMatrices(_championAnimationService.FinalBoneTransforms);
-                    _vfxRenderer?.UpdateBoneTransforms((boneName, boneHash) =>
-                    {
-                        if (!string.IsNullOrEmpty(boneName) && _championAnimationService.TryGetBoneTransformExactName(boneName, out var m))
-                            return m;
-                        if (boneHash != 0 && _championAnimationService.TryGetBoneTransformFnv(boneHash, out m))
-                            return m;
-                        return null;
-                    });
-                }
-                else if (_model.SelectedSystem == null)
-                {
-                    // No standalone System owns this frame. Clear any pose left by an Animation
-                    // Clip; standalone Systems install their cached bind pose when selected.
-                    _vfxRenderer?.SetOwnerSkinningMatrices(null);
-                    _vfxRenderer?.UpdateBoneTransforms(null);
-                }
-            }
-
-            // Render Champion Mesh under VFX if available and enabled.
-            if (_activeMapCharacterClip == null &&
-                _model.ShowChampionMesh && _championModel != null && _championMeshRenderer != null)
-            {
-                var lighting = GlMeshRenderer.ReferenceCharacterLighting();
-                _championMeshRenderer.Render(
-                    _championModel,
-                    viewProj,
-                    view,
-                    proj,
-                    eye,
-                    lighting.LightDirection,
-                    lighting.LightColor,
-                    lighting.FillDirection,
-                    lighting.FillColor,
-                    lighting.AmbientColor,
-                    _model.PreviewViewMode,
-                    _model.EffectivePreviewWireOverlay,
-                    _model.PreviewShaders,
-                    mirrorCharacterX: true);
+                AdvanceCurrentVfxPlayback(dt);
+                UpdateChampionPoseForFrame();
+                RenderChampionMesh(viewProj, view, proj, eye);
+                UpdateCharacterArmatureOverlay(viewProj);
             }
 
             if (_vfxRenderer != null)
             {
-                if (_mapSceneRuntime == null)
+                if (_mapSceneRuntime == null && ShouldRenderCharacterVfx())
                 {
                     _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
                     _vfxRenderer.Render(viewProj, view, _model.PreviewViewMode, _model.EffectivePreviewWireOverlay);
@@ -1268,6 +1912,118 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             Dispatcher.InvokeAsync(UpdatePlayheadPosition);
+        }
+
+        private void AdvanceCurrentVfxPlayback(float dt)
+        {
+            // MAP character clips own the same VFX session clock themselves so their pose, cues
+            // and ParticleEventData stay on one timeline. Other previews keep the generic session clock.
+            if (HasSelectedMapClipReady() ||
+                !_model.IsPlaying || _isUserSeeking || _vfxRenderer?.ActiveSystem == null)
+            {
+                return;
+            }
+
+            _vfxRenderer.ActiveSystem.Speed = _model.Speed;
+            _vfxRenderer.Update(dt);
+            _model.CurrentTime = _vfxRenderer.PlaybackTime;
+            if (ShouldRestartPreview(_model.IsPreviewLoopEnabled, _model.CurrentTime, _model.ActiveLoopDuration))
+            {
+                double loopStart = ResolvePreviewLoopRestart(
+                    _model.ActiveLoopStart,
+                    _model.ActiveLoopDuration,
+                    _model.TotalDuration);
+                _vfxRenderer.Seek(loopStart);
+                _vfxRenderer.Play();
+                _model.CurrentTime = loopStart;
+            }
+            else if (_model.CurrentTime >= _model.TotalDuration)
+            {
+                _model.IsPlaying = false;
+            }
+        }
+
+        private void UpdateChampionPoseForFrame()
+        {
+            if (_activeMapCharacterClip != null ||
+                _championModel == null || _championAnimationService == null)
+            {
+                return;
+            }
+
+            ApplyAnimationClipCues(_model.CurrentTime);
+            if (_championModel.CurrentAnimation != null && _championModel.Skeleton != null)
+            {
+                float animationTime = _activeSpellPlan?.Animation != null
+                    ? SpellAnimationTime(_model.CurrentTime, _activeSpellPlan.Animation.Duration)
+                    : (float)_model.CurrentTime;
+                _championAnimationService.Update(
+                    animationTime,
+                    _championModel.CurrentAnimation,
+                    _championModel.Skeleton,
+                    _championModel.SkinnedMesh,
+                    _championModel.Parts,
+                    _championModel.Name);
+                _championModel.SkinningMatrices = _championAnimationService.FinalBoneTransforms;
+                _championModel.GpuSkinningData = _championAnimationService.SkinningData;
+                _vfxRenderer?.SetOwnerSkinningMatrices(_championAnimationService.FinalBoneTransforms);
+                _vfxRenderer?.UpdateBoneTransforms((boneName, boneHash) =>
+                {
+                    if (!string.IsNullOrEmpty(boneName) &&
+                        _championAnimationService.TryGetBoneTransformExactName(boneName, out Matrix4x4 transform))
+                    {
+                        return transform;
+                    }
+                    if (boneHash != 0 && _championAnimationService.TryGetBoneTransformFnv(boneHash, out transform))
+                        return transform;
+                    return null;
+                });
+            }
+            else if (_model.SelectedSystem == null)
+            {
+                _vfxRenderer?.SetOwnerSkinningMatrices(null);
+                _vfxRenderer?.UpdateBoneTransforms(null);
+            }
+        }
+
+        private void RenderChampionMesh(
+            Matrix4x4 viewProjection,
+            Matrix4x4 view,
+            Matrix4x4 projection,
+            Vector3 eye)
+        {
+            if (_activeMapCharacterClip != null ||
+                !_model.ShowChampionMesh ||
+                _championModel == null ||
+                _championMeshRenderer == null)
+            {
+                return;
+            }
+
+            var lighting = GlMeshRenderer.ReferenceCharacterLighting();
+            _championMeshRenderer.Render(
+                _championModel,
+                viewProjection,
+                view,
+                projection,
+                eye,
+                lighting.LightDirection,
+                lighting.LightColor,
+                lighting.FillDirection,
+                lighting.FillColor,
+                lighting.AmbientColor,
+                _model.PreviewViewMode,
+                _model.EffectivePreviewWireOverlay,
+                _model.PreviewShaders,
+                mirrorCharacterX: true);
+        }
+
+        private bool ShouldRenderCharacterVfx()
+        {
+            if (!_model.IsSkinWorkspace) return true;
+            // Explicit System inspection remains visible. The Character Effects switch owns the
+            // Skin-driven Clip/Spell/idle effects rather than muting an explicitly opened System.
+            return _model.SelectedSystem != null || _model.CharacterEffectsEnabled;
         }
 
         #endregion
@@ -1378,6 +2134,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private VfxDefinitionBounds CurrentPreviewBounds()
         {
+            if (_model.IsSkinWorkspace && _championModel != null)
+            {
+                VfxDefinitionBounds character = CharacterPreviewBounds();
+                if (IsFiniteBounds(character)) return character;
+            }
+
             if (_model.IsRawSystemsMode && _model.SelectedSystem?.Definition is { } definition)
             {
                 VfxRigSettings settings = _vfxRenderer?.RigSettings ??
@@ -1386,6 +2148,40 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             return DefaultPreviewBounds();
+        }
+
+        private static bool IsFiniteBounds(VfxDefinitionBounds bounds)
+        {
+            static bool Finite(Vector3 value) =>
+                float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+            return Finite(bounds.Min) && Finite(bounds.Max) &&
+                   bounds.Max.X >= bounds.Min.X &&
+                   bounds.Max.Y >= bounds.Min.Y &&
+                   bounds.Max.Z >= bounds.Min.Z &&
+                   (bounds.Max - bounds.Min).LengthSquared() > 1e-8f;
+        }
+
+        private VfxDefinitionBounds CharacterPreviewBounds()
+        {
+            if (_championModel == null) return default;
+            Rect3D local = ViewerInteractionService.GetLocalBounds(_championModel);
+            if (local.IsEmpty) return default;
+
+            Matrix4x4 world = GlMeshRenderer.CreateWorldMatrix(_championModel, mirrorCharacterX: true);
+            Vector3 min = new(float.PositiveInfinity);
+            Vector3 max = new(float.NegativeInfinity);
+            double[] xs = { local.X, local.X + local.SizeX };
+            double[] ys = { local.Y, local.Y + local.SizeY };
+            double[] zs = { local.Z, local.Z + local.SizeZ };
+            foreach (double x in xs)
+            foreach (double y in ys)
+            foreach (double z in zs)
+            {
+                Vector3 point = Vector3.Transform(new Vector3((float)x, (float)y, (float)z), world);
+                min = Vector3.Min(min, point);
+                max = Vector3.Max(max, point);
+            }
+            return new VfxDefinitionBounds(min, max);
         }
 
         private Vector3 CurrentPreviewGround()
@@ -1638,6 +2434,96 @@ namespace AssetsManager.Views.Controls.Viewer
             static byte Channel(float channel) =>
                 (byte)Math.Round(Math.Clamp(channel, 0f, 1f) * 255f, MidpointRounding.AwayFromZero);
             return $"#{Channel(value.X):X2}{Channel(value.Y):X2}{Channel(value.Z):X2}";
+        }
+
+        private void CharacterBackdrop_Click(object sender, RoutedEventArgs e)
+        {
+            if (CharacterBackdropPopup != null)
+                CharacterBackdropPopup.IsOpen = !CharacterBackdropPopup.IsOpen;
+            e.Handled = true;
+        }
+
+        private void CharacterPlacement_Click(object sender, RoutedEventArgs e)
+        {
+            if (CharacterPlacementPopup != null)
+                CharacterPlacementPopup.IsOpen = !CharacterPlacementPopup.IsOpen;
+            e.Handled = true;
+        }
+
+        private void CharacterArmature_Click(object sender, RoutedEventArgs e)
+        {
+            if (CharacterArmaturePopup != null)
+                CharacterArmaturePopup.IsOpen = !CharacterArmaturePopup.IsOpen;
+            e.Handled = true;
+        }
+
+        private void CharacterSubmeshes_Click(object sender, RoutedEventArgs e)
+        {
+            if (CharacterSubmeshesPopup != null)
+                CharacterSubmeshesPopup.IsOpen = !CharacterSubmeshesPopup.IsOpen;
+            e.Handled = true;
+        }
+
+        private void ResetCharacterPlacement_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            tab.CharacterPlacementCustomized = false;
+            _isApplyingCharacterViewportState = true;
+            try
+            {
+                _model.CharacterRotationX = 0d;
+                _model.CharacterRotationY = 0d;
+                _model.CharacterRotationZ = 0d;
+                _model.CharacterScaleMultiplier = 1d;
+                if (_model.HasActiveCharacterBackdrop && _mapSceneRuntime?.Scene != null)
+                {
+                    tab.CharacterPlacedOnKey = VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source);
+                }
+                else
+                {
+                    tab.CharacterPlacedOnKey = null;
+                    _model.CharacterPositionX = 0d;
+                    _model.CharacterPositionY = 0d;
+                    _model.CharacterPositionZ = 0d;
+                }
+            }
+            finally
+            {
+                _isApplyingCharacterViewportState = false;
+            }
+
+            if (_model.HasActiveCharacterBackdrop && _mapSceneRuntime?.Scene != null)
+                ApplyCharacterBackdropOrigin(_mapSceneRuntime.Scene, _model.SelectedCharacterBackdrop?.Source);
+            else
+                ApplyCharacterPlacement();
+            e.Handled = true;
+        }
+
+        private void FitCharacter_Click(object sender, RoutedEventArgs e)
+        {
+            if (_cameraController == null || _championModel == null) return;
+            VfxDefinitionBounds bounds = CharacterPreviewBounds();
+            if (!IsFiniteBounds(bounds)) return;
+
+            if (_dummyViewport.Camera is ProjectionCamera camera)
+            {
+                Vector3 look = new((float)camera.LookDirection.X, (float)camera.LookDirection.Y, (float)camera.LookDirection.Z);
+                Vector3 up = new((float)camera.UpDirection.X, (float)camera.UpDirection.Y, (float)camera.UpDirection.Z);
+                if (look.LengthSquared() <= 1e-8f) look = -Vector3.UnitZ;
+                if (up.LengthSquared() <= 1e-8f) up = Vector3.UnitY;
+                var stand = new VfxCameraStand(
+                    -Vector3.Normalize(look),
+                    Vector3.Normalize(up),
+                    camera is PerspectiveCamera perspective ? (float)perspective.FieldOfView : VfxPreviewCamera.OrbitFieldOfView,
+                    camera is OrthographicCamera);
+                FramePreviewBounds(bounds, stand);
+            }
+            else
+            {
+                FramePreviewBounds(bounds, VfxPreviewCamera.Stand(_model.PreviewCameraPreset));
+            }
+            e.Handled = true;
         }
 
         private void PreviewShow_Click(object sender, RoutedEventArgs e)
@@ -1998,6 +2884,9 @@ namespace AssetsManager.Views.Controls.Viewer
             Func<uint, string> resolveBinEntry = VfxLoadingService == null
                 ? null
                 : VfxLoadingService.ResolveBinEntryPath;
+            Func<ulong, string> resolveGamePath = VfxLoadingService == null
+                ? null
+                : VfxLoadingService.ResolveGamePath;
             try
             {
                 VfxFolderCatalog.BrowserCatalog catalog = await System.Threading.Tasks.Task.Run(
@@ -2007,9 +2896,39 @@ namespace AssetsManager.Views.Controls.Viewer
                         resolveBinEntry,
                         LogService),
                     operation.Token);
+                IReadOnlyList<MapSceneSource> installationMaps = await System.Threading.Tasks.Task.Run(
+                    () => VfxInstallationMapCatalog.Discover(
+                        AppSettings,
+                        rootFolder,
+                        resolveGamePath,
+                        operation.Token,
+                        LogService),
+                    operation.Token);
                 if (operation.IsCancellationRequested || _isCleanedUp) return false;
                 _model.DetectedSkins.Clear();
                 _model.BrowserRoots.Clear();
+                _model.CharacterBackdrops.Clear();
+
+                // Project geometry is listed first and wins for the same logical MapPath. Installation
+                // choices then fill the rest so a Character-only project can still use Map11/other maps.
+                var backdropKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (MapSceneSource mapSource in catalog.MapSources)
+                {
+                    string key = VfxInstallationMapCatalog.BackdropKey(mapSource);
+                    if (string.IsNullOrWhiteSpace(key) || !backdropKeys.Add(key)) continue;
+                    _model.CharacterBackdrops.Add(new VfxCharacterBackdropOption(
+                        VfxInstallationMapCatalog.Label(mapSource, projectSource: true),
+                        mapSource));
+                }
+                foreach (MapSceneSource mapSource in installationMaps)
+                {
+                    string key = VfxInstallationMapCatalog.BackdropKey(mapSource);
+                    if (string.IsNullOrWhiteSpace(key) || !backdropKeys.Add(key)) continue;
+                    _model.CharacterBackdrops.Add(new VfxCharacterBackdropOption(
+                        VfxInstallationMapCatalog.Label(mapSource, projectSource: false),
+                        mapSource));
+                }
+                _model.NotifyCharacterCollectionsChanged();
                 foreach (VfxSkinItem entry in catalog.Entries)
                 {
                     // Never carry expansion state into a freshly discovered project tree.
@@ -2066,7 +2985,19 @@ namespace AssetsManager.Views.Controls.Viewer
             return File.Exists(materials) ? Path.GetFullPath(materials) : null;
         }
 
-        private async Task LoadDetectedMapAsync(MapSceneSource source)
+        private static string MapSourceDisplayName(MapSceneSource source)
+        {
+            if (!string.IsNullOrWhiteSpace(source?.SelectedMapFilePath))
+                return Path.GetFileName(source.SelectedMapFilePath);
+            if (!string.IsNullOrWhiteSpace(source?.Map?.Value))
+                return source.Map.Value.Replace('\\', '/').Split('/').LastOrDefault() ?? source.Map.Value;
+            return "MAP";
+        }
+
+        private async Task LoadDetectedMapAsync(
+            MapSceneSource source,
+            bool asCharacterBackdrop = false,
+            int? initialVisibilityFlags = null)
         {
             if (source == null || MapViewerSceneService == null || _isCleanedUp)
                 return;
@@ -2090,49 +3021,91 @@ namespace AssetsManager.Views.Controls.Viewer
                 operation.Token.ThrowIfCancellationRequested();
                 if (staged == null)
                 {
-                    _model.StatusText = $"Unable to load {Path.GetFileName(source.SelectedMapFilePath)}.";
+                    _model.StatusText = $"Unable to load {MapSourceDisplayName(source)}.";
                     return;
                 }
                 if (_isCleanedUp || !ReferenceEquals(_mapCancellation, operation))
                     return;
 
+                if (asCharacterBackdrop && initialVisibilityFlags.HasValue)
+                    staged.SetVisibilityFlags(initialVisibilityFlags.Value);
+
                 _mapClipCancellation?.Cancel();
                 ClearMapCharacterClipPreview();
                 MapSceneRuntime previous = _mapSceneRuntime;
                 _mapSceneRuntime = staged;
+                _mapSceneIsCharacterBackdrop = asCharacterBackdrop;
+                SyncSelectedMapVariant(source);
+                _mapSkyCube = null;
+                _skyCubeDirty = true;
                 staged = null;
                 MapSceneRuntime backdrop = _mapSceneRuntime;
                 MapSceneData scene = backdrop.Scene;
+                backdrop.ShowStructures = _model.MapStructuresVisible;
+                backdrop.ShowParticles = _model.MapParticlesVisible;
                 _model.HasMapPreview = true;
                 _model.SetMapLayers(MapGeometrySemantics.Layers(scene.Geometry), backdrop.VisibilityFlags);
                 _mapGpuSceneDirty = true;
                 _mapTexturesDirty = false;
                 previous?.Dispose();
-                ReplaceMapBrowserRoot(MapBrowserSemantics.Build(backdrop));
-                SnapMapCamera(scene);
-                _model.StatusText = $"Loaded {Path.GetFileName(source.SelectedMapFilePath)} backdrop. Loading scene resources...";
+                if (!asCharacterBackdrop)
+                {
+                    ReplaceMapBrowserRoot(MapBrowserSemantics.Build(backdrop));
+                    SnapMapCamera(scene);
+                }
+                if (asCharacterBackdrop)
+                    ApplyCharacterBackdropOrigin(scene, source);
+                _model.StatusText = asCharacterBackdrop
+                    ? $"Loaded {MapSourceDisplayName(source)} behind the active Character. Loading backdrop resources..."
+                    : $"Loaded {MapSourceDisplayName(source)} backdrop. Loading scene resources...";
                 OpenTkControl?.InvalidateVisual();
 
-                Task<IReadOnlyDictionary<string, MapTextureImage>> previewTask =
+                // Every secondary MAP resource is independent. One malformed texture, optional sky,
+                // Character skin or VFX asset must never cancel the geometry/material scene nor the
+                // other resource waves. Cancellation still propagates when this MAP selection is replaced.
+                Task<VfxCubeMapData> skyTask = LoadMapResourceSafelyAsync(
+                    MapViewerSceneService.LoadBackdropSkyAsync(source.ProjectRoot, operation.Token),
+                    fallback: null,
+                    "sky",
+                    operation.Token);
+                Task<IReadOnlyDictionary<string, MapTextureImage>> previewTask = LoadMapResourceSafelyAsync(
                     MapViewerSceneService.LoadPreviewTexturesAsync(
                         backdrop,
                         operation.Token,
-                        (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Base, key, image));
-                Task<IReadOnlyDictionary<string, MapTextureImage>> previewProgramTask =
+                        (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Base, key, image)),
+                    new Dictionary<string, MapTextureImage>(StringComparer.Ordinal),
+                    "base preview textures",
+                    operation.Token);
+                Task<IReadOnlyDictionary<string, MapTextureImage>> previewProgramTask = LoadMapResourceSafelyAsync(
                     MapViewerSceneService.LoadPreviewProgramTexturesAsync(
                         backdrop,
                         operation.Token,
-                        (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Program, key, image));
-                Task<IReadOnlyDictionary<string, MapTextureImage>> previewLightmapTask =
+                        (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Program, key, image)),
+                    new Dictionary<string, MapTextureImage>(StringComparer.Ordinal),
+                    "program preview textures",
+                    operation.Token);
+                Task<IReadOnlyDictionary<string, MapTextureImage>> previewLightmapTask = LoadMapResourceSafelyAsync(
                     MapViewerSceneService.LoadPreviewLightmapsAsync(
                         backdrop,
                         operation.Token,
-                        (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Lightmap, key, image));
-                characterTask = MapViewerSceneService.LoadCharacterAssetsAsync(backdrop, operation.Token);
-                particleTask = MapViewerSceneService.LoadParticleAssetsAsync(backdrop, operation.Token);
+                        (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Lightmap, key, image)),
+                    new Dictionary<string, MapTextureImage>(StringComparer.OrdinalIgnoreCase),
+                    "preview lightmaps",
+                    operation.Token);
+                characterTask = LoadMapResourceSafelyAsync(
+                    MapViewerSceneService.LoadCharacterAssetsAsync(backdrop, operation.Token),
+                    (IReadOnlyList<MapCharacterRuntimeGroup>)Array.Empty<MapCharacterRuntimeGroup>(),
+                    "structures",
+                    operation.Token);
+                particleTask = LoadMapResourceSafelyAsync(
+                    MapViewerSceneService.LoadParticleAssetsAsync(backdrop, operation.Token),
+                    new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>()),
+                    "VFX placements",
+                    operation.Token);
 
                 Task previewWaveTask = Task.WhenAll(previewTask, previewProgramTask, previewLightmapTask);
                 bool previewFinalized = false;
+                bool skyFinalized = false;
                 Task<IReadOnlyDictionary<string, MapTextureImage>> fullTextureTask = null;
                 Task<IReadOnlyDictionary<string, MapTextureImage>> fullProgramTask = null;
                 Task<IReadOnlyDictionary<string, MapTextureImage>> fullLightmapTask = null;
@@ -2140,13 +3113,30 @@ namespace AssetsManager.Views.Controls.Viewer
                 // LTK lets independent scene resources join as they land. Do not hold Characters or
                 // placed VFX behind the complete preview-texture wave; texture callbacks already make
                 // the backdrop progressively visible while these tasks finish in parallel.
-                while (!previewFinalized || !characterAssetsAdopted || !particleAssetsAdopted)
+                while (!previewFinalized || !characterAssetsAdopted || !particleAssetsAdopted || !skyFinalized)
                 {
-                    var pending = new List<Task>(3);
+                    var pending = new List<Task>(4);
                     if (!previewFinalized) pending.Add(previewWaveTask);
                     if (!characterAssetsAdopted) pending.Add(characterTask);
                     if (!particleAssetsAdopted) pending.Add(particleTask);
+                    if (!skyFinalized) pending.Add(skyTask);
                     Task completed = await Task.WhenAny(pending);
+
+                    if (!skyFinalized && ReferenceEquals(completed, skyTask))
+                    {
+                        VfxCubeMapData sky = await skyTask;
+                        operation.Token.ThrowIfCancellationRequested();
+                        if (_isCleanedUp || !ReferenceEquals(_mapCancellation, operation) ||
+                            !ReferenceEquals(_mapSceneRuntime, backdrop))
+                        {
+                            return;
+                        }
+
+                        _mapSkyCube = sky;
+                        _skyCubeDirty = true;
+                        skyFinalized = true;
+                        OpenTkControl?.InvalidateVisual();
+                    }
 
                     if (!previewFinalized && ReferenceEquals(completed, previewWaveTask))
                     {
@@ -2167,18 +3157,30 @@ namespace AssetsManager.Views.Controls.Viewer
 
                         // Like LTK, only start the sharpening wave once every preview request has
                         // settled. Each full texture still publishes independently as it arrives.
-                        fullTextureTask = MapViewerSceneService.LoadFullTexturesAsync(
-                            backdrop,
-                            operation.Token,
-                            (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Base, key, image));
-                        fullProgramTask = MapViewerSceneService.LoadFullProgramTexturesAsync(
-                            backdrop,
-                            operation.Token,
-                            (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Program, key, image));
-                        fullLightmapTask = MapViewerSceneService.LoadFullLightmapsAsync(
-                            backdrop,
-                            operation.Token,
-                            (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Lightmap, key, image));
+                        fullTextureTask = LoadMapResourceSafelyAsync(
+                            MapViewerSceneService.LoadFullTexturesAsync(
+                                backdrop,
+                                operation.Token,
+                                (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Base, key, image)),
+                            new Dictionary<string, MapTextureImage>(StringComparer.Ordinal),
+                            "full base textures",
+                            operation.Token);
+                        fullProgramTask = LoadMapResourceSafelyAsync(
+                            MapViewerSceneService.LoadFullProgramTexturesAsync(
+                                backdrop,
+                                operation.Token,
+                                (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Program, key, image)),
+                            new Dictionary<string, MapTextureImage>(StringComparer.Ordinal),
+                            "full program textures",
+                            operation.Token);
+                        fullLightmapTask = LoadMapResourceSafelyAsync(
+                            MapViewerSceneService.LoadFullLightmapsAsync(
+                                backdrop,
+                                operation.Token,
+                                (key, image) => QueueMapTextureUpdate(backdrop, MapTextureUpdateKind.Lightmap, key, image)),
+                            new Dictionary<string, MapTextureImage>(StringComparer.OrdinalIgnoreCase),
+                            "full lightmaps",
+                            operation.Token);
                     }
 
                     if (!characterAssetsAdopted && ReferenceEquals(completed, characterTask))
@@ -2195,8 +3197,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
                         backdrop.SetCharacterGroups(characters);
                         characterAssetsAdopted = true;
-                        ReplaceMapBrowserRoot(MapBrowserSemantics.Build(backdrop));
-                        _model.StatusText = $"Loaded {backdrop.CharacterGroups.Count} MAP character skins. Loading remaining scene resources...";
+                        bool characterBackdropNow = _mapSceneIsCharacterBackdrop;
+                        if (!characterBackdropNow)
+                            ReplaceMapBrowserRoot(MapBrowserSemantics.Build(backdrop));
+                        _model.StatusText = characterBackdropNow
+                            ? $"Character backdrop loaded {backdrop.CharacterGroups.Count} authored MAP structures. Loading remaining resources..."
+                            : $"Loaded {backdrop.CharacterGroups.Count} MAP character skins. Loading remaining scene resources...";
                         OpenTkControl?.InvalidateVisual();
                     }
 
@@ -2214,13 +3220,25 @@ namespace AssetsManager.Views.Controls.Viewer
 
                         backdrop.SetParticles(particles);
                         particleAssetsAdopted = true;
-                        ReplaceMapBrowserRoot(MapBrowserSemantics.Build(backdrop));
-                        _model.StatusText = $"Loaded {backdrop.Particles.Runtimes.Count} MAP VFX placements. Loading remaining scene resources...";
+                        bool characterBackdropNow = _mapSceneIsCharacterBackdrop;
+                        if (!characterBackdropNow)
+                            ReplaceMapBrowserRoot(MapBrowserSemantics.Build(backdrop));
+                        _model.StatusText = characterBackdropNow
+                            ? $"Character backdrop loaded {backdrop.Particles.Runtimes.Count} authored MAP VFX placements. Loading remaining resources..."
+                            : $"Loaded {backdrop.Particles.Runtimes.Count} MAP VFX placements. Loading remaining scene resources...";
                         OpenTkControl?.InvalidateVisual();
                     }
                 }
 
-                _model.StatusText = $"Loaded map {scene.Source.Map.Value}.";
+                if (_isCleanedUp || !ReferenceEquals(_mapCancellation, operation) ||
+                    !ReferenceEquals(_mapSceneRuntime, backdrop))
+                {
+                    return;
+                }
+
+                _model.StatusText = _mapSceneIsCharacterBackdrop
+                    ? $"Character backdrop {scene.Source.Map.Value} ready."
+                    : $"Loaded map {scene.Source.Map.Value}.";
                 _model.LogMessages.Add(
                     $"[MAP] Loaded {scene.Geometry.Meshes.Count} backdrop meshes, " +
                     $"{scene.Characters.Count} characters and {scene.Particles.Count} particle placeables.");
@@ -2277,6 +3295,29 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (ReferenceEquals(_mapCancellation, operation))
                     _mapCancellation = null;
                 operation.Dispose();
+            }
+        }
+
+        private async Task<T> LoadMapResourceSafelyAsync<T>(
+            Task<T> task,
+            T fallback,
+            string label,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await task;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                string resource = string.IsNullOrWhiteSpace(label) ? "resource" : label;
+                LogService?.LogError(ex, $"MAP {resource} load failed without cancelling the scene.");
+                _model.LogMessages.Add($"[MAP WARNING] {resource}: {ex.Message}");
+                return fallback;
             }
         }
 
@@ -2392,8 +3433,13 @@ namespace AssetsManager.Views.Controls.Viewer
             ClearMapCharacterClipPreview();
 
             MapSceneRuntime previous = _mapSceneRuntime;
+            bool wasCharacterBackdrop = _mapSceneIsCharacterBackdrop;
             _mapSceneRuntime = null;
-            ReplaceMapBrowserRoot(null);
+            _mapSceneIsCharacterBackdrop = false;
+            _mapSkyCube = null;
+            _skyCubeDirty = true;
+            if (!wasCharacterBackdrop)
+                ReplaceMapBrowserRoot(null);
             _mapGpuSceneDirty = true;
             _mapTexturesDirty = false;
             previous?.Dispose();
@@ -2411,6 +3457,18 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.BrowserRoots.Insert(0, root);
                 RefreshMapBrowserVisibility(root);
             }
+        }
+
+        private void ApplyPendingSkyGpuState()
+        {
+            if (!_skyCubeDirty || _skyRenderer == null)
+                return;
+
+            VfxCubeMapData activeSky = _mapSceneRuntime != null && _mapSkyCube?.IsValid == true
+                ? _mapSkyCube
+                : _genericSkyCube;
+            _skyRenderer.SetCube(activeSky);
+            _skyCubeDirty = false;
         }
 
         private void ApplyPendingMapGpuState()
@@ -2521,7 +3579,14 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void SnapMapCamera(MapSceneData scene)
         {
-            if (scene?.Origin is not Vector3 engineOrigin || _cameraController == null)
+            if (scene?.Geometry == null || _cameraController == null)
+                return;
+
+            int visibilityFlags = ReferenceEquals(_mapSceneRuntime?.Scene, scene)
+                ? _mapSceneRuntime.VisibilityFlags
+                : scene.OpeningVisibilityFlags;
+            Vector3? calculatedOrigin = MapGeometrySemantics.CalculateOriginForFlags(scene.Geometry, visibilityFlags);
+            if (calculatedOrigin is not Vector3 engineOrigin)
                 return;
 
             if (_dummyViewport.Camera is not PerspectiveCamera)
@@ -2646,6 +3711,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     flags |= 1 << option.Index;
             }
             _model.SetMapLayerFlags(flags);
+            if (_mapSceneIsCharacterBackdrop && _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
+                _model.SelectedWorkspaceTab.CharacterBackdropVisibilityFlags = flags;
             _ = ApplyMapVisibilityFlagsAsync(flags);
         }
 
@@ -2683,8 +3750,17 @@ namespace AssetsManager.Views.Controls.Viewer
                 particlesAdopted = true;
                 runtime.SetVisibilityFlags(flags);
                 _model.SetMapLayerFlags(flags);
-                ReplaceMapBrowserRoot(MapBrowserSemantics.Build(runtime));
+                if (_mapSceneIsCharacterBackdrop && _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
+                {
+                    _model.SelectedWorkspaceTab.CharacterBackdropVisibilityFlags = flags;
+                }
+                else
+                {
+                    ReplaceMapBrowserRoot(MapBrowserSemantics.Build(runtime));
+                }
                 _mapVisibilityDirty = true;
+                if (_mapSceneIsCharacterBackdrop && _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
+                    ApplyCharacterBackdropOrigin(runtime.Scene, runtime.Scene.Source);
                 _model.StatusText = $"MAP layers 0x{flags:x2} · {runtime.CharacterGroups.Count} structure skins · {runtime.Particles.Runtimes.Count} VFX placements.";
                 OpenTkControl?.InvalidateVisual();
             }
@@ -2752,12 +3828,27 @@ namespace AssetsManager.Views.Controls.Viewer
                         source.SelectedMapFilePath,
                         StringComparison.OrdinalIgnoreCase))
                 {
+                    if (_mapSceneIsCharacterBackdrop)
+                    {
+                        // The same runtime can become the full MAP workspace without decoding the map again.
+                        // Character-backdrop mode intentionally omits the MAP browser root, so restore that owner
+                        // state explicitly instead of returning early with a half-switched workspace.
+                        _mapSceneIsCharacterBackdrop = false;
+                        _mapSceneRuntime.ShowStructures = _model.MapStructuresVisible;
+                        _mapSceneRuntime.ShowParticles = _model.MapParticlesVisible;
+                        _model.HasMapPreview = true;
+                        _model.SetMapLayers(
+                            MapGeometrySemantics.Layers(_mapSceneRuntime.Scene.Geometry),
+                            _mapSceneRuntime.VisibilityFlags);
+                        ReplaceMapBrowserRoot(MapBrowserSemantics.Build(_mapSceneRuntime));
+                        _mapGpuSceneDirty = true;
+                    }
                     SnapMapCamera(_mapSceneRuntime.Scene);
                     OpenTkControl?.InvalidateVisual();
                     return;
                 }
 
-                _model.StatusText = $"Loading {Path.GetFileName(source.SelectedMapFilePath)}...";
+                _model.StatusText = $"Loading {MapSourceDisplayName(source)}...";
                 _ = LoadDetectedMapAsync(source);
                 return;
             }
@@ -2904,57 +3995,87 @@ namespace AssetsManager.Views.Controls.Viewer
                     ? RequiredMapClipSystems(catalog, composition)
                     : new Dictionary<uint, VfxSystemDefinition>();
 
+                bool vfxSessionReady = false;
+                string vfxFallback = null;
                 _vfxRenderer?.SetSystem(null);
                 if (hasSceneVfx)
                 {
-                    VfxSceneResourceContext resources = await EnsureMapClipVfxResourcesAsync(
-                        selection.Group,
-                        scene,
-                        requiredSystems,
-                        operation.Token);
-                    operation.Token.ThrowIfCancellationRequested();
-                    if (_isCleanedUp || resources == null ||
+                    VfxSceneResourceContext resources = null;
+                    try
+                    {
+                        resources = await EnsureMapClipVfxResourcesAsync(
+                            selection.Group,
+                            scene,
+                            requiredSystems,
+                            operation.Token);
+                        operation.Token.ThrowIfCancellationRequested();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        LogService?.LogWarning($"MAP character clip VFX resources unavailable: {ex.Message}");
+                        vfxFallback = "VFX resources unavailable";
+                    }
+
+                    if (_isCleanedUp ||
                         !ReferenceEquals(_mapClipCancellation, operation) ||
                         !ReferenceEquals(_mapSceneRuntime, scene))
                     {
                         return;
                     }
 
-                    EnsureVfxRenderSession();
-                    if (_vfxRenderer != null)
+                    if (resources != null)
                     {
-                        _vfxRenderer.SetWorldTransform(
-                            MapCharacterSemantics.VfxWorldTransform(targetPlacement.Transform));
-                        int seed = unchecked((int)(selection.Clip.OwnerPathHash ^ targetPlacement.KeyHash));
-                        bool sessionReady = _vfxRenderer.SetAnimationSession(
-                            composition,
-                            catalog.IdleEffects,
-                            catalog.Systems,
-                            catalog.ResourceMap,
-                            resources.SearchDirectory,
-                            seed,
-                            duration,
-                            catalog.OwnerSceneContext);
-                        if (sessionReady)
+                        EnsureVfxRenderSession();
+                        if (_vfxRenderer != null)
                         {
-                            _vfxRenderer.SetBoneTransformSampler((time, boneName, boneHash) =>
-                                selection.Group.Animation.TrySamplePreparedClipBoneTransform(
-                                    selection.Group.Asset,
-                                    selection.Clip,
-                                    time,
-                                    boneName,
-                                    boneHash,
-                                    out Matrix4x4 transform)
-                                    ? transform
-                                    : null);
-                            _vfxRenderer.Seek(resumeAt);
-                            _vfxRenderer.Play();
+                            _vfxRenderer.SetWorldTransform(
+                                MapCharacterSemantics.VfxWorldTransform(targetPlacement.Transform));
+                            int seed = unchecked((int)(selection.Clip.OwnerPathHash ^ targetPlacement.KeyHash));
+                            vfxSessionReady = _vfxRenderer.SetAnimationSession(
+                                composition,
+                                catalog.IdleEffects,
+                                catalog.Systems,
+                                catalog.ResourceMap,
+                                resources.SearchDirectory,
+                                seed,
+                                duration,
+                                catalog.OwnerSceneContext);
+                            if (vfxSessionReady)
+                            {
+                                _vfxRenderer.SetBoneTransformSampler((time, boneName, boneHash) =>
+                                    selection.Group.Animation.TrySamplePreparedClipBoneTransform(
+                                        selection.Group.Asset,
+                                        selection.Clip,
+                                        time,
+                                        boneName,
+                                        boneHash,
+                                        out Matrix4x4 transform)
+                                        ? transform
+                                        : null);
+                                _vfxRenderer.Seek(resumeAt);
+                                _vfxRenderer.Play();
+                            }
+                            else
+                            {
+                                vfxFallback ??= "VFX session unavailable";
+                            }
                         }
                     }
+                    else
+                    {
+                        vfxFallback ??= "VFX resources unavailable";
+                    }
                 }
-                else
+
+                if (!vfxSessionReady)
                 {
+                    _vfxRenderer?.SetSystem(null);
                     _vfxRenderer?.SetWorldTransform(Matrix4x4.Identity);
+                    _vfxRenderer?.SetBoneTransformSampler(null);
                     _vfxRenderer?.UpdateBoneTransforms(null);
                     _vfxRenderer?.SetOwnerSkinningMatrices(null);
                 }
@@ -2969,9 +4090,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 string name = string.IsNullOrWhiteSpace(selection.Clip.ClipName)
                     ? $"0x{selection.Clip.OwnerPathHash:x8}"
                     : selection.Clip.ClipName;
-                string vfxSummary = composition.ResolvedCount > 0
+                string vfxSummary = vfxSessionReady
                     ? $" · {composition.ResolvedCount} VFX events"
-                    : string.Empty;
+                    : !string.IsNullOrWhiteSpace(vfxFallback)
+                        ? $" · animation only ({vfxFallback})"
+                        : string.Empty;
                 _model.StatusText = $"{name} ({duration:F2}s) · MAP character clip{vfxSummary}.";
                 _model.LogMessages.Add($"[MAP CLIP] {name} · {duration:F2}s{vfxSummary}.");
                 UpdateTimelineTrackMetrics();
@@ -3073,16 +4196,26 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ClearMapCharacterClipPreview()
         {
             _mapClipCancellation?.Cancel();
+            bool ownedVfxRenderer = VfxCharacterViewportSemantics.MapCharacterClipOwnsVfxRenderer(
+                _activeMapCharacterClip != null,
+                _activeMapCharacterGroup?.PreviewClip != null);
             _activeMapCharacterGroup?.ClearPreviewClip();
             _activeMapCharacterGroup = null;
             _activeMapCharacterPlacement = null;
             _activeMapCharacterClip = null;
             _mapAnimationVisibilityTimeline = Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
             _mapAnimationVisibilityDuration = 0d;
-            _vfxRenderer?.SetSystem(null);
-            _vfxRenderer?.SetWorldTransform(Matrix4x4.Identity);
-            _vfxRenderer?.UpdateBoneTransforms(null);
-            _vfxRenderer?.SetOwnerSkinningMatrices(null);
+
+            // MAP Character Clips share the scene VFX renderer with Skin/System/Spell previews. A MAP
+            // backdrop load, layer change or teardown must not clear a Skin-owned session merely because
+            // both flows use the same renderer instance.
+            if (ownedVfxRenderer)
+            {
+                _vfxRenderer?.SetSystem(null);
+                _vfxRenderer?.SetWorldTransform(Matrix4x4.Identity);
+                _vfxRenderer?.UpdateBoneTransforms(null);
+                _vfxRenderer?.SetOwnerSkinningMatrices(null);
+            }
         }
 
         private void SyncMapCharacterClipTime(double timeSeconds)
@@ -3265,8 +4398,13 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _championBundle = null;
+            _championAuthoredScale = 1d;
+            _characterAuthoredHiddenSubmeshes.Clear();
             InvalidateChampionBindPose();
             _model.HasChampionMesh = false;
+            _model.HasCharacterSkeleton = false;
+            RebuildCharacterSubmeshOptions();
+            ClearCharacterArmatureOverlay();
             RunReleaseStep("Champion animation cache", () => _championAnimationService?.ClearCache());
 
             VfxClipCatalog clipCatalog = _clipCatalog;
@@ -3609,21 +4747,22 @@ namespace AssetsManager.Views.Controls.Viewer
                         var oldModel = _championModel;
                         _championModel = loaded;
                         _championBundle = bundle;
-                        // LTK draws the owner mesh and builds joint anchors in skinScale space.
-                        // Keep the champion visual in the same space as Animation Clip/idle VFX bones.
-                        _championModel.Scale = _activeBundle?.OwnerSceneContext is { SkinScale: > 0f } owner
+                        // Keep the owner mesh and its joint anchors in authored skinScale space. User
+                        // placement is an outer multiplier so attached VFX do not receive skinScale twice.
+                        _championAuthoredScale = _activeBundle?.OwnerSceneContext is { SkinScale: > 0f } owner
                             ? owner.SkinScale
-                            : 1f;
+                            : 1d;
+                        _championModel.Scale = _championAuthoredScale;
                         IReadOnlyList<uint> initialHidden =
                             _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>();
                         ApplyOwnerSubmeshVisibility(initialHidden);
-                        _vfxRenderer?.SetOwnerHiddenSubmeshes(initialHidden);
                         if (oldModel != null)
                         {
                             _championMeshRenderer?.QueueRelease(oldModel);
                             oldModel.Dispose();
                         }
                         _model.HasChampionMesh = true;
+                        RebuildCharacterSubmeshOptions();
 
                         // Ensure skeleton is loaded
                         if (_championModel.Skeleton == null)
@@ -3635,6 +4774,8 @@ namespace AssetsManager.Views.Controls.Viewer
                                 _championModel.Skeleton = new LeagueToolkit.Core.Animation.RigResource(sklStream);
                             }
                         }
+
+                        _model.HasCharacterSkeleton = _championModel.Skeleton?.Joints?.Count > 0;
 
                         if (_championModel.GpuSkinningData == null &&
                             _championModel.Skeleton != null &&
@@ -3653,6 +4794,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         }
 
                         int boneCount = _championModel.Skeleton?.Joints?.Count ?? 0;
+                        ApplyCharacterPlacement();
                         _model.LogMessages.Add($"[CHAMPION MESH] Model loaded for VFX studio: {Path.GetFileName(sknPath)} (Skeleton: {(boneCount > 0 ? $"{boneCount} bones" : "None")})");
                         InvalidateChampionBindPose();
                         if (_model.SelectedSystem != null && _model.SelectedAnimation == null && _model.SelectedSpell == null)
@@ -4234,11 +5376,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _activeAnimationClip = clip;
             foreach (ModelPart part in _championModel.Parts)
-            {
                 _animationBasePartVisibility[part] = part.IsVisible;
-                if (!part.IsVisible && !string.IsNullOrWhiteSpace(part.Name))
-                    _animationBaseHiddenSubmeshes.Add(Fnv1a.HashLower(part.Name));
-            }
+            foreach (uint hash in _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>())
+                _animationBaseHiddenSubmeshes.Add(hash);
 
             _animationVisibilityTimeline = VfxClipCueEvaluator.BuildVisibilityTimeline(
                 clip.TimedCues,
@@ -4257,19 +5397,81 @@ namespace AssetsManager.Views.Controls.Viewer
                 _animationVisibilityTimeline,
                 folded);
             ApplyOwnerSubmeshVisibility(hidden);
-            _vfxRenderer?.SetOwnerHiddenSubmeshes(hidden);
         }
 
         private void ApplyOwnerSubmeshVisibility(IEnumerable<uint> hiddenHashes)
         {
+            _characterAuthoredHiddenSubmeshes.Clear();
+            foreach (uint hash in hiddenHashes ?? Array.Empty<uint>())
+                _characterAuthoredHiddenSubmeshes.Add(hash);
+            ApplyEffectiveCharacterSubmeshes();
+        }
+
+        private void ApplyEffectiveCharacterSubmeshes()
+        {
             if (_championModel == null) return;
-            var hidden = hiddenHashes as ISet<uint> ?? new HashSet<uint>(hiddenHashes ?? Array.Empty<uint>());
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin
+                ? _model.SelectedWorkspaceTab
+                : null;
+            var effectiveHidden = new HashSet<uint>();
             foreach (ModelPart part in _championModel.Parts)
             {
                 if (string.IsNullOrWhiteSpace(part.Name)) continue;
-                bool visible = !hidden.Contains(Fnv1a.HashLower(part.Name));
+                uint hash = Fnv1a.HashLower(part.Name);
+                bool inheritedVisible = !_characterAuthoredHiddenSubmeshes.Contains(hash);
+                bool manualVisible = false;
+                bool overridden = tab != null && tab.CharacterSubmeshOverrides.TryGetValue(hash, out manualVisible);
+                bool visible = VfxCharacterViewportSemantics.ResolveSubmeshVisibility(
+                    inheritedVisible,
+                    overridden,
+                    manualVisible);
                 if (part.IsVisible != visible) part.IsVisible = visible;
+                if (!visible) effectiveHidden.Add(hash);
+
+                VfxCharacterSubmeshOption option = _model.CharacterSubmeshes.FirstOrDefault(item => item.NameHash == hash);
+                option?.Sync(visible, overridden);
             }
+            _vfxRenderer?.SetOwnerHiddenSubmeshes(effectiveHidden);
+        }
+
+        private void RebuildCharacterSubmeshOptions()
+        {
+            foreach (VfxCharacterSubmeshOption existing in _model.CharacterSubmeshes)
+                existing.VisibilityChanged -= CharacterSubmesh_VisibilityChanged;
+            _model.CharacterSubmeshes.Clear();
+
+            if (_championModel != null)
+            {
+                foreach (ModelPart part in _championModel.Parts)
+                {
+                    if (string.IsNullOrWhiteSpace(part?.Name)) continue;
+                    var option = new VfxCharacterSubmeshOption(part.Name, part.IsVisible);
+                    option.VisibilityChanged += CharacterSubmesh_VisibilityChanged;
+                    _model.CharacterSubmeshes.Add(option);
+                }
+            }
+            _model.NotifyCharacterCollectionsChanged();
+            ApplyEffectiveCharacterSubmeshes();
+        }
+
+        private void CharacterSubmesh_VisibilityChanged(object sender, EventArgs e)
+        {
+            if (sender is not VfxCharacterSubmeshOption option ||
+                _model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin)
+            {
+                return;
+            }
+            _model.SelectedWorkspaceTab.CharacterSubmeshOverrides[option.NameHash] = option.IsVisible;
+            ApplyEffectiveCharacterSubmeshes();
+            OpenTkControl?.InvalidateVisual();
+        }
+
+        private void ResetCharacterSubmeshOverrides_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
+            _model.SelectedWorkspaceTab.CharacterSubmeshOverrides.Clear();
+            ApplyEffectiveCharacterSubmeshes();
+            OpenTkControl?.InvalidateVisual();
         }
 
         private void ClearAnimationClipCues()
@@ -4288,7 +5490,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationBaseHiddenSubmeshes.Clear();
             _animationVisibilityTimeline = Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
             _championAnimationService?.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
-            _vfxRenderer?.SetOwnerHiddenSubmeshes(
+            ApplyOwnerSubmeshVisibility(
                 _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>());
         }
 
@@ -4324,6 +5526,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _championBindSkeleton = skeleton;
                 _championBindBoneTransformProvider = AnimationService.CreateBindBoneTransformProvider(skeleton);
                 _championBindSkinningMatrices = AnimationService.CreateBindSkinningMatrices(skeleton);
+                _championBindWorldTransforms = AnimationService.CreateBindWorldTransforms(skeleton);
             }
 
             _championModel.SkinningMatrices = _championBindSkinningMatrices;
@@ -4336,6 +5539,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _championBindSkeleton = null;
             _championBindBoneTransformProvider = null;
             _championBindSkinningMatrices = Array.Empty<Matrix4x4>();
+            _championBindWorldTransforms = Array.Empty<Matrix4x4>();
         }
 
         private string ResolveSknPath(string authoredPath, string searchDir)

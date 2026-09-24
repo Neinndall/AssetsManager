@@ -257,18 +257,9 @@ namespace AssetsManager.Utils
                     return levels;
                 }
 
-                for (int level = firstLevel; level < mipCount; level++)
-                {
-                    stream.Position = start;
-                    int width = Math.Max(header.Width >> level, 1);
-                    int height = Math.Max(header.Height >> level, 1);
-                    Texture texture = Texture.LoadTex(stream, width, height);
-                    if (texture.Mips.Length == 0)
-                        break;
-                    levels.Add(ConvertTextureMipToBitmapSource(texture));
-                }
-
-                return levels;
+                stream.Position = start;
+                Texture texture = Texture.LoadTex(stream);
+                return ConvertTextureMipChain(texture, minWidth);
             }
             finally
             {

@@ -1,6 +1,7 @@
 dotnet build AssetsManager.csproj
 
 
+>null
 
 # Debugs/Publish types
 

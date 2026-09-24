@@ -16,6 +16,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             try
             {
                 using var stream = File.OpenRead(path);
+                return Decode(stream);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        internal static VfxCubeMapData Decode(Stream stream)
+        {
+            if (stream == null || !stream.CanRead) return null;
+            try
+            {
                 DdsFile dds = DdsFile.Load(stream);
                 if (dds.Faces.Count != 6) return null;
 
@@ -48,8 +61,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             }
             catch
             {
-                // LTK only treats a genuine six-face DDS as a reflection cube. A flat TEX/DDS
-                // simply means this optional reflection stage is unavailable.
+                // Only a genuine six-face DDS is a cube resource. Flat TEX/DDS content is optional
+                // and simply leaves the preview without a cube background/reflection stage.
                 return null;
             }
         }

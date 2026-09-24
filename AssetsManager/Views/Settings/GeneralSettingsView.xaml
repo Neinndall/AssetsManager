@@ -276,10 +276,10 @@
                 <Grid Margin="0,0,0,24">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Skybox on model load" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Show the studio skybox automatically when loading a model" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Sky on VFX Studio load" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Show the Studio sky automatically when opening a VFX Studio preview" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
-                    <CheckBox x:Name="swStudioSkybox" Grid.Column="1" IsChecked="{Binding Settings.StudioParameters.SkyboxVisible, Mode=TwoWay}" Checked="StudioSkybox_Checked" Style="{StaticResource ModernToggleSwitch}"/>
+                    <CheckBox Grid.Column="1" IsChecked="{Binding Settings.StudioParameters.SkyVisible, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                 </Grid>
 
                 <Grid Margin="0,0,0,24">
@@ -288,7 +288,7 @@
                         <TextBlock Text="Transparent background on model load" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
                         <TextBlock Text="Use a transparent viewport background when loading a model" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
-                    <CheckBox x:Name="swStudioTransparentBackground" Grid.Column="1" IsChecked="{Binding Settings.StudioParameters.TransparentBackground, Mode=TwoWay}" Checked="StudioTransparentBackground_Checked" Style="{StaticResource ModernToggleSwitch}"/>
+                    <CheckBox Grid.Column="1" IsChecked="{Binding Settings.StudioParameters.TransparentBackground, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                 </Grid>
 
                 <Grid>

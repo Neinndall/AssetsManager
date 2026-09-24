@@ -41,6 +41,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         internal string ResolveBinEntryPath(uint pathHash)
             => _hashResolverService?.ResolveBinEntry(pathHash);
 
+        /// <summary>
+        /// Resolves a GAME WAD path hash through the shared hash catalog. Installation backdrop
+        /// discovery uses the same catalog as Explorer instead of maintaining a second path database.
+        /// </summary>
+        internal string ResolveGamePath(ulong pathHash)
+            => _hashResolverService?.ResolveHash(pathHash);
+
         public sealed class Bundle
         {
             public string PrimaryBinPath { get; internal set; }

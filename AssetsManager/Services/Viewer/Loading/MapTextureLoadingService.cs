@@ -109,18 +109,34 @@ namespace AssetsManager.Services.Viewer.Loading
                 if (!assets.TryGetValue(reference, out MapResolvedAsset asset))
                     return;
 
-                MapTextureImage image = await DecodeAsync(
-                    asset,
-                    reference.VirtualPath ?? asset.VirtualPath,
-                    maxTextureSize,
-                    cancellationToken);
-                if (image == null)
-                    return;
+                try
+                {
+                    MapTextureImage image = await DecodeAsync(
+                        asset,
+                        reference.VirtualPath ?? asset.VirtualPath,
+                        maxTextureSize,
+                        cancellationToken);
+                    if (image == null)
+                        return;
 
-                decoded[reference] = image;
-                if (onLoaded != null && materialKeys.TryGetValue(reference, out string[] keys))
-                    foreach (string key in keys)
-                        onLoaded(key, image);
+                    decoded[reference] = image;
+                    if (onLoaded != null && materialKeys.TryGetValue(reference, out string[] keys))
+                        foreach (string key in keys)
+                            onLoaded(key, image);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // A single malformed or unsupported texture must not tear down the MAP scene.
+                    // Keep the material untextured and allow every other texture/structure/VFX wave
+                    // to continue independently, matching the reference viewer's partial-resource flow.
+                    _logService?.LogWarning(
+                        $"MAPGEO texture '{reference.VirtualPath ?? asset.VirtualPath ?? $"0x{reference.PathHash:x16}"}' " +
+                        $"could not be decoded: {ex.Message}");
+                }
             }).ToArray();
 
             await Task.WhenAll(loads);
@@ -188,18 +204,31 @@ namespace AssetsManager.Services.Viewer.Loading
                 if (!assets.TryGetValue(reference, out MapResolvedAsset asset))
                     return;
 
-                MapTextureImage image = await DecodeAsync(
-                    asset,
-                    reference.VirtualPath ?? asset.VirtualPath,
-                    maxTextureSize,
-                    cancellationToken);
-                if (image == null)
-                    return;
+                try
+                {
+                    MapTextureImage image = await DecodeAsync(
+                        asset,
+                        reference.VirtualPath ?? asset.VirtualPath,
+                        maxTextureSize,
+                        cancellationToken);
+                    if (image == null)
+                        return;
 
-                decoded[reference] = image;
-                if (onLoaded != null && keysByReference.TryGetValue(reference, out string[] keys))
-                    foreach (string key in keys)
-                        onLoaded(key, image);
+                    decoded[reference] = image;
+                    if (onLoaded != null && keysByReference.TryGetValue(reference, out string[] keys))
+                        foreach (string key in keys)
+                            onLoaded(key, image);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logService?.LogWarning(
+                        $"MAPGEO program texture '{reference.VirtualPath ?? asset.VirtualPath ?? $"0x{reference.PathHash:x16}"}' " +
+                        $"could not be decoded: {ex.Message}");
+                }
             }).ToArray();
 
             await Task.WhenAll(loads);
@@ -240,16 +269,29 @@ namespace AssetsManager.Services.Viewer.Loading
                 if (!assets.TryGetValue(reference, out MapResolvedAsset asset))
                     return;
 
-                MapTextureImage image = await DecodeAsync(
-                    asset,
-                    reference.VirtualPath ?? asset.VirtualPath,
-                    maxTextureSize,
-                    cancellationToken);
-                if (image == null)
-                    return;
+                try
+                {
+                    MapTextureImage image = await DecodeAsync(
+                        asset,
+                        reference.VirtualPath ?? asset.VirtualPath,
+                        maxTextureSize,
+                        cancellationToken);
+                    if (image == null)
+                        return;
 
-                decoded[reference.VirtualPath] = image;
-                onLoaded?.Invoke(reference.VirtualPath, image);
+                    decoded[reference.VirtualPath] = image;
+                    onLoaded?.Invoke(reference.VirtualPath, image);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logService?.LogWarning(
+                        $"MAPGEO lightmap '{reference.VirtualPath ?? asset.VirtualPath ?? $"0x{reference.PathHash:x16}"}' " +
+                        $"could not be decoded: {ex.Message}");
+                }
             }).ToArray();
 
             await Task.WhenAll(loads);

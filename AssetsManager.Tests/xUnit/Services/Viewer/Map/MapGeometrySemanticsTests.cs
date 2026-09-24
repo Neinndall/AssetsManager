@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Views.Models.Viewer;
@@ -72,6 +73,46 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 
             Assert.NotNull(origin);
             Assert.Equal(10f, origin.Value.Y);
+        }
+
+        [Fact]
+        public void OriginFollowsTheCurrentlyDrawnVisibilityFlags()
+        {
+            var indices = new uint[54];
+            indices[0] = 0;
+            indices[9] = 1;
+            indices[18] = 2;
+            indices[27] = 3;
+            indices[36] = 4;
+            indices[45] = 5;
+            var geometry = new MapGeometryData(
+                new[]
+                {
+                    new Vector3(-100f, 0f, 0f),
+                    new Vector3(0f, 0f, 0f),
+                    new Vector3(100f, 0f, 0f),
+                    new Vector3(900f, 50f, 1000f),
+                    new Vector3(1000f, 50f, 1000f),
+                    new Vector3(1100f, 50f, 1000f)
+                },
+                Enumerable.Repeat(Vector3.UnitY, 6).ToArray(),
+                Enumerable.Repeat(Vector2.Zero, 6).ToArray(),
+                null,
+                indices,
+                new[]
+                {
+                    Mesh(visibility: 1, firstSubmesh: 0, submeshCount: 1),
+                    Mesh(visibility: 2, firstSubmesh: 1, submeshCount: 1)
+                },
+                new[]
+                {
+                    new MapGeometrySubmeshData(0, 27, 0),
+                    new MapGeometrySubmeshData(27, 27, 0)
+                },
+                new[] { "Maps/Test/Material" });
+
+            Assert.Equal(new Vector3(0f, 0f, 0f), MapGeometrySemantics.CalculateOriginForFlags(geometry, 1));
+            Assert.Equal(new Vector3(1000f, 50f, 1000f), MapGeometrySemantics.CalculateOriginForFlags(geometry, 2));
         }
 
         [Fact]

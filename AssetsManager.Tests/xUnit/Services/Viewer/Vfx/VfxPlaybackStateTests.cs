@@ -117,6 +117,56 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void MapWorkspaceTabIdentityCanRetargetAndNotifiesBindings()
+        {
+            var tab = new VfxWorkspaceTab
+            {
+                Key = "map:maps/mapgeometry/map11/base",
+                Title = "Base",
+                Subtitle = "Maps/MapGeometry/Map11/Base",
+                Kind = VfxWorkspaceTabKind.Map,
+                Payload = new object()
+            };
+            var changed = new List<string>();
+            tab.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+            object replacement = new();
+
+            tab.Key = "map:maps/mapgeometry/map11/base_srx";
+            tab.Title = "Base_SRX";
+            tab.Subtitle = "Maps/MapGeometry/Map11/Base_SRX";
+            tab.Payload = replacement;
+
+            Assert.Equal("map:maps/mapgeometry/map11/base_srx", tab.Key);
+            Assert.Equal("Base_SRX", tab.Title);
+            Assert.Equal("Maps/MapGeometry/Map11/Base_SRX", tab.Subtitle);
+            Assert.Same(replacement, tab.Payload);
+            Assert.Contains(nameof(VfxWorkspaceTab.Key), changed);
+            Assert.Contains(nameof(VfxWorkspaceTab.Title), changed);
+            Assert.Contains(nameof(VfxWorkspaceTab.Subtitle), changed);
+            Assert.Contains(nameof(VfxWorkspaceTab.Payload), changed);
+        }
+
+        [Fact]
+        public void MapVariantPickerRequiresAnActiveMapPreview()
+        {
+            var model = new VfxInspectorModel();
+            model.SetMapVariants(new[]
+            {
+                new MapVariantData("Default", MapPath.FromEntryPath("Maps/MapGeometry/Map11/Base")),
+                new MapVariantData("SRX", MapPath.FromEntryPath("Maps/MapGeometry/Map11/Base_SRX"))
+            });
+
+            Assert.True(model.HasMultipleMapVariants);
+            Assert.False(model.CanSelectMapVariant);
+
+            model.HasMapPreview = true;
+            Assert.True(model.CanSelectMapVariant);
+
+            model.HasMapPreview = false;
+            Assert.False(model.CanSelectMapVariant);
+        }
+
+        [Fact]
         public void InspectorEmitterSelectionMovesTheSelectedMarker()
         {
             var model = new VfxInspectorModel();

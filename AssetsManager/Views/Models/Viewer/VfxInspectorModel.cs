@@ -718,6 +718,7 @@ namespace AssetsManager.Views.Models.Viewer
         private float _speed = 1.0f;
         private int _liveParticleCount;
         private string _bgMode = "Dark";
+        private bool _showPreviewSky;
         private bool _showPreviewGrid = true;
         private bool _showPreviewGround;
         private bool _showPreviewStage;
@@ -733,6 +734,23 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isAllMuted;
         private bool _showChampionMesh = true;
         private bool _hasChampionMesh;
+        private bool _hasCharacterSkeleton;
+        private bool _characterEffectsEnabled = true;
+        private bool _showCharacterArmature;
+        private bool _showCharacterJointNames;
+        private bool _characterAutoRotate;
+        private bool _characterControlsVisible = true;
+        private bool _characterBackdropEnabled;
+        private bool _mapParticlesVisible = true;
+        private bool _mapStructuresVisible = true;
+        private VfxCharacterBackdropOption _selectedCharacterBackdrop;
+        private double _characterPositionX;
+        private double _characterPositionY;
+        private double _characterPositionZ;
+        private double _characterRotationX;
+        private double _characterRotationY;
+        private double _characterRotationZ;
+        private double _characterScaleMultiplier = 1d;
         private int _playbackSeed = 1337;
         private VfxRigPreset _rigPreset = VfxRigPreset.Still;
 
@@ -783,6 +801,8 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<float> AnimationParameterValues { get; } = new();
         public ObservableCollection<MapVariantData> MapVariants { get; } = new();
         public ObservableCollection<MapVisibilityLayerOption> MapLayers { get; } = new();
+        public ObservableCollection<VfxCharacterBackdropOption> CharacterBackdrops { get; } = new();
+        public ObservableCollection<VfxCharacterSubmeshOption> CharacterSubmeshes { get; } = new();
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxForceAuthoringItem> ForceAuthoringItems { get; } = new();
@@ -841,6 +861,7 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public bool HasMultipleMapVariants => MapVariants.Count > 1;
+        public bool CanSelectMapVariant => HasMapPreview && HasMultipleMapVariants;
         public bool HasMapLayers => MapLayers.Count > 0;
         public int ActiveMapLayerCount => MapLayers.Count(layer => layer.IsEnabled);
         public bool HasMapPreview
@@ -851,6 +872,7 @@ namespace AssetsManager.Views.Models.Viewer
                 if (_hasMapPreview == value) return;
                 _hasMapPreview = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(CanSelectMapVariant));
             }
         }
 
@@ -891,6 +913,7 @@ namespace AssetsManager.Views.Models.Viewer
             _selectedMapVariant = MapVariantData.Opening(MapVariants);
             OnPropertyChanged(nameof(SelectedMapVariant));
             OnPropertyChanged(nameof(HasMultipleMapVariants));
+            OnPropertyChanged(nameof(CanSelectMapVariant));
         }
 
         internal void SetMapLayers(IEnumerable<MapGeometryLayerData> layers, int flags)
@@ -955,6 +978,150 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _hasChampionMesh;
             set { _hasChampionMesh = value; OnPropertyChanged(); }
+        }
+
+        public bool HasCharacterSkeleton
+        {
+            get => _hasCharacterSkeleton;
+            internal set
+            {
+                if (_hasCharacterSkeleton == value) return;
+                _hasCharacterSkeleton = value;
+                if (!value)
+                {
+                    _showCharacterArmature = false;
+                    _showCharacterJointNames = false;
+                    OnPropertyChanged(nameof(ShowCharacterArmature));
+                    OnPropertyChanged(nameof(ShowCharacterJointNames));
+                }
+                OnPropertyChanged();
+            }
+        }
+
+        public bool CharacterEffectsEnabled
+        {
+            get => _characterEffectsEnabled;
+            set
+            {
+                if (_characterEffectsEnabled == value) return;
+                _characterEffectsEnabled = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool ShowCharacterArmature
+        {
+            get => _showCharacterArmature;
+            set
+            {
+                bool next = value && HasCharacterSkeleton;
+                if (_showCharacterArmature == next) return;
+                _showCharacterArmature = next;
+                if (!next && _showCharacterJointNames)
+                {
+                    _showCharacterJointNames = false;
+                    OnPropertyChanged(nameof(ShowCharacterJointNames));
+                }
+                OnPropertyChanged();
+            }
+        }
+
+        public bool ShowCharacterJointNames
+        {
+            get => _showCharacterJointNames;
+            set
+            {
+                bool next = value && HasCharacterSkeleton && ShowCharacterArmature;
+                if (_showCharacterJointNames == next) return;
+                _showCharacterJointNames = next;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool CharacterAutoRotate
+        {
+            get => _characterAutoRotate;
+            set
+            {
+                if (_characterAutoRotate == value) return;
+                _characterAutoRotate = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool CharacterControlsVisible
+        {
+            get => _characterControlsVisible;
+            set
+            {
+                if (_characterControlsVisible == value) return;
+                _characterControlsVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool CharacterBackdropEnabled
+        {
+            get => _characterBackdropEnabled;
+            set
+            {
+                if (_characterBackdropEnabled == value) return;
+                _characterBackdropEnabled = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasActiveCharacterBackdrop));
+            }
+        }
+
+        public bool MapParticlesVisible
+        {
+            get => _mapParticlesVisible;
+            set { if (_mapParticlesVisible != value) { _mapParticlesVisible = value; OnPropertyChanged(); } }
+        }
+
+        public bool MapStructuresVisible
+        {
+            get => _mapStructuresVisible;
+            set { if (_mapStructuresVisible != value) { _mapStructuresVisible = value; OnPropertyChanged(); } }
+        }
+
+        public VfxCharacterBackdropOption SelectedCharacterBackdrop
+        {
+            get => _selectedCharacterBackdrop;
+            set
+            {
+                if (ReferenceEquals(_selectedCharacterBackdrop, value)) return;
+                _selectedCharacterBackdrop = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasActiveCharacterBackdrop));
+            }
+        }
+
+        public bool HasCharacterBackdropOptions => CharacterBackdrops.Count > 0;
+        public bool HasCharacterSubmeshes => CharacterSubmeshes.Count > 0;
+        public bool HasActiveCharacterBackdrop => IsSkinWorkspace && CharacterBackdropEnabled && SelectedCharacterBackdrop != null;
+
+        public double CharacterPositionX { get => _characterPositionX; set { if (_characterPositionX != value) { _characterPositionX = value; OnPropertyChanged(); } } }
+        public double CharacterPositionY { get => _characterPositionY; set { if (_characterPositionY != value) { _characterPositionY = value; OnPropertyChanged(); } } }
+        public double CharacterPositionZ { get => _characterPositionZ; set { if (_characterPositionZ != value) { _characterPositionZ = value; OnPropertyChanged(); } } }
+        public double CharacterRotationX { get => _characterRotationX; set { if (_characterRotationX != value) { _characterRotationX = value; OnPropertyChanged(); } } }
+        public double CharacterRotationY { get => _characterRotationY; set { if (_characterRotationY != value) { _characterRotationY = value; OnPropertyChanged(); } } }
+        public double CharacterRotationZ { get => _characterRotationZ; set { if (_characterRotationZ != value) { _characterRotationZ = value; OnPropertyChanged(); } } }
+        public double CharacterScaleMultiplier
+        {
+            get => _characterScaleMultiplier;
+            set
+            {
+                double next = double.IsFinite(value) ? Math.Clamp(value, 0.05d, 8d) : 1d;
+                if (_characterScaleMultiplier == next) return;
+                _characterScaleMultiplier = next;
+                OnPropertyChanged();
+            }
+        }
+
+        internal void NotifyCharacterCollectionsChanged()
+        {
+            OnPropertyChanged(nameof(HasCharacterBackdropOptions));
+            OnPropertyChanged(nameof(HasCharacterSubmeshes));
         }
 
         public int PlaybackSeed
@@ -1046,8 +1213,14 @@ namespace AssetsManager.Views.Models.Viewer
                 _selectedWorkspaceTab = value;
                 if (_selectedWorkspaceTab != null) _selectedWorkspaceTab.IsSelected = true;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(IsSkinWorkspace));
+                OnPropertyChanged(nameof(IsMapWorkspace));
+                OnPropertyChanged(nameof(HasActiveCharacterBackdrop));
             }
         }
+
+        public bool IsSkinWorkspace => SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin;
+        public bool IsMapWorkspace => SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Map;
 
         public void NotifyWorkspaceTabsChanged()
         {
@@ -1195,6 +1368,18 @@ namespace AssetsManager.Views.Models.Viewer
             set { _bgMode = value; OnPropertyChanged(); }
         }
 
+        public bool ShowPreviewSky
+        {
+            get => _showPreviewSky;
+            set
+            {
+                if (_showPreviewSky == value) return;
+                _showPreviewSky = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PreviewDisplayCount));
+            }
+        }
+
         public bool ShowPreviewGrid
         {
             get => _showPreviewGrid;
@@ -1232,6 +1417,7 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public int PreviewDisplayCount =>
+            (_showPreviewSky ? 1 : 0) +
             (_showPreviewGrid ? 1 : 0) +
             (_showPreviewGround ? 1 : 0) +
             (_showPreviewStage ? 1 : 0);

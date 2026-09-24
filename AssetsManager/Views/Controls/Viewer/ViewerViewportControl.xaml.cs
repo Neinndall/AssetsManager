@@ -205,12 +205,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     ambientColor);
             }
 
-            // Render skybox if visible
-            if (_skyModel != null && _viewModel.ShowSkybox)
-            {
-                _meshRenderer.Render(_skyModel, viewProj, view, proj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
-            }
-
         }
 
         private void EnsureSceneRenderers(bool required = false)
@@ -263,10 +257,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private readonly Dictionary<SceneModel, ModelUpdateKey> _lastModelUpdates = new();
         // Environment references
-        private ModelVisual3D _skyVisual;
         private ModelVisual3D _groundVisual;
         private SceneModel _groundModel;
-        private SceneModel _skyModel;
         private DispatcherOperation _groundRefreshOperation;
 
         public ViewerViewportControl()
@@ -321,9 +313,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
                     break;
                 case nameof(ViewerViewportModel.IsGridVisible):
-                    break;
-                case nameof(ViewerViewportModel.ShowSkybox):
-                    SetSkyboxVisibility(_viewModel.ShowSkybox);
                     break;
             }
         }
@@ -578,16 +567,8 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             _groundModel = BuildSceneModelFromVisual(_groundVisual, "Ground");
 
-            if (_skyVisual == null)
-            {
-                _skyVisual = SceneElements.CreateSidePlanes(LogService);
-                Viewport.Children.Add(_skyVisual);
-            }
-            _skyModel = BuildSceneModelFromVisual(_skyVisual, "Skybox");
-
             // Ensure initial state is applied
             SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
-            SetSkyboxVisibility(_viewModel.ShowSkybox);
         }
 
         public void ApplyStudioParameters()
@@ -598,7 +579,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel.IsGroundVisible = studioParameters.GroundVisible;
             _viewModel.IsGridVisible = studioParameters.GridVisible;
             _viewModel.IsTransparentBg = studioParameters.TransparentBackground;
-            _viewModel.ShowSkybox = studioParameters.SkyboxVisible && !studioParameters.TransparentBackground;
         }
 
 
@@ -645,7 +625,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _cameraController?.Dispose();
                 _cameraController = null;
 
-                _skyVisual = null;
                 _groundVisual = null;
 
                 // Liberar los recursos de renderizado OpenGL de forma aislada
@@ -1373,20 +1352,6 @@ namespace AssetsManager.Views.Controls.Viewer
             if (Viewport.Camera is PerspectiveCamera camera)
             {
                 camera.FieldOfView = _viewModel.FieldOfView;
-            }
-        }
-
-        public void SetSkyboxVisibility(bool isVisible)
-        {
-            if (_skyVisual == null) return;
-
-            if (isVisible && !Viewport.Children.Contains(_skyVisual))
-            {
-                Viewport.Children.Add(_skyVisual);
-            }
-            else if (!isVisible && Viewport.Children.Contains(_skyVisual))
-            {
-                Viewport.Children.Remove(_skyVisual);
             }
         }
 

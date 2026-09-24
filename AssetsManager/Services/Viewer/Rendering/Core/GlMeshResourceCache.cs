@@ -197,13 +197,14 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             resources.BoneWeightVbo = _gl.GenBuffer();
 
             _gl.BindVertexArray(resources.Vao);
-            if (skinningData.Tangents != null && skinningData.Tangents.Length == resources.VertexCount)
+            System.Numerics.Vector4[] tangents = skinningData.Tangents ?? BuildRuntimeTangents(part);
+            if (tangents != null && tangents.Length == resources.VertexCount)
             {
                 resources.TangentVbo = _gl.GenBuffer();
                 _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.TangentVbo);
                 _gl.BufferData(
                     BufferTargetARB.ArrayBuffer,
-                    new ReadOnlySpan<System.Numerics.Vector4>(skinningData.Tangents),
+                    new ReadOnlySpan<System.Numerics.Vector4>(tangents),
                     BufferUsageARB.StaticDraw);
                 ConfigureVertexAttribute(3, 4, 4 * sizeof(float), IntPtr.Zero);
             }
@@ -235,6 +236,32 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             _gl.BindVertexArray(0);
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
             resources.IsGpuSkinned = true;
+        }
+
+        private static System.Numerics.Vector4[] BuildRuntimeTangents(ModelPart part)
+        {
+            if (part?.Geometry?.Geometry is not MeshGeometry3D mesh ||
+                mesh.Positions == null || mesh.TextureCoordinates == null ||
+                mesh.Positions.Count == 0 || mesh.TextureCoordinates.Count != mesh.Positions.Count ||
+                mesh.TriangleIndices == null || mesh.TriangleIndices.Count == 0)
+            {
+                return null;
+            }
+
+            System.Numerics.Vector3[] positions = mesh.Positions
+                .Select(point => new System.Numerics.Vector3((float)point.X, (float)point.Y, (float)point.Z))
+                .ToArray();
+            System.Numerics.Vector3[] normals = mesh.Normals != null && mesh.Normals.Count == mesh.Positions.Count
+                ? mesh.Normals.Select(normal => new System.Numerics.Vector3((float)normal.X, (float)normal.Y, (float)normal.Z)).ToArray()
+                : null;
+            System.Numerics.Vector2[] uv = mesh.TextureCoordinates
+                .Select(point => new System.Numerics.Vector2((float)point.X, (float)point.Y))
+                .ToArray();
+            uint[] indices = mesh.TriangleIndices
+                .Where(index => index >= 0)
+                .Select(index => checked((uint)index))
+                .ToArray();
+            return MeshTangentBuilder.Build(positions, normals, uv, indices);
         }
 
         private void ReleaseSkinningBuffers(PartResources resources)

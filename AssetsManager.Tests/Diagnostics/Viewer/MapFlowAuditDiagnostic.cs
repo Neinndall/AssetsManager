@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Parsers;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Services.Viewer.Resolvers;
@@ -10,6 +15,8 @@ using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Loading;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Meta;
@@ -46,18 +53,36 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 return;
             }
 
-            var resolver = new MapAssetResolver(null, null);
+            var diagnosticLog = new LogService(new Serilog.LoggerConfiguration().CreateLogger());
+            var directories = new DirectoriesCreator();
+            using var hashResolver = new HashResolverService(directories, diagnosticLog);
+            await hashResolver.LoadHashesAsync();
+            await hashResolver.LoadBinHashesAsync();
+
+            var settings = AppSettings.GetDefaultSettings();
+            string pbe = @"C:\Riot Games\League of Legends (PBE)";
+            string live = @"C:\Riot Games\League of Legends";
+            settings.LolPbeDirectory = Directory.Exists(pbe) ? pbe : null;
+            settings.LolLiveDirectory = Directory.Exists(live) ? live : null;
+            settings.PreferredClient = settings.LolPbeDirectory != null ? PreferredClient.PBE : PreferredClient.LIVE;
+
+            var wadProvider = new WadContentProvider(
+                diagnosticLog,
+                new WadNodeLoaderService(hashResolver, diagnosticLog),
+                directories,
+                new SvgParser());
+            var resolver = new MapAssetResolver(wadProvider, settings);
             var sceneLoader = new MapSceneLoadingService(
                 resolver,
                 new MapGeometryDecoder(),
-                new MapMaterialParser(),
+                new MapMaterialParser(hashResolver),
                 new MapPlaceableParser(),
                 new MapCharacterParser(),
                 new MapParticleParser(),
                 new MapParticleSystemParser(),
-                new MapTextureLoadingService(resolver, null),
-                null,
-                null);
+                new MapTextureLoadingService(resolver, diagnosticLog),
+                hashResolver,
+                diagnosticLog);
 
             MapSceneRuntime runtime = null;
             try
@@ -68,6 +93,69 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     Console.WriteLine("[MapFlow] Backdrop load failed.");
                     return;
                 }
+
+                MapTextureReference[] baseReferences = scene.Materials
+                    .Select(material => material?.BaseTexture?.Texture)
+                    .Where(reference => reference?.IsEmpty == false)
+                    .Distinct()
+                    .ToArray();
+                GameMaterialTexture[] programReferences = scene.Materials
+                    .SelectMany(material => material?.Program?.Passes ?? Array.Empty<GameMaterialPass>())
+                    .SelectMany(pass => pass.Textures ?? Array.Empty<GameMaterialTexture>())
+                    .Where(texture => texture?.Texture?.IsEmpty == false)
+                    .ToArray();
+                Console.WriteLine(
+                    $"[MapFlow] texture refs base={baseReferences.Length}, program={programReferences.Length}, " +
+                    $"programDistinct={programReferences.Select(item => item.Texture).Distinct().Count()}.");
+                foreach (MapTextureReference reference in baseReferences.Take(5))
+                    Console.WriteLine($"[MapFlow] base texture ref path={reference.VirtualPath ?? "-"} hash=0x{reference.PathHash:x16}.");
+                foreach (GameMaterialTexture texture in programReferences.Take(5))
+                    Console.WriteLine($"[MapFlow] program texture ref {texture.Name} path={texture.Texture.VirtualPath ?? "-"} hash=0x{texture.Texture.PathHash:x16} source={texture.Source}.");
+
+                IReadOnlyDictionary<MapTextureReference, MapResolvedAsset> resolvedBase =
+                    await resolver.ResolveTexturesAsync(baseReferences, fullRoot, CancellationToken.None);
+                IReadOnlyDictionary<MapTextureReference, MapResolvedAsset> resolvedProgram =
+                    await resolver.ResolveTexturesAsync(
+                        programReferences.Select(item => item.Texture).Distinct(),
+                        fullRoot,
+                        CancellationToken.None);
+                Console.WriteLine(
+                    $"[MapFlow] resolved texture assets base={resolvedBase.Count}/{baseReferences.Length}, " +
+                    $"program={resolvedProgram.Count}/{programReferences.Select(item => item.Texture).Distinct().Count()}.");
+                if (resolvedBase.Count > 0)
+                {
+                    (MapTextureReference reference, MapResolvedAsset asset) = resolvedBase.First();
+                    await using Stream textureStream = await resolver.OpenReadAsync(asset, CancellationToken.None);
+                    string extension = MapTextureLoadingService.DetectTextureExtension(textureStream, reference.VirtualPath);
+                    var levels = TextureUtils.LoadViewerTextureMipChain(textureStream, extension, 512);
+                    Console.WriteLine(
+                        $"[MapFlow] first texture decode origin={asset.Origin} ext={extension} levels={levels.Count} " +
+                        $"size={(levels.Count > 0 ? $"{levels[0].PixelWidth}x{levels[0].PixelHeight}" : "-")}.");
+
+                    try
+                    {
+                        await using Stream freshTextureStream = await resolver.OpenReadAsync(asset, CancellationToken.None);
+                        LeagueToolkit.Core.Renderer.Texture toolkitTexture =
+                            LeagueToolkit.Core.Renderer.Texture.LoadTex(freshTextureStream);
+                        Console.WriteLine(
+                            $"[MapFlow] toolkit TEX decode mips={toolkitTexture?.Mips?.Length ?? 0} " +
+                            $"size={(toolkitTexture?.Mips is { Length: > 0 } ? $"{toolkitTexture.Mips[0].Width}x{toolkitTexture.Mips[0].Height}" : "-")}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[MapFlow] toolkit TEX decode failed: {ex.GetType().Name}: {ex.Message}");
+                    }
+                }
+
+                IReadOnlyDictionary<string, MapTextureImage> previewTextures =
+                    await sceneLoader.LoadPreviewTexturesAsync(scene, CancellationToken.None);
+                IReadOnlyDictionary<string, MapTextureImage> previewProgramTextures =
+                    await sceneLoader.LoadPreviewProgramTexturesAsync(scene, CancellationToken.None);
+                IReadOnlyDictionary<string, MapTextureImage> previewLightmaps =
+                    await sceneLoader.LoadPreviewLightmapsAsync(scene, CancellationToken.None);
+                Console.WriteLine(
+                    $"[MapFlow] preview textures={previewTextures.Count}, programTextures={previewProgramTextures.Count}, " +
+                    $"lightmaps={previewLightmaps.Count}/{scene.Geometry.Lightmaps.Count}.");
 
                 int placeableCount = scene.Placeables.Sum(chunk => chunk.Items.Count);
                 var stoodCharacters = MapCharacterSemantics.StoodForFlags(

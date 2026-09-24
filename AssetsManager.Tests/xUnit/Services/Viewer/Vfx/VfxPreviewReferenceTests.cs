@@ -69,28 +69,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void GridGroundAndStageDisplayPreferencesAreIndependent()
+        public void SkyGroundGridAndStageDisplayPreferencesAreIndependent()
         {
             var model = new VfxInspectorModel();
 
+            Assert.False(model.ShowPreviewSky);
             Assert.True(model.ShowPreviewGrid);
             Assert.False(model.ShowPreviewGround);
             Assert.False(model.ShowPreviewStage);
             Assert.Equal(1, model.PreviewDisplayCount);
 
+            model.ShowPreviewSky = true;
+            Assert.True(model.ShowPreviewSky);
+            Assert.Equal(2, model.PreviewDisplayCount);
+
             model.ShowPreviewGround = true;
             Assert.True(model.ShowPreviewGround);
-            Assert.Equal(2, model.PreviewDisplayCount);
+            Assert.Equal(3, model.PreviewDisplayCount);
 
             model.ShowPreviewStage = true;
             Assert.True(model.ShowPreviewStage);
-            Assert.Equal(3, model.PreviewDisplayCount);
+            Assert.Equal(4, model.PreviewDisplayCount);
 
             model.ShowPreviewGrid = false;
             Assert.False(model.ShowPreviewGrid);
+            Assert.True(model.ShowPreviewSky);
             Assert.True(model.ShowPreviewGround);
             Assert.True(model.ShowPreviewStage);
-            Assert.Equal(2, model.PreviewDisplayCount);
+            Assert.Equal(3, model.PreviewDisplayCount);
         }
 
         [Fact]
