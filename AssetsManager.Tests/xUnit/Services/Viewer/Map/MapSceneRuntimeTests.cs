@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Windows.Media;
@@ -132,6 +132,57 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Same(replacementLight, runtime.BackdropLightmaps["ASSETS/Maps/Light.TEX"]);
         }
 
+        [Fact]
+        public void BackdropTextureRetainerHoldsDistinctImagesUntilTheyLeaveTheRuntime()
+        {
+            var runtime = new MapSceneRuntime(
+                Scene(),
+                Array.Empty<MapCharacterRuntimeGroup>(),
+                new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>()));
+            MapTextureImage shared = Image(70);
+            MapTextureImage replacement = Image(80);
+            int sharedHolds = 0;
+            int sharedReleases = 0;
+            int replacementHolds = 0;
+            int replacementReleases = 0;
+
+            runtime.SetBackdropTextureRetainer(image =>
+            {
+                if (ReferenceEquals(image, shared)) sharedHolds++;
+                if (ReferenceEquals(image, replacement)) replacementHolds++;
+                bool released = false;
+                return () =>
+                {
+                    if (released) return;
+                    released = true;
+                    if (ReferenceEquals(image, shared)) sharedReleases++;
+                    if (ReferenceEquals(image, replacement)) replacementReleases++;
+                };
+            });
+
+            runtime.MergeBackdropTextures(new Dictionary<string, MapTextureImage>
+            {
+                ["material/base"] = shared
+            });
+            runtime.MergeBackdropProgramTextures(new Dictionary<string, MapTextureImage>
+            {
+                ["program:material:Diffuse"] = shared
+            });
+            Assert.Equal(1, sharedHolds);
+
+            runtime.SetBackdropTextures(new Dictionary<string, MapTextureImage>
+            {
+                ["material/base"] = replacement
+            });
+            Assert.Equal(1, replacementHolds);
+            Assert.Equal(0, sharedReleases);
+
+            runtime.SetBackdropProgramTextures(new Dictionary<string, MapTextureImage>());
+            Assert.Equal(1, sharedReleases);
+
+            runtime.Dispose();
+            Assert.Equal(1, replacementReleases);
+        }
         [Fact]
         public void HiddenIdsCanBeAddedAndRemovedWithoutRebuildingTheScene()
         {

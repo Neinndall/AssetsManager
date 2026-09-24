@@ -692,6 +692,12 @@ namespace AssetsManager.Views.Controls.Viewer
             _championMeshRenderer?.ProcessPendingReleases();
             if (_isExitPending)
             {
+                // ReleaseCurrentProject clears the CPU/runtime ownership first. Finish the matching
+                // GPU teardown here while the OpenGL context is current, then drop any grace-period
+                // resources that no longer have an owner because an explicit Studio exit should
+                // leave no project or MAP allocation behind.
+                ApplyPendingMapGpuState();
+                _mapGeometryRenderer?.PurgeReleasedResources();
                 _vfxRenderer?.SetSystem(null);
                 _isExitPending = false;
                 ExitRequested?.Invoke(this, EventArgs.Empty);
@@ -762,6 +768,7 @@ namespace AssetsManager.Views.Controls.Viewer
             // preparation are safe even when WPF selected the system before the GL control was ready.
             TryInspectPendingSystem();
             ApplyPendingMapGpuState();
+            _mapGeometryRenderer?.ProcessRetainedResources();
 
             // A detected map container owns the world backdrop. VFX helper surfaces are only a
             // standalone-effect aid and must not be layered over authored MAP geometry.
@@ -1577,13 +1584,12 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _scanCancellation?.Cancel();
             _binCancellation?.Cancel();
-            _mapClipCancellation?.Cancel();
+            CancelMapLoadAndClearScene();
             _mapClipCancellation?.Dispose();
             _mapClipCancellation = null;
             _animationClipCancellation?.Cancel();
             _animationClipCancellation?.Dispose();
             _animationClipCancellation = null;
-            ClearMapCharacterClipPreview();
             _championLoadGeneration++;
             _model.IsPlaying = false;
             _vfxRenderer?.Pause();

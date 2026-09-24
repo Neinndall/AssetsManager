@@ -192,7 +192,8 @@ namespace AssetsManager
       services.AddSingleton<MapSceneRuntimeFactory>();
       services.AddSingleton<MapViewerSceneService>(provider => new MapViewerSceneService(
         provider.GetRequiredService<MapSceneLoadingService>(),
-        provider.GetRequiredService<MapSceneRuntimeFactory>()));
+        provider.GetRequiredService<MapSceneRuntimeFactory>(),
+        provider.GetRequiredService<MapTextureLoadingService>()));
       services.AddSingleton<ChromaLoadingService>();
       services.AddTransient<VfxLoadingService>();
 

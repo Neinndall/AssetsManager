@@ -13,6 +13,40 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
     public sealed class MapGeometryRendererTests
     {
         [Fact]
+        public void RetainedBackdropResourcesUseSameFifteenSecondGraceAsCurrentUpstream()
+        {
+            Assert.Equal(15_000, MapGeometryRenderer.RetainedResourceLifetimeMs);
+            Assert.False(MapGeometryRenderer.RetentionExpired(1_000, 15_999));
+            Assert.True(MapGeometryRenderer.RetentionExpired(1_000, 16_000));
+            Assert.False(MapGeometryRenderer.RetentionExpired(-1, long.MaxValue));
+        }
+
+        [Fact]
+        public void ExplicitProjectExitPurgesOnlyReleasedBackdropResources()
+        {
+            Assert.True(MapGeometryRenderer.ShouldCollectRetainedResource(
+                references: 0,
+                releasedAtMs: 1_000,
+                nowMs: 1_001,
+                purgeReleased: true));
+            Assert.False(MapGeometryRenderer.ShouldCollectRetainedResource(
+                references: 1,
+                releasedAtMs: -1,
+                nowMs: long.MaxValue,
+                purgeReleased: true));
+            Assert.False(MapGeometryRenderer.ShouldCollectRetainedResource(
+                references: 0,
+                releasedAtMs: 1_000,
+                nowMs: 15_999,
+                purgeReleased: false));
+            Assert.True(MapGeometryRenderer.ShouldCollectRetainedResource(
+                references: 0,
+                releasedAtMs: 1_000,
+                nowMs: 16_000,
+                purgeReleased: false));
+        }
+
+        [Fact]
         public void DrawPlanRendersOnlyDefaultVisibilityLayer()
         {
             MapSceneData scene = Scene(

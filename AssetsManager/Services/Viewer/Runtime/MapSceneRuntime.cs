@@ -13,6 +13,9 @@ namespace AssetsManager.Services.Viewer.Runtime
     internal sealed class MapSceneRuntime : IDisposable
     {
         private readonly HashSet<string> _hidden = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<MapTextureImage, Action> _backdropTextureHolds =
+            new(ReferenceEqualityComparer.Instance);
+        private Func<MapTextureImage, Action> _holdBackdropTexture;
         private bool _disposed;
         private float _sceneTimeSeconds;
         private float _characterTimeSeconds;
@@ -87,11 +90,22 @@ namespace AssetsManager.Services.Viewer.Runtime
             _visibilityFlags = flags;
         }
 
+        internal void SetBackdropTextureRetainer(Func<MapTextureImage, Action> holdTexture)
+        {
+            ThrowIfDisposed();
+            ReleaseBackdropTextureHolds();
+            _holdBackdropTexture = holdTexture;
+            RefreshBackdropTextureHolds();
+        }
+
         internal void SetBackdropTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
         {
             ThrowIfDisposed();
             if (textures != null)
+            {
                 BackdropTextures = textures;
+                RefreshBackdropTextureHolds();
+            }
         }
 
         internal void MergeBackdropTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
@@ -105,13 +119,17 @@ namespace AssetsManager.Services.Viewer.Runtime
                 if (!string.IsNullOrWhiteSpace(key) && image != null)
                     merged[key] = image;
             BackdropTextures = merged;
+            RefreshBackdropTextureHolds();
         }
 
         internal void SetBackdropProgramTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
         {
             ThrowIfDisposed();
             if (textures != null)
+            {
                 BackdropProgramTextures = textures;
+                RefreshBackdropTextureHolds();
+            }
         }
 
         internal void MergeBackdropProgramTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
@@ -125,13 +143,17 @@ namespace AssetsManager.Services.Viewer.Runtime
                 if (!string.IsNullOrWhiteSpace(key) && image != null)
                     merged[key] = image;
             BackdropProgramTextures = merged;
+            RefreshBackdropTextureHolds();
         }
 
         internal void SetBackdropLightmaps(IReadOnlyDictionary<string, MapTextureImage> lightmaps)
         {
             ThrowIfDisposed();
             if (lightmaps != null)
+            {
                 BackdropLightmaps = lightmaps;
+                RefreshBackdropTextureHolds();
+            }
         }
 
         internal void MergeBackdropLightmaps(IReadOnlyDictionary<string, MapTextureImage> lightmaps)
@@ -145,6 +167,7 @@ namespace AssetsManager.Services.Viewer.Runtime
                 if (!string.IsNullOrWhiteSpace(key) && image != null)
                     merged[key] = image;
             BackdropLightmaps = merged;
+            RefreshBackdropTextureHolds();
         }
 
         internal void SetCharacterGroups(IReadOnlyList<MapCharacterRuntimeGroup> characterGroups)
@@ -185,6 +208,53 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal bool IsHidden(MapCharacterData character) =>
             character != null && MapOutlineSemantics.IsHidden(_hidden, character.ChunkHash, character.KeyHash);
 
+        private void RefreshBackdropTextureHolds()
+        {
+            if (_holdBackdropTexture == null)
+                return;
+
+            var desired = new HashSet<MapTextureImage>(ReferenceEqualityComparer.Instance);
+            AddImages(desired, BackdropTextures);
+            AddImages(desired, BackdropProgramTextures);
+            AddImages(desired, BackdropLightmaps);
+
+            var stale = new List<MapTextureImage>();
+            foreach (MapTextureImage image in _backdropTextureHolds.Keys)
+                if (!desired.Contains(image))
+                    stale.Add(image);
+            foreach (MapTextureImage image in stale)
+            {
+                _backdropTextureHolds[image]();
+                _backdropTextureHolds.Remove(image);
+            }
+
+            foreach (MapTextureImage image in desired)
+                if (!_backdropTextureHolds.ContainsKey(image))
+                    _backdropTextureHolds[image] = _holdBackdropTexture(image) ?? NoopRelease;
+        }
+
+        private static void AddImages(
+            HashSet<MapTextureImage> destination,
+            IReadOnlyDictionary<string, MapTextureImage> textures)
+        {
+            if (textures == null)
+                return;
+            foreach (MapTextureImage image in textures.Values)
+                if (image != null)
+                    destination.Add(image);
+        }
+
+        private static void NoopRelease()
+        {
+        }
+
+        private void ReleaseBackdropTextureHolds()
+        {
+            foreach (Action release in _backdropTextureHolds.Values)
+                release?.Invoke();
+            _backdropTextureHolds.Clear();
+        }
+
         private void ThrowIfDisposed()
         {
             if (_disposed)
@@ -196,6 +266,8 @@ namespace AssetsManager.Services.Viewer.Runtime
             if (_disposed) return;
             _disposed = true;
 
+            ReleaseBackdropTextureHolds();
+            _holdBackdropTexture = null;
             foreach (MapCharacterRuntimeGroup group in CharacterGroups)
                 group?.Dispose();
             Particles.Dispose();

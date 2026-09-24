@@ -22,6 +22,8 @@ namespace AssetsManager.Services.Viewer.Rendering
     internal sealed class MapGeometryRenderer : IDisposable
     {
         private const string IndicatorPattern = "indicator";
+        internal const long RetainedResourceLifetimeMs = 15_000;
+        private const long RetainedResourceSweepIntervalMs = 1_000;
 
         private static readonly Vector3 StoneSrgb = new(154f / 255f, 149f / 255f, 140f / 255f);
         private static readonly Vector3 StoneLinear = SrgbToLinear(StoneSrgb);
@@ -80,6 +82,19 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             internal uint Id;
             internal int References;
+            internal long ReleasedAtMs = -1;
+        }
+
+        private sealed class GeometryResources
+        {
+            internal uint Vao;
+            internal uint PositionVbo;
+            internal uint NormalVbo;
+            internal uint Uv0Vbo;
+            internal uint Uv1Vbo;
+            internal uint Ebo;
+            internal int References;
+            internal long ReleasedAtMs = -1;
         }
 
         private sealed record MaterialTexture(MapTextureImage Image, uint TextureId);
@@ -99,6 +114,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<MapTextureImage, SharedTexture> _sharedRawTextures =
             new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<MapResolvedAssetCacheKey, GeometryResources> _retainedGeometry = new();
         private readonly Dictionary<string, MaterialTexture> _materialTextures =
             new(StringComparer.Ordinal);
         private readonly Dictionary<string, MaterialTexture> _programTextures =
@@ -120,6 +136,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _uv0Vbo;
         private uint _uv1Vbo;
         private uint _ebo;
+        private GeometryResources _activeGeometryResources;
         private uint _whiteTexture;
         private int _uViewProjection;
         private int _uBaseTexture;
@@ -151,6 +168,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private GameShaderRuntime _gameShaderRuntime;
         private bool _gles;
         private bool _ready;
+        private long _nextRetentionSweepMs;
 
         internal bool HasScene => _scene != null && _plan != null && _vao != 0;
 
@@ -226,12 +244,13 @@ namespace AssetsManager.Services.Viewer.Rendering
                 throw new InvalidOperationException("MapGeometryRenderer must be initialized before loading a scene.");
             ArgumentNullException.ThrowIfNull(scene);
 
+            CollectRetainedResources(forceSweep: true, purgeReleased: false);
             ReleaseSceneResources();
             _scene = scene;
             _previewSun = scene.Sun;
             _plan = BuildDrawPlan(scene, scene.OpeningVisibilityFlags);
             _light = ResolveLight(scene.Sun);
-            UploadGeometry(scene.Geometry);
+            AcquireGeometry(scene);
             UpdateTextures(scene.Textures);
             UpdateProgramTextures(scene.ProgramTextures);
             UpdateLightmaps(scene.Lightmaps);
@@ -325,6 +344,23 @@ namespace AssetsManager.Services.Viewer.Rendering
                     ReleaseRawTexture(current.Image);
                 _lightmapTextures[path] = new MaterialTexture(image, textureId);
             }
+        }
+
+        internal void ProcessRetainedResources()
+        {
+            if (_ready)
+                CollectRetainedResources(forceSweep: false, purgeReleased: false);
+        }
+
+        /// <summary>
+        /// Drops only grace-period resources that no longer have an active owner. This is used by
+        /// an explicit VFX Studio project exit while the OpenGL context is current; active resources
+        /// are never touched.
+        /// </summary>
+        internal void PurgeReleasedResources()
+        {
+            if (_ready)
+                CollectRetainedResources(forceSweep: true, purgeReleased: true);
         }
 
         internal void Render(
@@ -667,6 +703,47 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
         }
 
+        private void AcquireGeometry(MapSceneData scene)
+        {
+            MapResolvedAsset asset = scene.Assets?.Geometry;
+            MapResolvedAssetCacheKey? key = asset == null ? null : MapResolvedAssetCacheKey.From(asset);
+            if (key.HasValue && _retainedGeometry.TryGetValue(key.Value, out GeometryResources retained))
+            {
+                retained.References++;
+                retained.ReleasedAtMs = -1;
+                _activeGeometryResources = retained;
+                BindGeometryResources(retained);
+                return;
+            }
+
+            UploadGeometry(scene.Geometry);
+            if (!key.HasValue)
+                return;
+
+            var resources = new GeometryResources
+            {
+                Vao = _vao,
+                PositionVbo = _positionVbo,
+                NormalVbo = _normalVbo,
+                Uv0Vbo = _uv0Vbo,
+                Uv1Vbo = _uv1Vbo,
+                Ebo = _ebo,
+                References = 1
+            };
+            _retainedGeometry[key.Value] = resources;
+            _activeGeometryResources = resources;
+        }
+
+        private void BindGeometryResources(GeometryResources resources)
+        {
+            _vao = resources.Vao;
+            _positionVbo = resources.PositionVbo;
+            _normalVbo = resources.NormalVbo;
+            _uv0Vbo = resources.Uv0Vbo;
+            _uv1Vbo = resources.Uv1Vbo;
+            _ebo = resources.Ebo;
+        }
+
         private void UploadGeometry(MapGeometryData geometry)
         {
             _vao = _gl.GenVertexArray();
@@ -732,13 +809,14 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (_sharedTextures.TryGetValue(image, out SharedTexture shared))
             {
                 shared.References++;
+                shared.ReleasedAtMs = -1;
                 return shared.Id;
             }
 
             // Stock/base material textures use the stage's sRGB colour space. OpenGL's sRGB
             // internal format gives the shader the same linear sample Three.js produces.
             uint id = UploadTexture(image, TextureSamplingSpace.SrgbColor);
-            _sharedTextures[image] = new SharedTexture { Id = id, References = 1 };
+            _sharedTextures[image] = new SharedTexture { Id = id, References = 1, ReleasedAtMs = -1 };
             return id;
         }
 
@@ -759,11 +837,12 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (cache.TryGetValue(image, out SharedTexture shared))
             {
                 shared.References++;
+                shared.ReleasedAtMs = -1;
                 return shared.Id;
             }
 
             uint id = UploadTexture(image, samplingSpace);
-            cache[image] = new SharedTexture { Id = id, References = 1 };
+            cache[image] = new SharedTexture { Id = id, References = 1, ReleasedAtMs = -1 };
             return id;
         }
 
@@ -774,13 +853,82 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (image == null || !cache.TryGetValue(image, out SharedTexture shared))
                 return;
 
-            shared.References--;
-            if (shared.References > 0)
-                return;
+            shared.References = Math.Max(0, shared.References - 1);
+            if (shared.References == 0)
+                shared.ReleasedAtMs = Environment.TickCount64;
+        }
 
-            if (shared.Id != 0)
-                _gl.DeleteTexture(shared.Id);
-            cache.Remove(image);
+        private void CollectRetainedResources(bool forceSweep, bool purgeReleased)
+        {
+            long now = Environment.TickCount64;
+            if (!forceSweep && now < _nextRetentionSweepMs)
+                return;
+            _nextRetentionSweepMs = now + RetainedResourceSweepIntervalMs;
+
+            CollectRetainedTextures(_sharedTextures, now, purgeReleased);
+            CollectRetainedTextures(_sharedRawTextures, now, purgeReleased);
+
+            MapResolvedAssetCacheKey[] expiredGeometry = _retainedGeometry
+                .Where(pair => ShouldCollectRetainedResource(
+                    pair.Value.References,
+                    pair.Value.ReleasedAtMs,
+                    now,
+                    purgeReleased))
+                .Select(pair => pair.Key)
+                .ToArray();
+            foreach (MapResolvedAssetCacheKey key in expiredGeometry)
+            {
+                if (!_retainedGeometry.Remove(key, out GeometryResources resources))
+                    continue;
+                DeleteGeometryResources(resources);
+            }
+        }
+
+        private void CollectRetainedTextures(
+            Dictionary<MapTextureImage, SharedTexture> cache,
+            long now,
+            bool purgeReleased)
+        {
+            MapTextureImage[] expired = cache
+                .Where(pair => ShouldCollectRetainedResource(
+                    pair.Value.References,
+                    pair.Value.ReleasedAtMs,
+                    now,
+                    purgeReleased))
+                .Select(pair => pair.Key)
+                .ToArray();
+            foreach (MapTextureImage image in expired)
+            {
+                if (!cache.Remove(image, out SharedTexture texture))
+                    continue;
+                if (texture.Id != 0)
+                    _gl.DeleteTexture(texture.Id);
+            }
+        }
+
+        internal static bool ShouldCollectRetainedResource(
+            int references,
+            long releasedAtMs,
+            long nowMs,
+            bool purgeReleased) =>
+            references == 0 && (purgeReleased || RetentionExpired(releasedAtMs, nowMs));
+
+        internal static bool RetentionExpired(long releasedAtMs, long nowMs) =>
+            releasedAtMs >= 0 && nowMs - releasedAtMs >= RetainedResourceLifetimeMs;
+
+        private void DeleteAllRetainedResources()
+        {
+            foreach (SharedTexture texture in _sharedTextures.Values)
+                if (texture.Id != 0) _gl.DeleteTexture(texture.Id);
+            _sharedTextures.Clear();
+
+            foreach (SharedTexture texture in _sharedRawTextures.Values)
+                if (texture.Id != 0) _gl.DeleteTexture(texture.Id);
+            _sharedRawTextures.Clear();
+
+            foreach (GeometryResources resources in _retainedGeometry.Values)
+                DeleteGeometryResources(resources);
+            _retainedGeometry.Clear();
         }
 
         private uint UploadTexture(MapTextureImage image, TextureSamplingSpace samplingSpace)
@@ -1112,6 +1260,32 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ReleaseRawTexture(texture.Image);
             _lightmapTextures.Clear();
 
+            ReleaseGeometry();
+
+            _scene = null;
+            _previewSun = null;
+            _plan = null;
+        }
+
+        private void ReleaseGeometry()
+        {
+            if (_activeGeometryResources != null)
+            {
+                GeometryResources resources = _activeGeometryResources;
+                _activeGeometryResources = null;
+                resources.References = Math.Max(0, resources.References - 1);
+                if (resources.References == 0)
+                    resources.ReleasedAtMs = Environment.TickCount64;
+
+                _vao = 0;
+                _positionVbo = 0;
+                _normalVbo = 0;
+                _uv0Vbo = 0;
+                _uv1Vbo = 0;
+                _ebo = 0;
+                return;
+            }
+
             DeleteBuffer(ref _positionVbo);
             DeleteBuffer(ref _normalVbo);
             DeleteBuffer(ref _uv0Vbo);
@@ -1122,10 +1296,23 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.DeleteVertexArray(_vao);
                 _vao = 0;
             }
+        }
 
-            _scene = null;
-            _previewSun = null;
-            _plan = null;
+        private void DeleteGeometryResources(GeometryResources resources)
+        {
+            if (resources == null)
+                return;
+
+            DeleteBuffer(ref resources.PositionVbo);
+            DeleteBuffer(ref resources.NormalVbo);
+            DeleteBuffer(ref resources.Uv0Vbo);
+            DeleteBuffer(ref resources.Uv1Vbo);
+            DeleteBuffer(ref resources.Ebo);
+            if (resources.Vao != 0)
+            {
+                _gl.DeleteVertexArray(resources.Vao);
+                resources.Vao = 0;
+            }
         }
 
         private void DeleteBuffer(ref uint buffer)
@@ -1144,6 +1331,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             try
             {
                 ReleaseSceneResources();
+                DeleteAllRetainedResources();
                 _gameShaderRuntime?.Dispose();
                 _gameShaderRuntime = null;
                 foreach (uint sampler in _samplers.Values)
@@ -1168,6 +1356,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             {
                 _sharedTextures.Clear();
                 _sharedRawTextures.Clear();
+                _retainedGeometry.Clear();
+                _activeGeometryResources = null;
                 _materialTextures.Clear();
                 _programTextures.Clear();
                 _lightmapTextures.Clear();
@@ -1175,6 +1365,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _lightmapSampler = 0;
                 _whiteTexture = 0;
                 _program = 0;
+                _nextRetentionSweepMs = 0;
                 _ready = false;
                 _gl = null;
                 _drawElements = null;

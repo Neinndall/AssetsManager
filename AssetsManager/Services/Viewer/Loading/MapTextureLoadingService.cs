@@ -15,7 +15,7 @@ namespace AssetsManager.Services.Viewer.Loading
     /// <summary>
     /// Resolves and decodes the base textures referenced by one map's material table.
     /// </summary>
-    internal sealed class MapTextureLoadingService
+    internal sealed class MapTextureLoadingService : IDisposable
     {
         internal const int PreviewTextureSize = 64;
         internal const int FullTextureSize = 1024;
@@ -23,6 +23,9 @@ namespace AssetsManager.Services.Viewer.Loading
 
         private readonly MapAssetResolver _assetResolver;
         private readonly LogService _logService;
+        private readonly MapTextureDecodeCache _decodeCache = new();
+        private readonly SemaphoreSlim _decodeGate = new(MaxConcurrentLoads, MaxConcurrentLoads);
+        private readonly CancellationTokenSource _disposeCancellation = new();
 
         public MapTextureLoadingService(
             MapAssetResolver assetResolver,
@@ -100,40 +103,24 @@ namespace AssetsManager.Services.Viewer.Loading
             IReadOnlyDictionary<MapTextureReference, MapResolvedAsset> assets =
                 await _assetResolver.ResolveTexturesAsync(references, projectRoot, cancellationToken);
             var decoded = new ConcurrentDictionary<MapTextureReference, MapTextureImage>();
-            using var gate = new SemaphoreSlim(MaxConcurrentLoads, MaxConcurrentLoads);
 
             Task[] loads = references.Select(async reference =>
             {
                 if (!assets.TryGetValue(reference, out MapResolvedAsset asset))
                     return;
 
-                await gate.WaitAsync(cancellationToken);
-                try
-                {
-                    await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
-                    if (stream == null)
-                        return;
+                MapTextureImage image = await DecodeAsync(
+                    asset,
+                    reference.VirtualPath ?? asset.VirtualPath,
+                    maxTextureSize,
+                    cancellationToken);
+                if (image == null)
+                    return;
 
-                    string extension = DetectTextureExtension(stream, reference.VirtualPath ?? asset.VirtualPath);
-                    IReadOnlyList<System.Windows.Media.Imaging.BitmapSource> levels = await Task.Run(
-                        () => TextureUtils.LoadViewerTextureMipChain(
-                            stream,
-                            extension,
-                            maxTextureSize),
-                        cancellationToken);
-                    if (levels.Count > 0)
-                    {
-                        var image = new MapTextureImage(levels);
-                        decoded[reference] = image;
-                        if (onLoaded != null && materialKeys.TryGetValue(reference, out string[] keys))
-                            foreach (string key in keys)
-                                onLoaded(key, image);
-                    }
-                }
-                finally
-                {
-                    gate.Release();
-                }
+                decoded[reference] = image;
+                if (onLoaded != null && materialKeys.TryGetValue(reference, out string[] keys))
+                    foreach (string key in keys)
+                        onLoaded(key, image);
             }).ToArray();
 
             await Task.WhenAll(loads);
@@ -195,37 +182,24 @@ namespace AssetsManager.Services.Viewer.Loading
             IReadOnlyDictionary<MapTextureReference, MapResolvedAsset> assets =
                 await _assetResolver.ResolveTexturesAsync(references, projectRoot, cancellationToken);
             var decoded = new ConcurrentDictionary<MapTextureReference, MapTextureImage>();
-            using var gate = new SemaphoreSlim(MaxConcurrentLoads, MaxConcurrentLoads);
 
             Task[] loads = references.Select(async reference =>
             {
                 if (!assets.TryGetValue(reference, out MapResolvedAsset asset))
                     return;
 
-                await gate.WaitAsync(cancellationToken);
-                try
-                {
-                    await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
-                    if (stream == null)
-                        return;
+                MapTextureImage image = await DecodeAsync(
+                    asset,
+                    reference.VirtualPath ?? asset.VirtualPath,
+                    maxTextureSize,
+                    cancellationToken);
+                if (image == null)
+                    return;
 
-                    string extension = DetectTextureExtension(stream, reference.VirtualPath ?? asset.VirtualPath);
-                    IReadOnlyList<System.Windows.Media.Imaging.BitmapSource> levels = await Task.Run(
-                        () => TextureUtils.LoadViewerTextureMipChain(stream, extension, maxTextureSize),
-                        cancellationToken);
-                    if (levels.Count > 0)
-                    {
-                        var image = new MapTextureImage(levels);
-                        decoded[reference] = image;
-                        if (onLoaded != null && keysByReference.TryGetValue(reference, out string[] keys))
-                            foreach (string key in keys)
-                                onLoaded(key, image);
-                    }
-                }
-                finally
-                {
-                    gate.Release();
-                }
+                decoded[reference] = image;
+                if (onLoaded != null && keysByReference.TryGetValue(reference, out string[] keys))
+                    foreach (string key in keys)
+                        onLoaded(key, image);
             }).ToArray();
 
             await Task.WhenAll(loads);
@@ -260,35 +234,22 @@ namespace AssetsManager.Services.Viewer.Loading
             IReadOnlyDictionary<MapTextureReference, MapResolvedAsset> assets =
                 await _assetResolver.ResolveTexturesAsync(references, projectRoot, cancellationToken);
             var decoded = new ConcurrentDictionary<string, MapTextureImage>(StringComparer.OrdinalIgnoreCase);
-            using var gate = new SemaphoreSlim(MaxConcurrentLoads, MaxConcurrentLoads);
 
             Task[] loads = references.Select(async reference =>
             {
                 if (!assets.TryGetValue(reference, out MapResolvedAsset asset))
                     return;
 
-                await gate.WaitAsync(cancellationToken);
-                try
-                {
-                    await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
-                    if (stream == null)
-                        return;
+                MapTextureImage image = await DecodeAsync(
+                    asset,
+                    reference.VirtualPath ?? asset.VirtualPath,
+                    maxTextureSize,
+                    cancellationToken);
+                if (image == null)
+                    return;
 
-                    string extension = DetectTextureExtension(stream, reference.VirtualPath ?? asset.VirtualPath);
-                    IReadOnlyList<System.Windows.Media.Imaging.BitmapSource> levels = await Task.Run(
-                        () => TextureUtils.LoadViewerTextureMipChain(stream, extension, maxTextureSize),
-                        cancellationToken);
-                    if (levels.Count > 0)
-                    {
-                        var image = new MapTextureImage(levels);
-                        decoded[reference.VirtualPath] = image;
-                        onLoaded?.Invoke(reference.VirtualPath, image);
-                    }
-                }
-                finally
-                {
-                    gate.Release();
-                }
+                decoded[reference.VirtualPath] = image;
+                onLoaded?.Invoke(reference.VirtualPath, image);
             }).ToArray();
 
             await Task.WhenAll(loads);
@@ -299,6 +260,79 @@ namespace AssetsManager.Services.Viewer.Loading
                 _logService?.LogDebug($"MAPGEO lightmaps unresolved or unreadable: {unresolved}/{references.Length}.");
 
             return new Dictionary<string, MapTextureImage>(decoded, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private Task<MapTextureImage> DecodeAsync(
+            MapResolvedAsset asset,
+            string virtualPath,
+            int requestedWidth,
+            CancellationToken cancellationToken)
+        {
+            // Match current LTK MAIN: once the sharpening/full decode has landed, a later preview
+            // request uses those pixels immediately instead of reviving an older low-resolution decode.
+            if (requestedWidth == PreviewTextureSize &&
+                _decodeCache.TryGetCompleted(asset, FullTextureSize, out MapTextureImage full))
+            {
+                return Task.FromResult(full);
+            }
+
+            // Match useAssetTextures.sharpens(): a preview that already landed at least as wide
+            // as the full ask, or below preview width because the source itself is smaller, is
+            // already the whole authored texture and must not be decoded a second time.
+            if (requestedWidth == FullTextureSize &&
+                _decodeCache.TryGetCompleted(asset, PreviewTextureSize, out MapTextureImage preview))
+            {
+                if (PreviewSatisfiesFull(preview))
+                    return Task.FromResult(preview);
+            }
+
+            return _decodeCache.GetOrLoadAsync(
+                asset,
+                requestedWidth,
+                () => DecodeCoreAsync(asset, virtualPath, requestedWidth),
+                cancellationToken);
+        }
+
+        internal static bool PreviewSatisfiesFull(MapTextureImage preview)
+        {
+            if (preview?.BaseLevel == null)
+                return false;
+            int landedWidth = preview.BaseLevel.PixelWidth;
+            return landedWidth >= FullTextureSize || landedWidth < PreviewTextureSize;
+        }
+
+        internal Action HoldDecodedTexture(MapTextureImage image) => _decodeCache.Hold(image);
+
+        private async Task<MapTextureImage> DecodeCoreAsync(
+            MapResolvedAsset asset,
+            string virtualPath,
+            int requestedWidth)
+        {
+            CancellationToken cancellationToken = _disposeCancellation.Token;
+            await _decodeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken).ConfigureAwait(false);
+                if (stream == null)
+                    return null;
+
+                string extension = DetectTextureExtension(stream, virtualPath ?? asset.VirtualPath);
+                IReadOnlyList<System.Windows.Media.Imaging.BitmapSource> levels = await Task.Run(
+                    () => TextureUtils.LoadViewerTextureMipChain(stream, extension, requestedWidth),
+                    cancellationToken).ConfigureAwait(false);
+                return levels.Count > 0 ? new MapTextureImage(levels) : null;
+            }
+            finally
+            {
+                _decodeGate.Release();
+            }
+        }
+
+        public void Dispose()
+        {
+            _disposeCancellation.Cancel();
+            _decodeCache.Dispose();
+            _disposeCancellation.Dispose();
         }
 
         internal static string DetectTextureExtension(Stream stream, string virtualPath)

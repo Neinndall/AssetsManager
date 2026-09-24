@@ -119,6 +119,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio / MAP backdrops now reuse decoded textures across stock/game shader paths and retain recently released geometry/textures for faster map switching.
   - Viewer / Rebuilt the MAPGEO loading core around canonical map paths, project-to-WAD asset resolution, flat geometry buffers, StaticMaterialDef semantics, shader defaults, and bounded batch texture decoding without routing maps through SceneModel/ModelPart.
   - Viewer / Removed the retired SceneModel-based MAPGEO loader, CPU terrain compositor and legacy MapGeometry entry paths; MAP project discovery and explicit scene loading are now owned exclusively by VFX Studio.
   - Viewer / MAP scene runtime now memoizes structure animation groups and placement matrices, propagates stale-load cancellation through BIN/texture/ANM reads, and releases already completed skin runtimes plus temporary MapVfx resources when a parallel map load is cancelled.
@@ -408,6 +409,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Exiting a project now clears its active MAP runtime and released backdrop GPU resources before returning to the normal Viewer.
   - Viewer / MAP scenes now resolve shared SKN indices, hash-only Animation Clips, and truncated or collision-renamed BIN dependencies directly from the extracted container so structures and clip VFX are not dropped.
   - VFX Studio / Fixed unresolved child identifiers incorrectly synthesizing or falling back to effect keys from unrelated hashes or names.
   - VFX Studio / Fixed null primitive defaults and invalid curve key pairs to match League VFX parsing semantics.

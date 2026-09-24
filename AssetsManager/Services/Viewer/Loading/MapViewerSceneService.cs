@@ -16,13 +16,16 @@ namespace AssetsManager.Services.Viewer.Loading
     {
         private readonly MapSceneLoadingService _sceneLoadingService;
         private readonly MapSceneRuntimeFactory _runtimeFactory;
+        private readonly MapTextureLoadingService _textureLoadingService;
 
         internal MapViewerSceneService(
             MapSceneLoadingService sceneLoadingService,
-            MapSceneRuntimeFactory runtimeFactory)
+            MapSceneRuntimeFactory runtimeFactory,
+            MapTextureLoadingService textureLoadingService)
         {
             _sceneLoadingService = sceneLoadingService;
             _runtimeFactory = runtimeFactory;
+            _textureLoadingService = textureLoadingService;
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewTexturesAsync(
@@ -91,20 +94,21 @@ namespace AssetsManager.Services.Viewer.Loading
         {
             ArgumentNullException.ThrowIfNull(source);
             MapSceneData scene = await _sceneLoadingService.LoadBackdropAsync(source, cancellationToken);
-            return scene == null
-                ? null
-                : new MapSceneRuntime(
-                    scene,
-                    Array.Empty<MapCharacterRuntimeGroup>(),
-                    new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>()));
+            if (scene == null)
+                return null;
+
+            return AttachTextureRetention(new MapSceneRuntime(
+                scene,
+                Array.Empty<MapCharacterRuntimeGroup>(),
+                new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>())));
         }
 
-        internal Task<MapSceneRuntime> LoadRuntimeAssetsAsync(
+        internal async Task<MapSceneRuntime> LoadRuntimeAssetsAsync(
             MapSceneRuntime backdrop,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(backdrop);
-            return _runtimeFactory.CreateAsync(backdrop.Scene, cancellationToken);
+            return AttachTextureRetention(await _runtimeFactory.CreateAsync(backdrop.Scene, cancellationToken));
         }
 
         internal Task<IReadOnlyList<MapCharacterRuntimeGroup>> LoadCharacterAssetsAsync(
@@ -141,6 +145,12 @@ namespace AssetsManager.Services.Viewer.Loading
             return _runtimeFactory.LoadParticlesAsync(backdrop.Scene, visibilityFlags, cancellationToken);
         }
 
+        private MapSceneRuntime AttachTextureRetention(MapSceneRuntime runtime)
+        {
+            runtime?.SetBackdropTextureRetainer(_textureLoadingService.HoldDecodedTexture);
+            return runtime;
+        }
+
         internal Task<MapSceneRuntime> LoadAsync(
             string mapFilePath,
             string projectRoot,
@@ -158,7 +168,7 @@ namespace AssetsManager.Services.Viewer.Loading
             if (scene == null)
                 return null;
 
-            return await _runtimeFactory.CreateAsync(scene, cancellationToken);
+            return AttachTextureRetention(await _runtimeFactory.CreateAsync(scene, cancellationToken));
         }
     }
 }

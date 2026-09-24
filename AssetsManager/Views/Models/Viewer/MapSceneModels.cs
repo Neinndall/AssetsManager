@@ -90,6 +90,29 @@ namespace AssetsManager.Views.Models.Viewer
                 pathHash != 0 ? pathHash : XxHash64Ext.Hash(virtualPath));
     }
 
+    internal readonly record struct MapResolvedAssetCacheKey(
+        string SourcePath,
+        ulong WadPathHash,
+        long SourceLength,
+        long SourceLastWriteTimeUtcTicks)
+    {
+        internal static MapResolvedAssetCacheKey From(MapResolvedAsset asset)
+        {
+            ArgumentNullException.ThrowIfNull(asset);
+            string sourcePath = asset.IsPhysicalFile ? asset.PhysicalPath : asset.WadPath;
+            string sourceIdentity = string.IsNullOrWhiteSpace(sourcePath)
+                ? (asset.VirtualPath ?? string.Empty).Replace('\\', '/').ToUpperInvariant()
+                : Path.GetFullPath(sourcePath).ToUpperInvariant();
+            ulong chunkHash = asset.IsPhysicalFile ? 0 : asset.WadPathHash;
+            if (string.IsNullOrWhiteSpace(sourcePath))
+                return new MapResolvedAssetCacheKey(sourceIdentity, chunkHash, -1, 0);
+
+            var info = new FileInfo(sourcePath);
+            return info.Exists
+                ? new MapResolvedAssetCacheKey(sourceIdentity, chunkHash, info.Length, info.LastWriteTimeUtc.Ticks)
+                : new MapResolvedAssetCacheKey(sourceIdentity, chunkHash, -1, 0);
+        }
+    }
     internal sealed record MapSceneAssets(
         MapSceneSource Source,
         MapResolvedAsset Geometry,
