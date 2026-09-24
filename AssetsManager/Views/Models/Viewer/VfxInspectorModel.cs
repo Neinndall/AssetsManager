@@ -740,7 +740,8 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _showCharacterJointNames;
         private bool _characterAutoRotate;
         private bool _characterTransformGizmoEnabled = true;
-        private bool _characterInspectorVisible = true;
+        private bool _inspectorVisible = true;
+        private bool _viewportToolbarVisible = true;
         private bool _characterBackdropEnabled;
         private bool _mapParticlesVisible = true;
         private bool _mapStructuresVisible = true;
@@ -1061,13 +1062,25 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        public bool CharacterInspectorVisible
+        public bool InspectorVisible
         {
-            get => _characterInspectorVisible;
+            get => _inspectorVisible;
             set
             {
-                if (_characterInspectorVisible == value) return;
-                _characterInspectorVisible = value;
+                if (_inspectorVisible == value) return;
+                _inspectorVisible = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsInspectorPanelVisible));
+            }
+        }
+
+        public bool ViewportToolbarVisible
+        {
+            get => _viewportToolbarVisible;
+            set
+            {
+                if (_viewportToolbarVisible == value) return;
+                _viewportToolbarVisible = value;
                 OnPropertyChanged();
             }
         }
@@ -1227,12 +1240,16 @@ namespace AssetsManager.Views.Models.Viewer
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsSkinWorkspace));
                 OnPropertyChanged(nameof(IsMapWorkspace));
+                OnPropertyChanged(nameof(HasContextInspector));
+                OnPropertyChanged(nameof(IsInspectorPanelVisible));
                 OnPropertyChanged(nameof(HasActiveCharacterBackdrop));
             }
         }
 
         public bool IsSkinWorkspace => SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin;
         public bool IsMapWorkspace => SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Map;
+        public bool HasContextInspector => IsSkinWorkspace || IsMapWorkspace;
+        public bool IsInspectorPanelVisible => HasContextInspector && InspectorVisible;
 
         public void NotifyWorkspaceTabsChanged()
         {

@@ -183,6 +183,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="LayersOutline" Width="15" Height="15"
                                                     Foreground="{StaticResource AccentBrush}" Margin="0,0,7,0"
@@ -204,7 +205,26 @@
                                 ToolTip="Exit VFX Studio">
                             <materialIcons:MaterialIcon Kind="ExitToApp" Width="16" Height="16"/>
                         </Button>
-                        <Button Grid.Column="3" Click="BrowseRoot_Click"
+                        <ToggleButton Grid.Column="3"
+                                      IsChecked="{Binding InspectorVisible, Mode=TwoWay}"
+                                      Style="{StaticResource TransparentIconToggleButton}"
+                                      Width="30" Height="30" Padding="0" Margin="0,0,4,0"
+                                      ToolTip="Show / Hide Inspector"
+                                      Visibility="{Binding HasContextInspector, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <materialIcons:MaterialIcon Width="16" Height="16">
+                                <materialIcons:MaterialIcon.Style>
+                                    <Style TargetType="materialIcons:MaterialIcon">
+                                        <Setter Property="Kind" Value="EyeOutline"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding InspectorVisible}" Value="False">
+                                                <Setter Property="Kind" Value="EyeOffOutline"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </materialIcons:MaterialIcon.Style>
+                            </materialIcons:MaterialIcon>
+                        </ToggleButton>
+                        <Button Grid.Column="4" Click="BrowseRoot_Click"
                                 Style="{StaticResource TransparentIconButton}" Width="30" Height="30" Padding="0"
                                 ToolTip="Open another project folder">
                             <materialIcons:MaterialIcon Kind="FolderOpen" Width="16" Height="16"/>
@@ -226,46 +246,13 @@
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                               VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"/>
 
-                    <GridSplitter Grid.Row="3" Height="6" HorizontalAlignment="Stretch" Background="Transparent" Cursor="SizeNS">
-                        <GridSplitter.Style>
-                            <Style TargetType="GridSplitter">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsMapWorkspace}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsSkinWorkspace}" Value="True"/>
-                                            <Condition Binding="{Binding CharacterInspectorVisible}" Value="True"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </MultiDataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </GridSplitter.Style>
-                    </GridSplitter>
+                    <GridSplitter Grid.Row="3" Height="6" HorizontalAlignment="Stretch" Background="Transparent" Cursor="SizeNS"
+                                  Visibility="{Binding IsInspectorPanelVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                     <Border Grid.Row="4" MaxHeight="330" MinHeight="150"
                             Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}"
-                            BorderThickness="1" CornerRadius="10" Padding="6">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsMapWorkspace}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsSkinWorkspace}" Value="True"/>
-                                            <Condition Binding="{Binding CharacterInspectorVisible}" Value="True"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </MultiDataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
+                            BorderThickness="1" CornerRadius="10" Padding="6"
+                            Visibility="{Binding IsInspectorPanelVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="2">
                                 <Grid Margin="4,2,4,7">
@@ -940,7 +927,8 @@
                         <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,16"
                                 Panel.ZIndex="20"
                                 Background="#E618181B" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                CornerRadius="18" Padding="6,4">
+                                CornerRadius="18" Padding="6,4"
+                                Visibility="{Binding ViewportToolbarVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Border.Effect>
                                 <DropShadowEffect Color="Black" BlurRadius="22" ShadowDepth="4" Opacity="0.4"/>
                             </Border.Effect>
@@ -1233,12 +1221,11 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Compact Inspector visibility affordance, matching the normal Viewer's FAB pattern. -->
-                        <ToggleButton IsChecked="{Binding CharacterInspectorVisible, Mode=TwoWay}"
+                        <!-- Compact viewport-toolbar affordance, matching the normal Viewer's FAB pattern. -->
+                        <ToggleButton IsChecked="{Binding ViewportToolbarVisible, Mode=TwoWay}"
                                       HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                       Margin="0,0,12,12" Cursor="Hand" Panel.ZIndex="30"
-                                      ToolTip="Show / Hide Character Inspector"
-                                      Visibility="{Binding IsSkinWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
+                                      ToolTip="Show / Hide Viewport Toolbar">
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
                                     <Border x:Name="border" Width="36" Height="36" CornerRadius="18"

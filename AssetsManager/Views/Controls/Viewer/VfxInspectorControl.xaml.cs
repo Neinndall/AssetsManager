@@ -429,7 +429,6 @@ namespace AssetsManager.Views.Controls.Viewer
             tab.CharacterAutoRotate = _model.CharacterAutoRotate;
             tab.CharacterAutoRotateDegrees = _characterAutoRotateDegrees;
             tab.CharacterTransformGizmoEnabled = _model.CharacterTransformGizmoEnabled;
-            tab.CharacterInspectorVisible = _model.CharacterInspectorVisible;
             tab.CharacterBackdropEnabled = _model.CharacterBackdropEnabled;
             tab.BackdropParticlesVisible = _model.MapParticlesVisible;
             tab.BackdropStructuresVisible = _model.MapStructuresVisible;
@@ -457,7 +456,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.CharacterAutoRotate = tab.CharacterAutoRotate;
                 _characterAutoRotateDegrees = tab.CharacterAutoRotateDegrees;
                 _model.CharacterTransformGizmoEnabled = tab.CharacterTransformGizmoEnabled;
-                _model.CharacterInspectorVisible = tab.CharacterInspectorVisible;
                 _model.MapParticlesVisible = tab.BackdropParticlesVisible;
                 _model.MapStructuresVisible = tab.BackdropStructuresVisible;
                 _model.CharacterPositionX = tab.CharacterPositionX;
@@ -850,7 +848,7 @@ namespace AssetsManager.Views.Controls.Viewer
                      e.PropertyName == nameof(VfxInspectorModel.ShowCharacterJointNames) ||
                      e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate) ||
                      e.PropertyName == nameof(VfxInspectorModel.CharacterTransformGizmoEnabled) ||
-                     e.PropertyName == nameof(VfxInspectorModel.CharacterInspectorVisible))
+                     e.PropertyName == nameof(VfxInspectorModel.InspectorVisible))
             {
                 if (e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate))
                     ApplyCharacterPlacement();
