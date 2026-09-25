@@ -2699,31 +2699,93 @@ namespace AssetsManager.Views.Controls.Viewer
             e.Handled = true;
         }
 
+        private long _previewShowClosedTicks;
+        private long _previewViewModeClosedTicks;
+        private long _previewCameraClosedTicks;
+        private long _rigMenuClosedTicks;
+
+        private void CloseAllToolbarPopups(Popup exceptPopup = null)
+        {
+            if (PreviewShowPopup != null && PreviewShowPopup != exceptPopup && PreviewShowPopup.IsOpen)
+                PreviewShowPopup.IsOpen = false;
+            if (PreviewViewModePopup != null && PreviewViewModePopup != exceptPopup && PreviewViewModePopup.IsOpen)
+                PreviewViewModePopup.IsOpen = false;
+            if (PreviewCameraPopup != null && PreviewCameraPopup != exceptPopup && PreviewCameraPopup.IsOpen)
+                PreviewCameraPopup.IsOpen = false;
+            if (RigPresetButton?.ContextMenu != null && RigPresetButton.ContextMenu.IsOpen)
+                RigPresetButton.ContextMenu.IsOpen = false;
+        }
+
+        private void PreviewShowPopup_Closed(object sender, EventArgs e)
+        {
+            _previewShowClosedTicks = Environment.TickCount64;
+        }
+
+        private void PreviewViewModePopup_Closed(object sender, EventArgs e)
+        {
+            _previewViewModeClosedTicks = Environment.TickCount64;
+        }
+
+        private void PreviewCameraPopup_Closed(object sender, EventArgs e)
+        {
+            _previewCameraClosedTicks = Environment.TickCount64;
+        }
+
+        private void RigPresetContextMenu_Closed(object sender, RoutedEventArgs e)
+        {
+            _rigMenuClosedTicks = Environment.TickCount64;
+        }
+
         private void PreviewShow_Click(object sender, RoutedEventArgs e)
         {
-            if (PreviewShowPopup != null)
-                PreviewShowPopup.IsOpen = !PreviewShowPopup.IsOpen;
+            if (PreviewShowPopup == null) return;
+            if (Environment.TickCount64 - _previewShowClosedTicks < 250)
+            {
+                // The popup was just closed by clicking on this trigger button: keep it closed
+                return;
+            }
+
+            CloseAllToolbarPopups(PreviewShowPopup);
+            PreviewShowPopup.IsOpen = true;
         }
 
         private void PreviewViewMode_Click(object sender, RoutedEventArgs e)
         {
-            if (PreviewViewModePopup != null)
-                PreviewViewModePopup.IsOpen = !PreviewViewModePopup.IsOpen;
+            if (PreviewViewModePopup == null) return;
+            if (Environment.TickCount64 - _previewViewModeClosedTicks < 250)
+            {
+                return;
+            }
+
+            CloseAllToolbarPopups(PreviewViewModePopup);
+            PreviewViewModePopup.IsOpen = true;
         }
 
         private void PreviewCamera_Click(object sender, RoutedEventArgs e)
         {
-            if (PreviewCameraPopup != null)
-                PreviewCameraPopup.IsOpen = !PreviewCameraPopup.IsOpen;
+            if (PreviewCameraPopup == null) return;
+            if (Environment.TickCount64 - _previewCameraClosedTicks < 250)
+            {
+                return;
+            }
+
+            CloseAllToolbarPopups(PreviewCameraPopup);
+            PreviewCameraPopup.IsOpen = true;
         }
 
         private void RigPreset_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.ContextMenu != null)
             {
+                if (Environment.TickCount64 - _rigMenuClosedTicks < 250)
+                {
+                    return;
+                }
+
+                CloseAllToolbarPopups();
                 UpdateRigControlValues();
                 btn.ContextMenu.PlacementTarget = btn;
-                btn.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                btn.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
                 btn.ContextMenu.IsOpen = true;
             }
         }

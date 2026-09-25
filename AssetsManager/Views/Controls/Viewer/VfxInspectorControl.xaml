@@ -777,7 +777,7 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Bottom-center action toolbar. Matches the normal Viewer placement and chrome. -->
+                        <!-- Bottom-center action toolbar. Matches the normal Viewer placement, acrylic background, and chrome. -->
                         <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,16"
                                 Panel.ZIndex="20"
                                 Background="#E618181B" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
@@ -786,91 +786,221 @@
                             <Border.Effect>
                                 <DropShadowEffect Color="Black" BlurRadius="22" ShadowDepth="4" Opacity="0.4"/>
                             </Border.Effect>
-                            <StackPanel Orientation="Horizontal">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
-                                            Visibility="{Binding IsSkinWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <ToggleButton IsChecked="{Binding CharacterTransformGizmoEnabled, Mode=TwoWay}"
-                                                  Style="{StaticResource TransparentIconToggleButton}"
-                                                  Width="28" Height="26" Margin="0,0,4,0"
-                                                  ToolTip="Move Character in viewport">
-                                        <materialIcons:MaterialIcon Kind="AxisArrow" Width="15" Height="15"/>
-                                    </ToggleButton>
-                                    <ToggleButton IsChecked="{Binding CharacterAutoRotate, Mode=TwoWay}"
-                                                  Style="{StaticResource TransparentIconToggleButton}"
-                                                  Width="28" Height="26" Margin="0,0,4,0"
-                                                  ToolTip="Auto Rotate Character">
-                                        <materialIcons:MaterialIcon Kind="Rotate3DVariant" Width="15" Height="15"/>
-                                    </ToggleButton>
-                                    <Button Click="FitCharacter_Click"
-                                            Style="{StaticResource TransparentIconButton}"
-                                            Width="28" Height="26" Margin="0,0,4,0"
-                                            ToolTip="Fit Character (F)">
-                                        <materialIcons:MaterialIcon Kind="FitToScreenOutline" Width="15" Height="15"/>
-                                    </Button>
-                                </StackPanel>
-
-                                <!-- Left group: toggles and immediate viewport actions. -->
-                                <ToggleButton x:Name="PreviewShadersToggle"
-                                              Style="{StaticResource TransparentIconToggleButton}"
-                                              Height="26" Width="30" Margin="0,0,4,0"
-                                              ToolTip="Use game shaders for Lit meshes"
-                                              IsChecked="{Binding PreviewShaders, Mode=TwoWay}">
-                                    <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"/>
-                                </ToggleButton>
-
-                                <ToggleButton IsChecked="{Binding ShowChampionMesh, Mode=TwoWay}"
-                                              Style="{StaticResource TransparentIconToggleButton}"
-                                              Width="28" Height="26" Margin="0,0,4,0"
-                                              ToolTip="Toggle Champion 3D Model Mesh (when available)"
-                                              Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <materialIcons:MaterialIcon Kind="AccountBoxOutline" Width="15" Height="15"/>
-                                </ToggleButton>
-
-                                <ToggleButton IsChecked="{Binding CharacterEffectsEnabled, Mode=TwoWay}"
-                                              Style="{StaticResource TransparentIconToggleButton}"
-                                              Width="28" Height="26" Margin="0,0,4,0"
-                                              ToolTip="Toggle Character Effects / Skin VFX"
-                                              Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <materialIcons:MaterialIcon Kind="Sparkles" Width="15" Height="15"/>
-                                </ToggleButton>
-
-                                <Button Click="ResetCamera_Click"
-                                        Style="{StaticResource TransparentIconButton}"
-                                        Width="28" Height="26" Margin="0,0,6,0"
-                                        ToolTip="Reset Camera (F)">
-                                    <materialIcons:MaterialIcon Kind="Restore" Width="15" Height="15"/>
-                                </Button>
-
-                                <Border Width="1" Height="16" Background="{StaticResource BorderColor}" Margin="0,0,6,0"/>
-
-                                <!-- Right group: menus and dropdown choices. -->
-                                <!-- Preview display controls mirror the VFX reference viewer. -->
-                                <Button x:Name="PreviewShowButton"
-                                        Click="PreviewShow_Click"
-                                        Style="{StaticResource TransparentIconButton}"
-                                        Height="26" Padding="6,0" Margin="0,0,4,0"
-                                        ToolTip="Preview display options">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Group 1: Character / Actor Gizmo & Framing (Skin workspace only) -->
+                                <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="0,0,2,0"
+                                        Visibility="{Binding IsSkinWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="EyeOutline" Width="13" Height="13"
-                                                                    Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0"/>
-                                        <TextBlock Text="Show" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="{Binding PreviewDisplayCount, StringFormat=' {0}'}" FontSize="10"
-                                                   FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
-                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
-                                                                    Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0"/>
+                                        <ToggleButton IsChecked="{Binding CharacterTransformGizmoEnabled, Mode=TwoWay}"
+                                                      Style="{StaticResource TransparentIconToggleButton}"
+                                                      Width="30" Height="30"
+                                                      ToolTip="Move Character in viewport">
+                                            <materialIcons:MaterialIcon Kind="AxisArrow" Width="14" Height="14"/>
+                                        </ToggleButton>
+                                        <ToggleButton IsChecked="{Binding CharacterAutoRotate, Mode=TwoWay}"
+                                                      Style="{StaticResource TransparentIconToggleButton}"
+                                                      Width="30" Height="30" Margin="2,0,0,0"
+                                                      ToolTip="Auto Rotate Character">
+                                            <materialIcons:MaterialIcon Kind="Rotate3DVariant" Width="14" Height="14"/>
+                                        </ToggleButton>
+                                        <Button Click="FitCharacter_Click"
+                                                Style="{StaticResource TransparentIconButton}"
+                                                Width="30" Height="30" Margin="2,0,0,0"
+                                                ToolTip="Fit Character (F)">
+                                            <materialIcons:MaterialIcon Kind="FitToScreenOutline" Width="14" Height="14"/>
+                                        </Button>
                                     </StackPanel>
-                                </Button>
+                                </Border>
 
+                                <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"
+                                           Visibility="{Binding IsSkinWorkspace, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                                <!-- Group 2: Display & Camera Options (Dropdown menus and shaders) -->
+                                <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <!-- Show dropdown -->
+                                        <Button x:Name="PreviewShowButton"
+                                                Click="PreviewShow_Click"
+                                                Style="{StaticResource TransparentIconButton}"
+                                                Height="30" Padding="8,0"
+                                                ToolTip="Preview display options">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="EyeOutline" Width="13" Height="13"
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Show" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding PreviewDisplayCount, StringFormat=' {0}'}" FontSize="10"
+                                                           FontFamily="Consolas" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- View Mode dropdown -->
+                                        <Button x:Name="PreviewViewModeButton"
+                                                Click="PreviewViewMode_Click"
+                                                Style="{StaticResource TransparentIconButton}"
+                                                Height="30" Padding="8,0" Margin="2,0,0,0"
+                                                ToolTip="Preview view mode">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="CubeOutline" Width="13" Height="13"
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding PreviewViewModeText}" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                                <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- Game Shaders Toggle -->
+                                        <ToggleButton x:Name="PreviewShadersToggle"
+                                                      Style="{StaticResource TransparentIconToggleButton}"
+                                                      Width="30" Height="30" Margin="2,0,0,0"
+                                                      ToolTip="Use game shaders for Lit meshes"
+                                                      IsChecked="{Binding PreviewShaders, Mode=TwoWay}">
+                                            <materialIcons:MaterialIcon Kind="PaletteOutline" Width="14" Height="14"/>
+                                        </ToggleButton>
+
+                                        <!-- Camera Preset dropdown -->
+                                        <Button x:Name="PreviewCameraButton"
+                                                Click="PreviewCamera_Click"
+                                                Style="{StaticResource TransparentIconButton}"
+                                                Height="30" Padding="8,0" Margin="2,0,0,0"
+                                                ToolTip="Preview camera preset">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="VideoOutline" Width="13" Height="13"
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding PreviewCameraText}" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                                <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- Standalone Simulation Rig Motion Preset -->
+                                        <Button x:Name="RigPresetButton"
+                                                Click="RigPreset_Click" 
+                                                Style="{StaticResource TransparentIconButton}"
+                                                Height="30" Padding="8,0" Margin="2,0,0,0"
+                                                Visibility="{Binding HasStandaloneSystem, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                ToolTip="Standalone system motion">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="{Binding RigPresetIcon}" Width="13" Height="13" Foreground="{StaticResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding RigPresetText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                                <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <Button.ContextMenu>
+                                                <ContextMenu x:Name="RigPresetContextMenu"
+                                                             Closed="RigPresetContextMenu_Closed"
+                                                             Background="#FF161822" BorderBrush="{StaticResource BorderColor}" Foreground="White"
+                                                             DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                                    <MenuItem Header="Still — Stationary, once" Tag="Still" Click="SetRigPreset_Click" StaysOpenOnClick="True">
+                                                        <MenuItem.Icon>
+                                                            <materialIcons:MaterialIcon Kind="CrosshairsGps" Width="14" Height="14" Foreground="{StaticResource TextSecondary}"/>
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="Burst — Stationary, loop" Tag="Burst" Click="SetRigPreset_Click" StaysOpenOnClick="True">
+                                                        <MenuItem.Icon>
+                                                            <materialIcons:MaterialIcon Kind="Sparkles" Width="14" Foreground="{StaticResource AccentGreen}"/>
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="Missile — Moving path" Tag="Missile" Click="SetRigPreset_Click" StaysOpenOnClick="True">
+                                                        <MenuItem.Icon>
+                                                            <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}"/>
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                    <MenuItem Header="Trail — Orbiting path" Tag="Trail" Click="SetRigPreset_Click" StaysOpenOnClick="True">
+                                                        <MenuItem.Icon>
+                                                            <materialIcons:MaterialIcon Kind="RotateRight" Width="14" Height="14" Foreground="{StaticResource AccentPurple}"/>
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+
+                                                    <Separator/>
+
+                                                    <MenuItem StaysOpenOnClick="True">
+                                                        <MenuItem.Header>
+                                                            <StackPanel Width="250" Margin="2">
+                                                                <Grid Margin="0,0,0,3">
+                                                                    <TextBlock Text="Height" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                                    <TextBlock x:Name="RigHeightValueText" Text="100 u" HorizontalAlignment="Right"
+                                                                               FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                                </Grid>
+                                                                <Slider x:Name="RigHeightSlider" Minimum="0" Maximum="600" TickFrequency="10"
+                                                                        IsSnapToTickEnabled="True" Value="100" Style="{StaticResource HUDSliderStyle}"
+                                                                        ValueChanged="RigHeightSlider_ValueChanged"/>
+
+                                                                <StackPanel x:Name="RigDistancePanel" Margin="0,7,0,0">
+                                                                    <Grid Margin="0,0,0,3">
+                                                                        <TextBlock Text="Distance" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                                        <TextBlock x:Name="RigDistanceValueText" Text="1200 u" HorizontalAlignment="Right"
+                                                                                   FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                                    </Grid>
+                                                                    <Slider x:Name="RigDistanceSlider" Minimum="200" Maximum="4000" TickFrequency="50"
+                                                                            IsSnapToTickEnabled="True" Value="1200" Style="{StaticResource HUDSliderStyle}"
+                                                                            ValueChanged="RigDistanceSlider_ValueChanged"/>
+                                                                    <Grid Margin="0,5,0,3">
+                                                                        <TextBlock Text="Speed" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                                        <TextBlock x:Name="RigSpeedValueText" Text="1600 u/s" HorizontalAlignment="Right"
+                                                                                   FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                                    </Grid>
+                                                                    <Slider x:Name="RigSpeedSlider" Minimum="100" Maximum="5000" TickFrequency="50"
+                                                                            IsSnapToTickEnabled="True" Value="1600" Style="{StaticResource HUDSliderStyle}"
+                                                                            ValueChanged="RigSpeedSlider_ValueChanged"/>
+                                                                </StackPanel>
+
+                                                                <StackPanel x:Name="RigOrbitPanel" Margin="0,7,0,0">
+                                                                    <Grid Margin="0,0,0,3">
+                                                                        <TextBlock Text="Radius" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                                        <TextBlock x:Name="RigRadiusValueText" Text="300 u" HorizontalAlignment="Right"
+                                                                                   FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                                    </Grid>
+                                                                    <Slider x:Name="RigRadiusSlider" Minimum="50" Maximum="1600" TickFrequency="25"
+                                                                            IsSnapToTickEnabled="True" Value="300" Style="{StaticResource HUDSliderStyle}"
+                                                                            ValueChanged="RigRadiusSlider_ValueChanged"/>
+                                                                    <Grid Margin="0,5,0,3">
+                                                                        <TextBlock Text="Period" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                                                        <TextBlock x:Name="RigPeriodValueText" Text="3.00 s" HorizontalAlignment="Right"
+                                                                                   FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
+                                                                    </Grid>
+                                                                    <Slider x:Name="RigPeriodSlider" Minimum="0.25" Maximum="12" TickFrequency="0.25"
+                                                                            IsSnapToTickEnabled="True" Value="3" Style="{StaticResource HUDSliderStyle}"
+                                                                            ValueChanged="RigPeriodSlider_ValueChanged"/>
+                                                                </StackPanel>
+
+                                                                <Grid Margin="0,9,0,0">
+                                                                    <TextBlock Text="Seed" FontSize="10.5" Foreground="{StaticResource TextSecondary}"
+                                                                               VerticalAlignment="Center"/>
+                                                                    <Button HorizontalAlignment="Right" Click="RerollSeed_Click"
+                                                                            Style="{StaticResource SmallTextButtonStyle}"
+                                                                            ToolTip="Generate another deterministic VFX variation">
+                                                                        <StackPanel Orientation="Horizontal">
+                                                                            <materialIcons:MaterialIcon Kind="DiceMultipleOutline" Width="13" Height="13"
+                                                                                                        Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0"/>
+                                                                            <TextBlock Text="{Binding PlaybackSeed}" FontSize="10" FontFamily="Consolas"
+                                                                                       Foreground="{StaticResource TextSecondary}"/>
+                                                                        </StackPanel>
+                                                                    </Button>
+                                                                </Grid>
+                                                            </StackPanel>
+                                                        </MenuItem.Header>
+                                                    </MenuItem>
+                                                </ContextMenu>
+                                            </Button.ContextMenu>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Popups for display & camera options -->
                                 <Popup x:Name="PreviewShowPopup"
                                        PlacementTarget="{Binding ElementName=PreviewShowButton}"
-                                       Placement="Top" HorizontalOffset="-70" VerticalOffset="-6"
+                                       Placement="Top" HorizontalOffset="-58" VerticalOffset="-6"
                                        AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False"
+                                       Closed="PreviewShowPopup_Closed"
                                        DataContext="{Binding DataContext, ElementName=PreviewShowButton}">
                                     <Border Width="190" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
                                             BorderThickness="1" CornerRadius="7" Padding="10">
                                         <Border.Effect>
-                                            <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="3" Opacity="0.42"/>
+                                            <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.45"/>
                                         </Border.Effect>
                                         <StackPanel>
                                             <TextBlock Text="SHOW" FontSize="10" FontWeight="Bold"
@@ -899,28 +1029,17 @@
                                     </Border>
                                 </Popup>
 
-                                <Button x:Name="PreviewViewModeButton"
-                                        Click="PreviewViewMode_Click"
-                                        Style="{StaticResource TransparentIconButton}"
-                                        Height="26" Padding="6,0" Margin="0,0,4,0"
-                                        ToolTip="Preview view mode">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="13" Height="13"
-                                                                    Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0"/>
-                                        <TextBlock Text="{Binding PreviewViewModeText}" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextPrimary}"/>
-                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
-                                                                    Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0"/>
-                                    </StackPanel>
-                                </Button>
-
                                 <Popup x:Name="PreviewViewModePopup"
                                        PlacementTarget="{Binding ElementName=PreviewViewModeButton}"
                                        Placement="Top" HorizontalOffset="-58" VerticalOffset="-6"
                                        AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False"
+                                       Closed="PreviewViewModePopup_Closed"
                                        DataContext="{Binding DataContext, ElementName=PreviewViewModeButton}">
                                     <Border Width="190" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
                                             BorderThickness="1" CornerRadius="7" Padding="7">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.45"/>
+                                        </Border.Effect>
                                         <StackPanel>
                                             <RadioButton GroupName="VfxPreviewViewMode" Content="Lit"
                                                          Style="{StaticResource SegmentedRadioButtonStyle}"
@@ -943,28 +1062,17 @@
                                     </Border>
                                 </Popup>
 
-                                <Button x:Name="PreviewCameraButton"
-                                        Click="PreviewCamera_Click"
-                                        Style="{StaticResource TransparentIconButton}"
-                                        Height="26" Padding="6,0" Margin="0,0,4,0"
-                                        ToolTip="Preview camera preset">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="VideoOutline" Width="13" Height="13"
-                                                                    Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0"/>
-                                        <TextBlock Text="{Binding PreviewCameraText}" FontSize="11" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource TextPrimary}"/>
-                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
-                                                                    Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0"/>
-                                    </StackPanel>
-                                </Button>
-
                                 <Popup x:Name="PreviewCameraPopup"
                                        PlacementTarget="{Binding ElementName=PreviewCameraButton}"
-                                       Placement="Top" HorizontalOffset="-48" VerticalOffset="-6"
+                                       Placement="Top" HorizontalOffset="-42" VerticalOffset="-6"
                                        AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False"
+                                       Closed="PreviewCameraPopup_Closed"
                                        DataContext="{Binding DataContext, ElementName=PreviewCameraButton}">
                                     <Border Width="160" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
                                             BorderThickness="1" CornerRadius="7" Padding="7">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.45"/>
+                                        </Border.Effect>
                                         <StackPanel>
                                             <RadioButton GroupName="VfxPreviewCamera" Content="Game"
                                                          Style="{StaticResource SegmentedRadioButtonStyle}"
@@ -985,113 +1093,41 @@
                                     </Border>
                                 </Popup>
 
-                                <!-- Simulation Rig Motion Preset (LTK-Manager style: Still, Burst, Missile, Trail) -->
-                                <Button Click="RigPreset_Click" Style="{StaticResource TransparentIconButton}"
-                                        Height="26" Padding="6,0" Margin="0,0,4,0"
-                                        Visibility="{Binding HasStandaloneSystem, Converter={StaticResource BoolToVisibilityConverter}}"
-                                        ToolTip="Standalone system motion">
+                                <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"
+                                           Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                                <!-- Group 3: Champion Mesh & Effects (Visible when champion mesh is present) -->
+                                <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0"
+                                        Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon Kind="{Binding RigPresetIcon}" Width="13" Height="13" Foreground="{StaticResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding RigPresetText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                                        <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                        <ToggleButton IsChecked="{Binding ShowChampionMesh, Mode=TwoWay}"
+                                                      Style="{StaticResource TransparentIconToggleButton}"
+                                                      Width="30" Height="30"
+                                                      ToolTip="Toggle Champion 3D Model Mesh (when available)">
+                                            <materialIcons:MaterialIcon Kind="AccountBoxOutline" Width="14" Height="14"/>
+                                        </ToggleButton>
+                                        <ToggleButton IsChecked="{Binding CharacterEffectsEnabled, Mode=TwoWay}"
+                                                      Style="{StaticResource TransparentIconToggleButton}"
+                                                      Width="30" Height="30" Margin="2,0,0,0"
+                                                      ToolTip="Toggle Character Effects / Skin VFX">
+                                            <materialIcons:MaterialIcon Kind="Sparkles" Width="14" Height="14"/>
+                                        </ToggleButton>
                                     </StackPanel>
-                                    <Button.ContextMenu>
-                                        <ContextMenu Background="#FF161822" BorderBrush="{StaticResource BorderColor}" Foreground="White"
-                                                     DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                            <MenuItem Header="Still — Stationary, once" Tag="Still" Click="SetRigPreset_Click" StaysOpenOnClick="True">
-                                                <MenuItem.Icon>
-                                                    <materialIcons:MaterialIcon Kind="CrosshairsGps" Width="14" Height="14" Foreground="{StaticResource TextSecondary}"/>
-                                                </MenuItem.Icon>
-                                            </MenuItem>
-                                            <MenuItem Header="Burst — Stationary, loop" Tag="Burst" Click="SetRigPreset_Click" StaysOpenOnClick="True">
-                                                <MenuItem.Icon>
-                                                    <materialIcons:MaterialIcon Kind="Sparkles" Width="14" Foreground="{StaticResource AccentGreen}"/>
-                                                </MenuItem.Icon>
-                                            </MenuItem>
-                                            <MenuItem Header="Missile — Moving path" Tag="Missile" Click="SetRigPreset_Click" StaysOpenOnClick="True">
-                                                <MenuItem.Icon>
-                                                    <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}"/>
-                                                </MenuItem.Icon>
-                                            </MenuItem>
-                                            <MenuItem Header="Trail — Orbiting path" Tag="Trail" Click="SetRigPreset_Click" StaysOpenOnClick="True">
-                                                <MenuItem.Icon>
-                                                    <materialIcons:MaterialIcon Kind="RotateRight" Width="14" Height="14" Foreground="{StaticResource AccentPurple}"/>
-                                                </MenuItem.Icon>
-                                            </MenuItem>
+                                </Border>
 
-                                            <Separator/>
+                                <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
 
-                                            <MenuItem StaysOpenOnClick="True">
-                                                <MenuItem.Header>
-                                                    <StackPanel Width="250" Margin="2">
-                                                        <Grid Margin="0,0,0,3">
-                                                            <TextBlock Text="Height" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
-                                                            <TextBlock x:Name="RigHeightValueText" Text="100 u" HorizontalAlignment="Right"
-                                                                       FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
-                                                        </Grid>
-                                                        <Slider x:Name="RigHeightSlider" Minimum="0" Maximum="600" TickFrequency="10"
-                                                                IsSnapToTickEnabled="True" Value="100" Style="{StaticResource HUDSliderStyle}"
-                                                                ValueChanged="RigHeightSlider_ValueChanged"/>
-
-                                                        <StackPanel x:Name="RigDistancePanel" Margin="0,7,0,0">
-                                                            <Grid Margin="0,0,0,3">
-                                                                <TextBlock Text="Distance" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
-                                                                <TextBlock x:Name="RigDistanceValueText" Text="1200 u" HorizontalAlignment="Right"
-                                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
-                                                            </Grid>
-                                                            <Slider x:Name="RigDistanceSlider" Minimum="200" Maximum="4000" TickFrequency="50"
-                                                                    IsSnapToTickEnabled="True" Value="1200" Style="{StaticResource HUDSliderStyle}"
-                                                                    ValueChanged="RigDistanceSlider_ValueChanged"/>
-                                                            <Grid Margin="0,5,0,3">
-                                                                <TextBlock Text="Speed" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
-                                                                <TextBlock x:Name="RigSpeedValueText" Text="1600 u/s" HorizontalAlignment="Right"
-                                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
-                                                            </Grid>
-                                                            <Slider x:Name="RigSpeedSlider" Minimum="100" Maximum="5000" TickFrequency="50"
-                                                                    IsSnapToTickEnabled="True" Value="1600" Style="{StaticResource HUDSliderStyle}"
-                                                                    ValueChanged="RigSpeedSlider_ValueChanged"/>
-                                                        </StackPanel>
-
-                                                        <StackPanel x:Name="RigOrbitPanel" Margin="0,7,0,0">
-                                                            <Grid Margin="0,0,0,3">
-                                                                <TextBlock Text="Radius" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
-                                                                <TextBlock x:Name="RigRadiusValueText" Text="300 u" HorizontalAlignment="Right"
-                                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
-                                                            </Grid>
-                                                            <Slider x:Name="RigRadiusSlider" Minimum="50" Maximum="1600" TickFrequency="25"
-                                                                    IsSnapToTickEnabled="True" Value="300" Style="{StaticResource HUDSliderStyle}"
-                                                                    ValueChanged="RigRadiusSlider_ValueChanged"/>
-                                                            <Grid Margin="0,5,0,3">
-                                                                <TextBlock Text="Period" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
-                                                                <TextBlock x:Name="RigPeriodValueText" Text="3.00 s" HorizontalAlignment="Right"
-                                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource TextMuted}"/>
-                                                            </Grid>
-                                                            <Slider x:Name="RigPeriodSlider" Minimum="0.25" Maximum="12" TickFrequency="0.25"
-                                                                    IsSnapToTickEnabled="True" Value="3" Style="{StaticResource HUDSliderStyle}"
-                                                                    ValueChanged="RigPeriodSlider_ValueChanged"/>
-                                                        </StackPanel>
-
-                                                        <Grid Margin="0,9,0,0">
-                                                            <TextBlock Text="Seed" FontSize="10.5" Foreground="{StaticResource TextSecondary}"
-                                                                       VerticalAlignment="Center"/>
-                                                            <Button HorizontalAlignment="Right" Click="RerollSeed_Click"
-                                                                    Style="{StaticResource SmallTextButtonStyle}"
-                                                                    ToolTip="Generate another deterministic VFX variation">
-                                                                <StackPanel Orientation="Horizontal">
-                                                                    <materialIcons:MaterialIcon Kind="DiceMultipleOutline" Width="13" Height="13"
-                                                                                                Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0"/>
-                                                                    <TextBlock Text="{Binding PlaybackSeed}" FontSize="10" FontFamily="Consolas"
-                                                                               Foreground="{StaticResource TextSecondary}"/>
-                                                                </StackPanel>
-                                                            </Button>
-                                                        </Grid>
-                                                    </StackPanel>
-                                                </MenuItem.Header>
-                                            </MenuItem>
-                                        </ContextMenu>
-                                    </Button.ContextMenu>
-                                </Button>
-
+                                <!-- Group 4: Reset Camera -->
+                                <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0,0,0">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Click="ResetCamera_Click"
+                                                Style="{StaticResource TransparentIconButton}"
+                                                Width="30" Height="30"
+                                                ToolTip="Reset Camera (F)">
+                                            <materialIcons:MaterialIcon Kind="Restore" Width="14" Height="14"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </Border>
 
