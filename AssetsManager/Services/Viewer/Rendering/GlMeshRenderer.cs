@@ -55,6 +55,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uMaterialUsesTextureAlpha;
         private int _uWireframePass;
         private int _uWireframeColor;
+        private int _uSelfIllumination;
         private bool _gles;
         private bool _ready;
 
@@ -164,7 +165,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 lightDir2,
                 lightColor2,
                 ambientColor,
-                materialTimeSeconds);
+                materialTimeSeconds,
+                model.SelfIllumination);
 
             // Per-part state below owns blending, depth and culling. Start and end from
             // conservative defaults so unbound Viewer/Diff parts keep their shared behavior unchanged.
@@ -200,7 +202,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                         lightDir2,
                         lightColor2,
                         ambientColor,
-                        materialTimeSeconds);
+                        materialTimeSeconds,
+                        model.SelfIllumination);
                     _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
                     _gl.Uniform1(_uWireframePass, 1);
                     _gl.Uniform4(
@@ -258,6 +261,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uMaterialUsesTextureAlpha = gl.GetUniformLocation(_program, "uMaterialUsesTextureAlpha");
             _uWireframePass = gl.GetUniformLocation(_program, "uWireframePass");
             _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
+            _uSelfIllumination = gl.GetUniformLocation(_program, "uSelfIllumination");
         }
 
         private void ConfigureSkinIndexAttribute(
@@ -298,7 +302,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3 lightDir2,
             Vector3 lightColor2,
             Vector3 ambientColor,
-            float materialTimeSeconds)
+            float materialTimeSeconds,
+            float selfIllumination = 0f)
         {
             _gl.UseProgram(_program);
             _gl.BindBufferBase(BufferTargetARB.UniformBuffer, 0, _boneBuffer);
@@ -311,6 +316,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform3(_uAmbient, ambientColor);
             _gl.Uniform3(_uCameraPosition, cameraPosition);
             _gl.Uniform1(_uEffectTime, materialTimeSeconds);
+            _gl.Uniform1(_uSelfIllumination, selfIllumination);
         }
 
         private void RenderParts(
@@ -400,7 +406,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                     lightDir2,
                     lightColor2,
                     ambientColor,
-                    materialTimeSeconds);
+                    materialTimeSeconds,
+                    model.SelfIllumination);
                 _gl.Uniform1(
                     _uUseSkinning,
                     resources.IsGpuSkinned && model.SkinningMatrices != null ? 1 : 0);

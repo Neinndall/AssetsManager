@@ -66,6 +66,7 @@ uniform int uPremultipliedAlpha;
 uniform vec3 uLightDirection;
 uniform int uWireframePass;
 uniform vec4 uWireframeColor;
+uniform float uSelfIllumination;
 
 out vec4 FragColor;
 
@@ -103,7 +104,7 @@ void main()
     if (uLit != 0)
     {
         float sun = max(dot(normalize(vNormal), normalize(uLightDirection)), 0.0);
-        color *= 0.6 + 0.4 * sun;
+        color *= clamp(0.6 + 0.4 * sun + uSelfIllumination, 0.0, 1.0);
     }
 
     if (uPremultipliedAlpha != 0)

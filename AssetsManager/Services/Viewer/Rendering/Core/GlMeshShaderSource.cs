@@ -65,6 +65,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform vec3 uLightDir2;
                     uniform vec3 uLightColor2;
                     uniform vec3 uAmbient;
+                    uniform float uSelfIllumination;
                     out vec4 fragColor;
                     vec3 srgbToLinear(vec3 value){
                         vec3 low = value / 12.92;
@@ -98,7 +99,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             texColor.a = coverageAlpha;
                             float diff1 = max(dot(vNormal, uLightDir), 0.0);
                             float diff2 = max(dot(vNormal, uLightDir2), 0.0);
-                            vec3 finalLight = clamp(uAmbient + diff1 * uLightColor + diff2 * uLightColor2, 0.0, 1.0);
+                            vec3 finalLight = clamp(uAmbient + diff1 * uLightColor + diff2 * uLightColor2 + uSelfIllumination, 0.0, 1.0);
                             vec3 finalColor = uMaterialUnlit != 0
                                 ? texColor.rgb
                                 : texColor.rgb * finalLight;

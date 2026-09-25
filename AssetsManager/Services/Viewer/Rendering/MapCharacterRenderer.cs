@@ -105,6 +105,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uLightDirection;
         private int _uWireframePass;
         private int _uWireframeColor;
+        private int _uSelfIllumination;
         private GameShaderRuntime _gameShaderRuntime;
         private bool _gles;
         private bool _ready;
@@ -146,6 +147,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uLightDirection = gl.GetUniformLocation(_program, "uLightDirection");
             _uWireframePass = gl.GetUniformLocation(_program, "uWireframePass");
             _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
+            _uSelfIllumination = gl.GetUniformLocation(_program, "uSelfIllumination");
 
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
@@ -425,7 +427,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gl.UniformMatrix4(_uWorld, 1, false, in world.M11);
                     _gl.Uniform1(_uUseSkinning, command.Resources.HasSkin ? 1 : 0);
                     if (!wireframePass)
-                        ApplyMaterial(command.Range, command.TimeSeconds, untextured, errored, viewMode);
+                        ApplyMaterial(command.Range, command.TimeSeconds, untextured, errored, viewMode, command.SelfIllumination);
                 }
                 else
                 {
@@ -600,7 +602,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             float timeSeconds,
             Vector3 untextured,
             Vector3 errored,
-            VfxPreviewViewMode viewMode)
+            VfxPreviewViewMode viewMode,
+            float selfIllumination = 0f)
         {
             ModelMaterialDefinition material = range.Material;
             bool forceUntextured = viewMode == VfxPreviewViewMode.Untextured;
@@ -642,6 +645,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform2(_uUvOffset, scroll.X, scroll.Y);
             _gl.Uniform1(_uLit, forceUntextured || (!forceUnshaded && range.Lit) ? 1 : 0);
             _gl.Uniform1(_uPremultipliedAlpha, renderState.PremultipliedAlpha ? 1 : 0);
+            _gl.Uniform1(_uSelfIllumination, forceUntextured || forceUnshaded ? 0f : selfIllumination);
             ApplyRenderState(renderState, transparent);
         }
 
