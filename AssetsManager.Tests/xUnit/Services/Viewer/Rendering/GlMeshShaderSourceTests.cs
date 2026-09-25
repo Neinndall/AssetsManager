@@ -67,36 +67,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             Assert.Equal(destinationAlpha, factors.DestinationAlpha);
         }
 
-        [Fact]
-        public void TransparentAuthoredPassKeepsTextureAlphaSeparateFromInferredIridescenceAlpha()
-        {
-            var iridescence = new ModelIridescenceDefinition(
-                "lut",
-                "mask",
-                Vector4.One,
-                Vector2.Zero,
-                new Vector2(0.9f, 0.9f),
-                1f,
-                UsesPulse: false,
-                UsesLocalizedAlpha: false);
-            ModelMaterialDefinition transparent = ModelMaterialDefinition.TextureOnly("cape") with
-            {
-                RenderState = ModelMaterialRenderState.Default with
-                {
-                    Blending = ModelMaterialBlendMode.Normal,
-                    DepthWrite = false
-                }
-            };
-            ModelMaterialDefinition opaque = ModelMaterialDefinition.TextureOnly("body");
-
-            Assert.True(iridescence.RequiresAlphaBlend);
-            Assert.False(GlMeshRenderer.ShouldApplyIridescenceAlpha(transparent, iridescence));
-            Assert.True(GlMeshRenderer.ShouldApplyIridescenceAlpha(opaque, iridescence));
-            Assert.True(
-                GlMeshRenderer.ShouldApplyIridescenceAlpha(
-                    transparent,
-                    iridescence with { UsesLocalizedAlpha = true }));
-        }
 
         [Fact]
         public void ReferenceCharacterLightingUsesTheAuthoredSunSplit()
@@ -232,54 +202,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 GlMeshShaderSource.Fragment);
         }
 
-        [Fact]
-        public void Fragment_CalibratesAuthoredGradientPulseWithoutDisablingThePulse()
-        {
-            Assert.Contains("bool hasPulseDriver = abs(uPulseRate) > 0.0001", GlMeshShaderSource.Fragment);
-            Assert.Contains(
-                "? max(sin(uEffectTime * uPulseRate) * uPulseMax + uPulseOffset, 0.0)",
-                GlMeshShaderSource.Fragment);
-            Assert.Contains(
-                ": 1.0;",
-                GlMeshShaderSource.Fragment);
-            Assert.Contains(
-                "float bloom = clamp(uGradientBloomIntensity * 0.05, 0.0, 1.0);",
-                GlMeshShaderSource.Fragment);
-            Assert.Contains(
-                "mask * uGradientStrength * gradientStrength * 0.1 *",
-                GlMeshShaderSource.Fragment);
-            Assert.Contains("max(pulse + bloom, 0.0)", GlMeshShaderSource.Fragment);
-            Assert.Contains("uniform int uGradientOutputMode;", GlMeshShaderSource.Fragment);
-            Assert.Contains("if (uGradientOutputMode == 0)", GlMeshShaderSource.Fragment);
-            Assert.Contains("vec3(2.0));", GlMeshShaderSource.Fragment);
-        }
 
-        [Fact]
-        public void Fragment_FresnelBasicMatchesShaderCacheLerpContract()
-        {
-            Assert.Contains("uniform int uFresnelMode;", GlMeshShaderSource.Fragment);
-            Assert.Contains("if (uFresnelMode == 1)", GlMeshShaderSource.Fragment);
-            Assert.Contains(
-                "1.0 - pow(max(facing, 0.0001), max(uFresnelPower, 0.01))",
-                GlMeshShaderSource.Fragment);
-            Assert.Contains("finalColor = mix(finalColor, uFresnelColor.rgb, amount);", GlMeshShaderSource.Fragment);
-            Assert.Contains("texColor.a = mix(texColor.a, uFresnelColor.a, amount);", GlMeshShaderSource.Fragment);
-        }
-
-        [Fact]
-        public void Fragment_ScrollingCustomAlphaMatchesRealAatroxBannerChannelEquation()
-        {
-            Assert.Contains("if ((uEffectKind & 4096) != 0 && uCustomAlphaMaskIndex >= 0)", GlMeshShaderSource.Fragment);
-            Assert.Contains(
-                "vec2 customAlphaUv = vUv * uCustomAlphaUvScale + uCustomAlphaScrollSpeed * uEffectTime;",
-                GlMeshShaderSource.Fragment);
-            Assert.Contains(
-                "vec2 customAlphaBlueUv = vUv * uCustomAlphaBlueUvScale + uCustomAlphaBlueScrollSpeed * uEffectTime;",
-                GlMeshShaderSource.Fragment);
-            Assert.Contains(
-                "(redCoverage * (customAlphaBlue.b * customAlphaScrolled.g) + uCustomAlphaBias) * redCoverage",
-                GlMeshShaderSource.Fragment);
-        }
         [Fact]
         public void Fragment_UsesSrgbCharacterMaterialPath()
         {
@@ -313,108 +236,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
-        public void Fragment_KeepsBaseTextureAlphaSeparateFromLocalizedIridescenceAlpha()
+        public void Fragment_UsesBaseTextureAlphaWhenConfigured()
         {
             Assert.Contains("uniform int uMaterialUsesTextureAlpha;", GlMeshShaderSource.Fragment);
             Assert.Contains(
                 "coverageAlpha = (uMaterialUsesTextureAlpha != 0 ? texColor.a : 1.0) * uColorTint.a;",
                 GlMeshShaderSource.Fragment);
-            Assert.Contains("texColor.a *= mix(1.0, fresnelAlpha, fadeMask);", GlMeshShaderSource.Fragment);
-            Assert.DoesNotContain(
-                "if (uMaterialUsesTextureAlpha != 0)\n                                    texColor.a *= mix(1.0, fresnelAlpha, fadeMask);",
-                GlMeshShaderSource.Fragment);
-            Assert.DoesNotContain("texColor.a <= 0.0001", GlMeshShaderSource.Fragment);
-        }
-
-        [Fact]
-        public void Fragment_ReusesDecodedBaseTextureForFlowSampling()
-        {
-            Assert.Contains("vec3 flowColor = readBaseTexture(flowUv).rgb", GlMeshShaderSource.Fragment);
-            Assert.DoesNotContain("vec3 flowColor = texture(uTex, flowUv).rgb", GlMeshShaderSource.Fragment);
-        }
-
-        [Fact]
-        public void Fragment_UsesIndependentComposableMaterialLayers()
-        {
-            Assert.Contains("if ((uEffectKind & 1) != 0 && uAdditiveTexIndex >= 0)", GlMeshShaderSource.Fragment);
-            Assert.Contains("if ((uEffectKind & 2) != 0 && uFlowTexIndex >= 0)", GlMeshShaderSource.Fragment);
-            Assert.Contains("if ((uEffectKind & 8) != 0 && uDissolvePatternIndex >= 0)", GlMeshShaderSource.Fragment);
-            Assert.Contains("if ((uEffectKind & 128) != 0 && uEmissionTexIndex >= 0)", GlMeshShaderSource.Fragment);
-            Assert.DoesNotContain("else if ((uEffectKind & 2)", GlMeshShaderSource.Fragment);
-        }
-
-        [Fact]
-        public void Fragment_ComposesPackedAdditiveChannelsWithIndependentScroll()
-        {
-            Assert.Contains("uniform vec2 uAdditiveScrollSpeedG;", GlMeshShaderSource.Fragment);
-            Assert.Contains("uniform float uAdditiveStrengthG;", GlMeshShaderSource.Fragment);
-            Assert.Contains("uniform vec2 uAdditiveScrollSpeedA;", GlMeshShaderSource.Fragment);
-            Assert.Contains("uniform float uAdditiveStrengthA;", GlMeshShaderSource.Fragment);
-            Assert.Contains("uAdditiveScrollSpeedG * uEffectTime", GlMeshShaderSource.Fragment);
-            Assert.Contains("uAdditiveScrollSpeedA * uEffectTime", GlMeshShaderSource.Fragment);
-            Assert.Contains("channelColor(additiveSampleG, uAdditiveTextureChannelG)", GlMeshShaderSource.Fragment);
-            Assert.Contains("channelColor(additiveSampleA, uAdditiveTextureChannelA)", GlMeshShaderSource.Fragment);
-        }
-
-        [Fact]
-        public void Fragment_UsesAuthoredStateDistortionAndChannels()
-        {
-            Assert.Contains("uDissolveStateIndex >= 0", GlMeshShaderSource.Fragment);
-            Assert.Contains("uDistortionTexIndex >= 0", GlMeshShaderSource.Fragment);
-            Assert.Contains("float channelValue(vec4 value, int channel)", GlMeshShaderSource.Fragment);
-            Assert.Contains("sampleAux(uFresnelNoiseIndex, uv)", GlMeshShaderSource.Fragment);
-        }
-
-        [Fact]
-        public void Vertex_UsesAuthoredComplexDeformationTextures()
-        {
-            Assert.Contains("(uEffectKind & 2048) != 0", GlMeshShaderSource.Vertex);
-            Assert.Contains("sampleAux(uDeformNoiseIndex, deformUv)", GlMeshShaderSource.Vertex);
-            Assert.Contains("sampleAux(uDeformMaskIndex, aUv)", GlMeshShaderSource.Vertex);
-        }
-
-        [Fact]
-        public void ShaderFactory_ExpandsAuxiliaryTextureSlotsForCapableHardware()
-        {
-            string vertex = GlMeshShaderSource.CreateVertex(GlMeshShaderSource.MaximumAuxiliaryTextureCount);
-            string fragment = GlMeshShaderSource.CreateFragment(GlMeshShaderSource.MaximumAuxiliaryTextureCount);
-
-            Assert.Contains("uniform sampler2D uAuxTex19;", vertex);
-            Assert.Contains("if (index == 19) return texture(uAuxTex19, uv);", vertex);
-            Assert.Contains("uniform sampler2D uAuxTex19;", fragment);
-            Assert.Contains("if (index == 19) return texture(uAuxTex19, uv);", fragment);
-        }
-
-        [Fact]
-        public void ShaderFactory_ShrinksAuxiliaryTextureSlotsForConstrainedHardware()
-        {
-            string vertex = GlMeshShaderSource.CreateVertex(4);
-            string fragment = GlMeshShaderSource.CreateFragment(4);
-
-            Assert.Contains("uniform sampler2D uAuxTex3;", vertex);
-            Assert.DoesNotContain("uniform sampler2D uAuxTex4;", vertex);
-            Assert.Contains("if (index == 3) return texture(uAuxTex3, uv);", vertex);
-            Assert.DoesNotContain("if (index == 4) return texture(uAuxTex4, uv);", vertex);
-            Assert.Contains("uniform sampler2D uAuxTex3;", fragment);
-            Assert.DoesNotContain("uniform sampler2D uAuxTex4;", fragment);
-        }
-
-        [Theory]
-        [InlineData(16, 16, 48, 15)]
-        [InlineData(32, 32, 192, 20)]
-        [InlineData(64, 64, 256, 20)]
-        public void Renderer_CapsAuxiliaryTexturesToContextLimits(
-            int fragmentUnits,
-            int vertexUnits,
-            int combinedUnits,
-            int expected)
-        {
-            Assert.Equal(
-                expected,
-                GlMeshRenderer.CalculateAuxiliaryTextureCapacity(
-                    fragmentUnits,
-                    vertexUnits,
-                    combinedUnits));
         }
     }
 }

@@ -154,8 +154,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 cancellationToken);
             SknMaterialTextureResolution materials = SknMaterialTextureResolver.Resolve(
                 metadata,
-                textures.Keys,
-                includeSpecializedEffects: false);
+                textures.Keys);
             Func<uint, string> graphHashNameResolver = _hashResolver == null
                 ? hash => hash.ToString("x8")
                 : _hashResolver.ResolveBinHashGeneral;

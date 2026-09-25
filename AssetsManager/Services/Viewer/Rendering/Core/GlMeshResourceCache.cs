@@ -28,11 +28,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal string LoadedTextureKey;
             internal BitmapSource LoadedBitmap;
             internal bool LoadedBitmapSrgb;
-            internal string AuxiliaryTextureSignature;
-            internal readonly Dictionary<string, uint> AuxiliaryTextures =
-                new(StringComparer.OrdinalIgnoreCase);
-            internal readonly Dictionary<string, BitmapSource> LoadedAuxiliaryBitmaps =
-                new(StringComparer.OrdinalIgnoreCase);
             internal readonly Dictionary<string, uint> ProgramTextures =
                 new(StringComparer.OrdinalIgnoreCase);
             internal readonly Dictionary<string, string> ProgramTextureKeyByPath =
@@ -82,7 +77,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             }
 
             EnsureBaseTexture(part, resources);
-            EnsureAuxiliaryTextures(part, resources);
             resources = EnsureMeshBuffers(part, resources);
             EnsureSkinningBuffers(model, resources, part);
             return resources;
@@ -318,41 +312,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         internal static InternalFormat BaseTextureInternalFormat(bool srgb) =>
             srgb ? InternalFormat.Srgb8Alpha8 : InternalFormat.Rgba8;
 
-        private void EnsureAuxiliaryTextures(ModelPart part, PartResources resources)
-        {
-            ModelMaterialEffectDefinition effect = ResolveMaterialEffect(part);
-            string[] textureKeys = effect
-                .EnumerateTextureNames()
-                .Where(key => !string.IsNullOrWhiteSpace(key))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            string signature = string.Join("\n", textureKeys);
-            if (string.Equals(resources.AuxiliaryTextureSignature, signature, StringComparison.Ordinal))
-                return;
-
-            ReleaseAuxiliaryTextures(resources);
-            resources.AuxiliaryTextureSignature = signature;
-            foreach (string textureKey in textureKeys)
-            {
-                BitmapSource bitmap = TextureUtils.ResolveTexture(part.AllTextures, textureKey);
-                if (bitmap == null)
-                    continue;
-
-                resources.LoadedAuxiliaryBitmaps[textureKey] = bitmap;
-                resources.AuxiliaryTextures[textureKey] = AcquireTexture(
-                    _sharedTextures,
-                    bitmap,
-                    () => UploadTexture(bitmap));
-            }
-        }
-
-        private static ModelMaterialEffectDefinition ResolveMaterialEffect(ModelPart part)
-        {
-            // Specialized SKN layers are owned by the authored material definition.
-            return part.MaterialDefinition?.Effect ?? ModelMaterialEffectDefinition.None;
-        }
-
         private static uint AcquireTexture(
             Dictionary<BitmapSource, SharedTexture> textures,
             BitmapSource bitmap,
@@ -373,7 +332,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             if (!_partResources.TryGetValue(part, out PartResources resources)) return;
 
             ReleaseBaseTexture(resources);
-            ReleaseAuxiliaryTextures(resources);
             ReleaseProgramTextures(resources);
             DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
             DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
@@ -397,16 +355,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             resources.Texture = 0;
             resources.LoadedBitmap = null;
             resources.LoadedBitmapSrgb = false;
-        }
-
-        private void ReleaseAuxiliaryTextures(PartResources resources)
-        {
-            foreach (BitmapSource bitmap in resources.LoadedAuxiliaryBitmaps.Values)
-                ReleaseSharedTexture(_sharedTextures, bitmap);
-
-            resources.AuxiliaryTextures.Clear();
-            resources.LoadedAuxiliaryBitmaps.Clear();
-            resources.AuxiliaryTextureSignature = null;
         }
 
         private void ReleaseProgramTextures(PartResources resources)

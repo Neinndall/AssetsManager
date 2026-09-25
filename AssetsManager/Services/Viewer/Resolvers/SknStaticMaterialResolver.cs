@@ -190,7 +190,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ? null
                 : resolveTexture(baseSampler.TexturePath);
 
-            (Vector4 color, bool hasOpacity, bool hasTint) = ResolveColor(parameters, effect, shaderPath);
+            (Vector4 color, bool hasOpacity, bool hasTint) = ResolveColor(parameters, shaderPath);
             bool hasAuthoredAlphaTest = TryFirst(parameters, AlphaTestNames, out Vector4 authoredAlphaTest) &&
                 authoredAlphaTest.X > 0f && authoredAlphaTest.X < 1f;
             float alphaCutoff = ResolveAlphaCutoff(parameters, macros, shaderPath);
@@ -404,7 +404,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         private static (Vector4 Color, bool HasOpacity, bool HasTint) ResolveColor(
             IReadOnlyDictionary<string, Vector4> parameters,
-            ModelMaterialEffectDefinition effect,
             string shaderPath)
         {
             Vector4 tint = Vector4.One;
@@ -428,22 +427,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 opacityValue.X >= 0f && opacityValue.X <= 1f;
             if (hasOpacity)
                 tint.W = opacityValue.X;
-
-            // AssetsManager intentionally preserves specialized material fallbacks that the
-            // reference stock preview does not reproduce. These are used for authored glass,
-            // iridescence/gradient layers and other materials we already know how to evaluate.
-            Vector4 specializedColor = effect?.MaterialTint ?? Vector4.One;
-            if (!hasTint && specializedColor != Vector4.One)
-            {
-                tint.X = specializedColor.X;
-                tint.Y = specializedColor.Y;
-                tint.Z = specializedColor.Z;
-            }
-            if (!hasOpacity && specializedColor.W < 0.9999f)
-            {
-                tint.W = specializedColor.W;
-                hasOpacity = true;
-            }
 
             return (tint, hasOpacity, hasTint);
         }

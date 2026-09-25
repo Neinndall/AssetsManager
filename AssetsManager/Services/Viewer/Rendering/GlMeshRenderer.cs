@@ -31,124 +31,14 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _program;
         private uint _boneBuffer;
         private readonly List<ModelPart> _alphaRenderQueue = new();
-        private readonly Dictionary<(ModelMaterialWrapMode U, ModelMaterialWrapMode V), uint> _auxiliarySamplers = new();
         private readonly Dictionary<SceneModel, long> _materialTimeOrigins = new();
         private readonly Dictionary<SceneModel, Matrix4x4[]> _bindSkinningPalettes = new();
         private int _uViewProj;
         private int _uWorld;
         private int _uUseSkinning;
-        private int _maxAuxiliaryTextures = GlMeshShaderSource.PortableAuxiliaryTextureCount;
         private int _uTex;
-        private int[] _uAuxTex = Array.Empty<int>();
-        private int _uEffectKind;
         private int _uEffectTime;
         private int _uCameraPosition;
-        private int _uAdditiveTexIndex;
-        private int _uAdditiveMaskIndex;
-        private int _uAdditiveScrollSpeed;
-        private int _uAdditiveTiling;
-        private int _uAdditiveColor;
-        private int _uAdditiveStrength;
-        private int _uAdditiveTextureChannel;
-        private int _uAdditiveScrollSpeedG;
-        private int _uAdditiveColorG;
-        private int _uAdditiveStrengthG;
-        private int _uAdditiveTextureChannelG;
-        private int _uAdditiveScrollSpeedA;
-        private int _uAdditiveColorA;
-        private int _uAdditiveStrengthA;
-        private int _uAdditiveTextureChannelA;
-        private int _uAdditiveMaskChannel;
-        private int _uFlowTexIndex;
-        private int _uFlowMaskIndex;
-        private int _uFlowScrollSpeed;
-        private int _uFlowTiling;
-        private int _uFlowStrength;
-        private int _uFlowIntensity;
-        private int _uFlowMaskChannel;
-        private int _uGradientTexIndex;
-        private int _uGradientMaskIndex;
-        private int _uGradientScrollSpeed;
-        private int _uGradientTiling;
-        private int _uGradientColor;
-        private int _uGradientStrength;
-        private int _uPulseRate;
-        private int _uPulseMax;
-        private int _uPulseOffset;
-        private int _uGradientSharpness;
-        private int _uGradientBloomIntensity;
-        private int _uGradientOutputMode;
-        private int _uGradientMaskThreshold;
-        private int _uGradientMaskSoftness;
-        private int _uGradientTextureChannel;
-        private int _uGradientMaskChannel;
-        private int _uDissolvePatternIndex;
-        private int _uDissolveStateIndex;
-        private int _uDissolveMaskIndex;
-        private int _uDissolveScrollSpeed;
-        private int _uDissolveTiling;
-        private int _uDissolveThreshold;
-        private int _uDissolveSoftness;
-        private int _uDissolvePatternChannel;
-        private int _uDissolveMaskChannel;
-        private int _uFresnelMaskIndex;
-        private int _uFresnelNoiseIndex;
-        private int _uFresnelColor;
-        private int _uFresnelPower;
-        private int _uFresnelStrength;
-        private int _uFresnelMode;
-        private int _uFresnelNoiseTiling;
-        private int _uFresnelNoiseSpeed;
-        private int _uFresnelMaskChannel;
-        private int _uFresnelNoiseChannel;
-        private int _uBloomMaskIndex;
-        private int _uBloomColor;
-        private int _uBloomIntensity;
-        private int _uBloomMaskChannel;
-        private int _uEmissionTexIndex;
-        private int _uEmissionMaskIndex;
-        private int _uEmissionScrollSpeed;
-        private int _uEmissionTiling;
-        private int _uEmissionColor;
-        private int _uEmissionStrength;
-        private int _uEmissionChannel;
-        private int _uEmissionMaskChannel;
-        private int _uDistortionTexIndex;
-        private int _uDistortionMaskIndex;
-        private int _uDistortionScrollSpeed;
-        private int _uDistortionTiling;
-        private int _uDistortionStrength;
-        private int _uDistortionChannelX;
-        private int _uDistortionChannelY;
-        private int _uDistortionMaskChannel;
-        private int _uIridescenceTexIndex;
-        private int _uIridescenceMaskIndex;
-        private int _uIridescenceControl;
-        private int _uIridescencePulseSpeedMin;
-        private int _uIridescenceAlphaMinMax;
-        private int _uIridescenceDiffuseFadeMask;
-        private int _uIridescenceMaskChannel;
-        private int _uCustomAlphaMaskIndex;
-        private int _uCustomAlphaUvScale;
-        private int _uCustomAlphaScrollSpeed;
-        private int _uCustomAlphaBlueUvScale;
-        private int _uCustomAlphaBlueScrollSpeed;
-        private int _uCustomAlphaBias;
-        private int _uWaveDirection;
-        private int _uWaveSpeed;
-        private int _uWaveFrequency;
-        private int _uWaveIntensity;
-        private int _uDeformNoiseIndex;
-        private int _uDeformMaskIndex;
-        private int _uDeformDirection;
-        private int _uDeformScrollSpeed;
-        private int _uDeformTiling;
-        private int _uDeformSpeed;
-        private int _uDeformFrequency;
-        private int _uDeformIntensity;
-        private int _uDeformProtection;
-        private int _uDeformNoiseChannel;
-        private int _uDeformMaskChannel;
         private int _uLightDir;
         private int _uLightColor;
         private int _uLightDir2;
@@ -186,15 +76,12 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _drawElements = Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(proc);
             }
 
-            _maxAuxiliaryTextures = ResolveAuxiliaryTextureCapacity(gl);
-            _uAuxTex = new int[_maxAuxiliaryTextures];
-
             _gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
             _program = GlShaderCompiler.CreateProgram(
                 gl,
                 _gles,
-                GlMeshShaderSource.CreateVertex(_maxAuxiliaryTextures),
-                GlMeshShaderSource.CreateFragment(_maxAuxiliaryTextures));
+                GlMeshShaderSource.Vertex,
+                GlMeshShaderSource.Fragment);
             CacheUniformLocations(gl);
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
@@ -203,8 +90,6 @@ namespace AssetsManager.Services.Viewer.Rendering
             // Initialize static sampler uniform slot assignments once.
             gl.UseProgram(_program);
             gl.Uniform1(_uTex, 0);
-            for (int i = 0; i < _maxAuxiliaryTextures; i++)
-                gl.Uniform1(_uAuxTex[i], i + 1);
             gl.UseProgram(0);
 
             _resources = new GlMeshResourceCache(gl);
@@ -220,34 +105,6 @@ namespace AssetsManager.Services.Viewer.Rendering
             gl.BindBufferBase(BufferTargetARB.UniformBuffer, 0, _boneBuffer);
             gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
             _ready = true;
-        }
-
-        private static int ResolveAuxiliaryTextureCapacity(GL gl)
-        {
-            gl.GetInteger(GLEnum.MaxTextureImageUnits, out int fragmentTextureUnits);
-            gl.GetInteger(GLEnum.MaxVertexTextureImageUnits, out int vertexTextureUnits);
-            gl.GetInteger(GLEnum.MaxCombinedTextureImageUnits, out int combinedTextureUnits);
-            return CalculateAuxiliaryTextureCapacity(
-                fragmentTextureUnits,
-                vertexTextureUnits,
-                combinedTextureUnits);
-        }
-
-        internal static int CalculateAuxiliaryTextureCapacity(
-            int fragmentTextureUnits,
-            int vertexTextureUnits,
-            int combinedTextureUnits)
-        {
-            int fragmentCapacity = Math.Max(0, fragmentTextureUnits - 1);
-            int vertexCapacity = Math.Max(0, vertexTextureUnits);
-            int combinedCapacity = Math.Max(0, (combinedTextureUnits - 1) / 2);
-            int available = Math.Min(
-                fragmentCapacity,
-                Math.Min(vertexCapacity, combinedCapacity));
-            return Math.Clamp(
-                available,
-                1,
-                GlMeshShaderSource.MaximumAuxiliaryTextureCount);
         }
 
         public void Render(
@@ -383,117 +240,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uWorld = gl.GetUniformLocation(_program, "uWorld");
             _uUseSkinning = gl.GetUniformLocation(_program, "uUseSkinning");
             _uTex = gl.GetUniformLocation(_program, "uTex");
-            for (int i = 0; i < _maxAuxiliaryTextures; i++)
-                _uAuxTex[i] = gl.GetUniformLocation(_program, $"uAuxTex{i}");
-            _uEffectKind = gl.GetUniformLocation(_program, "uEffectKind");
             _uEffectTime = gl.GetUniformLocation(_program, "uEffectTime");
             _uCameraPosition = gl.GetUniformLocation(_program, "uCameraPosition");
-            _uAdditiveTexIndex = gl.GetUniformLocation(_program, "uAdditiveTexIndex");
-            _uAdditiveMaskIndex = gl.GetUniformLocation(_program, "uAdditiveMaskIndex");
-            _uAdditiveScrollSpeed = gl.GetUniformLocation(_program, "uAdditiveScrollSpeed");
-            _uAdditiveTiling = gl.GetUniformLocation(_program, "uAdditiveTiling");
-            _uAdditiveColor = gl.GetUniformLocation(_program, "uAdditiveColor");
-            _uAdditiveStrength = gl.GetUniformLocation(_program, "uAdditiveStrength");
-            _uAdditiveTextureChannel = gl.GetUniformLocation(_program, "uAdditiveTextureChannel");
-            _uAdditiveScrollSpeedG = gl.GetUniformLocation(_program, "uAdditiveScrollSpeedG");
-            _uAdditiveColorG = gl.GetUniformLocation(_program, "uAdditiveColorG");
-            _uAdditiveStrengthG = gl.GetUniformLocation(_program, "uAdditiveStrengthG");
-            _uAdditiveTextureChannelG = gl.GetUniformLocation(_program, "uAdditiveTextureChannelG");
-            _uAdditiveScrollSpeedA = gl.GetUniformLocation(_program, "uAdditiveScrollSpeedA");
-            _uAdditiveColorA = gl.GetUniformLocation(_program, "uAdditiveColorA");
-            _uAdditiveStrengthA = gl.GetUniformLocation(_program, "uAdditiveStrengthA");
-            _uAdditiveTextureChannelA = gl.GetUniformLocation(_program, "uAdditiveTextureChannelA");
-            _uAdditiveMaskChannel = gl.GetUniformLocation(_program, "uAdditiveMaskChannel");
-            _uFlowTexIndex = gl.GetUniformLocation(_program, "uFlowTexIndex");
-            _uFlowMaskIndex = gl.GetUniformLocation(_program, "uFlowMaskIndex");
-            _uFlowScrollSpeed = gl.GetUniformLocation(_program, "uFlowScrollSpeed");
-            _uFlowTiling = gl.GetUniformLocation(_program, "uFlowTiling");
-            _uFlowStrength = gl.GetUniformLocation(_program, "uFlowStrength");
-            _uFlowIntensity = gl.GetUniformLocation(_program, "uFlowIntensity");
-            _uFlowMaskChannel = gl.GetUniformLocation(_program, "uFlowMaskChannel");
-            _uGradientTexIndex = gl.GetUniformLocation(_program, "uGradientTexIndex");
-            _uGradientMaskIndex = gl.GetUniformLocation(_program, "uGradientMaskIndex");
-            _uGradientScrollSpeed = gl.GetUniformLocation(_program, "uGradientScrollSpeed");
-            _uGradientTiling = gl.GetUniformLocation(_program, "uGradientTiling");
-            _uGradientColor = gl.GetUniformLocation(_program, "uGradientColor");
-            _uGradientStrength = gl.GetUniformLocation(_program, "uGradientStrength");
-            _uPulseRate = gl.GetUniformLocation(_program, "uPulseRate");
-            _uPulseMax = gl.GetUniformLocation(_program, "uPulseMax");
-            _uPulseOffset = gl.GetUniformLocation(_program, "uPulseOffset");
-            _uGradientSharpness = gl.GetUniformLocation(_program, "uGradientSharpness");
-            _uGradientBloomIntensity = gl.GetUniformLocation(_program, "uGradientBloomIntensity");
-            _uGradientOutputMode = gl.GetUniformLocation(_program, "uGradientOutputMode");
-            _uGradientMaskThreshold = gl.GetUniformLocation(_program, "uGradientMaskThreshold");
-            _uGradientMaskSoftness = gl.GetUniformLocation(_program, "uGradientMaskSoftness");
-            _uGradientTextureChannel = gl.GetUniformLocation(_program, "uGradientTextureChannel");
-            _uGradientMaskChannel = gl.GetUniformLocation(_program, "uGradientMaskChannel");
-            _uDissolvePatternIndex = gl.GetUniformLocation(_program, "uDissolvePatternIndex");
-            _uDissolveStateIndex = gl.GetUniformLocation(_program, "uDissolveStateIndex");
-            _uDissolveMaskIndex = gl.GetUniformLocation(_program, "uDissolveMaskIndex");
-            _uDissolveScrollSpeed = gl.GetUniformLocation(_program, "uDissolveScrollSpeed");
-            _uDissolveTiling = gl.GetUniformLocation(_program, "uDissolveTiling");
-            _uDissolveThreshold = gl.GetUniformLocation(_program, "uDissolveThreshold");
-            _uDissolveSoftness = gl.GetUniformLocation(_program, "uDissolveSoftness");
-            _uDissolvePatternChannel = gl.GetUniformLocation(_program, "uDissolvePatternChannel");
-            _uDissolveMaskChannel = gl.GetUniformLocation(_program, "uDissolveMaskChannel");
-            _uFresnelMaskIndex = gl.GetUniformLocation(_program, "uFresnelMaskIndex");
-            _uFresnelNoiseIndex = gl.GetUniformLocation(_program, "uFresnelNoiseIndex");
-            _uFresnelColor = gl.GetUniformLocation(_program, "uFresnelColor");
-            _uFresnelPower = gl.GetUniformLocation(_program, "uFresnelPower");
-            _uFresnelStrength = gl.GetUniformLocation(_program, "uFresnelStrength");
-            _uFresnelMode = gl.GetUniformLocation(_program, "uFresnelMode");
-            _uFresnelNoiseTiling = gl.GetUniformLocation(_program, "uFresnelNoiseTiling");
-            _uFresnelNoiseSpeed = gl.GetUniformLocation(_program, "uFresnelNoiseSpeed");
-            _uFresnelMaskChannel = gl.GetUniformLocation(_program, "uFresnelMaskChannel");
-            _uFresnelNoiseChannel = gl.GetUniformLocation(_program, "uFresnelNoiseChannel");
-            _uBloomMaskIndex = gl.GetUniformLocation(_program, "uBloomMaskIndex");
-            _uBloomColor = gl.GetUniformLocation(_program, "uBloomColor");
-            _uBloomIntensity = gl.GetUniformLocation(_program, "uBloomIntensity");
-            _uBloomMaskChannel = gl.GetUniformLocation(_program, "uBloomMaskChannel");
-            _uEmissionTexIndex = gl.GetUniformLocation(_program, "uEmissionTexIndex");
-            _uEmissionMaskIndex = gl.GetUniformLocation(_program, "uEmissionMaskIndex");
-            _uEmissionScrollSpeed = gl.GetUniformLocation(_program, "uEmissionScrollSpeed");
-            _uEmissionTiling = gl.GetUniformLocation(_program, "uEmissionTiling");
-            _uEmissionColor = gl.GetUniformLocation(_program, "uEmissionColor");
-            _uEmissionStrength = gl.GetUniformLocation(_program, "uEmissionStrength");
-            _uEmissionChannel = gl.GetUniformLocation(_program, "uEmissionChannel");
-            _uEmissionMaskChannel = gl.GetUniformLocation(_program, "uEmissionMaskChannel");
-            _uDistortionTexIndex = gl.GetUniformLocation(_program, "uDistortionTexIndex");
-            _uDistortionMaskIndex = gl.GetUniformLocation(_program, "uDistortionMaskIndex");
-            _uDistortionScrollSpeed = gl.GetUniformLocation(_program, "uDistortionScrollSpeed");
-            _uDistortionTiling = gl.GetUniformLocation(_program, "uDistortionTiling");
-            _uDistortionStrength = gl.GetUniformLocation(_program, "uDistortionStrength");
-            _uDistortionChannelX = gl.GetUniformLocation(_program, "uDistortionChannelX");
-            _uDistortionChannelY = gl.GetUniformLocation(_program, "uDistortionChannelY");
-            _uDistortionMaskChannel = gl.GetUniformLocation(_program, "uDistortionMaskChannel");
-            _uIridescenceTexIndex = gl.GetUniformLocation(_program, "uIridescenceTexIndex");
-            _uIridescenceMaskIndex = gl.GetUniformLocation(_program, "uIridescenceMaskIndex");
-            _uIridescenceControl = gl.GetUniformLocation(_program, "uIridescenceControl");
-            _uIridescencePulseSpeedMin = gl.GetUniformLocation(_program, "uIridescencePulseSpeedMin");
-            _uIridescenceAlphaMinMax = gl.GetUniformLocation(_program, "uIridescenceAlphaMinMax");
-            _uIridescenceDiffuseFadeMask = gl.GetUniformLocation(_program, "uIridescenceDiffuseFadeMask");
-            _uIridescenceMaskChannel = gl.GetUniformLocation(_program, "uIridescenceMaskChannel");
-            _uCustomAlphaMaskIndex = gl.GetUniformLocation(_program, "uCustomAlphaMaskIndex");
-            _uCustomAlphaUvScale = gl.GetUniformLocation(_program, "uCustomAlphaUvScale");
-            _uCustomAlphaScrollSpeed = gl.GetUniformLocation(_program, "uCustomAlphaScrollSpeed");
-            _uCustomAlphaBlueUvScale = gl.GetUniformLocation(_program, "uCustomAlphaBlueUvScale");
-            _uCustomAlphaBlueScrollSpeed = gl.GetUniformLocation(_program, "uCustomAlphaBlueScrollSpeed");
-            _uCustomAlphaBias = gl.GetUniformLocation(_program, "uCustomAlphaBias");
-            _uWaveDirection = gl.GetUniformLocation(_program, "uWaveDirection");
-            _uWaveSpeed = gl.GetUniformLocation(_program, "uWaveSpeed");
-            _uWaveFrequency = gl.GetUniformLocation(_program, "uWaveFrequency");
-            _uWaveIntensity = gl.GetUniformLocation(_program, "uWaveIntensity");
-            _uDeformNoiseIndex = gl.GetUniformLocation(_program, "uDeformNoiseIndex");
-            _uDeformMaskIndex = gl.GetUniformLocation(_program, "uDeformMaskIndex");
-            _uDeformDirection = gl.GetUniformLocation(_program, "uDeformDirection");
-            _uDeformScrollSpeed = gl.GetUniformLocation(_program, "uDeformScrollSpeed");
-            _uDeformTiling = gl.GetUniformLocation(_program, "uDeformTiling");
-            _uDeformSpeed = gl.GetUniformLocation(_program, "uDeformSpeed");
-            _uDeformFrequency = gl.GetUniformLocation(_program, "uDeformFrequency");
-            _uDeformIntensity = gl.GetUniformLocation(_program, "uDeformIntensity");
-            _uDeformProtection = gl.GetUniformLocation(_program, "uDeformProtection");
-            _uDeformNoiseChannel = gl.GetUniformLocation(_program, "uDeformNoiseChannel");
-            _uDeformMaskChannel = gl.GetUniformLocation(_program, "uDeformMaskChannel");
             _uLightDir = gl.GetUniformLocation(_program, "uLightDir");
             _uLightColor = gl.GetUniformLocation(_program, "uLightColor");
             _uLightDir2 = gl.GetUniformLocation(_program, "uLightDir2");
@@ -721,12 +469,6 @@ namespace AssetsManager.Services.Viewer.Rendering
                             (part.UseBaseTextureAlpha || part.AlphaCutoff > 0f);
                         _gl.Uniform1(_uMaterialUsesTextureAlpha, usesTextureAlpha ? 1 : 0);
                     }
-
-                    // AssetsManager intentionally retains the specialized material preview layer for
-                    // authored effects it knows how to evaluate (gradient pulse, iridescence, flow,
-                    // dissolve, fresnel, bloom, etc.). Hexshade still takes precedence when it binds.
-                    ModelMaterialEffectDefinition effect = material?.Effect ?? ModelMaterialEffectDefinition.None;
-                    UploadMaterialEffects(effect, material, resources);
                 }
 
                 _drawElements?.Invoke(
@@ -738,249 +480,6 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
-
-        private void UploadMaterialEffects(
-            ModelMaterialEffectDefinition effect,
-            ModelMaterialDefinition material,
-            GlMeshResourceCache.PartResources resources)
-        {
-            Dictionary<string, int> textureBindings = BindAuxiliaryTextures(effect, resources);
-            _gl.Uniform1(_uEffectKind, (int)effect.Kind);
-
-            ModelTextureLayerDefinition additive = effect.AdditiveScroll;
-            _gl.Uniform1(_uAdditiveTexIndex, TextureIndex(textureBindings, additive?.TextureName));
-            _gl.Uniform1(_uAdditiveMaskIndex, TextureIndex(textureBindings, additive?.MaskTextureName));
-            SetVector2(_uAdditiveScrollSpeed, additive?.ScrollSpeed ?? Vector2.Zero);
-            SetVector2(_uAdditiveTiling, additive?.Tiling ?? Vector2.One);
-            SetVector4(_uAdditiveColor, additive?.Color ?? Vector4.One);
-            _gl.Uniform1(_uAdditiveStrength, additive?.Strength ?? 0f);
-            _gl.Uniform1(_uAdditiveTextureChannel, additive?.TextureChannel ?? -1);
-            ModelTextureLayerChannelDefinition additiveG = additive?.GreenChannel;
-            SetVector2(_uAdditiveScrollSpeedG, additiveG?.ScrollSpeed ?? Vector2.Zero);
-            SetVector4(_uAdditiveColorG, additiveG?.Color ?? Vector4.One);
-            _gl.Uniform1(_uAdditiveStrengthG, additiveG?.Strength ?? 0f);
-            _gl.Uniform1(_uAdditiveTextureChannelG, additiveG?.TextureChannel ?? -1);
-            ModelTextureLayerChannelDefinition additiveA = additive?.AlphaChannel;
-            SetVector2(_uAdditiveScrollSpeedA, additiveA?.ScrollSpeed ?? Vector2.Zero);
-            SetVector4(_uAdditiveColorA, additiveA?.Color ?? Vector4.One);
-            _gl.Uniform1(_uAdditiveStrengthA, additiveA?.Strength ?? 0f);
-            _gl.Uniform1(_uAdditiveTextureChannelA, additiveA?.TextureChannel ?? -1);
-            _gl.Uniform1(_uAdditiveMaskChannel, additive?.MaskChannel ?? 0);
-
-            ModelFlowMapDefinition flow = effect.FlowMap;
-            _gl.Uniform1(_uFlowTexIndex, TextureIndex(textureBindings, flow?.TextureName));
-            _gl.Uniform1(_uFlowMaskIndex, TextureIndex(textureBindings, flow?.MaskTextureName));
-            SetVector2(_uFlowScrollSpeed, flow?.ScrollSpeed ?? Vector2.Zero);
-            SetVector2(_uFlowTiling, flow?.Tiling ?? Vector2.One);
-            _gl.Uniform1(_uFlowStrength, flow?.Strength ?? 0f);
-            _gl.Uniform1(_uFlowIntensity, flow?.Intensity ?? 0f);
-            _gl.Uniform1(_uFlowMaskChannel, flow?.MaskChannel ?? 0);
-
-            ModelGradientPulseDefinition gradient = effect.GradientPulse;
-            _gl.Uniform1(_uGradientTexIndex, TextureIndex(textureBindings, gradient?.TextureName));
-            _gl.Uniform1(_uGradientMaskIndex, TextureIndex(textureBindings, gradient?.MaskTextureName));
-            SetVector2(_uGradientScrollSpeed, gradient?.ScrollSpeed ?? Vector2.Zero);
-            SetVector2(_uGradientTiling, gradient?.Tiling ?? Vector2.One);
-            SetVector4(_uGradientColor, gradient?.Color ?? Vector4.One);
-            _gl.Uniform1(_uGradientStrength, gradient?.Strength ?? 0f);
-            _gl.Uniform1(_uPulseRate, gradient?.PulseRate ?? 0f);
-            _gl.Uniform1(_uPulseMax, gradient?.PulseMax ?? 0f);
-            _gl.Uniform1(_uPulseOffset, gradient?.PulseOffset ?? 0f);
-            _gl.Uniform1(_uGradientSharpness, gradient?.Sharpness ?? 1f);
-            _gl.Uniform1(_uGradientBloomIntensity, gradient?.BloomIntensity ?? 0f);
-            _gl.Uniform1(_uGradientOutputMode, (int)(gradient?.OutputMode ?? ModelGradientPulseOutputMode.MainColor));
-            _gl.Uniform1(_uGradientMaskThreshold, gradient?.MaskThreshold ?? 0f);
-            _gl.Uniform1(_uGradientMaskSoftness, gradient?.MaskSoftness ?? 0.05f);
-            _gl.Uniform1(_uGradientTextureChannel, gradient?.TextureChannel ?? 0);
-            _gl.Uniform1(_uGradientMaskChannel, gradient?.MaskChannel ?? 0);
-
-            ModelDissolveDefinition dissolve = effect.Dissolve;
-            _gl.Uniform1(_uDissolvePatternIndex, TextureIndex(textureBindings, dissolve?.PatternTextureName));
-            _gl.Uniform1(_uDissolveStateIndex, TextureIndex(textureBindings, dissolve?.StateTextureName));
-            _gl.Uniform1(_uDissolveMaskIndex, TextureIndex(textureBindings, dissolve?.MaskTextureName));
-            SetVector2(_uDissolveScrollSpeed, dissolve?.ScrollSpeed ?? Vector2.Zero);
-            SetVector2(_uDissolveTiling, dissolve?.Tiling ?? Vector2.One);
-            _gl.Uniform1(_uDissolveThreshold, dissolve?.Threshold ?? 0.5f);
-            _gl.Uniform1(_uDissolveSoftness, dissolve?.Softness ?? 0.05f);
-            _gl.Uniform1(_uDissolvePatternChannel, dissolve?.PatternChannel ?? 0);
-            _gl.Uniform1(_uDissolveMaskChannel, dissolve?.MaskChannel ?? 0);
-
-            ModelFresnelDefinition fresnel = effect.Fresnel;
-            _gl.Uniform1(_uFresnelMaskIndex, TextureIndex(textureBindings, fresnel?.MaskTextureName));
-            _gl.Uniform1(_uFresnelNoiseIndex, TextureIndex(textureBindings, fresnel?.NoiseTextureName));
-            SetVector4(_uFresnelColor, fresnel?.Color ?? Vector4.One);
-            _gl.Uniform1(_uFresnelPower, fresnel?.Power ?? 2f);
-            _gl.Uniform1(_uFresnelStrength, fresnel?.Strength ?? 0f);
-            _gl.Uniform1(_uFresnelMode, (int)(fresnel?.Mode ?? ModelFresnelMode.Additive));
-            SetVector2(_uFresnelNoiseTiling, fresnel?.NoiseTiling ?? Vector2.One);
-            SetVector2(_uFresnelNoiseSpeed, fresnel?.NoiseSpeed ?? Vector2.Zero);
-            _gl.Uniform1(_uFresnelMaskChannel, fresnel?.MaskChannel ?? 0);
-            _gl.Uniform1(_uFresnelNoiseChannel, fresnel?.NoiseChannel ?? 0);
-
-            ModelBloomDefinition bloom = effect.Bloom;
-            _gl.Uniform1(_uBloomMaskIndex, TextureIndex(textureBindings, bloom?.MaskTextureName));
-            SetVector4(_uBloomColor, bloom?.Color ?? Vector4.One);
-            _gl.Uniform1(_uBloomIntensity, bloom?.Intensity ?? 0f);
-            _gl.Uniform1(_uBloomMaskChannel, bloom?.MaskChannel ?? 0);
-
-            ModelEmissionDefinition emission = effect.Emission;
-            _gl.Uniform1(_uEmissionTexIndex, TextureIndex(textureBindings, emission?.TextureName));
-            _gl.Uniform1(_uEmissionMaskIndex, TextureIndex(textureBindings, emission?.MaskTextureName));
-            SetVector2(_uEmissionScrollSpeed, emission?.ScrollSpeed ?? Vector2.Zero);
-            SetVector2(_uEmissionTiling, emission?.Tiling ?? Vector2.One);
-            SetVector4(_uEmissionColor, emission?.Color ?? Vector4.One);
-            _gl.Uniform1(_uEmissionStrength, emission?.Strength ?? 0f);
-            _gl.Uniform1(_uEmissionChannel, emission?.TextureChannel ?? -1);
-            _gl.Uniform1(_uEmissionMaskChannel, emission?.MaskChannel ?? 0);
-
-            ModelDistortionDefinition distortion = effect.Distortion;
-            _gl.Uniform1(_uDistortionTexIndex, TextureIndex(textureBindings, distortion?.TextureName));
-            _gl.Uniform1(_uDistortionMaskIndex, TextureIndex(textureBindings, distortion?.MaskTextureName));
-            SetVector2(_uDistortionScrollSpeed, distortion?.ScrollSpeed ?? Vector2.Zero);
-            SetVector2(_uDistortionTiling, distortion?.Tiling ?? Vector2.One);
-            _gl.Uniform1(_uDistortionStrength, distortion?.Strength ?? 0f);
-            _gl.Uniform1(_uDistortionChannelX, distortion?.ChannelX ?? 0);
-            _gl.Uniform1(_uDistortionChannelY, distortion?.ChannelY ?? -1);
-            _gl.Uniform1(_uDistortionMaskChannel, distortion?.MaskChannel ?? 0);
-
-            ModelIridescenceDefinition iridescence = effect.Iridescence;
-            bool applyIridescenceAlpha = ShouldApplyIridescenceAlpha(material, iridescence);
-            _gl.Uniform1(_uIridescenceTexIndex, TextureIndex(textureBindings, iridescence?.LutTextureName));
-            _gl.Uniform1(
-                _uIridescenceMaskIndex,
-                TextureIndex(
-                    textureBindings,
-                    iridescence?.MaskTextureName,
-                    namedMissingValue: -2));
-            SetVector4(_uIridescenceControl, iridescence?.Control ?? new Vector4(1f, 1f, 1f, 0f));
-            SetVector2(
-                _uIridescencePulseSpeedMin,
-                iridescence?.UsesPulse == true ? iridescence.PulseSpeedMin : Vector2.Zero);
-            SetVector2(
-                _uIridescenceAlphaMinMax,
-                applyIridescenceAlpha ? iridescence.FresnelAlphaMinMax : Vector2.One);
-            _gl.Uniform1(
-                _uIridescenceDiffuseFadeMask,
-                applyIridescenceAlpha ? iridescence.DiffuseFadeMaskValue : 0f);
-            _gl.Uniform1(_uIridescenceMaskChannel, iridescence?.MaskChannel ?? 0);
-
-            ModelScrollingCustomAlphaDefinition customAlpha = effect.ScrollingCustomAlpha;
-            _gl.Uniform1(_uCustomAlphaMaskIndex, TextureIndex(textureBindings, customAlpha?.MaskTextureName));
-            SetVector2(_uCustomAlphaUvScale, customAlpha?.UvScale ?? Vector2.One);
-            SetVector2(_uCustomAlphaScrollSpeed, customAlpha?.ScrollSpeed ?? Vector2.Zero);
-            SetVector2(_uCustomAlphaBlueUvScale, customAlpha?.BlueUvScale ?? Vector2.One);
-            SetVector2(_uCustomAlphaBlueScrollSpeed, customAlpha?.BlueScrollSpeed ?? Vector2.Zero);
-            _gl.Uniform1(_uCustomAlphaBias, customAlpha?.AlphaBias ?? 0f);
-
-            ModelWaveDefinition wave = effect.Wave;
-            _gl.Uniform3(_uWaveDirection, wave?.Direction ?? Vector3.UnitY);
-            _gl.Uniform1(_uWaveSpeed, wave?.Speed ?? 0f);
-            _gl.Uniform1(_uWaveFrequency, wave?.Frequency ?? 1f);
-            _gl.Uniform1(_uWaveIntensity, wave?.Intensity ?? 0f);
-
-            ModelVertexDeformationDefinition deformation = effect.VertexDeformation;
-            _gl.Uniform1(_uDeformNoiseIndex, TextureIndex(textureBindings, deformation?.NoiseTextureName));
-            _gl.Uniform1(_uDeformMaskIndex, TextureIndex(textureBindings, deformation?.MaskTextureName));
-            _gl.Uniform3(_uDeformDirection, deformation?.Direction ?? Vector3.UnitY);
-            SetVector2(_uDeformScrollSpeed, deformation?.ScrollSpeed ?? Vector2.Zero);
-            SetVector2(_uDeformTiling, deformation?.Tiling ?? Vector2.One);
-            _gl.Uniform1(_uDeformSpeed, deformation?.Speed ?? 0f);
-            _gl.Uniform1(_uDeformFrequency, deformation?.Frequency ?? 1f);
-            _gl.Uniform1(_uDeformIntensity, deformation?.Intensity ?? 0f);
-            _gl.Uniform1(_uDeformProtection, deformation?.Protection ?? 0f);
-            _gl.Uniform1(_uDeformNoiseChannel, deformation?.NoiseChannel ?? 0);
-            _gl.Uniform1(_uDeformMaskChannel, deformation?.MaskChannel ?? 0);
-        }
-
-        private Dictionary<string, int> BindAuxiliaryTextures(
-            ModelMaterialEffectDefinition effect,
-            GlMeshResourceCache.PartResources resources)
-        {
-            var bindings = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            int slot = 0;
-            foreach (string textureKey in effect.EnumerateTextureNames())
-            {
-                if (string.IsNullOrWhiteSpace(textureKey) || bindings.ContainsKey(textureKey))
-                    continue;
-                if (!resources.AuxiliaryTextures.TryGetValue(textureKey, out uint texture))
-                    continue;
-                if (slot >= _maxAuxiliaryTextures)
-                {
-                    Debug.WriteLine(
-                        $"SKN material auxiliary texture capacity exceeded ({_maxAuxiliaryTextures}); " +
-                        $"remaining authored layer textures cannot be bound on this OpenGL context.");
-                    break;
-                }
-
-                bindings[textureKey] = slot;
-                _gl.ActiveTexture(ToTextureUnit(slot + 1));
-                _gl.BindTexture(TextureTarget.Texture2D, texture);
-                _gl.BindSampler((uint)(slot + 1), ResolveAuxiliarySampler(effect, textureKey));
-                slot++;
-            }
-
-            for (int i = slot; i < _maxAuxiliaryTextures; i++)
-            {
-                _gl.ActiveTexture(ToTextureUnit(i + 1));
-                _gl.BindTexture(TextureTarget.Texture2D, 0);
-                _gl.BindSampler((uint)(i + 1), 0);
-            }
-            return bindings;
-        }
-
-        private static int TextureIndex(
-            IReadOnlyDictionary<string, int> bindings,
-            string textureKey,
-            int namedMissingValue = -1)
-        {
-            if (string.IsNullOrWhiteSpace(textureKey))
-                return -1;
-            return bindings.TryGetValue(textureKey, out int index) ? index : namedMissingValue;
-        }
-
-        private uint ResolveAuxiliarySampler(ModelMaterialEffectDefinition effect, string textureKey)
-        {
-            ModelMaterialEffectDefinition materialEffect = effect ?? ModelMaterialEffectDefinition.None;
-            if (!materialEffect.TextureSampling.TryGetValue(textureKey, out ModelEffectTextureSamplingDefinition sampling))
-            {
-                sampling = new ModelEffectTextureSamplingDefinition(
-                    ModelMaterialWrapMode.Repeat,
-                    ModelMaterialWrapMode.Repeat);
-            }
-
-            var key = (sampling.WrapU, sampling.WrapV);
-            if (_auxiliarySamplers.TryGetValue(key, out uint sampler))
-                return sampler;
-
-            sampler = _gl.GenSampler();
-            _gl.SamplerParameter(
-                sampler,
-                SamplerParameterI.MinFilter,
-                (int)TextureMinFilter.LinearMipmapLinear);
-            _gl.SamplerParameter(
-                sampler,
-                SamplerParameterI.MagFilter,
-                (int)TextureMagFilter.Linear);
-            _gl.SamplerParameter(
-                sampler,
-                SamplerParameterI.WrapS,
-                (int)ToTextureWrapMode(sampling.WrapU));
-            _gl.SamplerParameter(
-                sampler,
-                SamplerParameterI.WrapT,
-                (int)ToTextureWrapMode(sampling.WrapV));
-            _auxiliarySamplers[key] = sampler;
-            return sampler;
-        }
-
-        private void SetVector2(int location, Vector2 value) =>
-            _gl.Uniform2(location, value.X, value.Y);
-
-        private void SetVector4(int location, Vector4 value) =>
-            _gl.Uniform4(location, value.X, value.Y, value.Z, value.W);
-
-        private static TextureUnit ToTextureUnit(int index) =>
-            (TextureUnit)((int)TextureUnit.Texture0 + index);
 
         internal static bool UsesGameShaders(
             VfxPreviewViewMode viewMode,
@@ -1034,7 +533,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             ModelMaterialRenderState state = material.RenderState;
             bool runtimeForcesBlend =
                 state.Blending == ModelMaterialBlendMode.Opaque &&
-                (part.ColorTint.W < 0.999f || material.Effect?.RequiresAlphaBlend == true);
+                part.ColorTint.W < 0.999f;
             ModelMaterialBlendMode blending = runtimeForcesBlend
                 ? ModelMaterialBlendMode.Normal
                 : state.Cutout
@@ -1064,7 +563,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             else
                 _gl.Disable(EnableCap.DepthTest);
 
-            // Runtime opacity or an authored shader alpha layer may promote an opaque material
+            // Runtime opacity may promote an opaque material
             // to the transparent pass; in that case depth writes must stay disabled for sorting.
             _gl.DepthMask(runtimeForcesBlend ? false : state.DepthWrite);
 
@@ -1083,13 +582,6 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         internal static TriangleFace MaterialCullFace(ModelMaterialRenderState state)
             => state.Inverted ? TriangleFace.Front : TriangleFace.Back;
-
-        internal static bool ShouldApplyIridescenceAlpha(
-            ModelMaterialDefinition material,
-            ModelIridescenceDefinition iridescence) =>
-            iridescence?.UsesLocalizedAlpha == true ||
-            (material?.RenderState.Blending == ModelMaterialBlendMode.Opaque &&
-             iridescence?.RequiresAlphaBlend == true);
 
         internal static (
             Vector3 LightDirection,
@@ -1229,13 +721,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UnbindSceneTextures()
         {
-            for (int i = _maxAuxiliaryTextures; i >= 0; i--)
-            {
-                _gl.ActiveTexture(ToTextureUnit(i));
-                _gl.BindTexture(TextureTarget.Texture2D, 0);
-                _gl.BindSampler((uint)i, 0);
-            }
             _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
         }
 
         private void UploadBoneTransforms(Matrix4x4[] boneTransforms)
@@ -1330,12 +817,6 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gameShaderRuntime?.Dispose();
                 _gameShaderRuntime = null;
                 _resources?.Dispose();
-                foreach (uint sampler in _auxiliarySamplers.Values)
-                {
-                    if (sampler != 0)
-                        _gl?.DeleteSampler(sampler);
-                }
-                _auxiliarySamplers.Clear();
                 _materialTimeOrigins.Clear();
                 _bindSkinningPalettes.Clear();
                 if (_boneBuffer != 0)

@@ -41,8 +41,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         bool UsesShaderDefaultTexture = false);
 
     /// <summary>
-    /// Raw authored StaticMaterialDef data. Generic material semantics are resolved separately
-    /// so shader render state does not compete with optional League-specific effect layers.
+    /// Raw authored StaticMaterialDef data. Generic material semantics are resolved for stock rendering;
+    /// real in-game shader effects are handled natively by GameShaderRuntime when Shaders is enabled.
     /// </summary>
     internal sealed record SknMaterialDefinition(
         IReadOnlyList<SknMaterialSampler> Samplers,
@@ -438,8 +438,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         internal static SknMaterialTextureResolution Resolve(
             SknMaterialTextureMetadata metadata,
-            IEnumerable<string> availableTextureKeys,
-            bool includeSpecializedEffects = false)
+            IEnumerable<string> availableTextureKeys)
         {
             var textureKeys = availableTextureKeys?.ToList() ?? new List<string>();
             // Once a skin BIN is available, only its authored texture participates. LTK does not
