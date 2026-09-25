@@ -489,6 +489,12 @@ namespace AssetsManager.Services.Viewer.Loading
                     }
                 }
 
+                foreach (BinTree binTree in binTrees)
+                {
+                    if (binTree != null && !shaderTrees.Contains(binTree))
+                        shaderTrees.Add(binTree);
+                }
+
                 Func<ulong, string> wadChunkPathResolver = _hashResolverService == null
                     ? null
                     : _hashResolverService.ResolveHash;

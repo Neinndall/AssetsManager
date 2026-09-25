@@ -110,10 +110,14 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             }
         }
 
-        private sealed record CacheEntry(
+        private sealed record PassRuntimeEntry(
+            int PassIndex,
             ProgramRuntime Program,
             GameMaterialPass Pass,
-            PassGlobals Globals,
+            PassGlobals Globals);
+
+        private sealed record CacheEntry(
+            IReadOnlyList<PassRuntimeEntry> Passes,
             string Failure);
 
         private readonly GL _gl;
@@ -153,8 +157,26 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             }
         }
 
+        internal int GetStaticPassCount(MapMaterialDefinition material)
+        {
+            if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.StaticMesh)
+                return 0;
+            CacheEntry entry = GetOrCreate(material, material.Program);
+            return entry?.Passes?.Count ?? 0;
+        }
+
         internal bool TryBind(
             MapMaterialDefinition material,
+            MapGeometryMeshData mesh,
+            bool meshDoubleSided,
+            in Frame frame,
+            Func<string, uint?> programTexture,
+            Func<string, uint?> lightmapTexture) =>
+            TryBind(material, 0, mesh, meshDoubleSided, in frame, programTexture, lightmapTexture);
+
+        internal bool TryBind(
+            MapMaterialDefinition material,
+            int passIndex,
             MapGeometryMeshData mesh,
             bool meshDoubleSided,
             in Frame frame,
@@ -165,20 +187,43 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 return false;
 
             CacheEntry entry = GetOrCreate(material, material.Program);
-            ProgramRuntime runtime = entry?.Program;
+            if (entry?.Passes == null || passIndex < 0 || passIndex >= entry.Passes.Count)
+                return false;
+
+            PassRuntimeEntry passEntry = entry.Passes[passIndex];
+            ProgramRuntime runtime = passEntry.Program;
             if (runtime == null)
                 return false;
 
             _gl.UseProgram(runtime.Program);
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.StaticMesh, hasTangents: false);
-            UpdateBlocks(runtime, entry, mesh, frame, null);
-            BindTextures(runtime, entry.Pass, material, mesh, programTexture, lightmapTexture);
-            ApplyPassState(entry.Pass.State, meshDoubleSided);
+            UpdateBlocks(runtime, passEntry.Globals, mesh, frame, null);
+            BindTextures(runtime, passEntry.Pass, passIndex, material, mesh, programTexture, lightmapTexture);
+            ApplyPassState(passEntry.Pass.State, meshDoubleSided);
             return true;
+        }
+
+        internal int GetSkinnedPassCount(ModelMaterialDefinition material)
+        {
+            if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.SkinnedMesh)
+                return 0;
+            CacheEntry entry = GetOrCreate(material, material.Program);
+            return entry?.Passes?.Count ?? 0;
         }
 
         internal bool TryBindSkinned(
             ModelMaterialDefinition material,
+            Matrix4x4 world,
+            IReadOnlyList<Matrix4x4> bones,
+            bool hasTangents,
+            in Frame frame,
+            Func<string, uint?> programTexture,
+            float selfIllumination = 0f) =>
+            TryBindSkinned(material, 0, world, bones, hasTangents, in frame, programTexture, selfIllumination);
+
+        internal bool TryBindSkinned(
+            ModelMaterialDefinition material,
+            int passIndex,
             Matrix4x4 world,
             IReadOnlyList<Matrix4x4> bones,
             bool hasTangents,
@@ -190,15 +235,19 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 return false;
 
             CacheEntry entry = GetOrCreate(material, material.Program);
-            ProgramRuntime runtime = entry?.Program;
+            if (entry?.Passes == null || passIndex < 0 || passIndex >= entry.Passes.Count)
+                return false;
+
+            PassRuntimeEntry passEntry = entry.Passes[passIndex];
+            ProgramRuntime runtime = passEntry.Program;
             if (runtime == null)
                 return false;
 
             _gl.UseProgram(runtime.Program);
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents);
-            UpdateBlocks(runtime, entry, null, frame, new CharacterDraw(world, bones, selfIllumination));
-            BindSkinnedTextures(runtime, entry.Pass, programTexture);
-            ApplyPassState(entry.Pass.State, material.RenderState.DoubleSided);
+            UpdateBlocks(runtime, passEntry.Globals, null, frame, new CharacterDraw(world, bones, selfIllumination));
+            BindSkinnedTextures(runtime, passEntry.Pass, programTexture);
+            ApplyPassState(passEntry.Pass.State, material.RenderState.DoubleSided);
             return true;
         }
 
@@ -223,9 +272,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 if (_shaderCache == null)
                 {
                     created = new CacheEntry(
-                        null,
-                        null,
-                        null,
+                        Array.Empty<PassRuntimeEntry>(),
                         string.IsNullOrWhiteSpace(_shaderCachePath)
                             ? "ShaderCache.dx11.wad.client was not found in the configured game installs."
                             : "ShaderCache.dx11.wad.client could not be opened.");
@@ -239,15 +286,15 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                             _shaderCachePath);
                     if (bytecodes == null)
                     {
-                        created = new CacheEntry(null, null, null, "Material has no resolved game program.");
+                        created = new CacheEntry(Array.Empty<PassRuntimeEntry>(), "Material has no resolved game program.");
                     }
                     else
                     {
-                        ProgramRuntime ready = null;
-                        GameMaterialPass readyPass = null;
+                        var readyPasses = new List<PassRuntimeEntry>();
                         var failures = new List<string>();
-                        foreach (GameShaderProgramResolver.ShaderBytecodePassRead passRead in bytecodes.Passes)
+                        for (int passIndex = 0; passIndex < bytecodes.Passes.Count; passIndex++)
                         {
+                            GameShaderProgramResolver.ShaderBytecodePassRead passRead = bytecodes.Passes[passIndex];
                             if (passRead?.Bytecode?.Ready != true)
                             {
                                 if (!string.IsNullOrWhiteSpace(passRead?.Bytecode?.Failure))
@@ -256,48 +303,53 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                             }
 
                             string key = ProgramKey(passRead.Pass, passRead.Bytecode.Program);
-                            if (_sharedPrograms.TryGetValue(key, out ready))
+                            if (!_sharedPrograms.TryGetValue(key, out ProgramRuntime ready))
                             {
-                                readyPass = passRead.Pass;
-                                break;
+                                GameShaderTranslator.TranslationRead translated =
+                                    GameShaderTranslator.Translate(
+                                        passRead.Bytecode.Program.Vertex,
+                                        passRead.Bytecode.Program.VertexReflection,
+                                        passRead.Bytecode.Program.Pixel,
+                                        passRead.Bytecode.Program.PixelReflection);
+                                if (!translated.Ready)
+                                {
+                                    if (!string.IsNullOrWhiteSpace(translated.Failure))
+                                        failures.Add(translated.Failure);
+                                    continue;
+                                }
+
+                                try
+                                {
+                                    ready = CreateProgram(translated.Program, program.Kind);
+                                    _sharedPrograms[key] = ready;
+                                }
+                                catch (Exception ex)
+                                {
+                                    ready = null;
+                                    failures.Add(ex.Message);
+                                    continue;
+                                }
                             }
 
-                            GameShaderTranslator.TranslationRead translated =
-                                GameShaderTranslator.Translate(
-                                    passRead.Bytecode.Program.Vertex,
-                                    passRead.Bytecode.Program.VertexReflection,
-                                    passRead.Bytecode.Program.Pixel,
-                                    passRead.Bytecode.Program.PixelReflection);
-                            if (!translated.Ready)
+                            if (ready != null)
                             {
-                                if (!string.IsNullOrWhiteSpace(translated.Failure))
-                                    failures.Add(translated.Failure);
-                                continue;
-                            }
-
-                            try
-                            {
-                                ready = CreateProgram(translated.Program, program.Kind);
-                                _sharedPrograms[key] = ready;
-                                readyPass = passRead.Pass;
-                                break;
-                            }
-                            catch (Exception ex)
-                            {
-                                ready = null;
-                                failures.Add(ex.Message);
+                                readyPasses.Add(new PassRuntimeEntry(
+                                    passIndex,
+                                    ready,
+                                    passRead.Pass,
+                                    new PassGlobals(passRead.Pass)));
                             }
                         }
 
-                        created = ready != null
-                            ? new CacheEntry(ready, readyPass, new PassGlobals(readyPass), null)
-                            : new CacheEntry(null, null, null, failures.FirstOrDefault() ?? "No material pass translated and linked.");
+                        created = readyPasses.Count > 0
+                            ? new CacheEntry(readyPasses, null)
+                            : new CacheEntry(Array.Empty<PassRuntimeEntry>(), failures.FirstOrDefault() ?? "No material pass translated and linked.");
                     }
                 }
             }
             catch (Exception ex)
             {
-                created = new CacheEntry(null, null, null, ex.Message);
+                created = new CacheEntry(Array.Empty<PassRuntimeEntry>(), ex.Message);
             }
 
             if (owner != null)
@@ -488,7 +540,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
         private void UpdateBlocks(
             ProgramRuntime runtime,
-            CacheEntry entry,
+            PassGlobals globals,
             MapGeometryMeshData mesh,
             in Frame frame,
             CharacterDraw? character)
@@ -500,7 +552,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 switch (block.Block.Name)
                 {
                     case Globals:
-                        WriteGlobals(block.Data, block.Block, entry.Globals, mesh);
+                        WriteGlobals(block.Data, block.Block, globals, mesh);
                         break;
                     case "PerFrameVertexCB":
                         WritePerFrameVertex(block.Data, frame, skinned);
@@ -780,6 +832,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         private void BindTextures(
             ProgramRuntime runtime,
             GameMaterialPass pass,
+            int passIndex,
             MapMaterialDefinition material,
             MapGeometryMeshData mesh,
             Func<string, uint?> programTexture,
@@ -819,7 +872,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     GameMaterialTexture declared = pass.Textures?
                         .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
                     uint? loaded = sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D
-                        ? programTexture?.Invoke(MapTextureLoadingService.ProgramTextureKey(material.Name, own))
+                        ? (programTexture?.Invoke(MapTextureLoadingService.ProgramTextureKey(material.Name, passIndex, own))
+                           ?? programTexture?.Invoke(MapTextureLoadingService.ProgramTextureKey(material.Name, own)))
                         : null;
                     if (loaded.HasValue && loaded.Value != 0)
                     {
@@ -1108,6 +1162,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             // renderer reapplies material state on every draw.
             _gl.ColorMask(true, true, true, true);
             _gl.DepthFunc(DepthFunction.Lequal);
+            _gl.DepthMask(true);
+            _gl.Enable(EnableCap.DepthTest);
+            _gl.Disable(EnableCap.Blend);
+            _gl.Disable(EnableCap.CullFace);
             for (uint unit = 0; unit < (uint)_maxTextureUnits; unit++)
             {
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));

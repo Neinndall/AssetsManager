@@ -369,30 +369,44 @@ namespace AssetsManager.Services.Viewer.Rendering
                                         resources.IsGpuSkinned &&
                                         gameSkinningMatrices is { Count: > 0 } &&
                                         material?.Program != null;
-                if (wantsGameProgram)
-                    ConfigureSkinIndexAttribute(resources, integer: true);
+                int passCount = wantsGameProgram && _gameShaderRuntime != null
+                    ? _gameShaderRuntime.GetSkinnedPassCount(material)
+                    : 0;
 
-                bool gameBound = wantsGameProgram &&
-                                 _gameShaderRuntime?.TryBindSkinned(
-                                     material,
-                                     world,
-                                     gameSkinningMatrices,
-                                     hasTangents: resources.TangentVbo != 0,
-                                     in gameFrame,
-                                     path => _resources.ResolveProgramTexture(part, resources, path), model.SelfIllumination) == true;
-                if (gameBound)
+                if (passCount > 0)
                 {
-                    _gl.FrontFace(world.GetDeterminant() < 0f
-                        ? FrontFaceDirection.CW
-                        : FrontFaceDirection.Ccw);
-                    _drawElements?.Invoke(
-                        (uint)PrimitiveType.Triangles,
-                        resources.IndexCount,
-                        (uint)DrawElementsType.UnsignedInt,
-                        IntPtr.Zero);
-                    _gameShaderRuntime.ResetBindings();
-                    lastBoundTex0 = uint.MaxValue;
-                    continue;
+                    ConfigureSkinIndexAttribute(resources, integer: true);
+                    bool boundAny = false;
+                    for (int passIndex = 0; passIndex < passCount; passIndex++)
+                    {
+                        if (_gameShaderRuntime.TryBindSkinned(
+                                material,
+                                passIndex,
+                                world,
+                                gameSkinningMatrices,
+                                hasTangents: resources.TangentVbo != 0,
+                                in gameFrame,
+                                path => _resources.ResolveProgramTexture(part, resources, path),
+                                model.SelfIllumination))
+                        {
+                            boundAny = true;
+                            _gl.FrontFace(world.GetDeterminant() < 0f
+                                ? FrontFaceDirection.CW
+                                : FrontFaceDirection.Ccw);
+                            _drawElements?.Invoke(
+                                (uint)PrimitiveType.Triangles,
+                                resources.IndexCount,
+                                (uint)DrawElementsType.UnsignedInt,
+                                IntPtr.Zero);
+                            _gameShaderRuntime.ResetBindings();
+                        }
+                    }
+
+                    if (boundAny)
+                    {
+                        lastBoundTex0 = uint.MaxValue;
+                        continue;
+                    }
                 }
 
                 if (resources.IsGpuSkinned)

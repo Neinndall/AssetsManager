@@ -402,46 +402,61 @@ namespace AssetsManager.Services.Viewer.Rendering
                                         viewMode == VfxPreviewViewMode.Lit &&
                                         command.Resources.HasSkin &&
                                         command.Range.Material?.Program != null;
-                if (wantsGameProgram)
-                    ConfigureSkinIndexAttribute(command.Resources, integer: true);
+                int passCount = wantsGameProgram && _gameShaderRuntime != null
+                    ? _gameShaderRuntime.GetSkinnedPassCount(command.Range.Material)
+                    : 0;
 
-                bool useGameProgram = wantsGameProgram &&
-                                      _gameShaderRuntime?.TryBindSkinned(
-                                          command.Range.Material,
-                                          world,
-                                          command.Palette,
-                                          command.Resources.TangentVbo != 0,
-                                          in gameFrame,
-                                          path => ResolveProgramTexture(command.Resources, path),
-                                          command.SelfIllumination) == true;
-                if (!useGameProgram)
+                if (passCount > 0)
                 {
-                    if (command.Resources.HasSkin)
-                        ConfigureSkinIndexAttribute(command.Resources, integer: false);
-                    UseStockProgram(viewProjection);
-                    if (!ReferenceEquals(activePalette, command.Palette))
+                    ConfigureSkinIndexAttribute(command.Resources, integer: true);
+                    bool boundAny = false;
+                    for (int passIndex = 0; passIndex < passCount; passIndex++)
                     {
-                        activePalette = command.Palette;
-                        UploadPalette(activePalette);
+                        if (_gameShaderRuntime.TryBindSkinned(
+                                command.Range.Material,
+                                passIndex,
+                                world,
+                                command.Palette,
+                                command.Resources.TangentVbo != 0,
+                                in gameFrame,
+                                path => ResolveProgramTexture(command.Resources, path),
+                                command.SelfIllumination))
+                        {
+                            boundAny = true;
+                            _drawElements(
+                                (uint)PrimitiveType.Triangles,
+                                command.Range.IndexCount,
+                                (uint)DrawElementsType.UnsignedInt,
+                                new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
+                            _gameShaderRuntime.ResetBindings();
+                        }
                     }
-                    _gl.UniformMatrix4(_uWorld, 1, false, in world.M11);
-                    _gl.Uniform1(_uUseSkinning, command.Resources.HasSkin ? 1 : 0);
-                    if (!wireframePass)
-                        ApplyMaterial(command.Range, command.TimeSeconds, untextured, errored, viewMode, command.SelfIllumination);
+
+                    if (boundAny)
+                    {
+                        activePalette = null;
+                        continue;
+                    }
                 }
-                else
+
+                if (command.Resources.HasSkin)
+                    ConfigureSkinIndexAttribute(command.Resources, integer: false);
+                UseStockProgram(viewProjection);
+                if (!ReferenceEquals(activePalette, command.Palette))
                 {
-                    activePalette = null;
+                    activePalette = command.Palette;
+                    UploadPalette(activePalette);
                 }
+                _gl.UniformMatrix4(_uWorld, 1, false, in world.M11);
+                _gl.Uniform1(_uUseSkinning, command.Resources.HasSkin ? 1 : 0);
+                if (!wireframePass)
+                    ApplyMaterial(command.Range, command.TimeSeconds, untextured, errored, viewMode, command.SelfIllumination);
 
                 _drawElements(
                     (uint)PrimitiveType.Triangles,
                     command.Range.IndexCount,
                     (uint)DrawElementsType.UnsignedInt,
                     new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
-
-                if (useGameProgram)
-                    _gameShaderRuntime.ResetBindings();
             }
         }
 

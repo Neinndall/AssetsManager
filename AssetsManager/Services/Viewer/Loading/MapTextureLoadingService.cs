@@ -164,6 +164,9 @@ namespace AssetsManager.Services.Viewer.Loading
         internal static string ProgramTextureKey(string material, string texture) =>
             $"program:{material}:{texture}";
 
+        internal static string ProgramTextureKey(string material, int pass, string texture) =>
+            $"program:{material}:{pass}:{texture}";
+
         private async Task<IReadOnlyDictionary<string, MapTextureImage>> LoadProgramWaveAsync(
             IReadOnlyList<MapMaterialDefinition> materials,
             string projectRoot,
@@ -173,13 +176,13 @@ namespace AssetsManager.Services.Viewer.Loading
         {
             var requested = (materials ?? Array.Empty<MapMaterialDefinition>())
                 .Where(material => material?.Program?.Passes != null && !string.IsNullOrWhiteSpace(material.Name))
-                .SelectMany(material => material.Program.Passes.SelectMany(pass =>
+                .SelectMany(material => material.Program.Passes.SelectMany((pass, passIndex) =>
                     (pass.Textures ?? Array.Empty<GameMaterialTexture>())
                         .Where(texture => texture?.Texture?.IsEmpty == false)
-                        .Select(texture => new
+                        .SelectMany(texture => new[]
                         {
-                            Key = ProgramTextureKey(material.Name, texture.Name),
-                            texture.Texture
+                            new { Key = ProgramTextureKey(material.Name, passIndex, texture.Name), texture.Texture },
+                            new { Key = ProgramTextureKey(material.Name, texture.Name), texture.Texture }
                         })))
                 .GroupBy(item => item.Key, StringComparer.Ordinal)
                 .Select(group => group.Last())

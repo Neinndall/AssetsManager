@@ -26,5 +26,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         {
             Assert.Equal(expected, GameShaderRuntime.ColorWriteEnabled(writeMask));
         }
+
+        [Fact]
+        public void ProgramTextureKeyIncludesPassIndexWhenSpecified()
+        {
+            Assert.Equal("program:materialA:0:Diffuse", AssetsManager.Services.Viewer.Loading.MapTextureLoadingService.ProgramTextureKey("materialA", 0, "Diffuse"));
+            Assert.Equal("program:materialA:1:Emissive", AssetsManager.Services.Viewer.Loading.MapTextureLoadingService.ProgramTextureKey("materialA", 1, "Emissive"));
+            Assert.Equal("program:materialA:Diffuse", AssetsManager.Services.Viewer.Loading.MapTextureLoadingService.ProgramTextureKey("materialA", "Diffuse"));
+        }
     }
 }

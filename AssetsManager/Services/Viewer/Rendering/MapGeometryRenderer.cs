@@ -499,41 +499,60 @@ namespace AssetsManager.Services.Viewer.Rendering
                 MapGeometryMeshData mesh = group.MeshIndex >= 0 && group.MeshIndex < _scene.Geometry.Meshes.Count
                     ? _scene.Geometry.Meshes[group.MeshIndex]
                     : null;
-                bool gameBound = shadersEnabled &&
-                                 viewMode == VfxPreviewViewMode.Lit &&
-                                 _gameShaderRuntime?.TryBind(
-                                     bound.Material,
-                                     mesh,
-                                     bound.MeshDoubleSided,
-                                     in gameFrame,
-                                     ResolveProgramTexture,
-                                     ResolveLightmapTexture) == true;
+                int passCount = shadersEnabled &&
+                                viewMode == VfxPreviewViewMode.Lit &&
+                                _gameShaderRuntime != null &&
+                                bound.Material?.Program != null
+                    ? _gameShaderRuntime.GetStaticPassCount(bound.Material)
+                    : 0;
 
-                if (gameBound)
+                if (passCount > 0)
                 {
-                    // Game programs carry material, lighting and lightmap state themselves.
-                    // Reset stock batching so a later fallback always rebinds the preview shader.
-                    stockActive = false;
-                    activeStockMaterial = -1;
-                    activeStockMesh = -1;
+                    bool boundAny = false;
+                    for (int passIndex = 0; passIndex < passCount; passIndex++)
+                    {
+                        if (_gameShaderRuntime.TryBind(
+                                bound.Material,
+                                passIndex,
+                                mesh,
+                                bound.MeshDoubleSided,
+                                in gameFrame,
+                                ResolveProgramTexture,
+                                ResolveLightmapTexture))
+                        {
+                            boundAny = true;
+                            _drawElements(
+                                (uint)PrimitiveType.Triangles,
+                                group.IndexCount,
+                                (uint)DrawElementsType.UnsignedInt,
+                                new IntPtr(checked(group.StartIndex * sizeof(uint))));
+                            _gameShaderRuntime.ResetBindings();
+                        }
+                    }
+
+                    if (boundAny)
+                    {
+                        stockActive = false;
+                        activeStockMaterial = -1;
+                        activeStockMesh = -1;
+                        continue;
+                    }
                 }
-                else
+
+                if (!stockActive)
                 {
-                    if (!stockActive)
-                    {
-                        _gl.UseProgram(_program);
-                        stockActive = true;
-                    }
-                    if (activeStockMaterial != group.BoundMaterialIndex)
-                    {
-                        activeStockMaterial = group.BoundMaterialIndex;
-                        ApplyMaterial(bound, viewMode);
-                    }
-                    if (activeStockMesh != group.MeshIndex)
-                    {
-                        activeStockMesh = group.MeshIndex;
-                        ApplyMeshLighting(activeStockMesh);
-                    }
+                    _gl.UseProgram(_program);
+                    stockActive = true;
+                }
+                if (activeStockMaterial != group.BoundMaterialIndex)
+                {
+                    activeStockMaterial = group.BoundMaterialIndex;
+                    ApplyMaterial(bound, viewMode);
+                }
+                if (activeStockMesh != group.MeshIndex)
+                {
+                    activeStockMesh = group.MeshIndex;
+                    ApplyMeshLighting(activeStockMesh);
                 }
 
                 _drawElements(

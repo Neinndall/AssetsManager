@@ -149,7 +149,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .Where(material => material?.Program?.Passes != null)
                 .SelectMany(material => material.Program.Passes)
                 .SelectMany(pass => pass.Textures ?? Array.Empty<GameMaterialTexture>())
-                .Select(texture => texture?.Texture?.VirtualPath)
+                .Select(texture => !string.IsNullOrWhiteSpace(texture?.Texture?.VirtualPath)
+                    ? texture.Texture.VirtualPath
+                    : texture?.Texture?.PathHash > 0 ? texture.Texture.PathHash.ToString("x16") : null)
                 .Where(path => !string.IsNullOrWhiteSpace(path));
 
         private IEnumerable<string> ReferencedShaderDefaultTextures()
