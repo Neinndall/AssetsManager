@@ -439,7 +439,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal static SknMaterialTextureResolution Resolve(
             SknMaterialTextureMetadata metadata,
             IEnumerable<string> availableTextureKeys,
-            bool includeSpecializedEffects = true)
+            bool includeSpecializedEffects = false)
         {
             var textureKeys = availableTextureKeys?.ToList() ?? new List<string>();
             // Once a skin BIN is available, only its authored texture participates. LTK does not
@@ -472,16 +472,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             SknShaderDefinition defaultShader = ResolveShaderDefinition(metadata, metadata.DefaultMaterial);
-            SknMaterialDefinition defaultEffectMaterial = includeSpecializedEffects
-                ? SknStaticMaterialResolver.CreateEffectiveEffectMaterial(metadata.DefaultMaterial, defaultShader)
-                : null;
-            ModelMaterialEffectDefinition defaultEffect = defaultEffectMaterial == null
-                ? ModelMaterialEffectDefinition.None
-                : SknMaterialEffectResolver.Resolve(
-                    defaultEffectMaterial,
-                    string.Empty,
-                    textureKeys,
-                    overrideSubmeshKeys);
+            ModelMaterialEffectDefinition defaultEffect = ModelMaterialEffectDefinition.None;
 
             ModelMaterialDefinition defaultMaterialDefinition;
             if (metadata.HasDefaultMaterialLink)
@@ -518,22 +509,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     }
 
                     SknShaderDefinition shader = ResolveShaderDefinition(metadata, material);
-                    SknMaterialDefinition effectMaterial = includeSpecializedEffects
-                        ? SknStaticMaterialResolver.CreateEffectiveEffectMaterial(material, shader)
-                        : null;
-                    ModelMaterialEffectDefinition effect = effectMaterial == null
-                        ? ModelMaterialEffectDefinition.None
-                        : SknMaterialEffectResolver.Resolve(
-                            effectMaterial,
-                            submesh,
-                            textureKeys,
-                            overrideSubmeshKeys);
                     materialDefinitions[submesh] = SknStaticMaterialResolver.Resolve(
                         material,
                         shader,
                         textureKeys,
                         textureFallback,
-                        effect);
+                        ModelMaterialEffectDefinition.None);
                     continue;
                 }
 

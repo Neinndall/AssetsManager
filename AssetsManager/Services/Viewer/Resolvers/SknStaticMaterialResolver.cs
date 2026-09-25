@@ -11,7 +11,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 {
     /// <summary>
     /// Resolves the generic StaticMaterialDef semantics used by the League client and LTK Manager.
-    /// Shader-specific secondary layers stay in SknMaterialEffectResolver instead of competing here.
+    /// Real shader effects are handled natively by GameShaderRuntime when Shaders is enabled.
     /// </summary>
     internal static class SknStaticMaterialResolver
     {
@@ -231,28 +231,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             {
                 HasAuthoredTint = hasTint,
                 Program = material.Program
-            };
-        }
-
-        internal static SknMaterialDefinition CreateEffectiveEffectMaterial(
-            SknMaterialDefinition material,
-            SknShaderDefinition shader)
-        {
-            if (material == null)
-                return null;
-
-            IReadOnlyDictionary<string, bool> switchStates = MergeSwitches(material, shader);
-            return material with
-            {
-                Samplers = MergeSamplers(material, shader),
-                Parameters = MergeParameters(material, shader),
-                SwitchStates = switchStates,
-                Switches = switchStates
-                    .Where(pair => pair.Value)
-                    .Select(pair => SknMaterialTextureResolver.NormalizeToken(pair.Key))
-                    .ToHashSet(StringComparer.Ordinal),
-                ShaderMacros = MergeMacros(material, shader),
-                ShaderPath = shader?.Path ?? material.ShaderPath
             };
         }
 
