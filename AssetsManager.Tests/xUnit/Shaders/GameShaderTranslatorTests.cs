@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using AssetsManager.Shaders;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Viewer;

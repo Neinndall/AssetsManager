@@ -11,7 +11,7 @@ using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Wad;
 using Silk.NET.OpenGL;
 
-namespace AssetsManager.Services.Viewer.Rendering
+namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 {
     /// <summary>
     /// OpenGL execution layer for translated game material programs. Resolution/translation stay in
@@ -40,7 +40,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private readonly record struct CharacterDraw(
             Matrix4x4 World,
-            IReadOnlyList<Matrix4x4> Bones);
+            IReadOnlyList<Matrix4x4> Bones,
+            float SelfIllumination = 0f);
 
         private sealed class BlockRuntime
         {
@@ -182,7 +183,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             IReadOnlyList<Matrix4x4> bones,
             bool hasTangents,
             in Frame frame,
-            Func<string, uint?> programTexture)
+            Func<string, uint?> programTexture,
+            float selfIllumination = 0f)
         {
             if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.SkinnedMesh)
                 return false;
@@ -194,7 +196,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             _gl.UseProgram(runtime.Program);
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents);
-            UpdateBlocks(runtime, entry, null, frame, new CharacterDraw(world, bones));
+            UpdateBlocks(runtime, entry, null, frame, new CharacterDraw(world, bones, selfIllumination));
             BindSkinnedTextures(runtime, entry.Pass, programTexture);
             ApplyPassState(entry.Pass.State, material.RenderState.DoubleSided);
             return true;
@@ -510,7 +512,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         WriteCharacterPerDrawVertex(block.Data, frame);
                         break;
                     case "CharacterPerDrawPS" when character.HasValue:
-                        WriteCharacterPerDrawPixel(block.Data);
+                        WriteCharacterPerDrawPixel(block.Data, character.Value);
                         break;
                     case "BonesCB" when character.HasValue:
                         WriteBones(block.Data, character.Value);
@@ -690,8 +692,11 @@ namespace AssetsManager.Services.Viewer.Rendering
             WriteIdentityRows(data, 44, 16);
         }
 
-        private static void WriteCharacterPerDrawPixel(float[] data)
+        private static void WriteCharacterPerDrawPixel(float[] data, in CharacterDraw character)
         {
+            Set(data, 0, character.SelfIllumination);
+            Set(data, 1, character.SelfIllumination);
+            Set(data, 2, character.SelfIllumination);
             Set(data, 7, 1f);
             Set(data, 8, 1f);
             Set(data, 9, 1f);
@@ -757,7 +762,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                     }
                     else
                     {
-                        (texture, target) = NeutralFor(sampler.Dimension, black: false);
+                        bool isBlackDefault = string.Equals(own, "EMISSIVE_MAP", StringComparison.OrdinalIgnoreCase) ||
+                                              own.IndexOf("emissive", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                              own.IndexOf("glow", StringComparison.OrdinalIgnoreCase) >= 0;
+                        (texture, target) = NeutralFor(sampler.Dimension, black: isBlackDefault);
                         samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
                     }
                 }

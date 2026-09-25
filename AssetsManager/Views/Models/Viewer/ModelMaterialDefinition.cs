@@ -35,6 +35,9 @@ namespace AssetsManager.Views.Models.Viewer
         public static ModelMaterialDefinition Default { get; } = TextureOnly(null);
 
         public static ModelMaterialDefinition TextureOnly(string baseTextureName) =>
+            TextureOnly(baseTextureName, null);
+
+        internal static ModelMaterialDefinition TextureOnly(string baseTextureName, GameMaterialProgram program) =>
             new(
                 baseTextureName,
                 ModelMaterialBaseRule.None,
@@ -47,7 +50,10 @@ namespace AssetsManager.Views.Models.Viewer
                 ModelMaterialRenderState.TextureOnly,
                 ModelMaterialBindingKind.TextureOnly,
                 false,
-                null);
+                program?.Passes?.Count > 0 ? program.Passes[0].ShaderPath : null)
+            {
+                Program = program
+            };
 
         public static ModelMaterialDefinition Missing { get; } = new(
             null,

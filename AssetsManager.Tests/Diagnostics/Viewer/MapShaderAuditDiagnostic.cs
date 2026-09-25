@@ -11,6 +11,7 @@ using AssetsManager.Services.Parsers;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Utils;

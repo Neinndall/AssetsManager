@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Viewer;
@@ -23,6 +24,29 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 GameShaderProgramResolver.BundlePath(
                     "assets/shaders/generated/shaders/staticmesh/defaultenv_flat.vs-dx11",
                     347));
+            Assert.Equal(
+                "assets/shaders/hlsl/skinnedmesh/lit_uber_vs.vs-dx11",
+                GameShaderProgramResolver.TocPath(GameShaderProgramResolver.LitUberShaderName, "vs"));
+            Assert.Equal(
+                "assets/shaders/hlsl/skinnedmesh/lit_uber_ps.ps-dx11",
+                GameShaderProgramResolver.TocPath(GameShaderProgramResolver.LitUberShaderName, "ps"));
+        }
+
+        [Fact]
+        public void DefaultSkinnedProgramMatchesLitUberSpecification()
+        {
+            GameMaterialProgram program = GameShaderProgramResolver.CreateDefaultSkinnedProgram("base_color", "base_emissive");
+            Assert.Equal(GameMaterialKind.SkinnedMesh, program.Kind);
+            Assert.False(program.Animated);
+            Assert.Single(program.Passes);
+
+            GameMaterialPass pass = program.Passes[0];
+            Assert.Equal(GameShaderProgramResolver.LitUberShaderName, pass.ShaderPath);
+            Assert.Equal(2, pass.Textures.Count);
+            Assert.Equal(GameShaderProgramResolver.LitUberDiffuseTexture, pass.Textures[0].Name);
+            Assert.Equal("base_color", pass.Textures[0].Texture.VirtualPath);
+            Assert.Equal(GameShaderProgramResolver.LitUberEmissiveTexture, pass.Textures[1].Name);
+            Assert.Equal("base_emissive", pass.Textures[1].Texture.VirtualPath);
         }
 
         [Fact]

@@ -9,6 +9,7 @@ using System.Windows.Media.Imaging;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
 

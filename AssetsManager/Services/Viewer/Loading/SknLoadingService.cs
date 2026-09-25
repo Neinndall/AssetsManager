@@ -358,7 +358,9 @@ namespace AssetsManager.Services.Viewer.Loading
                     SkinnedMesh = skinnedMesh,
                     FilePath = filePath,
                     Skeleton = skeleton,
-                    Scale = materialTextures?.SkinScale ?? 1f
+                    Scale = materialTextures?.SkinScale ?? 1f,
+                    SelfIllumination = materialTextures?.SelfIllumination ?? 0f,
+                    EmissiveTexturePath = materialTextures?.EmissiveTexturePath
                 };
                 _logService.LogDebug("--- Displaying Model ---");
                 var parts = new List<ModelPart>();

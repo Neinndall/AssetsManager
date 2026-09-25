@@ -11,6 +11,7 @@ using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Hashing;
@@ -65,7 +66,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             Matrix4x4 World,
             Matrix4x4[] Palette,
             float DistanceSquared,
-            float TimeSeconds);
+            float TimeSeconds,
+            float SelfIllumination = 0f);
 
         private static readonly Vector3 SunDirection = Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
         private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
@@ -362,7 +364,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (submeshHidden)
                     continue;
 
-                var command = new DrawCommand(resources, range, world, palette, distance, timeSeconds);
+                var command = new DrawCommand(resources, range, world, palette, distance, timeSeconds, group.Asset?.Materials?.SelfIllumination ?? 0f);
                 if (range.Transparent) _transparent.Add(command);
                 else _opaque.Add(command);
             }
@@ -408,7 +410,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                                           command.Palette,
                                           command.Resources.TangentVbo != 0,
                                           in gameFrame,
-                                          path => ResolveProgramTexture(command.Resources, path)) == true;
+                                          path => ResolveProgramTexture(command.Resources, path),
+                                          command.SelfIllumination) == true;
                 if (!useGameProgram)
                 {
                     if (command.Resources.HasSkin)

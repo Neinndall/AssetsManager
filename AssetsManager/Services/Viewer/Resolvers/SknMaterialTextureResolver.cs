@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Text.RegularExpressions;
 using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Utils;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
@@ -19,6 +20,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
     {
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
         internal float SkinScale { get; init; } = 1f;
+        internal float SelfIllumination { get; init; } = 0f;
+        internal string EmissiveTexturePath { get; init; }
 
         internal ModelMaterialDefinition ResolveMaterialDefinition(string submeshName)
         {
@@ -114,6 +117,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
     {
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
         internal float SkinScale { get; init; } = 1f;
+        internal float SelfIllumination { get; init; } = 0f;
+        internal string EmissiveTexturePath { get; init; }
         internal IReadOnlyDictionary<uint, SknShaderDefinition> ShaderDefinitions { get; init; } =
             new Dictionary<uint, SknShaderDefinition>();
         internal bool HasDefaultMaterialLink { get; init; }
@@ -170,6 +175,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint SkinMeshProperties = Fnv1a.HashLower("skinMeshProperties");
         private static readonly uint SimpleSkin = Fnv1a.HashLower("simpleSkin");
         private static readonly uint SkinScale = Fnv1a.HashLower("skinScale");
+        private static readonly uint SelfIllumination = Fnv1a.HashLower("selfIllumination");
+        private static readonly uint EmissiveTexture = Fnv1a.HashLower("emissiveTexture");
         private static readonly uint InitialSubmeshToHide = Fnv1a.HashLower("initialSubmeshToHide");
         private static readonly uint MaterialOverride = Fnv1a.HashLower("materialOverride");
         private static readonly uint Texture = Fnv1a.HashLower("texture");
@@ -267,6 +274,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             bool readInitialHiddenSubmeshes = false;
             float skinScale = 1f;
             bool readSkinScale = false;
+            float selfIllumination = 0f;
+            bool readSelfIllumination = false;
+            string emissiveTexturePath = null;
             bool hasDefaultMaterialLink = false;
             string defaultTexturePath = null;
             SknMaterialDefinition defaultMaterial = null;
@@ -318,6 +328,21 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     {
                         skinScale = authoredScale.Value;
                     }
+                }
+                if (!readSelfIllumination)
+                {
+                    readSelfIllumination = true;
+                    if (meshProperties.Properties.TryGetValue(SelfIllumination, out BinTreeProperty selfIllumProperty) &&
+                        selfIllumProperty is BinTreeF32 authoredSelfIllum)
+                    {
+                        selfIllumination = authoredSelfIllum.Value;
+                    }
+                }
+
+                if (emissiveTexturePath == null &&
+                    TryGetTexturePath(meshProperties, EmissiveTexture, wadChunkPathResolver, out string emissivePath))
+                {
+                    emissiveTexturePath = emissivePath;
                 }
 
                 if (defaultTexturePath == null &&
@@ -425,6 +450,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
             {
                 InitialHiddenSubmeshes = initialHiddenSubmeshes,
                 SkinScale = skinScale,
+                SelfIllumination = selfIllumination,
+                EmissiveTexturePath = emissiveTexturePath,
                 ShaderDefinitions = shaderDefinitions,
                 HasDefaultMaterialLink = hasDefaultMaterialLink,
                 OverrideMaterialLinkKeys = overrideMaterialLinkKeys,
@@ -472,6 +499,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             SknShaderDefinition defaultShader = ResolveShaderDefinition(metadata, metadata.DefaultMaterial);
 
+            string emissiveTextureKey = MatchTextureKey(metadata.EmissiveTexturePath, textureKeys);
+
             ModelMaterialDefinition defaultMaterialDefinition;
             if (metadata.HasDefaultMaterialLink)
             {
@@ -485,7 +514,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
             else
             {
-                defaultMaterialDefinition = ModelMaterialDefinition.TextureOnly(skinTextureKey);
+                defaultMaterialDefinition = ModelMaterialDefinition.TextureOnly(
+                    skinTextureKey,
+                    GameShaderProgramResolver.CreateDefaultSkinnedProgram(skinTextureKey, emissiveTextureKey));
             }
 
             var materialDefinitions = new Dictionary<string, ModelMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
@@ -515,7 +546,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 }
 
                 // A texture-only override falls back to the skin texture if its asset is unavailable.
-                materialDefinitions[submesh] = ModelMaterialDefinition.TextureOnly(textureFallback);
+                materialDefinitions[submesh] = ModelMaterialDefinition.TextureOnly(
+                    textureFallback,
+                    GameShaderProgramResolver.CreateDefaultSkinnedProgram(textureFallback, emissiveTextureKey));
             }
 
             return new SknMaterialTextureResolution(
@@ -523,7 +556,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 materialDefinitions)
             {
                 InitialHiddenSubmeshes = metadata.InitialHiddenSubmeshes ?? Array.Empty<string>(),
-                SkinScale = metadata.SkinScale
+                SkinScale = metadata.SkinScale,
+                SelfIllumination = metadata.SelfIllumination,
+                EmissiveTexturePath = metadata.EmissiveTexturePath
             };
         }
 

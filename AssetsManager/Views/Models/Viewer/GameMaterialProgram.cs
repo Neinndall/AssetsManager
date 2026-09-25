@@ -75,7 +75,20 @@ namespace AssetsManager.Views.Models.Viewer
         GameMaterialWinding WindingToCull,
         bool DepthEnabled,
         uint DepthCompareFunc,
-        uint WriteMask);
+        uint WriteMask)
+    {
+        public static GameMaterialPassState Default { get; } = new(
+            false,
+            MapBlendFactor.One,
+            MapBlendFactor.Zero,
+            MapBlendFactor.One,
+            MapBlendFactor.Zero,
+            true,
+            GameMaterialWinding.CounterClockwise,
+            true,
+            3,
+            31);
+    }
 
     internal sealed record GameMaterialPass(
         uint ShaderHash,

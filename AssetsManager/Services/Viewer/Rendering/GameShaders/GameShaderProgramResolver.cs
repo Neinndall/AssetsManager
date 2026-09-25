@@ -12,7 +12,7 @@ using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 
-namespace AssetsManager.Services.Viewer.Rendering
+namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 {
     /// <summary>
     /// Resolves the exact DX11 shader-cache permutation required by a resolved game material pass.
@@ -20,6 +20,12 @@ namespace AssetsManager.Services.Viewer.Rendering
     /// </summary>
     internal static class GameShaderProgramResolver
     {
+        public const string LitUberShaderName = "SkinnedMesh/LIT_UBER";
+        public const string LitUberVertexPath = "ASSETS/Shaders/HLSL/SkinnedMesh/LIT_UBER_VS.vs";
+        public const string LitUberPixelPath = "ASSETS/Shaders/HLSL/SkinnedMesh/LIT_UBER_PS.ps";
+        public const string LitUberDiffuseTexture = "DIFFUSE_MAP";
+        public const string LitUberEmissiveTexture = "EMISSIVE_MAP";
+
         private const string ShaderCacheRelativePath = @"Game\DATA\FINAL\ShaderCache.dx11.wad.client";
         private const int RecordsPerBundle = 100;
         internal sealed record ShaderBytecodeProgram(
@@ -227,8 +233,25 @@ namespace AssetsManager.Services.Viewer.Rendering
             return null;
         }
 
-        internal static string TocPath(string shaderObjectPath, string stage) =>
-            $"assets/shaders/generated/{shaderObjectPath.ToLowerInvariant()}.{stage}-dx11";
+        internal static string TocPath(string shaderObjectPath, string stage)
+        {
+            if (string.Equals(shaderObjectPath, LitUberShaderName, StringComparison.OrdinalIgnoreCase))
+            {
+                string hlslFile = string.Equals(stage, "vs", StringComparison.OrdinalIgnoreCase)
+                    ? LitUberVertexPath
+                    : LitUberPixelPath;
+                return $"{hlslFile.ToLowerInvariant()}-dx11";
+            }
+
+            if (shaderObjectPath.EndsWith(".vs", StringComparison.OrdinalIgnoreCase) ||
+                shaderObjectPath.EndsWith(".ps", StringComparison.OrdinalIgnoreCase) ||
+                shaderObjectPath.IndexOf("hlsl/", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return $"{shaderObjectPath.ToLowerInvariant()}-dx11";
+            }
+
+            return $"assets/shaders/generated/{shaderObjectPath.ToLowerInvariant()}.{stage}-dx11";
+        }
 
         internal static string BundlePath(string tocPath, uint shaderId) =>
             $"{tocPath}_{RecordsPerBundle * (shaderId / RecordsPerBundle)}";
@@ -285,6 +308,57 @@ namespace AssetsManager.Services.Viewer.Rendering
                 at = checked(body + recordSize);
             }
             throw new InvalidDataException($"Shader bundle ends before record {index}.");
+        }
+
+        public static GameMaterialProgram CreateDefaultSkinnedProgram(
+            string diffuseTextureKey,
+            string emissiveTextureKey = null)
+        {
+            var textures = new List<GameMaterialTexture>
+            {
+                new(
+                    LitUberDiffuseTexture,
+                    !string.IsNullOrWhiteSpace(diffuseTextureKey)
+                        ? new MapTextureReference(diffuseTextureKey, XxHash64Ext.Hash(diffuseTextureKey))
+                        : null,
+                    GameMaterialTextureSource.Fallback,
+                    new GameMaterialSamplerState(
+                        null,
+                        MapTextureWrap.Clamp,
+                        MapTextureWrap.Clamp,
+                        MapTextureWrap.Clamp,
+                        FilterMin: true,
+                        FilterMag: true))
+            };
+
+            if (!string.IsNullOrWhiteSpace(emissiveTextureKey))
+            {
+                textures.Add(new(
+                    LitUberEmissiveTexture,
+                    new MapTextureReference(emissiveTextureKey, XxHash64Ext.Hash(emissiveTextureKey)),
+                    GameMaterialTextureSource.Fallback,
+                    new GameMaterialSamplerState(
+                        null,
+                        MapTextureWrap.Clamp,
+                        MapTextureWrap.Clamp,
+                        MapTextureWrap.Clamp,
+                        FilterMin: true,
+                        FilterMag: true)));
+            }
+
+            var pass = new GameMaterialPass(
+                ShaderHash: 0,
+                ShaderPath: LitUberShaderName,
+                Defines: Array.Empty<GameMaterialDefine>(),
+                RuntimeSwitches: Array.Empty<KeyValuePair<string, bool>>(),
+                Textures: textures,
+                Parameters: Array.Empty<GameMaterialParameter>(),
+                State: GameMaterialPassState.Default);
+
+            return new GameMaterialProgram(
+                GameMaterialKind.SkinnedMesh,
+                Animated: false,
+                Passes: new[] { pass });
         }
 
     }

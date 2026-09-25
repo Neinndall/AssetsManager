@@ -30,6 +30,8 @@ namespace AssetsManager.Views.Models.Viewer
         public string FilePath { get; set; } = string.Empty;
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
+        public float SelfIllumination { get; set; }
+        public string EmissiveTexturePath { get; set; }
 
         private double _positionX;
         private double _positionY;

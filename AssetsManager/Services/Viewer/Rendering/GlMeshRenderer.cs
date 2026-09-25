@@ -8,6 +8,7 @@ using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Rendering
@@ -372,7 +373,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                                      gameSkinningMatrices,
                                      hasTangents: resources.TangentVbo != 0,
                                      in gameFrame,
-                                     path => _resources.ResolveProgramTexture(part, resources, path)) == true;
+                                     path => _resources.ResolveProgramTexture(part, resources, path), model.SelfIllumination) == true;
                 if (gameBound)
                 {
                     _gl.FrontFace(world.GetDeterminant() < 0f

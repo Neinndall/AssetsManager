@@ -1,5 +1,6 @@
 using AssetsManager.Shaders;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
