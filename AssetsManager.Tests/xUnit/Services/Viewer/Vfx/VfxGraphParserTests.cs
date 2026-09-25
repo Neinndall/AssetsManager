@@ -759,6 +759,100 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void CustomMaterialPreviewResolvesShaderDefinedInExternalShaderTree()
+        {
+            const string shaderPath = "Shaders/Particles/Custom_Glow";
+            const string materialPath = "Effects/Materials/ParticleCustom";
+            uint materialHash = Fnv1a.HashLower(materialPath);
+            uint shaderHash = Fnv1a.HashLower(shaderPath);
+
+            var pass = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialPassDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeObjectLink(Fnv1a.HashLower("shader"), shaderHash),
+                    new BinTreeBool(Fnv1a.HashLower("blendEnable"), true),
+                    new BinTreeU32(Fnv1a.HashLower("srcColorBlendFactor"), 6),
+                    new BinTreeU32(Fnv1a.HashLower("dstColorBlendFactor"), 7)
+                });
+            var technique = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialTechniqueDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "normal"),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("passes"),
+                        BinPropertyType.Embedded,
+                        new BinTreeProperty[] { pass })
+                });
+            var material = new BinTreeObject(
+                materialPath,
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("techniques"),
+                        BinPropertyType.Embedded,
+                        new BinTreeProperty[] { technique })
+                });
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("CustomMaterial"),
+                        Fnv1a.HashLower("VfxMaterialDefinitionData"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeObjectLink(Fnv1a.HashLower("Material"), materialHash)
+                        })
+                });
+            var system = new BinTreeObject(
+                "Effects/CustomMaterialExternalShader",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+
+            var shaderObj = new BinTreeObject(
+                shaderPath,
+                "CustomShaderDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("objectPath"), shaderPath)
+                });
+
+            using var systemStream = new MemoryStream();
+            new BinTree(new[] { system, material }, System.Array.Empty<string>()).Write(systemStream);
+
+            using var shaderStream = new MemoryStream();
+            new BinTree(new[] { shaderObj }, System.Array.Empty<string>()).Write(shaderStream);
+            shaderStream.Position = 0;
+            var shaderTree = new BinTree(shaderStream);
+
+            byte[] systemBytes = systemStream.ToArray();
+
+            // Without shaderTrees, the shader def cannot be resolved
+            VfxEmitterDefinition withoutDefs = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(systemBytes).Systems).Value.Emitters);
+            Assert.True(string.IsNullOrEmpty(withoutDefs.CustomMaterial.ShaderPath));
+
+            // With shaderTrees, the shader def in external shaders.bin resolves
+            VfxEmitterDefinition withDefs = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(
+                    systemBytes,
+                    shaderTrees: new[] { shaderTree }).Systems).Value.Emitters);
+            Assert.Equal(shaderPath, withDefs.CustomMaterial.ShaderPath);
+        }
+
+        [Fact]
         public void MissingCustomMaterialKeepsAuthoredEmitterTextureFallback()
         {
             const string fallbackTexturePath = "ASSETS/Effects/Fallback.tex";

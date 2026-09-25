@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -36,20 +36,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             Func<uint, string> graphHashNameResolver = null,
             Func<uint, string> graphClassNameResolver = null,
             Func<ulong, string> wadChunkPathResolver = null,
-            Func<uint, string> binEntryResolver = null)
+            Func<uint, string> binEntryResolver = null,
+            IEnumerable<BinTree> shaderTrees = null)
             => ParseDocument(
                 ParseTree(data),
                 graphHashNameResolver,
                 graphClassNameResolver,
                 wadChunkPathResolver,
-                binEntryResolver);
+                binEntryResolver,
+                shaderTrees);
 
         internal static VfxBinDocument ParseDocument(
             BinTree tree,
             Func<uint, string> graphHashNameResolver = null,
             Func<uint, string> graphClassNameResolver = null,
             Func<ulong, string> wadChunkPathResolver = null,
-            Func<uint, string> binEntryResolver = null)
+            Func<uint, string> binEntryResolver = null,
+            IEnumerable<BinTree> shaderTrees = null)
         {
             ArgumentNullException.ThrowIfNull(tree);
             IReadOnlyDictionary<uint, uint> resourceMap = VfxResourceParser.ExtractResourceMap(tree);
@@ -60,7 +63,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                         pair.Value with { ResourceMap = resourceMap },
                         tree,
                         wadChunkPathResolver,
-                        binEntryResolver));
+                        binEntryResolver,
+                        shaderTrees));
             IReadOnlyList<AnimationGraphDefinition> animationGraphs =
                 VfxAnimationParser.ExtractAnimationGraphs(tree, graphHashNameResolver, graphClassNameResolver);
             return new VfxBinDocument(
@@ -77,8 +81,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static VfxSystemDefinition ResolveCustomMaterials(
             VfxSystemDefinition system,
             BinTree tree,
-            Func<ulong, string> wadChunkPathResolver,
-            Func<uint, string> binEntryResolver)
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null,
+            IEnumerable<BinTree> shaderTrees = null)
         {
             VfxEmitterDefinition[] emitters = null;
             for (int index = 0; index < system.Emitters.Count; index++)
@@ -92,7 +97,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     out VfxCustomMaterialBlendFactor sourceBlendFactor,
                     out VfxCustomMaterialBlendFactor destinationBlendFactor,
                     wadChunkPathResolver,
-                    binEntryResolver);
+                    binEntryResolver,
+                    shaderTrees);
                 VfxEmitterDefinition resolved = emitter with
                 {
                     CustomMaterial = material,

@@ -150,7 +150,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 materials,
                 MapParticleSemantics.GroupBySystem(playedParticles),
                 _hashResolver == null ? null : _hashResolver.ResolveHash,
-                _hashResolver == null ? null : _hashResolver.ResolveBinEntry);
+                _hashResolver == null ? null : _hashResolver.ResolveBinEntry,
+                shaders != null ? new[] { shaders } : null);
             MapSunData sun = MapSunParser.Parse(materials, source.Map);
             MapPostEffectsData postEffects = MapPostEffectsParser.Parse(materials, source.Map);
             MapSsaoData ambientOcclusion = MapSsaoParser.Parse(materials, source.Map);

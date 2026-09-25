@@ -19,7 +19,8 @@ namespace AssetsManager.Services.Viewer.Parsing
             BinTree materials,
             IReadOnlyList<MapParticleGroupData> groups,
             Func<ulong, string> wadChunkPathResolver = null,
-            Func<uint, string> binEntryResolver = null)
+            Func<uint, string> binEntryResolver = null,
+            IEnumerable<BinTree> shaderTrees = null)
         {
             if (materials?.Objects == null || materials.Objects.Count == 0)
                 return Empty();
@@ -52,7 +53,8 @@ namespace AssetsManager.Services.Viewer.Parsing
                     parsed,
                     materials,
                     wadChunkPathResolver,
-                    binEntryResolver);
+                    binEntryResolver,
+                    shaderTrees);
                 VfxSystemDefinition system = parsed with { ResourceMap = resourceMap };
                 systems[pathHash] = system;
                 foreach (VfxEmitterDefinition emitter in system.Emitters ?? Array.Empty<VfxEmitterDefinition>())

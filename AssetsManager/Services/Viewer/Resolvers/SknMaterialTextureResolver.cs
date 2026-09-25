@@ -1214,19 +1214,23 @@ namespace AssetsManager.Services.Viewer.Resolvers
             out VfxCustomMaterialBlendFactor sourceBlendFactor,
             out VfxCustomMaterialBlendFactor destinationBlendFactor,
             Func<ulong, string> wadChunkPathResolver = null,
-            Func<uint, string> binEntryResolver = null)
+            Func<uint, string> binEntryResolver = null,
+            IEnumerable<BinTree> shaderTrees = null)
         {
             sourceBlendFactor = VfxCustomMaterialBlendFactor.One;
             destinationBlendFactor = VfxCustomMaterialBlendFactor.Zero;
             if (binTree == null || pathHash == 0)
                 return ModelMaterialDefinition.Missing;
 
-            var trees = new[] { binTree };
+            var trees = shaderTrees != null
+                ? new[] { binTree }.Concat(shaderTrees.Where(tree => tree != null)).ToArray()
+                : new[] { binTree };
             SknMaterialDefinition material = ResolveLinkedMaterialDefinition(
                 trees,
                 pathHash,
                 wadChunkPathResolver,
-                binEntryResolver);
+                binEntryResolver,
+                shaderTrees);
             if (material == null)
                 return ModelMaterialDefinition.Missing;
 
