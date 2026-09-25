@@ -952,8 +952,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 material,
                 shader,
                 textureKeys,
-                fallbackTextureKey,
-                ModelMaterialEffectDefinition.None);
+                fallbackTextureKey);
 
         private static SknMaterialDefinition CreateMaterial(
             IReadOnlyList<SknMaterialSampler> samplers = null,

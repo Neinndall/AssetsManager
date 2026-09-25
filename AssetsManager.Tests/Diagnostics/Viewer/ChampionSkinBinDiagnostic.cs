@@ -107,14 +107,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 .ToArray();
             SknMaterialTextureResolution resolution =
                 SknMaterialTextureResolver.Resolve(metadata, textureKeys);
-            var resolvedEffects = resolution.MaterialDefinitions
-                .Where(pair => pair.Value?.Effect?.Kind != ModelMaterialEffectKind.None)
-                .ToArray();
-            Console.WriteLine($"  ResolvedEffects={resolvedEffects.Length}");
-            foreach ((string submesh, ModelMaterialDefinition material) in resolvedEffects)
-            {
-                Console.WriteLine($"    {submesh}: {material.Effect.Kind}");
-            }
+            Console.WriteLine($"  ResolvedMaterials={resolution.MaterialDefinitions.Count}");
         }
 
         private static void PrintSkin(BinTreeObject obj)

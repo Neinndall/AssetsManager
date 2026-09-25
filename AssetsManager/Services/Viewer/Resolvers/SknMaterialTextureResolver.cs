@@ -471,7 +471,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             SknShaderDefinition defaultShader = ResolveShaderDefinition(metadata, metadata.DefaultMaterial);
-            ModelMaterialEffectDefinition defaultEffect = ModelMaterialEffectDefinition.None;
 
             ModelMaterialDefinition defaultMaterialDefinition;
             if (metadata.HasDefaultMaterialLink)
@@ -482,8 +481,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         metadata.DefaultMaterial,
                         defaultShader,
                         textureKeys,
-                        skinTextureKey,
-                        defaultEffect);
+                        skinTextureKey);
             }
             else
             {
@@ -512,8 +510,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         material,
                         shader,
                         textureKeys,
-                        textureFallback,
-                        ModelMaterialEffectDefinition.None);
+                        textureFallback);
                     continue;
                 }
 

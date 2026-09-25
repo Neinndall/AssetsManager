@@ -131,14 +131,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
             SknMaterialDefinition material,
             SknShaderDefinition shader,
             IReadOnlyList<string> textureKeys,
-            string fallbackTextureKey,
-            ModelMaterialEffectDefinition effect) =>
+            string fallbackTextureKey) =>
             ResolveCore(
                 material,
                 shader,
                 path => SknMaterialTextureResolver.MatchTextureKey(path, textureKeys),
                 fallbackTextureKey,
-                effect,
                 missingAsTextureOnly: true);
 
         /// <summary>
@@ -153,7 +151,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 shader,
                 static path => path,
                 fallbackTextureKey: null,
-                ModelMaterialEffectDefinition.None,
                 missingAsTextureOnly: false);
 
         private static ModelMaterialDefinition ResolveCore(
@@ -161,15 +158,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
             SknShaderDefinition shader,
             Func<string, string> resolveTexture,
             string fallbackTextureKey,
-            ModelMaterialEffectDefinition effect,
             bool missingAsTextureOnly)
         {
             if (material == null)
             {
                 return missingAsTextureOnly
-                    ? ModelMaterialDefinition.TextureOnly(
-                        fallbackTextureKey,
-                        effect ?? ModelMaterialEffectDefinition.None)
+                    ? ModelMaterialDefinition.TextureOnly(fallbackTextureKey)
                     : ModelMaterialDefinition.Missing;
             }
 
@@ -226,8 +220,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 renderState,
                 ModelMaterialBindingKind.Authored,
                 material.IsAnimated,
-                shaderPath,
-                effect ?? ModelMaterialEffectDefinition.None)
+                shaderPath)
             {
                 HasAuthoredTint = hasTint,
                 Program = material.Program

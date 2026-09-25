@@ -3,7 +3,7 @@ using System.Numerics;
 namespace AssetsManager.Views.Models.Viewer
 {
     /// <summary>
-    /// Describes the authored render state of a champion material independently from optional shader-specific effects.
+    /// Describes the authored render state of a champion material.
     /// </summary>
     public sealed record ModelMaterialDefinition(
         string BaseTextureName,
@@ -17,8 +17,7 @@ namespace AssetsManager.Views.Models.Viewer
         ModelMaterialRenderState RenderState,
         ModelMaterialBindingKind BindingKind,
         bool IsAnimated,
-        string ShaderPath,
-        ModelMaterialEffectDefinition Effect)
+        string ShaderPath)
     {
         internal bool HasAuthoredTint { get; init; }
         internal GameMaterialProgram Program { get; init; }
@@ -35,9 +34,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         public static ModelMaterialDefinition Default { get; } = TextureOnly(null);
 
-        public static ModelMaterialDefinition TextureOnly(
-            string baseTextureName,
-            ModelMaterialEffectDefinition effect = null) =>
+        public static ModelMaterialDefinition TextureOnly(string baseTextureName) =>
             new(
                 baseTextureName,
                 ModelMaterialBaseRule.None,
@@ -50,8 +47,7 @@ namespace AssetsManager.Views.Models.Viewer
                 ModelMaterialRenderState.TextureOnly,
                 ModelMaterialBindingKind.TextureOnly,
                 false,
-                null,
-                effect ?? ModelMaterialEffectDefinition.None);
+                null);
 
         public static ModelMaterialDefinition Missing { get; } = new(
             null,
@@ -60,13 +56,12 @@ namespace AssetsManager.Views.Models.Viewer
             0f,
             Vector2.One,
             Vector2.Zero,
-                ModelMaterialWrapMode.Clamp,
-                ModelMaterialWrapMode.Clamp,
-                ModelMaterialRenderState.TextureOnly,
-                ModelMaterialBindingKind.Missing,
+            ModelMaterialWrapMode.Clamp,
+            ModelMaterialWrapMode.Clamp,
+            ModelMaterialRenderState.TextureOnly,
+            ModelMaterialBindingKind.Missing,
             false,
-            null,
-            ModelMaterialEffectDefinition.None);
+            null);
     }
 
     public sealed record ModelMaterialRenderState(

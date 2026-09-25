@@ -75,14 +75,12 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 
             Console.WriteLine($"\n--- RESOLUTION RESULTS ---");
             Console.WriteLine($"Default Texture Key: {resolution.DefaultMaterialDefinition?.BaseTextureName ?? "<none>"}");
-            Console.WriteLine($"Default Effect: {resolution.DefaultMaterialDefinition?.Effect?.Kind ?? ModelMaterialEffectKind.None}");
             Console.WriteLine($"Resolved Materials:");
             foreach ((string submesh, ModelMaterialDefinition material) in resolution.MaterialDefinitions)
             {
-                ModelMaterialEffectDefinition effect = material?.Effect ?? ModelMaterialEffectDefinition.None;
                 Console.WriteLine(
                     $"  [{submesh}] -> Texture={material?.BaseTextureName ?? "<none>"} " +
-                    $"Binding={material?.BindingKind} Effect={effect.Kind}");
+                    $"Binding={material?.BindingKind}");
             }
 
             if (sknPath != null && File.Exists(sknPath))
@@ -97,12 +95,10 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 
                     ModelMaterialDefinition material = resolution.ResolveMaterialDefinition(normalizedKey);
                     string resolvedTextureKey = material?.BaseTextureName;
-                    ModelMaterialEffectDefinition effect = material?.Effect ?? ModelMaterialEffectDefinition.None;
 
                     Console.WriteLine($"\nSubmesh: '{submeshName}' (normalized: '{normalizedKey}')");
                     Console.WriteLine($"  IndexCount={range.IndexCount} StartIndex={range.StartIndex} StartVertex={range.StartVertex} VertexCount={range.VertexCount}");
                     Console.WriteLine($"  Assigned Texture Key: {resolvedTextureKey ?? "<none>"}");
-                    Console.WriteLine($"  Assigned Effect Kind: {effect.Kind}");
 
                     if (resolvedTextureKey != null && availableTextureFiles.TryGetValue(resolvedTextureKey, out string fullTexturePath))
                     {

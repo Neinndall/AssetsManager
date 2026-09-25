@@ -172,27 +172,11 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 .ToArray();
             SknMaterialTextureResolution resolution =
                 SknMaterialTextureResolver.Resolve(metadata, availableTextureKeys);
-            int effectCount = resolution.MaterialDefinitions.Values.Count(material =>
-                material?.Effect?.Kind != ModelMaterialEffectKind.None);
             Console.WriteLine(
                 $"  Viewer resolver: default={resolution.DefaultMaterialDefinition?.BaseTextureName ?? "<none>"} " +
-                $"materials={resolution.MaterialDefinitions.Count} effects={effectCount}");
+                $"materials={resolution.MaterialDefinitions.Count}");
             foreach ((string submesh, ModelMaterialDefinition material) in resolution.MaterialDefinitions)
             {
-                ModelMaterialEffectDefinition effect = material?.Effect ?? ModelMaterialEffectDefinition.None;
-                if (effect.Kind != ModelMaterialEffectKind.None)
-                {
-                    string textures = string.Join(
-                        ",",
-                        effect.EnumerateTextureNames()
-                            .Where(name => !string.IsNullOrWhiteSpace(name))
-                            .Distinct(StringComparer.OrdinalIgnoreCase));
-                    Console.WriteLine(
-                        $"    effect submesh={submesh} kind={effect.Kind} " +
-                        $"textures={(string.IsNullOrWhiteSpace(textures) ? "<none>" : textures)} " +
-                        $"emissionChannel={effect.Emission?.TextureChannel ?? -1}");
-                }
-
                 if (!string.IsNullOrWhiteSpace(material?.BaseTextureName))
                     Console.WriteLine($"    material submesh={submesh} texture={material.BaseTextureName}");
             }
@@ -312,11 +296,10 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 bool hasMaterialOverride = resolution.MaterialDefinitions.ContainsKey(materialKey);
                 ModelMaterialDefinition material = resolution.ResolveMaterialDefinition(materialKey);
                 string textureSource = hasMaterialOverride ? $"override:{materialKey}" : "linked-material/default";
-                ModelMaterialEffectDefinition effect = material?.Effect ?? ModelMaterialEffectDefinition.None;
 
                 Console.WriteLine(
                     $"      mesh={meshRange} binding={(hasMaterialOverride ? materialKey : "<default-material>")} " +
-                    $"texture={material?.BaseTextureName ?? "<none>"} source={textureSource} effect={effect.Kind}");
+                    $"texture={material?.BaseTextureName ?? "<none>"} source={textureSource}");
             }
         }
 

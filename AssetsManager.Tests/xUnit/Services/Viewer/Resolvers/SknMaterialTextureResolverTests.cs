@@ -844,9 +844,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 new[] { "aurora_base_tx_cm" });
 
             ModelMaterialDefinition material = resolution.ResolveMaterialDefinition("base");
-            Assert.Equal(ModelMaterialEffectKind.None, material.Effect.Kind);
             Assert.Equal(new Vector4(0.65f, 0.8f, 0.9f, 1f), material.Color);
-            Assert.Equal(Vector4.One, material.Effect.MaterialTint);
             Assert.Equal(ModelMaterialBlendMode.Opaque, material.RenderState.Blending);
             Assert.False(material.UsesTextureAlpha);
             Assert.False(new ModelPart { MaterialDefinition = material }.IsAlphaBlended);
