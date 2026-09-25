@@ -286,8 +286,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             // 2. Mesh rim/reflection sheen carrier uses alpha before erosion.
             Assert.Contains("float bareTexelAlpha = texel.a;", VfxShaderSource.MeshFragment);
-            Assert.Contains("float sheenCarrier = uAttachedMesh != 0 ? bareTexelAlpha : (bareTexelAlpha * authoredColor.a);", VfxShaderSource.MeshFragment);
-            Assert.Contains("if (uAttachedMesh != 0) mirrored *= bareTexelAlpha;", VfxShaderSource.MeshFragment);
+            Assert.Contains("bool isSkinned = (uMeshSkinned != 0 || uAttachedMesh != 0);", VfxShaderSource.MeshFragment);
+            Assert.Contains("float sheenCarrier = isSkinned ? bareTexelAlpha : (bareTexelAlpha * authoredColor.a);", VfxShaderSource.MeshFragment);
+            Assert.Contains("if (isSkinned) mirrored *= bareTexelAlpha;", VfxShaderSource.MeshFragment);
         }
     }
 }

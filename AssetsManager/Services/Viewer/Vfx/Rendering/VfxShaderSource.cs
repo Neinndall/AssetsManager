@@ -471,6 +471,7 @@ uniform vec2 uViewportSize;
 uniform samplerCube uReflectionTex;
 uniform int uHasReflection;
 uniform int uAttachedMesh;
+uniform int uMeshSkinned;
 uniform vec4 uReflectionColor;
 uniform int uWireframePass;
 uniform vec4 uWireframeColor;
@@ -567,12 +568,13 @@ void main(){
     // The rim and reflection use the carrier alpha taken before erosion. Skinned/attached
     // meshes carry them by the base texel alpha, while unskinned mesh particles carry
     // them by drawn alpha (bareTexelAlpha * authoredColor.a).
-    float sheenCarrier = uAttachedMesh != 0 ? bareTexelAlpha : (bareTexelAlpha * authoredColor.a);
+    bool isSkinned = (uMeshSkinned != 0 || uAttachedMesh != 0);
+    float sheenCarrier = isSkinned ? bareTexelAlpha : (bareTexelAlpha * authoredColor.a);
     vec3 mirrored = vec3(0.0);
     if (uHasReflection != 0) {
         mirrored = texture(uReflectionTex, vReflect.xyz).rgb * vReflect.w
             * mix(vec3(1.0), uReflectionColor.rgb, vReflect.w);
-        if (uAttachedMesh != 0) mirrored *= bareTexelAlpha;
+        if (isSkinned) mirrored *= bareTexelAlpha;
     }
     lit.rgb += mirrored + vRim * sheenCarrier;
 
