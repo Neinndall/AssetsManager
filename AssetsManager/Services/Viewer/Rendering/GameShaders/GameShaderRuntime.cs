@@ -696,7 +696,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             WriteMatrixRows(data, 104, cameraWorld);
         }
 
-        private static void WriteCharacterPerDrawVertex(float[] data, in Frame frame)
+        internal static void WriteCharacterPerDrawVertex(float[] data, in Frame frame)
         {
             WriteIdentityRows(data, 0, 16);
             ResolveSun(
@@ -736,7 +736,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 Vector3 basis = axis.Y > 0f ? sky : axis.Y < 0f ? ground : horizon;
                 Vector3 shaded = basis * skyScale;
                 float facing = MathF.Max(Vector3.Dot(axis, direction), 0f);
-                Vector3 lit = shaded + Vector3.Max(sun - shaded, Vector3.Zero) * facing;
+                Vector3 lit = shaded + sun * facing;
                 int at = 16 + face * 4;
                 WriteVector3(data, at, lit);
                 Set(data, at + 3, 1f);
