@@ -698,18 +698,18 @@ namespace AssetsManager.Services.Viewer.Parsing
             if (shader?.IsDeclared != true || shader.PhysicalParameters == null)
             {
                 var values = new Dictionary<string, GameMaterialParameter>(StringComparer.Ordinal);
-                foreach ((string name, Vector4 value) in material ?? EmptyVectorMap)
-                    values[name] = new GameMaterialParameter(name, value, GameMaterialParamSource.Material);
                 foreach ((string name, Vector4 value) in pass ?? EmptyVectorMap)
                     values[name] = new GameMaterialParameter(name, value, GameMaterialParamSource.Pass);
+                foreach ((string name, Vector4 value) in material ?? EmptyVectorMap)
+                    values[name] = new GameMaterialParameter(name, value, GameMaterialParamSource.Material);
                 return values.Values.ToArray();
             }
 
             var resolved = shader.PhysicalParameters
                 .Select(item => new GameMaterialParameter(item.Name, item.Data, GameMaterialParamSource.ShaderDefault))
                 .ToArray();
-            ApplyProgramParameters(resolved, material, GameMaterialParamSource.Material, shader, warnings);
             ApplyProgramParameters(resolved, pass, GameMaterialParamSource.Pass, shader, warnings);
+            ApplyProgramParameters(resolved, material, GameMaterialParamSource.Material, shader, warnings);
             return resolved;
         }
 

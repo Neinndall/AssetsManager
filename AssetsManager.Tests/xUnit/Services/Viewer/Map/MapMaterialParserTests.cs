@@ -141,8 +141,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 
             GameMaterialParameter parameter = Assert.Single(first.Parameters);
             Assert.Equal("Globals0", parameter.Name);
-            Assert.Equal(new Vector4(5f, 2f, 6f, 4f), parameter.Value);
-            Assert.Equal(GameMaterialParamSource.Pass, parameter.Source);
+            Assert.Equal(new Vector4(9f, 2f, 8f, 4f), parameter.Value);
+            Assert.Equal(GameMaterialParamSource.Material, parameter.Source);
 
             Assert.True(first.State.BlendEnabled);
             Assert.Equal(MapBlendFactor.SourceAlpha, first.State.SourceColor);
@@ -150,6 +150,52 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal(GameMaterialWinding.Clockwise, first.State.WindingToCull);
             Assert.False(first.State.CullEnabled);
             Assert.Equal((uint)15, first.State.WriteMask);
+        }
+
+        [Fact]
+        public void Program_UndeclaredShader_MaterialParamsWinOverPassParams()
+        {
+            const string materialPath = "Maps/Test/Materials/Undeclared";
+            const string shaderPath = "Shaders/StaticMesh/UndeclaredShader";
+            uint shaderHash = Fnv1a.HashLower(shaderPath);
+
+            BinTreeEmbedded materialParam = Embedded(
+                "StaticMaterialShaderParamDef",
+                new BinTreeString(Fnv1a.HashLower("name"), "TintColor"),
+                new BinTreeVector4(Fnv1a.HashLower("value"), new Vector4(1f, 0.5f, 0.25f, 1f)));
+            BinTreeEmbedded passParam = Embedded(
+                "StaticMaterialShaderParamDef",
+                new BinTreeString(Fnv1a.HashLower("name"), "TintColor"),
+                new BinTreeVector4(Fnv1a.HashLower("value"), new Vector4(2f, 2f, 2f, 1f)));
+            BinTreeEmbedded pass0 = Embedded(
+                "StaticMaterialPassDef",
+                new BinTreeObjectLink(Fnv1a.HashLower("shader"), shaderHash),
+                Container("paramValues", passParam));
+            BinTreeEmbedded technique = Embedded(
+                "StaticMaterialTechniqueDef",
+                new BinTreeString(Fnv1a.HashLower("name"), "normal"),
+                Container("passes", pass0));
+            var material = new BinTreeObject(
+                Fnv1a.HashLower(materialPath),
+                Fnv1a.HashLower("StaticMaterialDef"),
+                new BinTreeProperty[]
+                {
+                    Container("paramValues", materialParam),
+                    Container("techniques", technique)
+                });
+
+            var parser = new MapMaterialParser();
+            MapMaterialDefinition parsed = parser.ParseOne(
+                Tree(material),
+                null,
+                materialPath);
+
+            Assert.NotNull(parsed.Program);
+            GameMaterialPass first = Assert.Single(parsed.Program.Passes);
+            GameMaterialParameter parameter = Assert.Single(first.Parameters);
+            Assert.Equal("TintColor", parameter.Name);
+            Assert.Equal(new Vector4(1f, 0.5f, 0.25f, 1f), parameter.Value);
+            Assert.Equal(GameMaterialParamSource.Material, parameter.Source);
         }
 
         private static BinTree Tree(params BinTreeObject[] objects) =>

@@ -274,12 +274,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             bool HasDeclaration(string name) => shader == null || shader.DefaultParameters.ContainsKey(name);
-            foreach ((string name, Vector4 value) in material.Parameters ?? new Dictionary<string, Vector4>())
+            foreach ((string name, Vector4 value) in material.Pass?.Parameters ?? new Dictionary<string, Vector4>())
             {
                 if (HasDeclaration(name))
                     result[name] = value;
             }
-            foreach ((string name, Vector4 value) in material.Pass?.Parameters ?? new Dictionary<string, Vector4>())
+            foreach ((string name, Vector4 value) in material.Parameters ?? new Dictionary<string, Vector4>())
             {
                 if (HasDeclaration(name))
                     result[name] = value;

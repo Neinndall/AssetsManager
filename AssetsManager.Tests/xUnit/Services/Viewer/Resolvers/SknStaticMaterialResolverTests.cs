@@ -338,7 +338,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void Resolve_UsesShaderDeclarationsAndPassParametersLikeLtk()
+        public void Resolve_UsesShaderDeclarationsAndMaterialParametersWinOverPassParametersLikeLtk()
         {
             SknShaderDefinition shader = new(
                 "Shaders/Test/Body",
@@ -368,7 +368,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialDefinition resolved = Resolve(material, Array.Empty<string>(), shader: shader);
 
-            Assert.Equal(new Vector4(2f, 2f, 2f, 0.75f), resolved.Color);
+            Assert.Equal(new Vector4(0.5f, 0.5f, 0.5f, 0.75f), resolved.Color);
             Assert.Equal(ModelMaterialBlendMode.Normal, resolved.RenderState.Blending);
         }
 
