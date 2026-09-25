@@ -7,6 +7,10 @@ using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Core.Wad;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
+using LeagueToolkit.Hashing;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
@@ -142,6 +146,53 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.True(read.Passes[0].Bytecode.Ready, read.Passes[0].Bytecode.Failure);
             Assert.False(read.Passes[1].Bytecode.Ready);
             Assert.Equal("The pass links no shader the defs declare.", read.Passes[1].Bytecode.Failure);
+        }
+
+        [Fact]
+        public void ShadersBinCoverageMatchesInstalledShaderCache()
+        {
+            string root = FindInstalledShaderCacheRoot();
+            if (root == null)
+                return;
+
+            string shadersWadPath = Path.Combine(root, @"Game\DATA\FINAL\Shaders\Shaders.wad.client");
+            string cachePath = Path.Combine(root, @"Game\DATA\FINAL\ShaderCache.dx11.wad.client");
+            if (!File.Exists(shadersWadPath) || !File.Exists(cachePath))
+                return;
+
+            using var wad = new WadFile(shadersWadPath);
+            ulong shadersBinHash = XxHash64Ext.Hash("data/shaders/shaders.bin");
+            if (!wad.Chunks.ContainsKey(shadersBinHash))
+                return;
+
+            using var decompressed = wad.LoadChunkDecompressed(shadersBinHash);
+            using var stream = new MemoryStream(decompressed.Span.ToArray(), writable: false);
+            var binTree = new BinTree(stream);
+
+            uint customShaderClass = Fnv1a.HashLower("CustomShaderDef");
+            var customShaders = binTree.Objects.Values.Where(o => o.ClassHash == customShaderClass).ToList();
+            Assert.NotEmpty(customShaders);
+
+            using var cacheWad = new WadFile(cachePath);
+            ulong litUberVsHash = XxHash64Ext.Hash(GameShaderProgramResolver.TocPath(GameShaderProgramResolver.LitUberShaderName, "vs"));
+            ulong litUberPsHash = XxHash64Ext.Hash(GameShaderProgramResolver.TocPath(GameShaderProgramResolver.LitUberShaderName, "ps"));
+            Assert.True(cacheWad.Chunks.ContainsKey(litUberVsHash), "LIT_UBER VS TOC must exist in shader cache");
+            Assert.True(cacheWad.Chunks.ContainsKey(litUberPsHash), "LIT_UBER PS TOC must exist in shader cache");
+
+            uint objectPathPropHash = Fnv1a.HashLower("objectPath");
+            int verified = 0;
+            foreach (var shader in customShaders.Take(25))
+            {
+                if (shader.Properties.TryGetValue(objectPathPropHash, out var prop) && prop is BinTreeString str)
+                {
+                    string vsToc = GameShaderProgramResolver.TocPath(str.Value, "vs");
+                    string psToc = GameShaderProgramResolver.TocPath(str.Value, "ps");
+                    Assert.True(cacheWad.Chunks.ContainsKey(XxHash64Ext.Hash(vsToc)), $"VS TOC missing for {str.Value}");
+                    Assert.True(cacheWad.Chunks.ContainsKey(XxHash64Ext.Hash(psToc)), $"PS TOC missing for {str.Value}");
+                    verified++;
+                }
+            }
+            Assert.True(verified > 0);
         }
 
         private static string FindInstalledShaderCacheRoot() =>
