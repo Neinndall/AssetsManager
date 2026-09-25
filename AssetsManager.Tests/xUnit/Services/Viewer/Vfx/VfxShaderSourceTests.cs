@@ -267,5 +267,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Contains("uIsDistortion != 0 && uDistortionStrength != 0.0", VfxShaderSource.MeshFragment);
             Assert.Contains("uIsDistortion != 0 && uDistortionStrength != 0.0", VfxShaderSource.ParticleFragment);
         }
+
+        [Fact]
+        public void ShadersMatchEngineParticleShadingOrder()
+        {
+            // 1. Alpha test (discard) occurs AFTER soft particle fade, not before.
+            foreach (string shader in new[] { VfxShaderSource.MeshFragment, VfxShaderSource.ParticleFragment })
+            {
+                int softIndex = shader.IndexOf("if (uHasSoftParticle != 0)");
+                int discardIndex = shader.IndexOf("if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;");
+                Assert.True(softIndex >= 0 && discardIndex >= 0);
+                Assert.True(discardIndex > softIndex, "Alpha test discard must happen after soft particle depth fade.");
+
+                int clampIndex = shader.IndexOf("lit.rgb = clamp(lit.rgb, vec3(0.0), vec3(1.0));");
+                Assert.True(clampIndex >= 0);
+                Assert.True(clampIndex > softIndex, "Colour saturation must clamp after soft particle depth fade.");
+            }
+
+            // 2. Mesh rim/reflection sheen carrier uses alpha before erosion.
+            Assert.Contains("float bareTexelAlpha = texel.a;", VfxShaderSource.MeshFragment);
+            Assert.Contains("float sheenCarrier = uAttachedMesh != 0 ? bareTexelAlpha : (bareTexelAlpha * authoredColor.a);", VfxShaderSource.MeshFragment);
+            Assert.Contains("if (uAttachedMesh != 0) mirrored *= bareTexelAlpha;", VfxShaderSource.MeshFragment);
+        }
     }
 }

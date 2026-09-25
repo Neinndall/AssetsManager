@@ -544,6 +544,7 @@ void main(){
         texel.rgb *= mult.rgb;
         texel.a *= mult.a;
     }
+    float bareTexelAlpha = texel.a;
     if (uHasErosion != 0) {
         vec4 erosionTexel = uHasErosionMap != 0
             ? sampleAddressed(
@@ -551,7 +552,7 @@ void main(){
                 atlasUvRaw(vLocalUv, vCell, uTexDiv),
                 uErosionAddressMode)
             : uErosionDefault;
-        float erosion = clamp(dot(erosionTexel, uErosionMixer), 0.0, 1.0);
+        float erosion = clamp(dot(erosionTexel, vErosionMixer), 0.0, 1.0);
         float featherIn = max(0.0001, uErosionFeatherIn);
         float featherOut = max(0.0001, uErosionFeatherOut);
         float upper = clamp((uErosionDrive - erosion + uErosionSliceWidth) / featherIn, 0.0, 1.0);
@@ -562,19 +563,18 @@ void main(){
     // and attached meshes are tinted only by the particle/attachment material color.
     vec4 authoredColor = uColor;
     vec4 lit = texel * authoredColor;
-    if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;
 
-    // LTK mesh_ps adds the Fresnel rim even when no cube map is available. The cube
-    // reflection itself is weighted by its facing-derived opacity, then tinted toward
-    // reflectionFresnelColor. Attached meshes use the base texel alpha as the carrier.
-    float sheenCarrier = uAttachedMesh != 0 ? texel.a : lit.a;
+    // The rim and reflection use the carrier alpha taken before erosion. Skinned/attached
+    // meshes carry them by the base texel alpha, while unskinned mesh particles carry
+    // them by drawn alpha (bareTexelAlpha * authoredColor.a).
+    float sheenCarrier = uAttachedMesh != 0 ? bareTexelAlpha : (bareTexelAlpha * authoredColor.a);
     vec3 mirrored = vec3(0.0);
     if (uHasReflection != 0) {
         mirrored = texture(uReflectionTex, vReflect.xyz).rgb * vReflect.w
             * mix(vec3(1.0), uReflectionColor.rgb, vReflect.w);
-        if (uAttachedMesh != 0) mirrored *= texel.a;
+        if (uAttachedMesh != 0) mirrored *= bareTexelAlpha;
     }
-    lit.rgb = clamp(lit.rgb + mirrored + vRim * sheenCarrier, vec3(0.0), vec3(1.0));
+    lit.rgb += mirrored + vRim * sheenCarrier;
 
     if (uHasSoftParticle != 0) {
         vec2 sceneUv = gl_FragCoord.xy / max(uViewportSize, vec2(1.0));
@@ -592,6 +592,8 @@ void main(){
         lit.rgb *= uSoftParticleControl.x + fade * uSoftParticleControl.y;
         lit.a *= uSoftParticleControl.z + fade * uSoftParticleControl.w;
     }
+    lit.rgb = clamp(lit.rgb, vec3(0.0), vec3(1.0));
+    if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;
     if (uIsDistortion != 0 && uDistortionStrength != 0.0) {
         vec4 normalSample = texture(uDistortionTex, vLocalUv);
         float mask = normalSample.a * lit.a;
@@ -761,7 +763,6 @@ void main(){
     }
     vec4 authoredColor = vColor;
     vec4 lit = t * authoredColor;
-    if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;
     if (uHasSoftParticle != 0) {
         vec2 sceneUv = gl_FragCoord.xy / max(uViewportSize, vec2(1.0));
         float storedNdc = texture(uSceneDepthTex, sceneUv).r * 2.0 - 1.0;
@@ -778,6 +779,8 @@ void main(){
         lit.rgb *= uSoftParticleControl.x + fade * uSoftParticleControl.y;
         lit.a *= uSoftParticleControl.z + fade * uSoftParticleControl.w;
     }
+    lit.rgb = clamp(lit.rgb, vec3(0.0), vec3(1.0));
+    if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;
     if (uIsDistortion != 0 && uDistortionStrength != 0.0) {
         vec4 normalSample = texture(uDistortionTex, vLocalUv);
         float mask = normalSample.a * lit.a;
