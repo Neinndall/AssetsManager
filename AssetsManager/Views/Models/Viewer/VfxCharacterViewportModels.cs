@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using AssetsManager.Utils.Framework;
 using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Views.Models.Viewer
@@ -52,16 +53,40 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isVisible;
         private bool _isOverridden;
         private bool _suppressChanged;
+        private readonly ModelPart _part;
 
-        internal VfxCharacterSubmeshOption(string name, bool isVisible)
+        internal VfxCharacterSubmeshOption(string name, bool isVisible, ModelPart part = null)
         {
+            _part = part;
             Name = name ?? string.Empty;
             NameHash = Fnv1a.HashLower(Name);
             _isVisible = isVisible;
+
+            if (_part != null)
+            {
+                _part.PropertyChanged += Part_PropertyChanged;
+            }
+        }
+
+        private void Part_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ModelPart.SelectedTextureName))
+            {
+                OnPropertyChanged(nameof(SelectedTextureName));
+            }
+            else if (e.PropertyName == nameof(ModelPart.IsVisible))
+            {
+                if (_isVisible != _part.IsVisible)
+                {
+                    _isVisible = _part.IsVisible;
+                    OnPropertyChanged(nameof(IsVisible));
+                }
+            }
         }
 
         public string Name { get; }
         public uint NameHash { get; }
+        public ModelPart Part => _part;
 
         public bool IsVisible
         {
@@ -82,7 +107,33 @@ namespace AssetsManager.Views.Models.Viewer
 
         public bool IsOverridden => _isOverridden;
 
+        public ObservableRangeCollection<string> AvailableTextureNames => _part?.AvailableTextureNames;
+
+        public string SelectedTextureName
+        {
+            get => _part?.SelectedTextureName;
+            set
+            {
+                if (_part == null || string.Equals(_part.SelectedTextureName, value, StringComparison.Ordinal)) return;
+                _part.SelectedTextureName = value;
+                OnPropertyChanged();
+                TextureChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        public bool HasTextures => AvailableTextureNames != null && AvailableTextureNames.Count > 0;
+        public bool HasMultipleTextures => AvailableTextureNames != null && AvailableTextureNames.Count > 1;
+
         internal event EventHandler VisibilityChanged;
+        internal event EventHandler TextureChanged;
+
+        internal void Detach()
+        {
+            if (_part != null)
+            {
+                _part.PropertyChanged -= Part_PropertyChanged;
+            }
+        }
 
         internal void Sync(bool visible, bool overridden)
         {

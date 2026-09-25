@@ -848,12 +848,16 @@ namespace AssetsManager.Views.Controls.Viewer
                      e.PropertyName == nameof(VfxInspectorModel.ShowCharacterJointNames) ||
                      e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate) ||
                      e.PropertyName == nameof(VfxInspectorModel.CharacterTransformGizmoEnabled) ||
-                     e.PropertyName == nameof(VfxInspectorModel.InspectorVisible))
+                     e.PropertyName == nameof(VfxInspectorModel.InspectorVisible) ||
+                     e.PropertyName == nameof(VfxInspectorModel.IsInspectorPanelVisible))
             {
                 if (e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate))
                     ApplyCharacterPlacement();
                 if (e.PropertyName == nameof(VfxInspectorModel.CharacterTransformGizmoEnabled))
                     RefreshCharacterInteractionTarget();
+                if (e.PropertyName == nameof(VfxInspectorModel.InspectorVisible) ||
+                    e.PropertyName == nameof(VfxInspectorModel.IsInspectorPanelVisible))
+                    UpdateInspectorColumnVisibility();
                 OpenTkControl?.InvalidateVisual();
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.PreviewCameraPreset))
@@ -1299,10 +1303,54 @@ namespace AssetsManager.Views.Controls.Viewer
             return true;
         }
 
+        private GridLength _savedInspectorWidth = new GridLength(330, GridUnitType.Pixel);
+
+        private void InspectorSplitter_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+        {
+            if (CenterContentCol != null)
+            {
+                CenterContentCol.Width = new GridLength(1, GridUnitType.Star);
+            }
+            if (InspectorCol != null && InspectorCol.ActualWidth >= 180)
+            {
+                _savedInspectorWidth = new GridLength(InspectorCol.ActualWidth, GridUnitType.Pixel);
+                InspectorCol.Width = _savedInspectorWidth;
+            }
+        }
+
+        private void UpdateInspectorColumnVisibility()
+        {
+            if (InspectorCol == null || InspectorSplitterCol == null || CenterContentCol == null) return;
+
+            if (_model.IsInspectorPanelVisible)
+            {
+                double targetWidth = _savedInspectorWidth.Value >= 180 ? _savedInspectorWidth.Value : 330;
+                InspectorCol.Width = new GridLength(targetWidth, GridUnitType.Pixel);
+                InspectorSplitterCol.Width = GridLength.Auto;
+                CenterContentCol.Width = new GridLength(1, GridUnitType.Star);
+            }
+            else
+            {
+                if (InspectorCol.ActualWidth >= 180)
+                {
+                    _savedInspectorWidth = new GridLength(InspectorCol.ActualWidth, GridUnitType.Pixel);
+                }
+                else if (InspectorCol.Width.GridUnitType == GridUnitType.Pixel && InspectorCol.Width.Value >= 180)
+                {
+                    _savedInspectorWidth = InspectorCol.Width;
+                }
+
+                InspectorCol.Width = new GridLength(0, GridUnitType.Pixel);
+                InspectorSplitterCol.Width = new GridLength(0, GridUnitType.Pixel);
+                CenterContentCol.Width = new GridLength(1, GridUnitType.Star);
+            }
+        }
+
         private void OnControlLoaded(object sender, RoutedEventArgs e)
         {
             LoadPreviewDisplayPreferences();
             UpdateViewportClip();
+            UpdateInspectorColumnVisibility();
             if (_isActive)
             {
                 EnsureOpenGlStarted();
@@ -2554,6 +2602,76 @@ namespace AssetsManager.Views.Controls.Viewer
                 ApplyCharacterBackdropOrigin(_mapSceneRuntime.Scene, _model.SelectedCharacterBackdrop?.Source);
             else
                 ApplyCharacterPlacement();
+            e.Handled = true;
+        }
+
+        private void ResetCharacterPosition_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            tab.CharacterPlacementCustomized = true;
+            _isApplyingCharacterViewportState = true;
+            try
+            {
+                if (_model.HasActiveCharacterBackdrop && _mapSceneRuntime?.Scene != null)
+                {
+                    tab.CharacterPlacedOnKey = VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source);
+                }
+                else
+                {
+                    tab.CharacterPlacedOnKey = null;
+                    _model.CharacterPositionX = 0d;
+                    _model.CharacterPositionY = 0d;
+                    _model.CharacterPositionZ = 0d;
+                }
+            }
+            finally
+            {
+                _isApplyingCharacterViewportState = false;
+            }
+
+            if (_model.HasActiveCharacterBackdrop && _mapSceneRuntime?.Scene != null)
+                ApplyCharacterBackdropOrigin(_mapSceneRuntime.Scene, _model.SelectedCharacterBackdrop?.Source);
+            else
+                ApplyCharacterPlacement();
+            e.Handled = true;
+        }
+
+        private void ResetCharacterRotation_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            tab.CharacterPlacementCustomized = true;
+            _isApplyingCharacterViewportState = true;
+            try
+            {
+                _model.CharacterRotationX = 0d;
+                _model.CharacterRotationY = 0d;
+                _model.CharacterRotationZ = 0d;
+            }
+            finally
+            {
+                _isApplyingCharacterViewportState = false;
+            }
+            ApplyCharacterPlacement();
+            e.Handled = true;
+        }
+
+        private void ResetCharacterScale_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            tab.CharacterPlacementCustomized = true;
+            _isApplyingCharacterViewportState = true;
+            try
+            {
+                _model.CharacterScaleMultiplier = 1d;
+            }
+            finally
+            {
+                _isApplyingCharacterViewportState = false;
+            }
+            ApplyCharacterPlacement();
             e.Handled = true;
         }
 
@@ -5518,7 +5636,11 @@ namespace AssetsManager.Views.Controls.Viewer
         private void RebuildCharacterSubmeshOptions()
         {
             foreach (VfxCharacterSubmeshOption existing in _model.CharacterSubmeshes)
+            {
                 existing.VisibilityChanged -= CharacterSubmesh_VisibilityChanged;
+                existing.TextureChanged -= CharacterSubmesh_TextureChanged;
+                existing.Detach();
+            }
             _model.CharacterSubmeshes.Clear();
 
             if (_championModel != null)
@@ -5526,8 +5648,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 foreach (ModelPart part in _championModel.Parts)
                 {
                     if (string.IsNullOrWhiteSpace(part?.Name)) continue;
-                    var option = new VfxCharacterSubmeshOption(part.Name, part.IsVisible);
+                    var option = new VfxCharacterSubmeshOption(part.Name, part.IsVisible, part);
                     option.VisibilityChanged += CharacterSubmesh_VisibilityChanged;
+                    option.TextureChanged += CharacterSubmesh_TextureChanged;
                     _model.CharacterSubmeshes.Add(option);
                 }
             }
@@ -5547,10 +5670,25 @@ namespace AssetsManager.Views.Controls.Viewer
             OpenTkControl?.InvalidateVisual();
         }
 
+        private void CharacterSubmesh_TextureChanged(object sender, EventArgs e)
+        {
+            OpenTkControl?.InvalidateVisual();
+        }
+
         private void ResetCharacterSubmeshOverrides_Click(object sender, RoutedEventArgs e)
         {
             if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
             _model.SelectedWorkspaceTab.CharacterSubmeshOverrides.Clear();
+            if (_championModel != null)
+            {
+                foreach (ModelPart part in _championModel.Parts)
+                {
+                    if (!string.IsNullOrEmpty(part.MaterialDefinition?.BaseTextureName))
+                    {
+                        part.SelectedTextureName = part.MaterialDefinition.BaseTextureName;
+                    }
+                }
+            }
             ApplyEffectiveCharacterSubmeshes();
             OpenTkControl?.InvalidateVisual();
         }
