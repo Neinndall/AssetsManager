@@ -1053,16 +1053,14 @@ namespace AssetsManager.Views.Controls.Viewer
             // user placement multiplier belongs in the outer VFX transform, otherwise scale is doubled.
             if (_model.SelectedSystem == null)
             {
-                float pitch = (float)(_model.CharacterRotationX * Math.PI / 180d);
-                float yaw = (float)((_model.CharacterRotationY + autoYaw) * Math.PI / 180d);
-                float roll = (float)(_model.CharacterRotationZ * Math.PI / 180d);
-                float scale = (float)_model.CharacterScaleMultiplier;
-                Matrix4x4 placement = Matrix4x4.CreateScale(scale) *
-                                      Matrix4x4.CreateFromYawPitchRoll(yaw, pitch, roll) *
-                                      Matrix4x4.CreateTranslation(
-                                          (float)_model.CharacterPositionX,
-                                          (float)_model.CharacterPositionY,
-                                          (float)_model.CharacterPositionZ);
+                Matrix4x4 placement = VfxCharacterViewportSemantics.CharacterPlacementWorld(
+                    _model.CharacterRotationX,
+                    _model.CharacterRotationY + autoYaw,
+                    _model.CharacterRotationZ,
+                    _model.CharacterScaleMultiplier,
+                    _model.CharacterPositionX,
+                    _model.CharacterPositionY,
+                    _model.CharacterPositionZ);
                 _vfxRenderer?.SetWorldTransform(placement);
             }
             OpenTkControl?.InvalidateVisual();
@@ -4760,6 +4758,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.CurrentTime = 0;
             _model.PlaybackSeed = playbackSeed;
             string playbackContext = "standalone system";
+            _vfxRenderer?.SetWorldTransform(Matrix4x4.Identity);
             _vfxRenderer?.SetVfxSystem(systemModel);
             ApplyChampionBindPose();
             if (_vfxRenderer != null)
@@ -5180,6 +5179,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 EnsureVfxRenderSession();
                 ConfigureAnimationClipCues(animItem);
+                ApplyCharacterPlacement();
                 if (_vfxRenderer != null)
                 {
                     _championAnimationService?.Update(0, animItem.AnimationAsset, _championModel.Skeleton,
@@ -5455,6 +5455,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
 
                 string searchDir = ResolvePreviewSearchDirectory();
+                ApplyCharacterPlacement();
 
                 bool ready = _vfxRenderer?.SetSpellSession(
                     plan.Steps,

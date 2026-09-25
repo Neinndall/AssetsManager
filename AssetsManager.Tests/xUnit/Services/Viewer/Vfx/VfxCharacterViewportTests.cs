@@ -135,5 +135,76 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Assert.True(MathF.Abs(tangent.W) == 1f);
             });
         }
+
+        [Fact]
+        public void CharacterPlacementWorldMirrorsXAxisToMatchCharacterMeshRenderConvention()
+        {
+            Matrix4x4 placement = VfxCharacterViewportSemantics.CharacterPlacementWorld(
+                rotationX: 0d,
+                rotationY: 0d,
+                rotationZ: 0d,
+                scaleMultiplier: 1d,
+                positionX: 0d,
+                positionY: 0d,
+                positionZ: 0d);
+
+            // X scale must be -1 to mirror character mesh along the X axis.
+            Assert.Equal(-1f, placement.M11);
+            Assert.Equal(1f, placement.M22);
+            Assert.Equal(1f, placement.M33);
+            Assert.Equal(1f, placement.M44);
+            Assert.True(placement.GetDeterminant() < 0f);
+
+            // A point with positive X (e.g. Mordekaiser's mace bone at X = +147.75)
+            // must be mapped to negative X (-147.75) matching the mirrored mesh.
+            var maceBonePosition = new Vector3(147.74594f, 134.79817f, -94.46582f);
+            Vector3 transformed = Vector3.Transform(maceBonePosition, placement);
+
+            Assert.Equal(-147.74594f, transformed.X, 3);
+            Assert.Equal(134.79817f, transformed.Y, 3);
+            Assert.Equal(-94.46582f, transformed.Z, 3);
+        }
+
+        [Fact]
+        public void CharacterPlacementWorldMatchesGlMeshRendererMirroredMatrix()
+        {
+            var model = new SceneModel
+            {
+                RotationX = 15d,
+                RotationY = 45d,
+                RotationZ = 30d,
+                Scale = 1.25d,
+                PositionX = 100d,
+                PositionY = 50d,
+                PositionZ = -200d
+            };
+
+            Matrix4x4 meshWorld = GlMeshRenderer.CreateWorldMatrix(model, mirrorCharacterX: true);
+            Matrix4x4 vfxPlacement = VfxCharacterViewportSemantics.CharacterPlacementWorld(
+                model.RotationX,
+                model.RotationY,
+                model.RotationZ,
+                model.Scale,
+                model.PositionX,
+                model.PositionY,
+                model.PositionZ);
+
+            Assert.Equal(meshWorld.M11, vfxPlacement.M11, 4);
+            Assert.Equal(meshWorld.M12, vfxPlacement.M12, 4);
+            Assert.Equal(meshWorld.M13, vfxPlacement.M13, 4);
+            Assert.Equal(meshWorld.M14, vfxPlacement.M14, 4);
+            Assert.Equal(meshWorld.M21, vfxPlacement.M21, 4);
+            Assert.Equal(meshWorld.M22, vfxPlacement.M22, 4);
+            Assert.Equal(meshWorld.M23, vfxPlacement.M23, 4);
+            Assert.Equal(meshWorld.M24, vfxPlacement.M24, 4);
+            Assert.Equal(meshWorld.M31, vfxPlacement.M31, 4);
+            Assert.Equal(meshWorld.M32, vfxPlacement.M32, 4);
+            Assert.Equal(meshWorld.M33, vfxPlacement.M33, 4);
+            Assert.Equal(meshWorld.M34, vfxPlacement.M34, 4);
+            Assert.Equal(meshWorld.M41, vfxPlacement.M41, 4);
+            Assert.Equal(meshWorld.M42, vfxPlacement.M42, 4);
+            Assert.Equal(meshWorld.M43, vfxPlacement.M43, 4);
+            Assert.Equal(meshWorld.M44, vfxPlacement.M44, 4);
+        }
     }
 }

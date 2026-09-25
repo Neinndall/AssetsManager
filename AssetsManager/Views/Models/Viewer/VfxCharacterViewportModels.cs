@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using AssetsManager.Utils.Framework;
 using LeagueToolkit.Hashing;
@@ -45,6 +46,28 @@ namespace AssetsManager.Views.Models.Viewer
         {
             double normalized = degrees % 360d;
             return normalized < 0d ? normalized + 360d : normalized;
+        }
+
+        /// <summary>
+        /// Creates the complete world transform for character-attached VFX in the VFX Studio viewport.
+        /// Scales X by -scaleMultiplier to match the character mesh mirror convention (GlMeshRenderer.CreateWorldMatrix with mirrorCharacterX: true).
+        /// </summary>
+        internal static Matrix4x4 CharacterPlacementWorld(
+            double rotationX,
+            double rotationY,
+            double rotationZ,
+            double scaleMultiplier,
+            double positionX,
+            double positionY,
+            double positionZ)
+        {
+            float pitch = (float)(rotationX * Math.PI / 180d);
+            float yaw = (float)(rotationY * Math.PI / 180d);
+            float roll = (float)(rotationZ * Math.PI / 180d);
+            float scale = (float)scaleMultiplier;
+            return Matrix4x4.CreateScale(-scale, scale, scale) *
+                   Matrix4x4.CreateFromYawPitchRoll(yaw, pitch, roll) *
+                   Matrix4x4.CreateTranslation((float)positionX, (float)positionY, (float)positionZ);
         }
     }
 
