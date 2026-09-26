@@ -499,7 +499,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             => _particleCapacity = Math.Clamp(capacity, 1, RootParticleCapacity);
 
         /// <summary>
-        /// Installs loaded emission surfaces by emitter identity. Matching LTK, a late surface
+        /// Installs loaded emission surfaces by emitter identity. A late surface
         /// install rewinds and deterministically replays the current time so already-born
         /// particles are not left in the old spawn state.
         /// </summary>
@@ -508,13 +508,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             bool replayCurrentTime = true)
         {
             surfaces ??= EmptyEmissionSurfaces;
-            if (ReferenceEquals(_emissionSurfaces, surfaces)) return;
+            if (SurfacesEquals(_emissionSurfaces, surfaces)) return;
             _emissionSurfaces = surfaces;
 
             if (!replayCurrentTime || _definition is null || CurrentTime <= 0f) return;
             float targetTime = CurrentTime;
             Reset();
             Seek(targetTime);
+        }
+
+        private static bool SurfacesEquals(
+            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> a,
+            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> b)
+        {
+            if (ReferenceEquals(a, b)) return true;
+            if (a.Count != b.Count) return false;
+            foreach (var (k, v) in a)
+            {
+                if (!b.TryGetValue(k, out var other) || !ReferenceEquals(v, other))
+                    return false;
+            }
+            return true;
         }
 
         /// <summary>

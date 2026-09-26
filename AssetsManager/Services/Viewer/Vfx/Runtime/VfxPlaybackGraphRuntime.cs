@@ -225,7 +225,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> surfaces)
         {
             surfaces ??= EmptyEmissionSurfaces;
-            if (ReferenceEquals(_emissionSurfaces, surfaces)) return false;
+            if (SurfacesEquals(_emissionSurfaces, surfaces)) return false;
             _emissionSurfaces = surfaces;
             foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
                 runtime.SetEmissionSurfaces(surfaces, replayCurrentTime: false);
@@ -233,14 +233,42 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         }
 
         /// <summary>
-        /// VFX-mesh joints are keyed exactly like LTK drawn emitters: root "0", descendant
+        /// VFX-mesh joints are keyed by drawn emitter path: root "0", descendant
         /// "0.0:1", and so on. A present mesh joint table overrides the owner rig table.
         /// </summary>
         internal bool SetMeshJointProviders(IReadOnlyDictionary<string, IVfxMeshJointProvider> joints)
         {
             joints ??= EmptyMeshJoints;
-            if (ReferenceEquals(_meshJoints, joints)) return false;
+            if (JointsEquals(_meshJoints, joints)) return false;
             _meshJoints = joints;
+            return true;
+        }
+
+        private static bool SurfacesEquals(
+            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> a,
+            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> b)
+        {
+            if (ReferenceEquals(a, b)) return true;
+            if (a.Count != b.Count) return false;
+            foreach (var (k, v) in a)
+            {
+                if (!b.TryGetValue(k, out var other) || !ReferenceEquals(v, other))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool JointsEquals(
+            IReadOnlyDictionary<string, IVfxMeshJointProvider> a,
+            IReadOnlyDictionary<string, IVfxMeshJointProvider> b)
+        {
+            if (ReferenceEquals(a, b)) return true;
+            if (a.Count != b.Count) return false;
+            foreach (var (k, v) in a)
+            {
+                if (!b.TryGetValue(k, out var other) || !ReferenceEquals(v, other))
+                    return false;
+            }
             return true;
         }
 
