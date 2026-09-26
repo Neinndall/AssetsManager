@@ -81,7 +81,7 @@ namespace AssetsManager.Services.Viewer.Semantics
                     MapBrowserNodeKind.Chunk,
                     $"{chunk.Items?.Count ?? 0}",
                     chunk,
-                    canHide: true,
+                    canHide: chunk.Items?.Any(i => i?.IsDrawable == true) == true,
                     inspectorSummary: $"{chunk.Items?.Count ?? 0} placeables");
 
                 foreach (MapOutlineItemData item in chunk.Items ?? Array.Empty<MapOutlineItemData>())

@@ -1206,13 +1206,13 @@
                                                           Style="{StaticResource TransparentIconToggleButton}"
                                                           Width="30" Height="30" Margin="2,0,0,0"
                                                           ToolTip="Toggle Map Structures">
-                                                <materialIcons:MaterialIcon Kind="HomeOutline" Width="14" Height="14" Foreground="#38BDF8"/>
+                                                <materialIcons:MaterialIcon Kind="HomeOutline" Width="14" Height="14"/>
                                             </ToggleButton>
                                             <ToggleButton IsChecked="{Binding MapParticlesVisible, Mode=TwoWay}"
                                                           Style="{StaticResource TransparentIconToggleButton}"
                                                           Width="30" Height="30" Margin="2,0,0,0"
                                                           ToolTip="Toggle Map Effects VFX">
-                                                <materialIcons:MaterialIcon Kind="AutoAwesome" Width="14" Height="14" Foreground="{StaticResource AccentPurple}"/>
+                                                <materialIcons:MaterialIcon Kind="AutoAwesome" Width="14" Height="14"/>
                                             </ToggleButton>
                                         </StackPanel>
 
