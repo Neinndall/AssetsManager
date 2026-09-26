@@ -128,6 +128,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio / Timeline now starts at its minimum height to leave more space for the viewport.
   - VFX Studio / MAP backdrops now reuse decoded textures across stock/game shader paths and retain recently released geometry/textures for faster map switching.
   - Viewer / Rebuilt the MAPGEO loading core around canonical map paths, project-to-WAD asset resolution, flat geometry buffers, StaticMaterialDef semantics, shader defaults, and bounded batch texture decoding without routing maps through SceneModel/ModelPart.
   - Viewer / Removed the retired SceneModel-based MAPGEO loader, CPU terrain compositor and legacy MapGeometry entry paths; MAP project discovery and explicit scene loading are now owned exclusively by VFX Studio.

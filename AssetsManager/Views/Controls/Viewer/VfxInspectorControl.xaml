@@ -401,7 +401,7 @@
                     <RowDefinition Height="Auto"/>               <!-- Workspace tabs -->
                     <RowDefinition Height="3*" MinHeight="220"/> <!-- 3D Viewport Card -->
                     <RowDefinition Height="6"/>                  <!-- Resize Splitter -->
-                    <RowDefinition Height="2*" MinHeight="170"/> <!-- Timeline Deck Card -->
+                    <RowDefinition Height="170" MinHeight="170"/> <!-- Timeline Deck Card -->
                 </Grid.RowDefinitions>
 
                 <!-- Open Skin / MAP workspaces. Mirrors Explorer tab interaction without coupling to FileSystemNodeModel. -->
