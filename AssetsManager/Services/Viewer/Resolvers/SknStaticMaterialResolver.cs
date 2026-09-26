@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text.RegularExpressions;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Rendering;
 using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Viewer.Resolvers
@@ -205,9 +206,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             // LTK falls back to the skin texture only when the material names no base sampler at all.
             // A selected sampler whose asset is missing remains missing instead of silently drawing another texture.
-            if (baseSampler == null && renderState.Blending == ModelMaterialBlendMode.Opaque)
+            if (baseSampler == null)
             {
-                baseTextureKey = fallbackTextureKey;
+                baseTextureKey = SubmeshBindingUtils.SelectActiveTexture(
+                    baseTextureKey,
+                    fallbackTextureKey,
+                    renderState.Blending == ModelMaterialBlendMode.Opaque,
+                    isMaterialMissing: false);
             }
 
             return new ModelMaterialDefinition(

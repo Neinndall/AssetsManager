@@ -23,6 +23,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Rendering;
 
 
 namespace AssetsManager.Services.Viewer.Loading
@@ -280,26 +281,11 @@ namespace AssetsManager.Services.Viewer.Loading
                 var sourceVertexIndices = new List<int>();
                 var triangleIndices = new int[rangeObj.IndexCount];
 
-                // Riot SKNs may store submesh indices globally or relative to the range's first vertex.
-                bool usesGlobalIndices = true;
-                bool usesLocalIndices = rangeObj.StartVertex > 0;
-                for (int i = 0; i < rangeObj.IndexCount; i++)
-                {
-                    int index = (int)subIndices[i];
-                    usesGlobalIndices &= index >= rangeObj.StartVertex &&
-                                         index < rangeObj.StartVertex + rangeObj.VertexCount;
-                    usesLocalIndices &= index >= 0 && index < rangeObj.VertexCount;
-                }
-
-                if (!usesGlobalIndices && !usesLocalIndices)
-                {
-                    throw new InvalidDataException(
-                        $"Submesh '{materialName}' contains indices outside its declared vertex range.");
-                }
-
-                int vertexOffset = usesLocalIndices && !usesGlobalIndices
-                    ? rangeObj.StartVertex
-                    : 0;
+                int vertexOffset = SubmeshGeometryUtils.ResolveVertexOffset(
+                    rangeObj.StartVertex,
+                    rangeObj.VertexCount,
+                    subIndices,
+                    materialName);
 
                 for (int i = 0; i < rangeObj.IndexCount; i++)
                 {
@@ -400,8 +386,7 @@ namespace AssetsManager.Services.Viewer.Loading
                         MaterialDefinition = data.MaterialDefinition
                     };
 
-                    if (initiallyHiddenSubmeshes.Contains(modelPart.Name))
-                        modelPart.IsVisible = false;
+                    modelPart.IsVisible = SubmeshGeometryUtils.IsSubmeshVisible(modelPart.Name, initiallyHiddenSubmeshes);
 
                     parts.Add(modelPart);
                 }
