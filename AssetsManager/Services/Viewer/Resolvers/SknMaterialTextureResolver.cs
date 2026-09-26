@@ -62,6 +62,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         internal SknMaterialPassDefinition Pass { get; init; }
         internal bool IsAnimated { get; init; }
+        internal IReadOnlyList<GameMaterialTextureSwap> TextureSwaps { get; init; } = Array.Empty<GameMaterialTextureSwap>();
         internal uint ShaderHash { get; init; }
         internal string ShaderPath { get; init; }
         internal GameMaterialProgram Program { get; init; }
@@ -137,6 +138,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         .Select(sampler => sampler.TexturePath)))
                 .Concat((DefaultMaterial?.Samplers ?? Array.Empty<SknMaterialSampler>())
                     .Select(sampler => sampler.TexturePath))
+                .Concat(OverrideMaterials.Values.Append(DefaultMaterial)
+                    .Where(material => material != null)
+                    .SelectMany(material => material.TextureSwaps)
+                    .SelectMany(swap => swap.Options)
+                    .Select(option => option.TexturePath))
                 .Concat(ReferencedProgramTexturePaths())
                 .Concat(ReferencedShaderDefaultTextures())
                 .Prepend(DefaultTexturePath)
@@ -1312,6 +1318,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             // linked hash as a material and treats only an absent object as missing.
             return new SknMaterialDefinition(samplers, parameters)
             {
+                TextureSwaps = SknDynamicMaterialParser.Read(obj.Properties, wadChunkPathResolver),
                 Switches = switches,
                 SwitchStates = switchStates,
                 ShaderMacros = shaderMacros,

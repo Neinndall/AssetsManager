@@ -106,7 +106,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (clearManualOverrides)
                     tab.CharacterSubmeshOverrides.Clear();
             }
-            if (restoreTextures)
+            int gearIndex = _model.SelectedCharacterForm?.Definition.GearIndex ?? 0;
+            bool gearChanged = _championModel.Parts.Any(part => part.EquippedGearIndex != gearIndex);
+            foreach (var part in _championModel.Parts) part.EquippedGearIndex = gearIndex;
+            if (restoreTextures || gearChanged)
                 VfxCharacterFormSemantics.RestoreAuthoredTextures(_championModel.Parts);
 
             var clip = _activeAnimationClip;

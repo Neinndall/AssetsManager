@@ -21,6 +21,17 @@ namespace AssetsManager.Views.Models.Viewer
     {
         internal bool HasAuthoredTint { get; init; }
         internal GameMaterialProgram Program { get; init; }
+        internal string BaseSamplerName { get; init; }
+        internal System.Collections.Generic.IReadOnlyList<GameMaterialTextureSwap> TextureSwaps { get; init; } =
+            System.Array.Empty<GameMaterialTextureSwap>();
+
+        internal string ResolveTextureSwap(string samplerName, int gearIndex)
+        {
+            foreach (var swap in TextureSwaps)
+                if (string.Equals(swap.SamplerName, samplerName, System.StringComparison.Ordinal))
+                    return swap.Resolve(gearIndex);
+            return null;
+        }
 
         public bool IsLit =>
             BindingKind != ModelMaterialBindingKind.Missing &&

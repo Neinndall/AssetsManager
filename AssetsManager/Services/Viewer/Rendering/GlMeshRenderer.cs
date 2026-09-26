@@ -387,7 +387,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                                 hasTangents: resources.TangentVbo != 0,
                                 in gameFrame,
                                 path => _resources.ResolveProgramTexture(part, resources, path),
-                                model.SelfIllumination))
+                                model.SelfIllumination,
+                                part.EquippedGearIndex))
                         {
                             boundAny = true;
                             _gl.FrontFace(world.GetDeterminant() < 0f

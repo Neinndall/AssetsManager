@@ -182,7 +182,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 SelectBaseSampler(samplers, switches, switchedShader);
             string baseTextureKey = baseSampler == null
                 ? null
-                : resolveTexture(baseSampler.TexturePath);
+                : resolveTexture(material.TextureSwaps.FirstOrDefault(swap =>
+                    string.Equals(swap.SamplerName, baseSampler.TextureName, StringComparison.Ordinal))?.Resolve(0)
+                    ?? baseSampler.TexturePath);
 
             (Vector4 color, bool hasOpacity, bool hasTint) = ResolveColor(parameters, shaderPath);
             bool hasAuthoredAlphaTest = TryFirst(parameters, AlphaTestNames, out Vector4 authoredAlphaTest) &&
@@ -223,7 +225,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 shaderPath)
             {
                 HasAuthoredTint = hasTint,
-                Program = material.Program
+                Program = material.Program,
+                BaseSamplerName = baseSampler?.TextureName,
+                TextureSwaps = material.TextureSwaps
             };
         }
 

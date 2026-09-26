@@ -419,6 +419,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Fixed incorrect textures when switching champion forms, including Ahri Hall of Legends.
   - Chroma Library / Fixed chromas loading an unrelated skin model and made scene names identify the selected chroma.
   - VFX Studio / Exiting a project now clears its active MAP runtime and released backdrop GPU resources before returning to the normal Viewer.
   - Viewer / MAP scenes now resolve shared SKN indices, hash-only Animation Clips, and truncated or collision-renamed BIN dependencies directly from the extracted container so structures and clip VFX are not dropped.

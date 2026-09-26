@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using AssetsManager.Services.Viewer.Resolvers;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -21,8 +23,14 @@ namespace AssetsManager.Views.Models.Viewer
         {
             foreach (ModelPart part in parts)
             {
-                if (!string.IsNullOrEmpty(part.MaterialDefinition?.BaseTextureName))
-                    part.SelectedTextureName = part.MaterialDefinition.BaseTextureName;
+                var material = part.MaterialDefinition;
+                if (material == null) continue;
+                string path = material.ResolveTextureSwap(material.BaseSamplerName, part.EquippedGearIndex);
+                if (path != null)
+                    part.SelectedTextureName = SknMaterialTextureResolver.MatchTextureKey(
+                        path, part.AllTextures?.Keys.ToArray());
+                else if (!string.IsNullOrEmpty(material.BaseTextureName))
+                    part.SelectedTextureName = material.BaseTextureName;
             }
         }
     }

@@ -229,7 +229,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             bool hasTangents,
             in Frame frame,
             Func<string, uint?> programTexture,
-            float selfIllumination = 0f)
+            float selfIllumination = 0f,
+            int gearIndex = 0)
         {
             if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.SkinnedMesh)
                 return false;
@@ -246,7 +247,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             _gl.UseProgram(runtime.Program);
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents);
             UpdateBlocks(runtime, passEntry.Globals, null, frame, new CharacterDraw(world, bones, selfIllumination));
-            BindSkinnedTextures(runtime, passEntry.Pass, programTexture);
+            BindSkinnedTextures(runtime, passEntry.Pass, programTexture, material, gearIndex);
             ApplyPassState(passEntry.Pass.State, material.RenderState.DoubleSided);
             return true;
         }
@@ -776,7 +777,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         private void BindSkinnedTextures(
             ProgramRuntime runtime,
             GameMaterialPass pass,
-            Func<string, uint?> programTexture)
+            Func<string, uint?> programTexture,
+            ModelMaterialDefinition material,
+            int gearIndex)
         {
             foreach (SamplerRuntime sampler in runtime.Samplers)
             {
@@ -797,7 +800,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         : name;
                     GameMaterialTexture declared = pass.Textures?
                         .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
-                    string authoredPath = declared?.Texture?.VirtualPath;
+                    string authoredPath = material.ResolveTextureSwap(own, gearIndex) ?? declared?.Texture?.VirtualPath;
                     if (string.IsNullOrWhiteSpace(authoredPath) && declared?.Texture?.PathHash > 0)
                         authoredPath = declared.Texture.PathHash.ToString("x16");
                     uint? loaded = sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D &&
