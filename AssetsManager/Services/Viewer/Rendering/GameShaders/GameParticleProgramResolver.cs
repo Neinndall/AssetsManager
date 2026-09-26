@@ -124,6 +124,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                                   VfxEmitterRenderState.Default.AlphaReference;
             if (alphaReference != 0)
                 Add("ALPHA_TEST");
+
+            if (emitter.Distortion is not null)
+                return defines;
+
             if (emitter.AlphaErosion is not null)
                 Add("ALPHA_EROSION");
             if (!string.IsNullOrWhiteSpace(emitter.TextureMultPath) ||
@@ -136,15 +140,15 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             {
                 switch (emitter.UvMode)
                 {
+                    case 0:
+                        break;
                     case 1:
                         Add("SCREEN_SPACE_UV");
                         break;
                     case 2:
                         Add("SEPARATE_ALPHA_UV");
                         break;
-                    case 3:
-                    case 4:
-                    case 5:
+                    default:
                         Add("LOCAL_SPACE_UV");
                         break;
                 }
