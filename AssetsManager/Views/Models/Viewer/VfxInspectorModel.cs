@@ -735,7 +735,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _showChampionMesh = true;
         private bool _hasChampionMesh;
         private bool _hasCharacterSkeleton;
-        private bool _characterEffectsEnabled = true;
+        private bool _characterEffectsEnabled;
         private bool _showCharacterArmature;
         private bool _showCharacterJointNames;
         private bool _characterAutoRotate;
@@ -743,7 +743,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _inspectorVisible;
         private bool _viewportToolbarVisible;
         private bool _characterBackdropEnabled;
-        private bool _mapParticlesVisible = true;
+        private bool _mapParticlesVisible;
         private bool _mapStructuresVisible = true;
         private VfxCharacterBackdropOption _selectedCharacterBackdrop;
         private double _characterPositionX;

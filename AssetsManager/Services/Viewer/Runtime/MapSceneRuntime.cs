@@ -20,7 +20,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         private float _sceneTimeSeconds;
         private float _characterTimeSeconds;
         private bool _showStructures = true;
-        private bool _showParticles = true;
+        private bool _showParticles;
         private int _visibilityFlags;
 
         internal MapSceneRuntime(
