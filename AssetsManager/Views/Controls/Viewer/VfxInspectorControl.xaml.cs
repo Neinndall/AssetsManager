@@ -2813,32 +2813,6 @@ namespace AssetsManager.Views.Controls.Viewer
             e.Handled = true;
         }
 
-        private void FitCharacter_Click(object sender, RoutedEventArgs e)
-        {
-            if (_cameraController == null || _championModel == null) return;
-            VfxDefinitionBounds bounds = CharacterPreviewBounds();
-            if (!IsFiniteBounds(bounds)) return;
-
-            if (_dummyViewport.Camera is ProjectionCamera camera)
-            {
-                Vector3 look = new((float)camera.LookDirection.X, (float)camera.LookDirection.Y, (float)camera.LookDirection.Z);
-                Vector3 up = new((float)camera.UpDirection.X, (float)camera.UpDirection.Y, (float)camera.UpDirection.Z);
-                if (look.LengthSquared() <= 1e-8f) look = -Vector3.UnitZ;
-                if (up.LengthSquared() <= 1e-8f) up = Vector3.UnitY;
-                var stand = new VfxCameraStand(
-                    -Vector3.Normalize(look),
-                    Vector3.Normalize(up),
-                    camera is PerspectiveCamera perspective ? (float)perspective.FieldOfView : VfxPreviewCamera.OrbitFieldOfView,
-                    camera is OrthographicCamera);
-                FramePreviewBounds(bounds, stand);
-            }
-            else
-            {
-                FramePreviewBounds(bounds, VfxPreviewCamera.Stand(_model.PreviewCameraPreset));
-            }
-            e.Handled = true;
-        }
-
         private long _previewShowClosedTicks;
         private long _previewViewModeClosedTicks;
         private long _previewCameraClosedTicks;
