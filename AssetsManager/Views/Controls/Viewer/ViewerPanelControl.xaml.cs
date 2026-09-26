@@ -629,8 +629,13 @@ namespace AssetsManager.Views.Controls.Viewer
             if (skin == null || _viewModel.SelectedModel == null)
                 return;
 
-            _viewModel.SelectedModel.Name =
-                $"{Path.GetFileNameWithoutExtension(skin.ModelPath)} [{skin.Name}]" +
+            string modelName = Path.GetFileNameWithoutExtension(skin.ModelPath);
+            string modelSkinName = Path.GetFileName(Path.GetDirectoryName(skin.ModelPath));
+            string modelSkinSuffix = "_" + modelSkinName;
+            string chromaName = modelName.EndsWith(modelSkinSuffix, StringComparison.OrdinalIgnoreCase)
+                ? modelName[..^modelSkinSuffix.Length] + "_" + skin.Name.ToLowerInvariant()
+                : $"{skin.Name} ({modelName})";
+            _viewModel.SelectedModel.Name = chromaName +
                 (skin.IsReference ? " [REFERENCE]" : string.Empty);
         }
 
