@@ -378,7 +378,8 @@ namespace AssetsManager.Utils
                     GroundVisible = false,
                     GridVisible = true,
                     SkyVisible = false,
-                    TransparentBackground = false
+                    TransparentBackground = false,
+                    EnableFxaa = true
                 },
                 VfxStudio = new VfxStudioSettings
                 {
@@ -474,6 +475,7 @@ namespace AssetsManager.Utils
         public bool GridVisible { get; set; } = true;
         public bool SkyVisible { get; set; }
         public bool TransparentBackground { get; set; }
+        public bool EnableFxaa { get; set; } = true;
     }
 
     public class VfxStudioSettings

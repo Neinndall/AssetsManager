@@ -92,6 +92,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private MapCharacterRenderer _mapCharacterRenderer;
         private MapParticleRenderer _mapParticleRenderer;
         private MapPostEffectsRenderer _mapPostEffectsRenderer;
+        private FxaaPostEffectsRenderer _fxaaRenderer;
         private SkyRenderer _skyRenderer;
         private VfxCubeMapData _genericSkyCube;
         private VfxCubeMapData _mapSkyCube;
@@ -1554,6 +1555,10 @@ namespace AssetsManager.Views.Controls.Viewer
             _mapPostEffectsRenderer = null;
             RunReleaseStep(nameof(MapPostEffectsRenderer), () => mapPostEffectsRenderer?.Dispose(), gpuBound: true);
 
+            var fxaaRenderer = _fxaaRenderer;
+            _fxaaRenderer = null;
+            RunReleaseStep(nameof(FxaaPostEffectsRenderer), () => fxaaRenderer?.Dispose(), gpuBound: true);
+
             var skyRenderer = _skyRenderer;
             _skyRenderer = null;
             RunReleaseStep(nameof(SkyRenderer), () => skyRenderer?.Dispose(), gpuBound: true);
@@ -2033,6 +2038,19 @@ namespace AssetsManager.Views.Controls.Viewer
                     proj,
                     (uint)Math.Max(1d, OpenTkControl.ActualWidth),
                     (uint)Math.Max(1d, OpenTkControl.ActualHeight));
+            }
+
+            if (AppSettings?.StudioParameters?.EnableFxaa ?? true)
+            {
+                EnsureFxaaRenderer();
+                _fxaaRenderer?.Render(
+                    (int)Math.Max(1d, OpenTkControl.ActualWidth),
+                    (int)Math.Max(1d, OpenTkControl.ActualHeight));
+            }
+            else if (_fxaaRenderer != null)
+            {
+                _fxaaRenderer.Dispose();
+                _fxaaRenderer = null;
             }
 
             if (_vfxRenderer != null)
@@ -3803,6 +3821,15 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _mapPostEffectsRenderer.Dispose();
                 _mapPostEffectsRenderer = null;
+            }
+        }
+
+        private void EnsureFxaaRenderer()
+        {
+            if (_fxaaRenderer == null && _gl != null)
+            {
+                _fxaaRenderer = new FxaaPostEffectsRenderer();
+                _fxaaRenderer.Initialize(_gl);
             }
         }
 

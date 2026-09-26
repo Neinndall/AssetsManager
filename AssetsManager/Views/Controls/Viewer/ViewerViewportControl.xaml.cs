@@ -34,6 +34,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private Silk.NET.OpenGL.GL _gl;
         private GlMeshRenderer _meshRenderer;
         private GridRenderer _gridRenderer;
+        private FxaaPostEffectsRenderer _fxaaRenderer;
 
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
@@ -205,6 +206,10 @@ namespace AssetsManager.Views.Controls.Viewer
                     ambientColor);
             }
 
+            if (_fxaaRenderer != null && _viewModel.IsFxaaEnabled)
+            {
+                _fxaaRenderer.Render(framebufferWidth, framebufferHeight);
+            }
         }
 
         private void EnsureSceneRenderers(bool required = false)
@@ -224,6 +229,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 _gridRenderer.Initialize(_gl, GlShaderCompiler.UsesEmbeddedProfile(_gl), 1000f);
             }
 
+            if (hasClassicScene && _fxaaRenderer == null)
+            {
+                _fxaaRenderer = new FxaaPostEffectsRenderer();
+                _fxaaRenderer.Initialize(_gl);
+            }
         }
 
         private CustomCameraController _cameraController;
@@ -313,6 +323,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
                     break;
                 case nameof(ViewerViewportModel.IsGridVisible):
+                    break;
+                case nameof(ViewerViewportModel.IsFxaaEnabled):
+                    OpenTkControl.InvalidateVisual();
                     break;
             }
         }
@@ -414,8 +427,11 @@ namespace AssetsManager.Views.Controls.Viewer
             _fpsStopwatch.Restart();
         }
 
-        private void OnAppSettingsPropertyChanged(object sender, PropertyChangedEventArgs e) =>
+        private void OnAppSettingsPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            ApplyStudioParameters();
             RequestGroundPlaneRefresh();
+        }
 
         private void OnAppSettingsSaved(object sender, EventArgs e)
         {
@@ -579,6 +595,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel.IsGroundVisible = studioParameters.GroundVisible;
             _viewModel.IsGridVisible = studioParameters.GridVisible;
             _viewModel.IsTransparentBg = studioParameters.TransparentBackground;
+            _viewModel.IsFxaaEnabled = studioParameters.EnableFxaa;
         }
 
 
@@ -635,6 +652,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 var gridRenderer = _gridRenderer;
                 _gridRenderer = null;
                 RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
+
+                var fxaaRenderer = _fxaaRenderer;
+                _fxaaRenderer = null;
+                RunReleaseStep(nameof(FxaaPostEffectsRenderer), () => fxaaRenderer?.Dispose(), gpuBound: true);
 
                 var gl = _gl;
                 _gl = null;

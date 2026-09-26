@@ -291,6 +291,15 @@
                     <CheckBox Grid.Column="1" IsChecked="{Binding Settings.StudioParameters.TransparentBackground, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                 </Grid>
 
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Anti-Aliasing (FXAA)" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Smooth edges across Viewer previews using in-game Fast Approximate Anti-Aliasing" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <CheckBox Grid.Column="1" IsChecked="{Binding Settings.StudioParameters.EnableFxaa, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
+                </Grid>
+
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>

@@ -77,6 +77,13 @@ namespace AssetsManager.Views.Models.Viewer
             set { if (_isGridVisible != value) { _isGridVisible = value; OnPropertyChanged(); } }
         }
 
+        private bool _isFxaaEnabled = true;
+        public bool IsFxaaEnabled
+        {
+            get => _isFxaaEnabled;
+            set { if (_isFxaaEnabled != value) { _isFxaaEnabled = value; OnPropertyChanged(); } }
+        }
+
         public string SceneDisplayName
         {
             get => _sceneDisplayName;
@@ -146,6 +153,7 @@ namespace AssetsManager.Views.Models.Viewer
             IsGroundVisible = false;
             IsGridVisible = true;
             IsTransparentBg = false;
+            IsFxaaEnabled = true;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
