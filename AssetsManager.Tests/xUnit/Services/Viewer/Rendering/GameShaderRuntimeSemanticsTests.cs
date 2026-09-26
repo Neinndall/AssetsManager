@@ -91,5 +91,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             Assert.Equal(0.4f, data[17], precision: 4);
             Assert.Equal(0.4f, data[18], precision: 4);
         }
+
+        [Theory]
+        [InlineData(0u, Silk.NET.OpenGL.DepthFunction.Lequal)] // 0 reads as class default (Lequal) rather than Never
+        [InlineData(1u, Silk.NET.OpenGL.DepthFunction.Less)]
+        [InlineData(2u, Silk.NET.OpenGL.DepthFunction.Equal)]
+        [InlineData(3u, Silk.NET.OpenGL.DepthFunction.Lequal)]
+        [InlineData(4u, Silk.NET.OpenGL.DepthFunction.Greater)]
+        [InlineData(5u, Silk.NET.OpenGL.DepthFunction.Notequal)]
+        [InlineData(6u, Silk.NET.OpenGL.DepthFunction.Gequal)]
+        [InlineData(7u, Silk.NET.OpenGL.DepthFunction.Always)]
+        [InlineData(99u, Silk.NET.OpenGL.DepthFunction.Lequal)]
+        public void ToDepth_MapsZeroToDefaultLequal(uint value, Silk.NET.OpenGL.DepthFunction expected)
+        {
+            Assert.Equal(expected, GameShaderRuntime.ToDepth(value));
+        }
     }
 }

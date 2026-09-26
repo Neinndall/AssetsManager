@@ -1231,10 +1231,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 _ => BlendingFactor.One
             };
 
-        private static DepthFunction ToDepth(uint value) =>
+        internal static DepthFunction ToDepth(uint value) =>
             value switch
             {
-                0 => DepthFunction.Never,
+                // 0 reads as class default (Lequal) rather than Never: VFX materials
+                // that write it (such as HKG_Eyes_Blink_Mat) draw in the game.
+                0 => DepthFunction.Lequal,
                 1 => DepthFunction.Less,
                 2 => DepthFunction.Equal,
                 3 => DepthFunction.Lequal,
