@@ -584,7 +584,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 SceneModel previousModel = _viewModel.SelectedModel;
                 await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
                 if (!ReferenceEquals(previousModel, _viewModel.SelectedModel))
-                    LabelReferenceModel(skin);
+                    LabelChromaModel(skin);
 
                 // Una vez cargado y con el viewport listo, ocultamos la galería
                 ViewModel.IsChromaGalleryVisible = false;
@@ -611,7 +611,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     SceneModel previousModel = _viewModel.SelectedModel;
                     await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
                     if (!ReferenceEquals(previousModel, _viewModel.SelectedModel))
-                        LabelReferenceModel(skin);
+                        LabelChromaModel(skin);
                 }
 
                 // Cerramos solo cuando todo está cargado
@@ -624,14 +624,14 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void LabelReferenceModel(ChromaSkinModel skin)
+        private void LabelChromaModel(ChromaSkinModel skin)
         {
-            if (skin?.IsReference != true || _viewModel.SelectedModel == null)
+            if (skin == null || _viewModel.SelectedModel == null)
                 return;
 
-            const string referenceSuffix = " [REFERENCE]";
-            if (!_viewModel.SelectedModel.Name.EndsWith(referenceSuffix, StringComparison.OrdinalIgnoreCase))
-                _viewModel.SelectedModel.Name += referenceSuffix;
+            _viewModel.SelectedModel.Name =
+                $"{Path.GetFileNameWithoutExtension(skin.ModelPath)} [{skin.Name}]" +
+                (skin.IsReference ? " [REFERENCE]" : string.Empty);
         }
 
         public async Task LoadInitialModel(string filePath)

@@ -1043,6 +1043,11 @@ namespace AssetsManager.Views.Controls.Viewer
                         Viewport.Children.Remove(model.RootVisual);
                 }
             }
+            if (sender is SceneModel renamedModel && e.PropertyName == nameof(SceneModel.Name) &&
+                _loadedModels.Contains(renamedModel))
+            {
+                UpdateSceneDisplayFromPrimaryModels();
+            }
         }
 
         public void SetActiveModel(SceneModel model)

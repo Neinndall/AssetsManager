@@ -9,6 +9,8 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Resolvers;
+using LeagueToolkit.Core.Meta;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 
@@ -38,7 +40,24 @@ namespace AssetsManager.Services.Viewer.Loading
                         .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
                         .ToArray();
                     ChromaFamilyModel currentFamily = null;
-                    bool currentFamilyAdded = false;
+                    var modelFamilies = new Dictionary<string, ChromaFamilyModel>(StringComparer.OrdinalIgnoreCase);
+                    foreach (string directory in directories)
+                    {
+                        string modelPath = Directory.GetFiles(directory, "*.skn")
+                            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+                        if (modelPath == null)
+                            continue;
+                        string skinName = Path.GetFileName(directory);
+                        PreviewData preview = LoadPreview(Directory.GetFiles(directory, "*.tex"), skinName);
+                        modelFamilies[modelPath] = new ChromaFamilyModel
+                        {
+                            Name = skinName.ToUpperInvariant(),
+                            ModelName = Path.GetFileNameWithoutExtension(modelPath),
+                            ModelPath = modelPath,
+                            PreviewImage = preview.Image,
+                            SwatchColor = preview.Color
+                        };
+                    }
 
                     foreach (string directory in directories)
                     {
@@ -46,42 +65,54 @@ namespace AssetsManager.Services.Viewer.Loading
                         string[] textureFiles = Directory.GetFiles(directory, "*.tex")
                             .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
                             .ToArray();
-                        string modelPath = Directory.GetFiles(directory, "*.skn").FirstOrDefault();
-
-                        if (modelPath != null)
+                        ChromaFamilyModel ownFamily = modelFamilies.Values.FirstOrDefault(family =>
+                            Path.GetDirectoryName(family.ModelPath).Equals(directory, StringComparison.OrdinalIgnoreCase));
+                        if (ownFamily != null)
                         {
-                            PreviewData preview = LoadPreview(textureFiles, skinName);
-                            currentFamily = new ChromaFamilyModel
-                            {
-                                Name = skinName.ToUpperInvariant(),
-                                ModelName = Path.GetFileNameWithoutExtension(modelPath),
-                                ModelPath = modelPath,
-                                PreviewImage = preview.Image,
-                                SwatchColor = preview.Color
-                            };
-                            currentFamilyAdded = false;
+                            currentFamily = ownFamily;
                             continue;
                         }
-
-                        if (currentFamily == null || textureFiles.Length == 0)
+                        if (textureFiles.Length == 0)
                             continue;
+
+                        if (currentFamily == null)
+                            continue;
+                        string chromaModelPath = currentFamily.ModelPath;
+                        string binPath = SknMaterialTextureResolver.TryResolveBinPath(directory);
+                        if (binPath != null)
+                        {
+                            try
+                            {
+                                // Only the primary BIN's mesh binding is needed for discovery.
+                                using var stream = File.OpenRead(binPath);
+                                string declaredModel = SknMaterialTextureResolver.ResolveDeclaredSkinModel(
+                                    new BinTree(stream), modelFamilies.Keys);
+                                chromaModelPath = declaredModel;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logService.LogError(ex, $"Failed to read chroma model binding: {binPath}");
+                                continue;
+                            }
+                        }
+                        if (chromaModelPath == null)
+                        {
+                            _logService.LogDebug($"No available model for chroma '{skinName}'.");
+                            continue;
+                        }
 
                         PreviewData chromaPreview = LoadPreview(textureFiles, skinName);
                         currentFamily.Chromas.Add(new ChromaSkinModel
                         {
                             Name = skinName.ToUpperInvariant(),
                             TexturePath = directory,
-                            ModelPath = currentFamily.ModelPath,
+                            ModelPath = chromaModelPath,
                             PreviewImage = chromaPreview.Image,
                             SwatchColor = chromaPreview.Color,
                             PreviewTextureName = chromaPreview.TextureName
                         });
-                        if (!currentFamilyAdded)
-                        {
-                            families.Add(currentFamily);
-                            currentFamilyAdded = true;
-                        }
                     }
+                    families.AddRange(modelFamilies.Values.Where(family => family.ChromaCount > 0));
                 }
                 catch (Exception ex)
                 {

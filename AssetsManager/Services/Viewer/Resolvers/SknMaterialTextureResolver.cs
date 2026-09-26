@@ -1047,6 +1047,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return assetsIdx >= 0 && XxHash64Ext.Hash(normalizedSkn.AsSpan(assetsIdx)) == expectedHash;
         }
 
+        internal static string ResolveDeclaredSkinModel(BinTree tree, IEnumerable<string> availableModels)
+        {
+            string[] matches = availableModels
+                .Where(path => tree.Objects.Values.Any(obj => MatchesTargetSkin(obj, path)))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            return matches.Length == 1 ? matches[0] : null;
+        }
+
         private static bool TryGetSimpleSkin(BinTreeObject obj, out BinTreeProperty simpleSkinProperty)
         {
             simpleSkinProperty = null;
