@@ -2409,18 +2409,36 @@ namespace AssetsManager.Views.Controls.Viewer
                 new Vector3(reach, VfxRigMotion.ChampionHeight, reach));
         }
 
-        private void MapSun_Click(object sender, RoutedEventArgs e)
+        private void MapSunToggle_Click(object sender, RoutedEventArgs e)
         {
-            if (MapSunPopup == null || _mapSceneRuntime == null) return;
-            SyncMapPreviewControls();
-            MapSunPopup.IsOpen = !MapSunPopup.IsOpen;
+            if (_mapSceneRuntime == null) return;
+            if (MapSunToggle?.IsChecked == true)
+            {
+                if (MapPostToggle != null) MapPostToggle.IsChecked = false;
+                if (MapPostPanel != null) MapPostPanel.Visibility = Visibility.Collapsed;
+                if (MapSunPanel != null) MapSunPanel.Visibility = Visibility.Visible;
+                SyncMapPreviewControls();
+            }
+            else
+            {
+                if (MapSunPanel != null) MapSunPanel.Visibility = Visibility.Collapsed;
+            }
         }
 
-        private void MapPost_Click(object sender, RoutedEventArgs e)
+        private void MapPostToggle_Click(object sender, RoutedEventArgs e)
         {
-            if (MapPostPopup == null || _mapSceneRuntime == null) return;
-            SyncMapPreviewControls();
-            MapPostPopup.IsOpen = !MapPostPopup.IsOpen;
+            if (_mapSceneRuntime == null) return;
+            if (MapPostToggle?.IsChecked == true)
+            {
+                if (MapSunToggle != null) MapSunToggle.IsChecked = false;
+                if (MapSunPanel != null) MapSunPanel.Visibility = Visibility.Collapsed;
+                if (MapPostPanel != null) MapPostPanel.Visibility = Visibility.Visible;
+                SyncMapPreviewControls();
+            }
+            else
+            {
+                if (MapPostPanel != null) MapPostPanel.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void MapSunReset_Click(object sender, RoutedEventArgs e)
