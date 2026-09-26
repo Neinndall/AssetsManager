@@ -19,7 +19,7 @@ namespace AssetsManager.Views.Helpers
     public static class SceneElements
     {
         public const double GroundLevel = 1000;
-        public const string GroundChunkVirtualPath = "assets/maps/kitpieces/srs/base/textures/ground_c3_midlanecaps_a.tex";
+        public const string GroundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/ground_rift.dds";
         public const string SkyboxChunkVirtualPath = "assets/maps/skyboxes/riots_sru_skybox_cubemap.dds";
         private const double GroundLogoElevation = 2.0;
         public const int SceneTextureMaxSize = 2048;
@@ -50,21 +50,49 @@ namespace AssetsManager.Views.Helpers
                 _groundLoaded = true;
                 try
                 {
-                    _cachedGroundTexture = LoadGroundFromGame(settings, logService);
+                    _cachedGroundTexture = LoadBundledGround(logService);
                     return _cachedGroundTexture;
                 }
                 catch (Exception ex)
                 {
-                    logService?.LogError(ex, "Failed to load stage ground texture from League installation.");
+                    logService?.LogError(ex, "Failed to load stage ground texture.");
                     return null;
                 }
             }
         }
 
-        private static BitmapSource LoadGroundFromGame(AppSettings settings, LogService logService)
+        private static BitmapSource LoadBundledGround(LogService logService)
         {
-            using var stream = OpenMap11Chunk(settings, GroundChunkVirtualPath, logService);
-            return stream == null ? null : TextureUtils.LoadTexture(stream, ".tex", SceneTextureMaxSize);
+            try
+            {
+                var uri = new Uri(GroundTexturePath, UriKind.RelativeOrAbsolute);
+                var streamInfo = Application.GetResourceStream(uri);
+                if (streamInfo?.Stream != null)
+                {
+                    using var stream = streamInfo.Stream;
+                    return TextureUtils.LoadTexture(stream, ".dds", SceneTextureMaxSize);
+                }
+            }
+            catch (Exception ex)
+            {
+                logService?.LogDebug($"Could not load ground from resource stream: {ex.Message}");
+            }
+
+            string diskPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Scene", "ground_rift.dds");
+            if (File.Exists(diskPath))
+            {
+                try
+                {
+                    using var stream = File.OpenRead(diskPath);
+                    return TextureUtils.LoadTexture(stream, ".dds", SceneTextureMaxSize);
+                }
+                catch (Exception ex)
+                {
+                    logService?.LogError(ex, $"Failed to load ground from disk: {diskPath}");
+                }
+            }
+
+            return null;
         }
 
         #endregion
@@ -239,8 +267,8 @@ namespace AssetsManager.Views.Helpers
         {
             MeshGeometry3D groundMesh = new MeshGeometry3D();
 
-            // Ground plane size matching LTK (2400x2400 units, half = 1200)
-            const double half = 1200;
+            // Ground plane size (2000x2000 units, half = 1000)
+            const double half = 1000;
             groundMesh.Positions = new Point3DCollection()
             {
                 new Point3D(-half, GroundLevel, -half), // Bottom-left
