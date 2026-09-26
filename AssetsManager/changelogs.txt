@@ -10,7 +10,9 @@ New Features
   - Viewer / Skybox cubemap now loads dynamically from League Map11.wad.client matching LTK Manager, completely removing the bundled Resources/Scene directory (-16.8 MB).
   - Viewer / Consolidated Skybox cubemap and stage ground loading into SceneElements, eliminating redundant factories and obsolete texture caches.
   - Viewer / Added Skybox toggle to Environment controls in the main 3D viewer matching VFX Studio.
-  - Viewer / Ground stage texture now loads dynamically from League installation WAD kitpieces matching LTK Manager.
+  - VFX Studio / Redesigned Map Look lighting and post-processing controls using ModernTileToggleButton tiles matching the Environment section in Viewer Panel Control, eliminating dead card states and aligning with LTK Manager ephemeral lighting overrides.
+  - VFX Studio / Defaulted camera preset to Orbit and aligned Orbit camera framing to front-facing centered view matching Viewer normal, with automatic camera reset upon closing projects or all workspace tabs.
+  - Viewer / Restored the classic clean Summoner's Rift square ground stage (ground_rift.dds) for ideal champion model presentation.
   - Chroma Library / Added a removable reference skins source so current and archived chromas can be paired and loaded together for visual comparison.
   - VFX Studio / Animation clips now use authored AnimationGraph identities, composite playlists, and parametric clip selection without duplicating the clip browser in the timeline deck.
   - VFX Studio / Added full Animation Clip playback from each skin's authored AnimationGraphData, preserving mClipDataMap clip identity/order and spawning ParticleEventData VFX systems with authored timing, skeleton attachments, visibility, joint snap, and idle effects.

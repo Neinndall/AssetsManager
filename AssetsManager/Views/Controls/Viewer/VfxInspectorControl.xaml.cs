@@ -276,10 +276,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     Title = title,
                     Subtitle = skin.DisplayName ?? skin.BinPath,
                     Kind = VfxWorkspaceTabKind.Skin,
-                    Payload = skin,
-                    CharacterEffectsEnabled = AppSettings?.VfxStudio?.ChampionVfxEnabled ?? false,
-                    BackdropParticlesVisible = AppSettings?.VfxStudio?.MapVfxEnabled ?? false,
-                    BackdropStructuresVisible = AppSettings?.VfxStudio?.MapStructuresEnabled ?? true
+                    Payload = skin
                 };
                 if (inheritedBackdrop?.Source != null)
                 {
@@ -289,8 +286,6 @@ namespace AssetsManager.Views.Controls.Viewer
                         tab.CharacterBackdropEnabled = true;
                         tab.CharacterBackdropKey = backdropKey;
                         tab.CharacterBackdropVisibilityFlags = inheritedBackdrop.VisibilityFlags;
-                        tab.BackdropParticlesVisible = inheritedBackdrop.ShowParticles;
-                        tab.BackdropStructuresVisible = inheritedBackdrop.ShowStructures;
                     }
                 }
                 _model.WorkspaceTabs.Add(tab);
@@ -427,15 +422,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void CaptureCharacterWorkspaceState(VfxWorkspaceTab tab)
         {
             if (tab?.Kind != VfxWorkspaceTabKind.Skin) return;
-            tab.CharacterEffectsEnabled = _model.CharacterEffectsEnabled;
-            tab.CharacterArmatureVisible = _model.ShowCharacterArmature;
-            tab.CharacterJointNamesVisible = _model.ShowCharacterJointNames;
-            tab.CharacterAutoRotate = _model.CharacterAutoRotate;
-            tab.CharacterAutoRotateDegrees = _characterAutoRotateDegrees;
-            tab.CharacterTransformGizmoEnabled = _model.CharacterTransformGizmoEnabled;
             tab.CharacterBackdropEnabled = _model.CharacterBackdropEnabled;
-            tab.BackdropParticlesVisible = _model.MapParticlesVisible;
-            tab.BackdropStructuresVisible = _model.MapStructuresVisible;
             tab.CharacterBackdropKey = VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source);
             if (_mapSceneIsCharacterBackdrop && _mapSceneRuntime != null)
                 tab.CharacterBackdropVisibilityFlags = _mapSceneRuntime.VisibilityFlags;
@@ -454,14 +441,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _isApplyingCharacterViewportState = true;
             try
             {
-                _model.CharacterEffectsEnabled = tab.CharacterEffectsEnabled;
-                _model.ShowCharacterArmature = tab.CharacterArmatureVisible;
-                _model.ShowCharacterJointNames = tab.CharacterJointNamesVisible;
-                _model.CharacterAutoRotate = tab.CharacterAutoRotate;
-                _characterAutoRotateDegrees = tab.CharacterAutoRotateDegrees;
-                _model.CharacterTransformGizmoEnabled = tab.CharacterTransformGizmoEnabled;
-                _model.MapParticlesVisible = tab.BackdropParticlesVisible;
-                _model.MapStructuresVisible = tab.BackdropStructuresVisible;
                 _model.CharacterPositionX = tab.CharacterPositionX;
                 _model.CharacterPositionY = tab.CharacterPositionY;
                 _model.CharacterPositionZ = tab.CharacterPositionZ;
@@ -500,8 +479,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             ClearMapCharacterClipPreview();
             _mapSceneIsCharacterBackdrop = true;
-            _mapSceneRuntime.ShowParticles = tab.BackdropParticlesVisible;
-            _mapSceneRuntime.ShowStructures = tab.BackdropStructuresVisible;
+            _mapSceneRuntime.ShowParticles = _model.MapParticlesVisible;
+            _mapSceneRuntime.ShowStructures = _model.MapStructuresVisible;
             _model.HasMapPreview = true;
             _model.SetMapLayers(
                 MapGeometrySemantics.Layers(_mapSceneRuntime.Scene.Geometry),
@@ -699,6 +678,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 ClearLoadedSkinState();
                 _model.SelectedSkin = null;
                 _model.SelectedMapNode = null;
+                ResetCameraToConfiguredPreset();
             }
             finally
             {
@@ -834,11 +814,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     _mapSceneRuntime.ShowStructures = _model.MapStructuresVisible;
                     _mapSceneRuntime.ShowParticles = _model.MapParticlesVisible;
-                    if (_mapSceneIsCharacterBackdrop && _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
-                    {
-                        _model.SelectedWorkspaceTab.BackdropStructuresVisible = _model.MapStructuresVisible;
-                        _model.SelectedWorkspaceTab.BackdropParticlesVisible = _model.MapParticlesVisible;
-                    }
                     OpenTkControl?.InvalidateVisual();
                 }
                 SavePreviewDisplayPreferences();
@@ -2211,6 +2186,19 @@ namespace AssetsManager.Views.Controls.Viewer
             ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
         }
 
+        public void ResetCameraToConfiguredPreset()
+        {
+            VfxPreviewCameraPreset targetPreset = VfxPreviewCameraPreset.Orbit;
+            if (AppSettings?.VfxStudio?.CameraPreset != null &&
+                Enum.TryParse(AppSettings.VfxStudio.CameraPreset, ignoreCase: true, out VfxPreviewCameraPreset configuredPreset))
+            {
+                targetPreset = configuredPreset;
+            }
+
+            _model.PreviewCameraPreset = targetPreset;
+            ApplyCameraPreset(targetPreset, refit: true);
+        }
+
         private void CameraController_RotationStarted(object sender, EventArgs e)
         {
             if (_model.PreviewCameraPreset == VfxPreviewCameraPreset.Orbit) return;
@@ -2423,33 +2411,31 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void MapSunToggle_Click(object sender, RoutedEventArgs e)
         {
-            if (_mapSceneRuntime == null) return;
             if (MapSunToggle?.IsChecked == true)
             {
                 if (MapPostToggle != null) MapPostToggle.IsChecked = false;
                 if (MapPostPanel != null) MapPostPanel.Visibility = Visibility.Collapsed;
                 if (MapSunPanel != null) MapSunPanel.Visibility = Visibility.Visible;
-                SyncMapPreviewControls();
+                if (_mapSceneRuntime != null) SyncMapPreviewControls();
             }
             else
             {
-                if (MapSunPanel != null) MapSunPanel.Visibility = Visibility.Collapsed;
+                if (MapSunToggle != null) MapSunToggle.IsChecked = true;
             }
         }
 
         private void MapPostToggle_Click(object sender, RoutedEventArgs e)
         {
-            if (_mapSceneRuntime == null) return;
             if (MapPostToggle?.IsChecked == true)
             {
                 if (MapSunToggle != null) MapSunToggle.IsChecked = false;
                 if (MapSunPanel != null) MapSunPanel.Visibility = Visibility.Collapsed;
                 if (MapPostPanel != null) MapPostPanel.Visibility = Visibility.Visible;
-                SyncMapPreviewControls();
+                if (_mapSceneRuntime != null) SyncMapPreviewControls();
             }
             else
             {
-                if (MapPostPanel != null) MapPostPanel.Visibility = Visibility.Collapsed;
+                if (MapPostToggle != null) MapPostToggle.IsChecked = true;
             }
         }
 
@@ -3156,6 +3142,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.HasAnySolo = false;
             _model.IsAllMuted = false;
             _model.StatusText = "Ready";
+            ResetCameraToConfiguredPreset();
         }
 
         private void BrowseRoot_Click(object sender, RoutedEventArgs e)

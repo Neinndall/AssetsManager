@@ -270,7 +270,7 @@ namespace AssetsManager.Utils
                     string legacyWire = studioJson.Value<string>("VfxWireframeMode") ?? "Off";
                     settings.VfxStudio = new VfxStudioSettings
                     {
-                        CameraPreset = studioJson.Value<string>("VfxCameraPreset") ?? "Game",
+                        CameraPreset = studioJson.Value<string>("VfxCameraPreset") ?? "Orbit",
                         ViewMode = LegacyVfxViewMode(legacyWire),
                         WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase),
                         ShadersEnabled = false
@@ -408,7 +408,7 @@ namespace AssetsManager.Utils
                 },
                 VfxStudio = new VfxStudioSettings
                 {
-                    CameraPreset = "Game",
+                    CameraPreset = "Orbit",
                     StageVisible = false,
                     ViewMode = "Lit",
                     WireOverlay = false,
@@ -547,7 +547,7 @@ namespace AssetsManager.Utils
 
     public class VfxStudioSettings
     {
-        public string CameraPreset { get; set; } = "Game";
+        public string CameraPreset { get; set; } = "Orbit";
         public bool StageVisible { get; set; }
         public string ViewMode { get; set; } = "Lit";
         public bool WireOverlay { get; set; }

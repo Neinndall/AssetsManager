@@ -79,15 +79,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         // Character/Skin viewport state. The tab owns only lightweight controls; the single Studio
         // viewport still owns every decoded model, MAP scene and GPU resource.
-        internal bool CharacterEffectsEnabled { get; set; }
-        internal bool CharacterArmatureVisible { get; set; }
-        internal bool CharacterJointNamesVisible { get; set; }
-        internal bool CharacterAutoRotate { get; set; }
-        internal double CharacterAutoRotateDegrees { get; set; }
-        internal bool CharacterTransformGizmoEnabled { get; set; } = true;
         internal bool CharacterBackdropEnabled { get; set; }
-        internal bool BackdropParticlesVisible { get; set; }
-        internal bool BackdropStructuresVisible { get; set; } = true;
         internal string CharacterBackdropKey { get; set; }
         internal int? CharacterBackdropVisibilityFlags { get; set; }
         internal double CharacterPositionX { get; set; }

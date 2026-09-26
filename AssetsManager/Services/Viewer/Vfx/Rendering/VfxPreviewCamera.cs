@@ -24,12 +24,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal const float FarPlane = 20000f;
 
         private static readonly Vector3 OpeningPosition = new(
-            VfxRigMotion.ChampionHeight * 1.4f,
-            VfxRigMotion.ChampionHeight * 1.1f,
-            VfxRigMotion.ChampionHeight * 2f);
+            0f,
+            VfxRigMotion.ChampionHeight * 0.55f,
+            VfxRigMotion.ChampionHeight * 1.5f);
         private static readonly Vector3 OpeningTarget = new(
             0f,
-            VfxRigMotion.ChampionHeight * 0.35f,
+            VfxRigMotion.ChampionHeight * 0.40f,
             0f);
 
         internal static VfxCameraStand Stand(VfxPreviewCameraPreset preset)
