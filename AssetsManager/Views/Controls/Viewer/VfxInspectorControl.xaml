@@ -859,15 +859,6 @@
                                             </StackPanel>
                                         </Button>
 
-                                        <!-- Game Shaders Toggle -->
-                                        <ToggleButton x:Name="PreviewShadersToggle"
-                                                      Style="{StaticResource TransparentIconToggleButton}"
-                                                      Width="30" Height="30" Margin="2,0,0,0"
-                                                      ToolTip="Use game shaders for Lit meshes"
-                                                      IsChecked="{Binding PreviewShaders, Mode=TwoWay}">
-                                            <materialIcons:MaterialIcon Kind="PaletteOutline" Width="14" Height="14"/>
-                                        </ToggleButton>
-
                                         <!-- Camera Preset dropdown -->
                                         <Button x:Name="PreviewCameraButton"
                                                 Click="PreviewCamera_Click"
@@ -1107,7 +1098,7 @@
                                 <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"
                                            Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-                                <!-- Group 3: Champion Mesh & Effects (Visible when champion mesh is present) -->
+                                <!-- Group 3: Champion Mesh, Effects & Shaders (Visible when champion mesh is present) -->
                                 <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0"
                                         Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -1122,6 +1113,13 @@
                                                       Width="30" Height="30" Margin="2,0,0,0"
                                                       ToolTip="Toggle Character Effects / Skin VFX">
                                             <materialIcons:MaterialIcon Kind="Sparkles" Width="14" Height="14"/>
+                                        </ToggleButton>
+                                        <ToggleButton x:Name="PreviewShadersToggle"
+                                                      Style="{StaticResource TransparentIconToggleButton}"
+                                                      Width="30" Height="30" Margin="2,0,0,0"
+                                                      ToolTip="Use game shaders for Lit meshes"
+                                                      IsChecked="{Binding PreviewShaders, Mode=TwoWay}">
+                                            <materialIcons:MaterialIcon Kind="PaletteOutline" Width="14" Height="14"/>
                                         </ToggleButton>
                                     </StackPanel>
                                 </Border>
