@@ -2487,9 +2487,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             UpdateColorSwatch(MapDepthFogColorSwatch, MapDepthFogColorTextBox.Text);
             UpdateColorSwatch(MapHeightFogColorSwatch, MapHeightFogColorTextBox.Text);
-            if (!TryParseMapPreviewColor(MapDepthFogColorTextBox.Text, out Vector4 depthColor) ||
-                !TryParseMapPreviewColor(MapHeightFogColorTextBox.Text, out Vector4 heightColor))
-                return;
+            if (!TryParseMapPreviewColor(MapDepthFogColorTextBox.Text, out Vector4 depthColor))
+                depthColor = Vector4.UnitW;
+            if (!TryParseMapPreviewColor(MapHeightFogColorTextBox.Text, out Vector4 heightColor))
+                heightColor = Vector4.UnitW;
 
             _hasMapPostEffectsOverride = true;
             _mapPostEffectsOverride = new MapPostEffectsData(
@@ -2520,10 +2521,12 @@ namespace AssetsManager.Views.Controls.Viewer
             UpdateColorSwatch(MapSunColorSwatch, MapSunColorTextBox.Text);
             UpdateColorSwatch(MapSunSkyColorSwatch, MapSunSkyColorTextBox.Text);
             UpdateColorSwatch(MapSunGroundColorSwatch, MapSunGroundColorTextBox.Text);
-            if (!TryParseMapPreviewColor(MapSunColorTextBox.Text, out Vector4 color) ||
-                !TryParseMapPreviewColor(MapSunSkyColorTextBox.Text, out Vector4 sky) ||
-                !TryParseMapPreviewColor(MapSunGroundColorTextBox.Text, out Vector4 ground))
-                return;
+            if (!TryParseMapPreviewColor(MapSunColorTextBox.Text, out Vector4 color))
+                color = Vector4.One;
+            if (!TryParseMapPreviewColor(MapSunSkyColorTextBox.Text, out Vector4 sky))
+                sky = Vector4.One;
+            if (!TryParseMapPreviewColor(MapSunGroundColorTextBox.Text, out Vector4 ground))
+                ground = new Vector4(0.1f, 0.1f, 0.1f, 1f);
 
             _mapSunPreviewOverride = new MapSunPreviewOverride(
                 MapPreviewSemantics.SunDirection(
@@ -2615,8 +2618,10 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 string candidate = text.Trim();
-                if (!candidate.StartsWith("#") && (candidate.Length == 6 || candidate.Length == 8))
+                if (!candidate.StartsWith("#") && (candidate.Length == 3 || candidate.Length == 6 || candidate.Length == 8))
                     candidate = "#" + candidate;
+                if (candidate.StartsWith("#") && candidate.Length == 4)
+                    candidate = $"#{candidate[1]}{candidate[1]}{candidate[2]}{candidate[2]}{candidate[3]}{candidate[3]}";
                 object converted = ColorConverter.ConvertFromString(candidate);
                 if (converted is not System.Windows.Media.Color color) return false;
                 value = new Vector4(

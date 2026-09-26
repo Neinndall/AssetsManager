@@ -81,6 +81,7 @@ namespace AssetsManager.Services.Viewer.Semantics
             MapSunData own = authored ?? DefaultSun;
             MapSunPreviewOverride custom = previewOverride.Value;
             float total = MathF.Max(own.Intensity, 0f) + MathF.Max(own.SkyScale, 0f);
+            if (total <= 0f) total = 2f;
             return own with
             {
                 Direction = NormalizeOrDefault(custom.Direction),
