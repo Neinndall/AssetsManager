@@ -2485,6 +2485,8 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_isUpdatingMapPreviewControls || _mapSceneRuntime == null || MapDepthFogColorTextBox == null)
                 return;
+            UpdateColorSwatch(MapDepthFogColorSwatch, MapDepthFogColorTextBox.Text);
+            UpdateColorSwatch(MapHeightFogColorSwatch, MapHeightFogColorTextBox.Text);
             if (!TryParseMapPreviewColor(MapDepthFogColorTextBox.Text, out Vector4 depthColor) ||
                 !TryParseMapPreviewColor(MapHeightFogColorTextBox.Text, out Vector4 heightColor))
                 return;
@@ -2515,6 +2517,9 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_isUpdatingMapPreviewControls || _mapSceneRuntime == null || MapSunColorTextBox == null)
                 return;
+            UpdateColorSwatch(MapSunColorSwatch, MapSunColorTextBox.Text);
+            UpdateColorSwatch(MapSunSkyColorSwatch, MapSunSkyColorTextBox.Text);
+            UpdateColorSwatch(MapSunGroundColorSwatch, MapSunGroundColorTextBox.Text);
             if (!TryParseMapPreviewColor(MapSunColorTextBox.Text, out Vector4 color) ||
                 !TryParseMapPreviewColor(MapSunSkyColorTextBox.Text, out Vector4 sky) ||
                 !TryParseMapPreviewColor(MapSunGroundColorTextBox.Text, out Vector4 ground))
@@ -2550,17 +2555,22 @@ namespace AssetsManager.Views.Controls.Viewer
                 MapSunColorTextBox.Text = FormatMapPreviewColor(sun.Color);
                 MapSunSkyColorTextBox.Text = FormatMapPreviewColor(sun.SkyColor);
                 MapSunGroundColorTextBox.Text = FormatMapPreviewColor(sun.GroundColor);
+                UpdateColorSwatch(MapSunColorSwatch, MapSunColorTextBox.Text);
+                UpdateColorSwatch(MapSunSkyColorSwatch, MapSunSkyColorTextBox.Text);
+                UpdateColorSwatch(MapSunGroundColorSwatch, MapSunGroundColorTextBox.Text);
 
                 MapPostEffectsData post = _hasMapPostEffectsOverride
                     ? _mapPostEffectsOverride ?? MapPreviewSemantics.NoPostEffects
                     : MapPreviewSemantics.OwnPostEffects(_mapSceneRuntime.Scene.PostEffects);
                 MapDepthFogEnabledCheck.IsChecked = post.DepthFog.Enabled;
                 MapDepthFogColorTextBox.Text = FormatMapPreviewColor(post.DepthFog.Color);
+                UpdateColorSwatch(MapDepthFogColorSwatch, MapDepthFogColorTextBox.Text);
                 MapDepthFogStartSlider.Value = post.DepthFog.Start;
                 MapDepthFogEndSlider.Value = post.DepthFog.End;
                 MapDepthFogMaxSlider.Value = post.DepthFog.MaxIntensity;
                 MapHeightFogEnabledCheck.IsChecked = post.HeightFog.Enabled;
                 MapHeightFogColorTextBox.Text = FormatMapPreviewColor(post.HeightFog.Color);
+                UpdateColorSwatch(MapHeightFogColorSwatch, MapHeightFogColorTextBox.Text);
                 MapHeightFogStartSlider.Value = post.HeightFog.Start;
                 MapHeightFogEndSlider.Value = post.HeightFog.End;
                 MapHeightFogMaxSlider.Value = post.HeightFog.MaxIntensity;
@@ -2586,13 +2596,28 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private static void UpdateColorSwatch(System.Windows.Controls.Border swatch, string hex)
+        {
+            if (swatch == null) return;
+            if (TryParseMapPreviewColor(hex, out Vector4 v))
+            {
+                swatch.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(
+                    (byte)Math.Round(Math.Clamp(v.X, 0f, 1f) * 255f),
+                    (byte)Math.Round(Math.Clamp(v.Y, 0f, 1f) * 255f),
+                    (byte)Math.Round(Math.Clamp(v.Z, 0f, 1f) * 255f)));
+            }
+        }
+
         private static bool TryParseMapPreviewColor(string text, out Vector4 value)
         {
             value = Vector4.One;
             if (string.IsNullOrWhiteSpace(text)) return false;
             try
             {
-                object converted = ColorConverter.ConvertFromString(text.Trim());
+                string candidate = text.Trim();
+                if (!candidate.StartsWith("#") && (candidate.Length == 6 || candidate.Length == 8))
+                    candidate = "#" + candidate;
+                object converted = ColorConverter.ConvertFromString(candidate);
                 if (converted is not System.Windows.Media.Color color) return false;
                 value = new Vector4(
                     color.R / 255f,
@@ -3345,6 +3370,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     ? $"Loaded {MapSourceDisplayName(source)} behind the active Character. Loading backdrop resources..."
                     : $"Loaded {MapSourceDisplayName(source)} backdrop. Loading scene resources...";
                 OpenTkControl?.InvalidateVisual();
+                SyncMapPreviewControls();
 
                 // Every secondary MAP resource is independent. One malformed texture, optional sky,
                 // Character skin or VFX asset must never cancel the geometry/material scene nor the

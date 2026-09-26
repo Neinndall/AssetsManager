@@ -2259,7 +2259,7 @@
 
                                     <!-- INLINE SUN PANEL -->
                                     <StackPanel x:Name="MapSunPanel" Visibility="Visible">
-                                        <Grid Margin="0,0,0,8">
+                                        <Grid Margin="0,0,0,10">
                                             <TextBlock Text="SUN OVERRIDE" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                             <Button Content="Reset" HorizontalAlignment="Right" Padding="8,2" Style="{StaticResource SmallTextButtonStyle}" Foreground="{StaticResource AccentBrush}" Click="MapSunReset_Click"/>
                                         </Grid>
@@ -2268,12 +2268,12 @@
                                             <TextBlock Text="{Binding Value, ElementName=MapSunAzimuthSlider, StringFormat={}{0:F0}°}" FontSize="9" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
                                         </Grid>
                                         <Slider x:Name="MapSunAzimuthSlider" Minimum="-180" Maximum="180" TickFrequency="1" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
-                                        <Grid Margin="0,4,0,1">
+                                        <Grid Margin="0,6,0,1">
                                             <TextBlock Text="Elevation" FontSize="9" Foreground="{StaticResource TextMuted}"/>
                                             <TextBlock Text="{Binding Value, ElementName=MapSunElevationSlider, StringFormat={}{0:F0}°}" FontSize="9" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
                                         </Grid>
                                         <Slider x:Name="MapSunElevationSlider" Minimum="0" Maximum="89" TickFrequency="1" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
-                                        <Grid Margin="0,6,0,0">
+                                        <Grid Margin="0,8,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="10"/>
@@ -2294,93 +2294,221 @@
                                                 <Slider x:Name="MapSunAmbientSlider" Minimum="0" Maximum="2" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSunControl_ValueChanged"/>
                                             </StackPanel>
                                         </Grid>
-                                        <Grid Margin="0,7,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                             <TextBlock Text="Sun color" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="MapSunColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/>
+                                            <Border x:Name="MapSunColorSwatch" Grid.Column="1" Width="18" Height="18" CornerRadius="4" BorderThickness="1" BorderBrush="#33FFFFFF" Background="#FFFFFF" Margin="0,0,6,0" VerticalAlignment="Center" ToolTip="Color preview"/>
+                                            <TextBox x:Name="MapSunColorTextBox" Grid.Column="2" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/>
                                         </Grid>
-                                        <Grid Margin="0,4,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid Margin="0,6,0,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                             <TextBlock Text="Sky color" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="MapSunSkyColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/>
+                                            <Border x:Name="MapSunSkyColorSwatch" Grid.Column="1" Width="18" Height="18" CornerRadius="4" BorderThickness="1" BorderBrush="#33FFFFFF" Background="#FFFFFF" Margin="0,0,6,0" VerticalAlignment="Center" ToolTip="Color preview"/>
+                                            <TextBox x:Name="MapSunSkyColorTextBox" Grid.Column="2" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/>
                                         </Grid>
-                                        <Grid Margin="0,4,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Grid Margin="0,6,0,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                             <TextBlock Text="Ground" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="MapSunGroundColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/>
+                                            <Border x:Name="MapSunGroundColorSwatch" Grid.Column="1" Width="18" Height="18" CornerRadius="4" BorderThickness="1" BorderBrush="#33FFFFFF" Background="#FFFFFF" Margin="0,0,6,0" VerticalAlignment="Center" ToolTip="Color preview"/>
+                                            <TextBox x:Name="MapSunGroundColorTextBox" Grid.Column="2" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapSunColor_TextChanged"/>
                                         </Grid>
                                     </StackPanel>
 
                                     <!-- INLINE POST-PROCESS PANEL -->
                                     <StackPanel x:Name="MapPostPanel" Visibility="Collapsed">
-                                        <Grid Margin="0,0,0,8">
+                                        <Grid Margin="0,0,0,10">
                                             <TextBlock Text="POST EFFECTS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                             <Button Content="Reset" HorizontalAlignment="Right" Padding="8,2" Style="{StaticResource SmallTextButtonStyle}" Foreground="{StaticResource AccentBrush}" Click="MapPostReset_Click"/>
                                         </Grid>
-                                        <TextBlock Text="AMBIENT OCCLUSION" FontSize="9" FontWeight="Bold" Foreground="#A78BFA"/>
-                                        <CheckBox x:Name="MapSsaoEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,4" Click="MapSsaoControl_Changed"/>
-                                        <Grid Margin="0,2,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+
+                                        <!-- AMBIENT OCCLUSION (SSAO) -->
+                                        <Border Margin="0,0,0,10" Padding="10,9" CornerRadius="8" Background="#0DFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1">
                                             <StackPanel>
-                                                <TextBlock Text="Quality" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
-                                                <ComboBox x:Name="MapSsaoQualityCombo" Style="{StaticResource ModernComboBox}" Height="24" SelectionChanged="MapSsaoControl_Changed">
-                                                    <ComboBoxItem Content="4 samples"/>
-                                                    <ComboBoxItem Content="8 samples"/>
-                                                </ComboBox>
+                                                <Grid>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="BoxShadow" Width="13" Height="13" Foreground="#A78BFA" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="AMBIENT OCCLUSION" FontSize="9.5" FontWeight="Bold" Foreground="#A78BFA" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                    <CheckBox x:Name="MapSsaoEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" HorizontalAlignment="Right" Click="MapSsaoControl_Changed"/>
+                                                </Grid>
+                                                <StackPanel Visibility="{Binding IsChecked, ElementName=MapSsaoEnabledCheck, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,6,0,0">
+                                                    <Border Height="1" Background="#14FFFFFF" Margin="0,0,0,8"/>
+                                                    <Grid Margin="0,0,0,6">
+                                                        <TextBlock Text="Quality" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                        <ComboBox x:Name="MapSsaoQualityCombo" HorizontalAlignment="Right" Width="110" Style="{StaticResource ModernComboBox}" Height="24" SelectionChanged="MapSsaoControl_Changed">
+                                                            <ComboBoxItem Content="4 samples"/>
+                                                            <ComboBoxItem Content="8 samples"/>
+                                                        </ComboBox>
+                                                    </Grid>
+                                                    <Grid Margin="0,2,0,1">
+                                                        <TextBlock Text="Radius" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                        <TextBlock Text="{Binding Value, ElementName=MapSsaoRadiusSlider, StringFormat={}{0:F0}}" FontSize="9" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                    </Grid>
+                                                    <Slider x:Name="MapSsaoRadiusSlider" Minimum="0" Maximum="200" TickFrequency="1" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                                    <Grid Margin="0,5,0,0">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <Grid Margin="0,0,0,1">
+                                                                <TextBlock Text="Power" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                                                                <TextBlock Text="{Binding Value, ElementName=MapSsaoPowerSlider, StringFormat={}{0:F1}}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <Slider x:Name="MapSsaoPowerSlider" Minimum="0" Maximum="30" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <Grid Margin="0,0,0,1">
+                                                                <TextBlock Text="Intensity" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                                                                <TextBlock Text="{Binding Value, ElementName=MapSsaoIntensitySlider, StringFormat={}{0:F2}}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <Slider x:Name="MapSsaoIntensitySlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <Grid Margin="0,5,0,0">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <Grid Margin="0,0,0,1">
+                                                                <TextBlock Text="Bias" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                                                                <TextBlock Text="{Binding Value, ElementName=MapSsaoBiasSlider, StringFormat={}{0:F1}}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <Slider x:Name="MapSsaoBiasSlider" Minimum="0" Maximum="20" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <Grid Margin="0,0,0,1">
+                                                                <TextBlock Text="Buffer scale" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                                                                <TextBlock Text="{Binding Value, ElementName=MapSsaoBufferScaleSlider, StringFormat={}{0:P0}}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <Slider x:Name="MapSsaoBufferScaleSlider" Minimum="0.25" Maximum="1" TickFrequency="0.05" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <CheckBox x:Name="MapSsaoEdgeAwareCheck" Content="Edge-aware blur" Style="{StaticResource ModernCheckBox}" Margin="0,7,0,2" Click="MapSsaoControl_Changed"/>
+                                                </StackPanel>
                                             </StackPanel>
-                                            <StackPanel Grid.Column="2">
-                                                <TextBlock Text="Radius" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
-                                                <Slider x:Name="MapSsaoRadiusSlider" Minimum="0" Maximum="200" TickFrequency="1" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/>
+                                        </Border>
+
+                                        <!-- DEPTH FOG -->
+                                        <Border Margin="0,0,0,10" Padding="10,9" CornerRadius="8" Background="#0DFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="WeatherFog" Width="13" Height="13" Foreground="#38BDF8" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="DEPTH FOG" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                    <CheckBox x:Name="MapDepthFogEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" HorizontalAlignment="Right" Click="MapPostControl_Changed"/>
+                                                </Grid>
+                                                <StackPanel Visibility="{Binding IsChecked, ElementName=MapDepthFogEnabledCheck, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,6,0,0">
+                                                    <Border Height="1" Background="#14FFFFFF" Margin="0,0,0,8"/>
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="75"/></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="Fog color" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                        <Border x:Name="MapDepthFogColorSwatch" Grid.Column="1" Width="18" Height="18" CornerRadius="4" BorderThickness="1" BorderBrush="#33FFFFFF" Background="#000000" Margin="0,0,6,0" VerticalAlignment="Center" ToolTip="Color preview"/>
+                                                        <TextBox x:Name="MapDepthFogColorTextBox" Grid.Column="2" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapPostControl_Changed"/>
+                                                    </Grid>
+                                                    <Grid Margin="0,4,0,0">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <Grid Margin="0,0,0,1">
+                                                                <TextBlock Text="Start" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                                                                <TextBlock Text="{Binding Value, ElementName=MapDepthFogStartSlider, StringFormat={}{0:F0}}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <Slider x:Name="MapDepthFogStartSlider" Minimum="0" Maximum="20000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <Grid Margin="0,0,0,1">
+                                                                <TextBlock Text="End" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                                                                <TextBlock Text="{Binding Value, ElementName=MapDepthFogEndSlider, StringFormat={}{0:F0}}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <Slider x:Name="MapDepthFogEndSlider" Minimum="0" Maximum="20000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <Grid Margin="0,5,0,1">
+                                                        <TextBlock Text="Max intensity" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                        <TextBlock Text="{Binding Value, ElementName=MapDepthFogMaxSlider, StringFormat={}{0:F2}}" FontSize="9" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                    </Grid>
+                                                    <Slider x:Name="MapDepthFogMaxSlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/>
+                                                </StackPanel>
                                             </StackPanel>
-                                        </Grid>
-                                        <Grid Margin="0,4,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                            <StackPanel><TextBlock Text="Power" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoPowerSlider" Minimum="0" Maximum="30" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel>
-                                            <StackPanel Grid.Column="2"><TextBlock Text="Intensity" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoIntensitySlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel>
-                                        </Grid>
-                                        <Grid Margin="0,4,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                            <StackPanel><TextBlock Text="Bias" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoBiasSlider" Minimum="0" Maximum="20" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel>
-                                            <StackPanel Grid.Column="2"><TextBlock Text="Buffer scale" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapSsaoBufferScaleSlider" Minimum="0.25" Maximum="1" TickFrequency="0.05" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapSsaoControl_Changed"/></StackPanel>
-                                        </Grid>
-                                        <CheckBox x:Name="MapSsaoEdgeAwareCheck" Content="Edge-aware blur" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,6" Click="MapSsaoControl_Changed"/>
-                                        <Separator Margin="0,4,0,6"/>
-                                        <TextBlock Text="DEPTH FOG" FontSize="9" FontWeight="Bold" Foreground="#38BDF8"/>
-                                        <CheckBox x:Name="MapDepthFogEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,4" Click="MapPostControl_Changed"/>
-                                        <Grid Margin="0,2,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                            <TextBlock Text="Color" FontSize="8.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="MapDepthFogColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9" FontFamily="Consolas" TextChanged="MapPostControl_Changed"/>
-                                        </Grid>
-                                        <Grid Margin="0,4,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                            <StackPanel><TextBlock Text="Start" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogStartSlider" Minimum="0" Maximum="20000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
-                                            <StackPanel Grid.Column="2"><TextBlock Text="End" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogEndSlider" Minimum="0" Maximum="20000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
-                                            <StackPanel Grid.Column="4"><TextBlock Text="Max" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDepthFogMaxSlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
-                                        </Grid>
-                                        <Separator Margin="0,6,0,6"/>
-                                        <TextBlock Text="HEIGHT FOG" FontSize="9" FontWeight="Bold" Foreground="#38BDF8"/>
-                                        <CheckBox x:Name="MapHeightFogEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,4" Click="MapPostControl_Changed"/>
-                                        <Grid Margin="0,2,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="70"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                            <TextBlock Text="Color" FontSize="8.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="MapHeightFogColorTextBox" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9" FontFamily="Consolas" TextChanged="MapPostControl_Changed"/>
-                                        </Grid>
-                                        <Grid Margin="0,4,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                            <StackPanel><TextBlock Text="Start" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogStartSlider" Minimum="-1000" Maximum="1500" TickFrequency="10" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
-                                            <StackPanel Grid.Column="2"><TextBlock Text="End" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogEndSlider" Minimum="-1000" Maximum="1500" TickFrequency="10" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
-                                            <StackPanel Grid.Column="4"><TextBlock Text="Max" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapHeightFogMaxSlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
-                                        </Grid>
-                                        <Separator Margin="0,6,0,6"/>
-                                        <TextBlock Text="DEPTH OF FIELD" FontSize="9" FontWeight="Bold" Foreground="#F59E0B"/>
-                                        <CheckBox x:Name="MapDofEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,4" Click="MapPostControl_Changed"/>
-                                        <Grid Margin="0,4,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                            <StackPanel><TextBlock Text="Focal" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofFocalSlider" Minimum="0" Maximum="10000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
-                                            <StackPanel Grid.Column="2"><TextBlock Text="Focus width" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofWidthSlider" Minimum="0" Maximum="5000" TickFrequency="25" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
-                                            <StackPanel Grid.Column="4"><TextBlock Text="CoC" FontSize="8.5" Foreground="{StaticResource TextMuted}"/><Slider x:Name="MapDofCocSlider" Minimum="0" Maximum="30" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/></StackPanel>
-                                        </Grid>
+                                        </Border>
+
+                                        <!-- HEIGHT FOG -->
+                                        <Border Margin="0,0,0,10" Padding="10,9" CornerRadius="8" Background="#0DFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="CloudOutline" Width="13" Height="13" Foreground="#38BDF8" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="HEIGHT FOG" FontSize="9.5" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                    <CheckBox x:Name="MapHeightFogEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" HorizontalAlignment="Right" Click="MapPostControl_Changed"/>
+                                                </Grid>
+                                                <StackPanel Visibility="{Binding IsChecked, ElementName=MapHeightFogEnabledCheck, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,6,0,0">
+                                                    <Border Height="1" Background="#14FFFFFF" Margin="0,0,0,8"/>
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="75"/></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="Fog color" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                        <Border x:Name="MapHeightFogColorSwatch" Grid.Column="1" Width="18" Height="18" CornerRadius="4" BorderThickness="1" BorderBrush="#33FFFFFF" Background="#000000" Margin="0,0,6,0" VerticalAlignment="Center" ToolTip="Color preview"/>
+                                                        <TextBox x:Name="MapHeightFogColorTextBox" Grid.Column="2" Style="{StaticResource ModernTextBox}" Height="24" Padding="5,0" FontSize="9.5" FontFamily="Consolas" TextChanged="MapPostControl_Changed"/>
+                                                    </Grid>
+                                                    <Grid Margin="0,4,0,0">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <Grid Margin="0,0,0,1">
+                                                                <TextBlock Text="Start" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                                                                <TextBlock Text="{Binding Value, ElementName=MapHeightFogStartSlider, StringFormat={}{0:F0}}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <Slider x:Name="MapHeightFogStartSlider" Minimum="-1000" Maximum="1500" TickFrequency="10" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <Grid Margin="0,0,0,1">
+                                                                <TextBlock Text="End" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                                                                <TextBlock Text="{Binding Value, ElementName=MapHeightFogEndSlider, StringFormat={}{0:F0}}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <Slider x:Name="MapHeightFogEndSlider" Minimum="-1000" Maximum="1500" TickFrequency="10" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <Grid Margin="0,5,0,1">
+                                                        <TextBlock Text="Max intensity" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                        <TextBlock Text="{Binding Value, ElementName=MapHeightFogMaxSlider, StringFormat={}{0:F2}}" FontSize="9" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                    </Grid>
+                                                    <Slider x:Name="MapHeightFogMaxSlider" Minimum="0" Maximum="1" TickFrequency="0.01" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- DEPTH OF FIELD -->
+                                        <Border Margin="0,0,0,4" Padding="10,9" CornerRadius="8" Background="#0DFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="CameraIris" Width="13" Height="13" Foreground="#F59E0B" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="DEPTH OF FIELD" FontSize="9.5" FontWeight="Bold" Foreground="#F59E0B" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                    <CheckBox x:Name="MapDofEnabledCheck" Content="Enabled" Style="{StaticResource ModernCheckBox}" HorizontalAlignment="Right" Click="MapPostControl_Changed"/>
+                                                </Grid>
+                                                <StackPanel Visibility="{Binding IsChecked, ElementName=MapDofEnabledCheck, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,6,0,0">
+                                                    <Border Height="1" Background="#14FFFFFF" Margin="0,0,0,8"/>
+                                                    <Grid Margin="0,2,0,0">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <Grid Margin="0,0,0,1">
+                                                                <TextBlock Text="Focal dist" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                                                                <TextBlock Text="{Binding Value, ElementName=MapDofFocalSlider, StringFormat={}{0:F0}}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <Slider x:Name="MapDofFocalSlider" Minimum="0" Maximum="10000" TickFrequency="50" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <Grid Margin="0,0,0,1">
+                                                                <TextBlock Text="Focus width" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                                                                <TextBlock Text="{Binding Value, ElementName=MapDofWidthSlider, StringFormat={}{0:F0}}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <Slider x:Name="MapDofWidthSlider" Minimum="0" Maximum="5000" TickFrequency="25" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <Grid Margin="0,5,0,1">
+                                                        <TextBlock Text="Blur (CoC)" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                                                        <TextBlock Text="{Binding Value, ElementName=MapDofCocSlider, StringFormat={}{0:F1}}" FontSize="9" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right"/>
+                                                    </Grid>
+                                                    <Slider x:Name="MapDofCocSlider" Minimum="0" Maximum="30" TickFrequency="0.5" Style="{StaticResource HUDSliderStyle}" ValueChanged="MapPostControl_Changed"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
