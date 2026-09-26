@@ -781,7 +781,7 @@
                         <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,12" Margin="0,4,0,0"
                                 Visibility="{Binding IsChecked, ElementName=SectionEnvironment, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid>
-                            <UniformGrid Columns="3" Height="68">
+                            <UniformGrid Columns="4" Height="68">
                                 <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.IsTransparentBg, Mode=TwoWay}" Margin="0,0,4,0"
                                               Click="SharedViewerEnvironment_Click">
                                     <StackPanel>
@@ -796,11 +796,18 @@
                                         <TextBlock Text="Ground" FontSize="10.5" FontWeight="SemiBold"/>
                                     </StackPanel>
                                 </ToggleButton>
-                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.IsGridVisible, Mode=TwoWay}" Margin="0"
+                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.IsGridVisible, Mode=TwoWay}" Margin="0,0,4,0"
                                               Click="SharedViewerEnvironment_Click">
                                     <StackPanel>
                                         <materialIcons:MaterialIcon Kind="Grid" Width="22" Height="22" Margin="0,0,0,3"/>
                                         <TextBlock Text="Grid" FontSize="10.5" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{StaticResource ModernTileToggleButton}" IsChecked="{Binding ViewportViewModel.IsSkyVisible, Mode=TwoWay}" Margin="0"
+                                              Click="SharedViewerEnvironment_Click">
+                                    <StackPanel>
+                                        <materialIcons:MaterialIcon Kind="CloudOutline" Width="22" Height="22" Margin="0,0,0,3"/>
+                                        <TextBlock Text="Skybox" FontSize="10.5" FontWeight="SemiBold"/>
                                     </StackPanel>
                                 </ToggleButton>
                             </UniformGrid>

@@ -1744,7 +1744,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
                 if (_previewSurfaceRenderer == null)
                 {
-                    BitmapSource groundTexture = SceneElements.LoadSceneTexture(SceneElements.GroundTexturePath, LogService);
+                    BitmapSource groundTexture = SceneElements.LoadStageGroundTexture(AppSettings, LogService);
                     _previewSurfaceRenderer = new VfxPreviewSurfaceRenderer();
                     _previewSurfaceRenderer.Initialize(_gl, groundTexture);
                 }

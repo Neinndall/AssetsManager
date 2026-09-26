@@ -17,6 +17,7 @@ using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
@@ -34,6 +35,9 @@ namespace AssetsManager.Views.Controls.Viewer
         private Silk.NET.OpenGL.GL _gl;
         private GlMeshRenderer _meshRenderer;
         private GridRenderer _gridRenderer;
+        private SkyRenderer _skyRenderer;
+        private VfxCubeMapData _genericSkyCube;
+        private bool _skyCubeDirty;
         private FxaaPostEffectsRenderer _fxaaRenderer;
 
         private readonly ViewerViewportModel _viewModel;
@@ -151,6 +155,33 @@ namespace AssetsManager.Views.Controls.Viewer
             var viewProj = view * proj;
             _modelInteractionController?.Update(viewProj);
 
+            bool hasClassicScene = _loadedModels.Count > 0 || _auxiliaryModels.Count > 0;
+            if (!hasClassicScene)
+            {
+                return;
+            }
+
+            // Render sky before ground, grid, and scene models
+            if (_skyRenderer != null)
+            {
+                if (_genericSkyCube == null)
+                {
+                    _genericSkyCube = SkyCubeMapFactory.LoadGeneric(LogService);
+                    _skyCubeDirty = true;
+                }
+
+                if (_skyCubeDirty)
+                {
+                    _skyRenderer.SetCube(_genericSkyCube);
+                    _skyCubeDirty = false;
+                }
+
+                if (_viewModel.IsSkyVisible && !_viewModel.IsTransparentBg)
+                {
+                    _skyRenderer.Render(view, proj);
+                }
+            }
+
             // 3. Setup lighting from view model settings. The default values reproduce the
             // character preview sun/ambient split while still allowing explicit studio overrides.
             var lighting = GlMeshRenderer.StudioCharacterLighting(
@@ -227,6 +258,14 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _gridRenderer = new GridRenderer();
                 _gridRenderer.Initialize(_gl, GlShaderCompiler.UsesEmbeddedProfile(_gl), 1000f);
+            }
+
+            if (hasClassicScene && _skyRenderer == null)
+            {
+                _skyRenderer = new SkyRenderer();
+                _skyRenderer.Initialize(_gl);
+                _genericSkyCube ??= SkyCubeMapFactory.LoadGeneric(LogService);
+                _skyCubeDirty = true;
             }
 
             if (hasClassicScene && _fxaaRenderer == null)
@@ -323,7 +362,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
                     break;
                 case nameof(ViewerViewportModel.IsGridVisible):
-                    break;
+                case nameof(ViewerViewportModel.IsSkyVisible):
                 case nameof(ViewerViewportModel.IsFxaaEnabled):
                     OpenTkControl.InvalidateVisual();
                     break;
@@ -458,6 +497,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_isCleanedUp) return;
 
+            SceneElements.ClearGroundCache();
             if (_groundVisual != null && Viewport.Children.Contains(_groundVisual))
                 Viewport.Children.Remove(_groundVisual);
 
@@ -575,6 +615,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_groundVisual == null)
             {
                 _groundVisual = SceneElements.CreateGroundPlane(
+                    AppSettings,
                     LogService,
                     AppSettings?.CustomGroundLogoPath,
                     AppSettings?.GroundLogoScale ?? 1.0,
@@ -594,6 +635,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _viewModel.IsGroundVisible = studioParameters.GroundVisible;
             _viewModel.IsGridVisible = studioParameters.GridVisible;
+            _viewModel.IsSkyVisible = studioParameters.SkyVisible;
             _viewModel.IsTransparentBg = studioParameters.TransparentBackground;
             _viewModel.IsFxaaEnabled = studioParameters.EnableFxaa;
         }
@@ -652,6 +694,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 var gridRenderer = _gridRenderer;
                 _gridRenderer = null;
                 RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
+
+                var skyRenderer = _skyRenderer;
+                _skyRenderer = null;
+                RunReleaseStep(nameof(SkyRenderer), () => skyRenderer?.Dispose(), gpuBound: true);
+                _genericSkyCube = null;
+                _skyCubeDirty = false;
 
                 var fxaaRenderer = _fxaaRenderer;
                 _fxaaRenderer = null;

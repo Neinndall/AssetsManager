@@ -69,7 +69,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                             return null;
                         }
 
-                        faces.Add(ToRgbaBottomUp(bitmap));
+                        faces.Add(ToRgba(bitmap));
                     }
 
                     _cachedGenericSky = new VfxCubeMapData(width, height, faces);
@@ -94,7 +94,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 return TextureUtils.LoadTexture(resource.Stream, ".dds", MaxFaceSize);
         }
 
-        private static byte[] ToRgbaBottomUp(BitmapSource source)
+        private static byte[] ToRgba(BitmapSource source)
         {
             BitmapSource bitmap = source.Format == PixelFormats.Bgra32
                 ? source
@@ -103,26 +103,19 @@ namespace AssetsManager.Services.Viewer.Rendering
             int width = bitmap.PixelWidth;
             int height = bitmap.PixelHeight;
             int stride = checked(width * 4);
-            byte[] bgraTopDown = new byte[checked(stride * height)];
-            bitmap.CopyPixels(bgraTopDown, stride, 0);
+            byte[] bgra = new byte[checked(stride * height)];
+            bitmap.CopyPixels(bgra, stride, 0);
 
-            byte[] rgbaBottomUp = new byte[bgraTopDown.Length];
-            for (int y = 0; y < height; y++)
+            byte[] rgba = new byte[bgra.Length];
+            for (int i = 0; i < bgra.Length; i += 4)
             {
-                int sourceRow = y * stride;
-                int targetRow = (height - 1 - y) * stride;
-                for (int x = 0; x < width; x++)
-                {
-                    int sourceOffset = sourceRow + x * 4;
-                    int targetOffset = targetRow + x * 4;
-                    rgbaBottomUp[targetOffset] = bgraTopDown[sourceOffset + 2];
-                    rgbaBottomUp[targetOffset + 1] = bgraTopDown[sourceOffset + 1];
-                    rgbaBottomUp[targetOffset + 2] = bgraTopDown[sourceOffset];
-                    rgbaBottomUp[targetOffset + 3] = bgraTopDown[sourceOffset + 3];
-                }
+                rgba[i] = bgra[i + 2];
+                rgba[i + 1] = bgra[i + 1];
+                rgba[i + 2] = bgra[i];
+                rgba[i + 3] = bgra[i + 3];
             }
 
-            return rgbaBottomUp;
+            return rgba;
         }
     }
 }

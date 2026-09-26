@@ -891,6 +891,7 @@ namespace AssetsManager.Views.Controls.Viewer
             settings.StudioParameters ??= new StudioParametersSettings();
             settings.StudioParameters.GroundVisible = viewportModel.IsGroundVisible;
             settings.StudioParameters.GridVisible = viewportModel.IsGridVisible;
+            settings.StudioParameters.SkyVisible = viewportModel.IsSkyVisible;
             settings.StudioParameters.TransparentBackground = viewportModel.IsTransparentBg;
 
             try

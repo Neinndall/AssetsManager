@@ -276,8 +276,8 @@
                 <Grid Margin="0,0,0,24">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Sky on VFX Studio load" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Show the Studio sky automatically when opening a VFX Studio preview" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Sky" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Use the Studio sky across Viewer previews, including VFX Studio" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <CheckBox Grid.Column="1" IsChecked="{Binding Settings.StudioParameters.SkyVisible, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                 </Grid>

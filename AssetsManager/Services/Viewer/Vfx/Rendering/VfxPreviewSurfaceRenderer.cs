@@ -60,7 +60,7 @@ uniform int uTextured;
 void main() {
     fragColor = uTextured != 0
         ? texture(uTexture, vUv)
-        : vec4(0.105, 0.115, 0.135, 1.0);
+        : vec4(0.137, 0.165, 0.196, 1.0);
 }";
 
         private const string StageVertexShader = @"

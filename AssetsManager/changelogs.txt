@@ -6,6 +6,8 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Viewer / Added Skybox toggle to Environment controls in the main 3D viewer matching VFX Studio.
+  - Viewer / Ground stage texture now loads dynamically from League installation WAD kitpieces matching LTK Manager.
   - Chroma Library / Added a removable reference skins source so current and archived chromas can be paired and loaded together for visual comparison.
   - VFX Studio / Animation clips now use authored AnimationGraph identities, composite playlists, and parametric clip selection without duplicating the clip browser in the timeline deck.
   - VFX Studio / Added full Animation Clip playback from each skin's authored AnimationGraphData, preserving mClipDataMap clip identity/order and spawning ParticleEventData VFX systems with authored timing, skeleton attachments, visibility, joint snap, and idle effects.

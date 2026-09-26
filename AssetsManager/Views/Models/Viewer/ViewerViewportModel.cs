@@ -26,6 +26,7 @@ namespace AssetsManager.Views.Models.Viewer
         private double _fieldOfView = 45;
         private bool _isGroundVisible = false;
         private bool _isGridVisible = true;
+        private bool _isSkyVisible = false;
         private string _sceneDisplayName = "No model loaded";
 
         public bool IsFpsVisible
@@ -75,6 +76,12 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _isGridVisible;
             set { if (_isGridVisible != value) { _isGridVisible = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsSkyVisible
+        {
+            get => _isSkyVisible;
+            set { if (_isSkyVisible != value) { _isSkyVisible = value; OnPropertyChanged(); } }
         }
 
         private bool _isFxaaEnabled = true;
@@ -152,6 +159,7 @@ namespace AssetsManager.Views.Models.Viewer
             FieldOfView = 45;
             IsGroundVisible = false;
             IsGridVisible = true;
+            IsSkyVisible = false;
             IsTransparentBg = false;
             IsFxaaEnabled = true;
         }
