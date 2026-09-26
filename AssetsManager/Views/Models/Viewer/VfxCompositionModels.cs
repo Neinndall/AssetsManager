@@ -286,6 +286,24 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<float> ParameterValues = null,
         float? ParameterValue = null)
     {
+        public const string BindPoseName = "Bind pose";
+
+        public bool IsBindPose => string.Equals(Name, BindPoseName, StringComparison.OrdinalIgnoreCase);
+
+        public static AnimationClipCatalogItem CreateBindPoseItem() =>
+            new(
+                BindPoseName,
+                BindPoseName,
+                string.Empty,
+                0f,
+                null,
+                null,
+                null,
+                Array.Empty<AnimationClipTimedCue>(),
+                0,
+                false,
+                "Skeleton rest pose (T-Pose)");
+
         public int VfxEventCount => Composition?.Events.Count(eventCue => !eventCue.Event.IsKillEvent) ?? 0;
 
         public bool HasParameterValues => ParameterValues is { Count: > 1 };

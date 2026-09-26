@@ -232,6 +232,49 @@ public class VfxClipCatalogTests
         Assert.Equal(0.5f, source.LastEvaluationTime, 5);
     }
 
+    [Fact]
+    public void BindPoseItemIsCorrectlyIdentifiedAndConfigured()
+    {
+        AnimationClipCatalogItem bindPose = AnimationClipCatalogItem.CreateBindPoseItem();
+
+        Assert.True(bindPose.IsBindPose);
+        Assert.Equal(AnimationClipCatalogItem.BindPoseName, bindPose.Name);
+        Assert.Equal(0f, bindPose.Duration);
+        Assert.Null(bindPose.AnimationAsset);
+        Assert.Null(bindPose.Clip);
+    }
+
+    [Fact]
+    public void OpeningClipPrefersIdleOverBindPose()
+    {
+        AnimationClipCatalogItem bindPose = AnimationClipCatalogItem.CreateBindPoseItem();
+        var idleClip = new AnimationClipCatalogItem(
+            "Idle1", "Idle1", "idle.anm", 2f, null, null, null,
+            Array.Empty<AnimationClipTimedCue>(), 0, false, "Idle");
+        var runClip = new AnimationClipCatalogItem(
+            "Run", "Run", "run.anm", 1f, null, null, null,
+            Array.Empty<AnimationClipTimedCue>(), 0, false, "Run");
+
+        AnimationClipCatalogItem opening = VfxClipCatalog.OpeningClip(new[] { bindPose, idleClip, runClip });
+
+        Assert.NotNull(opening);
+        Assert.Equal("Idle1", opening.Name);
+        Assert.False(opening.IsBindPose);
+    }
+
+    [Fact]
+    public void OpeningClipReturnsNullWhenOnlyBindPoseOrNonIdleClipsPresent()
+    {
+        AnimationClipCatalogItem bindPose = AnimationClipCatalogItem.CreateBindPoseItem();
+        var runClip = new AnimationClipCatalogItem(
+            "Run", "Run", "run.anm", 1f, null, null, null,
+            Array.Empty<AnimationClipTimedCue>(), 0, false, "Run");
+
+        AnimationClipCatalogItem opening = VfxClipCatalog.OpeningClip(new[] { bindPose, runClip });
+
+        Assert.Null(opening);
+    }
+
     private static AnimationClipDefinition Clip(
         uint ownerPathHash,
         uint graphPathHash,

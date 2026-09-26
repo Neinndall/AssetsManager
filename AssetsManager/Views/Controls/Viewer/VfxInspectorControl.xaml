@@ -151,10 +151,17 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type models:AnimationClipCatalogItem}">
             <StackPanel Orientation="Horizontal" Margin="1,2" ToolTip="{Binding TooltipSummary}">
-                <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="11" Height="11" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                <materialIcons:MaterialIcon x:Name="ClipIcon" Kind="MotionPlayOutline" Width="11" Height="11" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding Name}" FontSize="10.5" MaxWidth="225" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding Duration, StringFormat='{}{0:F2}s'}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="DurationText" Text="{Binding Duration, StringFormat='{}{0:F2}s'}" FontSize="8.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0" VerticalAlignment="Center"/>
             </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsBindPose}" Value="True">
+                    <Setter TargetName="ClipIcon" Property="Kind" Value="HumanHandsup"/>
+                    <Setter TargetName="ClipIcon" Property="Foreground" Value="{StaticResource TextMuted}"/>
+                    <Setter TargetName="DurationText" Property="Text" Value="T-Pose"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
         <DataTemplate DataType="{x:Type models:VfxSpellBrowserItem}">
             <StackPanel Orientation="Horizontal" Margin="1,2" ToolTip="{Binding ObjectPath}">
@@ -1284,8 +1291,14 @@
 
                                 <!-- Step Forward Button (>|) -->
                                 <Button Click="StepForward_Click" Style="{StaticResource TimelineTransportButtonStyle}"
-                                        Margin="0,0,8,0" ToolTip="Step Forward (+1 frame)">
+                                        Margin="0,0,2,0" ToolTip="Step Forward (+1 frame)">
                                     <materialIcons:MaterialIcon Kind="SkipNext" Width="18" Height="18"/>
+                                </Button>
+
+                                <!-- Stop / Reset to Bind Pose (T-Pose) Button -->
+                                <Button Click="StopToBindPose_Click" Style="{StaticResource TimelineTransportButtonStyle}"
+                                        Margin="0,0,8,0" ToolTip="Reset to Bind Pose (T-Pose)">
+                                    <materialIcons:MaterialIcon Kind="Stop" Width="18" Height="18"/>
                                 </Button>
 
                                 <!-- Time Readout -->

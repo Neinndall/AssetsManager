@@ -770,8 +770,23 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_model.SelectedAnimation != null)
                 {
                     BeginExclusivePreviewSelection();
-                    ConfigureAnimationParameterOptions(_model.SelectedAnimation);
-                    _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
+                    if (_model.SelectedAnimation.IsBindPose)
+                    {
+                        _animationClipCancellation?.Cancel();
+                        _activeAnimationClip = null;
+                        ResetChampionToBindPose();
+                        _model.StatusText = "Character in Bind pose (T-Pose).";
+                        _model.TotalDuration = 0d;
+                        _model.CurrentTime = 0d;
+                        _model.IsPlaying = false;
+                        _vfxRenderer?.SetSystem(null);
+                        OpenTkControl?.InvalidateVisual();
+                    }
+                    else
+                    {
+                        ConfigureAnimationParameterOptions(_model.SelectedAnimation);
+                        _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
+                    }
                 }
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedSpell))
@@ -5111,9 +5126,10 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_activeBundle == null || VfxLoadingService == null)
                 return;
 
+            _model.DetectedAnimations.Add(AnimationClipCatalogItem.CreateBindPoseItem());
             foreach (AnimationClipCatalogItem item in BuildAnimationCatalog(null))
                 _model.DetectedAnimations.Add(item);
-            _model.LogMessages.Add($"[ANIMATIONS] Loaded {_model.DetectedAnimations.Count} authored clips.");
+            _model.LogMessages.Add($"[ANIMATIONS] Loaded {_model.DetectedAnimations.Count - 1} authored clips.");
         }
 
         private IReadOnlyList<AnimationClipCatalogItem> BuildAnimationCatalog(float? parameter)
@@ -5139,7 +5155,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
             AnimationClipCatalogItem opening = VfxClipCatalog.OpeningClip(_model.DetectedAnimations);
             if (opening == null)
-                return false;
+            {
+                opening = _model.DetectedAnimations.FirstOrDefault(item => item.IsBindPose);
+                if (opening == null)
+                    return false;
+            }
 
             _model.IsAnimationMode = true;
             _model.SelectedAnimation = opening;
@@ -5194,6 +5214,7 @@ namespace AssetsManager.Views.Controls.Viewer
             // Rebuilding parameter choices is metadata-only; the chosen playlist is decoded
             // when the replacement selection starts playback.
             _model.DetectedAnimations.Clear();
+            _model.DetectedAnimations.Add(AnimationClipCatalogItem.CreateBindPoseItem());
             foreach (AnimationClipCatalogItem item in rebuilt)
                 _model.DetectedAnimations.Add(item);
 
@@ -5214,7 +5235,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private async Task PlaySelectedAnimationAsync(AnimationClipCatalogItem selectedItem)
         {
-            if (selectedItem == null || _activeBundle == null || _clipCatalog == null) return;
+            if (selectedItem == null || selectedItem.IsBindPose || _activeBundle == null || _clipCatalog == null) return;
             if (_championModel == null)
             {
                 _model.StatusText = $"{selectedItem.DisplayName} · waiting for character model.";
@@ -7543,6 +7564,29 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private void StopToBindPose_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model == null) return;
+
+            AnimationClipCatalogItem bindPose = _model.DetectedAnimations.FirstOrDefault(item => item.IsBindPose);
+            if (bindPose != null)
+            {
+                _model.SelectedAnimation = bindPose;
+            }
+            else
+            {
+                _animationClipCancellation?.Cancel();
+                _activeAnimationClip = null;
+                ResetChampionToBindPose();
+                _model.StatusText = "Character in Bind pose (T-Pose).";
+                _model.TotalDuration = 0d;
+                _model.CurrentTime = 0d;
+                _model.IsPlaying = false;
+                _vfxRenderer?.SetSystem(null);
+                OpenTkControl?.InvalidateVisual();
+            }
+        }
+
         private void EmitterFilter_TextChanged(object sender, TextChangedEventArgs e)
         {
             ApplyEmitterFilter();
@@ -7815,6 +7859,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_model.IsAnimationMode && _model.SelectedAnimation != null)
             {
+                if (_model.SelectedAnimation.IsBindPose)
+                    return false;
                 if (!HasSelectedAnimationReady())
                     _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
                 else
