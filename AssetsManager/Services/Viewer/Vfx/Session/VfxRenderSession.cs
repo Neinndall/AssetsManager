@@ -301,7 +301,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         /// <summary>
-        /// Applies an edited standalone definition like LTK driver.swap. Address-compatible emitter
+        /// Applies an edited standalone definition like driver.swap. Address-compatible emitter
         /// edits repoint the live run in place; structural edits rebuild deterministically at the
         /// current playhead. Appearance-resource edits are released on the next GL frame, while
         /// transform/curve-only edits keep their existing GPU bindings.
@@ -1053,7 +1053,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         /// <summary>
-        /// Installs newly loaded emission surfaces on one graph. Like LTK's driver.setSurfaces,
+        /// Installs newly loaded emission surfaces on one graph. Like driver.setSurfaces,
         /// changing the shared lineage resource replays the run so earlier births use it too.
         /// </summary>
         internal bool SetEmissionSurfaces(

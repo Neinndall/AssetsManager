@@ -283,7 +283,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         /// <summary>
         /// Applies an authoring edit to the opened system without rewinding when pool indices still
-        /// address the same emitters. Child runs remain alive, matching LTK driver.swap's repoint path.
+        /// address the same emitters. Child runs remain alive, matching the driver.swap repoint path.
         /// Structural edits return false so the session can rebuild deterministically instead.
         /// </summary>
         internal bool TrySwapRootDefinition(VfxSystemDefinition next)

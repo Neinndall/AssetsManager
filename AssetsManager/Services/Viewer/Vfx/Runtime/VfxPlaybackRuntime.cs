@@ -576,8 +576,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         /// <summary>
         /// Repoints an already-running system at an edited definition when every pool emitter index
-        /// still addresses the same authored emitter. LTK's driver.swap keeps live particles in this
-        /// case: birth values stay on the particles while appearance/integration reads the new model.
+        /// still addresses the same authored emitter: birth values stay on the particles while
+        /// appearance/integration reads the new model.
         /// </summary>
         internal bool TrySwapDefinition(VfxSystemDefinition next)
         {
