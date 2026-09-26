@@ -1481,20 +1481,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         }
 
         internal static float PaletteSelectorAtZero(VfxPaletteDefinition palette)
-            => palette is null ? 0f : palette.PaletteSelector.Sample(0f).X;
+            => VfxShaderParameterUtils.SamplePaletteSelectorAtZero(palette);
+
+        internal static float PaletteRowNormalized(VfxPaletteDefinition palette)
+            => VfxShaderParameterUtils.ResolvePaletteRowNormalized(palette);
 
         internal static Vector3 ResolveCameraForward(Vector3 cameraRight, Vector3 cameraUp)
-        {
-            Vector3 forward = Vector3.Cross(cameraUp, cameraRight);
-            return forward.LengthSquared() > 0f ? Vector3.Normalize(forward) : -Vector3.UnitZ;
-        }
+            => VfxGeometryUtils.ResolveCameraForward(cameraRight, cameraUp);
 
         internal static bool ShouldDirectionOrientBillboard(VfxEmitterDefinition definition)
-        {
-            if (definition is null || !definition.IsDirectionOriented) return false;
-            if (definition.AuthoredFeatures?.HasLegacySimple == true) return false;
-            return definition.PrimitiveKind is VfxPrimitiveKind.CameraQuad or VfxPrimitiveKind.CameraUnitQuad;
-        }
+            => VfxGeometryUtils.ShouldDirectionOrientBillboard(definition);
 
         internal static int ResolveEmitterDrawCount(
             VfxEmitterDefinition definition,
@@ -1579,99 +1575,30 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                ContainsHash(always, hash);
 
         internal static bool ShouldSampleBaseTexture(VfxEmitterDefinition definition, uint textureHandle)
-        {
-            if (definition?.HasResolvedCustomMaterial == true)
-            {
-                return textureHandle != 0 &&
-                    !string.IsNullOrWhiteSpace(definition.CustomMaterial?.BaseTextureName);
-            }
-
-            return textureHandle != 0 || string.IsNullOrWhiteSpace(definition?.TexturePath);
-        }
+            => VfxGeometryUtils.ShouldSampleBaseTexture(definition, textureHandle);
 
         internal static float ResolveEmitterPhase(VfxEmitterDefinition definition, float age)
-        {
-            float lifetime = definition?.EmitterLifetime ?? 0f;
-            if (lifetime <= 0f || !float.IsFinite(lifetime) || !float.IsFinite(age)) return 0f;
-            return Math.Clamp(age / lifetime, 0f, 1f);
-        }
+            => VfxGeometryUtils.ResolveEmitterPhase(definition, age);
 
         internal static Vector2? ResolvePolygonOffset(VfxEmitterDefinition definition)
-        {
-            if (definition is null) return null;
-
-            if (definition.DepthBiasFactors is { } authored &&
-                (authored.X != 0f || authored.Y != 0f))
-            {
-                return authored;
-            }
-
-            // skinnedmesh/particle_ps gives AttachedMesh a small overlay offset whenever
-            // the emitter authors no effective bias. Riot treats an explicit [0,0] the same
-            // as an omitted pair here.
-            return definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh
-                ? new Vector2(-1f, -1f)
-                : null;
-        }
+            => VfxGeometryUtils.ResolvePolygonOffset(definition);
 
         internal static bool HasTextureMultLayer(VfxEmitterDefinition definition)
-            => definition is not null &&
-               (definition.AuthoredFeatures?.HasTextureMultLayer == true ||
-                !string.IsNullOrWhiteSpace(definition.TextureMultPath));
+            => VfxGeometryUtils.HasTextureMultLayer(definition);
 
         internal static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture)
-        {
-            if (!hasColorRampTexture || definition is null) return false;
-
-            // The second UV layer exists when textureMult is authored, even if its texture is
-            // unnamed or has not loaded. That structural layer still owns the ramp lookup lane.
-            bool fixedAlphaUv = definition.UvMode == 2 &&
-                definition.PrimitiveKind != VfxPrimitiveKind.Mesh &&
-                definition.PrimitiveKind != VfxPrimitiveKind.AttachedMesh;
-            bool erosionEnabled = definition.AlphaErosion is not null && !fixedAlphaUv;
-            bool hasMultLayer = HasTextureMultLayer(definition);
-            return !erosionEnabled && !(hasMultLayer && definition.UvMode == 2);
-        }
+            => VfxGeometryUtils.ShouldUseColorRamp(definition, hasColorRampTexture);
 
         internal static bool ShouldProjectToGround(VfxEmitterDefinition definition)
-        {
-            if (definition is null) return false;
-
-            // LTK enables GROUND_LAYER only from the authored isGroundLayer flag. Neither
-            // isFollowingTerrain nor a ground-looking birth rotation selects this draw path.
-            return definition.IsGroundLayer;
-        }
+            => VfxGeometryUtils.ShouldProjectToGround(definition);
 
         internal static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
-        {
-            if (!hasSceneDepth || definition?.SoftParticle is null) return false;
-            if (definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh) return false;
-
-            // The fixed-alpha quad/ribbon bundle compiles no soft fade. Meshes keep the normal
-            // particle material under LOCK_ALPHA, while AttachedMesh has no soft path at all.
-            bool fixedAlphaUv = definition.UvMode == 2 &&
-                definition.PrimitiveKind != VfxPrimitiveKind.Mesh &&
-                definition.PrimitiveKind != VfxPrimitiveKind.AttachedMesh;
-            return !fixedAlphaUv;
-        }
+            => VfxGeometryUtils.ShouldUseSoftParticles(definition, hasSceneDepth);
 
         internal static Vector4 ResolveSoftParticleParams(VfxSoftParticleDefinition soft)
-        {
-            if (soft is null) return Vector4.Zero;
-            bool fadesIn = soft.DeltaIn != 0f;
-            return new Vector4(
-                fadesIn ? soft.BeginIn : -1e9f,
-                soft.BeginIn + soft.DeltaIn + soft.BeginOut,
-                fadesIn ? 1f / soft.DeltaIn : 1f,
-                soft.DeltaOut == 0f ? 0f : 1f / soft.DeltaOut);
-        }
+            => VfxShaderParameterUtils.ResolveSoftParticleParams(soft);
 
         internal static Vector4 ResolveSoftParticleControl(int blendMode)
-            => blendMode switch
-            {
-                1 or 4 => new Vector4(1f, 0f, 0f, 1f),
-                5 => new Vector4(0f, 1f, 0f, 1f),
-                _ => new Vector4(0f, 1f, 1f, 0f)
-            };
+            => VfxShaderParameterUtils.ResolveSoftParticleControl(blendMode);
     }
 }

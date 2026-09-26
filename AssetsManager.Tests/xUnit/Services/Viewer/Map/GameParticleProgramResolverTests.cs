@@ -180,6 +180,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                     .Select(define => define.Name));
         }
 
+        [Theory]
+        [InlineData(0, 4, 0.125f)]
+        [InlineData(1, 4, 0.375f)]
+        [InlineData(2, 4, 0.625f)]
+        [InlineData(3, 4, 0.875f)]
+        public void PaletteRowNormalizedCalculatesCenterRowVCoordinate(float pickedRow, int count, float expectedV)
+        {
+            var palette = new VfxPaletteDefinition(count, VfxCurve3.Const(new Vector3(pickedRow, 0f, 0f)));
+            Assert.Equal(expectedV, AssetsManager.Services.Viewer.Vfx.Rendering.VfxOpenGlRenderer.PaletteRowNormalized(palette), 5);
+        }
+
         [Fact]
         public void StockParticlePermutationsComposeAndCompileAgainstAnInvisibleWglContext()
         {

@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
 
@@ -61,30 +62,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             var uniforms = mesh ? _meshUniforms : _particleUniforms;
             _gl.Uniform1(uniforms.HasTexMult, HasTextureMultLayer(emitter.Def) ? 1 : 0);
             _particleParameters.Clear();
-            _particleParameters["TEXTURE_INFO"] = new Vector4(1f, 1f, 1f, 0f);
-            _particleParameters["TEXTURE_INFO_2"] = new Vector4(1f, 1f, 1f, 0f);
-            _particleParameters["PARTICLE_DEPTH_PUSH_PULL"] = new Vector4(emitter.Def.DepthPushPull, 0f, 0f, 0f);
-            if (!emitter.Def.HasResolvedCustomMaterial)
-            {
-                var erosion = emitter.Def.AlphaErosion;
-                _particleParameters["AlphaTestReferenceValue"] = new Vector4((emitter.Def.RenderState?.AlphaReference ?? 0) / 255f, 0f, 0f, 0f);
-                _particleParameters["cAlphaErosionParams"] = new Vector4(0f, erosion?.SliceWidth ?? 1.5f, 1f / Math.Max(erosion?.FeatherIn ?? 0f, 1e-4f), 1f / Math.Max(erosion?.FeatherOut ?? 0f, 1e-4f));
-                _particleParameters["cAlphaErosionTextureMixer"] = erosion?.ChannelMixer?.Sample(phase) ?? Vector4.UnitW;
-                var palette = emitter.Def.PaletteDefinition;
-                _particleParameters["cPaletteSelectMain"] = new Vector4(PaletteSelectorAtZero(palette), 0f,
-                    palette?.ScrollU?.Sample(phase) ?? 0f, palette?.ScrollV?.Sample(phase) ?? 0f);
-                _particleParameters["cPaletteSrcMixerMain"] = palette?.PaletteSourceMixColor ?? Vector4.Zero;
-                _particleParameters["kColorFactor"] = Vector4.One;
-                _particleParameters["cSoftParticleParams"] = ResolveSoftParticleParams(emitter.Def.SoftParticle);
-                _particleParameters["cSoftParticleControl"] = ResolveSoftParticleControl(emitter.Def.BlendMode);
-                var reflection = emitter.Def.Reflection;
-                _particleParameters["vFresnel"] = reflection == null ? new Vector4(0f, 0f, 0f, 1f) :
-                    new Vector4(reflection.FresnelColor.X, reflection.FresnelColor.Y, reflection.FresnelColor.Z, reflection.Fresnel);
-                _particleParameters["vReflection"] = reflection == null ? new Vector4(1f, 0f, 1f, 0f) :
-                    new Vector4(reflection.ReflectionFresnel, reflection.DirectOpacity, reflection.GlancingOpacity, 0f);
-                _particleParameters["vReflectionFColor"] = reflection?.ReflectionFresnelColor ?? Vector4.One;
-                _particleParameters["DistortionPower"] = new Vector4(emitter.Def.Distortion?.Strength ?? 0f, 0f, 0f, 0f);
-            }
+            VfxShaderParameterUtils.PopulateNativeParameters(_particleParameters, emitter.Def, phase);
             var frame = _gameFrame with { TimeSeconds = emitter.RenderTime };
             _gameShaders.BindParticle(emitter.Def, mesh, pass, frame, _particleParameters, name => ParticleTexture(emitter, name));
         }
