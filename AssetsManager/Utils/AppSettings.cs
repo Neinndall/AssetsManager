@@ -412,7 +412,10 @@ namespace AssetsManager.Utils
                     StageVisible = false,
                     ViewMode = "Lit",
                     WireOverlay = false,
-                    ShadersEnabled = false
+                    ShadersEnabled = false,
+                    ChampionVfxEnabled = false,
+                    MapVfxEnabled = false,
+                    MapStructuresEnabled = true
                 },
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
@@ -549,6 +552,9 @@ namespace AssetsManager.Utils
         public string ViewMode { get; set; } = "Lit";
         public bool WireOverlay { get; set; }
         public bool ShadersEnabled { get; set; }
+        public bool ChampionVfxEnabled { get; set; } = false;
+        public bool MapVfxEnabled { get; set; } = false;
+        public bool MapStructuresEnabled { get; set; } = true;
     }
 
     public class ReportGenerationSettings

@@ -276,7 +276,10 @@ namespace AssetsManager.Views.Controls.Viewer
                     Title = title,
                     Subtitle = skin.DisplayName ?? skin.BinPath,
                     Kind = VfxWorkspaceTabKind.Skin,
-                    Payload = skin
+                    Payload = skin,
+                    CharacterEffectsEnabled = AppSettings?.VfxStudio?.ChampionVfxEnabled ?? false,
+                    BackdropParticlesVisible = AppSettings?.VfxStudio?.MapVfxEnabled ?? false,
+                    BackdropStructuresVisible = AppSettings?.VfxStudio?.MapStructuresEnabled ?? true
                 };
                 if (inheritedBackdrop?.Source != null)
                 {
@@ -838,6 +841,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     }
                     OpenTkControl?.InvalidateVisual();
                 }
+                SavePreviewDisplayPreferences();
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.CharacterPositionX) ||
                      e.PropertyName == nameof(VfxInspectorModel.CharacterPositionY) ||
@@ -867,6 +871,8 @@ namespace AssetsManager.Views.Controls.Viewer
                      e.PropertyName == nameof(VfxInspectorModel.InspectorVisible) ||
                      e.PropertyName == nameof(VfxInspectorModel.IsInspectorPanelVisible))
             {
+                if (e.PropertyName == nameof(VfxInspectorModel.CharacterEffectsEnabled))
+                    SavePreviewDisplayPreferences();
                 if (e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate))
                     ApplyCharacterPlacement();
                 if (e.PropertyName == nameof(VfxInspectorModel.CharacterTransformGizmoEnabled))
@@ -1391,6 +1397,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.PreviewViewMode = viewMode;
                 _model.PreviewWireOverlay = vfxSettings.WireOverlay;
                 _model.PreviewShaders = vfxSettings.ShadersEnabled;
+                _model.CharacterEffectsEnabled = vfxSettings.ChampionVfxEnabled;
+                _model.MapParticlesVisible = vfxSettings.MapVfxEnabled;
+                _model.MapStructuresVisible = vfxSettings.MapStructuresEnabled;
             }
             finally
             {
@@ -1413,6 +1422,9 @@ namespace AssetsManager.Views.Controls.Viewer
             AppSettings.VfxStudio.ShadersEnabled = _model.PreviewShaders;
             AppSettings.VfxStudio.StageVisible = _model.ShowPreviewStage;
             AppSettings.VfxStudio.CameraPreset = _model.PreviewCameraPreset.ToString();
+            AppSettings.VfxStudio.ChampionVfxEnabled = _model.CharacterEffectsEnabled;
+            AppSettings.VfxStudio.MapVfxEnabled = _model.MapParticlesVisible;
+            AppSettings.VfxStudio.MapStructuresEnabled = _model.MapStructuresVisible;
             _ = SavePreviewDisplayPreferencesAsync();
         }
 
@@ -1764,7 +1776,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     _skyRenderer = new SkyRenderer();
                     _skyRenderer.Initialize(_gl);
-                    _genericSkyCube ??= SkyCubeMapFactory.LoadGeneric(LogService);
+                    _genericSkyCube ??= SceneElements.LoadGenericSkyCube(AppSettings, LogService);
                     _skyCubeDirty = true;
                 }
                 if (_mapCharacterRenderer == null)

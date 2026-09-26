@@ -6,19 +6,26 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Utils;
 using Material3D = System.Windows.Media.Media3D.Material;
 
 namespace AssetsManager.Views.Helpers
 {
+    /// <summary>
+    /// Centralized provider for viewport environment elements:
+    /// ground stage (LTK dynamic WAD texture or fallback), studio skybox cubemap (dynamic WAD cubemap), and 3D visual helpers.
+    /// </summary>
     public static class SceneElements
     {
         public const double GroundLevel = 1000;
         public const string GroundChunkVirtualPath = "assets/maps/kitpieces/srs/base/textures/ground_c3_midlanecaps_a.tex";
+        public const string SkyboxChunkVirtualPath = "assets/maps/skyboxes/riots_sru_skybox_cubemap.dds";
         private const double GroundLogoElevation = 2.0;
         public const int SceneTextureMaxSize = 2048;
 
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, BitmapSource> _textureCache = new();
+        #region Stage Ground Cache & Loader
+
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, BitmapSource> _groundLogoTextureCache = new();
         private static readonly object GroundLock = new();
         private static BitmapSource _cachedGroundTexture;
@@ -56,10 +63,80 @@ namespace AssetsManager.Views.Helpers
 
         private static BitmapSource LoadGroundFromGame(AppSettings settings, LogService logService)
         {
+            using var stream = OpenMap11Chunk(settings, GroundChunkVirtualPath, logService);
+            return stream == null ? null : TextureUtils.LoadTexture(stream, ".tex", SceneTextureMaxSize);
+        }
+
+        #endregion
+
+        #region Studio Skybox Cubemap Cache & Loader
+
+        private static readonly object SkyLock = new();
+        private static VfxCubeMapData _cachedGenericSky;
+        private static bool _skyAttempted;
+
+        public static void ClearSkyCache()
+        {
+            lock (SkyLock)
+            {
+                _skyAttempted = false;
+                _cachedGenericSky = null;
+            }
+        }
+
+        /// <summary>
+        /// Clears both ground texture and skybox cubemap caches.
+        /// </summary>
+        public static void ClearSceneCache()
+        {
+            ClearGroundCache();
+            ClearSkyCache();
+        }
+
+        internal static VfxCubeMapData LoadGenericSkyCube(LogService logService) =>
+            LoadGenericSkyCube(null, logService);
+
+        /// <summary>
+        /// Loads the official Summoner's Rift sky cubemap from Map11.wad.client matching LTK Manager.
+        /// </summary>
+        internal static VfxCubeMapData LoadGenericSkyCube(AppSettings settings, LogService logService)
+        {
+            lock (SkyLock)
+            {
+                if (_skyAttempted)
+                    return _cachedGenericSky;
+
+                _skyAttempted = true;
+                try
+                {
+                    _cachedGenericSky = LoadSkyFromGame(settings, logService);
+                    return _cachedGenericSky;
+                }
+                catch (Exception ex)
+                {
+                    logService?.LogError(ex, "Failed to load studio skybox cubemap from League installation.");
+                    _cachedGenericSky = null;
+                    return null;
+                }
+            }
+        }
+
+        private static VfxCubeMapData LoadSkyFromGame(AppSettings settings, LogService logService)
+        {
+            using var stream = OpenMap11Chunk(settings, SkyboxChunkVirtualPath, logService);
+            return stream == null ? null : VfxCubeMapDecoder.Decode(stream);
+        }
+
+        #endregion
+
+        #region Game WAD Chunk Resolution Helpers
+
+        private static MemoryStream OpenMap11Chunk(AppSettings settings, string virtualPath, LogService logService)
+        {
             string gameRoot = GetPreferredGameRoot(settings);
             if (string.IsNullOrWhiteSpace(gameRoot) || !Directory.Exists(gameRoot))
             {
-                logService?.LogDebug("No valid League of Legends installation directory configured for ground texture.");
+                logService?.LogDebug($"No valid League of Legends installation directory configured for '{virtualPath}'.");
                 return null;
             }
 
@@ -70,17 +147,16 @@ namespace AssetsManager.Views.Helpers
                 return null;
             }
 
-            ulong chunkHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(GroundChunkVirtualPath);
+            ulong chunkHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(virtualPath);
             using var wad = new LeagueToolkit.Core.Wad.WadFile(mapWadPath);
             if (!wad.Chunks.TryGetValue(chunkHash, out var chunk))
             {
-                logService?.LogWarning($"Ground chunk {chunkHash:x16} ({GroundChunkVirtualPath}) not found in '{mapWadPath}'.");
+                logService?.LogWarning($"Chunk {chunkHash:x16} ({virtualPath}) not found in '{mapWadPath}'.");
                 return null;
             }
 
             using var decompressed = wad.LoadChunkDecompressed(chunk);
-            using var stream = new MemoryStream(decompressed.Span.ToArray(), writable: false);
-            return TextureUtils.LoadTexture(stream, ".tex", SceneTextureMaxSize);
+            return new MemoryStream(decompressed.Span.ToArray(), writable: false);
         }
 
         private static string GetPreferredGameRoot(AppSettings settings)
@@ -123,32 +199,9 @@ namespace AssetsManager.Views.Helpers
             }
         }
 
-        public static BitmapSource LoadSceneTexture(string path, LogService logService)
-        {
-            if (string.IsNullOrEmpty(path)) return null;
+        #endregion
 
-            return _textureCache.GetOrAdd(path, p =>
-            {
-                try
-                {
-                    if (File.Exists(p))
-                    {
-                        using (FileStream fileStream = new FileStream(p, FileMode.Open, FileAccess.Read))
-                            return TextureUtils.LoadTexture(fileStream, Path.GetExtension(p), SceneTextureMaxSize);
-                    }
-                    else
-                    {
-                        using (Stream resourceStream = Application.GetResourceStream(new Uri(p)).Stream)
-                            return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(p), SceneTextureMaxSize);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logService.LogError(ex, $"Failed to load scene texture: {p}");
-                    return null;
-                }
-            });
-        }
+        #region 3D Visual Helpers (Helix / WPF Ground Plane)
 
         private static BitmapSource LoadGroundLogoTexture(string path, LogService logService)
         {
@@ -260,5 +313,7 @@ namespace AssetsManager.Views.Helpers
 
             return new ModelVisual3D { Content = scene };
         }
+
+        #endregion
     }
 }

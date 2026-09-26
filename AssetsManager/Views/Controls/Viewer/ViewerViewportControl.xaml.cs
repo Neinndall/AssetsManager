@@ -166,7 +166,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (_genericSkyCube == null)
                 {
-                    _genericSkyCube = SkyCubeMapFactory.LoadGeneric(LogService);
+                    _genericSkyCube = SceneElements.LoadGenericSkyCube(AppSettings, LogService);
                     _skyCubeDirty = true;
                 }
 
@@ -264,7 +264,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _skyRenderer = new SkyRenderer();
                 _skyRenderer.Initialize(_gl);
-                _genericSkyCube ??= SkyCubeMapFactory.LoadGeneric(LogService);
+                _genericSkyCube ??= SceneElements.LoadGenericSkyCube(AppSettings, LogService);
                 _skyCubeDirty = true;
             }
 
@@ -497,7 +497,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_isCleanedUp) return;
 
-            SceneElements.ClearGroundCache();
+            SceneElements.ClearSceneCache();
             if (_groundVisual != null && Viewport.Children.Contains(_groundVisual))
                 Viewport.Children.Remove(_groundVisual);
 
