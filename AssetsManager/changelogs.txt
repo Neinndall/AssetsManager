@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Added a styled form selector for compatible champion skins with authored submeshes, textures, animations, and VFX.
   - VFX Studio / Persisted Champion VFX, Map Effects VFX, and Map Structures visibility toggles across sessions in VfxStudio settings.
   - Viewer / Skybox cubemap now loads dynamically from League Map11.wad.client matching LTK Manager, completely removing the bundled Resources/Scene directory (-16.8 MB).
   - Viewer / Consolidated Skybox cubemap and stage ground loading into SceneElements, eliminating redundant factories and obsolete texture caches.

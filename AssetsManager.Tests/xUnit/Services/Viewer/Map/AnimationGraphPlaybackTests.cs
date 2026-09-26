@@ -15,6 +15,47 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         private static readonly uint Sequencer = Fnv1a.HashLower("SequencerClipData");
 
         [Fact]
+        public void GearIndexSelectsOnlyGearDrivenParametricBranchesInsideSequences()
+        {
+            uint parametric = Fnv1a.HashLower("ParametricClipData");
+            var gear = Clip(2, parametric, "Form", null, 4, 5) with
+            {
+                ChildParameters = new[] { 0f, 1f },
+                UsesEquippedGearParameter = true
+            };
+            var manual = Clip(3, parametric, "Speed", null, 6, 7) with
+            {
+                ChildParameters = new[] { 0f, 1f }
+            };
+            var sequence = Clip(1, Sequencer, "Combined", null, 2, 3);
+            var baseForm = Clip(4, Atomic, "Base", "base.anm");
+            var alternateForm = Clip(5, Atomic, "Alternate", "alternate.anm");
+            var slow = Clip(6, Atomic, "Slow", "slow.anm");
+            var fast = Clip(7, Atomic, "Fast", "fast.anm");
+            var clips = new[] { sequence, gear, manual, baseForm, alternateForm, slow, fast };
+
+            Assert.Equal(new[] { alternateForm, slow },
+                AnimationGraphPlayback.ResolvePlaylist(sequence, clips, parameter: 0f, gearIndex: 1));
+            Assert.Equal(new[] { baseForm, fast },
+                AnimationGraphPlayback.ResolvePlaylist(sequence, clips, parameter: 1f, gearIndex: 0));
+        }
+
+        [Fact]
+        public void MissingGearSelectionKeepsExistingManualParameterBehavior()
+        {
+            var parametric = Clip(1, Fnv1a.HashLower("ParametricClipData"), "Form", null, 2, 3) with
+            {
+                ChildParameters = new[] { 0f, 1f },
+                UsesEquippedGearParameter = true
+            };
+            var first = Clip(2, Atomic, "First", "first.anm");
+            var second = Clip(3, Atomic, "Second", "second.anm");
+
+            Assert.Same(second, Assert.Single(AnimationGraphPlayback.ResolvePlaylist(
+                parametric, new[] { parametric, first, second }, parameter: 1f)));
+        }
+
+        [Fact]
         public void OpeningClipIsFirstPlayableIdleCaseInsensitively()
         {
             var clips = new[]

@@ -805,6 +805,20 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<MapVisibilityLayerOption> MapLayers { get; } = new();
         public ObservableCollection<VfxCharacterBackdropOption> CharacterBackdrops { get; } = new();
         public ObservableCollection<VfxCharacterSubmeshOption> CharacterSubmeshes { get; } = new();
+        public ObservableCollection<VfxCharacterFormOption> CharacterForms { get; } = new();
+        private VfxCharacterFormOption _selectedCharacterForm;
+        public VfxCharacterFormOption SelectedCharacterForm
+        {
+            get => _selectedCharacterForm;
+            set
+            {
+                if (ReferenceEquals(_selectedCharacterForm, value)) return;
+                _selectedCharacterForm = value;
+                OnPropertyChanged();
+            }
+        }
+        public bool HasCharacterForms => CharacterForms.Count > 1;
+
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxForceAuthoringItem> ForceAuthoringItems { get; } = new();
@@ -1158,6 +1172,7 @@ namespace AssetsManager.Views.Models.Viewer
         {
             OnPropertyChanged(nameof(HasCharacterBackdropOptions));
             OnPropertyChanged(nameof(HasCharacterSubmeshes));
+            OnPropertyChanged(nameof(HasCharacterForms));
         }
 
         public int PlaybackSeed

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -90,27 +90,37 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             foreach (BinTreeObject owner in tree.Objects.Values)
             {
                 if (owner.ClassHash != SkinCharacterDataPropertiesClass) continue;
-                var prop = Get(owner.Properties, F_idleParticlesEffects);
-                if (prop is not BinTreeContainer container) continue;
-                foreach (var elem in container.Elements.OfType<BinTreeStruct>())
-                {
-                    uint effectKey = AsU32(Get(elem.Properties, F_idleEffectKey)) ?? 0u;
-                    string effectName = GetString(elem.Properties, F_idleEffectName) ?? string.Empty;
-                    string boneName = GetString(elem.Properties, F_idleBoneName) ?? string.Empty;
-                    uint boneNameHash = AsU32(Get(elem.Properties, F_idleBoneName)) ?? (string.IsNullOrEmpty(boneName) ? 0u : VfxParsingHash.Fnv1a(boneName));
-                    string targetBoneName = GetString(elem.Properties, F_idleTargetBoneName) ?? string.Empty;
-                    uint targetBoneNameHash = AsU32(Get(elem.Properties, F_idleTargetBoneName)) ?? (string.IsNullOrEmpty(targetBoneName) ? 0u : VfxParsingHash.Fnv1a(targetBoneName));
-                    Vector3 position = AsVec3(Get(elem.Properties, F_idlePosition)) ?? Vector3.Zero;
+                idleEffects.AddRange(ExtractIdleEffects(Get(owner.Properties, F_idleParticlesEffects)));
+            }
+            return idleEffects;
+        }
 
-                    idleEffects.Add(new VfxIdleEffectDefinition(
-                        effectKey,
-                        effectName,
-                        boneName,
-                        boneNameHash,
-                        targetBoneName,
-                        targetBoneNameHash,
-                        position));
-                }
+        internal static IReadOnlyList<VfxIdleEffectDefinition> ExtractIdleEffects(BinTreeProperty property)
+        {
+            if (property is BinTreeOptional optional) property = optional.Value;
+            if (property is not BinTreeContainer container)
+                return Array.Empty<VfxIdleEffectDefinition>();
+
+            var idleEffects = new List<VfxIdleEffectDefinition>();
+            foreach (BinTreeStruct elem in container.Elements.OfType<BinTreeStruct>())
+            {
+                uint effectKey = AsU32(Get(elem.Properties, F_idleEffectKey)) ?? 0u;
+                string effectName = GetString(elem.Properties, F_idleEffectName) ?? string.Empty;
+                string boneName = GetString(elem.Properties, F_idleBoneName) ?? string.Empty;
+                uint boneNameHash = AsU32(Get(elem.Properties, F_idleBoneName)) ??
+                    (string.IsNullOrEmpty(boneName) ? 0u : VfxParsingHash.Fnv1a(boneName));
+                string targetBoneName = GetString(elem.Properties, F_idleTargetBoneName) ?? string.Empty;
+                uint targetBoneNameHash = AsU32(Get(elem.Properties, F_idleTargetBoneName)) ??
+                    (string.IsNullOrEmpty(targetBoneName) ? 0u : VfxParsingHash.Fnv1a(targetBoneName));
+                Vector3 position = AsVec3(Get(elem.Properties, F_idlePosition)) ?? Vector3.Zero;
+                idleEffects.Add(new VfxIdleEffectDefinition(
+                    effectKey,
+                    effectName,
+                    boneName,
+                    boneNameHash,
+                    targetBoneName,
+                    targetBoneNameHash,
+                    position));
             }
             return idleEffects;
         }
@@ -231,7 +241,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                         parametricValues,
                         ResolveGraphClassName(clip.ClassHash, graphClassNameResolver),
                         includeEmpty: true);
-                    if (definition != null) clips.Add(definition);
+                    if (definition != null)
+                    {
+                        definition = definition with
+                        {
+                            UsesEquippedGearParameter =
+                                Get(clip.Properties, VfxParsingHash.Fnv1a("Updater")) is BinTreeStruct updater &&
+                                updater.ClassHash == VfxParsingHash.Fnv1a("EquippedGearParametricUpdater")
+                        };
+                        clips.Add(definition);
+                    }
                 }
 
                 graphs.Add(new AnimationGraphDefinition(

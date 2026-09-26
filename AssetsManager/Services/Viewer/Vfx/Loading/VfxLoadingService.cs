@@ -51,17 +51,53 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         public sealed class Bundle
         {
             public string PrimaryBinPath { get; internal set; }
-            public Dictionary<uint, VfxSystemDefinition> Systems { get; } = new();
-            public Dictionary<uint, uint> ResourceMap { get; } = new();
-            public Dictionary<uint, string> SystemSources { get; } = new();
-            public Dictionary<uint, AnimationClipDefinition> EventSequences { get; } = new();
-            public List<AnimationClipDefinition> Clips { get; } = new();
-            public List<AnimationGraphDefinition> AnimationGraphs { get; } = new();
-            public List<VfxIdleEffectDefinition> IdleEffects { get; } = new();
+            public Dictionary<uint, VfxSystemDefinition> Systems { get; private set; } = new();
+            public Dictionary<uint, uint> ResourceMap { get; private set; } = new();
+            public Dictionary<uint, string> SystemSources { get; private set; } = new();
+            public Dictionary<uint, AnimationClipDefinition> EventSequences { get; private set; } = new();
+            public List<AnimationClipDefinition> Clips { get; private set; } = new();
+            public List<AnimationGraphDefinition> AnimationGraphs { get; private set; } = new();
+            public List<VfxIdleEffectDefinition> IdleEffects { get; private set; } = new();
+            public IReadOnlyList<VfxCharacterFormDefinition> CharacterForms { get; internal set; } =
+                Array.Empty<VfxCharacterFormDefinition>();
             public VfxOwnerSceneContext OwnerSceneContext { get; set; }
-            public List<string> LoadedBins { get; } = new();
-            public List<string> MissingDependencies { get; } = new();
-            public List<string> AmbiguousDependencies { get; } = new();
+            public List<string> LoadedBins { get; private set; } = new();
+            public List<string> MissingDependencies { get; private set; } = new();
+            public List<string> AmbiguousDependencies { get; private set; } = new();
+            internal int? CharacterGearIndex { get; private set; }
+
+            public Bundle()
+            {
+            }
+
+            private Bundle(Bundle source, VfxCharacterFormDefinition form)
+            {
+                PrimaryBinPath = source.PrimaryBinPath;
+                Systems = source.Systems;
+                SystemSources = source.SystemSources;
+                EventSequences = source.EventSequences;
+                Clips = source.Clips;
+                AnimationGraphs = source.AnimationGraphs;
+                LoadedBins = source.LoadedBins;
+                MissingDependencies = source.MissingDependencies;
+                AmbiguousDependencies = source.AmbiguousDependencies;
+                CharacterForms = source.CharacterForms;
+                OwnerSceneContext = source.OwnerSceneContext;
+
+                ResourceMap = new Dictionary<uint, uint>(source.ResourceMap);
+                if (form.ResourceMap != null)
+                {
+                    foreach (var entry in form.ResourceMap)
+                        ResourceMap[entry.Key] = entry.Value;
+                }
+                IdleEffects = form.EnableOverrideIdleEffects
+                    ? (form.OverrideIdleEffects ?? Array.Empty<VfxIdleEffectDefinition>()).ToList()
+                    : source.IdleEffects;
+                CharacterGearIndex = form.GearIndex;
+            }
+
+            internal Bundle CreateCharacterPlaybackView(VfxCharacterFormDefinition form)
+                => form == null ? this : new Bundle(this, form);
         }
 
         public Bundle Load(string skinBinPath, LogService log)
@@ -114,6 +150,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 var clipKeys = new HashSet<(uint Graph, uint Clip)>();
                 var graphKeys = new HashSet<uint>();
                 var queue = new Queue<string>();
+                var characterFormDocuments = new List<VfxCharacterFormDocumentData>();
 
                 void Enqueue(string p)
                 {
@@ -148,6 +185,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                             _hashResolverService == null ? null : _hashResolverService.ResolveHash,
                             _hashResolverService == null ? null : _hashResolverService.ResolveBinEntry);
                         bundle.LoadedBins.Add(Path.GetFullPath(currentBinPath));
+                        if (document.CharacterFormData != null)
+                            characterFormDocuments.Add(document.CharacterFormData);
 
                         foreach (var kv in document.Systems)
                         {
@@ -217,6 +256,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     }
                 }
 
+                bundle.CharacterForms = VfxCharacterFormParser.Resolve(characterFormDocuments, ResolveBinEntryPath);
                 log?.Log($"Loaded {bundle.Systems.Count} VFX systems.");
             }
             catch (OperationCanceledException)

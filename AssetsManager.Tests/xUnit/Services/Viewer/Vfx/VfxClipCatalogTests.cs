@@ -135,6 +135,37 @@ public class VfxClipCatalogTests
     }
 
     [Fact]
+    public void FormMetadataUsesGearBranchWithoutDecodingOrChangingTheBaseCatalog()
+    {
+        AnimationClipDefinition first = Clip(0x01, 0x100, "base", "base.anm");
+        AnimationClipDefinition second = Clip(0x02, 0x100, "alternate", "alternate.anm");
+        AnimationClipDefinition gear = Clip(0x10, 0x100, "idle", null) with
+        {
+            OwnerClassHash = Fnv1a.HashLower("ParametricClipData"),
+            ChildClipHashes = new uint[] { 0x01, 0x02 },
+            ParametricValues = new float?[] { 0f, 1f },
+            UsesEquippedGearParameter = true
+        };
+        var bundle = new VfxLoadingService.Bundle();
+        bundle.Clips.AddRange(new[] { gear, first, second });
+        var form = new VfxCharacterFormDefinition(123, 1, "Alternate",
+            Array.Empty<uint>(), Array.Empty<uint>());
+        using var catalog = new VfxClipCatalog();
+
+        AnimationClipCatalogItem alternate = catalog.BuildMetadata(
+            bundle.CreateCharacterPlaybackView(form), path => path, parameter: 0f)
+            .Single(item => item.Clip.OwnerPathHash == gear.OwnerPathHash);
+        AnimationClipCatalogItem original = catalog.BuildMetadata(bundle, path => path)
+            .Single(item => item.Clip.OwnerPathHash == gear.OwnerPathHash);
+
+        Assert.Equal("alternate.anm", alternate.FilePath);
+        Assert.Equal(1f, alternate.ParameterValue);
+        Assert.Null(alternate.AnimationAsset);
+        Assert.Equal("base.anm", original.FilePath);
+        Assert.Null(bundle.CharacterGearIndex);
+    }
+
+    [Fact]
     public void ParametricPlaylistUsesTheNearestAuthoredValue()
     {
         AnimationClipDefinition first = Clip(0x01, 0x100, "first", "first.anm");

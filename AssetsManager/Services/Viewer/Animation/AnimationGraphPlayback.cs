@@ -94,7 +94,8 @@ namespace AssetsManager.Services.Viewer.Animation
         internal static IReadOnlyList<AnimationClipDefinition> ResolvePlaylist(
             AnimationClipDefinition clip,
             IReadOnlyList<AnimationClipDefinition> clips,
-            float? parameter = null)
+            float? parameter = null,
+            int? gearIndex = null)
         {
             if (clip == null || clips == null)
                 return Array.Empty<AnimationClipDefinition>();
@@ -119,15 +120,17 @@ namespace AssetsManager.Services.Viewer.Animation
 
                     IReadOnlyList<uint> children = current.ChildClipHashes ?? Array.Empty<uint>();
                     IEnumerable<int> order = Enumerable.Range(0, children.Count);
+                    float? selectedParameter = current.UsesEquippedGearParameter && gearIndex.HasValue
+                        ? gearIndex.Value : parameter;
                     if (current.OwnerClassHash == ParametricClipClass &&
                         children.Count > 0 &&
-                        parameter.HasValue)
+                        selectedParameter.HasValue)
                     {
                         IReadOnlyList<float?> values = current.ParametricValues ??
                             (current.ChildParameters ?? Array.Empty<float>())
                                 .Select(value => (float?)value)
                                 .ToArray();
-                        float selected = parameter.Value;
+                        float selected = selectedParameter.Value;
                         order = order
                             .OrderBy(index => MathF.Abs(
                                 ((index < values.Count ? values[index] : null) ?? 0f) - selected))

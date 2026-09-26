@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -30,6 +30,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return map;
         }
 
+        internal static IReadOnlyDictionary<uint, uint> ExtractResourceMap(
+            IReadOnlyDictionary<uint, BinTreeProperty> resolverProperties)
+        {
+            var map = new Dictionary<uint, uint>();
+            AppendResolverEntries(resolverProperties, map);
+            return map;
+        }
+
         internal static IReadOnlyDictionary<uint, uint> ExtractSkinResourceMap(BinTree tree)
         {
             foreach (BinTreeObject skin in tree.Objects.Values)
@@ -50,15 +58,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return new Dictionary<uint, uint>();
         }
 
+        private static void AppendResolverEntries(BinTreeObject resolver, Dictionary<uint, uint> map)
+            => AppendResolverEntries(resolver.Properties, map);
+
         private static void AppendResolverEntries(
-            BinTreeObject resolver,
+            IReadOnlyDictionary<uint, BinTreeProperty> resolverProperties,
             Dictionary<uint, uint> map)
         {
-            if (!resolver.Properties.TryGetValue(F_resourceMap, out BinTreeProperty prop) &&
-                !resolver.Properties.TryGetValue(F_mResourceMap, out prop))
-            {
+            if (!resolverProperties.TryGetValue(F_resourceMap, out BinTreeProperty prop) &&
+                !resolverProperties.TryGetValue(F_mResourceMap, out prop))
                 return;
-            }
             if (prop is not BinTreeMap entries) return;
 
             foreach (KeyValuePair<BinTreeProperty, BinTreeProperty> entry in entries)
@@ -71,6 +80,5 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 if (key != 0) map.TryAdd(key, value);
             }
         }
-
     }
 }

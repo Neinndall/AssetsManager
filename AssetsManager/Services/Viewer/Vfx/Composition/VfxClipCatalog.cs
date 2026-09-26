@@ -57,12 +57,12 @@ internal sealed class VfxClipCatalog : IDisposable
             float? effectiveParameter = parameterValues.Count > 1
                 ? NearestParameter(
                     parameterValues,
-                    parameter ??
+                    (clip.UsesEquippedGearParameter ? bundle.CharacterGearIndex : null) ?? parameter ??
                     clip.ParametricValues?.FirstOrDefault() ??
                     parameterValues[0])
                 : null;
             IReadOnlyList<AnimationClipDefinition> playlist =
-                ResolvePlaylist(clip, graphClips, effectiveParameter);
+                ResolvePlaylist(clip, graphClips, effectiveParameter, bundle.CharacterGearIndex);
             if (playlist.Count == 0) continue;
 
             string firstResolvedPath = null;
@@ -156,7 +156,7 @@ internal sealed class VfxClipCatalog : IDisposable
             bundle.Clips,
             bundle.OwnerSceneContext?.AnimationGraphPathHash ?? 0u);
         IReadOnlyList<AnimationClipDefinition> playlist =
-            ResolvePlaylist(item.Clip, graphClips, item.ParameterValue);
+            ResolvePlaylist(item.Clip, graphClips, item.ParameterValue, bundle.CharacterGearIndex);
         if (playlist.Count == 0)
             return null;
 
@@ -349,8 +349,9 @@ internal sealed class VfxClipCatalog : IDisposable
     internal static IReadOnlyList<AnimationClipDefinition> ResolvePlaylist(
         AnimationClipDefinition clip,
         IReadOnlyList<AnimationClipDefinition> clips,
-        float? parameter = null) =>
-        AnimationGraphPlayback.ResolvePlaylist(clip, clips, parameter);
+        float? parameter = null,
+        int? gearIndex = null) =>
+        AnimationGraphPlayback.ResolvePlaylist(clip, clips, parameter, gearIndex);
 
     internal static IAnimationAsset RetimeForGraph(IAnimationAsset asset, float tickDuration) =>
         AnimationGraphPlayback.RetimeForGraph(asset, tickDuration);

@@ -145,6 +145,8 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<float?> ParametricValues = null,
         string ClassName = null)
     {
+        public bool UsesEquippedGearParameter { get; init; }
+
         public IEnumerable<VfxParticleEventDefinition> ParticleEvents
             => (Events ?? Array.Empty<AnimationClipEventDefinition>()).OfType<VfxParticleEventDefinition>();
 

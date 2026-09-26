@@ -750,6 +750,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedAnimation))
             {
+                if (_isUpdatingCharacterForms) return;
                 if (_model.SelectedAnimation != null)
                 {
                     BeginExclusivePreviewSelection();
@@ -800,6 +801,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     RebuildAnimationsForParameter(_model.AnimationParameter.Value);
                 }
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedCharacterForm))
+            {
+                if (!_isUpdatingCharacterForms)
+                    ApplySelectedCharacterForm(clearManualOverrides: true, restoreTextures: true);
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.CharacterBackdropEnabled) ||
                      e.PropertyName == nameof(VfxInspectorModel.SelectedCharacterBackdrop))
@@ -1599,6 +1605,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _activeBundle = null;
             _championBundle = null;
+            ClearCharacterFormState();
             _pendingSystem = null;
             _inspectedSystem = null;
 
@@ -3142,6 +3149,7 @@ namespace AssetsManager.Views.Controls.Viewer
             RunReleaseStep(nameof(VfxClipCatalog), () => clipCatalog?.Dispose());
             _activeBundle = null;
             _championBundle = null;
+            ClearCharacterFormState();
 
             _model.SelectedAnimation = null;
             _model.SelectedSpell = null;
@@ -4767,6 +4775,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _championBundle = null;
+            ClearCharacterFormState();
             _championAuthoredScale = 1d;
             _characterAuthoredHiddenSubmeshes.Clear();
             InvalidateChampionBindPose();
@@ -5234,7 +5243,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 return Array.Empty<AnimationClipCatalogItem>();
 
             return _clipCatalog.BuildMetadata(
-                _activeBundle,
+                GetCharacterPlaybackBundle(),
                 path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
                 parameter);
         }
@@ -5267,7 +5276,9 @@ namespace AssetsManager.Views.Controls.Viewer
             _isUpdatingAnimationParameter = true;
             try
             {
-                IReadOnlyList<float> values = item?.ParameterValues ?? Array.Empty<float>();
+                IReadOnlyList<float> values = item?.Clip?.UsesEquippedGearParameter == true &&
+                    _model.SelectedCharacterForm != null
+                    ? Array.Empty<float>() : item?.ParameterValues ?? Array.Empty<float>();
                 _model.SetAnimationParameterOptions(
                     values,
                     values.Count > 1 ? item?.ParameterValue : _model.AnimationParameter);
@@ -5344,13 +5355,14 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationClipCancellation = operation;
             VfxClipCatalog catalog = _clipCatalog;
             VfxLoadingService.Bundle bundle = _activeBundle;
+            VfxLoadingService.Bundle playbackBundle = GetCharacterPlaybackBundle();
 
             try
             {
                 _model.StatusText = $"{selectedItem.DisplayName} · loading animation...";
                 AnimationClipCatalogItem animItem = await catalog.PrepareAsync(
                     selectedItem,
-                    bundle,
+                    playbackBundle,
                     path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
                     LogService,
                     operation.Token);
@@ -5397,9 +5409,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     int seed = HashCode.Combine(animItem.Name, bundle.Systems.Count);
                     _vfxRenderer.SetAnimationSession(
                         animItem.Composition,
-                        bundle.IdleEffects,
+                        playbackBundle.IdleEffects,
                         bundle.Systems,
-                        bundle.ResourceMap,
+                        playbackBundle.ResourceMap,
                         searchDir,
                         seed,
                         dur,
@@ -5409,9 +5421,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
 
                 int resolvedIdleVfx = VfxAbilityCompositionBuilder.CountResolvedIdleEffects(
-                    bundle.IdleEffects,
+                    playbackBundle.IdleEffects,
                     bundle.Systems,
-                    bundle.ResourceMap);
+                    playbackBundle.ResourceMap);
                 _model.IsPlaying = true;
                 _model.StatusText = $"{animItem.DisplayName} ({dur:F2}s) · {(animItem.HasVfx ? animItem.VfxSummary : "Animation only")}";
                 _model.LogMessages.Add($"[PLAY ANIMATION] {animItem.DisplayName} ({dur:F2}s) with {(animItem.Composition?.ResolvedCount ?? 0)} VFX events & {resolvedIdleVfx} resolved idle auras.");
@@ -5569,6 +5581,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationClipCancellation = operation;
             VfxClipCatalog catalog = _clipCatalog;
             VfxLoadingService.Bundle bundle = _activeBundle;
+            VfxLoadingService.Bundle playbackBundle = GetCharacterPlaybackBundle();
 
             try
             {
@@ -5582,7 +5595,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.StatusText = $"{spell.Name} · loading cast animation...";
                     AnimationClipCatalogItem prepared = await catalog.PrepareAsync(
                         requestedAnimation,
-                        bundle,
+                        playbackBundle,
                         path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
                         LogService,
                         operation.Token);
@@ -5620,7 +5633,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     : hash => VfxLoadingService.ResolveBinEntryPath(hash);
                 VfxSpellPreviewPlan plan = VfxSpellPreviewComposer.Build(
                     spell,
-                    bundle,
+                    playbackBundle,
                     clips,
                     ResolveSpellLaunchFrame,
                     resolveSystemPath);
@@ -5783,7 +5796,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _activeAnimationClip = clip;
             foreach (ModelPart part in _championModel.Parts)
                 _animationBasePartVisibility[part] = part.IsVisible;
-            foreach (uint hash in _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>())
+            foreach (uint hash in GetCharacterFormHiddenSubmeshes())
                 _animationBaseHiddenSubmeshes.Add(hash);
 
             _animationVisibilityTimeline = VfxClipCueEvaluator.BuildVisibilityTimeline(
@@ -5861,6 +5874,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.CharacterSubmeshes.Add(option);
                 }
             }
+            RebuildCharacterFormOptions();
             _model.NotifyCharacterCollectionsChanged();
             ApplyEffectiveCharacterSubmeshes();
         }
@@ -5887,15 +5901,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
             _model.SelectedWorkspaceTab.CharacterSubmeshOverrides.Clear();
             if (_championModel != null)
-            {
-                foreach (ModelPart part in _championModel.Parts)
-                {
-                    if (!string.IsNullOrEmpty(part.MaterialDefinition?.BaseTextureName))
-                    {
-                        part.SelectedTextureName = part.MaterialDefinition.BaseTextureName;
-                    }
-                }
-            }
+                VfxCharacterFormSemantics.RestoreAuthoredTextures(_championModel.Parts);
             ApplyEffectiveCharacterSubmeshes();
             OpenTkControl?.InvalidateVisual();
         }
@@ -5916,8 +5922,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationBaseHiddenSubmeshes.Clear();
             _animationVisibilityTimeline = Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
             _championAnimationService?.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
-            ApplyOwnerSubmeshVisibility(
-                _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>());
+            ApplyOwnerSubmeshVisibility(GetCharacterFormHiddenSubmeshes());
         }
 
         private void ResetChampionToBindPose()

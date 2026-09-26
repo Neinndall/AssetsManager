@@ -75,7 +75,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 VfxAnimationParser.ExtractEventSequences(tree, animationGraphs),
                 VfxAnimationParser.ExtractOwnerSceneContext(tree),
                 VfxAnimationParser.ExtractIdleEffects(tree),
-                animationGraphs);
+                animationGraphs,
+                VfxCharacterFormParser.ParseDocument(tree));
         }
 
         internal static VfxSystemDefinition ResolveCustomMaterials(

@@ -92,6 +92,7 @@ namespace AssetsManager.Views.Models.Viewer
         internal bool CharacterPlacementCustomized { get; set; }
         internal string CharacterPlacedOnKey { get; set; }
         internal Dictionary<uint, bool> CharacterSubmeshOverrides { get; } = new();
+        internal uint? SelectedCharacterFormPathHash { get; set; }
 
         public bool IsSelected
         {

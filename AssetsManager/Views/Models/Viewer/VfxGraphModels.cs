@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Vfx.Parsing;
 namespace AssetsManager.Views.Models.Viewer
 {
     public enum VfxPrimitiveKind
@@ -46,7 +47,8 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<AnimationClipDefinition> EventSequences,
         VfxOwnerSceneContext OwnerSceneContext,
         IReadOnlyList<VfxIdleEffectDefinition> IdleEffects = null,
-        IReadOnlyList<AnimationGraphDefinition> AnimationGraphs = null);
+        IReadOnlyList<AnimationGraphDefinition> AnimationGraphs = null,
+        VfxCharacterFormDocumentData CharacterFormData = null);
 
     /// <summary>
     /// Domain graph for a League VFX system and its emitter nodes.

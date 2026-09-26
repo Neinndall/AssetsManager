@@ -2087,6 +2087,23 @@
 
                             <!-- GEOMETRY CONTENT -->
                             <StackPanel Visibility="{Binding IsChecked, ElementName=VfxCharacterGeometrySection, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,0,12">
+                                <Border Background="{StaticResource CardBackground}" CornerRadius="12"
+                                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,10" Margin="0,0,0,8"
+                                        Visibility="{Binding HasCharacterForms, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <materialIcons:MaterialIcon Kind="LayersOutline" Width="14" Height="14"
+                                                                        Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                            <TextBlock Text="FORM" FontSize="10.5" FontWeight="Bold"
+                                                       Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <ComboBox ItemsSource="{Binding CharacterForms}" DisplayMemberPath="Label"
+                                                  SelectedItem="{Binding SelectedCharacterForm, Mode=TwoWay}"
+                                                  Style="{StaticResource ModernComboBox}" Height="28" FontSize="11"
+                                                  ToolTip="Select character form"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- Armature Card -->
                                 <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,10" Margin="0,0,0,8">
                                     <UniformGrid Columns="2">
