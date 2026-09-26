@@ -2183,6 +2183,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void ResetCamera()
         {
+            if (TryGetStandaloneMapCenter(out _))
+            {
+                SnapMapCamera(_mapSceneRuntime?.Scene);
+                return;
+            }
+
             ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
         }
 
@@ -2211,8 +2217,9 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _model.PreviewCameraPreset = VfxPreviewCameraPreset.Orbit;
                 VfxCameraStand orbit = VfxPreviewCamera.Stand(VfxPreviewCameraPreset.Orbit);
-                _cameraController.PerspectiveMinDistance = orbit.Nearest ?? 0d;
-                _cameraController.PerspectiveMaxDistance = orbit.Farthest ?? double.PositiveInfinity;
+                bool isStandaloneMap = TryGetStandaloneMapCenter(out _);
+                _cameraController.PerspectiveMinDistance = isStandaloneMap ? 10d : (orbit.Nearest ?? 0d);
+                _cameraController.PerspectiveMaxDistance = isStandaloneMap ? 50000d : (orbit.Farthest ?? double.PositiveInfinity);
             }
             finally
             {
@@ -2259,8 +2266,17 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_cameraController == null) return;
 
             VfxCameraStand stand = VfxPreviewCamera.Stand(preset);
-            _cameraController.PerspectiveMinDistance = stand.Nearest ?? 0d;
-            _cameraController.PerspectiveMaxDistance = stand.Farthest ?? double.PositiveInfinity;
+            bool isStandaloneMap = TryGetStandaloneMapCenter(out _);
+            if (isStandaloneMap)
+            {
+                _cameraController.PerspectiveMinDistance = stand.Farthest != null ? (stand.Nearest ?? 1000d) : 10d;
+                _cameraController.PerspectiveMaxDistance = stand.Farthest != null ? stand.Farthest.Value : 50000d;
+            }
+            else
+            {
+                _cameraController.PerspectiveMinDistance = stand.Nearest ?? 0d;
+                _cameraController.PerspectiveMaxDistance = stand.Farthest ?? double.PositiveInfinity;
+            }
 
             ProjectionCamera camera;
             if (stand.Orthographic)
@@ -2293,7 +2309,42 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
+            if (TryGetStandaloneMapCenter(out _) &&
+                _model.PreviewCameraPreset == VfxPreviewCameraPreset.Orbit)
+            {
+                var mapOrbitStand = new VfxCameraStand(
+                    Vector3.Normalize(new Vector3(280f, 150f, 400f)),
+                    Vector3.UnitY,
+                    stand.FieldOfView,
+                    Orthographic: false);
+                FramePreviewBounds(CurrentPreviewBounds(), mapOrbitStand);
+                return;
+            }
+
             FramePreviewBounds(CurrentPreviewBounds(), stand);
+        }
+
+        private bool TryGetStandaloneMapCenter(out Vector3 center)
+        {
+            center = Vector3.Zero;
+            if (_mapSceneIsCharacterBackdrop || _mapSceneRuntime?.Scene?.Geometry == null)
+                return false;
+
+            int visibilityFlags = _mapSceneRuntime.VisibilityFlags;
+            Vector3? calculatedOrigin = MapGeometrySemantics.CalculateOriginForFlags(
+                _mapSceneRuntime.Scene.Geometry, visibilityFlags);
+            if (calculatedOrigin is not Vector3 engineOrigin)
+                return false;
+
+            center = new Vector3(-engineOrigin.X, engineOrigin.Y + 300f, engineOrigin.Z);
+            return true;
+        }
+
+        private static VfxDefinitionBounds MapFrameBounds(Vector3 center)
+        {
+            return new VfxDefinitionBounds(
+                new Vector3(center.X - 1500f, center.Y - 300f, center.Z - 1500f),
+                new Vector3(center.X + 1500f, center.Y + 300f, center.Z + 1500f));
         }
 
         private VfxDefinitionBounds CurrentPreviewBounds()
@@ -2309,6 +2360,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 VfxRigSettings settings = _vfxRenderer?.RigSettings ??
                     VfxRigSettings.ForPreset(_model.RigPreset);
                 return VfxSystemBounds.Calculate(definition, settings);
+            }
+
+            if (TryGetStandaloneMapCenter(out Vector3 mapCenter))
+            {
+                return MapFrameBounds(mapCenter);
             }
 
             return DefaultPreviewBounds();
@@ -2350,6 +2406,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private Vector3 CurrentPreviewGround()
         {
+            if (TryGetStandaloneMapCenter(out Vector3 mapCenter))
+            {
+                return mapCenter;
+            }
+
             if (_model.IsRawSystemsMode && _model.SelectedSystem?.Definition is { } definition)
             {
                 VfxRigSettings settings = _vfxRenderer?.RigSettings ??
@@ -3917,6 +3978,8 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_dummyViewport.Camera is not PerspectiveCamera)
                 _dummyViewport.Camera = _previewPerspectiveCamera;
             _previewPerspectiveCamera.FieldOfView = 45d;
+            _cameraController.PerspectiveMinDistance = 10d;
+            _cameraController.PerspectiveMaxDistance = 50000d;
 
             var target = new Point3D(-engineOrigin.X, engineOrigin.Y + 300f, engineOrigin.Z);
             var direction = new Vector3D(280d, 150d, 400d);
