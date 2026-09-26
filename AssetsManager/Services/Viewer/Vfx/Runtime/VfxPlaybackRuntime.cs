@@ -43,6 +43,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public uint ErosionTexture;
             public uint ReflectionTexture;
             public uint PaletteTexture;
+            public readonly Dictionary<string, uint> ProgramTextures = new(StringComparer.OrdinalIgnoreCase);
+            public readonly Dictionary<string, object> PendingProgramTextures = new(StringComparer.OrdinalIgnoreCase);
             public object PendingTexture;
             public object PendingTextureMult;
             public object PendingDistortionTexture;
@@ -178,6 +180,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 ReflectionTexture = 0;
                 PaletteTexture = 0;
                 ColorGradientTexture = 0;
+                ProgramTextures.Clear();
+                PendingProgramTextures.Clear();
                 PendingTexture = null;
                 PendingTextureMult = null;
                 PendingDistortionTexture = null;

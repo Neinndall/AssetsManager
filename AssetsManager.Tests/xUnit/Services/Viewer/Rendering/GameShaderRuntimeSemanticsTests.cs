@@ -9,6 +9,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
 {
     public sealed class GameShaderRuntimeSemanticsTests
     {
+        [Theory]
+        [InlineData(0.1f, 1000f, 0.2f)]
+        [InlineData(1f, 10000f, 50f)]
+        [InlineData(5f, 200f, 150f)]
+        public void DepthConversionReconstructsTheStoredStockOpenGlDepth(float near, float far, float distance)
+        {
+            var projection = Matrix4x4.CreatePerspectiveFieldOfView(1f, 1.5f, near, far);
+            Vector4 clip = Vector4.Transform(new Vector4(0f, 0f, -distance, 1f), projection);
+            float storedDepth = (clip.Z / clip.W + 1f) * 0.5f;
+            Vector2 conversion = GameShaderRuntime.DepthConversion(projection);
+            float reconstructed = 1f / (conversion.X + storedDepth * conversion.Y);
+            Assert.InRange(reconstructed, distance * 0.999f, distance * 1.001f);
+        }
+
+        [Fact]
+        public void OrthographicDepthConversionPreservesDistanceGaps()
+        {
+            var projection = Matrix4x4.CreateOrthographic(100f, 100f, 1f, 201f);
+            var conversion = GameShaderRuntime.DepthConversion(projection);
+            float Read(float distance)
+            {
+                var clip = Vector4.Transform(new Vector4(0f, 0f, -distance, 1f), projection);
+                float depth = (clip.Z + 1f) * 0.5f;
+                return 1f / (conversion.X + depth * conversion.Y);
+            }
+            Assert.InRange(Read(100f) - Read(50f), 49.8f, 50.2f);
+        }
+
         [Fact]
         public void BufferTexturesRequireIntegerNearestNeutralSampling()
         {

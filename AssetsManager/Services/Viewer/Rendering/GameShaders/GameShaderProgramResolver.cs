@@ -59,7 +59,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             AppSettings settings,
             bool lowQuality = false)
         {
-            if (pass == null || string.IsNullOrWhiteSpace(pass.ShaderPath))
+            if (pass == null || !HasShaderPath(pass))
                 return new ShaderBytecodeRead(null, "The pass links no shader the defs declare.");
 
             string cachePath = FindShaderCachePath(settings);
@@ -160,9 +160,22 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         private static ShaderBytecodeRead UnavailableRead(
             GameMaterialPass pass,
             string failure) =>
-            pass == null || string.IsNullOrWhiteSpace(pass.ShaderPath)
+            pass == null || !HasShaderPath(pass)
                 ? new ShaderBytecodeRead(null, "The pass links no shader the defs declare.")
                 : new ShaderBytecodeRead(null, failure);
+
+        private static bool HasShaderPath(GameMaterialPass pass) =>
+            !string.IsNullOrWhiteSpace(ShaderPathForStage(pass, vertexStage: true)) &&
+            !string.IsNullOrWhiteSpace(ShaderPathForStage(pass, vertexStage: false));
+
+        private static string ShaderPathForStage(GameMaterialPass pass, bool vertexStage)
+        {
+            if (pass == null)
+                return null;
+
+            string stagePath = vertexStage ? pass.VertexShaderPath : pass.PixelShaderPath;
+            return !string.IsNullOrWhiteSpace(stagePath) ? stagePath : pass.ShaderPath;
+        }
 
         private static ShaderBytecodeRead ReadFromWad(
             GameMaterialPass pass,
@@ -171,14 +184,14 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             string cachePath,
             bool lowQuality)
         {
-            if (pass == null || string.IsNullOrWhiteSpace(pass.ShaderPath))
+            if (pass == null || !HasShaderPath(pass))
                 return new ShaderBytecodeRead(null, "The pass links no shader the defs declare.");
 
             IReadOnlyList<GameMaterialDefine> defines = BuildDefineList(pass, kind, lowQuality);
             try
             {
-                byte[] vertex = ReadStage(wad, pass.ShaderPath, "vs", defines);
-                byte[] pixel = ReadStage(wad, pass.ShaderPath, "ps", defines);
+                byte[] vertex = ReadStage(wad, ShaderPathForStage(pass, vertexStage: true), "vs", defines);
+                byte[] pixel = ReadStage(wad, ShaderPathForStage(pass, vertexStage: false), "ps", defines);
                 ShaderReflectionData vertexReflection = DxbcReflection.Reflect(vertex);
                 ShaderReflectionData pixelReflection = DxbcReflection.Reflect(pixel);
                 return new ShaderBytecodeRead(
@@ -363,4 +376,3 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
     }
 }
-

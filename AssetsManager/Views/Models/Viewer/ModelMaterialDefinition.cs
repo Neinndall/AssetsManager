@@ -25,6 +25,9 @@ namespace AssetsManager.Views.Models.Viewer
         internal System.Collections.Generic.IReadOnlyList<GameMaterialTextureSwap> TextureSwaps { get; init; } =
             System.Array.Empty<GameMaterialTextureSwap>();
 
+        internal System.Collections.Generic.IReadOnlyList<GameMaterialDynamicParameter> DynamicParameters { get; init; } =
+            System.Array.Empty<GameMaterialDynamicParameter>();
+
         internal string ResolveTextureSwap(string samplerName, int gearIndex)
         {
             foreach (var swap in TextureSwaps)

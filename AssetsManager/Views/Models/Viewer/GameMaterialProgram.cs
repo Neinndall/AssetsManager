@@ -97,7 +97,11 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<KeyValuePair<string, bool>> RuntimeSwitches,
         IReadOnlyList<GameMaterialTexture> Textures,
         IReadOnlyList<GameMaterialParameter> Parameters,
-        GameMaterialPassState State);
+        GameMaterialPassState State)
+    {
+        internal string VertexShaderPath { get; init; }
+        internal string PixelShaderPath { get; init; }
+    }
 
     internal sealed record GameMaterialProgram(
         GameMaterialKind Kind,

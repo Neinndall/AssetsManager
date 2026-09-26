@@ -346,6 +346,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 if (resetResolved)
                     emitter.ResetResolvedResources();
 
+                if (emitter.Def.CustomMaterial?.Program?.Passes != null)
+                    foreach (var pass in emitter.Def.CustomMaterial.Program.Passes)
+                        foreach (var texture in pass.Textures)
+                        {
+                            string path = texture.Texture?.VirtualPath;
+                            if (string.IsNullOrWhiteSpace(path) && texture.Texture?.PathHash > 0)
+                                path = texture.Texture.PathHash.ToString("x16");
+                            if (!string.IsNullOrWhiteSpace(path))
+                                emitter.PendingProgramTextures[path] = _resources.ResolveMaterialTexture(path, searchDirectory);
+                        }
                 emitter.PendingTexture = _resources.ResolveTexture(emitter.Def.TexturePath, searchDirectory);
                 emitter.PendingTextureMult = _resources.ResolveTexture(emitter.Def.TextureMultPath, searchDirectory);
                 emitter.PendingDistortionTexture = _resources.ResolveTexture(
@@ -457,7 +467,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         private static bool UsesSameResolvedAssets(VfxEmitterDefinition before, VfxEmitterDefinition after)
         {
             if (before is null || after is null) return before is null && after is null;
-            return string.Equals(before.TexturePath, after.TexturePath, StringComparison.OrdinalIgnoreCase) &&
+            return Equals(before.CustomMaterial?.Program, after.CustomMaterial?.Program) &&
+                   string.Equals(before.TexturePath, after.TexturePath, StringComparison.OrdinalIgnoreCase) &&
                    string.Equals(before.TextureMultPath, after.TextureMultPath, StringComparison.OrdinalIgnoreCase) &&
                    string.Equals(before.ParticleColorTexturePath, after.ParticleColorTexturePath, StringComparison.OrdinalIgnoreCase) &&
                    string.Equals(before.AlphaErosion?.TexturePath, after.AlphaErosion?.TexturePath, StringComparison.OrdinalIgnoreCase) &&

@@ -17,7 +17,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
     /// OpenGL execution layer for translated game material programs. Resolution/translation stay in
     /// GameShaderProgramResolver/Translator; this class owns only GL programs, UBOs and bindings.
     /// </summary>
-    internal sealed class GameShaderRuntime : IDisposable
+    internal sealed partial class GameShaderRuntime : IDisposable
     {
         private const string Globals = "$Globals";
         private const string MaterialTextureSuffix = "__TX";
@@ -118,7 +118,23 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
         private sealed record CacheEntry(
             IReadOnlyList<PassRuntimeEntry> Passes,
-            string Failure);
+            string Failure)
+        {
+            private int? _dynamicGear;
+            private readonly Dictionary<string, Vector4> _dynamicParameters = new(StringComparer.Ordinal);
+
+            internal IReadOnlyDictionary<string, Vector4> DynamicParameters(ModelMaterialDefinition material, int gear)
+            {
+                if (_dynamicGear != gear)
+                {
+                    _dynamicParameters.Clear();
+                    foreach (var parameter in material.DynamicParameters)
+                        if (parameter.Evaluate(gear) is Vector4 value) _dynamicParameters[parameter.Name] = value;
+                    _dynamicGear = gear;
+                }
+                return _dynamicParameters;
+            }
+        }
 
         private readonly GL _gl;
         private readonly bool _gles;
@@ -246,7 +262,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
             _gl.UseProgram(runtime.Program);
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents);
-            UpdateBlocks(runtime, passEntry.Globals, null, frame, new CharacterDraw(world, bones, selfIllumination));
+            UpdateBlocks(runtime, passEntry.Globals, null, frame, new CharacterDraw(world, bones, selfIllumination),
+                overrides: entry.DynamicParameters(material, gearIndex));
             BindSkinnedTextures(runtime, passEntry.Pass, programTexture, material, gearIndex);
             ApplyPassState(passEntry.Pass.State, material.RenderState.DoubleSided);
             return true;
@@ -262,7 +279,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 ? entry.Failure
                 : null;
 
-        private CacheEntry GetOrCreate(object owner, GameMaterialProgram program)
+        private CacheEntry GetOrCreate(object owner, GameMaterialProgram program, bool? particleMesh = null)
         {
             if (owner != null && _programs.TryGetValue(owner, out CacheEntry cached))
                 return cached;
@@ -303,7 +320,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                                 continue;
                             }
 
-                            string key = ProgramKey(passRead.Pass, passRead.Bytecode.Program);
+                            string key = program.Kind + "|" + particleMesh + "|" + ProgramKey(passRead.Pass, passRead.Bytecode.Program);
                             if (!_sharedPrograms.TryGetValue(key, out ProgramRuntime ready))
                             {
                                 GameShaderTranslator.TranslationRead translated =
@@ -321,7 +338,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
                                 try
                                 {
-                                    ready = CreateProgram(translated.Program, program.Kind);
+                                    ready = CreateProgram(particleMesh.HasValue
+                                        ? GameParticleShaderPrelude.Compose(translated.Program, particleMesh.Value)
+                                        : translated.Program, program.Kind, particleMesh.HasValue);
                                     _sharedPrograms[key] = ready;
                                 }
                                 catch (Exception ex)
@@ -360,10 +379,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
         private ProgramRuntime CreateProgram(
             GameShaderTranslator.TranslatedProgram translated,
-            GameMaterialKind kind)
+            GameMaterialKind kind, bool particle = false)
         {
-            IReadOnlyDictionary<uint, string> attributes = AttributeLocations(translated.Vertex.Sidecar.Attributes, kind);
-            string vertex = SourceForProfile(translated.Vertex.Glsl, vertexStage: true);
+            IReadOnlyDictionary<uint, string> attributes = particle ? new Dictionary<uint, string>() :
+                AttributeLocations(translated.Vertex.Sidecar.Attributes, kind);
+            string vertex = SourceForProfile(translated.Vertex.Glsl, vertexStage: true, preserveInputs: particle);
             string pixel = SourceForProfile(translated.Pixel.Glsl, vertexStage: false);
             uint program = GlShaderCompiler.CreateRawProgram(_gl, vertex, pixel, attributes);
 
@@ -432,10 +452,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             }
         }
 
-        private string SourceForProfile(string source, bool vertexStage)
+        private string SourceForProfile(string source, bool vertexStage, bool preserveInputs = false)
         {
             string result = source ?? string.Empty;
-            if (vertexStage)
+            if (vertexStage && !preserveInputs)
             {
                 // SPIRV-Cross may preserve Vulkan interface locations. The renderer owns stable
                 // engine semantics, so remove only vertex-input locations and let
@@ -476,7 +496,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 ";",
                 (bytecode?.Defines ?? Array.Empty<GameMaterialDefine>())
                     .Select(define => define.Name + "=" + define.Value));
-            return shader + "|" + defines;
+            return shader + "|" + pass?.VertexShaderPath + "|" + pass?.PixelShaderPath + "|" + defines;
         }
 
         private static IReadOnlyDictionary<uint, string> AttributeLocations(
@@ -544,16 +564,17 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             PassGlobals globals,
             MapGeometryMeshData mesh,
             in Frame frame,
-            CharacterDraw? character)
+            CharacterDraw? character, VfxEmitterDefinition particle = null,
+            IReadOnlyDictionary<string, Vector4> overrides = null)
         {
-            bool skinned = character.HasValue;
+            bool skinned = character.HasValue || particle != null;
             foreach (BlockRuntime block in runtime.Blocks)
             {
                 Array.Clear(block.Data, 0, block.Data.Length);
                 switch (block.Block.Name)
                 {
                     case Globals:
-                        WriteGlobals(block.Data, block.Block, globals, mesh);
+                        WriteGlobals(block.Data, block.Block, globals, mesh, overrides);
                         break;
                     case "PerFrameVertexCB":
                         WritePerFrameVertex(block.Data, frame, skinned);
@@ -561,11 +582,15 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     case "PerFramePixelCB":
                         WritePerFramePixel(block.Data, frame, skinned);
                         break;
-                    case "CharacterPerDrawVertexCB" when character.HasValue:
+                    case "CharacterPerDrawVertexCB" when character.HasValue || particle != null:
                         WriteCharacterPerDrawVertex(block.Data, frame);
                         break;
-                    case "CharacterPerDrawPS" when character.HasValue:
-                        WriteCharacterPerDrawPixel(block.Data, character.Value);
+                    case "CharacterPerDrawPS" when character.HasValue || particle != null:
+                        WriteCharacterPerDrawPixel(block.Data, character ?? new CharacterDraw(Matrix4x4.Identity, Array.Empty<Matrix4x4>()));
+                        break;
+                    case "VFXDynamicPerParticleInstanceCBVS" when particle != null:
+                        WriteVector4(block.Data, 4, 4, Vector4.One);
+                        Set(block.Data, 10, particle.DepthPushPull);
                         break;
                     case "BonesCB" when character.HasValue:
                         WriteBones(block.Data, character.Value);
@@ -583,7 +608,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             float[] data,
             GameShaderTranslator.UniformBlock block,
             PassGlobals globals,
-            MapGeometryMeshData mesh)
+            MapGeometryMeshData mesh, IReadOnlyDictionary<string, Vector4> overrides = null)
         {
             IReadOnlyDictionary<string, Vector4> parameters = globals?.Parameters;
             IReadOnlyDictionary<string, bool> switches = globals?.RuntimeSwitches;
@@ -609,6 +634,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     continue;
                 }
 
+                if (overrides != null && overrides.TryGetValue(member.Name, out Vector4 dynamicValue))
+                {
+                    WriteVector4(data, at, count, dynamicValue);
+                    continue;
+                }
                 if (parameters != null && parameters.TryGetValue(member.Name, out Vector4 value))
                 {
                     WriteVector4(data, at, count, value);
@@ -673,6 +703,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             Set(data, 15, 1f);
             WriteVector3(data, 16, complement);
             Set(data, 19, 1f);
+            Vector2 depth = DepthConversion(frame.Projection);
+            Set(data, 20, depth.X);
+            Set(data, 21, depth.Y);
             WriteVector3(data, 24, sun);
             Set(data, 27, 1f);
             WriteVector3(data, 29, direction);
@@ -695,6 +728,15 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             }
             WriteMatrixRows(data, 68, frame.View);
             WriteMatrixRows(data, 104, cameraWorld);
+        }
+
+        internal static Vector2 DepthConversion(Matrix4x4 projection)
+        {
+            if (MathF.Abs(projection.M34) > 0f && projection.M43 != 0f)
+                return new Vector2((projection.M33 - 1f) / projection.M43, 2f / projection.M43);
+            float span = projection.M33 == 0f ? 1f : MathF.Abs(2f / projection.M33);
+            const float slope = 1e-3f;
+            return new Vector2(slope / span, -slope * slope / span);
         }
 
         internal static void WriteCharacterPerDrawVertex(float[] data, in Frame frame)

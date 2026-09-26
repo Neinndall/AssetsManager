@@ -1677,7 +1677,7 @@ namespace AssetsManager.Views.Controls.Viewer
             var renderer = new VfxRenderSession(LogService, VfxLoadingService);
             try
             {
-                renderer.Initialize(_gl);
+                renderer.Initialize(_gl, AppSettings);
                 _vfxRenderer = renderer;
             }
             catch
@@ -1769,7 +1769,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_mapParticleRenderer == null)
                 {
                     _mapParticleRenderer = new MapParticleRenderer();
-                    _mapParticleRenderer.Initialize(_gl);
+                    _mapParticleRenderer.Initialize(_gl, AppSettings);
                 }
                 _championAnimationService ??= new AnimationService(LogService);
 
@@ -1963,6 +1963,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 // keep their renderers separate but coordinate the phases: every soft-depth grab
                 // happens before particle colour, then all colour/wire draws land before either
                 // renderer captures the frame used by distortion.
+                _mapParticleRenderer?.SetSun(EffectiveMapSun());
+                _vfxRenderer?.SetSun(EffectiveMapSun());
                 bool mapParticlesPrepared = _mapSceneRuntime.ShowParticles &&
                     _mapParticleRenderer?.PrepareRenderFrame(
                         _mapSceneRuntime.Particles.VisibleRuntimes,
@@ -2018,6 +2020,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (!characterBackdrop)
             {
+                _vfxRenderer?.SetSun(null);
                 AdvanceCurrentVfxPlayback(dt);
                 UpdateChampionPoseForFrame();
                 RenderChampionMesh(viewProj, view, proj, eye);

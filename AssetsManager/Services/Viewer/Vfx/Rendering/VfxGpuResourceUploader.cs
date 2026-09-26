@@ -97,6 +97,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 renderer,
                 ref budget);
 
+            foreach (string path in new List<string>(emitter.PendingProgramTextures.Keys))
+            {
+                object pending = emitter.PendingProgramTextures[path];
+                uint handle = pending is VfxCubeMapData
+                    ? UploadCubeMap(ref pending, emitter.ProgramTextures.GetValueOrDefault(path), renderer, ref budget)
+                    : UploadTexture(ref pending, emitter.ProgramTextures.GetValueOrDefault(path), renderer, ref budget);
+                if (pending == null) emitter.PendingProgramTextures.Remove(path);
+                else emitter.PendingProgramTextures[path] = pending;
+                if (handle != 0) emitter.ProgramTextures[path] = handle;
+            }
+
             if (emitter.PendingMesh is { } mesh)
             {
                 bool skinning = mesh.HasSkinning;

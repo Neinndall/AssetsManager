@@ -63,6 +63,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal SknMaterialPassDefinition Pass { get; init; }
         internal bool IsAnimated { get; init; }
         internal IReadOnlyList<GameMaterialTextureSwap> TextureSwaps { get; init; } = Array.Empty<GameMaterialTextureSwap>();
+        internal IReadOnlyList<GameMaterialDynamicParameter> DynamicParameters { get; init; } = Array.Empty<GameMaterialDynamicParameter>();
         internal uint ShaderHash { get; init; }
         internal string ShaderPath { get; init; }
         internal GameMaterialProgram Program { get; init; }
@@ -1319,6 +1320,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return new SknMaterialDefinition(samplers, parameters)
             {
                 TextureSwaps = SknDynamicMaterialParser.Read(obj.Properties, wadChunkPathResolver),
+                DynamicParameters = SknDynamicMaterialParser.ReadParameters(obj.Properties),
                 Switches = switches,
                 SwitchStates = switchStates,
                 ShaderMacros = shaderMacros,

@@ -165,11 +165,27 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 }
             }
 
+            if (obj.Properties.TryGetValue(Fnv1a.HashLower("dynamicMaterial"), out var dynamicMaterial))
+                PrintDynamicProperty(dynamicMaterial, 0);
+
             uint shaderHash = ReadShaderHash(obj.Properties);
             if (shaderHash != 0)
             {
                 Console.WriteLine($"    shader=0x{shaderHash:x8}");
             }
+        }
+
+        private static void PrintDynamicProperty(BinTreeProperty property, int depth)
+        {
+            string prefix = new string(' ', depth * 2 + 4);
+            string type = property is BinTreeStruct structure ? $" class={structure.ClassHash:x8}" : string.Empty;
+            string value = GetValue(new Dictionary<uint, BinTreeProperty> { [property.NameHash] = property }, property.NameHash);
+            Console.WriteLine($"{prefix}{property.NameHash:x8} {property.GetType().Name}{type}: {value}");
+            if (depth >= 32) return;
+            if (property is BinTreeStruct nested)
+                foreach (var child in nested.Properties.Values) PrintDynamicProperty(child, depth + 1);
+            else if (property is BinTreeContainer container)
+                foreach (var child in container.Elements) PrintDynamicProperty(child, depth + 1);
         }
 
         private static bool TryGetStruct(

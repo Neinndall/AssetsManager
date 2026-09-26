@@ -11,6 +11,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
     /// <summary>Decodes the six-face DDS reflection resources consumed by League's mesh shader.</summary>
     internal static class VfxCubeMapDecoder
     {
+        internal static bool HasCubeHeader(string path)
+        {
+            try
+            {
+                using var stream = File.OpenRead(path);
+                Span<byte> header = stackalloc byte[128];
+                stream.ReadExactly(header);
+                return System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(header) == 0x20534444 &&
+                    (System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(header.Slice(112, 4)) & 0x200) != 0;
+            }
+            catch (IOException) { return false; }
+            catch (UnauthorizedAccessException) { return false; }
+        }
+
         internal static VfxCubeMapData Decode(string path)
         {
             try

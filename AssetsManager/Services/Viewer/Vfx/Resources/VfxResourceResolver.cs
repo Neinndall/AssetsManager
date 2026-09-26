@@ -60,6 +60,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             return texture;
         }
 
+        internal object ResolveMaterialTexture(string authoredPath, string searchDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(authoredPath) || string.IsNullOrWhiteSpace(searchDirectory)) return null;
+            string key = CreateKey(authoredPath, searchDirectory);
+            if (_cubeMaps.TryGetValue(key, out var cube)) return cube;
+            if (_textures.TryGetValue(key, out var texture)) return texture;
+            if (_missingTextures.Contains(key)) return null;
+            string resolved = ResolvePath(authoredPath, searchDirectory, TextureExtensions);
+            return resolved != null && VfxCubeMapDecoder.HasCubeHeader(resolved)
+                ? ResolveCubeMap(authoredPath, searchDirectory)
+                : ResolveTexture(authoredPath, searchDirectory);
+        }
+
         public VfxCubeMapData ResolveCubeMap(string authoredPath, string searchDirectory)
         {
             if (string.IsNullOrWhiteSpace(authoredPath) || string.IsNullOrWhiteSpace(searchDirectory)) return null;

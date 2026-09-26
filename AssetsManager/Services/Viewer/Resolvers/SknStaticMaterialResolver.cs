@@ -227,7 +227,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 HasAuthoredTint = hasTint,
                 Program = material.Program,
                 BaseSamplerName = baseSampler?.TextureName,
-                TextureSwaps = material.TextureSwaps
+                TextureSwaps = material.TextureSwaps,
+                DynamicParameters = material.DynamicParameters
             };
         }
 

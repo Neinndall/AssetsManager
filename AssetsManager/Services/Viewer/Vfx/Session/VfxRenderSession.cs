@@ -240,10 +240,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 : Matrix4x4.CreateTranslation(step.To);
         }
 
-        public void Initialize(GL gl)
+        public void Initialize(GL gl, AssetsManager.Utils.AppSettings settings = null)
         {
             _renderer = new VfxOpenGlRenderer();
-            _renderer.Initialize(gl);
+            _renderer.Initialize(gl, settings);
             _renderer.SetOwnerWorldTransform(_worldTransform);
             _ready = true;
         }
@@ -1342,6 +1342,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _purgeGpuResourcesBeforeNextFrame = false;
         }
 
+        internal void SetSun(MapSunData sun)
+        {
+            if (_renderer != null) _renderer.Sun = sun;
+        }
+
         internal bool PrepareRenderFrame(
             Matrix4x4 viewProjection,
             Matrix4x4 view,
@@ -1355,20 +1360,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _gpuResourceUploader.UploadPendingResources(_graphs, _renderer);
             _renderSources.Clear();
             bool needsSoftParticles = false;
+            bool needsSceneColor = false;
             foreach (VfxPlaybackGraphRuntime graph in _graphs)
             {
                 foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
                 {
                     IReadOnlyList<VfxPlaybackRuntime.EmitterState> emitters = runtime.Emitters;
                     _renderSources.Add(emitters);
-                    if (needsSoftParticles) continue;
+                    if (needsSoftParticles && needsSceneColor) continue;
 
                     foreach (VfxPlaybackRuntime.EmitterState emitter in emitters)
                     {
-                        if (!emitter.IsVisible || !VfxOpenGlRenderer.ShouldUseSoftParticles(emitter.Def, true))
-                            continue;
-                        needsSoftParticles = true;
-                        break;
+                        if (!emitter.IsVisible || emitter.InstanceCount == 0) continue;
+                        var inputs = _renderer.SceneInputsFor(emitter.Def);
+                        needsSoftParticles |= inputs.Depth;
+                        needsSceneColor |= inputs.Color;
                     }
                 }
             }
@@ -1376,7 +1382,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _renderer.CaptureScene(
                 _viewportWidth,
                 _viewportHeight,
-                false,
+                needsSceneColor,
                 needsSoftParticles);
             VfxRenderQueue.BuildInto(_renderSources, _renderQueue, _renderGraphOrders);
 

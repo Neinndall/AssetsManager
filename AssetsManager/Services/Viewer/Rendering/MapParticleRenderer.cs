@@ -34,12 +34,12 @@ namespace AssetsManager.Services.Viewer.Rendering
         private float _preparedWireOpacity;
         private bool _ready;
 
-        internal void Initialize(GL gl)
+        internal void Initialize(GL gl, AssetsManager.Utils.AppSettings settings = null)
         {
             ArgumentNullException.ThrowIfNull(gl);
             if (_ready) return;
             _renderer = new VfxOpenGlRenderer();
-            _renderer.Initialize(gl);
+            _renderer.Initialize(gl, settings);
             _ready = true;
         }
 
@@ -61,6 +61,11 @@ namespace AssetsManager.Services.Viewer.Rendering
             RenderPreparedDistortionPass();
         }
 
+        internal void SetSun(MapSunData sun)
+        {
+            if (_renderer != null) _renderer.Sun = sun;
+        }
+
         internal bool PrepareRenderFrame(
             IReadOnlyList<MapParticleRuntime> runtimes,
             Matrix4x4 viewProjection,
@@ -76,6 +81,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _sources.Clear();
             _graphs.Clear();
             bool needsSoftParticles = false;
+            bool needsSceneColor = false;
             foreach (MapParticleRuntime mapRuntime in runtimes)
             {
                 VfxPlaybackGraphRuntime graph = mapRuntime?.Graph;
@@ -85,16 +91,13 @@ namespace AssetsManager.Services.Viewer.Rendering
                 {
                     IReadOnlyList<VfxPlaybackRuntime.EmitterState> emitters = runtime.Emitters;
                     _sources.Add(emitters);
-                    if (needsSoftParticles) continue;
+                    if (needsSoftParticles && needsSceneColor) continue;
                     foreach (VfxPlaybackRuntime.EmitterState emitter in emitters)
                     {
-                        if (!emitter.IsVisible ||
-                            !VfxOpenGlRenderer.ShouldUseSoftParticles(emitter.Def, true))
-                        {
-                            continue;
-                        }
-                        needsSoftParticles = true;
-                        break;
+                        if (!emitter.IsVisible || emitter.InstanceCount == 0) continue;
+                        var inputs = _renderer.SceneInputsFor(emitter.Def);
+                        needsSoftParticles |= inputs.Depth;
+                        needsSceneColor |= inputs.Color;
                     }
                 }
             }
@@ -103,7 +106,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 return false;
 
             _uploader.UploadPendingResources(_graphs, _renderer);
-            _renderer.CaptureScene(viewportWidth, viewportHeight, false, needsSoftParticles);
+            _renderer.CaptureScene(viewportWidth, viewportHeight, needsSceneColor, needsSoftParticles);
             VfxRenderQueue.BuildInto(_sources, _queue, _graphOrders);
 
             _preparedView = MapParticleSemantics.ViewportView(view);
