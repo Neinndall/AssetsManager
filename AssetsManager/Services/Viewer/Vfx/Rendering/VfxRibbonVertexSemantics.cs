@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
+using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Rendering
@@ -147,18 +148,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector2 offset,
             bool flipU,
             bool flipV)
-        {
-            Vector2 placed = (raw - center) * scale;
-            float c = MathF.Cos(radians);
-            float s = MathF.Sin(radians);
-            Vector2 result = new(
-                placed.X * c - placed.Y * s,
-                placed.X * s + placed.Y * c);
-            result += center + offset;
-            if (flipU) result.X = 1f - result.X;
-            if (flipV) result.Y = 1f - result.Y;
-            return result;
-        }
+            => VfxTextureTransformUtils.Transform(raw, center, scale, radians, offset, flipU, flipV);
 
         internal static Vector2 TransformLockedAlpha(
             Vector2 raw,
@@ -166,36 +156,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             float radians,
             bool flipU,
             bool flipV)
-        {
-            Vector2 placed = raw * scale;
-            float c = MathF.Cos(radians);
-            float s = MathF.Sin(radians);
-            Vector2 result = new(
-                placed.X * c - placed.Y * s,
-                placed.X * s + placed.Y * c);
-            if (flipU) result.X = 1f - result.X;
-            if (flipV) result.Y = 1f - result.Y;
-            return result;
-        }
+            => VfxTextureTransformUtils.TransformLockedAlpha(raw, scale, radians, flipU, flipV);
 
         internal static Vector2 Cell(float logicalFrame, Vector2 divisions)
-        {
-            int columns = Math.Max(1, (int)MathF.Round(MathF.Max(1f, divisions.X)));
-            int rows = Math.Max(1, (int)MathF.Round(MathF.Max(1f, divisions.Y)));
-            int cells = checked(columns * rows);
-            int frame = (int)MathF.Floor(logicalFrame + 0.0001f);
-            int cell = ((frame % cells) + cells) % cells;
-            return new Vector2(cell % columns, cell / columns);
-        }
+            => VfxTextureTransformUtils.ResolveGridCell(logicalFrame, divisions);
 
         private static float LookupAxis(int kind, float scale, float offset, float age01, float speed, float birthRandom)
-            => kind switch
-            {
-                1 => scale * age01 + offset,
-                2 => scale * speed + offset,
-                3 => scale * birthRandom + offset,
-                _ => scale
-            };
+            => VfxColorEvaluationUtils.ResolveLookupAxis(kind, scale, offset, age01, speed, birthRandom);
 
         private static Vector2 Swap(Vector2 value) => new(value.Y, value.X);
     }
