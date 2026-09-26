@@ -4057,10 +4057,21 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private void MapBrowserEye_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            ToggleMapBrowserNodeVisibility(sender as FrameworkElement);
+        }
+
         private void MapBrowserEye_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
-            if ((sender as FrameworkElement)?.DataContext is not MapBrowserNode node ||
+            ToggleMapBrowserNodeVisibility(sender as FrameworkElement);
+        }
+
+        private void ToggleMapBrowserNodeVisibility(FrameworkElement element)
+        {
+            if (element?.DataContext is not MapBrowserNode node ||
                 !node.CanHide ||
                 _mapSceneRuntime == null)
             {

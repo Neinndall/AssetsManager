@@ -92,15 +92,95 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <materialIcons:MaterialIcon Kind="Map" Width="12" Height="12" Foreground="#38BDF8" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                <materialIcons:MaterialIcon Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon.Style>
+                        <Style TargetType="materialIcons:MaterialIcon">
+                            <Setter Property="Kind" Value="Map"/>
+                            <Setter Property="Foreground" Value="#38BDF8"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Kind}" Value="Map">
+                                    <Setter Property="Kind" Value="Map"/>
+                                    <Setter Property="Foreground" Value="#38BDF8"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Geometry">
+                                    <Setter Property="Kind" Value="VectorPolygon"/>
+                                    <Setter Property="Foreground" Value="#38BDF8"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Materials">
+                                    <Setter Property="Kind" Value="PaletteOutline"/>
+                                    <Setter Property="Foreground" Value="#F59E0B"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Material">
+                                    <Setter Property="Kind" Value="CircleSlice8"/>
+                                    <Setter Property="Foreground" Value="#F59E0B"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Chunks">
+                                    <Setter Property="Kind" Value="LayersOutline"/>
+                                    <Setter Property="Foreground" Value="#10B981"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Chunk">
+                                    <Setter Property="Kind" Value="PackageVariantClosed"/>
+                                    <Setter Property="Foreground" Value="#10B981"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Placeable">
+                                    <Setter Property="Kind" Value="CubeOutline"/>
+                                    <Setter Property="Foreground" Value="#A78BFA"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Characters">
+                                    <Setter Property="Kind" Value="AccountGroupOutline"/>
+                                    <Setter Property="Foreground" Value="#EC4899"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="CharacterSkin">
+                                    <Setter Property="Kind" Value="AccountOutline"/>
+                                    <Setter Property="Foreground" Value="#EC4899"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="CharacterPlacement">
+                                    <Setter Property="Kind" Value="MapMarkerOutline"/>
+                                    <Setter Property="Foreground" Value="#EC4899"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Clips">
+                                    <Setter Property="Kind" Value="MoviePlayOutline"/>
+                                    <Setter Property="Foreground" Value="#F43F5E"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Clip">
+                                    <Setter Property="Kind" Value="PlayOutline"/>
+                                    <Setter Property="Foreground" Value="#F43F5E"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Particles">
+                                    <Setter Property="Kind" Value="AutoAwesome"/>
+                                    <Setter Property="Foreground" Value="#A855F7"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="ParticleSystem">
+                                    <Setter Property="Kind" Value="Creation"/>
+                                    <Setter Property="Foreground" Value="#A855F7"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="ParticlePlacement">
+                                    <Setter Property="Kind" Value="Sparkles"/>
+                                    <Setter Property="Foreground" Value="#A855F7"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </materialIcons:MaterialIcon.Style>
+                </materialIcons:MaterialIcon>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Title}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Subtitle}" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0" TextTrimming="CharacterEllipsis" MaxWidth="130" VerticalAlignment="Center"/>
                 </StackPanel>
                 <Border Grid.Column="2" Background="#0CFFFFFF" CornerRadius="4" Padding="5,1" Margin="6,0,2,0" VerticalAlignment="Center">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Children.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                     <TextBlock Text="{Binding Children.Count}" FontSize="8.5" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}"/>
                 </Border>
-                <Button Grid.Column="3" Click="MapBrowserEye_Click" Style="{StaticResource TransparentIconButton}"
+                <Button Grid.Column="3" Click="MapBrowserEye_Click" PreviewMouseLeftButtonDown="MapBrowserEye_PreviewMouseLeftButtonDown"
+                        Style="{StaticResource TransparentIconButton}"
                         Width="18" Height="18" Padding="0" Margin="2,0,0,0" ToolTip="Show / hide map item"
                         Visibility="{Binding CanHide, Converter={StaticResource BoolToVisibilityConverter}}">
                     <materialIcons:MaterialIcon Width="11" Height="11">
@@ -1096,28 +1176,51 @@
                                 </Popup>
 
                                 <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"
-                                           Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                           Visibility="{Binding HasViewportContentControls, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-                                <!-- Group 3: Champion Mesh, Effects & Shaders (Visible when champion mesh is present) -->
+                                <!-- Group 3: Content Controls & Shaders (Champion mesh/effects, Map structures/VFX, and Lit Shaders) -->
                                 <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0"
-                                        Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        Visibility="{Binding HasViewportContentControls, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <ToggleButton IsChecked="{Binding ShowChampionMesh, Mode=TwoWay}"
-                                                      Style="{StaticResource TransparentIconToggleButton}"
-                                                      Width="30" Height="30"
-                                                      ToolTip="Toggle Champion 3D Model Mesh (when available)">
-                                            <materialIcons:MaterialIcon Kind="AccountBoxOutline" Width="14" Height="14"/>
-                                        </ToggleButton>
-                                        <ToggleButton IsChecked="{Binding CharacterEffectsEnabled, Mode=TwoWay}"
-                                                      Style="{StaticResource TransparentIconToggleButton}"
-                                                      Width="30" Height="30" Margin="2,0,0,0"
-                                                      ToolTip="Toggle Character Effects / Skin VFX">
-                                            <materialIcons:MaterialIcon Kind="Sparkles" Width="14" Height="14"/>
-                                        </ToggleButton>
+                                        <!-- Champion Controls -->
+                                        <StackPanel Orientation="Horizontal"
+                                                    Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <ToggleButton IsChecked="{Binding ShowChampionMesh, Mode=TwoWay}"
+                                                          Style="{StaticResource TransparentIconToggleButton}"
+                                                          Width="30" Height="30"
+                                                          ToolTip="Toggle Champion 3D Model Mesh (when available)">
+                                                <materialIcons:MaterialIcon Kind="AccountBoxOutline" Width="14" Height="14"/>
+                                            </ToggleButton>
+                                            <ToggleButton IsChecked="{Binding CharacterEffectsEnabled, Mode=TwoWay}"
+                                                          Style="{StaticResource TransparentIconToggleButton}"
+                                                          Width="30" Height="30" Margin="2,0,0,0"
+                                                          ToolTip="Toggle Character Effects / Skin VFX">
+                                                <materialIcons:MaterialIcon Kind="Sparkles" Width="14" Height="14"/>
+                                            </ToggleButton>
+                                        </StackPanel>
+
+                                        <!-- Map Controls -->
+                                        <StackPanel Orientation="Horizontal"
+                                                    Visibility="{Binding HasMapPreview, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <ToggleButton IsChecked="{Binding MapStructuresVisible, Mode=TwoWay}"
+                                                          Style="{StaticResource TransparentIconToggleButton}"
+                                                          Width="30" Height="30" Margin="2,0,0,0"
+                                                          ToolTip="Toggle Map Structures">
+                                                <materialIcons:MaterialIcon Kind="HomeOutline" Width="14" Height="14" Foreground="#38BDF8"/>
+                                            </ToggleButton>
+                                            <ToggleButton IsChecked="{Binding MapParticlesVisible, Mode=TwoWay}"
+                                                          Style="{StaticResource TransparentIconToggleButton}"
+                                                          Width="30" Height="30" Margin="2,0,0,0"
+                                                          ToolTip="Toggle Map Ambient VFX">
+                                                <materialIcons:MaterialIcon Kind="AutoAwesome" Width="14" Height="14" Foreground="{StaticResource AccentPurple}"/>
+                                            </ToggleButton>
+                                        </StackPanel>
+
+                                        <!-- Shaders Toggle (Active for Lit meshes and terrain) -->
                                         <ToggleButton x:Name="PreviewShadersToggle"
                                                       Style="{StaticResource TransparentIconToggleButton}"
                                                       Width="30" Height="30" Margin="2,0,0,0"
-                                                      ToolTip="Use game shaders for Lit meshes"
+                                                      ToolTip="Use game shaders for Lit meshes and terrain"
                                                       IsChecked="{Binding PreviewShaders, Mode=TwoWay}">
                                             <materialIcons:MaterialIcon Kind="PaletteOutline" Width="14" Height="14"/>
                                         </ToggleButton>

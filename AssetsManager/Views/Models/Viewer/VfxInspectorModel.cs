@@ -866,6 +866,8 @@ namespace AssetsManager.Views.Models.Viewer
         public bool CanSelectMapVariant => HasMapPreview && HasMultipleMapVariants;
         public bool HasMapLayers => MapLayers.Count > 0;
         public int ActiveMapLayerCount => MapLayers.Count(layer => layer.IsEnabled);
+        public bool HasViewportContentControls => HasChampionMesh || HasMapPreview;
+        public bool HasMapOnlyWorkspace => HasMapPreview && !HasChampionMesh;
         public bool HasMapPreview
         {
             get => _hasMapPreview;
@@ -875,6 +877,8 @@ namespace AssetsManager.Views.Models.Viewer
                 _hasMapPreview = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CanSelectMapVariant));
+                OnPropertyChanged(nameof(HasViewportContentControls));
+                OnPropertyChanged(nameof(HasMapOnlyWorkspace));
             }
         }
 
@@ -979,7 +983,14 @@ namespace AssetsManager.Views.Models.Viewer
         public bool HasChampionMesh
         {
             get => _hasChampionMesh;
-            set { _hasChampionMesh = value; OnPropertyChanged(); }
+            set
+            {
+                if (_hasChampionMesh == value) return;
+                _hasChampionMesh = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasViewportContentControls));
+                OnPropertyChanged(nameof(HasMapOnlyWorkspace));
+            }
         }
 
         public bool HasCharacterSkeleton
