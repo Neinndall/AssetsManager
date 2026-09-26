@@ -243,5 +243,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 "coverageAlpha = (uMaterialUsesTextureAlpha != 0 ? texColor.a : 1.0) * uColorTint.a;",
                 GlMeshShaderSource.Fragment);
         }
+
+        [Fact]
+        public void VfxMeshFragment_UsesUniformErosionMixerWithoutUndefinedVariables()
+        {
+            Assert.Contains("uniform vec4 uErosionMixer;", AssetsManager.Services.Viewer.Vfx.Rendering.VfxShaderSource.MeshFragment);
+            Assert.Contains("clamp(dot(erosionTexel, uErosionMixer), 0.0, 1.0)", AssetsManager.Services.Viewer.Vfx.Rendering.VfxShaderSource.MeshFragment);
+            Assert.DoesNotContain("vErosionMixer", AssetsManager.Services.Viewer.Vfx.Rendering.VfxShaderSource.MeshFragment);
+        }
     }
 }

@@ -21,7 +21,32 @@ namespace AssetsManager.Utils
         public bool EnableExtraction { get; set; } 
         public bool OrganizeExtractedAssets { get; set; }
         public ReportGenerationSettings ReportGeneration { get; set; } = new();
-        public StudioParametersSettings StudioParameters { get; set; } = new();
+
+        private StudioParametersSettings _studioParameters;
+        public StudioParametersSettings StudioParameters
+        {
+            get => _studioParameters;
+            set
+            {
+                if (_studioParameters != null)
+                    _studioParameters.PropertyChanged -= OnStudioParametersPropertyChanged;
+                _studioParameters = value ?? new StudioParametersSettings();
+                _studioParameters.PropertyChanged += OnStudioParametersPropertyChanged;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StudioParameters)));
+            }
+        }
+
+        public AppSettings()
+        {
+            _studioParameters = new StudioParametersSettings();
+            _studioParameters.PropertyChanged += OnStudioParametersPropertyChanged;
+        }
+
+        private void OnStudioParametersPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StudioParameters)));
+        }
+
         public VfxStudioSettings VfxStudio { get; set; } = new();
         public bool AssetWatcherUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
@@ -469,13 +494,52 @@ namespace AssetsManager.Utils
         }
     }
 
-    public class StudioParametersSettings
+    public class StudioParametersSettings : INotifyPropertyChanged
     {
-        public bool GroundVisible { get; set; }
-        public bool GridVisible { get; set; } = true;
-        public bool SkyVisible { get; set; }
-        public bool TransparentBackground { get; set; }
-        public bool EnableFxaa { get; set; } = true;
+        private bool _groundVisible;
+        private bool _gridVisible = true;
+        private bool _skyVisible;
+        private bool _transparentBackground;
+        private bool _enableFxaa = true;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public bool GroundVisible
+        {
+            get => _groundVisible;
+            set => SetProperty(ref _groundVisible, value);
+        }
+
+        public bool GridVisible
+        {
+            get => _gridVisible;
+            set => SetProperty(ref _gridVisible, value);
+        }
+
+        public bool SkyVisible
+        {
+            get => _skyVisible;
+            set => SetProperty(ref _skyVisible, value);
+        }
+
+        public bool TransparentBackground
+        {
+            get => _transparentBackground;
+            set => SetProperty(ref _transparentBackground, value);
+        }
+
+        public bool EnableFxaa
+        {
+            get => _enableFxaa;
+            set => SetProperty(ref _enableFxaa, value);
+        }
+
+        private void SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return;
+            field = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     public class VfxStudioSettings

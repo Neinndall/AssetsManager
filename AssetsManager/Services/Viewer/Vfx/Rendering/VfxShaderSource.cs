@@ -553,14 +553,14 @@ void main(){
                 atlasUvRaw(vLocalUv, vCell, uTexDiv),
                 uErosionAddressMode)
             : uErosionDefault;
-        float erosion = clamp(dot(erosionTexel, vErosionMixer), 0.0, 1.0);
+        float erosion = clamp(dot(erosionTexel, uErosionMixer), 0.0, 1.0);
         float featherIn = max(0.0001, uErosionFeatherIn);
         float featherOut = max(0.0001, uErosionFeatherOut);
         float upper = clamp((uErosionDrive - erosion + uErosionSliceWidth) / featherIn, 0.0, 1.0);
         float lower = clamp((uErosionDrive - erosion) / featherOut, 0.0, 1.0);
         texel.a *= clamp(upper - lower, 0.0, 1.0);
     }
-    // LTK's VFX geometry buffer carries no vertex-color lane. Both particle meshes
+    // The reference VFX geometry buffer carries no vertex-color lane. Both particle meshes
     // and attached meshes are tinted only by the particle/attachment material color.
     vec4 authoredColor = uColor;
     vec4 lit = texel * authoredColor;
