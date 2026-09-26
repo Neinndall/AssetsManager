@@ -100,7 +100,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         public static bool ShouldTestDepth(int miscRenderFlags) => (miscRenderFlags & 1) == 0;
 
-        public static bool ShouldSortBackToFront(int rawMode) => rawMode is 1 or 2 or 5 or 8;
+        public static bool ShouldSortBackToFront(int rawMode) => rawMode is 1 or 5 or 8;
 
         public static bool IsAdditive(int rawMode) => GetDescriptor(rawMode).Kind == VfxBlendModeKind.Additive;
 

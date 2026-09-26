@@ -167,6 +167,8 @@ namespace AssetsManager.Views.Models.Viewer
         VfxReflectionDefinition Reflection = null,
         Vector3? RayTargetOffset = null,
         byte Importance = 0,
+        byte ColorblindVisibility = 0,
+        VfxCullReason Culled = VfxCullReason.None,
         VfxCurve3? BirthScale1 = null,
         VfxCurve3? Rotation1 = null,
         byte UvMode = 0,
@@ -410,6 +412,14 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<VfxOrbitalField> Orbital,
         IReadOnlyList<VfxNoiseField> Noise);
 
+    /// <summary>Why the engine culls an emitter at preview settings (Very High quality, default palette).</summary>
+    public enum VfxCullReason : byte
+    {
+        None = 0,
+        Importance = 1,
+        Colorblind = 2
+    }
+
     /// <summary>
     /// Authored particle spawn volume. EmitOffset is randomized by its ValueVector3
     /// probability tables, then the authored axis/angle rotations are applied in order.
@@ -460,9 +470,8 @@ namespace AssetsManager.Views.Models.Viewer
                     float radians = RotationAngles[i].SampleBirth(t, rng, birthChance) * (MathF.PI / 180f);
                     Vector3 normalizedAxis = axis / (float)axisLength;
                     Matrix4x4 step = Matrix4x4.CreateFromAxisAngle(normalizedAxis, radians);
-                    // LTK stores column-vector turns as current * step. System.Numerics
-                    // transforms row vectors, so the equivalent matrix composes in reverse.
-                    rotation = step * rotation;
+                    // Row-vector composition: first turn applies first.
+                    rotation = rotation * step;
                 }
                 return Vector3.Transform(offset, rotation);
             }
@@ -474,7 +483,7 @@ namespace AssetsManager.Views.Models.Viewer
                 {
                     Matrix4x4 yTurn = Matrix4x4.CreateRotationY(rng.Next(4) * (MathF.PI * 0.5f));
                     Matrix4x4 zTurn = Matrix4x4.CreateRotationZ(rng.Next(2) * (MathF.PI * 0.5f));
-                    rotation = zTurn * yTurn;
+                    rotation = yTurn * zTurn;
                     offset = Vector3.Transform(offset, rotation);
                 }
                 return offset;
@@ -504,9 +513,8 @@ namespace AssetsManager.Views.Models.Viewer
             float r = (volume ? (float)rng.NextDouble() : 1f) * radius;
             float angleY = (float)(rng.NextDouble() * Math.Tau);
             float angleZ = (float)(rng.NextDouble() * Math.Tau);
-            // LTK composes Y then Z in column-vector space; transpose that product for
-            // System.Numerics' row-vector convention.
-            rotation = Matrix4x4.CreateRotationZ(angleZ) * Matrix4x4.CreateRotationY(angleY);
+            // Composes Y then Z, putting the shell poles on +-Z.
+            rotation = Matrix4x4.CreateRotationY(angleY) * Matrix4x4.CreateRotationZ(angleZ);
             return Vector3.Transform(new Vector3(r, 0, 0), rotation);
         }
 
@@ -859,6 +867,7 @@ namespace AssetsManager.Views.Models.Viewer
         public const byte ColorLookUpTypeY = 0;
         public const byte MeshRenderFlags = 1;
         public const byte Importance = 1;
+        public const byte ColorblindVisibility = 0;
         public const byte RenderPhaseOverride = 7;
         public const byte StencilMode = 0;
         public const byte StencilReference = 0;

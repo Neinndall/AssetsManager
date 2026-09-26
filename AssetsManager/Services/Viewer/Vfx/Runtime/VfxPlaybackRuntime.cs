@@ -390,7 +390,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
             CurrentTime = snapshot.CurrentTime;
             _initialRandomState = snapshot.InitialRandomState;
-            _rng = new VfxLtkRandom(snapshot.RandomState);
+            _rng = VfxLtkRandom.FromState(snapshot.RandomState);
             _particleSerial = snapshot.ParticleSerial;
             _worldTransform = snapshot.WorldTransform;
             _orientationRootTransform = snapshot.OrientationRootTransform;
@@ -667,7 +667,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 direction.LengthSquared() > 0f)
             {
                 Vector3 up = Vector3.Normalize(direction);
-                Vector3 axis = MathF.Abs(up.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX;
+                Vector3 axis = MathF.Abs(up.Y) < 0.99999f ? Vector3.UnitY : Vector3.UnitX;
                 Vector3 right = SafeNormal(Vector3.Cross(axis, up), Vector3.UnitX);
                 Vector3 forward = SafeNormal(Vector3.Cross(right, up), Vector3.UnitZ);
                 return new Matrix4x4(
@@ -855,7 +855,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         public void Reset()
         {
-            _rng = new VfxLtkRandom(_initialRandomState);
+            _rng = VfxLtkRandom.FromState(_initialRandomState);
             _particleSerial = 0;
             ResetRunState();
         }

@@ -107,6 +107,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             => Assert.Equal(expected, VfxBlendModes.ShouldTestDepth(flags));
 
         [Theory]
+        [InlineData(0, false)] // Add
+        [InlineData(1, true)]  // Alpha
+        [InlineData(2, false)] // Subtract (order-independent multiplication)
+        [InlineData(3, false)] // None / Opaque
+        [InlineData(4, false)] // Alpha Add
+        [InlineData(5, true)]  // Premultiplied Alpha
+        [InlineData(6, false)] // Min
+        [InlineData(7, false)] // Max
+        [InlineData(8, true)]  // Target Alpha
+        public void ShouldSortBackToFront_ReturnsTrueOnlyForOverBlending(int rawMode, bool expected)
+            => Assert.Equal(expected, VfxBlendModes.ShouldSortBackToFront(rawMode));
+
+        [Theory]
         [InlineData(0)]
         [InlineData(2)]
         [InlineData(3)]

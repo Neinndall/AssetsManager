@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -344,6 +344,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             byte uvMode = NormalizeEnumByte(GetU8(p, F_uvMode), 5, 0);
             VfxEmissionSurfaceDefinition emissionSurface = ReadEmissionSurface(p);
             uint customMaterialPathHash = ReadCustomMaterialPathHash(p);
+            byte importance = (byte)(GetU8(p, F_importance) ?? VfxAuthoredDefaults.Importance);
+            byte colorblindVisibility = (byte)(GetU8(p, F_colorblindVisibility) ?? VfxAuthoredDefaults.ColorblindVisibility);
+            VfxCullReason culled = importance == 4
+                ? VfxCullReason.Importance
+                : (!isSimpleEmitter && colorblindVisibility == 2 ? VfxCullReason.Colorblind : VfxCullReason.None);
+            bool disabled = GetBool(p, F_disabled) || culled != VfxCullReason.None;
 
             return new VfxEmitterDefinition(
                 Name: GetString(p, F_emitterName) ?? string.Empty,
@@ -353,7 +359,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 ParticleLinger: GetOptionalF32(p, F_particleLinger) ?? 0f,
                 TimeBeforeFirstEmission: GetF32(p, F_timeBefore) ?? 0f,
                 IsSingleParticle: isSingle,
-                Disabled: GetBool(p, F_disabled),
+                Disabled: disabled,
                 RateIsPeriod: GetBool(p, F_rateIsPeriod),
                 BirthTimePeriod: GetF32(p, F_birthTimePeriod) ?? 0f,
                 IsLoop: GetBool(p, F_isLoop),
@@ -467,7 +473,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 TextureMultEmitterUvScrollRate: textureMultEmitterUvScroll,
                 SoftParticle: softParticle,
                 Reflection: reflection,
-                Importance: (byte)(GetU8(p, F_importance) ?? VfxAuthoredDefaults.Importance),
+                Importance: importance,
+                ColorblindVisibility: colorblindVisibility,
+                Culled: culled,
                 BirthScale1: birthScale1,
                 Rotation1: ReadCurve3(p, F_rotation1),
                 UvMode: uvMode,

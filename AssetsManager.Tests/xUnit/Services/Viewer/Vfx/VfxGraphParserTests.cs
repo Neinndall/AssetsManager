@@ -2427,5 +2427,69 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             var seq = Assert.Single(doc.EventSequences);
             Assert.Equal("9988776655443322.anm", seq.AnimationFilePath);
         }
+
+        [Fact]
+        public void CullsLowSpecImportanceSubstitute()
+        {
+            var emitter = new BinTreeStruct(
+                Fnv1a.HashLower("complexEmitterDefinitionData"),
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("emitterName"), "LowSpec"),
+                    new BinTreeU8(Fnv1a.HashLower("importance"), 4)
+                });
+            var systemObj = new BinTreeObject(
+                "Vfx/Test/System",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+
+            using var stream = new MemoryStream();
+            new BinTree(new[] { systemObj }, System.Array.Empty<string>()).Write(stream);
+
+            VfxBinDocument doc = VfxGraphParser.ParseDocument(stream.ToArray());
+            var parsedEmitter = Assert.Single(Assert.Single(doc.Systems).Value.Emitters);
+
+            Assert.Equal(VfxCullReason.Importance, parsedEmitter.Culled);
+            Assert.True(parsedEmitter.Disabled);
+        }
+
+        [Fact]
+        public void CullsColorblindOnlyEmitterOnDefaultPalette()
+        {
+            var emitter = new BinTreeStruct(
+                Fnv1a.HashLower("complexEmitterDefinitionData"),
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("emitterName"), "Colorblind"),
+                    new BinTreeU8(Fnv1a.HashLower("colorblindVisibility"), 2)
+                });
+            var systemObj = new BinTreeObject(
+                "Vfx/Test/System",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+
+            using var stream = new MemoryStream();
+            new BinTree(new[] { systemObj }, System.Array.Empty<string>()).Write(stream);
+
+            VfxBinDocument doc = VfxGraphParser.ParseDocument(stream.ToArray());
+            var parsedEmitter = Assert.Single(Assert.Single(doc.Systems).Value.Emitters);
+
+            Assert.Equal(VfxCullReason.Colorblind, parsedEmitter.Culled);
+            Assert.True(parsedEmitter.Disabled);
+        }
     }
 }

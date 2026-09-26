@@ -14,9 +14,26 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private const float Unit = 1f / 0x1000000;
         private uint _state;
 
+        /// <summary>
+        /// MurmurHash3 32-bit finalizer, which spreads neighbouring seeds across the whole state.
+        /// </summary>
+        public static uint FMix32(uint value)
+        {
+            uint mixed = value;
+            mixed ^= mixed >> 16;
+            mixed *= 0x85ebca6bu;
+            mixed ^= mixed >> 13;
+            mixed *= 0xc2b2ae35u;
+            mixed ^= mixed >> 16;
+            return mixed;
+        }
+
+        public static VfxLtkRandom FromState(uint state) => new() { State = state };
+
         public VfxLtkRandom(uint seed = 1234u)
         {
-            _state = seed == 0 ? DefaultNonZero : seed;
+            uint mixed = FMix32(seed);
+            _state = mixed == 0 ? DefaultNonZero : mixed;
         }
 
         public VfxLtkRandom(ulong seed) : this(unchecked((uint)seed))
@@ -96,13 +113,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
         }
 
-        public VfxLtkRandom Clone()
-        {
-            var clone = new VfxLtkRandom(DefaultNonZero)
-            {
-                _state = _state
-            };
-            return clone;
-        }
+        public VfxLtkRandom Clone() => FromState(_state);
     }
 }

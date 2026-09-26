@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -59,6 +59,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static readonly uint F_isSingle      = VfxParsingHash.Fnv1a("isSingleParticle");
         internal static readonly uint F_disabled      = VfxParsingHash.Fnv1a("disabled");
         internal static readonly uint F_importance    = VfxParsingHash.Fnv1a("importance");
+        internal static readonly uint F_colorblindVisibility = VfxParsingHash.Fnv1a("colorblindVisibility");
         internal static readonly uint F_miscRenderFlags = VfxParsingHash.Fnv1a("miscRenderFlags");
         internal static readonly uint F_meshRenderFlags = VfxParsingHash.Fnv1a("meshRenderFlags");
         internal static readonly uint F_useNavmeshMask = VfxParsingHash.Fnv1a("useNavmeshMask");

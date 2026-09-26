@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
@@ -335,26 +336,40 @@ public sealed class VfxEmissionContractTests
     }
 
     [Fact]
-    public void SurfaceBoxComposesItsQuarterTurnsInLtkOrder()
+    public void SurfaceBoxLandsOnAllSixSidesWithQuarterTurns()
     {
         var shape = new VfxSpawnShape(
             VfxSpawnShapeKind.Box,
             VfxCurve3.Const(Vector3.Zero),
             Array.Empty<Vector3>(),
             Array.Empty<VfxCurveF>(),
-            Size: Vector3.One,
+            Size: new Vector3(1f, 2f, 3f),
             Flags: 0);
-        var rng = new VfxLtkRandom(7);
 
-        Vector3 offset = shape.SampleOffset(rng, 0f, null, out _);
-
-        Assert.Equal(-1f, offset.X, precision: 5);
-        Assert.Equal(-0.9991188f, offset.Y, precision: 5);
-        Assert.Equal(0.78095794f, offset.Z, precision: 5);
+        var faces = new HashSet<string>();
+        for (uint seed = 1; seed < 200; seed++)
+        {
+            var rng = new VfxLtkRandom(seed);
+            Vector3 offset = shape.SampleOffset(rng, 0f, null, out _);
+            float[] coords = { offset.X, offset.Y, offset.Z };
+            int axis = -1;
+            for (int i = 0; i < 3; i++)
+            {
+                if (MathF.Abs(MathF.Abs(coords[i]) - 3f) < 1e-3f)
+                {
+                    axis = i;
+                    break;
+                }
+            }
+            Assert.True(axis >= 0);
+            string face = (axis == 0 ? "x" : axis == 1 ? "y" : "z") + (coords[axis] > 0 ? "+" : "-");
+            faces.Add(face);
+        }
+        Assert.Equal(6, faces.Count);
     }
 
     [Fact]
-    public void SphereComposesItsRandomTurnsInLtkOrder()
+    public void SpherePutsPolesOnZTurningYBeforeZ()
     {
         var shape = new VfxSpawnShape(
             VfxSpawnShapeKind.Sphere,
@@ -363,22 +378,28 @@ public sealed class VfxEmissionContractTests
             Array.Empty<VfxCurveF>(),
             Radius: 1f,
             Flags: 0);
-        var rng = new VfxLtkRandom(7);
 
-        Vector3 offset = shape.SampleOffset(rng, 0f, null, out _);
+        float y = 0f;
+        float z = 0f;
+        for (uint seed = 1; seed < 400; seed++)
+        {
+            var rng = new VfxLtkRandom(seed);
+            Vector3 offset = shape.SampleOffset(rng, 0f, null, out _);
+            y += MathF.Abs(offset.Y);
+            z += MathF.Abs(offset.Z);
+        }
 
-        Assert.Equal(0.7724251f, offset.X, precision: 5);
-        Assert.Equal(0.6351023f, offset.Y, precision: 5);
-        Assert.Equal(-0.00213835f, offset.Z, precision: 5);
+        Assert.Equal(2f / MathF.PI, z / 399f, precision: 1);
+        Assert.Equal(MathF.Pow(2f / MathF.PI, 2f), y / 399f, precision: 1);
     }
 
     [Fact]
-    public void LegacyShapeComposesMultipleAuthoredAxesInLtkOrder()
+    public void LegacyShapeComposesMultipleAuthoredAxesInOrder()
     {
         var shape = new VfxSpawnShape(
             VfxSpawnShapeKind.Legacy,
             VfxCurve3.Const(Vector3.UnitX),
-            new[] { Vector3.UnitY, Vector3.UnitZ },
+            new[] { Vector3.UnitZ, Vector3.UnitY },
             new[] { VfxCurveF.Const(90f), VfxCurveF.Const(90f) });
 
         Vector3 offset = shape.SampleOffset(new VfxLtkRandom(7), 0f, 0.5f, out Matrix4x4 turn);

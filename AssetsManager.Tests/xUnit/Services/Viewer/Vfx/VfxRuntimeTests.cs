@@ -2807,18 +2807,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             var rng = new VfxLtkRandom(7);
             float[] expected =
             {
-                0.0004405975341796875f,
-                0.10952103137969971f,
-                0.9038963913917542f,
-                0.7147876024246216f,
-                0.6646947264671326f,
-                0.48851478099823f,
-                0.060258567333221436f,
-                0.1849934458732605f
+                0.559420645236969f,
+                0.410114049911499f,
+                0.1269422173500061f,
+                0.8883126974105835f,
+                0.3450315594673157f,
+                0.8523433804512024f,
+                0.30515795946121216f,
+                0.011876523494720459f
             };
 
             foreach (float value in expected)
-                Assert.Equal(value, rng.NextUnitFloat());
+                Assert.Equal(value, rng.NextUnitFloat(), precision: 6);
+        }
+
+        [Fact]
+        public void RandomOpensNeighbouringSeedsOnUnrelatedFirstDraws()
+        {
+            var first = new[] { 1337u, 1338u, 1339u, 1340u }
+                .Select(seed => new VfxLtkRandom(seed).NextUnitFloat())
+                .ToArray();
+
+            for (int a = 0; a < first.Length; a++)
+            {
+                for (int b = a + 1; b < first.Length; b++)
+                {
+                    Assert.True(MathF.Abs(first[a] - first[b]) > 0.01f);
+                }
+            }
         }
 
         [Fact]
