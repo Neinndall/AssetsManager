@@ -111,6 +111,10 @@ namespace AssetsManager.Views.Helpers
         {
             if (sender is not FrameworkElement item || e.OriginalSource is ToggleButton) return;
             if (item is TreeViewItem && FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) != item) return;
+            // Ignore clicks that originate inside an interactive control (e.g. eye-toggle Button)
+            // embedded in the TreeViewItem content; those controls handle their own input.
+            if (item is TreeViewItem && FindAncestor<ButtonBase>(e.OriginalSource as DependencyObject) is ButtonBase ancestor
+                && ancestor is not ToggleButton { Name: "Expander" }) return;
 
             // TreeView owns its CTRL toggle; ListBox keeps native Extended selection.
             if (item is TreeViewItem treeItem && IsRangeSelectIntent())
