@@ -2428,8 +2428,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal("9988776655443322.anm", seq.AnimationFilePath);
         }
 
-        [Fact]
-        public void CullsLowSpecImportanceSubstitute()
+        [Theory]
+        [InlineData((byte)0, false)]
+        [InlineData((byte)1, false)]
+        [InlineData((byte)2, false)]
+        [InlineData((byte)3, false)]
+        [InlineData((byte)4, true)]
+        [InlineData((byte)5, false)]
+        public void CullsOnlyLowSpecImportanceSubstitute(byte importance, bool culled)
         {
             var emitter = new BinTreeStruct(
                 Fnv1a.HashLower("complexEmitterDefinitionData"),
@@ -2437,7 +2443,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new BinTreeProperty[]
                 {
                     new BinTreeString(Fnv1a.HashLower("emitterName"), "LowSpec"),
-                    new BinTreeU8(Fnv1a.HashLower("importance"), 4)
+                    new BinTreeU8(Fnv1a.HashLower("importance"), importance)
                 });
             var systemObj = new BinTreeObject(
                 "Vfx/Test/System",
@@ -2456,8 +2462,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxBinDocument doc = VfxGraphParser.ParseDocument(stream.ToArray());
             var parsedEmitter = Assert.Single(Assert.Single(doc.Systems).Value.Emitters);
 
-            Assert.Equal(VfxCullReason.Importance, parsedEmitter.Culled);
-            Assert.True(parsedEmitter.Disabled);
+            Assert.Equal(culled, parsedEmitter.Culled == VfxCullReason.Importance);
+            Assert.Equal(culled, parsedEmitter.Disabled);
         }
 
         [Fact]

@@ -164,15 +164,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     Vector3 to = new(settings.FlightRange * 0.5f, settings.Height, 0f);
                     Vector3 origin = Vector3.Lerp(from, to, progress);
 
-                    // Missile-attached VFX author travel on local +Y. The rig therefore
-                    // carries +Y along the flight path, +X to the side, and +Z downward.
-                    Matrix4x4 flightBasis = new(
-                        0f,  0f, -1f, 0f,
-                        1f,  0f,  0f, 0f,
-                        0f, -1f,  0f, 0f,
-                        0f,  0f,  0f, 1f
-                    );
-                    Matrix4x4 transform = flightBasis * Matrix4x4.CreateTranslation(origin);
+                    Matrix4x4 transform = FlightTransform(origin, to - from);
                     Vector3 moved = lastOrigin.HasValue &&
                                     phase >= 0.001f &&
                                     (!settings.IsLooping || phase < totalSpan - 0.05f)
@@ -252,21 +244,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 ? (float)Math.Clamp((time - startTime) / span, 0d, 1d)
                 : 1f;
             Vector3 origin = Vector3.Lerp(from, to, progress);
-            Vector3 forward = new(to.X - from.X, 0f, to.Z - from.Z);
+            return FlightTransform(origin, to - from);
+        }
+
+        private static Matrix4x4 FlightTransform(Vector3 origin, Vector3 direction)
+        {
+            // Missile systems author travel on local +Y and height on local +Z.
+            Vector3 forward = new(direction.X, 0f, direction.Z);
             if (forward.LengthSquared() == 0f) forward = Vector3.UnitZ;
             else forward = Vector3.Normalize(forward);
 
-            Vector3 side = Vector3.Cross(Vector3.UnitY, forward);
-            if (side.LengthSquared() == 0f) side = Vector3.UnitX;
-            else side = Vector3.Normalize(side);
-            Vector3 down = Vector3.Cross(side, forward);
-            if (down.LengthSquared() == 0f) down = -Vector3.UnitY;
-            else down = Vector3.Normalize(down);
+            Vector3 side = Vector3.Cross(forward, Vector3.UnitY);
 
             return new Matrix4x4(
                 side.X, side.Y, side.Z, 0f,
                 forward.X, forward.Y, forward.Z, 0f,
-                down.X, down.Y, down.Z, 0f,
+                0f, 1f, 0f, 0f,
                 origin.X, origin.Y, origin.Z, 1f);
         }
     }

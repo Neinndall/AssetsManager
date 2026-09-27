@@ -34,7 +34,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(100f, atEnd.Origin.Y, tolerance: 0.1f);
             Assert.True(atEnd.IsStopped);
 
-            // LTK's missile object convention carries local +Y along flight and local +Z down.
+            // LTK's missile object convention carries local +Y along flight and local +Z up and local +X left.
             Vector3 localY = Vector3.TransformNormal(Vector3.UnitY, atStart.Transform);
             Assert.Equal(1f, localY.X, tolerance: 1e-4f);
             Assert.Equal(0f, localY.Y, tolerance: 1e-4f);
@@ -42,8 +42,60 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             Vector3 localZ = Vector3.TransformNormal(Vector3.UnitZ, atStart.Transform);
             Assert.Equal(0f, localZ.X, tolerance: 1e-4f);
-            Assert.Equal(-1f, localZ.Y, tolerance: 1e-4f);
+            Assert.Equal(1f, localZ.Y, tolerance: 1e-4f);
             Assert.Equal(0f, localZ.Z, tolerance: 1e-4f);
+        }
+
+        [Theory]
+        [InlineData(1f, 0f)]
+        [InlineData(0f, 1f)]
+        [InlineData(3f, 4f)]
+        [InlineData(0f, 0f)]
+        public void SpellPathKeepsGroundOffsetsBelowAndLocalTravelForward(float x, float z)
+        {
+            Vector3 from = new(10f, 100f, 20f);
+            Vector3 to = from + new Vector3(x, 5f, z);
+            Matrix4x4 placement = VfxRigMotion.PathTransform(from, to, 0d, 0d, 1d);
+            Vector3 ground = Vector3.Transform(new Vector3(0f, 0f, -100f), placement);
+            Assert.Equal(new Vector3(10f, 0f, 20f), ground);
+            Vector3 expected = x == 0f && z == 0f
+                ? Vector3.UnitZ : Vector3.Normalize(new Vector3(x, 0f, z));
+            Assert.True(Vector3.Distance(expected, Vector3.TransformNormal(Vector3.UnitY, placement)) < 1e-5f);
+            Assert.True(Vector3.Distance(Vector3.Cross(expected, Vector3.UnitY),
+                Vector3.TransformNormal(Vector3.UnitX, placement)) < 1e-5f);
+        }
+
+        [Fact]
+        public void MissileSessionSpawnsBelowFlightAndCarriesUpwardBirthVelocity()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
+            {
+                TexturePath = null,
+                Rate = VfxCurveF.Const(20f),
+                EmitterPosition = VfxCurve3.Const(new Vector3(0f, 0f, -100f)),
+                BirthVelocity = VfxCurve3.Const(new Vector3(0f, 50f, 100f))
+            };
+            var definition = new VfxSystemDefinition(9, "missile_ground", "missile_ground", new[] { emitter });
+            using var session = new VfxRenderSession();
+            session.SetSystem(new VfxSystemModel
+            {
+                Name = definition.Name,
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [9] = definition },
+                ResourceMap = new Dictionary<uint, uint>()
+            });
+            session.RigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Missile);
+            session.Play();
+            session.Update(0.1f);
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(Assert.Single(session.Graphs).Root.Emitters);
+            Assert.Equal(0f, state.BasePos.Y, precision: 4);
+            Assert.NotEmpty(state.Particles);
+            Assert.All(state.Particles, particle =>
+            {
+                Assert.Equal(50f, particle.Vel.X, precision: 4);
+                Assert.Equal(100f, particle.Vel.Y, precision: 4);
+                Assert.Equal(0f, particle.Vel.Z, precision: 4);
+            });
         }
 
         [Fact]
