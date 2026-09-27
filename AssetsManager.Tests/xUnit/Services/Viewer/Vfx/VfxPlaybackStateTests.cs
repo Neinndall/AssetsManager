@@ -188,19 +188,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void CompatibleFormsExcludeMaterialOverridesAndOtherMeshes()
+        public void CompatibleFormsExcludeOwnerMeshMismatchesUnlessTheyReloadTheModel()
         {
             var owner = new VfxOwnerSceneContext("ASSETS/Kayn/Skin0/Kayn.skn", "ASSETS/Kayn/Skin0/Kayn.skl", 1f);
             var shared = new VfxCharacterFormDefinition(1, 0, "Darkin", null, null, MeshPath: @"assets\kayn\skin0\kayn.skn");
             var materials = new VfxCharacterFormDefinition(2, 1, "Shadow", null, null, HasMaterialOverrides: true);
             var otherMesh = new VfxCharacterFormDefinition(3, 2, "Other", null, null, MeshPath: "ASSETS/Kayn/Skin8/Rhaast.skn");
             var otherSkeleton = new VfxCharacterFormDefinition(4, 3, "Rig", null, null, SkeletonPath: "ASSETS/Kayn/Skin8/Rhaast.skl");
+            var reloading = materials with { PathHash = 5, ReloadsModel = true };
 
             IReadOnlyList<VfxCharacterFormDefinition> compatible = VfxCharacterFormSemantics.CompatibleForms(
-                new[] { shared, materials, otherMesh, otherSkeleton, null },
+                new[] { shared, materials, otherMesh, otherSkeleton, reloading, null },
                 owner);
 
-            Assert.Equal(new[] { shared }, compatible);
+            Assert.Equal(new[] { shared, reloading }, compatible);
         }
 
         [Fact]

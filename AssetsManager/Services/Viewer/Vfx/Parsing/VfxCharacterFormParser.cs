@@ -22,7 +22,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         IReadOnlyDictionary<uint, uint> ResourceMap,
         IReadOnlyList<VfxIdleEffectDefinition> OverrideIdleEffects,
         bool EnableOverrideIdleEffects,
-        bool HasMaterialOverrides);
+        bool HasMaterialOverrides,
+        IReadOnlyList<uint> InitialHiddenSubmeshHashes = null);
 
     /// <summary>Projects authored primary gear links and compact GearData payloads without retaining BIN trees.</summary>
     internal static class VfxCharacterFormParser
@@ -39,6 +40,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_skinMeshProperties = VfxParsingHash.Fnv1a("skinMeshProperties");
         private static readonly uint F_simpleSkin = VfxParsingHash.Fnv1a("simpleSkin");
         private static readonly uint F_skeleton = VfxParsingHash.Fnv1a("skeleton");
+        private static readonly uint F_initialSubmeshToHide = VfxParsingHash.Fnv1a("initialSubmeshToHide");
         private static readonly uint F_equipAnimation = VfxParsingHash.Fnv1a("mEquipAnimation");
         private static readonly uint F_vfxResourceResolver = VfxParsingHash.Fnv1a("mVFXResourceResolver");
         private static readonly uint F_overrideIdleEffects = VfxParsingHash.Fnv1a("OverrideIdleEffects");
@@ -77,8 +79,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         }
 
         /// <summary>
-        /// Resolves the primary gear links. A GearData authored on another skin's SKN (Elementalist Lux:
-        /// ASSETS/Characters/LuxFire/Skins/Skin07/...) is a model-swap form that loads that model.
+        /// Resolves the primary gear links. A GearData whose skinMeshProperties changes the SKN (Elementalist
+        /// Lux: ASSETS/Characters/LuxFire/...), the SKL or the materials reloads the model with those properties.
         /// </summary>
         internal static IReadOnlyList<VfxCharacterFormDefinition> Resolve(
             IReadOnlyList<VfxCharacterFormDocumentData> documents,
@@ -108,9 +110,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     !gearForms.TryGetValue(links[index].Value, out VfxCharacterFormDataProjection data))
                     continue;
 
-                bool modelSwap = IsOtherModel(data.MeshPath, owner?.MeshPath);
+                bool otherMesh = IsOtherAsset(data.MeshPath, owner?.MeshPath);
+                bool reloadsModel = otherMesh || data.HasMaterialOverrides ||
+                    IsOtherAsset(data.SkeletonPath, owner?.SkeletonPath);
                 string name = ResolveName(links[index].Value, index, binEntryResolver);
-                if (modelSwap && name.StartsWith("Form ", StringComparison.Ordinal))
+                if (otherMesh && name.StartsWith("Form ", StringComparison.Ordinal))
                     name = ModelFormName(data.MeshPath, ownerCharacter) ?? name;
 
                 forms.Add(new VfxCharacterFormDefinition(
@@ -126,14 +130,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     data.OverrideIdleEffects,
                     data.EnableOverrideIdleEffects,
                     data.HasMaterialOverrides,
-                    modelSwap));
+                    reloadsModel,
+                    data.InitialHiddenSubmeshHashes));
             }
             return forms.ToArray();
         }
 
-        private static bool IsOtherModel(string formMesh, string ownerMesh) =>
-            !string.IsNullOrWhiteSpace(formMesh) && !string.IsNullOrWhiteSpace(ownerMesh) &&
-            !string.Equals(formMesh.Replace('\\', '/'), ownerMesh.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
+        private static bool IsOtherAsset(string formAsset, string ownerAsset) =>
+            !string.IsNullOrWhiteSpace(formAsset) && !string.IsNullOrWhiteSpace(ownerAsset) &&
+            !string.Equals(formAsset.Replace('\\', '/'), ownerAsset.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
 
         /// <summary>"ASSETS/Characters/LuxFire/..." on owner "Lux" gives "Fire".</summary>
         private static string ModelFormName(string meshPath, string ownerCharacter)
@@ -185,7 +190,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 resourceMap,
                 VfxAnimationParser.ExtractIdleEffects(Get(properties, F_overrideIdleEffects)),
                 GetBool(properties, F_enableOverrideIdleEffects),
-                hasMaterialOverrides);
+                hasMaterialOverrides,
+                skinMesh == null
+                    ? Array.Empty<uint>()
+                    : ReadSubmeshNameHashes(GetString(skinMesh.Properties, F_initialSubmeshToHide)));
         }
 
         private static IReadOnlyList<uint> ReadHashList(BinTreeProperty property)

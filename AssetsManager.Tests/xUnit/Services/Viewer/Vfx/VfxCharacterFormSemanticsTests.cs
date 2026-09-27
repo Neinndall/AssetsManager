@@ -19,27 +19,35 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new Dictionary<uint, uint>(), Array.Empty<VfxIdleEffectDefinition>(), false);
 
         [Fact]
-        public void GearFormsAuthoredOnAnotherSkinModelAreCompatibleModelSwaps()
+        public void GearFormsChangingMeshSkeletonOrMaterialsReloadTheModel()
         {
             // Elementalist Lux (Skin07): each GearData points at another skin's SKN/SKL with material overrides.
-            var owner = new VfxOwnerSceneContext("ASSETS/Characters/Lux/Skins/Skin07/Lux_Skin07.skn", "", 1f);
-            var projection = new VfxCharacterFormDataProjection(
-                Array.Empty<uint>(), Array.Empty<uint>(),
+            var owner = new VfxOwnerSceneContext(
+                "ASSETS/Characters/Lux/Skins/Skin07/Lux_Skin07.skn", "ASSETS/Characters/Lux/Skins/Skin07/Lux_Skin07.skl", 1f);
+            var otherMesh = new VfxCharacterFormDataProjection(
+                Array.Empty<uint>(), new uint[] { 3 },
                 "ASSETS/Characters/LuxFire/Skins/Skin07/Lux_Skin07_Fire.skn",
                 "ASSETS/Characters/LuxFire/Skins/Skin07/Lux_Skin07_Fire.skl",
-                null, new Dictionary<uint, uint>(), Array.Empty<VfxIdleEffectDefinition>(), false, true);
-            var sameModel = projection with { MeshPath = owner.MeshPath };
+                null, new Dictionary<uint, uint>(), Array.Empty<VfxIdleEffectDefinition>(), false, true,
+                new uint[] { 7 });
+            var materialsOnly = otherMesh with { MeshPath = owner.MeshPath, SkeletonPath = owner.SkeletonPath };
+            var skeletonOnly = materialsOnly with { HasMaterialOverrides = false, SkeletonPath = "ASSETS/Other.skl" };
+            var plain = skeletonOnly with { SkeletonPath = owner.SkeletonPath };
             var document = new VfxCharacterFormDocumentData(
-                new uint?[] { 10, 20 },
-                new Dictionary<uint, VfxCharacterFormDataProjection> { [10] = sameModel, [20] = projection });
+                new uint?[] { 10, 20, 30, 40 },
+                new Dictionary<uint, VfxCharacterFormDataProjection>
+                {
+                    [10] = otherMesh, [20] = materialsOnly, [30] = skeletonOnly, [40] = plain
+                });
 
             var forms = VfxCharacterFormParser.Resolve(new[] { document }, null, owner);
 
-            Assert.False(forms[0].IsModelSwap);
-            Assert.True(forms[1].IsModelSwap);
-            Assert.Equal("Fire", forms[1].Name);
-            Assert.Equal(-1, forms[1].EquippedGearIndex);
-            Assert.Equal(new[] { forms[1] }, VfxCharacterFormSemantics.CompatibleForms(forms, owner));
+            Assert.Equal(new[] { true, true, true, false }, forms.Select(form => form.ReloadsModel));
+            Assert.Equal("Fire", forms[0].Name);
+            Assert.Equal(forms, VfxCharacterFormSemantics.CompatibleForms(forms, owner));
+            // A reloading form starts from its own initialSubmeshToHide, then its GearData hide list applies.
+            Assert.True(VfxCharacterFormSemantics.HiddenSubmeshes(new uint[] { 2, 9 }, forms[0]).SetEquals(new uint[] { 3, 7 }));
+            Assert.True(VfxCharacterFormSemantics.HiddenSubmeshes(new uint[] { 2, 9 }, null).SetEquals(new uint[] { 2, 9 }));
         }
 
         [Fact]

@@ -113,15 +113,18 @@ namespace AssetsManager.Services.Viewer.Loading
             string filePath,
             string skinBinPath,
             string projectRoot = null,
-            CancellationToken cancellationToken = default)
-            => LoadModelCore(filePath, skinBinPath, loadDirectoryTextures: false, projectRoot, cancellationToken);
+            CancellationToken cancellationToken = default,
+            uint gearUpgradePathHash = 0)
+            => LoadModelCore(filePath, skinBinPath, loadDirectoryTextures: false, projectRoot, cancellationToken,
+                gearUpgradePathHash);
 
         private async Task<SceneModel> LoadModelCore(
             string filePath,
             string explicitSkinBinPath,
             bool loadDirectoryTextures,
             string projectRoot,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            uint gearUpgradePathHash = 0)
         {
             if (_hashResolverService != null)
                 await _hashResolverService.LoadHashesAsync();
@@ -151,7 +154,8 @@ namespace AssetsManager.Services.Viewer.Loading
                         explicitSkinBinPath,
                         filePath,
                         projectRoot,
-                        cancellationToken);
+                        cancellationToken,
+                        gearUpgradePathHash);
                     if (!loadDirectoryTextures)
                         selectableTextureKeys = loadedTextures.Keys.ToArray();
 
@@ -404,7 +408,8 @@ namespace AssetsManager.Services.Viewer.Loading
             string explicitSkinBinPath = null,
             string targetSknPath = null,
             string projectRoot = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            uint gearUpgradePathHash = 0)
         {
             string skinBinPath = !string.IsNullOrWhiteSpace(explicitSkinBinPath) && File.Exists(explicitSkinBinPath)
                 ? Path.GetFullPath(explicitSkinBinPath)
@@ -492,7 +497,8 @@ namespace AssetsManager.Services.Viewer.Loading
                         shaderTrees,
                         wadChunkPathResolver,
                         binEntryResolver,
-                        targetSknPath);
+                        targetSknPath,
+                        gearUpgradePathHash);
                 if (loadReferencedTextures)
                 {
                     foreach (string texturePath in metadata.ReferencedTexturePaths)

@@ -16,12 +16,10 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<VfxIdleEffectDefinition> OverrideIdleEffects = null,
         bool EnableOverrideIdleEffects = false,
         bool HasMaterialOverrides = false,
-        bool IsModelSwap = false)
+        bool ReloadsModel = false,
+        IReadOnlyList<uint> InitialHiddenSubmeshHashes = null)
     {
         public bool IsBase => GearIndex < 0;
-
-        /// <summary>Gear index equipped on the owner parts; model-swap forms render their own mesh ungeared.</summary>
-        public int EquippedGearIndex => IsModelSwap ? -1 : GearIndex;
 
         public static VfxCharacterFormDefinition CreateBase(string name = "Base") =>
             new(

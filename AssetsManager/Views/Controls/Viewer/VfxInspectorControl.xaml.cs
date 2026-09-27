@@ -79,6 +79,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private VfxLoadingService.Bundle _championBundle;
         private string _championSknPath;
         private string _championSearchDir;
+        // GearSkinUpgrade whose skinMeshProperties the installed model was loaded with; 0 for the skin's own.
+        private uint _championFormPathHash;
         // Like LTK's Skin preview, a freshly installed Character is not drawn until the clip it opens
         // on has its pose, instead of flashing the bind pose while the ANM is prepared.
         private bool _championAwaitingFirstPose;
@@ -5270,13 +5272,15 @@ namespace AssetsManager.Views.Controls.Viewer
             string sknPath,
             string searchDir,
             bool startPreview,
-            string authoredSkeletonPath = null)
+            string authoredSkeletonPath = null,
+            uint formPathHash = 0)
         {
             var oldModel = _championModel;
             _championModel = loaded;
             _championBundle = bundle;
             _championSknPath = sknPath;
             _championSearchDir = searchDir;
+            _championFormPathHash = formPathHash;
             _championAwaitingFirstPose = true;
             RefreshCharacterInteractionTarget();
             // Keep the owner mesh and its joint anchors in authored skinScale space. User
@@ -5285,9 +5289,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 ? owner.SkinScale
                 : 1d;
             _championModel.Scale = _championAuthoredScale;
-            IReadOnlyList<uint> initialHidden =
-                bundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>();
-            ApplyOwnerSubmeshVisibility(initialHidden);
+            // The selected form owns the baseline: a model-swap form hides its own submeshes, not the owner's.
+            ApplyOwnerSubmeshVisibility(GetCharacterFormHiddenSubmeshes());
             if (oldModel != null && !ReferenceEquals(oldModel, loaded))
             {
                 _championMeshRenderer?.QueueRelease(oldModel);
@@ -5296,8 +5299,8 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.HasChampionMesh = true;
             RebuildCharacterSubmeshOptions();
 
-            // Ensure skeleton is loaded
-            if (_championModel.Skeleton == null && !string.IsNullOrEmpty(sknPath))
+            // Ensure skeleton is loaded; a form's authored SKL replaces the one found beside the SKN.
+            if ((_championModel.Skeleton == null || authoredSkeletonPath != null) && !string.IsNullOrEmpty(sknPath))
             {
                 string sklPath = ResolveSklPath(
                     authoredSkeletonPath ?? bundle?.OwnerSceneContext?.SkeletonPath, sknPath, searchDir);

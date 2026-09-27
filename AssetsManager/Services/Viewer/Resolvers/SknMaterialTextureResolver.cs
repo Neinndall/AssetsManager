@@ -182,6 +182,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint SkinPropertiesClass = Fnv1a.HashLower("SkinCharacterDataProperties");
         private static readonly uint CustomShaderClass = Fnv1a.HashLower("CustomShaderDef");
         private static readonly uint SkinMeshProperties = Fnv1a.HashLower("skinMeshProperties");
+        private const uint GearData = 0x639b0013;
         private static readonly uint SimpleSkin = Fnv1a.HashLower("simpleSkin");
         private static readonly uint SkinScale = Fnv1a.HashLower("skinScale");
         private static readonly uint SelfIllumination = Fnv1a.HashLower("selfIllumination");
@@ -256,7 +257,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IEnumerable<BinTree> shaderTrees,
             Func<ulong, string> wadChunkPathResolver = null,
             Func<uint, string> binEntryResolver = null,
-            string targetSknPath = null)
+            string targetSknPath = null,
+            uint gearUpgradePathHash = 0)
         {
             List<BinTree> trees = (materialTrees ?? Enumerable.Empty<BinTree>())
                 .Where(tree => tree != null)
@@ -315,13 +317,26 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 }
             }
 
-            foreach (BinTreeObject obj in primarySkins)
+            // A selected gear form replaces the skin's skinMeshProperties with its GearData's own
+            // (materials, textures, initialSubmeshToHide, scale), as the game does when it equips.
+            IEnumerable<BinTreeStruct> meshPropertySets = primarySkins
+                .Select(obj => obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty)
+                    ? meshProperty as BinTreeStruct
+                    : null);
+            if (gearUpgradePathHash != 0 &&
+                primaryTree.Objects.TryGetValue(gearUpgradePathHash, out BinTreeObject gearUpgrade) &&
+                gearUpgrade.Properties.TryGetValue(GearData, out BinTreeProperty gearProperty) &&
+                gearProperty is BinTreeStruct gearData &&
+                gearData.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty gearMeshProperty) &&
+                gearMeshProperty is BinTreeStruct gearMeshProperties)
             {
-                if (!obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
-                    meshProperty is not BinTreeStruct meshProperties)
-                {
+                meshPropertySets = new[] { gearMeshProperties };
+            }
+
+            foreach (BinTreeStruct meshProperties in meshPropertySets)
+            {
+                if (meshProperties == null)
                     continue;
-                }
 
                 if (!readInitialHiddenSubmeshes)
                 {

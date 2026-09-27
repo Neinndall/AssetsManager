@@ -9,8 +9,8 @@ namespace AssetsManager.Views.Models.Viewer
     internal static class VfxCharacterFormSemantics
     {
         /// <summary>
-        /// Forms the Studio can preview: model-swap forms load their own SKN/SKL; the rest must fit the
-        /// loaded owner mesh, so material overrides and other SKN/SKL paths on it are excluded.
+        /// Forms the Studio can preview: forms that reload the model with their own SKN, SKL or materials,
+        /// and forms that fit the loaded owner mesh as authored; any other form cannot be previewed.
         /// </summary>
         internal static IReadOnlyList<VfxCharacterFormDefinition> CompatibleForms(
             IEnumerable<VfxCharacterFormDefinition> forms,
@@ -21,8 +21,7 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 if (form == null)
                     continue;
-                // Model-swap forms load their own SKN/SKL and that skin's materials when selected.
-                if (form.IsModelSwap)
+                if (form.ReloadsModel)
                 {
                     compatible.Add(form);
                     continue;
@@ -47,8 +46,12 @@ namespace AssetsManager.Views.Models.Viewer
             VfxCharacterFormDefinition form,
             IEnumerable<ModelPart> parts = null)
         {
-            var hidden = new HashSet<uint>(initiallyHidden ?? Array.Empty<uint>());
-            if (form == null || form.IsBase || form.IsModelSwap)
+            // A reloading form replaces the skin's skinMeshProperties, so its own initialSubmeshToHide
+            // is the baseline instead of the owner's; its GearData show/hide lists still apply on top.
+            bool reloads = form is { ReloadsModel: true };
+            var hidden = new HashSet<uint>(
+                (reloads ? form.InitialHiddenSubmeshHashes : initiallyHidden) ?? Array.Empty<uint>());
+            if (form == null || form.IsBase)
                 return hidden;
 
             // Authored show/hide lists in GearData take absolute priority
@@ -62,8 +65,9 @@ namespace AssetsManager.Views.Models.Viewer
                 return hidden;
             }
 
-            // Fallback for skins where Riot authored no submesh lists in GearData (e.g. Sett 66)
-            if (parts != null && form.GearIndex >= 0)
+            // Fallback for skins where Riot authored no submesh lists in GearData (e.g. Sett 66).
+            // Reloading forms already carry their authored baseline, so nothing is inferred for them.
+            if (parts != null && form.GearIndex >= 0 && !reloads)
             {
                 var (inferredShow, inferredHide) = InferFormSubmeshes(form, initiallyHidden, parts);
                 hidden.ExceptWith(inferredShow);
