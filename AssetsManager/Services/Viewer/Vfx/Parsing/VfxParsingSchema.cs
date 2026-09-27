@@ -31,6 +31,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             VfxParsingHash.Fnv1a("complexEmitterDefinitionData"),
             VfxParsingHash.Fnv1a("simpleEmitterDefinitionData")
         };
+        internal static readonly uint F_shimmerEmitterDefinitionData = 0xeb0aabeb;
+        internal static readonly uint ShimmerEmitterClass = VfxParsingHash.Fnv1a("VfxShimmerEmitterDefinitionData");
         internal static readonly uint F_materialOverrideDefinitions = VfxParsingHash.Fnv1a("materialOverrideDefinitions");
         internal static readonly uint F_assetRemappingTable = VfxParsingHash.Fnv1a("assetRemappingTable");
 

@@ -2491,5 +2491,85 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(VfxCullReason.Colorblind, parsedEmitter.Culled);
             Assert.True(parsedEmitter.Disabled);
         }
+
+        [Fact]
+        public void ParsesShimmerEmitterWithDriverTransformsAndAssets()
+        {
+            var shimmerEmitter = new BinTreeStruct(
+                0xeb0aabeb,
+                Fnv1a.HashLower("VfxShimmerEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("emitterName"), "ShimmerCubeMesh"),
+                    new BinTreeString(Fnv1a.HashLower("mesh"), "assets/particles/cube.scb"),
+                    new BinTreeString(Fnv1a.HashLower("texture"), "assets/particles/cube.dds"),
+                    new BinTreeVector4(Fnv1a.HashLower("Color"), new Vector4(0.5f, 0.6f, 0.7f, 1f)),
+                    new BinTreeVector3(Fnv1a.HashLower("Scale"), new Vector3(2f, 2f, 2f)),
+                    new BinTreeVector3(Fnv1a.HashLower("Position"), new Vector3(10f, 20f, 30f)),
+                    new BinTreeVector3(Fnv1a.HashLower("Rotation"), new Vector3(0f, 90f, 0f))
+                });
+
+            var systemObj = new BinTreeObject(
+                "Vfx/Test/ShimmerSystem",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        0xeb0aabeb,
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { shimmerEmitter })
+                });
+
+            using var stream = new MemoryStream();
+            new BinTree(new[] { systemObj }, System.Array.Empty<string>()).Write(stream);
+
+            VfxBinDocument doc = VfxGraphParser.ParseDocument(stream.ToArray());
+            var parsedSystem = Assert.Single(doc.Systems).Value;
+            var parsedEmitter = Assert.Single(parsedSystem.Emitters);
+
+            Assert.Equal("ShimmerCubeMesh", parsedEmitter.Name);
+            Assert.True(parsedEmitter.IsMeshPrimitive);
+            Assert.Equal(VfxPrimitiveKind.Mesh, parsedEmitter.PrimitiveKind);
+            Assert.Equal("assets/particles/cube.scb", parsedEmitter.MeshPath);
+            Assert.Equal("assets/particles/cube.dds", parsedEmitter.TexturePath);
+            Assert.True(parsedEmitter.IsSingleParticle);
+            Assert.Equal(new Vector4(0.5f, 0.6f, 0.7f, 1f), parsedEmitter.BirthColor.Constant);
+            Assert.Equal(new Vector3(2f, 2f, 2f), parsedEmitter.BirthScale.Constant);
+            Assert.Equal(new Vector3(10f, 20f, 30f), parsedEmitter.EmitterPosition.Constant);
+            Assert.NotNull(parsedEmitter.BirthRotation);
+            Assert.Equal(new Vector3(0f, 90f * (System.MathF.PI / 180f), 0f), parsedEmitter.BirthRotation.Value.Constant);
+            Assert.False(parsedEmitter.Disabled);
+        }
+
+        [Fact]
+        public void IgnoresShimmerEmitterWithoutValidMesh()
+        {
+            var shimmerEmitterWithoutMesh = new BinTreeStruct(
+                0xeb0aabeb,
+                Fnv1a.HashLower("VfxShimmerEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("emitterName"), "NoMeshShimmer"),
+                    new BinTreeString(Fnv1a.HashLower("texture"), "assets/particles/cube.dds"),
+                });
+
+            var systemObj = new BinTreeObject(
+                "Vfx/Test/EmptyShimmerSystem",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(
+                        0xeb0aabeb,
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { shimmerEmitterWithoutMesh })
+                });
+
+            using var stream = new MemoryStream();
+            new BinTree(new[] { systemObj }, System.Array.Empty<string>()).Write(stream);
+
+            VfxBinDocument doc = VfxGraphParser.ParseDocument(stream.ToArray());
+            var parsedSystem = Assert.Single(doc.Systems).Value;
+            Assert.Empty(parsedSystem.Emitters);
+        }
     }
 }

@@ -53,6 +53,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     if (el is BinTreeStruct s && s.ClassHash == EmitterClass)
                         emitters.Add(ParseEmitter(s, simple));
             }
+            if (Get(o.Properties, F_shimmerEmitterDefinitionData) is BinTreeContainer shimmerContainer)
+            {
+                for (int i = 0; i < shimmerContainer.Elements.Count; i++)
+                {
+                    if (shimmerContainer.Elements[i] is BinTreeStruct shimmerStruct)
+                    {
+                        var shimmerEmitter = ParseShimmerEmitter(shimmerStruct, i);
+                        if (shimmerEmitter != null)
+                            emitters.Add(shimmerEmitter);
+                    }
+                }
+            }
             float radius = GetF32(o.Properties, F_visibilityRadius) ?? 0f;
             Matrix4x4? transform = Get(o.Properties, F_transform) is BinTreeMatrix44 matrix
                 ? matrix.Value
@@ -850,6 +862,249 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 values.Add(ReadCurveFProperty(el) ?? VfxCurveF.Zero);
             }
             return values;
+        }
+
+        private static readonly string[] ShimmerMeshExtensions = { ".gmesh", ".tmesh", ".scb", ".skn" };
+        private static readonly string[] ShimmerTextureExtensions = { ".dds", ".tex" };
+
+        private static readonly uint[] ShimmerColorFieldHashes =
+        {
+            VfxParsingHash.Fnv1a("Color"),
+            VfxParsingHash.Fnv1a("InitialColor"),
+            VfxParsingHash.Fnv1a("color"),
+            VfxParsingHash.Fnv1a("initialColor")
+        };
+
+        private static readonly uint[] ShimmerScaleFieldHashes =
+        {
+            VfxParsingHash.Fnv1a("Scale"),
+            VfxParsingHash.Fnv1a("InitialScale"),
+            VfxParsingHash.Fnv1a("scale"),
+            VfxParsingHash.Fnv1a("initialScale")
+        };
+
+        private static readonly uint[] ShimmerPositionFieldHashes =
+        {
+            VfxParsingHash.Fnv1a("Position"),
+            VfxParsingHash.Fnv1a("InitialPosition"),
+            VfxParsingHash.Fnv1a("Offset"),
+            VfxParsingHash.Fnv1a("Translation"),
+            VfxParsingHash.Fnv1a("ShapeCenter"),
+            VfxParsingHash.Fnv1a("position"),
+            VfxParsingHash.Fnv1a("offset")
+        };
+
+        private static readonly uint[] ShimmerRotationFieldHashes =
+        {
+            VfxParsingHash.Fnv1a("Rotation"),
+            VfxParsingHash.Fnv1a("InitialRotation"),
+            VfxParsingHash.Fnv1a("rotation"),
+            VfxParsingHash.Fnv1a("initialRotation")
+        };
+
+        private static VfxEmitterDefinition ParseShimmerEmitter(BinTreeStruct s, int index)
+        {
+            var p = s.Properties;
+            string name = GetString(p, F_emitterName) ?? $"[{index}]";
+            bool disabled = GetBool(p, F_disabled);
+
+            string meshPath = FindFirstAsset(s, ShimmerMeshExtensions);
+            if (string.IsNullOrWhiteSpace(meshPath))
+                return null;
+
+            string texturePath = FindFirstAsset(s, ShimmerTextureExtensions);
+
+            Vector4 color = FindNamedDriverVector4(s, ShimmerColorFieldHashes) ?? Vector4.One;
+            Vector3 scale = FindNamedDriverVector3(s, ShimmerScaleFieldHashes) ?? Vector3.One;
+            Vector3 offset = FindNamedDriverVector3(s, ShimmerPositionFieldHashes) ?? Vector3.Zero;
+            Vector3 rotation = FindNamedDriverVector3(s, ShimmerRotationFieldHashes) ?? Vector3.Zero;
+            Vector3 rotationRad = rotation * (MathF.PI / 180f);
+
+            return new VfxEmitterDefinition(
+                Name: name,
+                Rate: VfxCurveF.Const(1f),
+                ParticleLifetime: VfxCurveF.Const(1000f),
+                EmitterLifetime: null,
+                ParticleLinger: 0f,
+                TimeBeforeFirstEmission: 0f,
+                IsSingleParticle: true,
+                Disabled: disabled,
+                BlendMode: 0,
+                BirthScale: VfxCurve3.Const(scale),
+                ScaleOverLife: null,
+                BirthColor: VfxCurve4.Const(color),
+                ColorOverLife: null,
+                BirthVelocity: null,
+                Acceleration: null,
+                BirthRotationalVelocity: null,
+                EmitterPosition: VfxCurve3.Const(offset),
+                TexturePath: texturePath ?? string.Empty,
+                TexDiv: Vector2.One,
+                NumFrames: 1,
+                RandomStartFrame: false,
+                IsMeshPrimitive: true,
+                MeshPath: meshPath,
+                PrimitiveKind: VfxPrimitiveKind.Mesh,
+                BirthRotation: VfxCurve3.Const(rotationRad));
+        }
+
+        private static string FindFirstAsset(BinTreeProperty prop, string[] extensions, int depth = 0)
+        {
+            if (prop is null || depth > 24) return null;
+            if (prop is BinTreeOptional opt) prop = opt.Value;
+            if (prop is null) return null;
+
+            if (prop is BinTreeString str && !string.IsNullOrWhiteSpace(str.Value))
+            {
+                string lower = str.Value.ToLowerInvariant();
+                foreach (var ext in extensions)
+                {
+                    if (lower.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+                        return str.Value;
+                }
+            }
+            else if (prop is BinTreeWadChunkLink link && link.Value != 0)
+            {
+                return $"{link.Value:x16}{extensions[0]}";
+            }
+
+            if (prop is BinTreeStruct s)
+            {
+                foreach (var child in s.Properties.Values)
+                {
+                    var found = FindFirstAsset(child, extensions, depth + 1);
+                    if (found != null) return found;
+                }
+            }
+            else if (prop is BinTreeContainer c)
+            {
+                foreach (var child in c.Elements)
+                {
+                    var found = FindFirstAsset(child, extensions, depth + 1);
+                    if (found != null) return found;
+                }
+            }
+            else if (prop is BinTreeMap m)
+            {
+                foreach (var pair in m)
+                {
+                    var found = FindFirstAsset(pair.Value, extensions, depth + 1);
+                    if (found != null) return found;
+                }
+            }
+
+            return null;
+        }
+
+        private static Vector4? FindNamedDriverVector4(BinTreeProperty root, uint[] targetHashes, int depth = 0)
+        {
+            if (root is null || depth > 24) return null;
+            if (root is BinTreeOptional opt) root = opt.Value;
+            if (root is not BinTreeStruct s) return null;
+
+            foreach (uint hash in targetHashes)
+            {
+                if (s.Properties.TryGetValue(hash, out var prop))
+                {
+                    var val = ExtractDriverVector4(prop);
+                    if (val.HasValue) return val;
+                }
+            }
+
+            foreach (var child in s.Properties.Values)
+            {
+                if (child is BinTreeStruct childStruct)
+                {
+                    var found = FindNamedDriverVector4(childStruct, targetHashes, depth + 1);
+                    if (found.HasValue) return found;
+                }
+                else if (child is BinTreeContainer container)
+                {
+                    foreach (var elem in container.Elements)
+                    {
+                        var found = FindNamedDriverVector4(elem, targetHashes, depth + 1);
+                        if (found.HasValue) return found;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static Vector3? FindNamedDriverVector3(BinTreeProperty root, uint[] targetHashes, int depth = 0)
+        {
+            if (root is null || depth > 24) return null;
+            if (root is BinTreeOptional opt) root = opt.Value;
+            if (root is not BinTreeStruct s) return null;
+
+            foreach (uint hash in targetHashes)
+            {
+                if (s.Properties.TryGetValue(hash, out var prop))
+                {
+                    var val = ExtractDriverVector3(prop);
+                    if (val.HasValue) return val;
+                }
+            }
+
+            foreach (var child in s.Properties.Values)
+            {
+                if (child is BinTreeStruct childStruct)
+                {
+                    var found = FindNamedDriverVector3(childStruct, targetHashes, depth + 1);
+                    if (found.HasValue) return found;
+                }
+                else if (child is BinTreeContainer container)
+                {
+                    foreach (var elem in container.Elements)
+                    {
+                        var found = FindNamedDriverVector3(elem, targetHashes, depth + 1);
+                        if (found.HasValue) return found;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static Vector4? ExtractDriverVector4(BinTreeProperty prop)
+        {
+            if (prop is null) return null;
+            if (prop is BinTreeOptional opt) prop = opt.Value;
+            if (prop is null) return null;
+
+            if (prop is BinTreeVector4 v4) return v4.Value;
+            if (prop is BinTreeColor c) return c.Value;
+
+            if (prop is BinTreeStruct s)
+            {
+                foreach (var inner in s.Properties.Values)
+                {
+                    var res = ExtractDriverVector4(inner);
+                    if (res.HasValue) return res;
+                }
+            }
+
+            return null;
+        }
+
+        private static Vector3? ExtractDriverVector3(BinTreeProperty prop)
+        {
+            if (prop is null) return null;
+            if (prop is BinTreeOptional opt) prop = opt.Value;
+            if (prop is null) return null;
+
+            if (prop is BinTreeVector3 v3) return v3.Value;
+
+            if (prop is BinTreeStruct s)
+            {
+                foreach (var inner in s.Properties.Values)
+                {
+                    var res = ExtractDriverVector3(inner);
+                    if (res.HasValue) return res;
+                }
+            }
+
+            return null;
         }
 
     }
