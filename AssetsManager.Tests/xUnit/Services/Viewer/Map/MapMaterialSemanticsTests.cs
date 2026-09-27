@@ -95,6 +95,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void MaterialParameterWinsOverPassParameter()
+        {
+            MapMaterialPassData pass = Pass(blend: false, 1, 0) with
+            {
+                Parameters = new Dictionary<string, Vector4>
+                {
+                    ["TintColor"] = new Vector4(0f, 0f, 1f, 1f)
+                }
+            };
+
+            MapMaterialDefinition material = Resolve(
+                pass: pass,
+                shader: Shader("Shaders/Test/Flat"),
+                parameters: new Dictionary<string, Vector4>
+                {
+                    ["TintColor"] = new Vector4(1f, 0.5f, 0.25f, 1f)
+                });
+
+            Assert.Equal(new Vector3(1f, 0.5f, 0.25f), material.Tint);
+        }
+
+        [Fact]
         public void SwitchedShaderIsRecognizedByPassHashWithoutShaderDefs()
         {
             var samplers = new[]

@@ -424,6 +424,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Maps / Material parameter values now take priority over their shader pass values when shaders are off.
+  - VFX Studio / Champion materials with two passes draw the second pass in the same order as LTK Manager.
   - Maps / Apply authored ambient grid lighting to placed structures and characters.
   - Maps / Preserve game shader definitions and custom material textures when rebuilding map effects.
   - Viewer / Switching scene actors preserves their selected form and scale without reloading the model.

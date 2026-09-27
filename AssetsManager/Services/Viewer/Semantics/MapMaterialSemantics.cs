@@ -260,10 +260,11 @@ namespace AssetsManager.Services.Viewer.Semantics
 
             bool IsDeclared(string key) =>
                 shader?.IsDeclared != true || shader.DefaultParameters.ContainsKey(key);
-            foreach ((string key, Vector4 value) in material ?? EmptyVectorMap)
+            // The material's value wins over the pass's, as LTK 1.23 reads paramValues.
+            foreach ((string key, Vector4 value) in pass ?? EmptyVectorMap)
                 if (IsDeclared(key))
                     result[key] = value;
-            foreach ((string key, Vector4 value) in pass ?? EmptyVectorMap)
+            foreach ((string key, Vector4 value) in material ?? EmptyVectorMap)
                 if (IsDeclared(key))
                     result[key] = value;
             return result;

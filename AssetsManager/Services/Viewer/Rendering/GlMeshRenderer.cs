@@ -32,6 +32,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _program;
         private uint _boneBuffer;
         private readonly List<ModelPart> _alphaRenderQueue = new();
+        private readonly List<PartDraw> _opaqueDraws = new();
+        private readonly List<PartDraw> _transparentDraws = new();
         private readonly Dictionary<SceneModel, long> _materialTimeOrigins = new();
         private readonly Dictionary<SceneModel, Matrix4x4[]> _bindSkinningPalettes = new();
         private int _uViewProj;
@@ -185,12 +187,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (solids)
                 {
                     _gl.Uniform1(_uWireframePass, 0);
-                    RenderParts(model, false, cameraPosition, world, viewProj, in gameFrame,
+                    RenderSolidParts(model, cameraPosition, world, viewProj, in gameFrame,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
-                        solidMode, shadersEnabled, wireframePass: false, gameSkinningMatrices);
-                    RenderParts(model, true, cameraPosition, world, viewProj, in gameFrame,
-                        lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
-                        solidMode, shadersEnabled, wireframePass: false, gameSkinningMatrices);
+                        solidMode, shadersEnabled, gameSkinningMatrices);
                 }
 
                 if (wireframe)
@@ -216,12 +215,12 @@ namespace AssetsManager.Services.Viewer.Rendering
                         PreviewWireColor.Z,
                         wireOpacity);
                     ApplyWireframeState(wireOpacity);
-                    RenderParts(model, false, cameraPosition, world, viewProj, in gameFrame,
+                    RenderParts(model, false, cameraPosition, world, viewProj,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
-                        solidMode, shadersEnabled: false, wireframePass: true, gameSkinningMatrices);
-                    RenderParts(model, true, cameraPosition, world, viewProj, in gameFrame,
+                        solidMode, wireframePass: true);
+                    RenderParts(model, true, cameraPosition, world, viewProj,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
-                        solidMode, shadersEnabled: false, wireframePass: true, gameSkinningMatrices);
+                        solidMode, wireframePass: true);
                 }
             }
             finally
@@ -323,9 +322,20 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform1(_uSelfIllumination, selfIllumination);
         }
 
-        private void RenderParts(
+        private readonly record struct PartDraw(
+            ModelPart Part,
+            GlMeshResourceCache.PartResources Resources,
+            int PassIndex,
+            float DistanceSquared,
+            int Order);
+
+        /// <summary>
+        /// Solid parts as LTK draws a skin: every translated pass is its own draw, opaque or
+        /// transparent by that pass's blend, and a later pass draws after every earlier one,
+        /// as the pass twins of LTK 1.23 raise their render order.
+        /// </summary>
+        private void RenderSolidParts(
             SceneModel model,
-            bool alphaBlended,
             Vector3 cameraPosition,
             Matrix4x4 world,
             Matrix4x4 viewProj,
@@ -338,8 +348,133 @@ namespace AssetsManager.Services.Viewer.Rendering
             float materialTimeSeconds,
             VfxPreviewViewMode viewMode,
             bool shadersEnabled,
-            bool wireframePass,
             IReadOnlyList<Matrix4x4> gameSkinningMatrices)
+        {
+            _opaqueDraws.Clear();
+            _transparentDraws.Clear();
+            int order = 0;
+            foreach (ModelPart part in model.Parts)
+            {
+                if (!part.IsVisible)
+                    continue;
+
+                GlMeshResourceCache.PartResources resources = _resources.Ensure(model, part);
+                if (resources.Vao == 0)
+                    continue;
+
+                ModelMaterialDefinition material = part.MaterialDefinition;
+                bool wantsGameProgram = UsesGameShaders(viewMode, shadersEnabled) &&
+                                        resources.IsGpuSkinned &&
+                                        gameSkinningMatrices is { Count: > 0 } &&
+                                        material?.Program != null;
+                int passCount = wantsGameProgram && _gameShaderRuntime != null
+                    ? _gameShaderRuntime.GetSkinnedPassCount(material)
+                    : 0;
+
+                if (passCount == 0)
+                {
+                    bool blended = IsPreviewAlphaBlended(part, viewMode, wireframePass: false);
+                    float distance = blended ? GetRenderDistanceSquared(part, cameraPosition, world) : 0f;
+                    (blended ? _transparentDraws : _opaqueDraws)
+                        .Add(new PartDraw(part, resources, -1, distance, order++));
+                    continue;
+                }
+
+                for (int passIndex = 0; passIndex < passCount; passIndex++)
+                {
+                    bool blended = _gameShaderRuntime.GetSkinnedPassState(material, passIndex)?.BlendEnabled == true;
+                    float distance = blended ? GetRenderDistanceSquared(part, cameraPosition, world) : 0f;
+                    (blended ? _transparentDraws : _opaqueDraws)
+                        .Add(new PartDraw(part, resources, passIndex, distance, order++));
+                }
+            }
+
+            _opaqueDraws.Sort((left, right) => MapCharacterRenderer.ComparePassOrder(
+                left.PassIndex, left.DistanceSquared, left.Order,
+                right.PassIndex, right.DistanceSquared, right.Order, false));
+            _transparentDraws.Sort((left, right) => MapCharacterRenderer.ComparePassOrder(
+                left.PassIndex, left.DistanceSquared, left.Order,
+                right.PassIndex, right.DistanceSquared, right.Order, true));
+
+            uint lastBoundTex0 = uint.MaxValue;
+            for (int queueIndex = 0; queueIndex < 2; queueIndex++)
+            {
+                foreach (PartDraw draw in queueIndex == 0 ? _opaqueDraws : _transparentDraws)
+                {
+                    _gl.BindVertexArray(draw.Resources.Vao);
+                    if (draw.PassIndex >= 0)
+                    {
+                        if (TryDrawProgramPass(model, draw, world, in gameFrame, gameSkinningMatrices))
+                        {
+                            lastBoundTex0 = uint.MaxValue;
+                            continue;
+                        }
+
+                        // A pass that fails to bind keeps the part visible once, as the stock draw.
+                        if (draw.PassIndex > 0)
+                            continue;
+                    }
+
+                    DrawStockPart(model, draw.Part, draw.Resources, viewProj, world, cameraPosition,
+                        lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
+                        viewMode, wireframePass: false, ref lastBoundTex0);
+                }
+            }
+
+            _opaqueDraws.Clear();
+            _transparentDraws.Clear();
+            _gl.ActiveTexture(TextureUnit.Texture0);
+        }
+
+        private bool TryDrawProgramPass(
+            SceneModel model,
+            PartDraw draw,
+            Matrix4x4 world,
+            in GameShaderRuntime.Frame gameFrame,
+            IReadOnlyList<Matrix4x4> gameSkinningMatrices)
+        {
+            ModelPart part = draw.Part;
+            GlMeshResourceCache.PartResources resources = draw.Resources;
+            ConfigureSkinIndexAttribute(resources, integer: true);
+            if (!_gameShaderRuntime.TryBindSkinned(
+                    part.MaterialDefinition,
+                    draw.PassIndex,
+                    world,
+                    gameSkinningMatrices,
+                    hasTangents: resources.TangentVbo != 0,
+                    in gameFrame,
+                    path => _resources.ResolveProgramTexture(part, resources, path),
+                    model.SelfIllumination,
+                    part.EquippedGearIndex))
+            {
+                return false;
+            }
+
+            _gl.FrontFace(world.GetDeterminant() < 0f
+                ? FrontFaceDirection.CW
+                : FrontFaceDirection.Ccw);
+            _gameShaderRuntime.DrawBoundPass(
+                _drawElements,
+                resources.IndexCount,
+                IntPtr.Zero);
+            _gameShaderRuntime.ResetBindings();
+            return true;
+        }
+
+        private void RenderParts(
+            SceneModel model,
+            bool alphaBlended,
+            Vector3 cameraPosition,
+            Matrix4x4 world,
+            Matrix4x4 viewProj,
+            Vector3 lightDir,
+            Vector3 lightColor,
+            Vector3 lightDir2,
+            Vector3 lightColor2,
+            Vector3 ambientColor,
+            float materialTimeSeconds,
+            VfxPreviewViewMode viewMode,
+            bool wireframePass)
         {
             IEnumerable<ModelPart> parts = model.Parts;
             if (alphaBlended)
@@ -368,143 +503,121 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (resources.Vao == 0) continue;
 
                 _gl.BindVertexArray(resources.Vao);
-                ModelMaterialDefinition material = part.MaterialDefinition;
-                bool wantsGameProgram = UsesGameShaders(viewMode, shadersEnabled, wireframePass) &&
-                                        resources.IsGpuSkinned &&
-                                        gameSkinningMatrices is { Count: > 0 } &&
-                                        material?.Program != null;
-                int passCount = wantsGameProgram && _gameShaderRuntime != null
-                    ? _gameShaderRuntime.GetSkinnedPassCount(material)
-                    : 0;
-
-                if (passCount > 0)
-                {
-                    ConfigureSkinIndexAttribute(resources, integer: true);
-                    bool boundAny = false;
-                    for (int passIndex = 0; passIndex < passCount; passIndex++)
-                    {
-                        if (_gameShaderRuntime.TryBindSkinned(
-                                material,
-                                passIndex,
-                                world,
-                                gameSkinningMatrices,
-                                hasTangents: resources.TangentVbo != 0,
-                                in gameFrame,
-                                path => _resources.ResolveProgramTexture(part, resources, path),
-                                model.SelfIllumination,
-                                part.EquippedGearIndex))
-                        {
-                            boundAny = true;
-                            _gl.FrontFace(world.GetDeterminant() < 0f
-                                ? FrontFaceDirection.CW
-                                : FrontFaceDirection.Ccw);
-                            _gameShaderRuntime.DrawBoundPass(
-                                _drawElements,
-                                resources.IndexCount,
-                                IntPtr.Zero);
-                            _gameShaderRuntime.ResetBindings();
-                        }
-                    }
-
-                    if (boundAny)
-                    {
-                        lastBoundTex0 = uint.MaxValue;
-                        continue;
-                    }
-                }
-
-                if (resources.IsGpuSkinned)
-                    ConfigureSkinIndexAttribute(resources, integer: false);
-                UseStockProgram(
-                    viewProj,
-                    world,
-                    cameraPosition,
-                    lightDir,
-                    lightColor,
-                    lightDir2,
-                    lightColor2,
-                    ambientColor,
-                    materialTimeSeconds,
-                    model.SelfIllumination);
-                _gl.Uniform1(
-                    _uUseSkinning,
-                    resources.IsGpuSkinned && model.SkinningMatrices != null ? 1 : 0);
-
-                if (!wireframePass)
-                {
-                    _gl.Uniform1(_uWireframePass, 0);
-                    if (viewMode == VfxPreviewViewMode.Untextured)
-                    {
-                        ApplyUntexturedPartState();
-                        _gl.ActiveTexture(TextureUnit.Texture0);
-                        _gl.BindTexture(TextureTarget.Texture2D, _resources.WhiteTexture);
-                        lastBoundTex0 = _resources.WhiteTexture;
-                        _gl.Uniform4(
-                            _uColorTint,
-                            DefaultUntexturedColor.X,
-                            DefaultUntexturedColor.Y,
-                            DefaultUntexturedColor.Z,
-                            1f);
-                        _gl.Uniform1(_uAlphaCutoff, 0f);
-                        _gl.Uniform2(_uMaterialUvRepeat, 1f, 1f);
-                        _gl.Uniform2(_uMaterialUvScroll, 0f, 0f);
-                        _gl.Uniform1(_uMaterialUnlit, 0);
-                        _gl.Uniform1(_uMaterialPremultipliedAlpha, 0);
-                        _gl.Uniform1(_uMaterialSrgb, 0);
-                        _gl.Uniform1(_uMaterialUsesTextureAlpha, 0);
-                    }
-                    else
-                    {
-                        ApplyPartRenderState(part, material);
-                        uint targetTex0 = resources.Texture != 0 ? resources.Texture : _resources.WhiteTexture;
-                        if (targetTex0 != lastBoundTex0)
-                        {
-                            _gl.ActiveTexture(TextureUnit.Texture0);
-                            _gl.BindTexture(TextureTarget.Texture2D, targetTex0);
-                            lastBoundTex0 = targetTex0;
-                        }
-                        if (resources.Texture != 0)
-                        {
-                            if (material != null)
-                                ApplyBaseTextureWrap(material);
-                            else
-                                ApplyUnboundTextureWrap(part);
-                        }
-
-                        // Authored SKN color and runtime Viewer/Diff tint are separate concerns and combine multiplicatively.
-                        Vector4 colorTint = material != null
-                            ? material.Color * part.ColorTint
-                            : part.ColorTint;
-                        float alphaCutoff = material?.AlphaCutoff ??
-                            (part.IsAlphaBlended ? 0f : part.AlphaCutoff);
-                        Vector2 uvRepeat = material?.UvRepeat ?? Vector2.One;
-                        Vector2 uvScroll = material?.UvScroll ?? Vector2.Zero;
-
-                        _gl.Uniform4(_uColorTint, colorTint.X, colorTint.Y, colorTint.Z, colorTint.W);
-                        _gl.Uniform1(_uAlphaCutoff, alphaCutoff);
-                        _gl.Uniform2(_uMaterialUvRepeat, uvRepeat.X, uvRepeat.Y);
-                        _gl.Uniform2(_uMaterialUvScroll, uvScroll.X, uvScroll.Y);
-                        _gl.Uniform1(
-                            _uMaterialUnlit,
-                            viewMode == VfxPreviewViewMode.Unshaded || part.UsesUnlitShading ? 1 : 0);
-                        _gl.Uniform1(
-                            _uMaterialPremultipliedAlpha,
-                            material?.RenderState.PremultipliedAlpha == true ? 1 : 0);
-                        _gl.Uniform1(_uMaterialSrgb, part.UsesSrgbBaseTexture ? 1 : 0);
-                        bool usesTextureAlpha = material?.UsesTextureAlpha ??
-                            (part.UseBaseTextureAlpha || part.AlphaCutoff > 0f);
-                        _gl.Uniform1(_uMaterialUsesTextureAlpha, usesTextureAlpha ? 1 : 0);
-                    }
-                }
-
-                _drawElements?.Invoke(
-                    (uint)PrimitiveType.Triangles,
-                    resources.IndexCount,
-                    (uint)DrawElementsType.UnsignedInt,
-                    IntPtr.Zero);
+                DrawStockPart(model, part, resources, viewProj, world, cameraPosition,
+                    lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
+                    viewMode, wireframePass, ref lastBoundTex0);
             }
 
             _gl.ActiveTexture(TextureUnit.Texture0);
+        }
+
+        private void DrawStockPart(
+            SceneModel model,
+            ModelPart part,
+            GlMeshResourceCache.PartResources resources,
+            Matrix4x4 viewProj,
+            Matrix4x4 world,
+            Vector3 cameraPosition,
+            Vector3 lightDir,
+            Vector3 lightColor,
+            Vector3 lightDir2,
+            Vector3 lightColor2,
+            Vector3 ambientColor,
+            float materialTimeSeconds,
+            VfxPreviewViewMode viewMode,
+            bool wireframePass,
+            ref uint lastBoundTex0)
+        {
+            ModelMaterialDefinition material = part.MaterialDefinition;
+            if (resources.IsGpuSkinned)
+                ConfigureSkinIndexAttribute(resources, integer: false);
+            UseStockProgram(
+                viewProj,
+                world,
+                cameraPosition,
+                lightDir,
+                lightColor,
+                lightDir2,
+                lightColor2,
+                ambientColor,
+                materialTimeSeconds,
+                model.SelfIllumination);
+            _gl.Uniform1(
+                _uUseSkinning,
+                resources.IsGpuSkinned && model.SkinningMatrices != null ? 1 : 0);
+
+            if (!wireframePass)
+            {
+                _gl.Uniform1(_uWireframePass, 0);
+                if (viewMode == VfxPreviewViewMode.Untextured)
+                {
+                    ApplyUntexturedPartState();
+                    _gl.ActiveTexture(TextureUnit.Texture0);
+                    _gl.BindTexture(TextureTarget.Texture2D, _resources.WhiteTexture);
+                    lastBoundTex0 = _resources.WhiteTexture;
+                    _gl.Uniform4(
+                        _uColorTint,
+                        DefaultUntexturedColor.X,
+                        DefaultUntexturedColor.Y,
+                        DefaultUntexturedColor.Z,
+                        1f);
+                    _gl.Uniform1(_uAlphaCutoff, 0f);
+                    _gl.Uniform2(_uMaterialUvRepeat, 1f, 1f);
+                    _gl.Uniform2(_uMaterialUvScroll, 0f, 0f);
+                    _gl.Uniform1(_uMaterialUnlit, 0);
+                    _gl.Uniform1(_uMaterialPremultipliedAlpha, 0);
+                    _gl.Uniform1(_uMaterialSrgb, 0);
+                    _gl.Uniform1(_uMaterialUsesTextureAlpha, 0);
+                }
+                else
+                {
+                    ApplyPartRenderState(part, material);
+                    uint targetTex0 = resources.Texture != 0 ? resources.Texture : _resources.WhiteTexture;
+                    if (targetTex0 != lastBoundTex0)
+                    {
+                        _gl.ActiveTexture(TextureUnit.Texture0);
+                        _gl.BindTexture(TextureTarget.Texture2D, targetTex0);
+                        lastBoundTex0 = targetTex0;
+                    }
+                    if (resources.Texture != 0)
+                    {
+                        if (material != null)
+                            ApplyBaseTextureWrap(material);
+                        else
+                            ApplyUnboundTextureWrap(part);
+                    }
+
+                    // Authored SKN color and runtime Viewer/Diff tint are separate concerns and combine multiplicatively.
+                    Vector4 colorTint = material != null
+                        ? material.Color * part.ColorTint
+                        : part.ColorTint;
+                    float alphaCutoff = material?.AlphaCutoff ??
+                        (part.IsAlphaBlended ? 0f : part.AlphaCutoff);
+                    Vector2 uvRepeat = material?.UvRepeat ?? Vector2.One;
+                    Vector2 uvScroll = material?.UvScroll ?? Vector2.Zero;
+
+                    _gl.Uniform4(_uColorTint, colorTint.X, colorTint.Y, colorTint.Z, colorTint.W);
+                    _gl.Uniform1(_uAlphaCutoff, alphaCutoff);
+                    _gl.Uniform2(_uMaterialUvRepeat, uvRepeat.X, uvRepeat.Y);
+                    _gl.Uniform2(_uMaterialUvScroll, uvScroll.X, uvScroll.Y);
+                    _gl.Uniform1(
+                        _uMaterialUnlit,
+                        viewMode == VfxPreviewViewMode.Unshaded || part.UsesUnlitShading ? 1 : 0);
+                    _gl.Uniform1(
+                        _uMaterialPremultipliedAlpha,
+                        material?.RenderState.PremultipliedAlpha == true ? 1 : 0);
+                    _gl.Uniform1(_uMaterialSrgb, part.UsesSrgbBaseTexture ? 1 : 0);
+                    bool usesTextureAlpha = material?.UsesTextureAlpha ??
+                        (part.UseBaseTextureAlpha || part.AlphaCutoff > 0f);
+                    _gl.Uniform1(_uMaterialUsesTextureAlpha, usesTextureAlpha ? 1 : 0);
+                }
+            }
+
+            _drawElements?.Invoke(
+                (uint)PrimitiveType.Triangles,
+                resources.IndexCount,
+                (uint)DrawElementsType.UnsignedInt,
+                IntPtr.Zero);
         }
 
         internal static bool UsesGameShaders(
