@@ -56,7 +56,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             SknPath = sknPath;
             SearchDirectory = searchDirectory;
             PlaybackBundle = bundle.CreateCharacterPlaybackView(form);
-            AuthoredScale = bundle.OwnerSceneContext is { SkinScale: > 0f } owner ? owner.SkinScale : 1d;
+            AuthoredScale = PlaybackBundle.OwnerSceneContext is { SkinScale: > 0f } owner ? owner.SkinScale : 1d;
             _poseBoneProvider = (boneName, boneHash) =>
             {
                 if (!string.IsNullOrEmpty(boneName) &&
@@ -107,7 +107,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             VfxLoadingService.Bundle bundle = await loading.LoadAsync(actor.Skin.BinPath, log, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
-            string sknPath = loading.ResolveAssetPath(bundle?.OwnerSceneContext?.MeshPath, searchDirectory, ".skn");
+            // Resolve the actor's form first: a form that reloads the model brings its own SKN, SKL
+            // and GearData mesh properties, exactly as the focused inspector installs it.
+            VfxCharacterFormDefinition form = VfxCharacterFormSemantics
+                .CompatibleForms(bundle?.CharacterForms, bundle?.OwnerSceneContext)
+                .FirstOrDefault(candidate => candidate.PathHash == actor.SelectedCharacterFormPathHash);
+            bool reloads = form is { ReloadsModel: true };
+            string authoredMesh = reloads && !string.IsNullOrWhiteSpace(form.MeshPath)
+                ? form.MeshPath
+                : bundle?.OwnerSceneContext?.MeshPath;
+            string sknPath = loading.ResolveAssetPath(authoredMesh, searchDirectory, ".skn");
             if (string.IsNullOrEmpty(sknPath) || !File.Exists(sknPath))
                 return null;
 
@@ -115,19 +124,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 sknPath,
                 bundle.PrimaryBinPath,
                 searchDirectory,
-                cancellationToken);
+                cancellationToken,
+                gearUpgradePathHash: reloads ? form.PathHash : 0u);
             if (model == null)
                 return null;
 
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                EnsureSkeleton(model, loading, bundle.OwnerSceneContext?.SkeletonPath, sknPath, searchDirectory);
+                bool formSkeleton = reloads && !string.IsNullOrWhiteSpace(form.SkeletonPath);
+                EnsureSkeleton(
+                    model,
+                    loading,
+                    formSkeleton ? form.SkeletonPath : bundle.OwnerSceneContext?.SkeletonPath,
+                    sknPath,
+                    searchDirectory,
+                    replaceLoaded: formSkeleton);
                 EnsureGpuSkinning(model, log);
 
-                VfxCharacterFormDefinition form = VfxCharacterFormSemantics
-                    .CompatibleForms(bundle.CharacterForms, bundle.OwnerSceneContext)
-                    .FirstOrDefault(candidate => candidate.PathHash == actor.SelectedCharacterFormPathHash);
                 int gearIndex = form?.GearIndex ?? -1;
                 foreach (ModelPart part in model.Parts)
                     part.EquippedGearIndex = gearIndex;
@@ -155,9 +169,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             VfxLoadingService loading,
             string authoredSkeleton,
             string sknPath,
-            string searchDirectory)
+            string searchDirectory,
+            bool replaceLoaded = false)
         {
-            if (model.Skeleton != null) return;
+            // A form's authored SKL replaces the one the loader found beside the SKN.
+            if (model.Skeleton != null && !replaceLoaded) return;
             string sklPath = !string.IsNullOrEmpty(authoredSkeleton)
                 ? loading.ResolveAssetPath(authoredSkeleton, searchDirectory, ".skl")
                 : Path.ChangeExtension(sknPath, ".skl");
@@ -245,7 +261,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 SearchDirectory,
                 HashCode.Combine(clip.Name, Bundle.Systems.Count),
                 LoopDuration,
-                Bundle.OwnerSceneContext);
+                PlaybackBundle.OwnerSceneContext);
             Session.SetOwnerSkinningMatrices(Animation.FinalBoneTransforms);
             Session.Play();
         }

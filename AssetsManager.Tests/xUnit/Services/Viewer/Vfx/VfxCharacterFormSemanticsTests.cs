@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Viewer.Vfx.Composition;
+using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
@@ -51,6 +52,23 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             // A reloading form starts from its own initialSubmeshToHide, then its GearData hide list applies.
             Assert.True(VfxCharacterFormSemantics.HiddenSubmeshes(new uint[] { 2, 9 }, forms[0]).SetEquals(new uint[] { 3, 7 }));
             Assert.True(VfxCharacterFormSemantics.HiddenSubmeshes(new uint[] { 2, 9 }, null).SetEquals(new uint[] { 2, 9 }));
+        }
+
+        [Fact]
+        public void PlaybackViewAnchorsEffectsAtTheReloadedFormsSkinScale()
+        {
+            var bundle = new VfxLoadingService.Bundle
+            {
+                OwnerSceneContext = new VfxOwnerSceneContext("ASSETS/Test/Base.skn", "ASSETS/Test/Base.skl", 1f)
+            };
+            var reloading = VfxCharacterFormDefinition.CreateBase() with
+            {
+                PathHash = 1, GearIndex = 0, ReloadsModel = true, SkinScale = 1.3f
+            };
+
+            Assert.Equal(1.3f, bundle.CreateCharacterPlaybackView(reloading).OwnerSceneContext.SkinScale);
+            Assert.Equal(1f, bundle.CreateCharacterPlaybackView(reloading with { ReloadsModel = false }).OwnerSceneContext.SkinScale);
+            Assert.Equal(1f, bundle.CreateCharacterPlaybackView(reloading with { SkinScale = null }).OwnerSceneContext.SkinScale);
         }
 
         [Fact]

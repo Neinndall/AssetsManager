@@ -82,7 +82,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 MissingDependencies = source.MissingDependencies;
                 AmbiguousDependencies = source.AmbiguousDependencies;
                 CharacterForms = source.CharacterForms;
-                OwnerSceneContext = source.OwnerSceneContext;
+                // A reloaded form renders at its GearData skinScale, so bone anchors must use it too.
+                OwnerSceneContext = form.ReloadsModel && form.SkinScale is > 0f && source.OwnerSceneContext != null
+                    ? source.OwnerSceneContext with { SkinScale = form.SkinScale.Value }
+                    : source.OwnerSceneContext;
 
                 ResourceMap = new Dictionary<uint, uint>(source.ResourceMap);
                 if (form.ResourceMap != null)

@@ -5570,7 +5570,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         searchDir,
                         seed,
                         dur,
-                        bundle.OwnerSceneContext);
+                        playbackBundle.OwnerSceneContext);
                     _vfxRenderer.SetOwnerSkinningMatrices(_championAnimationService?.FinalBoneTransforms);
                     if (startTime > 0d)
                     {
@@ -5846,7 +5846,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     bundle.ResourceMap,
                     searchDir,
                     animation?.Duration ?? 0d,
-                    bundle.OwnerSceneContext) == true;
+                    playbackBundle.OwnerSceneContext) == true;
                 if (_vfxRenderer != null)
                 {
                     _vfxRenderer.SetOwnerSkinningMatrices(_championModel.SkinningMatrices);
@@ -5931,7 +5931,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     out rootTransform);
             }
 
-            float skinScale = _activeBundle?.OwnerSceneContext is { SkinScale: > 0f } context
+            float skinScale = GetCharacterPlaybackBundle()?.OwnerSceneContext is { SkinScale: > 0f } context
                 ? context.SkinScale
                 : 1f;
             Vector3 origin = hasLaunchBone
