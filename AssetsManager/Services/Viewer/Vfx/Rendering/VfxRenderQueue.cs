@@ -76,6 +76,38 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             entries.Sort(Compare);
         }
 
+        internal readonly record struct PassDraw(VfxRenderQueueEntry Entry, int PassIndex, bool Transparent);
+
+        internal static void BuildPassesInto(
+            IReadOnlyList<VfxRenderQueueEntry> source,
+            List<PassDraw> draws,
+            Func<VfxPlaybackRuntime.EmitterState, int> passCount,
+            Func<VfxPlaybackRuntime.EmitterState, int, bool> transparent)
+        {
+            draws.Clear();
+            foreach (var entry in source)
+                for (int pass = 0, count = Math.Max(1, passCount(entry.Emitter)); pass < count; pass++)
+                    draws.Add(new PassDraw(entry, pass, transparent(entry.Emitter, pass)));
+            draws.Sort(ComparePassDraws);
+        }
+
+        internal static int ComparePassDraws(PassDraw left, PassDraw right)
+        {
+            int order = left.Transparent.CompareTo(right.Transparent);
+            if (order != 0) return order;
+            order = left.Entry.Emitter.Def.IsGroundLayer.CompareTo(right.Entry.Emitter.Def.IsGroundLayer);
+            if (order != 0) return -order;
+            order = left.Entry.GraphOrder.CompareTo(right.Entry.GraphOrder);
+            if (order != 0) return order;
+            // passTwin raises the emitter rank, rather than drawing its passes consecutively.
+            long leftRank = (long)left.Entry.Emitter.RenderRank + left.PassIndex;
+            long rightRank = (long)right.Entry.Emitter.RenderRank + right.PassIndex;
+            order = leftRank.CompareTo(rightRank);
+            if (order != 0) return order;
+            order = Compare(left.Entry, right.Entry);
+            return order != 0 ? order : left.PassIndex.CompareTo(right.PassIndex);
+        }
+
         private static int Compare(VfxRenderQueueEntry left, VfxRenderQueueEntry right)
         {
             // 1. Ground layer emitters render before default emitters (Riot / LTK drawKind.ts)

@@ -56,6 +56,7 @@
   
   <ItemGroup>
     <EmbeddedResource Include="changelogs.txt" />
+    <EmbeddedResource Include="Resources\Shaders\Smaa\*" />
     <EmbeddedResource Include="Resources\AudioPlayer.html" />
     <EmbeddedResource Include="Resources\JsonSyntaxHighlighting.xshd" />
     <EmbeddedResource Include="Resources\Vgmstream\**" />

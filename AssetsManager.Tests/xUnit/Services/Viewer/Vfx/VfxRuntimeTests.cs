@@ -4654,6 +4654,41 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ParticlePassQueueUsesEmitterRankPlusPassRatherThanConsecutivePasses()
+        {
+            var definition = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "passes", "passes",
+                new[] { definition with { Name = "first" }, definition with { Name = "second" } }), Vector3.Zero);
+            runtime.Emitters[0].RenderRank = 0;
+            runtime.Emitters[1].RenderRank = 1;
+            var queue = VfxRenderQueue.Build(new[] { runtime.Emitters });
+            var draws = new List<VfxRenderQueue.PassDraw>();
+            VfxRenderQueue.BuildPassesInto(queue, draws, emitter => emitter.Def.Name == "first" ? 3 : 1, (_, _) => true);
+            Assert.Equal(new[] { "first:0", "first:1", "second:0", "first:2" },
+                draws.Select(draw => draw.Entry.Emitter.Def.Name + ":" + draw.PassIndex));
+            Assert.Equal(2, queue.Count);
+            VfxRenderQueue.BuildPassesInto(queue, draws, _ => 0, (_, _) => true);
+            Assert.Equal(2, draws.Count);
+            Assert.All(draws, draw => Assert.Equal(0, draw.PassIndex));
+        }
+
+        [Fact]
+        public void ParticlePassQueueUsesEachPassBlendAndStableGroundOrder()
+        {
+            var definition = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "passes", "passes",
+                new[] { definition with { Name = "ground", IsGroundLayer = true },
+                    definition with { Name = "default" } }), Vector3.Zero);
+            var queue = VfxRenderQueue.Build(new[] { runtime.Emitters });
+            var draws = new List<VfxRenderQueue.PassDraw>();
+            VfxRenderQueue.BuildPassesInto(queue, draws, _ => 2, (_, pass) => pass == 0);
+            Assert.Equal(new[] { "ground:1", "default:1", "ground:0", "default:0" },
+                draws.Select(draw => draw.Entry.Emitter.Def.Name + ":" + draw.PassIndex));
+        }
+
+        [Fact]
         public void GlobalRenderQueueBuildIntoClearsReusableScratch()
         {
             VfxEmitterDefinition first = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with { Name = "first" };

@@ -32,16 +32,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private float[] _sortedInstances = Array.Empty<float>();
         private float[] _instanceDepths = Array.Empty<float>();
         private int[] _instanceOrder = Array.Empty<int>();
-        private readonly Dictionary<(object Graph, string Path, int SourceOrder), int> _emitterUsed = new();
+        private readonly Dictionary<(object Graph, string Path, int SourceOrder, int Pass), int> _emitterUsed = new();
         private readonly Dictionary<(object Graph, string Path, int SourceOrder), VfxPlaybackRuntime.EmitterState> _firstSourceByEmitter = new();
         private readonly Dictionary<(object Graph, string Path, int SourceOrder), List<VfxPlaybackRuntime.EmitterState>> _sortedQuadGroups = new();
-        private readonly HashSet<(object Graph, string Path, int SourceOrder)> _renderedSortedQuadGroups = new();
+        private readonly HashSet<(object Graph, string Path, int SourceOrder, int Pass)> _renderedSortedQuadGroups = new();
         private readonly List<List<VfxPlaybackRuntime.EmitterState>> _quadSourceLists = new();
         private int _quadSourceListCount;
+        private readonly List<VfxRenderQueue.PassDraw> _particlePassDraws = new();
+        private Func<VfxPlaybackRuntime.EmitterState, int> _particlePassCountSelector;
+        private Func<VfxPlaybackRuntime.EmitterState, int, bool> _particleTransparencySelector;
+        private bool _drawingWireframe;
         private readonly HashSet<uint> _ownerHiddenSubmeshes = new();
-        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
-        private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
-        private DrawElementsDelegate _drawElements = null!;
+        private AssetsManager.Services.Viewer.Rendering.GameShaders.GameShaderRuntime.DrawElementsDelegate _drawElements = null!;
         private const int Stride = VfxPlaybackRuntime.InstanceStride;
         private const int QuadsPerEmitter = 4096;
         private const int MeshesPerEmitter = 512;
@@ -59,6 +61,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             internal bool DepthTest;
             internal bool CullFace;
             internal int CullMode;
+            internal int FrontFace;
             internal bool PolygonOffset;
             internal bool Blend;
             internal bool StencilTest;
@@ -116,7 +119,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             var proc = gl.Context.GetProcAddress("glDrawElements");
             if (proc == IntPtr.Zero)
                 throw new NotSupportedException("The active OpenGL context does not expose glDrawElements.");
-            _drawElements = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(proc);
+            _drawElements = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<AssetsManager.Services.Viewer.Rendering.GameShaders.GameShaderRuntime.DrawElementsDelegate>(proc);
             bool gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
             _gles = gles;
             _gameShaders = new AssetsManager.Services.Viewer.Rendering.GameShaders.GameShaderRuntime(gl, gles, settings);
@@ -268,6 +271,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.GetInteger(GLEnum.VertexArrayBinding, out state.VertexArray);
             _gl.GetInteger(GLEnum.ArrayBufferBinding, out state.ArrayBuffer);
             _gl.GetInteger(GLEnum.CullFaceMode, out state.CullMode);
+            _gl.GetInteger(GLEnum.FrontFace, out state.FrontFace);
             _gl.GetInteger(GLEnum.ActiveTexture, out state.ActiveTexture);
             for (int unit = 0; unit < state.TextureBindings.Length; unit++)
             {
@@ -285,6 +289,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private void RestoreGlState(GlStateSnapshot state)
         {
             _gl.CullFace((TriangleFace)state.CullMode);
+            _gl.FrontFace((FrontFaceDirection)state.FrontFace);
             _gl.DepthMask(state.DepthWrite != 0);
             _gl.DepthFunc((DepthFunction)state.DepthFunction);
             _gl.BlendEquationSeparate((GLEnum)state.BlendEquation, (GLEnum)state.BlendEquationAlpha);
@@ -402,7 +407,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Matrix4x4 particleProjection = invView * viewProj;
             _gameFrame = new AssetsManager.Services.Viewer.Rendering.GameShaders.GameShaderRuntime.Frame(view, particleProjection, camPos, 0f, Sun);
 
-            Dictionary<(object Graph, string Path, int SourceOrder), int> emitterUsed = _emitterUsed;
+            Dictionary<(object Graph, string Path, int SourceOrder, int Pass), int> emitterUsed = _emitterUsed;
             Dictionary<(object Graph, string Path, int SourceOrder), VfxPlaybackRuntime.EmitterState> firstSourceByEmitter = _firstSourceByEmitter;
             Dictionary<(object Graph, string Path, int SourceOrder), List<VfxPlaybackRuntime.EmitterState>> sortedQuadGroups = _sortedQuadGroups;
             foreach (VfxRenderQueueEntry candidate in renderQueue)
@@ -421,14 +426,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 }
                 sources.Add(candidateEmitter);
             }
-            HashSet<(object Graph, string Path, int SourceOrder)> renderedSortedQuadGroups = _renderedSortedQuadGroups;
+            HashSet<(object Graph, string Path, int SourceOrder, int Pass)> renderedSortedQuadGroups = _renderedSortedQuadGroups;
 
-            foreach (VfxRenderQueueEntry entry in renderQueue)
+            _drawingWireframe = useWireframe;
+            _particlePassCountSelector ??= emitter => ParticlePassCount(emitter, emitter.Def.IsMeshPrimitive, _drawingWireframe);
+            _particleTransparencySelector ??= (emitter, pass) => ParticlePassTransparent(emitter, pass, _drawingWireframe);
+            VfxRenderQueue.BuildPassesInto(renderQueue, _particlePassDraws,
+                _particlePassCountSelector, _particleTransparencySelector);
+            foreach (VfxRenderQueue.PassDraw draw in _particlePassDraws)
             {
-                VfxPlaybackRuntime.EmitterState es = entry.Emitter;
+                VfxPlaybackRuntime.EmitterState es = draw.Entry.Emitter;
+                int passIndex = draw.PassIndex;
                 if (es.InstanceCount == 0) continue;
                 if (!es.IsVisible) continue;
-                VfxEmitterRenderState emitterRenderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 if (useWireframe)
                     _gl.Disable(EnableCap.CullFace);
 
@@ -445,6 +455,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 // LTK allocates one draw component per graph/path/emitter definition. Every live
                 // source of that child path shares the same fixed draw budget and palette phase.
                 var emitterKey = (es.RenderGraphKey ?? es, es.RenderPath ?? string.Empty, es.SourceOrder);
+                var passKey = (emitterKey.Item1, emitterKey.Item2, emitterKey.Item3, passIndex);
                 VfxPlaybackRuntime.EmitterState paletteSource = firstSourceByEmitter.GetValueOrDefault(emitterKey) ?? es;
                 float sharedPalettePhase = ResolveEmitterPhase(es.Def, paletteSource.EmitterAge);
                 int renderInstanceCount;
@@ -452,7 +463,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (sortedQuadGroups.TryGetValue(emitterKey, out List<VfxPlaybackRuntime.EmitterState> quadSources))
                 {
                     // Quads.tsx gathers every live source first and sorts the combined set once.
-                    if (!renderedSortedQuadGroups.Add(emitterKey)) continue;
+                    if (!renderedSortedQuadGroups.Add(passKey)) continue;
                     EnsureInstanceSortCapacity(QuadsPerEmitter, QuadsPerEmitter * Stride);
                     renderInstanceCount = VfxRenderQueue.CopyQuadSourcesBackToFront(
                         quadSources,
@@ -465,19 +476,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                         _instanceOrder);
                     if (renderInstanceCount == 0) continue;
                     instancesSpan = new ReadOnlySpan<float>(_sortedInstances, 0, renderInstanceCount * Stride);
-                    emitterUsed[emitterKey] = renderInstanceCount;
+                    emitterUsed[passKey] = renderInstanceCount;
                 }
                 else
                 {
-                    int alreadyUsed = emitterUsed.GetValueOrDefault(emitterKey);
+                    int alreadyUsed = emitterUsed.GetValueOrDefault(passKey);
                     renderInstanceCount = ResolveEmitterDrawCount(es.Def, alreadyUsed, es.InstanceCount);
                     if (renderInstanceCount == 0) continue;
-                    emitterUsed[emitterKey] = alreadyUsed + renderInstanceCount;
+                    emitterUsed[passKey] = alreadyUsed + renderInstanceCount;
                     instancesSpan = es.PrepareInstances(renderInstanceCount);
                 }
-
-                bool attachedMesh = es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh;
-                int floats = renderInstanceCount * Stride;
 
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
@@ -492,7 +500,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                         ApplyWireframeBlend();
                     else
                         ApplyEmitterBlendState(es.Def, meshDistortion);
-                    for (int pass = 0; pass < Math.Max(1, ParticlePassCount(es, true, useWireframe)); pass++)
                     RenderMeshEmitter(
                         es,
                         viewProj,
@@ -502,12 +509,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                         renderInstanceCount,
                         sharedPalettePhase,
                         useWireframe,
-                        wireOpacity, pass);
+                        wireOpacity, passIndex);
                     continue;
                 }
-                int quadPasses = Math.Max(1, ParticlePassCount(es, false, useWireframe));
-                for (int pass = 0; pass < quadPasses; pass++)
-                    RenderQuadEmitter(es, instancesSpan, renderInstanceCount, sharedPalettePhase, useWireframe, wireOpacity, camPos, camRight, camUp, pass);
+                RenderQuadEmitter(es, instancesSpan, renderInstanceCount, sharedPalettePhase, useWireframe, wireOpacity, camPos, camRight, camUp, passIndex);
             }
 
             }
@@ -726,7 +731,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                         _trailGeometry.Vertices,
                         0,
                         vertices * VfxTrailGeometry.VertexStride));
-                    _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
+                    if (native) _gameShaders.DrawBoundArrays(PrimitiveType.Triangles, vertices);
+                    else _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
                     _gl.BindVertexArray(_vao);
                 }
             }
@@ -744,7 +750,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                         _beamGeometry.Vertices,
                         0,
                         vertices * VfxBeamGeometry.VertexStride));
-                    _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
+                    if (native) _gameShaders.DrawBoundArrays(PrimitiveType.Triangles, vertices);
+                    else _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
                     _gl.BindVertexArray(_vao);
                 }
             }
@@ -761,7 +768,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, instancesSpan);
                 }
-                _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)renderInstanceCount);
+                if (native) _gameShaders.DrawBoundArrays(PrimitiveType.TriangleFan, 4, (uint)renderInstanceCount);
+                else _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)renderInstanceCount);
             }
             _particleUniforms = _stockParticleUniforms;
             _gl.UseProgram(_program);
@@ -782,6 +790,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private void ResetEmitterDrawScratch()
         {
             _emitterUsed.Clear();
+            _particlePassDraws.Clear();
             _firstSourceByEmitter.Clear();
             _sortedQuadGroups.Clear();
             _renderedSortedQuadGroups.Clear();
@@ -1457,19 +1466,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                                     continue;
                                 }
 
-                                _drawElements(
-                                    (uint)PrimitiveType.Triangles,
-                                    range.IndexCount,
-                                    (uint)DrawElementsType.UnsignedInt,
+                                if (native) _gameShaders.DrawBoundPass(_drawElements, range.IndexCount, new IntPtr(range.StartIndex * sizeof(uint)));
+                                else _drawElements((uint)PrimitiveType.Triangles, range.IndexCount, (uint)DrawElementsType.UnsignedInt,
                                     new IntPtr(range.StartIndex * sizeof(uint)));
                             }
                         }
                         else
                         {
-                            _drawElements((uint)PrimitiveType.Triangles, es.MeshIndexCount, (uint)DrawElementsType.UnsignedInt, IntPtr.Zero);
+                            if (native) _gameShaders.DrawBoundPass(_drawElements, es.MeshIndexCount, IntPtr.Zero);
+                            else _drawElements((uint)PrimitiveType.Triangles, es.MeshIndexCount, (uint)DrawElementsType.UnsignedInt, IntPtr.Zero);
                         }
                     }
                 }
+                else if (native) _gameShaders.DrawBoundArrays(PrimitiveType.Triangles, es.MeshVertexCount);
                 else _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)es.MeshVertexCount);
             }
             if (cullFace) _gl.Enable(EnableCap.CullFace);

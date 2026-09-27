@@ -24,8 +24,25 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return (depth || inputs.Depth, inputs.Color);
         }
 
+        private static bool HasParticleDraw(VfxPlaybackRuntime.EmitterState emitter) =>
+            emitter.InstanceCount > 0 && emitter.IsVisible && (!emitter.Def.IsMeshPrimitive || emitter.MeshVao != 0);
+
         private int ParticlePassCount(VfxPlaybackRuntime.EmitterState emitter, bool mesh, bool wireframe) =>
-            wireframe ? 0 : _gameShaders?.GetParticlePassCount(emitter.Def, mesh) ?? 0;
+            wireframe || !HasParticleDraw(emitter) ? 0 : _gameShaders?.GetParticlePassCount(emitter.Def, mesh) ?? 0;
+
+        private bool ParticlePassTransparent(VfxPlaybackRuntime.EmitterState emitter, int pass, bool wireframe) =>
+            HasParticleDraw(emitter) && IsParticlePassTransparent(emitter.Def, wireframe, emitter.Def.HasResolvedCustomMaterial
+                ? _gameShaders?.GetParticlePassState(emitter.Def, emitter.Def.IsMeshPrimitive, pass)?.BlendEnabled
+                : null);
+
+        internal static bool IsParticlePassTransparent(VfxEmitterDefinition emitter, bool wireframe, bool? customBlend = null)
+        {
+            if (emitter.IsGroundLayer) return false;
+            if (wireframe) return true;
+            if (customBlend.HasValue) return customBlend.Value;
+            return emitter.HasResolvedCustomMaterial ||
+                VfxBlendModes.GetDrawDescriptor(emitter.BlendMode, emitter.DrawsAsDistortion).Kind != VfxBlendModeKind.Opaque;
+        }
 
         private bool UseGameParticle(VfxPlaybackRuntime.EmitterState emitter, bool mesh, int pass, bool wireframe)
         {
@@ -65,6 +82,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             VfxShaderParameterUtils.PopulateNativeParameters(_particleParameters, emitter.Def, phase);
             var frame = _gameFrame with { TimeSeconds = emitter.RenderTime };
             _gameShaders.BindParticle(emitter.Def, mesh, pass, frame, _particleParameters, name => ParticleTexture(emitter, name));
+            // LTK quad/ribbon preludes draw in WORLD; mesh preludes draw in mirrored ENGINE_WORLD.
+            bool mirrored = mesh && (emitter.Def.PrimitiveKind != VfxPrimitiveKind.AttachedMesh ||
+                _ownerWorldTransform.GetDeterminant() < 0f);
+            _gl.FrontFace(mirrored ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
         }
 
         private uint? ParticleTexture(VfxPlaybackRuntime.EmitterState emitter, string name) => name switch

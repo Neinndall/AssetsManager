@@ -1,3 +1,5 @@
+using Silk.NET.OpenGL;
+using System;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -353,6 +355,116 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                     linked++;
                 });
             Assert.True(linked > 0, "Map11 must supply translated programs for the GPU check.");
+        }
+
+        [Theory]
+        [InlineData(0, false, true)]
+        [InlineData(1, false, true)]
+        [InlineData(3, false, false)]
+        [InlineData(1, true, false)]
+        public void ParticlePassClassificationPreservesOpaqueModeAndGround(int blend, bool ground, bool expected)
+        {
+            var emitter = Emitter() with { BlendMode = blend, IsGroundLayer = ground };
+            Assert.Equal(expected, AssetsManager.Services.Viewer.Vfx.Rendering.VfxOpenGlRenderer.IsParticlePassTransparent(emitter, false));
+            Assert.False(AssetsManager.Services.Viewer.Vfx.Rendering.VfxOpenGlRenderer.IsParticlePassTransparent(emitter, false, false));
+            Assert.Equal(!ground, AssetsManager.Services.Viewer.Vfx.Rendering.VfxOpenGlRenderer.IsParticlePassTransparent(emitter, false, true));
+        }
+
+        [Fact]
+        public void CustomParticlePassTextureWinsOverEmitterAliasAndDoesNotLeakAcrossPasses()
+        {
+            var handles = new System.Collections.Generic.Dictionary<string, uint>
+            {
+                ["TEXTURE"] = 99, ["assets/first.tex"] = 11, ["assets/second.tex"] = 22,
+                ["0000000000001234"] = 33, ["sDepthTexture_SharedTexture"] = 44
+            };
+            uint? Lookup(string name) => handles.TryGetValue(name, out uint handle) ? handle : null;
+            GameMaterialTexture Texture(string path, ulong hash = 0) => new(
+                "TEXTURE", new MapTextureReference(path, hash),
+                GameMaterialTextureSource.Material, null);
+            Assert.Equal((uint)11, GameShaderRuntime.ResolveParticleTexture(true, "TEXTURE__TX", Texture("assets/first.tex"), Lookup));
+            Assert.Equal((uint)22, GameShaderRuntime.ResolveParticleTexture(true, "TEXTURE__TX", Texture("assets/second.tex"), Lookup));
+            Assert.Equal((uint)33, GameShaderRuntime.ResolveParticleTexture(true, "TEXTURE__TX", Texture(null, 0x1234), Lookup));
+            Assert.Null(GameShaderRuntime.ResolveParticleTexture(true, "TEXTURE__TX", Texture("assets/missing.tex"), Lookup));
+            Assert.Equal((uint)99, GameShaderRuntime.ResolveParticleTexture(false, "TEXTURE", null, Lookup));
+            Assert.Equal((uint)44, GameShaderRuntime.ResolveParticleTexture(true, "sDepthTexture_SharedTexture", null, Lookup));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void SmaaRunsAllThreePassesResizesAndRestoresFramebuffer(bool diagonal)
+        {
+            using var context = new HiddenWglContext();
+            using Silk.NET.OpenGL.GL gl = Silk.NET.OpenGL.GL.GetApi(context.GetProcAddress);
+            using var smaa = new AssetsManager.Services.Viewer.Rendering.SmaaPostEffectsRenderer();
+            smaa.Initialize(gl);
+            uint source = gl.GenTexture(), target = gl.GenTexture(), framebuffer = gl.GenFramebuffer();
+            try
+            {
+                foreach (var size in new[] { (Width: 16, Height: 16), (Width: 7, Height: 9), (Width: 16, Height: 16) })
+                {
+                    byte[] pixels = new byte[size.Width * size.Height * 4];
+                    for (int y = 0; y < size.Height; y++)
+                    for (int x = 0; x < size.Width; x++)
+                    {
+                        int at = (y * size.Width + x) * 4;
+                        byte color = diagonal ? (byte)(x > y ? 255 : 0) : (byte)96;
+                        pixels[at] = pixels[at + 1] = pixels[at + 2] = color;
+                        pixels[at + 3] = 255;
+                    }
+                    gl.ActiveTexture(Silk.NET.OpenGL.TextureUnit.Texture0);
+                    gl.BindTexture(Silk.NET.OpenGL.TextureTarget.Texture2D, source);
+                    gl.TexImage2D(Silk.NET.OpenGL.TextureTarget.Texture2D, 0, Silk.NET.OpenGL.InternalFormat.Rgba8,
+                        (uint)size.Width, (uint)size.Height, 0, Silk.NET.OpenGL.PixelFormat.Rgba,
+                        Silk.NET.OpenGL.PixelType.UnsignedByte, pixels.AsSpan());
+                    gl.TexParameter(Silk.NET.OpenGL.TextureTarget.Texture2D, Silk.NET.OpenGL.TextureParameterName.TextureMinFilter,
+                        (int)Silk.NET.OpenGL.TextureMinFilter.Linear);
+                    gl.TexParameter(Silk.NET.OpenGL.TextureTarget.Texture2D, Silk.NET.OpenGL.TextureParameterName.TextureMagFilter,
+                        (int)Silk.NET.OpenGL.TextureMagFilter.Linear);
+                    gl.TexParameter(Silk.NET.OpenGL.TextureTarget.Texture2D, Silk.NET.OpenGL.TextureParameterName.TextureWrapS,
+                        (int)Silk.NET.OpenGL.TextureWrapMode.ClampToEdge);
+                    gl.TexParameter(Silk.NET.OpenGL.TextureTarget.Texture2D, Silk.NET.OpenGL.TextureParameterName.TextureWrapT,
+                        (int)Silk.NET.OpenGL.TextureWrapMode.ClampToEdge);
+                    gl.BindTexture(Silk.NET.OpenGL.TextureTarget.Texture2D, target);
+                    gl.TexImage2D(Silk.NET.OpenGL.TextureTarget.Texture2D, 0, Silk.NET.OpenGL.InternalFormat.Rgba8,
+                        (uint)size.Width, (uint)size.Height, 0, Silk.NET.OpenGL.PixelFormat.Rgba,
+                        Silk.NET.OpenGL.PixelType.UnsignedByte, ReadOnlySpan<byte>.Empty);
+                    gl.BindFramebuffer(Silk.NET.OpenGL.FramebufferTarget.Framebuffer, framebuffer);
+                    gl.FramebufferTexture2D(Silk.NET.OpenGL.FramebufferTarget.Framebuffer,
+                        Silk.NET.OpenGL.FramebufferAttachment.ColorAttachment0, Silk.NET.OpenGL.TextureTarget.Texture2D, target, 0);
+                    gl.Viewport(0, 0, (uint)size.Width, (uint)size.Height);
+                    gl.Enable(Silk.NET.OpenGL.EnableCap.ScissorTest);
+                    gl.Enable(Silk.NET.OpenGL.EnableCap.DepthTest);
+                    gl.DepthMask(true);
+                    smaa.RenderTexture(source, size.Width, size.Height);
+                    gl.GetInteger(Silk.NET.OpenGL.GLEnum.DrawFramebufferBinding, out int bound);
+                    Assert.Equal(framebuffer, (uint)bound);
+                    Assert.True(gl.IsEnabled(Silk.NET.OpenGL.EnableCap.ScissorTest));
+                    Assert.True(gl.IsEnabled(Silk.NET.OpenGL.EnableCap.DepthTest));
+                    byte[] result = new byte[pixels.Length];
+                    gl.ReadPixels(0, 0, (uint)size.Width, (uint)size.Height, Silk.NET.OpenGL.PixelFormat.Rgba,
+                        Silk.NET.OpenGL.PixelType.UnsignedByte, result.AsSpan());
+                    if (!diagonal)
+                    {
+                        for (int i = 0; i < result.Length; i += 4)
+                            Assert.InRange(result[i], 95, 97);
+                    }
+                    else
+                    {
+                        Assert.Contains(Enumerable.Range(0, size.Width * size.Height),
+                            at => result[at * 4] > 0 && result[at * 4] < 255);
+                        Assert.Contains(Enumerable.Range(0, size.Width * size.Height), at => result[at * 4] == 0);
+                        Assert.Contains(Enumerable.Range(0, size.Width * size.Height), at => result[at * 4] == 255);
+                    }
+                    Assert.Equal(Silk.NET.OpenGL.GLEnum.NoError, gl.GetError());
+                }
+            }
+            finally
+            {
+                gl.BindFramebuffer(Silk.NET.OpenGL.FramebufferTarget.Framebuffer, 0);
+                gl.DeleteFramebuffer(framebuffer); gl.DeleteTexture(source); gl.DeleteTexture(target);
+            }
         }
 
         [Theory]

@@ -100,6 +100,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private MapParticleRenderer _mapParticleRenderer;
         private MapPostEffectsRenderer _mapPostEffectsRenderer;
         private FxaaPostEffectsRenderer _fxaaRenderer;
+        private SmaaPostEffectsRenderer _smaaRenderer;
         private SkyRenderer _skyRenderer;
         private VfxCubeMapData _genericSkyCube;
         private VfxCubeMapData _mapSkyCube;
@@ -1684,6 +1685,9 @@ namespace AssetsManager.Views.Controls.Viewer
             var fxaaRenderer = _fxaaRenderer;
             _fxaaRenderer = null;
             RunReleaseStep(nameof(FxaaPostEffectsRenderer), () => fxaaRenderer?.Dispose(), gpuBound: true);
+            var smaaRenderer = _smaaRenderer;
+            _smaaRenderer = null;
+            RunReleaseStep(nameof(SmaaPostEffectsRenderer), () => smaaRenderer?.Dispose(), gpuBound: true);
 
             var skyRenderer = _skyRenderer;
             _skyRenderer = null;
@@ -2160,15 +2164,29 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (AppSettings?.StudioParameters?.EnableFxaa ?? true)
             {
-                EnsureFxaaRenderer();
-                _fxaaRenderer?.Render(
-                    (int)Math.Max(1d, OpenTkControl.ActualWidth),
-                    (int)Math.Max(1d, OpenTkControl.ActualHeight));
+                int aaWidth = (int)Math.Max(1d, OpenTkControl.ActualWidth);
+                int aaHeight = (int)Math.Max(1d, OpenTkControl.ActualHeight);
+                if (AppSettings?.StudioParameters?.AntiAliasingMode == "Smaa")
+                {
+                    if (_smaaRenderer == null)
+                    {
+                        _smaaRenderer = new SmaaPostEffectsRenderer();
+                        _smaaRenderer.Initialize(_gl);
+                    }
+                    _smaaRenderer.Render(aaWidth, aaHeight);
+                }
+                else
+                {
+                    EnsureFxaaRenderer();
+                    _fxaaRenderer?.Render(aaWidth, aaHeight);
+                }
             }
-            else if (_fxaaRenderer != null)
+            else
             {
-                _fxaaRenderer.Dispose();
+                _fxaaRenderer?.Dispose();
                 _fxaaRenderer = null;
+                _smaaRenderer?.Dispose();
+                _smaaRenderer = null;
             }
 
             if (_vfxRenderer != null)

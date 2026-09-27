@@ -39,6 +39,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private VfxCubeMapData _genericSkyCube;
         private bool _skyCubeDirty;
         private FxaaPostEffectsRenderer _fxaaRenderer;
+        private SmaaPostEffectsRenderer _smaaRenderer;
 
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
@@ -239,7 +240,16 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_fxaaRenderer != null && _viewModel.IsFxaaEnabled)
             {
-                _fxaaRenderer.Render(framebufferWidth, framebufferHeight);
+                if (AppSettings?.StudioParameters?.AntiAliasingMode == "Smaa")
+                {
+                    if (_smaaRenderer == null)
+                    {
+                        _smaaRenderer = new SmaaPostEffectsRenderer();
+                        _smaaRenderer.Initialize(_gl);
+                    }
+                    _smaaRenderer.Render(framebufferWidth, framebufferHeight);
+                }
+                else _fxaaRenderer.Render(framebufferWidth, framebufferHeight);
             }
         }
 
@@ -700,6 +710,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 var fxaaRenderer = _fxaaRenderer;
                 _fxaaRenderer = null;
                 RunReleaseStep(nameof(FxaaPostEffectsRenderer), () => fxaaRenderer?.Dispose(), gpuBound: true);
+                var smaaRenderer = _smaaRenderer;
+                _smaaRenderer = null;
+                RunReleaseStep(nameof(SmaaPostEffectsRenderer), () => smaaRenderer?.Dispose(), gpuBound: true);
 
                 var gl = _gl;
                 _gl = null;

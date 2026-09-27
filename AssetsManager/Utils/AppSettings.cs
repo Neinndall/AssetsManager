@@ -504,6 +504,7 @@ namespace AssetsManager.Utils
         private bool _skyVisible;
         private bool _transparentBackground;
         private bool _enableFxaa = true;
+        private string _antiAliasingMode = "Fxaa";
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -529,6 +530,12 @@ namespace AssetsManager.Utils
         {
             get => _transparentBackground;
             set => SetProperty(ref _transparentBackground, value);
+        }
+
+        public string AntiAliasingMode
+        {
+            get => _antiAliasingMode;
+            set => SetProperty(ref _antiAliasingMode, string.Equals(value, "Smaa", StringComparison.OrdinalIgnoreCase) ? "Smaa" : "Fxaa");
         }
 
         public bool EnableFxaa

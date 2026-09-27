@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -44,6 +44,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal int GetParticlePassCount(VfxEmitterDefinition emitter, bool mesh) =>
             _disposed ? 0 : ParticleEntry(emitter, mesh).Cache?.Passes.Count ?? 0;
 
+        internal GameMaterialPassState GetParticlePassState(VfxEmitterDefinition emitter, bool mesh, int index)
+        {
+            var passes = ParticleEntry(emitter, mesh).Cache?.Passes;
+            return passes != null && index >= 0 && index < passes.Count ? passes[index].Pass.State : null;
+        }
+
         internal uint UseParticleProgram(VfxEmitterDefinition emitter, bool mesh, int index)
         {
             var cache = ParticleEntry(emitter, mesh).Cache;
@@ -63,10 +69,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 string own = sampler.TextureName.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
                     ? sampler.TextureName[..^MaterialTextureSuffix.Length] : sampler.TextureName;
                 var declared = entry.Pass.Textures?.FirstOrDefault(texture => string.Equals(texture.Name, own, StringComparison.Ordinal));
-                string path = declared?.Texture?.VirtualPath;
-                if (string.IsNullOrWhiteSpace(path) && declared?.Texture?.PathHash > 0)
-                    path = declared.Texture.PathHash.ToString("x16");
-                uint? texture = textures(own) ?? (!string.IsNullOrWhiteSpace(path) ? textures(path) : null);
+                uint? texture = ResolveParticleTexture(emitter.HasResolvedCustomMaterial, sampler.TextureName, declared, textures);
                 TextureTarget target = sampler.Dimension switch
                 {
                     GameShaderTranslator.TextureDimension.Cube => TextureTarget.TextureCubeMap,
@@ -108,7 +111,24 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             }
             _gl.ActiveTexture(TextureUnit.Texture0);
             if (emitter.HasResolvedCustomMaterial)
-                ApplyPassState(entry.Pass.State, emitter.CustomMaterial.RenderState.DoubleSided);
+                ApplyPassState(entry.Pass.State, meshDoubleSided: false);
+            else
+                _doubleSidedTransparent = false;
+            if (emitter.IsGroundLayer) _doubleSidedTransparent = false;
+        }
+
+        internal static uint? ResolveParticleTexture(bool custom, string samplerName,
+            GameMaterialTexture declared, Func<string, uint?> textures)
+        {
+            string own = samplerName.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
+                ? samplerName[..^MaterialTextureSuffix.Length] : samplerName;
+            string path = declared?.Texture?.VirtualPath;
+            if (string.IsNullOrWhiteSpace(path) && declared?.Texture?.PathHash > 0)
+                path = declared.Texture.PathHash.ToString("x16");
+            // A custom pass owns its texture; an emitter's TEXTURE alias must not replace it.
+            if (custom && !samplerName.EndsWith(SharedTextureSuffix, StringComparison.Ordinal))
+                return !string.IsNullOrWhiteSpace(path) ? textures(path) : null;
+            return textures(own) ?? (!string.IsNullOrWhiteSpace(path) ? textures(path) : null);
         }
 
         internal void ClearParticlePrograms()

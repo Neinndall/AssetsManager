@@ -6,6 +6,8 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Viewer / Added SMAA as an alternative to FXAA in preview settings.
+  - VFX Studio / Corrected particle material pass ordering, textures and face visibility.
   - VFX Studio / Aligned map shader draw queues with ready pass blending, structure pass layers and transparent double-sided rendering; restored per-vertex preview lighting and removed redundant unindexed program texture aliases.
   - VFX Studio / Scenes can now hold several Characters: add skins with + or right-click in the browser, then pick any of them in Scene Actors or the viewport to edit it.
   - VFX Studio / Added shimmerEmitterDefinitionData parsing with constant driver graph evaluations for modern mesh particle systems.

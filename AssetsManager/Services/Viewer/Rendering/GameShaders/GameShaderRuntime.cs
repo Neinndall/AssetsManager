@@ -28,6 +28,23 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal void DrawBoundPass(DrawElementsDelegate draw, int count, IntPtr offset) =>
             DrawIndexedPass(draw, count, offset, _doubleSidedTransparent);
 
+        internal void DrawBoundArrays(PrimitiveType mode, int count, uint instances = 0)
+        {
+            void Draw()
+            {
+                if (instances == 0) _gl.DrawArrays(mode, 0, (uint)count);
+                else _gl.DrawArraysInstanced(mode, 0, (uint)count, instances);
+            }
+            if (!_doubleSidedTransparent) { Draw(); return; }
+            _gl.Enable(EnableCap.CullFace);
+            try
+            {
+                _gl.CullFace(TriangleFace.Front); Draw();
+                _gl.CullFace(TriangleFace.Back); Draw();
+            }
+            finally { _gl.Disable(EnableCap.CullFace); }
+        }
+
         internal void DrawIndexedPass(DrawElementsDelegate draw, int count, IntPtr offset, bool doubleSidedTransparent)
         {
             if (draw == null)
