@@ -46,11 +46,12 @@ namespace AssetsManager.Views.Models.Viewer
             VfxCharacterFormDefinition form,
             IEnumerable<ModelPart> parts = null)
         {
-            // A reloading form replaces the skin's skinMeshProperties, so its own initialSubmeshToHide
-            // is the baseline instead of the owner's; its GearData show/hide lists still apply on top.
+            // A reloading form's GearData initialSubmeshToHide, when authored, replaces the owner's
+            // baseline; its GearData show/hide lists still apply on top.
             bool reloads = form is { ReloadsModel: true };
             var hidden = new HashSet<uint>(
-                (reloads ? form.InitialHiddenSubmeshHashes : initiallyHidden) ?? Array.Empty<uint>());
+                (reloads && form.InitialHiddenSubmeshHashes != null ? form.InitialHiddenSubmeshHashes : initiallyHidden)
+                ?? Array.Empty<uint>());
             if (form == null || form.IsBase)
                 return hidden;
 

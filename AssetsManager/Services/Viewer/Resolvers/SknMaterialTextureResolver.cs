@@ -317,20 +317,27 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 }
             }
 
-            // A selected gear form replaces the skin's skinMeshProperties with its GearData's own
-            // (materials, textures, initialSubmeshToHide, scale), as the game does when it equips.
+            // A selected gear form overlays its GearData skinMeshProperties on the skin's, field by field:
+            // what the GearData authors (often just materialOverride) replaces that field, the rest is kept.
             IEnumerable<BinTreeStruct> meshPropertySets = primarySkins
                 .Select(obj => obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty)
                     ? meshProperty as BinTreeStruct
                     : null);
-            if (gearUpgradePathHash != 0 &&
-                primaryTree.Objects.TryGetValue(gearUpgradePathHash, out BinTreeObject gearUpgrade) &&
+            // Like the form parser, the GearSkinUpgrade may live in the skin BIN or one of its dependencies.
+            BinTreeObject gearUpgrade = gearUpgradePathHash == 0
+                ? null
+                : trees.Select(tree => tree.Objects.TryGetValue(gearUpgradePathHash, out BinTreeObject found) ? found : null)
+                    .FirstOrDefault(found => found != null);
+            if (gearUpgrade != null &&
                 gearUpgrade.Properties.TryGetValue(GearData, out BinTreeProperty gearProperty) &&
                 gearProperty is BinTreeStruct gearData &&
                 gearData.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty gearMeshProperty) &&
                 gearMeshProperty is BinTreeStruct gearMeshProperties)
             {
-                meshPropertySets = new[] { gearMeshProperties };
+                meshPropertySets = meshPropertySets
+                    .DefaultIfEmpty()
+                    .Select(skinProperties => OverlayMeshProperties(skinProperties, gearMeshProperties))
+                    .ToList();
             }
 
             foreach (BinTreeStruct meshProperties in meshPropertySets)
@@ -486,6 +493,52 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     StringComparer.OrdinalIgnoreCase)
             };
         }
+
+        private static BinTreeStruct OverlayMeshProperties(BinTreeStruct skinProperties, BinTreeStruct gearProperties)
+        {
+            if (skinProperties == null)
+                return gearProperties;
+            // materialOverride is merged separately below, so neither side contributes it directly.
+            IEnumerable<BinTreeProperty> overlaid = skinProperties.Properties.Values
+                .Where(property => !gearProperties.Properties.ContainsKey(property.NameHash))
+                .Concat(gearProperties.Properties.Values)
+                .Where(property => property.NameHash != MaterialOverride);
+            BinTreeContainer materialOverrides = OverlayMaterialOverrides(
+                skinProperties.Properties.GetValueOrDefault(MaterialOverride) as BinTreeContainer,
+                gearProperties.Properties.GetValueOrDefault(MaterialOverride) as BinTreeContainer);
+            if (materialOverrides != null)
+                overlaid = overlaid.Append(materialOverrides);
+            return new BinTreeStruct(skinProperties.NameHash, skinProperties.ClassHash, overlaid);
+        }
+
+        /// <summary>
+        /// materialOverride is keyed by submesh: the GearData entries win for their submeshes and the
+        /// skin's entries for every other submesh stay, so untouched submeshes keep their textures.
+        /// </summary>
+        private static BinTreeContainer OverlayMaterialOverrides(BinTreeContainer skinOverrides, BinTreeContainer gearOverrides)
+        {
+            if (gearOverrides == null)
+                return skinOverrides;
+            if (skinOverrides == null)
+                return gearOverrides;
+            var gearSubmeshes = gearOverrides.Elements
+                .Select(OverrideSubmesh)
+                .Where(submesh => submesh != null)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return new BinTreeContainer(
+                gearOverrides.NameHash,
+                gearOverrides.ElementType,
+                skinOverrides.Elements
+                    .Where(element => OverrideSubmesh(element) is not string submesh || !gearSubmeshes.Contains(submesh))
+                    .Concat(gearOverrides.Elements));
+        }
+
+        private static string OverrideSubmesh(BinTreeProperty element) =>
+            element is BinTreeStruct entry &&
+            entry.Properties.TryGetValue(Submesh, out BinTreeProperty submesh) &&
+            submesh is BinTreeString value
+                ? NormalizeMaterialKey(value.Value)
+                : null;
 
         internal static SknMaterialTextureResolution Resolve(
             SknMaterialTextureMetadata metadata,

@@ -11,6 +11,7 @@ namespace AssetsManager.Views.Controls.Viewer
     public partial class VfxInspectorControl
     {
         private bool _isUpdatingCharacterForms;
+        private int _characterFormLoadGeneration;
         private VfxLoadingService.Bundle _characterPlaybackSource;
         private VfxCharacterFormDefinition _characterPlaybackForm;
         private VfxLoadingService.Bundle _characterPlaybackBundle;
@@ -139,6 +140,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private bool TryReloadCharacterFormModel()
         {
+            // Every selection supersedes a pending form load, including a return to the installed form.
+            int formGeneration = ++_characterFormLoadGeneration;
             VfxCharacterFormDefinition form = _model.SelectedCharacterForm?.Definition;
             bool reloads = form is { ReloadsModel: true };
             uint formPathHash = reloads ? form.PathHash : 0u;
@@ -152,12 +155,12 @@ namespace AssetsManager.Views.Controls.Viewer
                      StringComparison.OrdinalIgnoreCase)))
                 return false;
 
-            _ = LoadCharacterFormModelAsync(form, formPathHash, sknPath);
+            _ = LoadCharacterFormModelAsync(form, formPathHash, sknPath, formGeneration);
             return true;
         }
 
         private async Task LoadCharacterFormModelAsync(
-            VfxCharacterFormDefinition form, uint formPathHash, string sknPath)
+            VfxCharacterFormDefinition form, uint formPathHash, string sknPath, int formGeneration)
         {
             int generation = ++_championLoadGeneration;
             var bundle = _championBundle;
@@ -167,7 +170,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 // The GearData lives in the Skin BIN: its skinMeshProperties supplies the form's materials.
                 SceneModel loaded = await SknLoadingService.LoadModelWithSkinBin(
                     sknPath, bundle?.PrimaryBinPath, searchDir, gearUpgradePathHash: formPathHash);
-                if (generation != _championLoadGeneration || !ReferenceEquals(bundle, _activeBundle) || _isCleanedUp)
+                if (generation != _championLoadGeneration || formGeneration != _characterFormLoadGeneration ||
+                    !ReferenceEquals(bundle, _activeBundle) || _isCleanedUp)
                 {
                     loaded?.Dispose();
                     return;
@@ -178,9 +182,11 @@ namespace AssetsManager.Views.Controls.Viewer
                     return;
                 }
 
+                bool reloaded = formPathHash != 0;
                 InstallChampionModel(loaded, bundle, sknPath, searchDir, startPreview: false,
-                    authoredSkeletonPath: formPathHash != 0 ? form.SkeletonPath : null,
-                    formPathHash: formPathHash);
+                    authoredSkeletonPath: reloaded ? form.SkeletonPath : null,
+                    formPathHash: formPathHash,
+                    formSkinScale: reloaded ? form.SkinScale : null);
 
                 _animationClipCancellation?.Cancel();
                 if (_model.SelectedSpell != null)

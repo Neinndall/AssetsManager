@@ -17,7 +17,8 @@ namespace AssetsManager.Views.Models.Viewer
         bool EnableOverrideIdleEffects = false,
         bool HasMaterialOverrides = false,
         bool ReloadsModel = false,
-        IReadOnlyList<uint> InitialHiddenSubmeshHashes = null)
+        IReadOnlyList<uint> InitialHiddenSubmeshHashes = null,
+        float? SkinScale = null)
     {
         public bool IsBase => GearIndex < 0;
 

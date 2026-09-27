@@ -29,8 +29,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 "ASSETS/Characters/LuxFire/Skins/Skin07/Lux_Skin07_Fire.skn",
                 "ASSETS/Characters/LuxFire/Skins/Skin07/Lux_Skin07_Fire.skl",
                 null, new Dictionary<uint, uint>(), Array.Empty<VfxIdleEffectDefinition>(), false, true,
-                new uint[] { 7 });
-            var materialsOnly = otherMesh with { MeshPath = owner.MeshPath, SkeletonPath = owner.SkeletonPath };
+                new uint[] { 7 }, 1.2f);
+            var materialsOnly = otherMesh with { SkinScale = null, MeshPath = owner.MeshPath, SkeletonPath = owner.SkeletonPath };
             var skeletonOnly = materialsOnly with { HasMaterialOverrides = false, SkeletonPath = "ASSETS/Other.skl" };
             var plain = skeletonOnly with { SkeletonPath = owner.SkeletonPath };
             var document = new VfxCharacterFormDocumentData(
@@ -44,6 +44,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             Assert.Equal(new[] { true, true, true, false }, forms.Select(form => form.ReloadsModel));
             Assert.Equal("Fire", forms[0].Name);
+            // GearData skinScale is kept only when authored, so an absent one falls back to the skin's.
+            Assert.Equal(1.2f, forms[0].SkinScale);
+            Assert.Null(forms[1].SkinScale);
             Assert.Equal(forms, VfxCharacterFormSemantics.CompatibleForms(forms, owner));
             // A reloading form starts from its own initialSubmeshToHide, then its GearData hide list applies.
             Assert.True(VfxCharacterFormSemantics.HiddenSubmeshes(new uint[] { 2, 9 }, forms[0]).SetEquals(new uint[] { 3, 7 }));

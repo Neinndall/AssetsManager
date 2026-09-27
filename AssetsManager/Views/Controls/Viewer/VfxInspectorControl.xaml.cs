@@ -5273,7 +5273,8 @@ namespace AssetsManager.Views.Controls.Viewer
             string searchDir,
             bool startPreview,
             string authoredSkeletonPath = null,
-            uint formPathHash = 0)
+            uint formPathHash = 0,
+            float? formSkinScale = null)
         {
             var oldModel = _championModel;
             _championModel = loaded;
@@ -5285,11 +5286,14 @@ namespace AssetsManager.Views.Controls.Viewer
             RefreshCharacterInteractionTarget();
             // Keep the owner mesh and its joint anchors in authored skinScale space. User
             // placement is an outer multiplier so attached VFX do not receive skinScale twice.
-            _championAuthoredScale = bundle?.OwnerSceneContext is { SkinScale: > 0f } owner
-                ? owner.SkinScale
-                : 1d;
+            // A reloaded form's GearData skinScale replaces the skin's when authored.
+            _championAuthoredScale = formSkinScale is > 0f
+                ? formSkinScale.Value
+                : bundle?.OwnerSceneContext is { SkinScale: > 0f } owner
+                    ? owner.SkinScale
+                    : 1d;
             _championModel.Scale = _championAuthoredScale;
-            // The selected form owns the baseline: a model-swap form hides its own submeshes, not the owner's.
+            // The selected form owns the baseline: a reloaded form hides its own submeshes, not the owner's.
             ApplyOwnerSubmeshVisibility(GetCharacterFormHiddenSubmeshes());
             if (oldModel != null && !ReferenceEquals(oldModel, loaded))
             {

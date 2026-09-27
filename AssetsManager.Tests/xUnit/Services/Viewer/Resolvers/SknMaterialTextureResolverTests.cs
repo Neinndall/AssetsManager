@@ -28,6 +28,49 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         };
 
         [Fact]
+        public void ReadMetadata_GearFormOverlaysItsMeshPropertiesOnTheSkinsFieldByField()
+        {
+            // Sett 38 / Seraphine 69: the GearData authors only materialOverride. Everything else, and the
+            // overrides of every submesh it does not name, must stay the skin's.
+            BinTreeStruct MeshProperties(params BinTreeProperty[] properties) => new(
+                Fnv1a.HashLower("skinMeshProperties"), Fnv1a.HashLower("SkinMeshDataProperties"), properties);
+            BinTreeUnorderedContainer Overrides(params BinTreeEmbedded[] entries) => new(
+                Fnv1a.HashLower("materialOverride"), BinPropertyType.Embedded, entries);
+
+            var skin = new BinTreeObject("Characters/Test/Skins/Skin1", "SkinCharacterDataProperties", new BinTreeProperty[]
+            {
+                MeshProperties(
+                    CreateTextureLink("texture", "ASSETS/Test/Base_TX_CM.tex"),
+                    new BinTreeString(Fnv1a.HashLower("initialSubmeshToHide"), "Cape"),
+                    new BinTreeF32(Fnv1a.HashLower("skinScale"), 1.25f),
+                    Overrides(
+                        CreateOverride("Body", CreateTextureLink("texture", "ASSETS/Test/Body_TX_CM.tex")),
+                        CreateOverride("Hand", CreateTextureLink("texture", "ASSETS/Test/Hand_TX_CM.tex"))))
+            });
+            var gear = new BinTreeObject("Characters/Test/Skins/Skin1/Gear1", "GearSkinUpgrade", new BinTreeProperty[]
+            {
+                new BinTreeStruct(0x639b0013, Fnv1a.HashLower("GearData"), new BinTreeProperty[]
+                {
+                    MeshProperties(Overrides(
+                        CreateOverride("Body", CreateTextureLink("texture", "ASSETS/Test/Body_Gold_TX_CM.tex"))))
+                })
+            });
+            var tree = new BinTree(new[] { skin, gear }, Array.Empty<string>());
+
+            SknMaterialTextureMetadata metadata = SknResolver.ReadMetadata(
+                materialTrees: new[] { tree },
+                shaderTrees: new[] { tree },
+                wadChunkPathResolver: ResolveTestTexturePath,
+                gearUpgradePathHash: gear.PathHash);
+
+            Assert.Equal("ASSETS/Test/Base_TX_CM.tex", metadata.DefaultTexturePath, ignoreCase: true);
+            Assert.Equal(new[] { "Cape" }, metadata.InitialHiddenSubmeshes);
+            Assert.Equal(1.25f, metadata.SkinScale);
+            Assert.Equal("ASSETS/Test/Body_Gold_TX_CM.tex", metadata.DirectOverrideTexturePaths["body"], ignoreCase: true);
+            Assert.Equal("ASSETS/Test/Hand_TX_CM.tex", metadata.DirectOverrideTexturePaths["hand"], ignoreCase: true);
+        }
+
+        [Fact]
         public void ReadMetadata_ParsesInitialHiddenSubmeshesLikeLtk()
         {
             var meshProperties = new BinTreeStruct(

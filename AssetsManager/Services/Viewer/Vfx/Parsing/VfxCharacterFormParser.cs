@@ -23,7 +23,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         IReadOnlyList<VfxIdleEffectDefinition> OverrideIdleEffects,
         bool EnableOverrideIdleEffects,
         bool HasMaterialOverrides,
-        IReadOnlyList<uint> InitialHiddenSubmeshHashes = null);
+        IReadOnlyList<uint> InitialHiddenSubmeshHashes = null,
+        float? SkinScale = null);
 
     /// <summary>Projects authored primary gear links and compact GearData payloads without retaining BIN trees.</summary>
     internal static class VfxCharacterFormParser
@@ -41,6 +42,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_simpleSkin = VfxParsingHash.Fnv1a("simpleSkin");
         private static readonly uint F_skeleton = VfxParsingHash.Fnv1a("skeleton");
         private static readonly uint F_initialSubmeshToHide = VfxParsingHash.Fnv1a("initialSubmeshToHide");
+        private static readonly uint F_skinScale = VfxParsingHash.Fnv1a("skinScale");
         private static readonly uint F_equipAnimation = VfxParsingHash.Fnv1a("mEquipAnimation");
         private static readonly uint F_vfxResourceResolver = VfxParsingHash.Fnv1a("mVFXResourceResolver");
         private static readonly uint F_overrideIdleEffects = VfxParsingHash.Fnv1a("OverrideIdleEffects");
@@ -131,7 +133,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     data.EnableOverrideIdleEffects,
                     data.HasMaterialOverrides,
                     reloadsModel,
-                    data.InitialHiddenSubmeshHashes));
+                    data.InitialHiddenSubmeshHashes,
+                    data.SkinScale));
             }
             return forms.ToArray();
         }
@@ -191,9 +194,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 VfxAnimationParser.ExtractIdleEffects(Get(properties, F_overrideIdleEffects)),
                 GetBool(properties, F_enableOverrideIdleEffects),
                 hasMaterialOverrides,
-                skinMesh == null
-                    ? Array.Empty<uint>()
-                    : ReadSubmeshNameHashes(GetString(skinMesh.Properties, F_initialSubmeshToHide)));
+                // Null when not authored: the form then inherits the skin's own list.
+                skinMesh == null || GetString(skinMesh.Properties, F_initialSubmeshToHide) is not string hidden
+                    ? null
+                    : ReadSubmeshNameHashes(hidden),
+                skinMesh == null ? null : GetF32(skinMesh.Properties, F_skinScale));
         }
 
         private static IReadOnlyList<uint> ReadHashList(BinTreeProperty property)
