@@ -62,7 +62,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         {
             Assert.Equal("program:materialA:0:Diffuse", AssetsManager.Services.Viewer.Loading.MapTextureLoadingService.ProgramTextureKey("materialA", 0, "Diffuse"));
             Assert.Equal("program:materialA:1:Emissive", AssetsManager.Services.Viewer.Loading.MapTextureLoadingService.ProgramTextureKey("materialA", 1, "Emissive"));
-            Assert.Equal("program:materialA:Diffuse", AssetsManager.Services.Viewer.Loading.MapTextureLoadingService.ProgramTextureKey("materialA", "Diffuse"));
+        }
+
+        [Fact]
+        public void TerrainTextureLookupKeepsAuthoredIndexAfterAnEarlierPassFails()
+        {
+            var textures = new System.Collections.Generic.Dictionary<string, uint>
+            {
+                ["program:terrain:0:Diffuse"] = 10,
+                ["program:terrain:1:Diffuse"] = 20,
+                ["program:terrain:Diffuse"] = 30
+            };
+            uint? Lookup(string key) => textures.TryGetValue(key, out uint value) ? value : null;
+            Assert.Equal(20u, GameShaderRuntime.ResolveStaticProgramTexture("terrain", 1, "Diffuse", Lookup));
+            Assert.Null(GameShaderRuntime.ResolveStaticProgramTexture("terrain", 2, "Diffuse", Lookup));
         }
 
         [Fact]

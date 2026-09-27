@@ -42,9 +42,6 @@ namespace AssetsManager.Services.Viewer.Rendering
             true,
             true);
 
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
-
         internal sealed record BoundMaterial(
             int MaterialIndex,
             string MaterialPath,
@@ -123,13 +120,14 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly Dictionary<string, MaterialTexture> _lightmapTextures =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<(MapTextureWrap U, MapTextureWrap V), uint> _samplers = new();
-        private uint _lightmapSampler;
 
         private GL _gl;
-        private DrawElementsDelegate _drawElements;
+        private GameShaderRuntime.DrawElementsDelegate _drawElements;
         private MapSceneData _scene;
         private MapSunData _previewSun;
         private DrawPlan _plan;
+        private DrawPlan _programPlan;
+        private DrawPlan _programPlanSource;
         private uint _program;
         private uint _vao;
         private uint _positionVbo;
@@ -141,8 +139,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _whiteTexture;
         private int _uViewProjection;
         private int _uBaseTexture;
-        private int _uBakedLight;
-        private int _uStationaryLight;
         private int _uColor;
         private int _uOpacity;
         private int _uAlphaTest;
@@ -154,15 +150,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uSunStrength;
         private int _uSkyColor;
         private int _uGroundColor;
-        private int _uHorizonColor;
         private int _uAmbientStrength;
-        private int _uLightMapColorScale;
-        private int _uHasBakedLight;
-        private int _uHasStationaryLight;
-        private int _uBakedLightScale;
-        private int _uBakedLightBias;
-        private int _uStationaryLightScale;
-        private int _uStationaryLightBias;
         private int _uWireframePass;
         private int _uWireframeColor;
         private LightState _light = ResolveLight(null);
@@ -188,7 +176,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             IntPtr drawElements = gl.Context.GetProcAddress("glDrawElements");
             if (drawElements == IntPtr.Zero)
                 throw new InvalidOperationException("OpenGL glDrawElements is unavailable for MAPGEO rendering.");
-            _drawElements = Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(drawElements);
+            _drawElements = Marshal.GetDelegateForFunctionPointer<GameShaderRuntime.DrawElementsDelegate>(drawElements);
 
             bool embedded = GlShaderCompiler.UsesEmbeddedProfile(gl);
             _gles = embedded;
@@ -199,8 +187,6 @@ namespace AssetsManager.Services.Viewer.Rendering
                 MapGeometryShaderSource.Fragment);
             _uViewProjection = gl.GetUniformLocation(_program, "uViewProjection");
             _uBaseTexture = gl.GetUniformLocation(_program, "uBaseTexture");
-            _uBakedLight = gl.GetUniformLocation(_program, "uBakedLight");
-            _uStationaryLight = gl.GetUniformLocation(_program, "uStationaryLight");
             _uColor = gl.GetUniformLocation(_program, "uColor");
             _uOpacity = gl.GetUniformLocation(_program, "uOpacity");
             _uAlphaTest = gl.GetUniformLocation(_program, "uAlphaTest");
@@ -212,25 +198,14 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uSunStrength = gl.GetUniformLocation(_program, "uSunStrength");
             _uSkyColor = gl.GetUniformLocation(_program, "uSkyColor");
             _uGroundColor = gl.GetUniformLocation(_program, "uGroundColor");
-            _uHorizonColor = gl.GetUniformLocation(_program, "uHorizonColor");
             _uAmbientStrength = gl.GetUniformLocation(_program, "uAmbientStrength");
-            _uLightMapColorScale = gl.GetUniformLocation(_program, "uLightMapColorScale");
-            _uHasBakedLight = gl.GetUniformLocation(_program, "uHasBakedLight");
-            _uHasStationaryLight = gl.GetUniformLocation(_program, "uHasStationaryLight");
-            _uBakedLightScale = gl.GetUniformLocation(_program, "uBakedLightScale");
-            _uBakedLightBias = gl.GetUniformLocation(_program, "uBakedLightBias");
-            _uStationaryLightScale = gl.GetUniformLocation(_program, "uStationaryLightScale");
-            _uStationaryLightBias = gl.GetUniformLocation(_program, "uStationaryLightBias");
             _uWireframePass = gl.GetUniformLocation(_program, "uWireframePass");
             _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
 
             gl.UseProgram(_program);
             gl.Uniform1(_uBaseTexture, 0);
-            gl.Uniform1(_uBakedLight, 1);
-            gl.Uniform1(_uStationaryLight, 2);
             gl.UseProgram(0);
             _whiteTexture = CreateWhiteTexture();
-            _lightmapSampler = CreateLightmapSampler();
             // Keep the large ShaderCache WAD and translated/linked game programs alive for the
             // renderer lifetime. Map variants commonly reuse the same 14-ish permutations.
             _gameShaderRuntime = _appSettings != null
@@ -372,7 +347,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             float timeSeconds,
             VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
             bool wireOverlay = false,
-            bool shadersEnabled = true)
+            bool shadersEnabled = true,
+            bool? transparentPass = null)
         {
             if (!_ready || !HasScene)
                 return;
@@ -389,6 +365,17 @@ namespace AssetsManager.Services.Viewer.Rendering
                 timeSeconds,
                 _previewSun);
 
+            DrawPlan solidPlan = _plan;
+            if (shadersEnabled && solidMode == VfxPreviewViewMode.Lit && _gameShaderRuntime != null)
+            {
+                if (!ReferenceEquals(_programPlanSource, _plan))
+                {
+                    _programPlan = ResolveProgramDrawPlan(_plan, _gameShaderRuntime.GetStaticPassState);
+                    _programPlanSource = _plan;
+                }
+                solidPlan = _programPlan;
+            }
+
             PrepareStockFrame(viewProjection);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindVertexArray(_vao);
@@ -404,11 +391,13 @@ namespace AssetsManager.Services.Viewer.Rendering
                 {
                     _gl.UseProgram(_program);
                     _gl.Uniform1(_uWireframePass, 0);
-                    DrawGroups(_plan.OpaqueGroups, solidMode, shadersEnabled, in gameFrame);
-                    DrawGroups(_plan.TransparentGroups, solidMode, shadersEnabled, in gameFrame);
+                    if (transparentPass != true)
+                        DrawGroups(solidPlan.OpaqueGroups, solidMode, shadersEnabled, in gameFrame);
+                    if (transparentPass != false)
+                        DrawGroups(solidPlan.TransparentGroups, solidMode, shadersEnabled, in gameFrame);
                 }
 
-                if (wireframe)
+                if (wireframe && transparentPass != false)
                 {
                     _gl.UseProgram(_program);
                     _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
@@ -451,6 +440,22 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
         }
 
+        internal static DrawPlan ResolveProgramDrawPlan(
+            DrawPlan preview, Func<MapMaterialDefinition, GameMaterialPassState> stateOf)
+        {
+            var transparent = preview.Materials
+                .Select(bound => stateOf(bound.Material)?.BlendEnabled ?? bound.Transparent)
+                .ToArray();
+            var groups = preview.OpaqueGroups.Concat(preview.TransparentGroups).ToArray();
+            return preview with
+            {
+                OpaqueGroups = groups.Where(group => !transparent[group.BoundMaterialIndex])
+                    .OrderBy(group => group.BoundMaterialIndex).ThenBy(group => group.Order).ToArray(),
+                TransparentGroups = groups.Where(group => transparent[group.BoundMaterialIndex])
+                    .OrderBy(group => group.Order).ToArray()
+            };
+        }
+
         private void PrepareStockFrame(Matrix4x4 viewProjection)
         {
             _gl.UseProgram(_program);
@@ -460,9 +465,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform1(_uSunStrength, _light.SunStrength);
             _gl.Uniform3(_uSkyColor, _light.SkyColor.X, _light.SkyColor.Y, _light.SkyColor.Z);
             _gl.Uniform3(_uGroundColor, _light.GroundColor.X, _light.GroundColor.Y, _light.GroundColor.Z);
-            _gl.Uniform3(_uHorizonColor, _light.HorizonColor.X, _light.HorizonColor.Y, _light.HorizonColor.Z);
             _gl.Uniform1(_uAmbientStrength, _light.AmbientStrength);
-            _gl.Uniform1(_uLightMapColorScale, _light.LightMapColorScale);
         }
 
         internal static (bool Solids, bool Wireframe, float WireOpacity) ResolveViewPasses(
@@ -485,7 +488,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             _gl.UseProgram(_program);
             int activeStockMaterial = -1;
-            int activeStockMesh = -1;
             bool stockActive = true;
             foreach (DrawGroup group in groups)
             {
@@ -521,10 +523,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                                 ResolveLightmapTexture))
                         {
                             boundAny = true;
-                            _drawElements(
-                                (uint)PrimitiveType.Triangles,
+                            _gameShaderRuntime.DrawBoundPass(
+                                _drawElements,
                                 group.IndexCount,
-                                (uint)DrawElementsType.UnsignedInt,
                                 new IntPtr(checked(group.StartIndex * sizeof(uint))));
                             _gameShaderRuntime.ResetBindings();
                         }
@@ -534,7 +535,6 @@ namespace AssetsManager.Services.Viewer.Rendering
                     {
                         stockActive = false;
                         activeStockMaterial = -1;
-                        activeStockMesh = -1;
                         continue;
                     }
                 }
@@ -549,17 +549,17 @@ namespace AssetsManager.Services.Viewer.Rendering
                     activeStockMaterial = group.BoundMaterialIndex;
                     ApplyMaterial(bound, viewMode);
                 }
-                if (activeStockMesh != group.MeshIndex)
-                {
-                    activeStockMesh = group.MeshIndex;
-                    ApplyMeshLighting(activeStockMesh);
-                }
 
-                _drawElements(
-                    (uint)PrimitiveType.Triangles,
-                    group.IndexCount,
-                    (uint)DrawElementsType.UnsignedInt,
-                    new IntPtr(checked(group.StartIndex * sizeof(uint))));
+                if (_gameShaderRuntime != null)
+                    _gameShaderRuntime.DrawIndexedPass(
+                        _drawElements, group.IndexCount, new IntPtr(checked(group.StartIndex * sizeof(uint))),
+                        bound.Transparent && bound.RenderState.DoubleSided && viewMode != VfxPreviewViewMode.Untextured);
+                else
+                    _drawElements(
+                        (uint)PrimitiveType.Triangles,
+                        group.IndexCount,
+                        (uint)DrawElementsType.UnsignedInt,
+                        new IntPtr(checked(group.StartIndex * sizeof(uint))));
             }
         }
 
@@ -635,40 +635,6 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform1(_uLit, lit ? 1 : 0);
             _gl.Uniform1(_uPremultipliedAlpha, renderState.PremultipliedAlpha ? 1 : 0);
             ApplyRenderState(renderState, transparent);
-        }
-
-        private void ApplyMeshLighting(int meshIndex)
-        {
-            if (meshIndex < 0 || meshIndex >= _scene.Geometry.Meshes.Count || !_scene.Geometry.HasUv1)
-            {
-                _gl.Uniform1(_uHasBakedLight, 0);
-                _gl.Uniform1(_uHasStationaryLight, 0);
-                return;
-            }
-
-            MapGeometryMeshData mesh = _scene.Geometry.Meshes[meshIndex];
-            BindLightChannel(mesh.BakedLight, TextureUnit.Texture1, 1, _uHasBakedLight, _uBakedLightScale, _uBakedLightBias);
-            BindLightChannel(mesh.StationaryLight, TextureUnit.Texture2, 2, _uHasStationaryLight, _uStationaryLightScale, _uStationaryLightBias);
-            _gl.ActiveTexture(TextureUnit.Texture0);
-        }
-
-        private void BindLightChannel(
-            MapGeometryLightChannelData channel,
-            TextureUnit textureUnit,
-            uint samplerUnit,
-            int hasLocation,
-            int scaleLocation,
-            int biasLocation)
-        {
-            MaterialTexture texture = null;
-            bool available = channel?.IsEmpty == false &&
-                             _lightmapTextures.TryGetValue(channel.Texture, out texture);
-            _gl.Uniform1(hasLocation, available ? 1 : 0);
-            _gl.Uniform2(scaleLocation, channel?.Scale.X ?? 1f, channel?.Scale.Y ?? 1f);
-            _gl.Uniform2(biasLocation, channel?.Bias.X ?? 0f, channel?.Bias.Y ?? 0f);
-            _gl.ActiveTexture(textureUnit);
-            _gl.BindTexture(TextureTarget.Texture2D, available ? texture.TextureId : _whiteTexture);
-            _gl.BindSampler(samplerUnit, _lightmapSampler);
         }
 
         private void ApplyRenderState(MapMaterialRenderState state, bool transparent)
@@ -1030,16 +996,6 @@ namespace AssetsManager.Services.Viewer.Rendering
             return texture;
         }
 
-        private uint CreateLightmapSampler()
-        {
-            uint sampler = _gl.GenSampler();
-            _gl.SamplerParameter(sampler, SamplerParameterI.MinFilter, (int)TextureMinFilter.LinearMipmapLinear);
-            _gl.SamplerParameter(sampler, SamplerParameterI.MagFilter, (int)TextureMagFilter.Linear);
-            _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)TextureWrapMode.ClampToEdge);
-            _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)TextureWrapMode.ClampToEdge);
-            return sampler;
-        }
-
         private uint ResolveSampler(MapTextureWrap wrapU, MapTextureWrap wrapV)
         {
             var key = (wrapU, wrapV);
@@ -1285,6 +1241,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _scene = null;
             _previewSun = null;
             _plan = null;
+            _programPlan = null;
+            _programPlanSource = null;
         }
 
         private void ReleaseGeometry()
@@ -1358,8 +1316,6 @@ namespace AssetsManager.Services.Viewer.Rendering
                     if (sampler != 0)
                         _gl.DeleteSampler(sampler);
                 _samplers.Clear();
-                if (_lightmapSampler != 0)
-                    _gl.DeleteSampler(_lightmapSampler);
                 if (_whiteTexture != 0)
                     _gl.DeleteTexture(_whiteTexture);
                 if (_program != 0)
@@ -1382,7 +1338,6 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _programTextures.Clear();
                 _lightmapTextures.Clear();
                 _samplers.Clear();
-                _lightmapSampler = 0;
                 _whiteTexture = 0;
                 _program = 0;
                 _nextRetentionSweepMs = 0;

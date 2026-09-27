@@ -235,7 +235,8 @@ namespace AssetsManager.Tests.Diagnostics
             {
                 string targetPath = args.Length > 1 ? args[1] : null;
                 string mapEntry = args.Length > 2 ? args[2] : null;
-                await MapShaderAuditDiagnostic.Run(targetPath, mapEntry);
+                await MapShaderAuditDiagnostic.Run(targetPath, mapEntry,
+                    verifyResources: args.Skip(3).Contains("--resources", StringComparer.OrdinalIgnoreCase));
                 return;
             }
             if (args.Length > 0 && string.Equals(args[0], "champion-bin-audit", StringComparison.OrdinalIgnoreCase))

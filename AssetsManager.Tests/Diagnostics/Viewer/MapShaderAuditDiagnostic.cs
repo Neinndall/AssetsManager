@@ -11,6 +11,8 @@ using AssetsManager.Services.Parsers;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Runtime;
+using LeagueToolkit.Core.Meta.Properties;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Vfx.Loading;
@@ -24,7 +26,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
     {
         private const string DefaultMap = "Maps/MapGeometry/Map11/Base_SRX";
 
-        public static async Task Run(string root, string mapEntry = null)
+        public static async Task Run(string root, string mapEntry = null,
+            Action<GameShaderTranslator.TranslatedProgram> verifyProgram = null, bool verifyResources = false)
         {
             if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
             {
@@ -114,6 +117,48 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 return;
             }
 
+            if (verifyResources)
+            {
+                IReadOnlyDictionary<string, MapTextureImage> textures =
+                    await sceneLoader.LoadFullProgramTexturesAsync(scene);
+                int requestedTextures = 0;
+                int loadedTextures = 0;
+                foreach (MapMaterialDefinition material in scene.Materials)
+                {
+                    if (material?.Program?.Passes == null)
+                        continue;
+                    for (int pass = 0; pass < material.Program.Passes.Count; pass++)
+                    {
+                        foreach (GameMaterialTexture texture in material.Program.Passes[pass].Textures ?? Array.Empty<GameMaterialTexture>())
+                        {
+                            if (texture?.Texture?.IsEmpty != false)
+                                continue;
+                            requestedTextures++;
+                            string key = MapTextureLoadingService.ProgramTextureKey(material.Name, pass, texture.Name);
+                            if (textures.ContainsKey(key))
+                                loadedTextures++;
+                            else
+                                Console.WriteLine($"[MapShader] Missing texture {key}: {texture.Texture.VirtualPath ?? $"0x{texture.Texture.PathHash:x16}"}.");
+                        }
+                    }
+                }
+                IReadOnlyDictionary<string, MapTextureImage> lights =
+                    await sceneLoader.LoadFullLightmapsAsync(scene);
+                Console.WriteLine($"[MapShader] decodedProgramTextures={loadedTextures}/{requestedTextures} lightmaps={lights.Count}/{scene.Geometry.Lightmaps.Count}.");
+            }
+
+            BinTreeStruct bake = MapPostEffectsParser.FindComponent(scene.MaterialsDocument, source.Map, 0x6a4a3409);
+            string lightGrid = (bake?.Properties.GetValueOrDefault(0x7561b09eu) as BinTreeString)?.Value;
+            Console.WriteLine($"[MapShader] bakedLightMeshes={scene.Geometry.Meshes.Count(mesh => mesh.BakedLight?.IsEmpty == false)} stationaryLightMeshes={scene.Geometry.Meshes.Count(mesh => mesh.StationaryLight?.IsEmpty == false)} lightGrid={lightGrid ?? "-"} loadedGrid={(scene.LightGrid == null ? "-" : $"{scene.LightGrid.Width}x{scene.LightGrid.Height} scale={scene.LightGrid.Scale} fullBright={scene.LightGrid.FullBright}")}.");
+
+            // Inspect the retained shader definitions without uploading resources or creating a GL context.
+            MapParticleSystemCatalog runtimeCatalog = MapSceneRuntimeFactory.ParseParticleSystems(
+                scene, scene.OpeningVisibilityFlags);
+            VfxEmitterDefinition[] initialEmitters = scene.ParticleSystems.Systems.Values.SelectMany(system => system.Emitters).ToArray();
+            VfxEmitterDefinition[] runtimeEmitters = runtimeCatalog.Systems.Values.SelectMany(system => system.Emitters).ToArray();
+            Console.WriteLine($"[MapShader] customMaterialEmitters initial={initialEmitters.Count(emitter => emitter.CustomMaterial != null)} runtime={runtimeEmitters.Count(emitter => emitter.CustomMaterial != null)} programs initial={initialEmitters.Count(emitter => emitter.CustomMaterial?.Program != null)} runtime={runtimeEmitters.Count(emitter => emitter.CustomMaterial?.Program != null)}.");
+            Console.WriteLine("[MapShader] Coverage below measures bytecode and GLSL translation; it does not execute OpenGL draws.");
+
             int materialPrograms = 0;
             int passes = 0;
             int bytecodeReady = 0;
@@ -161,6 +206,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     translatedReady++;
                     materialReady = true;
                     GameShaderTranslator.TranslatedProgram ready = translated.Program;
+                    verifyProgram?.Invoke(ready);
                     foreach (GameShaderTranslator.TextureBinding texture in ready.Vertex.Sidecar.Textures.Concat(ready.Pixel.Sidecar.Textures))
                     {
                         textureBindings++;

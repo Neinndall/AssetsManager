@@ -323,8 +323,8 @@ void main()
             uint frameHeight)
         {
             float scale = Math.Clamp(occlusion.BufferScale, 0f, 1f);
-            int width = Math.Max(1, (int)MathF.Round(frameWidth * scale));
-            int height = Math.Max(1, (int)MathF.Round(frameHeight * scale));
+            int width = Math.Max(1, (int)MathF.Round(frameWidth * scale, MidpointRounding.AwayFromZero));
+            int height = Math.Max(1, (int)MathF.Round(frameHeight * scale, MidpointRounding.AwayFromZero));
             EnsureOcclusionTargets(width, height);
 
             _gl.Disable(EnableCap.DepthTest);

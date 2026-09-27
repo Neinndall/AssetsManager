@@ -200,6 +200,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                     Add(requests, emitter.Reflection?.TexturePath, TextureExtensions);
                     Add(requests, emitter.PaletteDefinition?.PaletteTexturePath, TextureExtensions);
                     Add(requests, emitter.ParticleColorTexturePath, TextureExtensions);
+                    Add(requests, emitter.CustomMaterial?.BaseTextureName, TextureExtensions);
+                    if (emitter.CustomMaterial?.Program?.Passes is { } passes)
+                    foreach (GameMaterialPass pass in passes)
+                    foreach (GameMaterialTexture binding in pass.Textures ?? Array.Empty<GameMaterialTexture>())
+                    {
+                        if (binding?.Texture is not { IsEmpty: false } texture)
+                            continue;
+                        string path = !string.IsNullOrWhiteSpace(texture.VirtualPath)
+                            ? texture.VirtualPath
+                            : $"{texture.PathHash:x16}.tex";
+                        Add(requests, path, TextureExtensions);
+                    }
                     Add(requests, emitter.MeshPath, VfxMeshFormatSemantics.SceneExtensions);
                     Add(requests, emitter.MeshFallbackPath, VfxMeshFormatSemantics.SceneExtensions);
                     Add(requests, emitter.MeshSkeletonPath, SkeletonExtensions);

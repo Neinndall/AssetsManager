@@ -2048,29 +2048,36 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 AdvanceMapCharacterClip(dt);
                 _mapSceneRuntime.Update(viewProj, dt);
-                _mapGeometryRenderer?.Render(
-                    viewProj,
-                    view,
-                    proj,
-                    eye,
-                    _mapSceneRuntime.SceneTimeSeconds,
-                    _model.PreviewViewMode,
-                    _model.EffectivePreviewWireOverlay,
-                    _model.PreviewShaders);
-                if (_mapSceneRuntime.ShowStructures)
+                // Three.js draws all scene opaque queues before any transparent queue.
+                for (int phase = 0; phase < 2; phase++)
                 {
-                    _mapCharacterRenderer?.Render(
-                        _mapSceneRuntime.CharacterGroups,
+                    _mapGeometryRenderer?.Render(
                         viewProj,
                         view,
                         proj,
                         eye,
-                        _mapSceneRuntime.CharacterTimeSeconds,
-                        EffectiveMapSun(),
-                        _mapSceneRuntime.Hidden,
-                        viewMode: _model.PreviewViewMode,
-                        wireOverlay: _model.EffectivePreviewWireOverlay,
-                        shadersEnabled: _model.PreviewShaders);
+                        _mapSceneRuntime.SceneTimeSeconds,
+                        _model.PreviewViewMode,
+                        _model.EffectivePreviewWireOverlay,
+                        _model.PreviewShaders,
+                        transparentPass: phase == 1);
+                    if (_mapSceneRuntime.ShowStructures)
+                    {
+                        _mapCharacterRenderer?.Render(
+                            _mapSceneRuntime.CharacterGroups,
+                            viewProj,
+                            view,
+                            proj,
+                            eye,
+                            _mapSceneRuntime.CharacterTimeSeconds,
+                            EffectiveMapSun(),
+                            _mapSceneRuntime.Hidden,
+                            viewMode: _model.PreviewViewMode,
+                            wireOverlay: _model.EffectivePreviewWireOverlay,
+                            shadersEnabled: _model.PreviewShaders,
+                            lightGrid: _mapSceneRuntime.Scene.LightGrid,
+                            transparentPass: phase == 1);
+                    }
                 }
                 if (characterBackdrop)
                 {
@@ -2289,7 +2296,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.PreviewViewMode,
                 _model.EffectivePreviewWireOverlay,
                 _model.PreviewShaders,
-                mirrorCharacterX: true);
+                mirrorCharacterX: true,
+                mapSun: _mapSceneRuntime != null ? EffectiveMapSun() : null,
+                lightGrid: _mapSceneRuntime?.Scene.LightGrid);
         }
 
         private bool ShouldRenderCharacterVfx()

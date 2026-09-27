@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
@@ -77,6 +78,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         public void ParserResolvesCustomMaterialForPlacedMapSystemsLikeVfxStudio()
         {
             const ulong customTextureHash = 0x1234567890abcdefUL;
+            const string shaderPath = "Shaders/Particles/Test";
+            uint shaderHash = Fnv1a.HashLower(shaderPath);
             const string systemPath = "Effects/CustomMaterial";
             const string materialPath = "Effects/Materials/Particle";
             const string customTexturePath = "ASSETS/Effects/MapParticle_TX_CM.tex";
@@ -97,6 +100,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 Fnv1a.HashLower("StaticMaterialPassDef"),
                 new BinTreeProperty[]
                 {
+                    new BinTreeObjectLink(Fnv1a.HashLower("shader"), shaderHash),
                     new BinTreeBool(Fnv1a.HashLower("blendEnable"), true),
                     new BinTreeU32(Fnv1a.HashLower("srcColorBlendFactor"), 6),
                     new BinTreeU32(Fnv1a.HashLower("dstColorBlendFactor"), 7)
@@ -151,17 +155,37 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                         new BinTreeProperty[] { emitter })
                 });
 
+            var shader = new BinTreeObject(shaderPath, "CustomShaderDef", new BinTreeProperty[]
+            {
+                new BinTreeString(Fnv1a.HashLower("objectPath"), shaderPath),
+                new BinTreeUnorderedContainer(Fnv1a.HashLower("textures"), BinPropertyType.Embedded,
+                    new[] { new BinTreeEmbedded(0, Fnv1a.HashLower("ShaderTextureDef"), new BinTreeProperty[]
+                    {
+                        new BinTreeString(Fnv1a.HashLower("name"), "Mask_Texture"),
+                        new BinTreeString(Fnv1a.HashLower("defaultTexturePath"), "assets/vfx/default_mask.tex")
+                    }) })
+            });
             MapParticleSystemCatalog catalog = new MapParticleSystemParser().Parse(
                 Tree(system, material),
                 new[] { new MapParticleGroupData(systemHash, new[] { Particle("Placement", systemHash) }) },
-                hash => hash == customTextureHash ? customTexturePath : null);
+                hash => hash == customTextureHash ? customTexturePath : null,
+                shaderTrees: new[] { Tree(shader) });
 
             VfxEmitterDefinition parsed = Assert.Single(catalog.Systems[systemHash].Emitters);
             Assert.Equal(materialHash, parsed.CustomMaterialPathHash);
             Assert.True(parsed.HasResolvedCustomMaterial);
+            Assert.Contains(Assert.Single(parsed.CustomMaterial.Program.Passes).Textures,
+                binding => binding.Texture.VirtualPath == "assets/vfx/default_mask.tex");
             Assert.Equal(VfxCustomMaterialBlendFactor.SourceAlpha, parsed.CustomMaterialSourceBlendFactor);
             Assert.Equal(VfxCustomMaterialBlendFactor.OneMinusSourceAlpha, parsed.CustomMaterialDestinationBlendFactor);
             Assert.Equal(customTexturePath.ToLowerInvariant(), parsed.TexturePath);
+            var scene = new MapSceneData(null, null, null, Tree(system, material),
+                null, null, null, null, new[] { Particle("Placement", systemHash) }, null,
+                shaderDefinitions: Tree(shader));
+            MapParticleSystemCatalog rebuilt = MapSceneRuntimeFactory.ParseParticleSystems(scene, 1);
+            VfxEmitterDefinition runtimeEmitter = Assert.Single(rebuilt.Systems[systemHash].Emitters);
+            Assert.Contains(Assert.Single(runtimeEmitter.CustomMaterial.Program.Passes).Textures,
+                binding => binding.Texture.VirtualPath == "assets/vfx/default_mask.tex");
         }
 
         [Fact]

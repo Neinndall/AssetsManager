@@ -327,6 +327,157 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             }
         }
 
+        [Fact]
+        public async System.Threading.Tasks.Task InstalledMap11ProgramsCompileAndLinkOnDesktopOpenGl()
+        {
+            string root = Path.Combine(
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory),
+                "Map11.wad.client");
+            if (!Directory.Exists(root) || FindInstalledShaderCacheRoot() == null)
+                return;
+
+            int linked = 0;
+            var seen = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
+            await AssetsManager.Tests.Diagnostics.Viewer.MapShaderAuditDiagnostic.Run(
+                root, "Maps/MapGeometry/Map11/Base_SRX", program =>
+                {
+                    string vertex = ToDesktopGlsl(program.Vertex.Glsl);
+                    string fragment = ToDesktopGlsl(program.Pixel.Glsl);
+                    if (!seen.Add(vertex + fragment))
+                        return;
+                    using var context = new HiddenWglContext();
+                    using Silk.NET.OpenGL.GL gl = Silk.NET.OpenGL.GL.GetApi(context.GetProcAddress);
+                    uint handle = AssetsManager.Utils.Rendering.GlShaderCompiler.CreateRawProgram(
+                        gl, vertex, fragment);
+                    gl.DeleteProgram(handle);
+                    linked++;
+                });
+            Assert.True(linked > 0, "Map11 must supply translated programs for the GPU check.");
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void TransparentDoubleSideDrawsBackThenFrontAndRestoresCulling(bool doubleSide)
+        {
+            using var context = new HiddenWglContext();
+            using Silk.NET.OpenGL.GL gl = Silk.NET.OpenGL.GL.GetApi(context.GetProcAddress);
+            using var runtime = new GameShaderRuntime(gl, false, null);
+            var faces = new System.Collections.Generic.List<int>();
+            gl.Disable(Silk.NET.OpenGL.EnableCap.CullFace);
+            gl.CullFace(Silk.NET.OpenGL.TriangleFace.Back);
+            runtime.DrawIndexedPass((mode, count, type, offset) =>
+            {
+                gl.GetInteger(Silk.NET.OpenGL.GLEnum.CullFaceMode, out int face);
+                faces.Add(face);
+                Assert.Equal(3, count);
+                Assert.Equal(System.IntPtr.Zero, offset);
+            }, 3, System.IntPtr.Zero, doubleSide);
+
+            Assert.Equal(
+                doubleSide
+                    ? new[] { (int)Silk.NET.OpenGL.TriangleFace.Front, (int)Silk.NET.OpenGL.TriangleFace.Back }
+                    : new[] { (int)Silk.NET.OpenGL.TriangleFace.Back },
+                faces);
+            Assert.False(gl.IsEnabled(Silk.NET.OpenGL.EnableCap.CullFace));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void CapturedSolidDepthMatchesFreshSceneWithTransparentDepthWrites(bool writesDepth)
+        {
+            using var context = new HiddenWglContext();
+            using Silk.NET.OpenGL.GL gl = Silk.NET.OpenGL.GL.GetApi(context.GetProcAddress);
+            const string vertex = @"
+uniform float uDepth;
+void main()
+{
+    vec2 point = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+    gl_Position = vec4(point * 2.0 - 1.0, uDepth, 1.0);
+}";
+            const string fragment = @"out vec4 FragColor;
+void main() { FragColor = vec4(0.4, 0.6, 0.8, 0.5); }";
+            uint program = AssetsManager.Utils.Rendering.GlShaderCompiler.CreateProgram(gl, false, vertex, fragment);
+            uint vao = gl.GenVertexArray();
+            using var capture = new AssetsManager.Services.Viewer.Rendering.Core.GlSceneCapture(gl);
+            try
+            {
+                gl.Viewport(0, 0, 1, 1);
+                gl.BindVertexArray(vao);
+                gl.UseProgram(program);
+                gl.Enable(Silk.NET.OpenGL.EnableCap.DepthTest);
+                gl.DepthFunc(Silk.NET.OpenGL.DepthFunction.Lequal);
+                int depth = gl.GetUniformLocation(program, "uDepth");
+
+                void DrawSolidScene()
+                {
+                    gl.DepthMask(true);
+                    gl.ClearDepth(1.0);
+                    gl.Clear(Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit);
+                    gl.Disable(Silk.NET.OpenGL.EnableCap.Blend);
+                    gl.Uniform1(depth, 0.6f);
+                    gl.DrawArrays(Silk.NET.OpenGL.PrimitiveType.Triangles, 0, 3);
+                    gl.Enable(Silk.NET.OpenGL.EnableCap.Blend);
+                    gl.BlendFunc(Silk.NET.OpenGL.BlendingFactor.SrcAlpha, Silk.NET.OpenGL.BlendingFactor.OneMinusSrcAlpha);
+                    gl.DepthMask(writesDepth);
+                    gl.Uniform1(depth, -0.2f);
+                    gl.DrawArrays(Silk.NET.OpenGL.PrimitiveType.Triangles, 0, 3);
+                }
+
+                DrawSolidScene();
+                capture.Capture(1, 1, captureColor: false, captureDepth: true);
+                float copied;
+                gl.BindTexture(Silk.NET.OpenGL.TextureTarget.Texture2D, capture.DepthTexture);
+                gl.GetTexImage<float>(Silk.NET.OpenGL.GLEnum.Texture2D, 0,
+                    Silk.NET.OpenGL.GLEnum.DepthComponent, Silk.NET.OpenGL.GLEnum.Float, out copied);
+
+                DrawSolidScene();
+                float rebuilt;
+                gl.ReadPixels<float>(0, 0, 1, 1,
+                    Silk.NET.OpenGL.GLEnum.DepthComponent, Silk.NET.OpenGL.GLEnum.Float, out rebuilt);
+                Assert.Equal(writesDepth ? 0.4f : 0.8f, copied, 5);
+                Assert.Equal(rebuilt, copied, 5);
+            }
+            finally
+            {
+                gl.DeleteVertexArray(vao);
+                gl.DeleteProgram(program);
+            }
+        }
+
+        [Fact]
+        public void MapPreviewShadersCompileAndLinkOnDesktopOpenGl()
+        {
+            using var context = new HiddenWglContext();
+            using Silk.NET.OpenGL.GL gl = Silk.NET.OpenGL.GL.GetApi(context.GetProcAddress);
+            var sources = new[]
+            {
+                (
+                    AssetsManager.Services.Viewer.Rendering.MapGeometryShaderSource.Vertex,
+                    AssetsManager.Services.Viewer.Rendering.MapGeometryShaderSource.Fragment),
+                (
+                    AssetsManager.Services.Viewer.Rendering.MapCharacterShaderSource.Vertex,
+                    AssetsManager.Services.Viewer.Rendering.MapCharacterShaderSource.Fragment),
+                (
+                    AssetsManager.Services.Viewer.Rendering.Core.GlMeshShaderSource.Vertex,
+                    AssetsManager.Services.Viewer.Rendering.Core.GlMeshShaderSource.Fragment)
+            };
+            foreach ((string vertex, string fragment) in sources)
+            {
+                uint program = AssetsManager.Utils.Rendering.GlShaderCompiler.CreateProgram(
+                    gl, false, vertex, fragment);
+                try
+                {
+                    Assert.NotEqual(0u, program);
+                }
+                finally
+                {
+                    gl.DeleteProgram(program);
+                }
+            }
+        }
+
         private sealed record ParticleShaderCase(
             string Name,
             VfxEmitterDefinition Emitter,

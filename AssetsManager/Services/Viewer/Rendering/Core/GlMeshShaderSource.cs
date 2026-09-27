@@ -21,6 +21,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                         mat4 uBoneTransforms[MAX_BONES];
                     };
                     out vec3 vNormal;
+                    uniform vec3 uLightGridCube[6];
+                    out vec3 vLightGrid;
                     out vec3 vWorldPosition;
                     out vec2 vUv;
                     void main(){
@@ -40,6 +42,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             vec4 worldPos = uWorld * vec4(animatedPosition, 1.0);
                             gl_Position = uViewProj * worldPos;
                             vNormal = normalize(mat3(uWorld) * animatedNormal);
+                            vec3 gridWeight = vNormal * vNormal;
+                            vLightGrid = gridWeight.x * uLightGridCube[vNormal.x < 0.0 ? 1 : 0]
+                                + gridWeight.y * uLightGridCube[vNormal.y < 0.0 ? 3 : 2]
+                                + gridWeight.z * uLightGridCube[vNormal.z < 0.0 ? 5 : 4];
                             vWorldPosition = worldPos.xyz;
                             vUv = aUv;
                     }";
@@ -66,6 +72,9 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     uniform vec3 uLightColor2;
                     uniform vec3 uAmbient;
                     uniform float uSelfIllumination;
+                    uniform int uLightGridOn;
+                    uniform float uLightGridFullBright;
+                    in vec3 vLightGrid;
                     out vec4 fragColor;
                     vec3 srgbToLinear(vec3 value){
                         vec3 low = value / 12.92;
@@ -100,6 +109,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             float diff1 = max(dot(vNormal, uLightDir), 0.0);
                             float diff2 = max(dot(vNormal, uLightDir2), 0.0);
                             vec3 finalLight = clamp(uAmbient + diff1 * uLightColor + diff2 * uLightColor2 + uSelfIllumination, 0.0, 1.0);
+                            if (uLightGridOn != 0)
+                                finalLight = srgbToLinear(clamp(vLightGrid + vec3(uSelfIllumination * uLightGridFullBright), 0.0, 1.0));
                             vec3 finalColor = uMaterialUnlit != 0
                                 ? texColor.rgb
                                 : texColor.rgb * finalLight;

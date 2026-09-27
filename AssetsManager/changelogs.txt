@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Aligned map shader draw queues with ready pass blending, structure pass layers and transparent double-sided rendering; restored per-vertex preview lighting and removed redundant unindexed program texture aliases.
   - VFX Studio / Scenes can now hold several Characters: add skins with + or right-click in the browser, then pick any of them in Scene Actors or the viewport to edit it.
   - VFX Studio / Added shimmerEmitterDefinitionData parsing with constant driver graph evaluations for modern mesh particle systems.
   - VFX Studio / Added a styled form selector for compatible champion skins with authored submeshes, textures, animations, and VFX.
@@ -423,6 +424,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Maps / Apply authored ambient grid lighting to placed structures and characters.
+  - Maps / Preserve game shader definitions and custom material textures when rebuilding map effects.
   - Viewer / Switching scene actors preserves their selected form and scale without reloading the model.
   - VFX Studio / Opened Inspector sections collapsed and added a Collapse all button to its header.
   - Viewer / Shared a stable gizmo overlay across both viewports so changing actors redraws its axes immediately.
@@ -672,3 +675,5 @@ Bug Fixes
   - Viewer / Fixed opaque SKN color-map alpha creating transparent holes in champion models.
   - VFX Studio / Fixed loading crashes for particle lifetimes using single-value probability tables.
   - Viewer / Fixed authored SKN face culling so champion materials render their outward-facing geometry.
+
+Map shader preview now preserves authored pass texture bindings and matches LTK terrain fallback lighting.

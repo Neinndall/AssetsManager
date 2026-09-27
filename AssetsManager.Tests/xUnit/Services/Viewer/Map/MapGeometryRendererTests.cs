@@ -99,6 +99,35 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void TerrainQueueUsesTheReadyPassBlendStateInsteadOfPreview()
+        {
+            MapSceneData scene = Scene(
+                meshes: new[] { Mesh(1, 0, 1) },
+                submeshes: new[] { new MapGeometrySubmeshData(0, 3, 0) },
+                materials: new[] { Material("Maps/Test/OpaquePreview") });
+            MapGeometryRenderer.DrawPlan preview = MapGeometryRenderer.BuildDrawPlan(scene);
+            Assert.Single(preview.OpaqueGroups);
+
+            MapGeometryRenderer.DrawPlan ready = MapGeometryRenderer.ResolveProgramDrawPlan(
+                preview, _ => GameMaterialPassState.Default with { BlendEnabled = true });
+            Assert.Empty(ready.OpaqueGroups);
+            Assert.Single(ready.TransparentGroups);
+
+            MapGeometryRenderer.DrawPlan fallback = MapGeometryRenderer.ResolveProgramDrawPlan(preview, _ => null);
+            Assert.Single(fallback.OpaqueGroups);
+            Assert.Empty(fallback.TransparentGroups);
+        }
+
+        [Fact]
+        public void StructurePassLayersPrecedeDistanceAndKeepStableTies()
+        {
+            Assert.True(MapCharacterRenderer.ComparePassOrder(0, 1f, 0, 1, 100f, 1, true) < 0);
+            Assert.True(MapCharacterRenderer.ComparePassOrder(1, 100f, 0, 1, 1f, 1, true) < 0);
+            Assert.True(MapCharacterRenderer.ComparePassOrder(-1, 1f, 0, 0, 1f, 1, true) < 0);
+            Assert.True(MapCharacterRenderer.ComparePassOrder(0, 1f, 0, 0, 100f, 1, false) < 0);
+        }
+
+        [Fact]
         public void IndicatorWithoutBaseTextureIsNotDrawn()
         {
             MapMaterialDefinition indicator = Material(

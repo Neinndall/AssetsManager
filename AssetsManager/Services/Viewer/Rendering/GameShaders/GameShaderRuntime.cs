@@ -4,6 +4,7 @@ using System.Linq;
 using AssetsManager.Shaders;
 using System.Numerics;
 using System.Text.RegularExpressions;
+using System.Runtime.InteropServices;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
@@ -19,6 +20,39 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
     /// </summary>
     internal sealed partial class GameShaderRuntime : IDisposable
     {
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        internal delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
+
+        private bool _doubleSidedTransparent;
+
+        internal void DrawBoundPass(DrawElementsDelegate draw, int count, IntPtr offset) =>
+            DrawIndexedPass(draw, count, offset, _doubleSidedTransparent);
+
+        internal void DrawIndexedPass(DrawElementsDelegate draw, int count, IntPtr offset, bool doubleSidedTransparent)
+        {
+            if (draw == null)
+                return;
+            if (!doubleSidedTransparent)
+            {
+                draw((uint)PrimitiveType.Triangles, count, (uint)DrawElementsType.UnsignedInt, offset);
+                return;
+            }
+
+            // Three.js r185 renders transparent DoubleSide materials back, then front.
+            _gl.Enable(EnableCap.CullFace);
+            try
+            {
+                _gl.CullFace(TriangleFace.Front);
+                draw((uint)PrimitiveType.Triangles, count, (uint)DrawElementsType.UnsignedInt, offset);
+                _gl.CullFace(TriangleFace.Back);
+                draw((uint)PrimitiveType.Triangles, count, (uint)DrawElementsType.UnsignedInt, offset);
+            }
+            finally
+            {
+                _gl.Disable(EnableCap.CullFace);
+            }
+        }
+
         private const string Globals = "$Globals";
         private const string MaterialTextureSuffix = "__TX";
         private const string SharedTextureSuffix = "_SharedTexture";
@@ -36,7 +70,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             Matrix4x4 Projection,
             Vector3 Eye,
             float TimeSeconds,
-            MapSunData Sun);
+            MapSunData Sun,
+            MapLightGridData LightGrid = null,
+            Vector3 CharacterPosition = default);
 
         private readonly record struct CharacterDraw(
             Matrix4x4 World,
@@ -178,7 +214,21 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.StaticMesh)
                 return 0;
             CacheEntry entry = GetOrCreate(material, material.Program);
-            return entry?.Passes?.Count ?? 0;
+            // LTK Backdrop uses programWith: only the first translated terrain pass.
+            return Math.Min(1, entry?.Passes?.Count ?? 0);
+        }
+
+        internal GameMaterialPassState GetStaticPassState(MapMaterialDefinition material) =>
+            GetStaticPassCount(material) > 0
+                ? GetOrCreate(material, material.Program).Passes[0].Pass.State
+                : null;
+
+        internal GameMaterialPassState GetSkinnedPassState(ModelMaterialDefinition material, int passIndex)
+        {
+            int count = GetSkinnedPassCount(material);
+            return passIndex >= 0 && passIndex < count
+                ? GetOrCreate(material, material.Program).Passes[passIndex].Pass.State
+                : null;
         }
 
         internal bool TryBind(
@@ -214,7 +264,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             _gl.UseProgram(runtime.Program);
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.StaticMesh, hasTangents: false);
             UpdateBlocks(runtime, passEntry.Globals, mesh, frame, null);
-            BindTextures(runtime, passEntry.Pass, passIndex, material, mesh, programTexture, lightmapTexture);
+            BindTextures(runtime, passEntry.Pass, passEntry.PassIndex, material, mesh, programTexture, lightmapTexture);
             ApplyPassState(passEntry.Pass.State, meshDoubleSided);
             return true;
         }
@@ -265,7 +315,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             UpdateBlocks(runtime, passEntry.Globals, null, frame, new CharacterDraw(world, bones, selfIllumination),
                 overrides: entry.DynamicParameters(material, gearIndex));
             BindSkinnedTextures(runtime, passEntry.Pass, programTexture, material, gearIndex);
-            ApplyPassState(passEntry.Pass.State, material.RenderState.DoubleSided);
+            ApplyPassState(passEntry.Pass.State, meshDoubleSided: false);
             return true;
         }
 
@@ -586,7 +636,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         WriteCharacterPerDrawVertex(block.Data, frame);
                         break;
                     case "CharacterPerDrawPS" when character.HasValue || particle != null:
-                        WriteCharacterPerDrawPixel(block.Data, character ?? new CharacterDraw(Matrix4x4.Identity, Array.Empty<Matrix4x4>()));
+                        WriteCharacterPerDrawPixel(block.Data, character ?? new CharacterDraw(Matrix4x4.Identity, Array.Empty<Matrix4x4>()), frame.LightGrid);
                         break;
                     case "VFXDynamicPerParticleInstanceCBVS" when particle != null:
                         WriteVector4(block.Data, 4, 4, Vector4.One);
@@ -742,6 +792,18 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal static void WriteCharacterPerDrawVertex(float[] data, in Frame frame)
         {
             WriteIdentityRows(data, 0, 16);
+            if (frame.LightGrid != null)
+            {
+                Span<Vector3> cube = stackalloc Vector3[6];
+                frame.LightGrid.SampleSceneCube(frame.CharacterPosition, cube);
+                for (int face = 0; face < 6; face++)
+                {
+                    WriteVector3(data, 16 + face * 4, cube[face]);
+                    Set(data, 19 + face * 4, 1f);
+                }
+                WriteIdentityRows(data, 44, 16);
+                return;
+            }
             ResolveSun(
                 frame.Sun,
                 out Vector3 color,
@@ -787,14 +849,14 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             WriteIdentityRows(data, 44, 16);
         }
 
-        private static void WriteCharacterPerDrawPixel(float[] data, in CharacterDraw character)
+        private static void WriteCharacterPerDrawPixel(float[] data, in CharacterDraw character, MapLightGridData lightGrid)
         {
             Set(data, 0, character.SelfIllumination);
             Set(data, 1, character.SelfIllumination);
             Set(data, 2, character.SelfIllumination);
             Set(data, 7, 1f);
             Set(data, 8, 1f);
-            Set(data, 9, 1f);
+            Set(data, 9, lightGrid?.FullBright ?? 1f);
             WriteIdentityRows(data, 16, 16);
             WriteIdentityRows(data, 32, 16);
         }
@@ -917,8 +979,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     GameMaterialTexture declared = pass.Textures?
                         .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
                     uint? loaded = sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D
-                        ? (programTexture?.Invoke(MapTextureLoadingService.ProgramTextureKey(material.Name, passIndex, own))
-                           ?? programTexture?.Invoke(MapTextureLoadingService.ProgramTextureKey(material.Name, own)))
+                        ? ResolveStaticProgramTexture(material.Name, passIndex, own, programTexture)
                         : null;
                     if (loaded.HasValue && loaded.Value != 0)
                     {
@@ -939,6 +1000,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             }
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
+
+        internal static uint? ResolveStaticProgramTexture(
+            string material, int authoredPassIndex, string texture, Func<string, uint?> lookup) =>
+            lookup?.Invoke(MapTextureLoadingService.ProgramTextureKey(material, authoredPassIndex, texture));
 
         private static uint? ResolveLightmap(
             MapGeometryLightChannelData channel,
@@ -1225,6 +1290,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
         private void ApplyPassState(GameMaterialPassState state, bool meshDoubleSided)
         {
+            _doubleSidedTransparent = state.BlendEnabled && (meshDoubleSided || !state.CullEnabled);
             if (state.BlendEnabled)
             {
                 _gl.Enable(EnableCap.Blend);

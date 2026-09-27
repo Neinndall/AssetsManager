@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Viewer.Animation;
+using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Resolvers;
@@ -25,12 +26,10 @@ namespace AssetsManager.Services.Viewer.Rendering
     /// </summary>
     internal sealed class MapCharacterRenderer : IDisposable
     {
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
-
         private sealed class SkinResources
         {
             internal MapCharacterAssetData Asset;
+            internal Vector3 BoundsCenter;
             internal uint Vao;
             internal uint PositionVbo;
             internal uint NormalVbo;
@@ -67,9 +66,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             Matrix4x4[] Palette,
             float DistanceSquared,
             float TimeSeconds,
-            float SelfIllumination = 0f);
+            float SelfIllumination = 0f,
+            int PassIndex = -1,
+            int Order = 0);
 
-        private static readonly Vector3 SunDirection = Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
         private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
         private static readonly Vector3 DefaultUntextured = new(0.5f);
         private static readonly Vector3 DefaultErrored = new(1f, 0.08f, 0.16f);
@@ -82,11 +82,12 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly Dictionary<BitmapSource, uint> _rawProgramTextures =
             new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<(ModelMaterialWrapMode U, ModelMaterialWrapMode V), uint> _samplers = new();
+        private readonly List<DrawCommand> _passSource = new();
         private readonly List<DrawCommand> _opaque = new();
         private readonly List<DrawCommand> _transparent = new();
 
         private GL _gl;
-        private DrawElementsDelegate _drawElements;
+        private GameShaderRuntime.DrawElementsDelegate _drawElements;
         private uint _program;
         private uint _boneBuffer;
         private uint _whiteTexture;
@@ -103,9 +104,15 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uLit;
         private int _uPremultipliedAlpha;
         private int _uLightDirection;
+        private int _uSunColor;
+        private int _uSunStrength;
+        private int _uSkyColor;
+        private int _uGroundColor;
+        private int _uAmbientStrength;
         private int _uWireframePass;
         private int _uWireframeColor;
         private int _uSelfIllumination;
+        private GlLightGridBindings _lightGridBindings;
         private GameShaderRuntime _gameShaderRuntime;
         private bool _gles;
         private bool _ready;
@@ -124,7 +131,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             IntPtr drawElements = gl.Context.GetProcAddress("glDrawElements");
             if (drawElements == IntPtr.Zero)
                 throw new InvalidOperationException("OpenGL glDrawElements is unavailable for MAP character rendering.");
-            _drawElements = Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(drawElements);
+            _drawElements = Marshal.GetDelegateForFunctionPointer<GameShaderRuntime.DrawElementsDelegate>(drawElements);
 
             _gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
             _program = GlShaderCompiler.CreateProgram(
@@ -145,9 +152,15 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uLit = gl.GetUniformLocation(_program, "uLit");
             _uPremultipliedAlpha = gl.GetUniformLocation(_program, "uPremultipliedAlpha");
             _uLightDirection = gl.GetUniformLocation(_program, "uLightDirection");
+            _uSunColor = gl.GetUniformLocation(_program, "uSunColor");
+            _uSunStrength = gl.GetUniformLocation(_program, "uSunStrength");
+            _uSkyColor = gl.GetUniformLocation(_program, "uSkyColor");
+            _uGroundColor = gl.GetUniformLocation(_program, "uGroundColor");
+            _uAmbientStrength = gl.GetUniformLocation(_program, "uAmbientStrength");
             _uWireframePass = gl.GetUniformLocation(_program, "uWireframePass");
             _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
             _uSelfIllumination = gl.GetUniformLocation(_program, "uSelfIllumination");
+            _lightGridBindings = new GlLightGridBindings(gl, _program);
 
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
@@ -184,18 +197,23 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3? erroredLinear = null,
             VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
             bool wireOverlay = false,
-            bool shadersEnabled = true)
+            bool shadersEnabled = true,
+            MapLightGridData lightGrid = null,
+            bool? transparentPass = null)
         {
             if (!_ready || groups == null || groups.Count == 0)
                 return;
 
             Vector3 untextured = untexturedLinear ?? DefaultUntextured;
             Vector3 errored = erroredLinear ?? DefaultErrored;
-            BuildQueues(groups, cameraPosition, timeSeconds, hidden);
+            if (transparentPass != true)
+            {
+                BuildQueues(groups, cameraPosition, timeSeconds, hidden);
+                PreparePassQueues(shadersEnabled && viewMode == VfxPreviewViewMode.Lit);
+            }
             if (_opaque.Count == 0 && _transparent.Count == 0)
                 return;
 
-            _transparent.Sort((left, right) => right.DistanceSquared.CompareTo(left.DistanceSquared));
             (bool solids, bool wireframe, float wireOpacity) =
                 MapGeometryRenderer.ResolveViewPasses(viewMode, wireOverlay, supportsWireframe: !_gles);
             VfxPreviewViewMode solidMode = viewMode == VfxPreviewViewMode.Wireframe
@@ -207,8 +225,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                 projection,
                 cameraPosition,
                 timeSeconds,
-                sun);
-            UseStockProgram(viewProjection);
+                sun,
+                lightGrid);
+            UseStockProgram(viewProjection, gameFrame.Sun);
             _gl.DepthFunc(DepthFunction.Lequal);
 
             Matrix4x4[] activePalette = null;
@@ -218,11 +237,13 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (solids)
                 {
                     _gl.Uniform1(_uWireframePass, 0);
-                    DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
-                    DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
+                    if (transparentPass != true)
+                        DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
+                    if (transparentPass != false)
+                        DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
                 }
 
-                if (wireframe)
+                if (wireframe && transparentPass != false)
                 {
                     activePalette = null;
                     activeVao = 0;
@@ -235,7 +256,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         PreviewWireColor.Z,
                         wireOpacity);
                     ApplyWireframeState(wireOpacity);
-                    UseStockProgram(viewProjection);
+                    UseStockProgram(viewProjection, gameFrame.Sun);
                     DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
                     DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
                 }
@@ -372,6 +393,52 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
         }
 
+        private void PreparePassQueues(bool shadersEnabled)
+        {
+            _passSource.Clear();
+            _passSource.AddRange(_opaque);
+            _passSource.AddRange(_transparent);
+            _opaque.Clear();
+            _transparent.Clear();
+            int order = 0;
+            foreach (DrawCommand command in _passSource)
+            {
+                int count = shadersEnabled && command.Resources.HasSkin
+                    ? _gameShaderRuntime?.GetSkinnedPassCount(command.Range.Material) ?? 0
+                    : 0;
+                if (count == 0)
+                {
+                    DrawCommand fallback = command with { Order = order++ };
+                    (command.Range.Transparent ? _transparent : _opaque).Add(fallback);
+                    continue;
+                }
+
+                for (int pass = 0; pass < count; pass++)
+                {
+                    GameMaterialPassState state = _gameShaderRuntime.GetSkinnedPassState(command.Range.Material, pass);
+                    DrawCommand layered = command with { PassIndex = pass, Order = order++ };
+                    (state.BlendEnabled ? _transparent : _opaque).Add(layered);
+                }
+            }
+            _opaque.Sort((left, right) => ComparePassOrder(
+                left.PassIndex, left.DistanceSquared, left.Order,
+                right.PassIndex, right.DistanceSquared, right.Order, false));
+            _transparent.Sort((left, right) => ComparePassOrder(
+                left.PassIndex, left.DistanceSquared, left.Order,
+                right.PassIndex, right.DistanceSquared, right.Order, true));
+        }
+
+        internal static int ComparePassOrder(
+            int leftPass, float leftDistance, int leftOrder,
+            int rightPass, float rightDistance, int rightOrder, bool transparent)
+        {
+            int layer = Math.Max(leftPass, 0).CompareTo(Math.Max(rightPass, 0));
+            if (layer != 0)
+                return layer;
+            int distance = transparent ? rightDistance.CompareTo(leftDistance) : 0;
+            return distance != 0 ? distance : leftOrder.CompareTo(rightOrder);
+        }
+
         private void DrawQueue(
             IReadOnlyList<DrawCommand> queue,
             Matrix4x4 viewProjection,
@@ -386,6 +453,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             foreach (DrawCommand command in queue)
             {
+                if (wireframePass && command.PassIndex > 0)
+                    continue;
                 if (command.Resources.Vao != activeVao)
                 {
                     activeVao = command.Resources.Vao;
@@ -393,55 +462,44 @@ namespace AssetsManager.Services.Viewer.Rendering
                 }
 
                 Matrix4x4 world = command.World;
+                var drawFrame = gameFrame with
+                {
+                    CharacterPosition = Vector3.Transform(command.Resources.BoundsCenter, world)
+                };
                 _gl.FrontFace(world.GetDeterminant() < 0f
                     ? FrontFaceDirection.CW
                     : FrontFaceDirection.Ccw);
 
-                bool wantsGameProgram = !wireframePass &&
-                                        shadersEnabled &&
-                                        viewMode == VfxPreviewViewMode.Lit &&
-                                        command.Resources.HasSkin &&
-                                        command.Range.Material?.Program != null;
-                int passCount = wantsGameProgram && _gameShaderRuntime != null
-                    ? _gameShaderRuntime.GetSkinnedPassCount(command.Range.Material)
-                    : 0;
-
-                if (passCount > 0)
+                if (!wireframePass && command.PassIndex >= 0)
                 {
                     ConfigureSkinIndexAttribute(command.Resources, integer: true);
-                    bool boundAny = false;
-                    for (int passIndex = 0; passIndex < passCount; passIndex++)
+                    if (_gameShaderRuntime.TryBindSkinned(
+                            command.Range.Material,
+                            command.PassIndex,
+                            world,
+                            command.Palette,
+                            command.Resources.TangentVbo != 0,
+                            in drawFrame,
+                            path => ResolveProgramTexture(command.Resources, path),
+                            command.SelfIllumination))
                     {
-                        if (_gameShaderRuntime.TryBindSkinned(
-                                command.Range.Material,
-                                passIndex,
-                                world,
-                                command.Palette,
-                                command.Resources.TangentVbo != 0,
-                                in gameFrame,
-                                path => ResolveProgramTexture(command.Resources, path),
-                                command.SelfIllumination))
-                        {
-                            boundAny = true;
-                            _drawElements(
-                                (uint)PrimitiveType.Triangles,
-                                command.Range.IndexCount,
-                                (uint)DrawElementsType.UnsignedInt,
-                                new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
-                            _gameShaderRuntime.ResetBindings();
-                        }
-                    }
-
-                    if (boundAny)
-                    {
+                        _gameShaderRuntime.DrawBoundPass(
+                            _drawElements,
+                            command.Range.IndexCount,
+                            new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
+                        _gameShaderRuntime.ResetBindings();
                         activePalette = null;
                         continue;
                     }
+                    // Later passes have no separate stock counterpart.
+                    if (command.PassIndex > 0)
+                        continue;
                 }
 
                 if (command.Resources.HasSkin)
                     ConfigureSkinIndexAttribute(command.Resources, integer: false);
-                UseStockProgram(viewProjection);
+                UseStockProgram(viewProjection, gameFrame.Sun);
+                _lightGridBindings.Apply(drawFrame.LightGrid, drawFrame.CharacterPosition);
                 if (!ReferenceEquals(activePalette, command.Palette))
                 {
                     activePalette = command.Palette;
@@ -452,12 +510,29 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (!wireframePass)
                     ApplyMaterial(command.Range, command.TimeSeconds, untextured, errored, viewMode, command.SelfIllumination);
 
-                _drawElements(
-                    (uint)PrimitiveType.Triangles,
-                    command.Range.IndexCount,
-                    (uint)DrawElementsType.UnsignedInt,
-                    new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
+                if (_gameShaderRuntime != null)
+                    _gameShaderRuntime.DrawIndexedPass(
+                        _drawElements, command.Range.IndexCount, new IntPtr(checked(command.Range.StartIndex * sizeof(uint))),
+                        !wireframePass && command.Range.Transparent && command.Range.Material.RenderState.DoubleSided && viewMode != VfxPreviewViewMode.Untextured);
+                else
+                    _drawElements(
+                        (uint)PrimitiveType.Triangles,
+                        command.Range.IndexCount,
+                        (uint)DrawElementsType.UnsignedInt,
+                        new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
             }
+        }
+
+        private static Vector3 MeshBoundsCenter(Vector3[] positions)
+        {
+            if (positions == null || positions.Length == 0) return Vector3.Zero;
+            Vector3 min = positions[0], max = positions[0];
+            foreach (Vector3 position in positions)
+            {
+                min = Vector3.Min(min, position);
+                max = Vector3.Max(max, position);
+            }
+            return (min + max) * 0.5f;
         }
 
         private void ConfigureSkinIndexAttribute(SkinResources resources, bool integer)
@@ -487,11 +562,17 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
         }
 
-        private void UseStockProgram(Matrix4x4 viewProjection)
+        private void UseStockProgram(Matrix4x4 viewProjection, MapSunData sun)
         {
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProjection, 1, false, in viewProjection.M11);
-            _gl.Uniform3(_uLightDirection, SunDirection.X, SunDirection.Y, SunDirection.Z);
+            MapGeometryRenderer.LightState light = MapGeometryRenderer.ResolveLight(sun);
+            _gl.Uniform3(_uLightDirection, light.Direction.X, light.Direction.Y, light.Direction.Z);
+            _gl.Uniform3(_uSunColor, light.SunColor.X, light.SunColor.Y, light.SunColor.Z);
+            _gl.Uniform1(_uSunStrength, light.SunStrength);
+            _gl.Uniform3(_uSkyColor, light.SkyColor.X, light.SkyColor.Y, light.SkyColor.Z);
+            _gl.Uniform3(_uGroundColor, light.GroundColor.X, light.GroundColor.Y, light.GroundColor.Z);
+            _gl.Uniform1(_uAmbientStrength, light.AmbientStrength);
         }
 
         private uint? ResolveProgramTexture(SkinResources resources, string authoredPath)
@@ -534,6 +615,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             var resources = new SkinResources
             {
                 Asset = asset,
+                BoundsCenter = MeshBoundsCenter(asset.Mesh?.Positions),
                 Vao = _gl.GenVertexArray(),
                 HasSkin = mesh.HasSkin,
                 InfluenceJointSlots = BuildInfluenceJointSlots(asset.Skeleton),
@@ -984,6 +1066,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _rawProgramTextures.Clear();
             _opaque.Clear();
             _transparent.Clear();
+            _passSource.Clear();
         }
 
         private void ReleaseResources(SkinResources resources)

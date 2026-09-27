@@ -13,6 +13,7 @@ namespace AssetsManager.Views.Models.Viewer
         public MapSceneAssets Assets { get; }
         public MapGeometryData Geometry { get; }
         public BinTree MaterialsDocument { get; }
+        public BinTree ShaderDefinitions { get; }
         public IReadOnlyList<MapMaterialDefinition> Materials { get; }
         public IReadOnlyDictionary<string, MapTextureImage> Textures { get; }
         public IReadOnlyDictionary<string, MapTextureImage> ProgramTextures { get; }
@@ -25,6 +26,7 @@ namespace AssetsManager.Views.Models.Viewer
         public int OpeningVisibilityFlags { get; }
         public Vector3? Origin { get; }
         public MapSunData Sun { get; }
+        public MapLightGridData LightGrid { get; }
         public MapPostEffectsData PostEffects { get; }
         public MapSsaoData AmbientOcclusion { get; }
 
@@ -46,12 +48,15 @@ namespace AssetsManager.Views.Models.Viewer
             MapSsaoData ambientOcclusion = null,
             IReadOnlyDictionary<string, MapTextureImage> lightmaps = null,
             IReadOnlyDictionary<string, MapTextureImage> programTextures = null,
-            int openingVisibilityFlags = 1)
+            int openingVisibilityFlags = 1,
+            BinTree shaderDefinitions = null,
+            MapLightGridData lightGrid = null)
         {
             Source = source;
             Assets = assets;
             Geometry = geometry;
             MaterialsDocument = materialsDocument;
+            ShaderDefinitions = shaderDefinitions;
             Materials = materials;
             Textures = textures;
             ProgramTextures = programTextures ?? new Dictionary<string, MapTextureImage>(System.StringComparer.Ordinal);
@@ -64,6 +69,7 @@ namespace AssetsManager.Views.Models.Viewer
             OpeningVisibilityFlags = openingVisibilityFlags;
             Origin = origin;
             Sun = sun;
+            LightGrid = lightGrid;
             PostEffects = postEffects;
             AmbientOcclusion = ambientOcclusion;
         }

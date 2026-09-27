@@ -84,8 +84,13 @@ namespace AssetsManager.Services.Viewer.Parsing
         }
 
         private static bool? ReadBool(BinTreeStruct holder, uint field) =>
-            holder.Properties.TryGetValue(field, out BinTreeProperty property) && property is BinTreeBool value
-                ? value.Value
+            holder.Properties.TryGetValue(field, out BinTreeProperty property)
+                ? property switch
+                {
+                    BinTreeBool value => value.Value,
+                    BinTreeBitBool value => value.Value,
+                    _ => null
+                }
                 : null;
 
         private static Vector2? ReadVector2(BinTreeStruct holder, uint field) =>

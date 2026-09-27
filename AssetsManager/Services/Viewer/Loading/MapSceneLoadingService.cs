@@ -153,6 +153,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 _hashResolver == null ? null : _hashResolver.ResolveBinEntry,
                 shaders != null ? new[] { shaders } : null);
             MapSunData sun = MapSunParser.Parse(materials, source.Map);
+            MapLightGridData lightGrid = await new MapLightGridLoadingService(_assetResolver, _logService)
+                .LoadAsync(materials, source, cancellationToken);
             MapPostEffectsData postEffects = MapPostEffectsParser.Parse(materials, source.Map);
             MapSsaoData ambientOcclusion = MapSsaoParser.Parse(materials, source.Map);
             IReadOnlyDictionary<string, MapTextureImage> textures = includePreviewTextures
@@ -205,7 +207,9 @@ namespace AssetsManager.Services.Viewer.Loading
                 ambientOcclusion,
                 lightmaps,
                 programTextures,
-                openingVisibilityFlags);
+                openingVisibilityFlags,
+                shaders,
+                lightGrid);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewTexturesAsync(

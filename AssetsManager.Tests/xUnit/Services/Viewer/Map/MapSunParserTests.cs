@@ -52,6 +52,23 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal(2.1f, parsed.FogEmissiveRemap);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void FogEnabledAcceptsAuthoredFlag(bool enabled)
+        {
+            BinTree tree = Tree(Container(
+                BaseSrx,
+                new BinTreeStruct(
+                    0,
+                    MapSunParser.SunPropertiesClass,
+                    new BinTreeProperty[] { new BinTreeBitBool(MapSunParser.FogEnabledField, enabled) })));
+
+            MapSunData parsed = MapSunParser.Parse(tree, MapPath.FromEntryPath(BaseSrx));
+
+            Assert.Equal(enabled, parsed.FogEnabled);
+        }
+
         [Fact]
         public void MissingExactContainerFallsBackToFirstMapContainerLikeLtk()
         {

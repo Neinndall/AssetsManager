@@ -161,9 +161,6 @@ namespace AssetsManager.Services.Viewer.Loading
             return byMaterial;
         }
 
-        internal static string ProgramTextureKey(string material, string texture) =>
-            $"program:{material}:{texture}";
-
         internal static string ProgramTextureKey(string material, int pass, string texture) =>
             $"program:{material}:{pass}:{texture}";
 
@@ -179,10 +176,10 @@ namespace AssetsManager.Services.Viewer.Loading
                 .SelectMany(material => material.Program.Passes.SelectMany((pass, passIndex) =>
                     (pass.Textures ?? Array.Empty<GameMaterialTexture>())
                         .Where(texture => texture?.Texture?.IsEmpty == false)
-                        .SelectMany(texture => new[]
+                        .Select(texture => new
                         {
-                            new { Key = ProgramTextureKey(material.Name, passIndex, texture.Name), texture.Texture },
-                            new { Key = ProgramTextureKey(material.Name, texture.Name), texture.Texture }
+                            Key = ProgramTextureKey(material.Name, passIndex, texture.Name),
+                            texture.Texture
                         })))
                 .GroupBy(item => item.Key, StringComparer.Ordinal)
                 .Select(group => group.Last())

@@ -133,15 +133,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(scene);
-            IReadOnlyList<MapParticleData> played = MapParticleSemantics.PlayedForFlags(
-                scene.Particles,
-                visibilityFlags);
-            var parser = new MapParticleSystemParser();
-            MapParticleSystemCatalog catalog = parser.Parse(
-                scene.MaterialsDocument,
-                MapParticleSemantics.GroupBySystem(played),
-                _hashResolver == null ? null : _hashResolver.ResolveHash,
-                _hashResolver == null ? null : _hashResolver.ResolveBinEntry);
+            MapParticleSystemCatalog catalog = ParseParticleSystems(scene, visibilityFlags, _hashResolver);
             return MapParticleSceneRuntime.CreateAsync(
                 catalog,
                 scene.Source?.ProjectRoot,
@@ -149,6 +141,22 @@ namespace AssetsManager.Services.Viewer.Runtime
                 _hashResolver,
                 _logService,
                 cancellationToken);
+        }
+
+        internal static MapParticleSystemCatalog ParseParticleSystems(
+            MapSceneData scene,
+            int visibilityFlags,
+            HashResolverService hashResolver = null)
+        {
+            ArgumentNullException.ThrowIfNull(scene);
+            IReadOnlyList<MapParticleData> played = MapParticleSemantics.PlayedForFlags(
+                scene.Particles, visibilityFlags);
+            return new MapParticleSystemParser().Parse(
+                scene.MaterialsDocument,
+                MapParticleSemantics.GroupBySystem(played),
+                hashResolver == null ? null : hashResolver.ResolveHash,
+                hashResolver == null ? null : hashResolver.ResolveBinEntry,
+                scene.ShaderDefinitions != null ? new[] { scene.ShaderDefinitions } : null);
         }
 
         internal static void DisposeCompletedCharacterLoads(

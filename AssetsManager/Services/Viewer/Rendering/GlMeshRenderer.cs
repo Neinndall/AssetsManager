@@ -56,6 +56,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uWireframePass;
         private int _uWireframeColor;
         private int _uSelfIllumination;
+        private GlLightGridBindings _lightGridBindings;
         private bool _gles;
         private bool _ready;
 
@@ -64,10 +65,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _appSettings = appSettings;
         }
 
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
-
-        private DrawElementsDelegate _drawElements = null!;
+        private GameShaderRuntime.DrawElementsDelegate _drawElements = null!;
 
         public void Initialize(GL gl)
         {
@@ -75,7 +73,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             IntPtr proc = gl.Context.GetProcAddress("glDrawElements");
             if (proc != IntPtr.Zero)
             {
-                _drawElements = Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(proc);
+                _drawElements = Marshal.GetDelegateForFunctionPointer<GameShaderRuntime.DrawElementsDelegate>(proc);
             }
 
             _gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
@@ -109,7 +107,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _ready = true;
         }
 
-        public void Render(
+        internal void Render(
             SceneModel model,
             Matrix4x4 viewProj,
             Matrix4x4 view,
@@ -123,7 +121,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
             bool wireOverlay = false,
             bool shadersEnabled = false,
-            bool mirrorCharacterX = false)
+            bool mirrorCharacterX = false,
+            MapSunData mapSun = null,
+            MapLightGridData lightGrid = null)
         {
             if (!_ready || model == null || !model.IsVisible) return;
 
@@ -149,7 +149,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                 projection,
                 cameraPosition,
                 materialTimeSeconds,
-                null);
+                mapSun,
+                lightGrid,
+                Vector3.Transform(model.SkinnedMesh?.BoundingSphere.Position ?? Vector3.Zero, world));
             (bool solids, bool wireframe, float wireOpacity) =
                 MapGeometryRenderer.ResolveViewPasses(viewMode, wireOverlay, supportsWireframe: !_gles);
             VfxPreviewViewMode solidMode = viewMode == VfxPreviewViewMode.Wireframe
@@ -167,6 +169,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ambientColor,
                 materialTimeSeconds,
                 model.SelfIllumination);
+            _lightGridBindings.Apply(lightGrid, gameFrame.CharacterPosition);
 
             // Per-part state below owns blending, depth and culling. Start and end from
             // conservative defaults so unbound Viewer/Diff parts keep their shared behavior unchanged.
@@ -262,6 +265,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uWireframePass = gl.GetUniformLocation(_program, "uWireframePass");
             _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
             _uSelfIllumination = gl.GetUniformLocation(_program, "uSelfIllumination");
+            _lightGridBindings = new GlLightGridBindings(gl, _program);
         }
 
         private void ConfigureSkinIndexAttribute(
@@ -394,10 +398,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                             _gl.FrontFace(world.GetDeterminant() < 0f
                                 ? FrontFaceDirection.CW
                                 : FrontFaceDirection.Ccw);
-                            _drawElements?.Invoke(
-                                (uint)PrimitiveType.Triangles,
+                            _gameShaderRuntime.DrawBoundPass(
+                                _drawElements,
                                 resources.IndexCount,
-                                (uint)DrawElementsType.UnsignedInt,
                                 IntPtr.Zero);
                             _gameShaderRuntime.ResetBindings();
                         }

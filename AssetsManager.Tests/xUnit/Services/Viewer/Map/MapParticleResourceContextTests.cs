@@ -83,6 +83,39 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void CustomMaterialResourcesIncludeEveryPassAndUnresolvedWadHashes()
+        {
+            var sampler = new GameMaterialSamplerState(null,
+                MapTextureWrap.Clamp, MapTextureWrap.Clamp, MapTextureWrap.Clamp, true, true);
+            GameMaterialPass Pass(params GameMaterialTexture[] textures) => new(
+                1, "Shaders/Particles/Test", Array.Empty<GameMaterialDefine>(),
+                Array.Empty<KeyValuePair<string, bool>>(), textures,
+                Array.Empty<GameMaterialParameter>(), GameMaterialPassState.Default);
+            var program = new GameMaterialProgram(GameMaterialKind.Particles, false, new[]
+            {
+                Pass(new GameMaterialTexture("Diffuse_Texture",
+                    new MapTextureReference("assets/vfx/custom.tex", 0),
+                    GameMaterialTextureSource.Material, sampler)),
+                Pass(new GameMaterialTexture("Mask_Texture",
+                    new MapTextureReference(null, 0x1234567890abcdefUL),
+                    GameMaterialTextureSource.ShaderDefault, sampler))
+            });
+            VfxEmitterDefinition emitter = Emitter(null, null) with
+            {
+                CustomMaterial = ModelMaterialDefinition.TextureOnly("assets/vfx/custom.tex", program)
+            };
+
+            string[] paths = VfxSceneResourceContext.CollectRequests(Catalog(emitter))
+                .Select(request => request.AuthoredPath).ToArray();
+
+            Assert.Equal(2, paths.Length);
+            Assert.Contains("assets/vfx/custom.tex", paths);
+            Assert.Contains("1234567890abcdef.tex", paths);
+            Assert.Equal(0x1234567890abcdefUL,
+                VfxSceneResourceContext.ReferenceFor("1234567890abcdef.tex").PathHash);
+        }
+
+        [Fact]
         public void ReachableSystemsKeepsOnlyTransitiveChildrenAndUsesTheParentResolverScope()
         {
             const uint rootHash = 1;
