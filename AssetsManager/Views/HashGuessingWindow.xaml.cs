@@ -276,15 +276,12 @@ namespace AssetsManager.Views
                 BadgeBrush = accentGreen,
                 EstimatedTime = "~5s"
             };
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-filepath", Name = "BinFilePaths", Description = "Name root, resolver and nested entries after their BIN file path", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-owning", Name = "OwningEntryStrings", Description = "Resolve object entry names from embedded strings", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-objectlocal", Name = "ObjectLocalHashPairs", Description = "Correlate strings and hash pairs inside the same struct", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-pathleaf", Name = "ResolvedHashPathLeaf", Description = "Infer child property names from resolved child hashes", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
-            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-structures", Name = "ContextualStructures", Description = "Heuristics for Spells, VFX, Characters and MapSkins", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
-            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-tft-shop", Name = "TftShopPaths", Description = "Resolve TFT shop entries from set and item names", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
-            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-augment", Name = "AugmentSpellPaths", Description = "Resolve augment entries and their root spells", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
-            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-quests", Name = "ModeQuestPaths", Description = "Resolve mode quest entries from quest names", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
-            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-attributes", Name = "AttributeEntryPaths", Description = "Map known BIN attributes directly to entry paths", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
-            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-relations", Name = "ObjectLinkRelations", Description = "Resolve entry links exposed by map and loadout structures", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-structures", Name = "ContextualStructures", Description = "CommunityDragon patterns for characters, spells, TFT, augments, maps and loadouts", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-learned", Name = "LearnedTemplates", Description = "Learn naming templates from resolved hashes and apply them to their unresolved siblings", BadgeText = "🐢 SLOW", BadgeBrush = accentOrange });
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-strings", Name = "LiteralBinStrings", Description = "Scan all binary strings against local target domains", BadgeText = "⚡ ~3s", BadgeBrush = accentOrange });
             _allMethods.Add(binContext);
 
@@ -303,7 +300,6 @@ namespace AssetsManager.Views
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-reverse-suffix", Name = "SuffixFoldingEngine", Description = "Reverse-fold 45+ class/field suffixes in state space (O(Words))", BadgeText = "🚀 FAST", BadgeBrush = accentGreen });
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-family-lattice", Name = "BaseClassFamilyLattice", Description = "Inherit sibling suffixes & vocabulary from base classes", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-crossdomain", Name = "CrossDomainDictionary", Description = "Known types as fields, known fields as types, 3D bones", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
-            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-path-templates", Name = "StructuralTemplates", Description = "Path and field numeric and character substitutions", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
             _allMethods.Add(binSchema);
 
             // RST (Domain 3)

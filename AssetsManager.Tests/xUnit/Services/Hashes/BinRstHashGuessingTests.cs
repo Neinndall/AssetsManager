@@ -397,7 +397,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 tree,
                 matcher,
                 "synthetic-shop.bin",
-                selectedSubMethods: new HashSet<string> { "bin-context-tft-shop" });
+                selectedSubMethods: new HashSet<string> { "bin-context-structures" });
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(InternalHashKind.BinEntries, match.Kind);
@@ -429,7 +429,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 tree,
                 matcher,
                 "synthetic-augment.bin",
-                selectedSubMethods: new HashSet<string> { "bin-context-augment" });
+                selectedSubMethods: new HashSet<string> { "bin-context-structures" });
 
             Assert.Equal(2, matcher.Matches.Count);
             Assert.Contains(matcher.Matches, match => match.Value == augmentPath);
@@ -457,7 +457,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 tree,
                 matcher,
                 "synthetic-quest.bin",
-                selectedSubMethods: new HashSet<string> { "bin-context-quests" });
+                selectedSubMethods: new HashSet<string> { "bin-context-structures" });
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(expected, match.Value);
@@ -483,7 +483,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 tree,
                 matcher,
                 "synthetic-ui.bin",
-                selectedSubMethods: new HashSet<string> { "bin-context-attributes" });
+                selectedSubMethods: new HashSet<string> { "bin-context-structures" });
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(expected, match.Value);
@@ -530,7 +530,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 tree,
                 matcher,
                 "synthetic-relations.bin",
-                selectedSubMethods: new HashSet<string> { "bin-context-relations" });
+                selectedSubMethods: new HashSet<string> { "bin-context-structures" });
 
             Assert.Equal(2, matcher.Matches.Count);
             Assert.Contains(matcher.Matches, match => match.Value == groupPath);
@@ -566,7 +566,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 matcher,
                 "legacy-relations.bin",
                 resolver: resolver,
-                selectedSubMethods: new HashSet<string> { "bin-context-relations" });
+                selectedSubMethods: new HashSet<string> { "bin-context-structures" });
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(groupPath, match.Value);
@@ -1679,6 +1679,353 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.True(match.CanPromote);
             Assert.Equal(InternalHashEvidence.MetaSchemaWordset, match.Evidence);
             Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public void NoisyGateDemotesSchemaHitsToCandidates()
+        {
+            const string candidate = "SyntheticNoisyType";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            matcher.BeginGate("noisy pass");
+            matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, InternalHashGuessStrategy.NumericVariant, "noisy pass", preserveCasing: true);
+            matcher.AddGateNoise(1.0);
+            Assert.Empty(matcher.TakePendingMatches());
+            var result = matcher.EndGate();
+
+            Assert.False(result.Accepted);
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.False(match.IsVerified);
+            Assert.False(match.CanPromote);
+            Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
+            Assert.Single(matcher.TakePendingMatches());
+        }
+
+        [Fact]
+        public void QuietGateKeepsSchemaHitsVerified()
+        {
+            const string candidate = "SyntheticQuietType";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            matcher.BeginGate("quiet pass");
+            matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, InternalHashGuessStrategy.CrossDictionary, "quiet pass", preserveCasing: true);
+            Assert.True(matcher.EndGate().Accepted);
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public void UntargetedHitOutsideItsBinWaitsForTheUntargetedGate()
+        {
+            const string candidate = "Maps/Shipping/Map22/MapGroups/Remote";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            matcher.CheckContextualCandidate(InternalHashKind.BinEntries, candidate, "remote.bin");
+            Assert.Empty(matcher.TakePendingMatches());
+
+            Assert.True(matcher.ResolveUntargetedGate().Accepted);
+            InternalHashGuessMatch match = Assert.Single(matcher.TakePendingMatches());
+            Assert.True(match.CanPromote);
+        }
+
+        [Fact]
+        public void UntargetedHitInsideItsBinBypassesTheGate()
+        {
+            const string candidate = "Maps/Shipping/Map22/MapGroups/Local";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var local = CreateTargets();
+            local[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            matcher.CheckContextualCandidate(InternalHashKind.BinEntries, candidate, "local.bin", localTargets: local);
+
+            Assert.Single(matcher.TakePendingMatches());
+            Assert.Equal(0, matcher.ResolveUntargetedGate().Hits);
+        }
+
+        [Theory]
+        [InlineData("Character", "name", "Aatrox", "Characters/Aatrox")]
+        [InlineData("CheatSet", "mName", "Arena", "Cheats/CheatSets/Arena")]
+        public void CdragonCharacterAndCheatSetPatternsResolveEntryPath(string className, string field, string value, string expected)
+        {
+            uint hash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                CreateEntryTree(hash, className, field, value),
+                matcher,
+                "synthetic.bin",
+                selectedSubMethods: new HashSet<string> { "bin-context-structures" });
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(expected, match.Value);
+            Assert.True(match.CanPromote);
+        }
+
+        [Fact]
+        public void AnimationClipNameUsesCdragonCasing()
+        {
+            const string clipName = "Idle_Base";
+            uint clipHash = Fnv1a.HashLower(clipName);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(clipHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var clip = new BinTreeStruct(0, Fnv1a.HashLower("AtomicClipData"), new BinTreeProperty[]
+            {
+                new BinTreeStruct(Fnv1a.HashLower("mAnimationResourceData"), Fnv1a.HashLower("AnimationResourceData"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mAnimationFilePath"), "ASSETS/Characters/Ahri/Animations/ahri_idle_base.anm")
+                })
+            });
+            var clipMap = new BinTreeMap(Fnv1a.HashLower("mClipDataMap"), BinPropertyType.Hash, BinPropertyType.Struct, new[]
+            {
+                new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, clipHash), clip)
+            });
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x11111111, Fnv1a.HashLower("AnimationGraphData"), new BinTreeProperty[] { clipMap })
+            }, System.Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                tree,
+                matcher,
+                "synthetic-animations.bin",
+                selectedSubMethods: new HashSet<string> { "bin-context-structures" });
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(clipName, match.Value);
+        }
+
+        [Fact]
+        public void FilePathNamesRootEntryAndResolverWithRiotCasing()
+        {
+            const string root = "Characters/PetShark/Themes/RPG/Tier1";
+            uint rootHash = Fnv1a.HashLower(root);
+            uint resolverHash = Fnv1a.HashLower(root + "/Resources");
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(rootHash);
+            targets[InternalHashKind.BinEntries].Add(resolverHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(rootHash, Fnv1a.HashLower("SkinCharacterDataProperties"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("championSkinName"), "PetShark")
+                }),
+                new BinTreeObject(resolverHash, Fnv1a.HashLower("ResourceResolver"), Array.Empty<BinTreeProperty>())
+            }, Array.Empty<string>());
+            var casing = BinPathCasing.FromKnownNames(new[] { "Characters/Other/Themes/RPG/Tier1/Resources" });
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                tree,
+                matcher,
+                "data/characters/petshark/themes/rpg/tier1.bin",
+                selectedSubMethods: new HashSet<string> { "bin-context-filepath" },
+                casing: casing);
+
+            Assert.Equal(2, matcher.Matches.Count);
+            Assert.Contains(matcher.Matches, m => m.Value == root && m.CanPromote);
+            Assert.Contains(matcher.Matches, m => m.Value == root + "/Resources" && m.CanPromote);
+        }
+
+        [Fact]
+        public void FilePathNamesObjectNestedUnderItsFile()
+        {
+            const string expected = "passes/tft/assets/Firelight_Rio";
+            uint hash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                CreateEntryTree(hash, "TftPassAsset", "internalName", "Firelight_Rio"),
+                matcher,
+                "passes/tft/assets",
+                selectedSubMethods: new HashSet<string> { "bin-context-filepath" });
+
+            Assert.Equal(expected, Assert.Single(matcher.Matches).Value);
+        }
+
+        [Theory]
+        [InlineData("ScriptCheat", "mName", "TFT14_Virus_ForceBlob", "Cheats/GameModes/TFT/TFT14/TFT14_Virus_ForceBlob")]
+        [InlineData("SpellObject", "mScriptName", "TFT14_AnimaSquad_Ship_Mis", "Maps/Shipping/Map22/Sets/TFTSet14/Spells/TFT14_AnimaSquad_Ship_Mis")]
+        [InlineData("TftPlaybook", "name", "Poro", "Loadouts/TFTPlaybooks/Poro")]
+        public void TftSetScopedPatternsResolveEntryPath(string className, string field, string value, string expected)
+        {
+            uint hash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                CreateEntryTree(hash, className, field, value),
+                matcher,
+                "synthetic.bin",
+                selectedSubMethods: new HashSet<string> { "bin-context-structures" });
+
+            Assert.Equal(expected, Assert.Single(matcher.Matches).Value);
+        }
+
+        [Fact]
+        public void LearnedTemplateResolvesUnknownSiblingFromResolvedExamples()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            string[] known = { "Loadouts/Synthetic/Alpha", "Loadouts/Synthetic/Beta", "Loadouts/Synthetic/Gamma" };
+            File.WriteAllLines(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt"),
+                known.Select(name => $"{Fnv1a.HashLower(name):x8} {name}"));
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            resolver.LoadBinHashes();
+
+            const string expected = "Loadouts/Synthetic/Delta";
+            uint unknownHash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(unknownHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var learned = new BinLearnedTemplateSource(resolver);
+            var objects = known.Select(name => name[(name.LastIndexOf('/') + 1)..])
+                .Append("Delta")
+                .Select(leaf => new BinTreeObject(
+                    Fnv1a.HashLower($"Loadouts/Synthetic/{leaf}"),
+                    Fnv1a.HashLower("SyntheticLoadout"),
+                    new BinTreeProperty[] { new BinTreeString(Fnv1a.HashLower("name"), leaf) }));
+
+            learned.Observe(new BinTree(objects, Array.Empty<string>()), matcher, "synthetic.bin", null);
+            Assert.Equal(1, learned.Apply(matcher));
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(expected, match.Value);
+            Assert.True(match.CanPromote);
+        }
+
+        [Fact]
+        public void SameNameInAnotherCasingIsNotASecondVerifiedMatch()
+        {
+            const string name = "Characters/DA_18_Lux_Coven/Animations/Skin0";
+            uint hash = Fnv1a.HashLower(name);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var local = CreateTargets();
+            local[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            matcher.Check(name, InternalHashGuessStrategy.BinContent, "a.bin", localTargets: local);
+            matcher.Check(name.ToLowerInvariant(), InternalHashGuessStrategy.BinContent, "b.bin", localTargets: local);
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(name, match.Value);
+            Assert.True(match.CanPromote);
+        }
+
+        [Fact]
+        public void MapKeyVocabularyResolvesNumberedVariantOfKnownKey()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            var known = Enumerable.Range(1, 20).Select(i => $"Swipe{i}").Append("Trail_01").ToList();
+            File.WriteAllLines(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt"),
+                known.Select(name => $"{Fnv1a.HashLower(name):x8} {name}"));
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            resolver.LoadBinHashes();
+
+            const string expected = "Trail_07";
+            uint unknownHash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(unknownHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var events = new BinTreeMap(
+                Fnv1a.HashLower("mEventDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                known.Select(name => Fnv1a.HashLower(name)).Append(unknownHash)
+                    .Select(hash => new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, hash),
+                        new BinTreeStruct(0, Fnv1a.HashLower("ParticleEventData"), Array.Empty<BinTreeProperty>()))));
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x11111111, Fnv1a.HashLower("AtomicClipData"), new BinTreeProperty[] { events })
+            }, Array.Empty<string>());
+            var learned = new BinLearnedTemplateSource(resolver);
+
+            learned.Observe(tree, matcher, "synthetic-animations.bin", null);
+            learned.Apply(matcher);
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(expected, match.Value);
+            Assert.True(match.CanPromote);
+            Assert.True(learned.LastVocabularyGate?.Accepted);
+        }
+
+        [Fact]
+        public void TrophyDataResolvesCupAndGemCountFromSkeleton()
+        {
+            const string expected = "Loadouts/SummonerTrophies/Trophies/Bandle_City/Trophy_8";
+            uint hash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(hash, Fnv1a.HashLower("TrophyData"), new BinTreeProperty[]
+                {
+                    new BinTreeStruct(Fnv1a.HashLower("skinMeshProperties"), Fnv1a.HashLower("SkinMeshDataProperties"), new BinTreeProperty[]
+                    {
+                        new BinTreeString(Fnv1a.HashLower("skeleton"), "ASSETS/Loadouts/SummonerTrophies/Trophies/Bandle_City/Trophy.skl")
+                    })
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "synthetic.bin",
+                selectedSubMethods: new HashSet<string> { "bin-context-structures" });
+
+            Assert.Equal(expected, Assert.Single(matcher.Matches).Value);
+        }
+
+        [Fact]
+        public void LearnedTemplateNeedsMinimumSupport()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt"),
+                $"{Fnv1a.HashLower("Loadouts/Synthetic/Alpha"):x8} Loadouts/Synthetic/Alpha{Environment.NewLine}");
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            resolver.LoadBinHashes();
+
+            uint unknownHash = Fnv1a.HashLower("Loadouts/Synthetic/Delta");
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(unknownHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var learned = new BinLearnedTemplateSource(resolver);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(Fnv1a.HashLower("Loadouts/Synthetic/Alpha"), Fnv1a.HashLower("SyntheticLoadout"),
+                    new BinTreeProperty[] { new BinTreeString(Fnv1a.HashLower("name"), "Alpha") }),
+                new BinTreeObject(unknownHash, Fnv1a.HashLower("SyntheticLoadout"),
+                    new BinTreeProperty[] { new BinTreeString(Fnv1a.HashLower("name"), "Delta") })
+            }, Array.Empty<string>());
+
+            learned.Observe(tree, matcher, "synthetic.bin", null);
+
+            Assert.Equal(0, learned.Apply(matcher));
+            Assert.Empty(matcher.Matches);
         }
 
         private static BinRstHashGuessingService.TokenWordlist CreateWordlist(params string[] names)

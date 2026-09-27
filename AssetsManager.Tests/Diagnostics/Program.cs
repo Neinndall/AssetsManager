@@ -105,6 +105,41 @@ namespace AssetsManager.Tests.Diagnostics
                 GameChunkLinkInspectorDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "bin-schema-dryrun", StringComparison.OrdinalIgnoreCase))
+            {
+                await BinSchemaDryRunDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "bin-event-key-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                BinEventKeyAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "bin-find-hash", StringComparison.OrdinalIgnoreCase))
+            {
+                BinFindHashDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "bin-context-dryrun", StringComparison.OrdinalIgnoreCase))
+            {
+                await BinContextDryRunDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "bin-template-probe", StringComparison.OrdinalIgnoreCase))
+            {
+                BinTemplateProbeDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "bin-class-sample", StringComparison.OrdinalIgnoreCase))
+            {
+                BinClassSampleDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "bin-unknowns-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                BinUnknownsAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "bin-dump", StringComparison.OrdinalIgnoreCase))
             {
                 await BinDumpDiagnostic.Run(args.Skip(1).ToArray());

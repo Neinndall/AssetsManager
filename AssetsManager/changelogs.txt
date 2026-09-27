@@ -15,11 +15,11 @@ New Features
   - VFX Studio / Added shimmerEmitterDefinitionData parsing with constant driver graph evaluations for modern mesh particle systems.
   - VFX Studio / Added a styled form selector for compatible champion skins with authored submeshes, textures, animations, and VFX.
   - VFX Studio / Persisted Champion VFX, Map Effects VFX, and Map Structures visibility toggles across sessions in VfxStudio settings.
-  - Viewer / Skybox cubemap now loads dynamically from League Map11.wad.client matching LTK Manager, completely removing the bundled Resources/Scene directory (-16.8 MB).
+  - Viewer / Skybox cubemap now loads dynamically from League Map11.wad.client, completely removing the bundled Resources/Scene directory (-16.8 MB).
   - Viewer / Consolidated Skybox cubemap and stage ground loading into SceneElements, eliminating redundant factories and obsolete texture caches.
   - Viewer / Added Skybox toggle to Environment controls in the main 3D viewer matching VFX Studio.
   - VFX Studio / Improved map camera framing and presets to properly frame map dimensions, added Fit to view affordance, and fixed camera presets (Orbit, Game, Top, Front, Side) to target the map origin instead of world center.
-  - VFX Studio / Redesigned Map Look lighting and post-processing controls using ModernTileToggleButton tiles matching the Environment section in Viewer Panel Control, eliminating dead card states and aligning with LTK Manager ephemeral lighting overrides.
+  - VFX Studio / Redesigned Map Look lighting and post-processing controls using ModernTileToggleButton tiles matching the Environment section in Viewer Panel Control, eliminating dead card states and keeping lighting overrides temporary.
   - VFX Studio / Defaulted camera preset to Orbit and aligned Orbit camera framing to front-facing centered view matching Viewer normal, with automatic camera reset upon closing projects or all workspace tabs.
   - Viewer / Restored the classic clean Summoner's Rift square ground stage (ground_rift.dds) for ideal champion model presentation.
   - Chroma Library / Added a removable reference skins source so current and archived chromas can be paired and loaded together for visual comparison.
@@ -43,7 +43,15 @@ New Features
   - Hash Guessing Lab / Added texture families build-list attack in GAME Custom Guess to recover skin texture patterns and material masks.
   - Hash Guessing Lab / Enabled BIN domain selection while keeping RST hidden.
   - Hash Guessing Lab / GAME animation BIN links now recognize companion theme layouts and prioritize nearby cross-skin targets from corpus evidence.
-  - Hash Guessing Lab / BIN guessing now matches current CommunityDragon patterns, resolves UI component paths, and no longer exposes retired speculative methods or mixes object-path hash domains.
+  - Hash Guessing Lab / BIN guessing now covers current community naming patterns, resolves UI component paths, and no longer exposes retired speculative methods or mixes object-path hash domains.
+  - Hash Guessing Lab / BIN Context now resolves Character and CheatSet entry paths.
+  - Hash Guessing Lab / BIN Context names entries after their BIN file and learns naming patterns from already resolved hashes.
+  - Hash Guessing Lab / BIN Context resolves TFT set cheats, TFT set spells, TFT playbooks and summoner trophies.
+  - Hash Guessing Lab / Merged duplicated BIN Context options into ContextualStructures.
+  - Hash Guessing Lab / BIN names built from game paths now keep Riot casing.
+  - Hash Guessing Lab / BIN Context resolves animation event and clip keys from names already used by other characters.
+  - Hash Guessing Lab / Fixed the same BIN hash being verified twice with different casing.
+  - Hash Guessing Lab / BIN Context and Schema findings with a high chance of being coincidental are kept as candidates instead of entering the BIN dictionaries.
   - Hash Guessing Lab / Added read-only champion texture and in-memory GAME diagnostics with WAD-local family/content/visual evidence, plus bounded typed BIN-reference candidates and per-run WAD context caching.
   - Hash Guessing Lab / Added background execution and global status bar progress reporting, allowing uninterrupted scans across app navigation with live status and percentage feedback.
   - Hash Guessing Lab / Expanded Game Basic Suite and GrepWad with universal champion asset discovery spanning HD texture prefixes (2x_, 4x_, tft_, sd_), sub-props, 3D meshes, and core animations.
@@ -222,9 +230,9 @@ Improvements
   - VFX Studio now builds one authored render queue across root, child, and ability-composed systems, honoring render phase, pass, stable importance, optional emitter depth sorting, and alpha-only output without leaking OpenGL state.
   - VFX Studio now preserves schema-authored emitter defaults and translates every BIN blend mode through explicit RGB/alpha render descriptors; Multiply particles and meshes keep transparent coverage neutral instead of darkening the framebuffer.
   - Hash Guessing Lab / GAME WAD grep now discovers generated dotted BIN paths from their embedded object identifiers.
-  - Hash Guessing Lab / GAME Canonical now follows CDTB character templates and exact LCU-to-GAME mappings without duplicate Basic-suite scans.
-  - Hash Guessing Lab / GAME Locale Variants now runs GameHashGuesser.SubstituteLang with per-format CheckIter calls matching CDTB.
-  - Hash Guessing Lab / GAME Numeric Ranges now uses one GameHashGuesser.SubstituteNumbers call backed by HashGuesser.SubstituteNumbersCore, matching CDTB basename-only number substitution.
+  - Hash Guessing Lab / GAME Canonical now follows character templates and exact LCU-to-GAME mappings without duplicate Basic-suite scans.
+  - Hash Guessing Lab / GAME Locale Variants now runs GameHashGuesser.SubstituteLang with per-format CheckIter calls.
+  - Hash Guessing Lab / GAME Numeric Ranges now uses one GameHashGuesser.SubstituteNumbers call backed by HashGuesser.SubstituteNumbersCore, with basename-only number substitution.
   - Hash Guessing Lab / GAME Extended now reports live progress across skin and chroma group bin generations and builds unknown inventories with real-time WAD tracking.
   - Hash Guessing Lab / LCU unknown hash discovery now reads WAD index tables directly without unnecessary image atlas decompression.
   - Hash Guessing Lab / GAME Extended now runs only skin groups, chroma groups, suffixes, skin numbers, character substitution and the GetCharacters corpus helper; custom attacks are reserved for a separate button.
@@ -334,9 +342,9 @@ Improvements
   - Hash Guessing / GAME Extended prefix guessing now also covers tft_ prefixes (tft_, 2x_, 2x_sd_, 4x_, 4x_sd_, sd_), restoring the full prefix set that the removed shader/basename generator previously supplied.
   - BIN/RST Hash Lab / The active Meta Schema dictionary (classes and properties, hash plus name) is now merged into the local known catalogs as hashes.metaclasses.txt / hashes.metafields.txt supplements, so BIN types and fields referenced by any bin are resolved by name immediately and never appear as guessing unknowns; verified research matches still take precedence.
   - Shared GAME and LCU basename substitution now reports live candidate counts and speed during exhaustive searches.
-  - LCU Basic Suite now caps basename and basename-word substitution at 10M candidates each, and numeric variant guessing only varies digits inside file names (matching CDTB), keeping the suite fast while preserving full-coverage attacks for the Advanced suite.
+  - LCU Basic Suite now caps basename and basename-word substitution at 10M candidates each, and numeric variant guessing only varies digits inside file names, keeping the suite fast while preserving full-coverage attacks for the Advanced suite.
   - Hash Guessing / GAME number substitution is path-wide again (map11 → map12 folders resolve), while LCU numeric guessing stays anchored to file names for the Basic suite cap.
-  - Hash Guessing / GAME skin number substitution now follows CDTB combinations instead of permutations, avoiding the larger permutation cross while preserving mixed skin-token candidates.
+  - Hash Guessing / GAME skin number substitution now uses combinations instead of permutations, avoiding the larger permutation cross while preserving mixed skin-token candidates.
   - Hash Guessing / GAME chroma skin groups only run for champions attested in the known corpus (all champions are still processed when the corpus has none), and the character list is cached per hash-file revision.
   - Hash Guessing / GAME basename word and word-addition attacks now share a frequency-ranked wordlist (basename words first) and reuse prebuilt formats cached per hash-file revision, so productive words are tried first and formats are not rebuilt on every run.
   - Hash Guessing / GAME Extended now caps the unbounded attacks (character substitution 10M, basename words 10M, word addition 10M, Cartesian cross 10M, skin numbers 5M) so patches with many unknowns no longer hang, while the frequency-ordered candidates keep the same hit order.
@@ -367,7 +375,7 @@ Improvements
   - LCU Basic guessing now includes full basename and basename-word substitution before its plugin and pattern phases.
   - LCU Advanced guessing now targets two-word party image variants with a reduced PNG vocabulary.
   - GAME chroma-group guessing now works offline from the installed skins catalog.
-  - Hash guessing now preserves complete CDTB baseline coverage before running additional optimized GAME and LCU strategies.
+  - Hash guessing now preserves complete baseline coverage before running additional optimized GAME and LCU strategies.
   - Hash guessing now uses dedicated shared, GAME, and LCU strategy components with one centralized save flow.
   - Hash guessing now isolates GAME and LCU WAD discovery while preserving shared unknown tracking and expanded path coverage.
   - Hash Guessing Lab results list columns now automatically resize to perfectly fit the window width.
@@ -381,8 +389,8 @@ Improvements
   - Advanced hash guessing now prioritizes proven Riot path combinations and avoids redundant candidate attacks.
   - Hash Guessing Lab now separates current, recent, and historical unknowns across patches.
   - LCU GREP now resolves relative, CSS, and HTML asset references from their Riot plugin context.
-  - GAME and LCU WAD GREP now match CDTB parsing behavior with fewer redundant scans and temporary allocations.
-  - GAME and LCU Basic guessing now avoids duplicate candidate passes while preserving CDTB search coverage.
+  - GAME and LCU WAD GREP now parse with fewer redundant scans and temporary allocations.
+  - GAME and LCU Basic guessing now avoids duplicate candidate passes while preserving search coverage.
   - GAME Extended now searches base filenames derived from Riot suffix variants.
   - Reduced memory pressure while creating WAD backups and made interrupted saves leave no incomplete history entry.
   - Accelerated Explorer tree loading for large WAD and local folder structures.
@@ -431,7 +439,7 @@ Bug Fixes
   - VFX Studio / Corrected projectile effect orientation so ground offsets stay below flight and upward motion rises correctly.
   - VFX Studio / Corrected Shimmer mesh colors and transforms built from combined drivers.
   - Maps / Material parameter values now take priority over their shader pass values when shaders are off.
-  - VFX Studio / Champion materials with two passes draw the second pass in the same order as LTK Manager.
+  - VFX Studio / Champion materials with two passes draw the second pass in authored order.
   - Maps / Apply authored ambient grid lighting to placed structures and characters.
   - Maps / Preserve game shader definitions and custom material textures when rebuilding map effects.
   - Viewer / Switching scene actors preserves their selected form and scale without reloading the model.
@@ -599,7 +607,7 @@ Bug Fixes
   - BIN JSON now keeps fields, types, entries, and hash values isolated so cross-domain collisions cannot produce incorrect names.
   - Game updates now reject corrupt server chunks and repair incorrect trailing file data safely.
   - Extensionless UI atlas assets now export with their correct `.atlas` extension.
-  - GAME and LCU hash files now preserve CommunityDragon-compatible LF line endings when new matches are saved.
+  - GAME and LCU hash files now preserve LF line endings when new matches are saved.
   - Version updates now display the completed verification and updating states before advancing or closing.
   - Background update, Asset Tracker, and PBE checks no longer overlap or continue notifying after shutdown.
   - Raw export now correctly saves loose physical files, including local BNK and WPK sound banks.
@@ -684,4 +692,4 @@ Bug Fixes
   - VFX Studio / Fixed loading crashes for particle lifetimes using single-value probability tables.
   - Viewer / Fixed authored SKN face culling so champion materials render their outward-facing geometry.
 
-Map shader preview now preserves authored pass texture bindings and matches LTK terrain fallback lighting.
+Map shader preview now preserves authored pass texture bindings and correct terrain fallback lighting.

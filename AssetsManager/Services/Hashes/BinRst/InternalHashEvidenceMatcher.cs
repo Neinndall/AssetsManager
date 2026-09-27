@@ -19,6 +19,23 @@ namespace AssetsManager.Services.Hashes
         private readonly List<InternalHashGuessMatch> _pendingMatches = new();
         private readonly HashSet<uint> _observedItemDataEntries = new();
         private readonly HashSet<uint> _observedItemListHashes = new();
+        // FNV-1a is 32-bit: a probe tested against every remaining unknown collides by chance with
+        // probability remaining / 2^32. Untargeted hits are only trusted when that accumulated noise
+        // is negligible against the number of hits the same probes produced.
+        private const double HashSpace = 4294967296.0;
+        internal const double MaxGateFalseDiscoveryRate = 0.01;
+        private readonly NoiseGate _untargetedGate = new("Untargeted BIN context");
+        private NoiseGate _activeGate;
+
+        private sealed class NoiseGate
+        {
+            internal NoiseGate(string name) => Name = name;
+            internal string Name { get; }
+            internal double ExpectedChanceMatches { get; set; }
+            internal List<(InternalHashKind Kind, ulong Hash, string Value)> Hits { get; } = new();
+        }
+
+        internal readonly record struct NoiseGateResult(string Name, int Hits, double ExpectedChanceMatches, bool Accepted);
 
         internal InternalHashEvidenceMatcher(Dictionary<InternalHashKind, HashSet<ulong>> targets)
         {
@@ -55,6 +72,79 @@ namespace AssetsManager.Services.Hashes
             InternalHashGuessMatch[] matches = _pendingMatches.ToArray();
             _pendingMatches.Clear();
             return matches;
+        }
+
+        internal void BeginGate(string name)
+        {
+            if (_activeGate != null) throw new InvalidOperationException($"Noise gate '{_activeGate.Name}' is still open.");
+            _activeGate = new NoiseGate(name);
+        }
+
+        internal void AddGateNoise(double expectedChanceMatches)
+        {
+            if (_activeGate != null) _activeGate.ExpectedChanceMatches += expectedChanceMatches;
+        }
+
+        internal NoiseGateResult EndGate()
+        {
+            NoiseGate gate = _activeGate ?? throw new InvalidOperationException("No noise gate is open.");
+            _activeGate = null;
+            return ResolveGate(gate);
+        }
+
+        internal NoiseGateResult ResolveUntargetedGate()
+        {
+            NoiseGateResult result = ResolveGate(_untargetedGate);
+            _untargetedGate.Hits.Clear();
+            _untargetedGate.ExpectedChanceMatches = 0;
+            return result;
+        }
+
+        private NoiseGateResult ResolveGate(NoiseGate gate)
+        {
+            var hits = gate.Hits.Where(_matches.ContainsKey).ToList();
+            bool accepted = hits.Count == 0 || gate.ExpectedChanceMatches <= hits.Count * MaxGateFalseDiscoveryRate;
+            foreach (var key in hits)
+            {
+                InternalHashGuessMatch match = _matches[key];
+                if (!accepted && match.IsVerified)
+                {
+                    match = Demote(match);
+                    _matches[key] = match;
+                    _targets[key.Kind].Add(key.Hash);
+                    _verifiedValues.Remove((key.Kind, (uint)key.Hash));
+                }
+                _pendingMatches.Add(match);
+            }
+            return new NoiseGateResult(gate.Name, hits.Count, gate.ExpectedChanceMatches, accepted);
+        }
+
+        private static InternalHashGuessMatch Demote(InternalHashGuessMatch match) => new()
+        {
+            Hash = match.Hash,
+            LookupHash = match.LookupHash,
+            HashBits = match.HashBits,
+            Value = match.Value,
+            Kind = match.Kind,
+            Strategy = match.Strategy,
+            Source = match.Source,
+            SourceWad = match.SourceWad,
+            SourceBin = match.SourceBin,
+            IsVerified = false,
+            VerificationSchema = match.VerificationSchema,
+            Confidence = InternalHashConfidence.Candidate,
+            Evidence = match.Evidence,
+            EvidenceOrigin = match.EvidenceOrigin,
+            FoundAtUtc = match.FoundAtUtc
+        };
+
+        private double ChanceOfAnyMatch(InternalHashKind kind) => GetRemainingCount(kind) / HashSpace;
+
+        // Gated hits stay out of the live feed until their gate decides whether they are trustworthy.
+        private void Publish(InternalHashGuessMatch match, NoiseGate gate)
+        {
+            if (gate == null) _pendingMatches.Add(match);
+            else gate.Hits.Add((match.Kind, match.Hash, match.Value));
         }
 
         internal void Check(
@@ -115,7 +205,8 @@ namespace AssetsManager.Services.Hashes
             string source,
             string sourceWad = null,
             uint? observedHash = null,
-            InternalHashEvidence evidence = InternalHashEvidence.ObservedHashPair)
+            InternalHashEvidence evidence = InternalHashEvidence.ObservedHashPair,
+            IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null)
         {
             CheckedCandidates++;
             if (string.IsNullOrWhiteSpace(value) || value.Length > 512)
@@ -129,6 +220,10 @@ namespace AssetsManager.Services.Hashes
             }
             if (!observedHash.HasValue)
             {
+                // A hash present in the same BIN is as specific as a targeted check; anything else
+                // was tested against the whole unknown set and must pass the untargeted noise gate.
+                bool local = HasLocalEvidence(computedHash, localTargets, kind);
+                if (!local) _untargetedGate.ExpectedChanceMatches += ChanceOfAnyMatch(kind);
                 return CheckResearchCandidate(
                     kind,
                     candidate,
@@ -137,7 +232,8 @@ namespace AssetsManager.Services.Hashes
                     InternalHashEvidence.SemanticReference,
                     sourceWad: sourceWad,
                     countCheck: false,
-                    verified: true);
+                    verified: true,
+                    gate: local ? null : _untargetedGate);
             }
 
             int before = _matches.Count;
@@ -154,6 +250,16 @@ namespace AssetsManager.Services.Hashes
             return _matches.Count != before;
         }
 
+        /// <summary>
+        /// Targeted check of a vocabulary candidate for one observed hash. Verified hits join the
+        /// open noise gate, which demotes them when the vocabulary pass is too noisy overall.
+        /// </summary>
+        internal bool CheckVocabularyCandidate(InternalHashKind kind, string value, string source, string sourceWad, uint observedHash) =>
+            !string.IsNullOrWhiteSpace(value) &&
+            Fnv1a.HashLower(NormalizeCandidate(value)) == observedHash &&
+            CheckResearchCandidate(kind, value, InternalHashGuessStrategy.CrossDictionary, source, InternalHashEvidence.SemanticReference,
+                sourceWad, countCheck: true, verified: true, gate: _activeGate);
+
         internal bool CheckResearchCandidate(
             InternalHashKind kind,
             string value,
@@ -163,6 +269,18 @@ namespace AssetsManager.Services.Hashes
             string sourceWad = null,
             bool countCheck = true,
             bool verified = false)
+            => CheckResearchCandidate(kind, value, strategy, source, evidence, sourceWad, countCheck, verified, gate: null);
+
+        private bool CheckResearchCandidate(
+            InternalHashKind kind,
+            string value,
+            InternalHashGuessStrategy strategy,
+            string source,
+            InternalHashEvidence evidence,
+            string sourceWad,
+            bool countCheck,
+            bool verified,
+            NoiseGate gate)
         {
             if (countCheck) CheckedCandidates++;
             if (kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64 ||
@@ -206,7 +324,7 @@ namespace AssetsManager.Services.Hashes
             };
             _matches[key] = match;
             if (verified) _verifiedValues[(kind, hash)] = candidate;
-            _pendingMatches.Add(match);
+            Publish(match, gate);
             return true;
         }
 
@@ -248,6 +366,7 @@ namespace AssetsManager.Services.Hashes
                 : kind == InternalHashKind.BinTypes
                     ? UpperFirst(candidate)
                     : char.ToLowerInvariant(candidate[0]) + candidate[1..];
+            if (_activeGate != null) _activeGate.ExpectedChanceMatches += ChanceOfAnyMatch(kind);
             uint hash = Fnv1a.HashLower(candidate);
             if (!_targets[kind].Contains(hash))
             {
@@ -291,7 +410,7 @@ namespace AssetsManager.Services.Hashes
                 EvidenceOrigin = GetEvidenceOrigin(evidence)
             };
             _matches[key] = match;
-            _pendingMatches.Add(match);
+            Publish(match, _activeGate);
             return true;
         }
 
@@ -330,10 +449,14 @@ namespace AssetsManager.Services.Hashes
                 evidence = InternalHashEvidence.OwningFileString;
             var key = (kind, (ulong)hash, value);
             if (_matches.ContainsKey(key)) return;
+            // FNV-1a ignores case: another spelling of the same name is a duplicate, not a collision.
+            if (_matches.Keys.Any(item => item.Kind == kind && item.Hash == (ulong)hash &&
+                                          string.Equals(item.Value, value, StringComparison.OrdinalIgnoreCase)))
+                return;
             // A second literal for the same hash stays a candidate instead of
             // promoting the first one: the store quarantines the collision.
             bool conflicting = _matches.Keys.Any(item => item.Kind == kind && item.Hash == (ulong)hash);
-            bool verified = InternalHashGuessMatch.IsPromotableEvidence(evidence);
+            bool verified = InternalHashGuessMatch.IsPromotableEvidence(evidence) && !conflicting;
             if (verified && !conflicting)
             {
                 _targets[kind].Remove(hash);

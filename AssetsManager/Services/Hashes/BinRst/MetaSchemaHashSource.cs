@@ -24,8 +24,6 @@ namespace AssetsManager.Services.Hashes
             new Dictionary<ulong, string>();
         public IReadOnlyDictionary<ulong, string> KnownFieldEntries { get; init; } =
             new Dictionary<ulong, string>();
-        public IReadOnlyDictionary<ulong, IReadOnlyList<string>> TypeContexts { get; init; } =
-            new Dictionary<ulong, IReadOnlyList<string>>();
         public IReadOnlyDictionary<ulong, IReadOnlyList<ulong>> BaseToChildren { get; init; } =
             new Dictionary<ulong, IReadOnlyList<ulong>>();
         public IReadOnlyDictionary<ulong, IReadOnlyList<ulong>> ClassBases { get; init; } =
@@ -110,23 +108,12 @@ namespace AssetsManager.Services.Hashes
             var knownFields = new HashSet<string>(StringComparer.Ordinal);
             var knownTypeEntries = new Dictionary<ulong, string>();
             var knownFieldEntries = new Dictionary<ulong, string>();
-            var typeContexts = new Dictionary<ulong, HashSet<string>>();
             var baseToChildren = new Dictionary<ulong, HashSet<ulong>>();
             var classBases = new Dictionary<ulong, HashSet<ulong>>();
 
             if (root.TryGetProperty("classes", out JsonElement classes) &&
                 classes.ValueKind == JsonValueKind.Object)
             {
-                var classNamesByHash = classes.EnumerateObject()
-                    .Where(property => IsActive(property.Value) && TryParseHash(property.Name, out _))
-                    .ToDictionary(
-                        property =>
-                        {
-                            TryParseHash(property.Name, out ulong hash);
-                            return hash;
-                        },
-                        property => TryReadName(property.Value, out string name) ? name : property.Name);
-
                 foreach (JsonProperty classProperty in classes.EnumerateObject())
                 {
                     JsonElement classValue = classProperty.Value;
@@ -153,23 +140,14 @@ namespace AssetsManager.Services.Hashes
                     else if (hasClassHash)
                         unknownTypes.Add(currentClassHash);
 
-                    string ownerName = TryReadName(classValue, out className)
-                        ? className
-                        : classProperty.Name;
                     if (TryGetActiveRevision(classValue, out classRevision) &&
                         classRevision.TryGetProperty("bases", out JsonElement bases))
                     {
                         foreach (ulong referencedHash in EnumerateHashes(bases))
                         {
                             if (referencedHash == 0) continue;
-                            AddTypeContext(referencedHash, $"base of {ownerName}");
                             if (hasClassHash)
                             {
-                                string baseName = classNamesByHash.TryGetValue(referencedHash, out string knownBase)
-                                    ? knownBase
-                                    : $"0x{referencedHash:x8}";
-                                AddTypeContext(currentClassHash, $"inherits {baseName}");
-
                                 if (!baseToChildren.TryGetValue(referencedHash, out var children))
                                 {
                                     children = new HashSet<ulong>();
@@ -201,19 +179,6 @@ namespace AssetsManager.Services.Hashes
                         }
                         else if (hasFieldHash)
                             unknownFields.Add(fieldHash);
-
-                        string propertyName = TryReadName(fieldValue, out fieldName)
-                            ? fieldName
-                            : fieldProperty.Name;
-                        if (TryGetActiveRevision(fieldValue, out JsonElement fieldRevision) &&
-                            fieldRevision.TryGetProperty("type", out JsonElement type))
-                        {
-                            foreach (ulong referencedHash in EnumerateHashes(type))
-                            {
-                                if (referencedHash == 0) continue;
-                                AddTypeContext(referencedHash, $"{ownerName}.{propertyName}");
-                            }
-                        }
                     }
                 }
             }
@@ -228,9 +193,6 @@ namespace AssetsManager.Services.Hashes
                 KnownFieldNames = knownFields.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 KnownTypeEntries = knownTypeEntries,
                 KnownFieldEntries = knownFieldEntries,
-                TypeContexts = typeContexts.ToDictionary(
-                    pair => pair.Key,
-                    pair => (IReadOnlyList<string>)pair.Value.OrderBy(value => value, StringComparer.Ordinal).ToArray()),
                 BaseToChildren = baseToChildren.ToDictionary(
                     pair => pair.Key,
                     pair => (IReadOnlyList<ulong>)pair.Value.OrderBy(value => value).ToArray()),
@@ -238,16 +200,6 @@ namespace AssetsManager.Services.Hashes
                     pair => pair.Key,
                     pair => (IReadOnlyList<ulong>)pair.Value.OrderBy(value => value).ToArray())
             };
-
-            void AddTypeContext(ulong hash, string context)
-            {
-                if (!typeContexts.TryGetValue(hash, out HashSet<string> contexts))
-                {
-                    contexts = new HashSet<string>(StringComparer.Ordinal);
-                    typeContexts[hash] = contexts;
-                }
-                contexts.Add(context);
-            }
         }
 
         private static bool IsActive(JsonElement value)

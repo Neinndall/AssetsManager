@@ -105,44 +105,32 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        internal static void ScanBinContextualMatches(Stream stream, InternalHashEvidenceMatcher matcher, string path, string wadPath, HashResolverService resolver)
-        {
-            var tree = new BinTree(stream);
-            MatchBinContentEvidence(tree, matcher, path, wadPath, resolver);
-        }
-
         internal static void MatchBinContentEvidence(
             BinTree tree,
             InternalHashEvidenceMatcher matcher,
             string path,
             string wadPath = null,
             HashResolverService resolver = null,
-            IReadOnlySet<string> selectedSubMethods = null)
+            IReadOnlySet<string> selectedSubMethods = null,
+            BinPathCasing casing = null)
         {
             bool ShouldRun(string id) => selectedSubMethods == null || selectedSubMethods.Contains(id);
+            IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = CollectLocalTargets(tree);
 
+            // File paths run first: the entries they name feed objectPath and link hooks below.
+            if (ShouldRun("bin-context-filepath"))
+                MatchFilePathEvidence(tree, matcher, path, wadPath, casing ?? BinPathCasing.Empty);
             if (ShouldRun("bin-context-owning"))
                 MatchOwningEntryStringEvidence(tree, matcher, path, wadPath);
             if (ShouldRun("bin-context-structures"))
-                MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver);
+                MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver, localTargets, casing);
             if (ShouldRun("bin-context-pathleaf"))
                 MatchResolvedHashPathLeafEvidence(tree, matcher, path, wadPath, resolver);
             if (ShouldRun("bin-context-objectlocal"))
                 MatchObjectLocalHashEvidence(tree, matcher, path, wadPath);
-            if (ShouldRun("bin-context-tft-shop"))
-                MatchTftShopPaths(tree, matcher, path, wadPath);
-            if (ShouldRun("bin-context-augment"))
-                MatchAugmentPaths(tree, matcher, path, wadPath);
-            if (ShouldRun("bin-context-quests"))
-                MatchModeQuestPaths(tree, matcher, path, wadPath);
-            if (ShouldRun("bin-context-attributes"))
-                MatchAttributeEntryPaths(tree, matcher, path, wadPath);
-            if (ShouldRun("bin-context-relations"))
-                MatchObjectLinkRelations(tree, matcher, path, wadPath, resolver);
             if (matcher.Remaining > 0 &&
                 (ShouldRun("bin-context-strings") || ShouldRun("rst-content-binstrings")))
             {
-                IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = CollectLocalTargets(tree);
                 VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path, localTargets));
             }
         }
@@ -190,6 +178,59 @@ namespace AssetsManager.Services.Hashes
             }
 
             return targets;
+        }
+
+        /// <summary>
+        /// Root objects are named after their BIN file (data/characters/x/skins/skin3.bin ->
+        /// Characters/X/Skins/Skin3), resolvers append /Resources and loadout-style objects nest
+        /// their own name under the file path. Every candidate is checked against its own object.
+        /// </summary>
+        internal static void MatchFilePathEvidence(
+            BinTree tree,
+            InternalHashEvidenceMatcher matcher,
+            string path,
+            string wadPath,
+            BinPathCasing casing)
+        {
+            string stem = GetBinPathStem(path);
+            if (stem == null) return;
+            int slash = stem.LastIndexOf('/');
+            string parent = slash > 0 ? stem[..slash] : null;
+            var namesByObject = tree.Objects.ToDictionary(pair => pair.Key, pair => ObjectNames(pair.Value));
+            // Any name in the file may spell a folder of its path (a resolver has no strings of its own).
+            var fileHints = namesByObject.Values.SelectMany(names => names).Distinct(StringComparer.Ordinal).Take(256).ToList();
+
+            foreach (var (entryHash, names) in namesByObject)
+            {
+                if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) continue;
+                if (Check(stem) || Check(stem + "/Resources")) continue;
+                foreach (string name in names)
+                    if (Check($"{stem}/{name}") || (parent != null && Check($"{parent}/{name}"))) break;
+
+                bool Check(string candidate) => matcher.CheckContextualCandidate(
+                    InternalHashKind.BinEntries,
+                    casing.Recase(candidate, names.Count > 0 ? names.Concat(fileHints).ToList() : fileHints),
+                    path,
+                    wadPath,
+                    entryHash,
+                    InternalHashEvidence.SemanticReference);
+            }
+
+            static List<string> ObjectNames(BinTreeObject item) => item.Properties.Values
+                .Select(property => property is BinTreeOptional { Value: BinTreeString optional } ? optional : property)
+                .OfType<BinTreeString>()
+                .Select(text => text.Value?.Trim())
+                .Where(value => !string.IsNullOrEmpty(value) && InternalHashEvidenceMatcher.IsIdentifier(value))
+                .ToList();
+        }
+
+        private static string GetBinPathStem(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || path.StartsWith('[')) return null;
+            string stem = InternalHashEvidenceMatcher.NormalizeCandidate(path);
+            if (stem.StartsWith("data/", StringComparison.OrdinalIgnoreCase)) stem = stem[5..];
+            if (stem.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) stem = stem[..^4];
+            return stem.Length > 0 && !stem.Contains(':') ? stem : null;
         }
 
         internal static void MatchOwningEntryStringEvidence(
@@ -431,175 +472,6 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        private static void MatchTftShopPaths(
-            BinTree tree,
-            InternalHashEvidenceMatcher matcher,
-            string path,
-            string wadPath)
-        {
-            uint classHash = Fnv1a.HashLower("TftShopData");
-            foreach (var pair in tree.Objects)
-            {
-                if (pair.Value.ClassHash != classHash ||
-                    !TryGetString(pair.Value.Properties, "mName", out string name))
-                {
-                    continue;
-                }
-
-                foreach (int set in Enumerable.Range(1, 29))
-                {
-                    if (CheckEntryCandidate(
-                        matcher,
-                        pair.Key,
-                        $"Maps/Shipping/Map22/Sets/TFTSet{set}/Shop/{name}",
-                        path,
-                        wadPath))
-                    {
-                        break;
-                    }
-                }
-
-                CheckEntryCandidate(matcher, pair.Key, $"Maps/Shipping/Map22/Shop/{name}", path, wadPath);
-            }
-        }
-
-        private static void MatchAugmentPaths(
-            BinTree tree,
-            InternalHashEvidenceMatcher matcher,
-            string path,
-            string wadPath)
-        {
-            uint classHash = Fnv1a.HashLower("AugmentData");
-            foreach (var pair in tree.Objects)
-            {
-                if (pair.Value.ClassHash != classHash ||
-                    !TryGetString(pair.Value.Properties, "AugmentNameId", out string augmentName))
-                {
-                    continue;
-                }
-
-                string augmentPath = $"Maps/ModeSpecificData/Augments/{augmentName}";
-                CheckEntryCandidate(matcher, pair.Key, augmentPath, path, wadPath);
-
-                if (TryGetObjectLink(pair.Value.Properties, "RootSpell", out BinTreeObjectLink rootSpell))
-                {
-                    CheckEntryCandidate(
-                        matcher,
-                        rootSpell.Value,
-                        $"{augmentPath}/Augment_{augmentName}",
-                        path,
-                        wadPath);
-                }
-            }
-        }
-
-        private static void MatchModeQuestPaths(
-            BinTree tree,
-            InternalHashEvidenceMatcher matcher,
-            string path,
-            string wadPath)
-        {
-            const uint modeQuestClassHash = 0x8d31b69b;
-            foreach (var pair in tree.Objects)
-            {
-                if (pair.Value.ClassHash != modeQuestClassHash ||
-                    !TryGetString(pair.Value.Properties, "QuestName", out string questName))
-                {
-                    continue;
-                }
-
-                CheckEntryCandidate(
-                    matcher,
-                    pair.Key,
-                    $"Maps/ModeSpecificData/ModesQuests/{questName}",
-                    path,
-                    wadPath);
-            }
-        }
-
-        private static void MatchAttributeEntryPaths(
-            BinTree tree,
-            InternalHashEvidenceMatcher matcher,
-            string path,
-            string wadPath)
-        {
-            foreach (var pair in tree.Objects)
-            {
-                uint classHash = pair.Value.ClassHash;
-
-                if (NamedEntryTypes.Contains(classHash))
-                    MatchDirectEntryAttribute(pair.Key, pair.Value, "name", matcher, path, wadPath);
-                else if (classHash == Fnv1a.HashLower("ContextualActionData"))
-                    MatchDirectEntryAttribute(pair.Key, pair.Value, "mObjectPath", matcher, path, wadPath);
-                else if (classHash == Fnv1a.HashLower("CustomShaderDef"))
-                    MatchDirectEntryAttribute(pair.Key, pair.Value, "objectPath", matcher, path, wadPath);
-                else if (classHash == Fnv1a.HashLower("RewardGroup"))
-                    MatchDirectEntryAttribute(pair.Key, pair.Value, "internalName", matcher, path, wadPath);
-                else if (classHash == Fnv1a.HashLower("Sequence"))
-                    MatchDirectEntryAttribute(pair.Key, pair.Value, "path", matcher, path, wadPath);
-                else if (classHash == Fnv1a.HashLower("MapContainer"))
-                    MatchDirectEntryAttribute(pair.Key, pair.Value, "mapPath", matcher, path, wadPath);
-                else if (classHash == Fnv1a.HashLower("VfxSystemDefinitionData") ||
-                         classHash == Fnv1a.HashLower("VfxEmitterDefinitionData"))
-                    MatchDirectEntryAttribute(pair.Key, pair.Value, "particlePath", matcher, path, wadPath);
-            }
-        }
-
-        private static void MatchObjectLinkRelations(
-            BinTree tree,
-            InternalHashEvidenceMatcher matcher,
-            string path,
-            string wadPath,
-            HashResolverService resolver)
-        {
-            uint tftMapSkinClassHash = Fnv1a.HashLower("TftMapSkin");
-            uint gdsMapObjectClassHash = Fnv1a.HashLower("GdsMapObject");
-            uint mapPlaceableContainerClassHash = Fnv1a.HashLower("MapPlaceableContainer");
-            const uint taggedObjectHash = 0xad304db5;
-
-            foreach (var pair in tree.Objects)
-            {
-                BinTreeObject item = pair.Value;
-                if (item.ClassHash == tftMapSkinClassHash &&
-                    TryGetString(item.Properties, "GroupLink", out string groupPath))
-                {
-                    matcher.CheckContextualCandidate(InternalHashKind.BinEntries, groupPath, path, wadPath);
-                }
-                else if (item.ClassHash == tftMapSkinClassHash &&
-                         resolver != null &&
-                         TryGetObjectLink(item.Properties, "GroupLink", out BinTreeObjectLink groupLink))
-                {
-                    MatchResolvedEntryLink(groupLink.Value, matcher, resolver, path, wadPath);
-                }
-
-                if (item.ClassHash == mapPlaceableContainerClassHash &&
-                    item.Properties.TryGetValue(Fnv1a.HashLower("items"), out BinTreeProperty items) &&
-                    items is BinTreeMap itemMap &&
-                    itemMap.KeyType == BinPropertyType.Hash &&
-                    itemMap.ValueType == BinPropertyType.Struct)
-                {
-                    foreach (var mapItem in itemMap)
-                    {
-                        if (mapItem.Value is not BinTreeStruct mapObject ||
-                            mapObject.ClassHash != gdsMapObjectClassHash)
-                        {
-                            continue;
-                        }
-
-                        if (TryGetStringByHash(mapObject.Properties, taggedObjectHash, out string objectPath))
-                        {
-                            matcher.CheckContextualCandidate(InternalHashKind.BinEntries, objectPath, path, wadPath);
-                        }
-                        else if (resolver != null &&
-                                 TryGetObjectLinkByHash(mapObject.Properties, taggedObjectHash, out BinTreeObjectLink objectLink))
-                        {
-                            MatchResolvedEntryLink(objectLink.Value, matcher, resolver, path, wadPath);
-                        }
-                    }
-                }
-            }
-        }
-
         private static void MatchResolvedEntryLink(
             uint linkHash,
             InternalHashEvidenceMatcher matcher,
@@ -623,33 +495,16 @@ namespace AssetsManager.Services.Hashes
                 InternalHashEvidence.SemanticReference);
         }
 
-        private static void MatchDirectEntryAttribute(
-            uint entryHash,
-            BinTreeObject item,
-            string field,
-            InternalHashEvidenceMatcher matcher,
-            string path,
-            string wadPath)
+        // TFT content is prefixed by its set: "TFT14_..." -> 14.
+        private static bool TryGetTftSet(string name, out int set)
         {
-            if (TryGetString(item.Properties, field, out string value))
-            {
-                CheckEntryCandidate(matcher, entryHash, value, path, wadPath);
-            }
+            set = 0;
+            if (name == null || !name.StartsWith("TFT", StringComparison.OrdinalIgnoreCase)) return false;
+            int end = 3;
+            while (end < name.Length && char.IsAsciiDigit(name[end])) end++;
+            return end > 3 && end < name.Length && name[end] == '_' &&
+                int.TryParse(name.AsSpan(3, end - 3), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out set);
         }
-
-        private static bool CheckEntryCandidate(
-            InternalHashEvidenceMatcher matcher,
-            uint hash,
-            string candidate,
-            string path,
-            string wadPath) =>
-            matcher.CheckContextualCandidate(
-                InternalHashKind.BinEntries,
-                candidate,
-                path,
-                wadPath,
-                hash,
-                InternalHashEvidence.SemanticReference);
 
         private static bool TryGetObjectLink(
             Dictionary<uint, BinTreeProperty> properties,
@@ -742,8 +597,12 @@ namespace AssetsManager.Services.Hashes
             InternalHashEvidenceMatcher matcher,
             string path,
             string wadPath = null,
-            HashResolverService resolver = null)
+            HashResolverService resolver = null,
+            IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null,
+            BinPathCasing casing = null)
         {
+            localTargets ??= CollectLocalTargets(tree);
+            casing ??= BinPathCasing.Empty;
             foreach (var pair in tree.Objects)
             {
                 BinTreeObject item = pair.Value;
@@ -824,12 +683,13 @@ namespace AssetsManager.Services.Hashes
                         {
                             foreach (var pair in itemsMap)
                             {
-                                if (pair.Value is BinTreeStruct placeableStruct &&
-                                    placeableStruct.ClassHash == Fnv1a.HashLower("GdsMapObject") &&
-                                    TryGetStringByHash(placeableStruct.Properties, 0xad304db5, out string gdsPath))
-                                {
+                                if (pair.Value is not BinTreeStruct placeableStruct ||
+                                    placeableStruct.ClassHash != Fnv1a.HashLower("GdsMapObject"))
+                                    continue;
+                                if (TryGetStringByHash(placeableStruct.Properties, 0xad304db5, out string gdsPath))
                                     MatchAnyEntry(gdsPath);
-                                }
+                                else if (TryGetObjectLinkByHash(placeableStruct.Properties, 0xad304db5, out BinTreeObjectLink gdsLink))
+                                    MatchLinkedEntry(gdsLink.Value);
                             }
                         }
                     }
@@ -845,6 +705,10 @@ namespace AssetsManager.Services.Hashes
                         MatchEntryPattern(entryHash, item, "name", value => $"Maps/Shipping/Map22/Sets/{value}");
                     else if (classHash == Fnv1a.HashLower("TooltipFormat"))
                         MatchEntryPattern(entryHash, item, "mObjectName", value => $"UX/Tooltips/{value}");
+                    else if (classHash == Fnv1a.HashLower("Character"))
+                        MatchEntryPattern(entryHash, item, "name", value => $"Characters/{value}");
+                    else if (classHash == Fnv1a.HashLower("CheatSet"))
+                        MatchEntryPattern(entryHash, item, "mName", value => $"Cheats/CheatSets/{value}");
                     else if (classHash == Fnv1a.HashLower("X3DSharedConstantBufferDef"))
                         MatchSharedBufferDef(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("X3DSharedSamplerDef"))
@@ -871,13 +735,43 @@ namespace AssetsManager.Services.Hashes
                         }
                         if (TryGetString(item.Properties, "GroupLink", out string groupLink))
                             MatchAnyEntry(groupLink);
+                        else if (TryGetObjectLink(item.Properties, "GroupLink", out BinTreeObjectLink groupEntry))
+                            MatchLinkedEntry(groupEntry.Value);
                         MatchAnyEntryString(item, "speciesLink");
                     }
                     else if (classHash == Fnv1a.HashLower("SpellObject"))
                         MatchSpellObject(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("ScriptCheat"))
+                    {
                         MatchEntryFromCandidates(entryHash, item, "mName", new[] { "TFT", "Cherry", "Slime", "Strawberry", "Ultbook" }
                             .Select(mode => (Func<string, string>)(value => $"Cheats/GameModes/{mode}/{value}")));
+                        // TFT cheats live under their set folder, named by the cheat's TFT{N}_ prefix.
+                        if (TryGetString(item.Properties, "mName", out string cheatName) && TryGetTftSet(cheatName, out int cheatSet))
+                            MatchObservedEntry(entryHash, $"Cheats/GameModes/TFT/TFT{cheatSet}/{cheatName}");
+                    }
+                    else if (classHash == Fnv1a.HashLower("TrophyData"))
+                    {
+                        // The cup folder is the fifth segment of ASSETS/Loadouts/SummonerTrophies/Trophies/{cup}/...
+                        if (item.Properties.TryGetValue(Fnv1a.HashLower("skinMeshProperties"), out BinTreeProperty meshProperty) &&
+                            meshProperty is BinTreeStruct mesh &&
+                            TryGetString(mesh.Properties, "skeleton", out string skeleton))
+                        {
+                            string[] segments = InternalHashEvidenceMatcher.NormalizeCandidate(skeleton).Split('/');
+                            if (segments.Length > 4)
+                                foreach (int gems in new[] { 4, 8, 16 })
+                                    if (MatchObservedEntry(entryHash, $"Loadouts/SummonerTrophies/Trophies/{segments[4]}/Trophy_{gems}")) break;
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("TftPlaybook"))
+                    {
+                        if (TryGetString(item.Properties, "name", out string playbook))
+                        {
+                            MatchObservedEntry(entryHash, $"Loadouts/TFTPlaybooks/{playbook}");
+                            if (item.Properties.TryGetValue(Fnv1a.HashLower("VfxResourceResolver"), out BinTreeProperty playbookResolver) &&
+                                playbookResolver is BinTreeHash playbookResolverHash)
+                                matcher.CheckContextualCandidate(InternalHashKind.BinHashes, $"Loadouts/TFTPlaybooks/{playbook}/Resources", path, wadPath, playbookResolverHash.Value);
+                        }
+                    }
                     else if (classHash == Fnv1a.HashLower("TftTraitData"))
                         MatchEntryFromCandidates(entryHash, item, "mName", Enumerable.Range(1, 29)
                             .Select(set => (Func<string, string>)(value => $"Maps/Shipping/Map22/Sets/TFTSet{set}/Traits/{value}")));
@@ -919,9 +813,7 @@ namespace AssetsManager.Services.Hashes
                         MatchStringsInField(item, "SpecifiedGameModes");
                     else if (classHash == Fnv1a.HashLower("ViewControllerList"))
                         foreach (BinTreeProperty property in item.Properties.Values) VisitStrings(property, MatchAnyEntry);
-                    else if (classHash == Fnv1a.HashLower("AtomicClipData") || classHash == Fnv1a.HashLower("SequencerClipData"))
-                        MatchAtomicClipData(entryHash, item);
-                    else if (classHash == Fnv1a.HashLower("AnimationGraphData") || classHash == Fnv1a.HashLower("AnimationGraphDataContainer"))
+                    else if (classHash == Fnv1a.HashLower("AnimationGraphData"))
                         MatchAnimationGraphData(entryHash, item);
                     else if (SkinCharacterDataPropertiesTypes.Contains(classHash))
                         MatchSkinCharacterData(entryHash, item);
@@ -936,44 +828,6 @@ namespace AssetsManager.Services.Hashes
                     {
                         MatchEntryDirect(entryHash, item, "mapPath");
                         MatchHashLinkMap(item, "chunks");
-                    }
-                }
-            }
-
-            void MatchAtomicClipData(uint entryHash, BinTreeObject item)
-            {
-                string animPath = null;
-                VisitForAnimPath(item.Properties.Values);
-
-                if (!string.IsNullOrEmpty(animPath))
-                {
-                    string fileName = Path.GetFileNameWithoutExtension(animPath);
-                    if (!string.IsNullOrEmpty(fileName))
-                    {
-                        MatchObservedEntry(entryHash, fileName);
-                        int underscore = fileName.IndexOf('_');
-                        if (underscore > 0 && underscore < fileName.Length - 1)
-                        {
-                            string shortName = fileName[(underscore + 1)..];
-                            MatchObservedEntry(entryHash, shortName);
-                        }
-                    }
-                }
-
-                void VisitForAnimPath(IEnumerable<BinTreeProperty> properties)
-                {
-                    foreach (var prop in properties)
-                    {
-                        if (animPath != null) return;
-                        if (prop is BinTreeString strProp && !string.IsNullOrWhiteSpace(strProp.Value) &&
-                            strProp.Value.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
-                        {
-                            animPath = strProp.Value;
-                            return;
-                        }
-                        if (prop is BinTreeStruct strct) VisitForAnimPath(strct.Properties.Values);
-                        else if (prop is BinTreeContainer ctr) VisitForAnimPath(ctr.Elements);
-                        else if (prop is BinTreeOptional opt && opt.Value != null) VisitForAnimPath(new[] { opt.Value });
                     }
                 }
             }
@@ -1089,25 +943,20 @@ namespace AssetsManager.Services.Hashes
                             resProp is BinTreeStruct resStruct &&
                             TryGetString(resStruct.Properties, "mAnimationFilePath", out string animFilePath))
                         {
-                            string animStem = animFilePath;
-                            if (animStem.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
-                                animStem = animStem[..^4];
-
+                            if (!animFilePath.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) continue;
+                            string animStem = animFilePath[..^4];
                             int firstSlash = animStem.IndexOf('/');
-                            if (firstSlash >= 0)
-                                animStem = animStem[(firstSlash + 1)..];
+                            if (firstSlash < 0) continue;
+                            animStem = UpperAfterUnderscore(animStem[(firstSlash + 1)..]);
 
-                            matcher.CheckContextualCandidate(InternalHashKind.BinHashes, animStem, path, wadPath, clipHash.Value);
-
-                            int lastIdx = 0;
-                            while ((lastIdx = animStem.IndexOf('_', lastIdx)) >= 0)
+                            // Clip names are underscore suffixes of the ANM stem, Riot-cased (Idle_Base).
+                            for (int underscore = animStem.LastIndexOf('_');
+                                 underscore >= 0;
+                                 underscore = underscore == 0 ? -1 : animStem.LastIndexOf('_', underscore - 1))
                             {
-                                lastIdx++;
-                                if (lastIdx < animStem.Length)
-                                {
-                                    string part = animStem[lastIdx..];
-                                    matcher.CheckContextualCandidate(InternalHashKind.BinHashes, part, path, wadPath, clipHash.Value);
-                                }
+                                if (underscore + 1 < animStem.Length &&
+                                    matcher.CheckContextualCandidate(InternalHashKind.BinHashes, animStem[(underscore + 1)..], path, wadPath, clipHash.Value))
+                                    break;
                             }
                         }
                     }
@@ -1239,6 +1088,7 @@ namespace AssetsManager.Services.Hashes
                     candidates.AddRange(new[] { 11, 12, 21, 22, 30, 33, 35 }.Select(map => $"Maps/Shipping/Map{map}/Spells/{name}"));
                     int digitCount = name.TakeWhile(char.IsAsciiDigit).Count();
                     if (digitCount > 0) candidates.Add($"Items/{name[..digitCount]}/Spells/{name}");
+                    if (TryGetTftSet(name, out int spellSet)) candidates.Add($"Maps/Shipping/Map22/Sets/TFTSet{spellSet}/Spells/{name}");
 
                     // Extract champion name if path contains characters directory
                     if (!string.IsNullOrEmpty(path))
@@ -1266,7 +1116,7 @@ namespace AssetsManager.Services.Hashes
                 {
                     foreach (BinTreeProperty value in values.Elements)
                         if (value is BinTreeStruct dataValue && TryGetString(dataValue.Properties, "name", out string dataName))
-                            matcher.CheckContextualCandidate(InternalHashKind.BinHashes, dataName, path, wadPath);
+                            matcher.CheckContextualCandidate(InternalHashKind.BinHashes, dataName, path, wadPath, localTargets: localTargets);
                 }
             }
 
@@ -1424,8 +1274,14 @@ namespace AssetsManager.Services.Hashes
                 if (TryGetString(item.Properties, field, out string val) && !string.IsNullOrWhiteSpace(val))
                     MatchObservedEntry(entryHash, val);
             }
-            bool MatchObservedEntry(uint hash, string value) => matcher.CheckContextualCandidate(InternalHashKind.BinEntries, value, path, wadPath, hash);
-            void MatchAnyEntry(string value) => matcher.CheckContextualCandidate(InternalHashKind.BinEntries, value, path, wadPath);
+            // Character folders often come from the lowercase BIN path; restore Riot casing.
+            bool MatchObservedEntry(uint hash, string value) =>
+                matcher.CheckContextualCandidate(InternalHashKind.BinEntries, casing.Recase(value, new[] { value }), path, wadPath, hash);
+            void MatchLinkedEntry(uint linkHash)
+            {
+                if (resolver != null) MatchResolvedEntryLink(linkHash, matcher, resolver, path, wadPath);
+            }
+            void MatchAnyEntry(string value) => matcher.CheckContextualCandidate(InternalHashKind.BinEntries, value, path, wadPath, localTargets: localTargets);
 
             void Visit(BinTreeProperty property)
             {
@@ -1449,6 +1305,14 @@ namespace AssetsManager.Services.Hashes
 
             static bool TryGetString(Dictionary<uint, BinTreeProperty> properties, string field, out string value) =>
                 TryGetStringByHash(properties, Fnv1a.HashLower(field), out value);
+
+            static string UpperAfterUnderscore(string value)
+            {
+                var chars = value.ToCharArray();
+                for (int index = 1; index < chars.Length; index++)
+                    if (chars[index - 1] == '_') chars[index] = char.ToUpperInvariant(chars[index]);
+                return new string(chars);
+            }
 
             static bool TryGetStringOrOptional(Dictionary<uint, BinTreeProperty> properties, string field, out string value)
             {

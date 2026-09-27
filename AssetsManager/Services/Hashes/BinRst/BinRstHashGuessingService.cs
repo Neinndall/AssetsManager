@@ -34,9 +34,7 @@ namespace AssetsManager.Services.Hashes
         };
 
         private const int MaximumTextChunkSize = 16 * 1024 * 1024;
-        private const int NumericBudget = 5_000_000;
         private const int ContentBudget = 25_000_000;
-        private static readonly Regex NumberRegex = new(@"[0-9]+", RegexOptions.Compiled);
         private readonly BinRstHashGuessingStore _store;
         private readonly HashGuessPersistenceService _persistence;
         private readonly HashResolverService _resolver;
@@ -258,6 +256,11 @@ namespace AssetsManager.Services.Hashes
                 string.Equals(id, "rst-content-binstrings", StringComparison.Ordinal));
             string[] looseBins = shouldScanBinContent ? EnumerateLooseBinFiles(rootDirectory) : Array.Empty<string>();
             var wadPaths = await LoadWadPathsAsync(includeRst, cancellationToken);
+            bool ShouldRunBin(string id) => includeBin && (selectedSubMethods == null || selectedSubMethods.Contains(id));
+            BinPathCasing casing = ShouldRunBin("bin-context-filepath") || ShouldRunBin("bin-context-learned")
+                ? BinPathCasing.FromKnownNames((await _store.LoadKnownAsync(InternalHashKind.BinEntries, cancellationToken)).Values)
+                : BinPathCasing.Empty;
+            BinLearnedTemplateSource learned = ShouldRunBin("bin-context-learned") ? new BinLearnedTemplateSource(_resolver, casing) : null;
             int totalSources = wads.Length + looseBins.Length;
             int scanned = 0;
             int contentStartedCandidates = matcher.CheckedCandidates > int.MaxValue
@@ -325,7 +328,9 @@ namespace AssetsManager.Services.Hashes
                                             path,
                                             wadPath,
                                             _resolver,
-                                            selectedSubMethods);
+                                            selectedSubMethods,
+                                            casing);
+                                        learned?.Observe(tree, matcher, path, wadPath);
                                     }
                                     catch (Exception)
                                     {
@@ -362,12 +367,15 @@ namespace AssetsManager.Services.Hashes
                             {
                                 using var stream = File.OpenRead(looseBin);
                                 var tree = new BinTree(stream);
+                                string loosePath = GetRelativeSourcePath(rootDirectory, looseBin);
                                 BinContentEvidenceSource.MatchBinContentEvidence(
                                     tree,
                                     matcher,
-                                    looseBin,
+                                    loosePath,
                                     resolver: _resolver,
-                                    selectedSubMethods: selectedSubMethods);
+                                    selectedSubMethods: selectedSubMethods,
+                                    casing: casing);
+                                learned?.Observe(tree, matcher, loosePath, null);
                             }
                             catch (Exception)
                             {
@@ -379,17 +387,36 @@ namespace AssetsManager.Services.Hashes
                         }
                     }
 
+                    if (learned != null)
+                    {
+                        progress?.Report(CreateProgress(matcher, stopwatch, $"Applying learned BIN templates to {learned.PendingCount} hashes", scanned));
+                        int learnedHits = learned.Apply(matcher);
+                        _log.LogDebug($"Learned BIN templates resolved {learnedHits} hashes.");
+                        if (learned.LastVocabularyGate is { } vocabularyGate) LogGate(vocabularyGate);
+                    }
                 }, cancellationToken);
 
                 int checkedCount = matcher.CheckedCandidates > int.MaxValue ? int.MaxValue : (int)matcher.CheckedCandidates;
+                LogGate(matcher.ResolveUntargetedGate());
                 progress?.Report(CreateProgress(matcher, stopwatch, "Persisting discovered internal hashes", checkedCount));
                 return await CompleteRunAsync(matcher, checkedCount);
             }
             catch (OperationCanceledException)
             {
                 int checkedCount = matcher.CheckedCandidates > int.MaxValue ? int.MaxValue : (int)matcher.CheckedCandidates;
+                LogGate(matcher.ResolveUntargetedGate());
                 return await CompleteRunAsync(matcher, checkedCount);
             }
+        }
+
+        private void LogGate(InternalHashEvidenceMatcher.NoiseGateResult gate)
+        {
+            if (gate.Hits == 0) return;
+            string report = $"{gate.Name}: {gate.Hits} hits; {gate.ExpectedChanceMatches:F4} expected chance matches.";
+            if (gate.Accepted)
+                _log.LogDebug(report);
+            else
+                _log.LogWarning($"{report} Findings kept as candidates: chance collisions exceed {InternalHashEvidenceMatcher.MaxGateFalseDiscoveryRate:P0} of hits.");
         }
 
 
@@ -456,6 +483,19 @@ namespace AssetsManager.Services.Hashes
                         CheckCandidates(Common3DBones, InternalHashGuessStrategy.CrossDictionary, "Common 3D Skeleton Bones");
                     }
 
+                    void RunGated(string name, Action pass)
+                    {
+                        matcher.BeginGate(name);
+                        try
+                        {
+                            pass();
+                        }
+                        finally
+                        {
+                            LogGate(matcher.EndGate());
+                        }
+                    }
+
                     // Build token wordlist for combinatorial and suffix folding passes
                     if (matcher.Remaining > 0)
                     {
@@ -472,55 +512,36 @@ namespace AssetsManager.Services.Hashes
                         if (includeBin && matcher.Remaining > 0 && ShouldRun("bin-schema-reverse-suffix"))
                         {
                             progress?.Report(CreateProgress(matcher, stopwatch, "State Space Suffix Folding", checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
-                            ExecuteSuffixFoldingPass(matcher, wordlist, metaSchema, progress, stopwatch, cancellationToken);
+                            RunGated("State Space Suffix Folding", () =>
+                                ExecuteSuffixFoldingPass(matcher, wordlist, metaSchema, progress, stopwatch, cancellationToken));
                         }
 
                         // 2. Base Class Family Sibling Lattice
                         if (includeBin && matcher.Remaining > 0 && ShouldRun("bin-schema-family-lattice"))
                         {
                             progress?.Report(CreateProgress(matcher, stopwatch, "Base Class Family Lattice", checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
-                            ExecuteFamilyLatticePass(matcher, wordlist, metaSchema, progress, stopwatch, cancellationToken);
-                        }
-
-                        // 3. Path & Field Templates
-                        if (matcher.Remaining > 0 && ShouldRun("bin-schema-path-templates"))
-                        {
-                            CheckCandidates(GenerateStructuralCandidates(wordlist, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Structural Templates", preserveCasing: true);
+                            RunGated("Base Class Family Lattice", () =>
+                                ExecuteFamilyLatticePass(matcher, wordlist, metaSchema, progress, stopwatch, cancellationToken));
                         }
                     }
 
                     void CheckCandidates(IEnumerable<string> candidates, InternalHashGuessStrategy strategy, string source, bool preserveCasing = false)
                     {
-                        long probesAtStart = matcher.CheckedCandidates;
-                        int hitsAtStart = matcher.Matches.Count;
-                        int states = matcher.GetRemainingCount(InternalHashKind.BinFields)
-                            + matcher.GetRemainingCount(InternalHashKind.BinTypes)
-                            + matcher.GetRemainingCount(InternalHashKind.BinEntries)
-                            + matcher.GetRemainingCount(InternalHashKind.BinHashes);
+                        if (includeBin)
+                            RunGated(source, () => CheckCandidatesCore(candidates, strategy, source, preserveCasing));
+                        else
+                            CheckCandidatesCore(candidates, strategy, source, preserveCasing);
+                    }
+
+                    void CheckCandidatesCore(IEnumerable<string> candidates, InternalHashGuessStrategy strategy, string source, bool preserveCasing)
+                    {
                         foreach (string candidate in candidates)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             if (includeBin)
                             {
                                 if (source != MetaSchemaPropertySource)
-                                {
-                                    string typeCandidate = UpperFirst(candidate?.Trim());
-                                    uint typeHash = string.IsNullOrEmpty(typeCandidate) ? 0 : Fnv1a.HashLower(typeCandidate);
-                                    if (strategy == InternalHashGuessStrategy.NumericVariant &&
-                                        metaSchema.TypeContexts.TryGetValue(typeHash, out IReadOnlyList<string> contexts))
-                                    {
-                                        matcher.CheckSchemaCandidate(
-                                            InternalHashKind.BinTypes,
-                                            candidate,
-                                            strategy,
-                                            $"{source}; schema context: {string.Join(", ", contexts.Take(3))}",
-                                            InternalHashEvidence.MetaSchemaRelation);
-                                    }
-                                    else
-                                    {
-                                        matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, strategy, source, preserveCasing: preserveCasing);
-                                    }
-                                }
+                                    matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, strategy, source, preserveCasing: preserveCasing);
                                 if (source != MetaSchemaClassSource)
                                     matcher.CheckSchemaCandidate(InternalHashKind.BinFields, candidate, strategy, source, preserveCasing: preserveCasing);
                             }
@@ -532,14 +553,6 @@ namespace AssetsManager.Services.Hashes
                                     checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
                             if (matcher.Remaining == 0) break;
                         }
-                        long probes = matcher.CheckedCandidates - probesAtStart;
-                        int hits = matcher.Matches.Count - hitsAtStart;
-                        double noise = probes * (double)states / (double)uint.MaxValue;
-                        string report = $"{source}: {hits} hits; {noise:F2} expected chance matches ({probes} probes x {states} states / 2^32).";
-                        if (hits > 0 && noise >= hits * 0.5)
-                            _log.LogWarning(report);
-                        else
-                            _log.LogDebug(report);
                     }
                 }, cancellationToken);
 
@@ -826,21 +839,6 @@ namespace AssetsManager.Services.Hashes
             scanner.Complete();
         }
 
-        private static async Task ScanTextFileAsync(string path, Action<string> check, CancellationToken cancellationToken, Func<bool> shouldContinue = null)
-        {
-            const int blockSize = 4 * 1024 * 1024;
-            byte[] buffer = new byte[blockSize];
-            var scanner = new BinaryTextCandidateScanner(check);
-            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, blockSize, true);
-            while (shouldContinue?.Invoke() != false)
-            {
-                int read = await stream.ReadAsync(buffer, cancellationToken);
-                if (read == 0) break;
-                scanner.Append(buffer.AsSpan(0, read));
-            }
-            scanner.Complete();
-        }
-
         private static void ExecuteSuffixFoldingPass(
             InternalHashEvidenceMatcher matcher,
             TokenWordlist wordlist,
@@ -900,6 +898,7 @@ namespace AssetsManager.Services.Hashes
             void TestStem(string stem)
             {
                 if (string.IsNullOrEmpty(stem) || stem.Length < 2) return;
+                matcher.AddGateNoise(stateMap.Count / 4294967296.0);
                 uint stemHash = Fnv1a.HashLower(stem);
                 if (stateMap.TryGetValue(stemHash, out var targets))
                 {
@@ -987,6 +986,7 @@ namespace AssetsManager.Services.Hashes
                 foreach (string token in wordlist.AllTokens.Take(2500))
                 {
                     string word = wordlist.Case(token);
+                    matcher.AddGateNoise(familyStateMap.Count / 4294967296.0);
                     uint wHash = Fnv1a.HashLower(word);
                     if (familyStateMap.TryGetValue(wHash, out var hits))
                     {
@@ -1098,9 +1098,6 @@ namespace AssetsManager.Services.Hashes
         {
             public List<string> AllTokens { get; } = new();
             public Dictionary<string, int> TokenCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
-            public HashSet<string> Characters { get; } = new(StringComparer.OrdinalIgnoreCase);
-            public List<string> PathTemplates { get; } = new();
-            public List<string> FieldTemplates { get; } = new();
             // Attested casing per word: the spelling the known corpus uses most.
             public Dictionary<string, string> PreferredSpellings { get; } = new(StringComparer.OrdinalIgnoreCase);
             // Word pairs attested in known names, case-folded, sorted for determinism.
@@ -1147,36 +1144,8 @@ namespace AssetsManager.Services.Hashes
             {
                 if (string.IsNullOrWhiteSpace(name)) return;
 
-                if (name.Contains('/'))
+                if (!name.Contains('/'))
                 {
-                    if (name.Contains("characters", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var parts = name.Split('/');
-                        for (int i = 0; i < parts.Length; i++)
-                        {
-                            if (string.Equals(parts[i], "characters", StringComparison.OrdinalIgnoreCase) && i + 1 < parts.Length)
-                            {
-                                string character = parts[i + 1];
-                                Characters.Add(character);
-                                string templated = name.Replace(character, "{character}", StringComparison.OrdinalIgnoreCase);
-                                PathTemplates.Add(templated);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    bool hasDigit = false;
-                    for (int i = 0; i < name.Length; i++)
-                    {
-                        if (char.IsDigit(name[i])) { hasDigit = true; break; }
-                    }
-                    if (hasDigit && NumberRegex.IsMatch(name))
-                    {
-                        string templated = NumberRegex.Replace(name, "{0}");
-                        FieldTemplates.Add(templated);
-                    }
-
                     // Attested casing, bigrams and tails come from the standard splitter.
                     string[] words = WordSplitter.Split(name).ToArray();
                     if (words.Length > 0)
@@ -1218,10 +1187,6 @@ namespace AssetsManager.Services.Hashes
             {
                 AllTokens.Clear();
                 AllTokens.AddRange(TokenCounts.OrderByDescending(pair => pair.Value).Select(pair => pair.Key));
-                PathTemplates.Clear();
-                PathTemplates.AddRange(PathTemplates.Distinct(StringComparer.OrdinalIgnoreCase));
-                FieldTemplates.Clear();
-                FieldTemplates.AddRange(FieldTemplates.Distinct(StringComparer.OrdinalIgnoreCase));
 
                 PreferredSpellings.Clear();
                 foreach (var pair in _spellings)
@@ -1260,170 +1225,6 @@ namespace AssetsManager.Services.Hashes
                 if (PreferredSpellings.TryGetValue(token, out string spelling)) return spelling;
                 return char.ToUpperInvariant(token[0]) + token[1..];
             }
-        }
-
-        internal static IEnumerable<string> GenerateStructuralCandidates(
-            TokenWordlist wordlist,
-            int budget,
-            CancellationToken cancellationToken)
-        {
-            var generatedSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            int count = 0;
-
-            bool Emit(string candidate)
-            {
-                if (string.IsNullOrWhiteSpace(candidate) || candidate.Length > 512) return false;
-                string clean = candidate.Trim();
-                if (generatedSet.Add(clean))
-                {
-                    count++;
-                    return true;
-                }
-                return false;
-            }
-
-            // 1. Path template substitution
-            foreach (string template in wordlist.PathTemplates)
-            {
-                foreach (string character in wordlist.Characters)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    string candidate = template.Replace("{character}", character, StringComparison.OrdinalIgnoreCase);
-                    if (Emit(candidate))
-                    {
-                        yield return candidate;
-                        if (count >= budget) yield break;
-                    }
-                }
-            }
-
-            // 2. Field template numeric substitution
-            foreach (string template in wordlist.FieldTemplates)
-            {
-                for (int num = 0; num <= 200; num++)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    string candidate = string.Format(CultureInfo.InvariantCulture, template, num);
-                    if (Emit(candidate))
-                    {
-                        yield return candidate;
-                        if (count >= budget) yield break;
-                    }
-                }
-            }
-
-            // 3. Plurals and singulars
-            var topTokens = wordlist.AllTokens.Take(1000).ToList();
-            foreach (string token in topTokens)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string plural = Pluralize(token);
-                if (Emit(plural))
-                {
-                    yield return plural;
-                    if (count >= budget) yield break;
-                }
-                if (token.EndsWith('s') && token.Length > 3)
-                {
-                    string singular = token[..^1];
-                    if (Emit(singular))
-                    {
-                        yield return singular;
-                        if (count >= budget) yield break;
-                    }
-                }
-            }
-
-            // 4. Token combinations (2-word combinations)
-            var combTokens = topTokens.Take(300).ToList();
-            for (int i = 0; i < combTokens.Count; i++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                for (int j = 0; j < combTokens.Count; j++)
-                {
-                    if (i == j) continue;
-
-                    string comb1 = UpperFirst(combTokens[i]) + UpperFirst(combTokens[j]);
-                    if (Emit(comb1))
-                    {
-                        yield return comb1;
-                        if (count >= budget) yield break;
-                    }
-
-                    string combCamel = char.ToLowerInvariant(combTokens[i][0]) + combTokens[i][1..] + UpperFirst(combTokens[j]);
-                    if (Emit(combCamel))
-                    {
-                        yield return combCamel;
-                        if (count >= budget) yield break;
-                    }
-                }
-            }
-
-            // 5. 3-word token combinations
-            var trigramTokens = topTokens.Take(100).ToList();
-            for (int i = 0; i < trigramTokens.Count; i++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                for (int j = 0; j < trigramTokens.Count; j++)
-                {
-                    if (i == j) continue;
-                    string prefix2 = UpperFirst(trigramTokens[i]) + UpperFirst(trigramTokens[j]);
-                    for (int k = 0; k < trigramTokens.Count; k++)
-                    {
-                        if (k == i || k == j) continue;
-                        string word3 = UpperFirst(trigramTokens[k]);
-                        string comb3 = prefix2 + word3;
-                        if (Emit(comb3))
-                        {
-                            yield return comb3;
-                            if (count >= budget) yield break;
-                        }
-                        string comb3Plural = prefix2 + Pluralize(word3);
-                        if (!string.Equals(comb3Plural, comb3, StringComparison.Ordinal) && Emit(comb3Plural))
-                        {
-                            yield return comb3Plural;
-                            if (count >= budget) yield break;
-                        }
-                    }
-                }
-            }
-
-            // 6. Hungarian prefix addition (m for member fields, b for booleans)
-            string[] hungarianPrefixes = { "m", "b" };
-            foreach (string token in topTokens.Take(500))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                foreach (string pref in hungarianPrefixes)
-                {
-                    string candidate = pref + UpperFirst(token);
-                    if (Emit(candidate))
-                    {
-                        yield return candidate;
-                        if (count >= budget) yield break;
-                    }
-                }
-            }
-        }
-
-        private static string Pluralize(string word)
-        {
-            if (word.EndsWith("y", StringComparison.OrdinalIgnoreCase) &&
-                !word.EndsWith("ay", StringComparison.OrdinalIgnoreCase) &&
-                !word.EndsWith("ey", StringComparison.OrdinalIgnoreCase) &&
-                !word.EndsWith("oy", StringComparison.OrdinalIgnoreCase) &&
-                !word.EndsWith("uy", StringComparison.OrdinalIgnoreCase))
-            {
-                return word[..^1] + "ies";
-            }
-            if (word.EndsWith("s", StringComparison.OrdinalIgnoreCase) ||
-                word.EndsWith("x", StringComparison.OrdinalIgnoreCase) ||
-                word.EndsWith("z", StringComparison.OrdinalIgnoreCase) ||
-                word.EndsWith("ch", StringComparison.OrdinalIgnoreCase) ||
-                word.EndsWith("sh", StringComparison.OrdinalIgnoreCase))
-            {
-                return word + "es";
-            }
-            return word + "s";
         }
 
         private static string UpperFirst(string value) =>
