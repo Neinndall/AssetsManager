@@ -61,19 +61,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     return;
                 }
 
-                var compatibleForms = new List<VfxCharacterFormDefinition>();
-                foreach (VfxCharacterFormDefinition form in _activeBundle.CharacterForms)
-                {
-                    if (form.HasMaterialOverrides)
-                        continue;
-                    if (!string.IsNullOrWhiteSpace(form.MeshPath) &&
-                        !SameCharacterAsset(form.MeshPath, _activeBundle.OwnerSceneContext?.MeshPath))
-                        continue;
-                    if (!string.IsNullOrWhiteSpace(form.SkeletonPath) &&
-                        !SameCharacterAsset(form.SkeletonPath, _activeBundle.OwnerSceneContext?.SkeletonPath))
-                        continue;
-                    compatibleForms.Add(form);
-                }
+                IReadOnlyList<VfxCharacterFormDefinition> compatibleForms = VfxCharacterFormSemantics.CompatibleForms(
+                    _activeBundle.CharacterForms,
+                    _activeBundle.OwnerSceneContext);
 
                 if (compatibleForms.Count > 0)
                 {
@@ -84,7 +74,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         _model.CharacterForms.Add(new VfxCharacterFormOption(form, _championModel));
                     }
                 }
-                uint? selectedHash = _model.SelectedWorkspaceTab?.SelectedCharacterFormPathHash;
+                uint? selectedHash = FocusedActor?.SelectedCharacterFormPathHash;
                 _model.SelectedCharacterForm = _model.CharacterForms.FirstOrDefault(option =>
                     option.Definition.PathHash == selectedHash) ?? _model.CharacterForms.FirstOrDefault();
             }
@@ -95,10 +85,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             ApplySelectedCharacterForm(clearManualOverrides: false, restoreTextures: false);
         }
-
-        private static bool SameCharacterAsset(string left, string right) =>
-            !string.IsNullOrWhiteSpace(right) && string.Equals(
-                left.Replace('\\', '/'), right.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
 
         private IReadOnlySet<uint> GetCharacterFormHiddenSubmeshes() =>
             VfxCharacterFormSemantics.HiddenSubmeshes(
@@ -111,12 +97,12 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_championModel == null || !ReferenceEquals(_championBundle, _activeBundle))
                 return;
-            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
-            if (tab?.Kind == VfxWorkspaceTabKind.Skin)
+            VfxSceneActor actor = FocusedActor;
+            if (actor != null)
             {
-                tab.SelectedCharacterFormPathHash = _model.SelectedCharacterForm?.Definition.PathHash;
+                actor.SelectedCharacterFormPathHash = _model.SelectedCharacterForm?.Definition.PathHash;
                 if (clearManualOverrides)
-                    tab.CharacterSubmeshOverrides.Clear();
+                    actor.SubmeshOverrides.Clear();
             }
             int gearIndex = _model.SelectedCharacterForm?.Definition.GearIndex ?? -1;
             bool gearChanged = _championModel.Parts.Any(part => part.EquippedGearIndex != gearIndex);

@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+using System;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -11,7 +12,8 @@ namespace AssetsManager.Views.Models.Viewer
     }
 
     /// <summary>
-    /// One independently addressable VFX Studio workspace document. The tab only owns navigation
+    /// One independently addressable VFX Studio workspace document. A Skin tab is a scene of one or
+    /// more Character actors; a MAP tab carries its browser node as Payload. The tab only owns navigation
     /// state; heavyweight Champion/MAP resources remain owned by VfxInspectorControl and are swapped
     /// into the single viewport when the tab becomes active.
     /// </summary>
@@ -22,6 +24,16 @@ namespace AssetsManager.Views.Models.Viewer
         private string _title;
         private string _subtitle;
         private object _payload;
+        private VfxSceneActor _focusedActor;
+
+        public VfxWorkspaceTab()
+        {
+            Actors.CollectionChanged += (_, _) =>
+            {
+                OnPropertyChanged(nameof(ExtraActorCount));
+                OnPropertyChanged(nameof(HasExtraActors));
+            };
+        }
 
         public string Key
         {
@@ -69,30 +81,37 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        // Lightweight navigation memory only. Runtime/GPU ownership stays in the single Studio viewport.
-        internal uint? SelectedSystemPathHash { get; set; }
-        internal string SelectedAnimationFilePath { get; set; }
-        internal uint? SelectedAnimationGraphPathHash { get; set; }
-        internal uint? SelectedAnimationOwnerPathHash { get; set; }
-        internal uint? SelectedSpellPathHash { get; set; }
-        internal float? AnimationParameter { get; set; }
-
-        // Character/Skin viewport state. The tab owns only lightweight controls; the single Studio
-        // viewport still owns every decoded model, MAP scene and GPU resource.
+        // Scene-level Skin workspace state. Every Character keeps its own placement and navigation
+        // memory in Actors; the single Studio viewport still owns every decoded model, MAP scene and
+        // GPU resource.
         internal bool CharacterBackdropEnabled { get; set; }
         internal string CharacterBackdropKey { get; set; }
         internal int? CharacterBackdropVisibilityFlags { get; set; }
-        internal double CharacterPositionX { get; set; }
-        internal double CharacterPositionY { get; set; }
-        internal double CharacterPositionZ { get; set; }
-        internal double CharacterRotationX { get; set; }
-        internal double CharacterRotationY { get; set; }
-        internal double CharacterRotationZ { get; set; }
-        internal double CharacterScaleMultiplier { get; set; } = 1d;
-        internal bool CharacterPlacementCustomized { get; set; }
-        internal string CharacterPlacedOnKey { get; set; }
-        internal Dictionary<uint, bool> CharacterSubmeshOverrides { get; } = new();
-        internal uint? SelectedCharacterFormPathHash { get; set; }
+
+        /// <summary>Characters composed into this Skin scene, in insertion order.</summary>
+        public ObservableCollection<VfxSceneActor> Actors { get; } = new();
+
+        /// <summary>The actor driven by the Inspector, browser, timeline and gizmo.</summary>
+        public VfxSceneActor FocusedActor
+        {
+            get => _focusedActor;
+            internal set
+            {
+                if (ReferenceEquals(_focusedActor, value)) return;
+                if (_focusedActor != null) _focusedActor.IsFocused = false;
+                _focusedActor = value;
+                if (_focusedActor != null)
+                {
+                    _focusedActor.IsFocused = true;
+                    Title = _focusedActor.Title;
+                    Subtitle = _focusedActor.Subtitle;
+                }
+                OnPropertyChanged();
+            }
+        }
+
+        public int ExtraActorCount => Math.Max(0, Actors.Count - 1);
+        public bool HasExtraActors => Actors.Count > 1;
 
         public bool IsSelected
         {

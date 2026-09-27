@@ -15,7 +15,7 @@ namespace AssetsManager.Services.Viewer.Rendering
     /// Scene-scoped renderer for MAP VFX. One OpenGL renderer and one GPU resource uploader are
     /// shared by every particle placement while the simulation graphs remain independent.
     /// </summary>
-    internal sealed class MapParticleRenderer : IDisposable
+    internal sealed class MapParticleRenderer : IDisposable, IPreparedParticlePass
     {
         private readonly VfxGpuResourceUploader _uploader = new();
         private readonly List<IReadOnlyList<VfxPlaybackRuntime.EmitterState>> _sources = new();
@@ -130,9 +130,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             return _queue.Count > 0;
         }
 
-        internal IDisposable BeginPreparedRenderBatch() => _renderer.BeginRenderBatch();
+        public IDisposable BeginPreparedRenderBatch() => _renderer.BeginRenderBatch();
 
-        internal void RenderPreparedColorPass()
+        public void RenderPreparedColorPass()
         {
             if (_preparedShaded && _shaded.Count > 0)
                 _renderer.Render(_shaded, _preparedViewProjection, _preparedView);
@@ -149,13 +149,13 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         internal bool HasPreparedDistortionPass => _preparedShaded && _distortion.Count > 0;
 
-        internal void CapturePreparedDistortionFrame()
+        public void CapturePreparedDistortionFrame()
         {
             if (HasPreparedDistortionPass)
                 _renderer.CaptureScene(_preparedViewportWidth, _preparedViewportHeight, true, false);
         }
 
-        internal void RenderPreparedDistortionPass()
+        public void RenderPreparedDistortionPass()
         {
             if (HasPreparedDistortionPass)
                 _renderer.Render(_distortion, _preparedViewProjection, _preparedView);

@@ -77,6 +77,10 @@ namespace AssetsManager.Views.Controls.Viewer
         private IReadOnlyList<VfxClipCueEvaluator.VisibilityEntry> _animationVisibilityTimeline =
             Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
         private VfxLoadingService.Bundle _championBundle;
+        private string _championSknPath;
+        // Like LTK's Skin preview, a freshly installed Character is not drawn until the clip it opens
+        // on has its pose, instead of flashing the bind pose while the ANM is prepared.
+        private bool _championAwaitingFirstPose;
         private string _animationSearchDirectory;
         private int _championLoadGeneration;
         private System.Threading.CancellationTokenSource _scanCancellation;
@@ -256,28 +260,44 @@ namespace AssetsManager.Views.Controls.Viewer
             return null;
         }
 
+        private static string SkinWorkspaceKey(VfxSkinItem skin) =>
+            $"skin:{Path.GetFullPath(skin.BinPath)}";
+
+        /// <summary>
+        /// Finds or creates the Skin scene for a browser Skin. A Skin already composed into another
+        /// scene reopens that scene unless the caller explicitly asks for the Skin's own tab.
+        /// </summary>
         private VfxWorkspaceTab EnsureSkinWorkspaceTab(
             VfxSkinItem skin,
-            bool select = true,
+            bool ownTab = false,
             CharacterBackdropSeed inheritedBackdrop = null)
         {
             if (skin == null || string.IsNullOrWhiteSpace(skin.BinPath)) return null;
-            string key = $"skin:{Path.GetFullPath(skin.BinPath)}";
+            string key = SkinWorkspaceKey(skin);
             VfxWorkspaceTab tab = _model.WorkspaceTabs.FirstOrDefault(item =>
                 string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase));
-            if (tab == null)
+            if (tab == null && !ownTab)
             {
-                string title = string.IsNullOrWhiteSpace(skin.OwnerName)
-                    ? skin.Title
-                    : $"{skin.OwnerName} · {skin.Title}";
+                tab = _model.WorkspaceTabs.FirstOrDefault(item =>
+                    item.Kind == VfxWorkspaceTabKind.Skin && item.Actors.Any(actor => actor.HasSkin(skin)));
+            }
+
+            if (tab != null)
+            {
+                VfxSceneActor member = tab.Actors.FirstOrDefault(actor => actor.HasSkin(skin));
+                if (member != null && !ReferenceEquals(tab, _model.SelectedWorkspaceTab))
+                    tab.FocusedActor = member;
+            }
+            else
+            {
                 tab = new VfxWorkspaceTab
                 {
                     Key = key,
-                    Title = title,
-                    Subtitle = skin.DisplayName ?? skin.BinPath,
-                    Kind = VfxWorkspaceTabKind.Skin,
-                    Payload = skin
+                    Kind = VfxWorkspaceTabKind.Skin
                 };
+                VfxSceneActor actor = CreateSceneActor(skin);
+                tab.Actors.Add(actor);
+                tab.FocusedActor = actor;
                 if (inheritedBackdrop?.Source != null)
                 {
                     string backdropKey = VfxInstallationMapCatalog.BackdropKey(inheritedBackdrop.Source);
@@ -297,8 +317,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 }));
             }
 
-            if (select)
-                SelectWorkspaceTab(tab);
+            SelectWorkspaceTab(tab);
             return tab;
         }
 
@@ -404,18 +423,19 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void CaptureWorkspaceSelection(VfxWorkspaceTab tab)
         {
-            if (tab?.Kind != VfxWorkspaceTabKind.Skin || tab.Payload is not VfxSkinItem)
+            VfxSceneActor actor = tab?.Kind == VfxWorkspaceTabKind.Skin ? tab.FocusedActor : null;
+            if (actor == null)
                 return;
 
             // The tree changes SelectedSkin before PropertyChanged reaches us, while the current
-            // System/Clip/Spell collections still belong to the previously active tab. Capture those
-            // live selections here instead of keying the snapshot off SelectedSkin identity.
-            tab.SelectedSystemPathHash = _model.SelectedSystem?.PathHash;
-            tab.SelectedAnimationFilePath = _model.SelectedAnimation?.FilePath;
-            tab.SelectedAnimationGraphPathHash = _model.SelectedAnimation?.Clip?.GraphPathHash;
-            tab.SelectedAnimationOwnerPathHash = _model.SelectedAnimation?.Clip?.OwnerPathHash;
-            tab.SelectedSpellPathHash = _model.SelectedSpell?.PathHash;
-            tab.AnimationParameter = _model.AnimationParameter;
+            // System/Clip/Spell collections still belong to the previously focused actor. Capture
+            // those live selections here instead of keying the snapshot off SelectedSkin identity.
+            actor.SelectedSystemPathHash = _model.SelectedSystem?.PathHash;
+            actor.SelectedAnimationFilePath = _model.SelectedAnimation?.FilePath;
+            actor.SelectedAnimationGraphPathHash = _model.SelectedAnimation?.Clip?.GraphPathHash;
+            actor.SelectedAnimationOwnerPathHash = _model.SelectedAnimation?.Clip?.OwnerPathHash;
+            actor.SelectedSpellPathHash = _model.SelectedSpell?.PathHash;
+            actor.AnimationParameter = _model.AnimationParameter;
             CaptureCharacterWorkspaceState(tab);
         }
 
@@ -426,28 +446,49 @@ namespace AssetsManager.Views.Controls.Viewer
             tab.CharacterBackdropKey = VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source);
             if (_mapSceneIsCharacterBackdrop && _mapSceneRuntime != null)
                 tab.CharacterBackdropVisibilityFlags = _mapSceneRuntime.VisibilityFlags;
-            tab.CharacterPositionX = _model.CharacterPositionX;
-            tab.CharacterPositionY = _model.CharacterPositionY;
-            tab.CharacterPositionZ = _model.CharacterPositionZ;
-            tab.CharacterRotationX = _model.CharacterRotationX;
-            tab.CharacterRotationY = _model.CharacterRotationY;
-            tab.CharacterRotationZ = _model.CharacterRotationZ;
-            tab.CharacterScaleMultiplier = _model.CharacterScaleMultiplier;
+            if (tab.FocusedActor != null)
+                StoreFocusedPlacement(tab.FocusedActor);
+        }
+
+        private void StoreFocusedPlacement(VfxSceneActor actor)
+        {
+            actor.PositionX = _model.CharacterPositionX;
+            actor.PositionY = _model.CharacterPositionY;
+            actor.PositionZ = _model.CharacterPositionZ;
+            actor.RotationX = _model.CharacterRotationX;
+            actor.RotationY = _model.CharacterRotationY;
+            actor.RotationZ = _model.CharacterRotationZ;
+            actor.ScaleMultiplier = _model.CharacterScaleMultiplier;
+        }
+
+        /// <summary>Mirrors an actor's placement into the Inspector without marking it as a user edit.</summary>
+        private void LoadFocusedPlacement(VfxSceneActor actor)
+        {
+            _isApplyingCharacterViewportState = true;
+            try
+            {
+                _model.CharacterPositionX = actor.PositionX;
+                _model.CharacterPositionY = actor.PositionY;
+                _model.CharacterPositionZ = actor.PositionZ;
+                _model.CharacterRotationX = actor.RotationX;
+                _model.CharacterRotationY = actor.RotationY;
+                _model.CharacterRotationZ = actor.RotationZ;
+                _model.CharacterScaleMultiplier = actor.ScaleMultiplier;
+            }
+            finally
+            {
+                _isApplyingCharacterViewportState = false;
+            }
         }
 
         private void RestoreCharacterWorkspaceState(VfxWorkspaceTab tab)
         {
-            if (tab?.Kind != VfxWorkspaceTabKind.Skin) return;
+            VfxSceneActor actor = tab?.Kind == VfxWorkspaceTabKind.Skin ? tab.FocusedActor : null;
+            if (actor == null) return;
+            LoadFocusedPlacement(actor);
             _isApplyingCharacterViewportState = true;
             try
             {
-                _model.CharacterPositionX = tab.CharacterPositionX;
-                _model.CharacterPositionY = tab.CharacterPositionY;
-                _model.CharacterPositionZ = tab.CharacterPositionZ;
-                _model.CharacterRotationX = tab.CharacterRotationX;
-                _model.CharacterRotationY = tab.CharacterRotationY;
-                _model.CharacterRotationZ = tab.CharacterRotationZ;
-                _model.CharacterScaleMultiplier = tab.CharacterScaleMultiplier;
                 _model.SelectedCharacterBackdrop = _model.CharacterBackdrops.FirstOrDefault(option =>
                     !string.IsNullOrWhiteSpace(tab.CharacterBackdropKey) &&
                     string.Equals(VfxInstallationMapCatalog.BackdropKey(option.Source), tab.CharacterBackdropKey, StringComparison.OrdinalIgnoreCase));
@@ -460,7 +501,9 @@ namespace AssetsManager.Views.Controls.Viewer
             ApplyCharacterPlacement();
             ApplyEffectiveCharacterSubmeshes();
             RefreshCharacterInteractionTarget();
-            EnsureCharacterBackdropRuntime(tab);
+            // Changing the focused actor keeps the scene backdrop exactly as it is.
+            if (!_isSceneFocusHandover)
+                EnsureCharacterBackdropRuntime(tab);
         }
 
         private bool TryAdoptLoadedMapAsCharacterBackdrop(VfxWorkspaceTab tab)
@@ -520,60 +563,67 @@ namespace AssetsManager.Views.Controls.Viewer
             _ = LoadCharacterBackdropAsync(_model.SelectedCharacterBackdrop);
         }
 
-        private void RestoreWorkspaceSelection(VfxWorkspaceTab tab, string loadedBinPath)
+        /// <summary>
+        /// Restores the focused actor's placement and its remembered System/Clip/Spell once its BIN is
+        /// loaded. Returns true when an explicit selection was restored.
+        /// </summary>
+        private bool RestoreWorkspaceSelection(VfxWorkspaceTab tab, string loadedBinPath)
         {
-            if (tab?.Kind != VfxWorkspaceTabKind.Skin ||
-                tab.Payload is not VfxSkinItem skin ||
+            VfxSceneActor actor = tab?.Kind == VfxWorkspaceTabKind.Skin ? tab.FocusedActor : null;
+            VfxSkinItem skin = actor?.Skin;
+            if (skin == null ||
                 !ReferenceEquals(_model.SelectedWorkspaceTab, tab) ||
                 !ReferenceEquals(_model.SelectedSkin, skin) ||
                 !string.Equals(Path.GetFullPath(skin.BinPath), Path.GetFullPath(loadedBinPath), StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                return false;
             }
 
             RestoreCharacterWorkspaceState(tab);
 
-            if (tab.SelectedSystemPathHash is uint systemHash)
+            if (actor.SelectedSystemPathHash is uint systemHash)
             {
                 VfxSystemDiagnosticItem system = _model.Systems.FirstOrDefault(item => item.PathHash == systemHash);
                 if (system != null)
                 {
                     _model.IsRawSystemsMode = true;
                     _model.SelectedSystem = system;
-                    return;
+                    return true;
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(tab.SelectedAnimationFilePath) ||
-                tab.SelectedAnimationOwnerPathHash.HasValue)
+            if (!string.IsNullOrWhiteSpace(actor.SelectedAnimationFilePath) ||
+                actor.SelectedAnimationOwnerPathHash.HasValue)
             {
                 AnimationClipCatalogItem animation = _model.DetectedAnimations.FirstOrDefault(item =>
-                    (!tab.SelectedAnimationGraphPathHash.HasValue || item.Clip?.GraphPathHash == tab.SelectedAnimationGraphPathHash) &&
-                    (!tab.SelectedAnimationOwnerPathHash.HasValue || item.Clip?.OwnerPathHash == tab.SelectedAnimationOwnerPathHash) &&
-                    (string.IsNullOrWhiteSpace(tab.SelectedAnimationFilePath) ||
-                     string.Equals(item.FilePath, tab.SelectedAnimationFilePath, StringComparison.OrdinalIgnoreCase)));
+                    (!actor.SelectedAnimationGraphPathHash.HasValue || item.Clip?.GraphPathHash == actor.SelectedAnimationGraphPathHash) &&
+                    (!actor.SelectedAnimationOwnerPathHash.HasValue || item.Clip?.OwnerPathHash == actor.SelectedAnimationOwnerPathHash) &&
+                    (string.IsNullOrWhiteSpace(actor.SelectedAnimationFilePath) ||
+                     string.Equals(item.FilePath, actor.SelectedAnimationFilePath, StringComparison.OrdinalIgnoreCase)));
                 if (animation != null)
                 {
                     _model.IsAnimationMode = true;
                     _model.SelectedAnimation = animation;
-                    if (tab.AnimationParameter.HasValue &&
-                        (_model.AnimationParameter != tab.AnimationParameter || animation.HasParameterValues))
+                    if (actor.AnimationParameter.HasValue &&
+                        (_model.AnimationParameter != actor.AnimationParameter || animation.HasParameterValues))
                     {
-                        _model.AnimationParameter = tab.AnimationParameter;
+                        _model.AnimationParameter = actor.AnimationParameter;
                     }
-                    return;
+                    return true;
                 }
             }
 
-            if (tab.SelectedSpellPathHash is uint spellHash)
+            if (actor.SelectedSpellPathHash is uint spellHash)
             {
                 VfxSpellBrowserItem spell = FindSpellByPathHash(skin.SpellItems, spellHash);
                 if (spell != null)
                 {
                     _model.IsAnimationMode = true;
                     _model.SelectedSpell = spell;
+                    return true;
                 }
             }
+            return false;
         }
 
         private static VfxSpellBrowserItem FindSpellByPathHash(IEnumerable<object> items, uint pathHash)
@@ -609,20 +659,23 @@ namespace AssetsManager.Views.Controls.Viewer
                 SelectWorkspaceTab(tab);
                 switch (tab.Kind)
                 {
-                    case VfxWorkspaceTabKind.Skin when tab.Payload is VfxSkinItem skin:
+                    case VfxWorkspaceTabKind.Skin when tab.FocusedActor?.Skin is VfxSkinItem skin:
                         _pendingWorkspaceRestoreTab = tab;
                         bool adoptedBackdrop = _mapSceneRuntime != null && TryAdoptLoadedMapAsCharacterBackdrop(tab);
                         if (!adoptedBackdrop)
                             CancelMapLoadAndClearScene();
                         _model.SelectedMapNode = null;
+                        SyncSceneActorRuntimes(tab);
+                        // Two scenes can focus the same Skin, so the focused actor always reloads.
                         if (!ReferenceEquals(_model.SelectedSkin, skin))
                             _model.SelectedSkin = skin;
-                        else if (_browserSkin == null)
+                        else
                             BindBrowserSkin();
                         break;
 
                     case VfxWorkspaceTabKind.Map when tab.Payload is MapBrowserNode mapNode:
                         _pendingWorkspaceRestoreTab = null;
+                        ReleaseSceneActorRuntimes();
                         if (_model.SelectedSkin != null || _championModel != null)
                         {
                             ClearLoadedSkinState();
@@ -675,6 +728,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _model.SelectedWorkspaceTab = null;
                 CancelMapLoadAndClearScene();
+                ReleaseSceneActorRuntimes();
                 ClearLoadedSkinState();
                 _model.SelectedSkin = null;
                 _model.SelectedMapNode = null;
@@ -717,6 +771,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ClearWorkspaceTabs()
         {
+            ReleaseSceneActorRuntimes();
             _model.SelectedWorkspaceTab = null;
             _model.WorkspaceTabs.Clear();
             _model.NotifyWorkspaceTabsChanged();
@@ -729,14 +784,31 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (_model.SelectedSkin != null && !_isSwitchingWorkspaceTab)
                 {
+                    VfxSkinItem skin = _model.SelectedSkin;
+                    VfxWorkspaceTab current = _model.SelectedWorkspaceTab;
+                    VfxSceneActor member = current?.Kind == VfxWorkspaceTabKind.Skin
+                        ? current.Actors.FirstOrDefault(actor => actor.HasSkin(skin))
+                        : null;
+                    bool staysInScene = member != null &&
+                        (!_openSkinInOwnTab ||
+                         string.Equals(current.Key, SkinWorkspaceKey(skin), StringComparison.OrdinalIgnoreCase));
+                    if (staysInScene && !ReferenceEquals(member, current.FocusedActor))
+                    {
+                        // A Skin already composed into the active scene only takes the focus.
+                        FocusSceneActor(member);
+                        return;
+                    }
+
                     CharacterBackdropSeed inheritedBackdrop = CaptureActiveBackdropSeed();
                     VfxWorkspaceTab skinTab = EnsureSkinWorkspaceTab(
-                        _model.SelectedSkin,
+                        skin,
+                        ownTab: _openSkinInOwnTab,
                         inheritedBackdrop: inheritedBackdrop);
                     _pendingWorkspaceRestoreTab = skinTab;
                     bool adoptedBackdrop = _mapSceneRuntime != null && TryAdoptLoadedMapAsCharacterBackdrop(skinTab);
                     if (!adoptedBackdrop)
                         CancelMapLoadAndClearScene();
+                    SyncSceneActorRuntimes(skinTab);
                 }
                 BindBrowserSkin();
             }
@@ -834,13 +906,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (!_isApplyingCharacterViewportState)
                 {
-                    if (_model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
-                    {
-                        _model.SelectedWorkspaceTab.CharacterPlacementCustomized = true;
-                        _model.SelectedWorkspaceTab.CharacterPlacedOnKey = _model.HasActiveCharacterBackdrop
-                            ? VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source)
-                            : null;
-                    }
+                    PinFocusedPlacement();
                     ApplyCharacterPlacement();
                 }
             }
@@ -855,7 +921,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (e.PropertyName == nameof(VfxInspectorModel.CharacterEffectsEnabled))
                     SavePreviewDisplayPreferences();
                 if (e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate))
+                {
                     ApplyCharacterPlacement();
+                    ApplySceneActorPlacements();
+                }
                 if (e.PropertyName == nameof(VfxInspectorModel.CharacterTransformGizmoEnabled))
                     RefreshCharacterInteractionTarget();
                 if (e.PropertyName == nameof(VfxInspectorModel.InspectorVisible) ||
@@ -995,48 +1064,69 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ApplyCharacterBackdropOrigin(MapSceneData scene, MapSceneSource source)
         {
-            if (!_model.IsSkinWorkspace || scene?.Geometry == null ||
-                _model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin)
-            {
-                return;
-            }
-
-            int visibilityFlags = _mapSceneRuntime?.VisibilityFlags ?? scene.OpeningVisibilityFlags;
-            Vector3? calculatedOrigin = MapGeometrySemantics.CalculateOriginForFlags(scene.Geometry, visibilityFlags);
-            if (calculatedOrigin is not Vector3 origin)
+            VfxSceneActor actor = FocusedActor;
+            if (actor == null || !TryGetCharacterBackdropOrigin(scene, out Vector3 origin))
                 return;
 
-            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
             string sourceKey = VfxInstallationMapCatalog.BackdropKey(source);
-            bool hasPinnedPlacement = tab.CharacterPlacementCustomized &&
-                string.Equals(tab.CharacterPlacedOnKey, sourceKey, StringComparison.OrdinalIgnoreCase);
+            bool hasPinnedPlacement = actor.PlacementCustomized &&
+                string.Equals(actor.PlacedOnKey, sourceKey, StringComparison.OrdinalIgnoreCase);
             if (hasPinnedPlacement) return;
 
+            var previous = new Vector3(
+                (float)_model.CharacterPositionX,
+                (float)_model.CharacterPositionY,
+                (float)_model.CharacterPositionZ);
             _isApplyingCharacterViewportState = true;
             try
             {
-                // MAP geometry is mirrored on X by the renderer. Convert the authored engine origin to
-                // the same preview-space point before standing the independently rendered Character on it.
-                _model.CharacterPositionX = -origin.X;
+                _model.CharacterPositionX = origin.X;
                 _model.CharacterPositionY = origin.Y;
                 _model.CharacterPositionZ = origin.Z;
                 _model.CharacterRotationX = 0d;
                 _model.CharacterRotationY = 0d;
                 _model.CharacterRotationZ = 0d;
-                tab.CharacterPositionX = _model.CharacterPositionX;
-                tab.CharacterPositionY = _model.CharacterPositionY;
-                tab.CharacterPositionZ = _model.CharacterPositionZ;
-                tab.CharacterRotationX = 0d;
-                tab.CharacterRotationY = 0d;
-                tab.CharacterRotationZ = 0d;
-                tab.CharacterPlacementCustomized = false;
-                tab.CharacterPlacedOnKey = sourceKey;
+                StoreFocusedPlacement(actor);
+                actor.PlacementCustomized = false;
+                actor.PlacedOnKey = sourceKey;
             }
             finally
             {
                 _isApplyingCharacterViewportState = false;
             }
             ApplyCharacterPlacement();
+            ShiftSceneActorsWithAnchor(origin - previous, sourceKey);
+        }
+
+        /// <summary>
+        /// Preview-space point where a Character stands on the active MAP backdrop. MAP geometry is
+        /// mirrored on X by the renderer, so the authored engine origin is converted to that space.
+        /// </summary>
+        private bool TryGetCharacterBackdropOrigin(MapSceneData scene, out Vector3 origin)
+        {
+            origin = default;
+            if (!_model.IsSkinWorkspace || scene?.Geometry == null)
+                return false;
+
+            int visibilityFlags = _mapSceneRuntime?.VisibilityFlags ?? scene.OpeningVisibilityFlags;
+            if (MapGeometrySemantics.CalculateOriginForFlags(scene.Geometry, visibilityFlags) is not Vector3 engineOrigin)
+                return false;
+            origin = new Vector3(-engineOrigin.X, engineOrigin.Y, engineOrigin.Z);
+            return true;
+        }
+
+        private string ActiveCharacterBackdropKey() =>
+            _model.HasActiveCharacterBackdrop
+                ? VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source)
+                : null;
+
+        /// <summary>A user placement edit pins the focused actor to the current stage.</summary>
+        private void PinFocusedPlacement()
+        {
+            VfxSceneActor actor = FocusedActor;
+            if (actor == null) return;
+            actor.PlacementCustomized = true;
+            actor.PlacedOnKey = ActiveCharacterBackdropKey();
         }
 
         private void ApplyCharacterPlacement()
@@ -1071,9 +1161,21 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void RefreshCharacterInteractionTarget()
         {
+            // Every visible Character can be picked to take the focus; only the focused one is moved.
             _characterInteractionModels.Clear();
-            if (_championModel != null && _model.IsSkinWorkspace)
-                _characterInteractionModels.Add(_championModel);
+            SceneModel focused = _championModel != null && _model.IsSkinWorkspace && IsFocusedActorVisible
+                ? _championModel
+                : null;
+            if (focused != null)
+                _characterInteractionModels.Add(focused);
+            if (_model.IsSkinWorkspace)
+            {
+                foreach ((VfxSceneActor actor, VfxSceneActorRuntime runtime) in _sceneActorRuntimes)
+                {
+                    if (actor.IsVisible)
+                        _characterInteractionModels.Add(runtime.Model);
+                }
+            }
 
             if (_characterInteractionController == null)
                 return;
@@ -1081,8 +1183,8 @@ namespace AssetsManager.Views.Controls.Viewer
             _characterInteractionController.IsEnabled =
                 _model.IsSkinWorkspace && _model.CharacterTransformGizmoEnabled;
             _characterInteractionController.SetSelection(
-                _characterInteractionModels,
-                _characterInteractionModels.FirstOrDefault());
+                focused == null ? Array.Empty<SceneModel>() : new[] { focused },
+                focused);
         }
 
         private void CharacterInteraction_TransformChanged(SceneModel model)
@@ -1101,18 +1203,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.CharacterPositionX = model.PositionX;
                 _model.CharacterPositionY = model.PositionY;
                 _model.CharacterPositionZ = model.PositionZ;
-
-                if (_model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
-                {
-                    VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
-                    tab.CharacterPositionX = model.PositionX;
-                    tab.CharacterPositionY = model.PositionY;
-                    tab.CharacterPositionZ = model.PositionZ;
-                    tab.CharacterPlacementCustomized = true;
-                    tab.CharacterPlacedOnKey = _model.HasActiveCharacterBackdrop
-                        ? VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source)
-                        : null;
-                }
+                PinFocusedPlacement();
             }
             finally
             {
@@ -1120,14 +1211,17 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             // The shared gizmo owns the SceneModel translation. Re-applying through the Studio placement
-            // path keeps attached clip/idle VFX and the per-tab placement in the same world frame.
+            // path keeps attached clip/idle VFX and the actor placement in the same world frame.
             ApplyCharacterPlacement();
         }
 
         private void AdvanceCharacterAutoRotate(float deltaSeconds)
         {
-            if (!_model.IsSkinWorkspace || !_model.CharacterAutoRotate || _championModel == null || deltaSeconds <= 0f)
+            if (!_model.IsSkinWorkspace || !_model.CharacterAutoRotate || deltaSeconds <= 0f ||
+                (_championModel == null && _sceneActorRuntimes.Count == 0))
+            {
                 return;
+            }
 
             // Match the normal Viewer: one calm 30-degree/second orbit. This is a transient layer over
             // the user's authored placement, so disabling Auto Rotate restores the exact manual yaw.
@@ -1149,6 +1243,8 @@ namespace AssetsManager.Views.Controls.Viewer
             if (CharacterArmatureCanvas == null ||
                 !_model.IsSkinWorkspace ||
                 !_model.ShowCharacterArmature ||
+                !IsFocusedActorVisible ||
+                _championAwaitingFirstPose ||
                 _championModel?.Skeleton?.Joints == null ||
                 _championModel.Skeleton.Joints.Count == 0)
             {
@@ -1539,6 +1635,8 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             RunReleaseStep(nameof(CustomCameraController), () => cameraController?.Dispose());
 
+            DisposeSceneActorResources();
+
             var vfxRenderer = _vfxRenderer;
             _vfxRenderer = null;
             RunReleaseStep(nameof(VfxRenderSession), () => vfxRenderer?.Dispose(), gpuBound: true);
@@ -1591,6 +1689,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (characterInteractionController != null)
             {
                 characterInteractionController.TransformChanged -= CharacterInteraction_TransformChanged;
+                characterInteractionController.SelectionRequested -= CharacterInteraction_SelectionRequested;
                 RunReleaseStep(nameof(ViewportModelInteractionController), characterInteractionController.Dispose);
             }
             _characterInteractionModels.Clear();
@@ -1784,7 +1883,10 @@ namespace AssetsManager.Views.Controls.Viewer
                         CharacterGizmoOrigin,
                         () => _dummyViewport.Camera as ProjectionCamera,
                         _characterInteractionModels);
+                    _characterInteractionController.WorldMatrixProvider =
+                        model => GlMeshRenderer.CreateWorldMatrix(model, mirrorCharacterX: true);
                     _characterInteractionController.TransformChanged += CharacterInteraction_TransformChanged;
+                    _characterInteractionController.SelectionRequested += CharacterInteraction_SelectionRequested;
                     RefreshCharacterInteractionTarget();
                 }
 
@@ -1819,6 +1921,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_gl == null) return;
 
             _championMeshRenderer?.ProcessPendingReleases();
+            ProcessSceneActorGpuState();
             if (_isExitPending)
             {
                 // ReleaseCurrentProject clears the CPU/runtime ownership first. Finish the matching
@@ -1834,6 +1937,13 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             if (!_isActive || !IsVisible) return;
+
+            // The first-pose wait ends once a pose landed or nothing is being prepared any more.
+            if (_championAwaitingFirstPose &&
+                (_animationClipCancellation == null || _championModel?.CurrentAnimation != null))
+            {
+                _championAwaitingFirstPose = false;
+            }
 
             float dt = ResolveSimulationFrameDelta(delta, _discardNextSimulationDelta);
             _discardNextSimulationDelta = false;
@@ -1908,6 +2018,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 AdvanceCurrentVfxPlayback(dt);
                 UpdateChampionPoseForFrame();
+                AdvanceSceneActors(dt);
             }
 
             // Sky is one Studio display element. MAP scenes supply their authored cubemap when available;
@@ -1948,6 +2059,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (characterBackdrop)
                 {
                     RenderChampionMesh(viewProj, view, proj, eye);
+                    RenderSceneActorMeshes(viewProj, view, proj, eye);
                     UpdateCharacterArmatureOverlay(viewProj);
                 }
                 uint mapViewportWidth = (uint)Math.Max(1d, OpenTkControl.ActualWidth);
@@ -1958,13 +2070,13 @@ namespace AssetsManager.Views.Controls.Viewer
                     mapViewportWidth,
                     mapViewportHeight);
 
-                // LTK has one global particle pass block for the scene. MAP placements and an
-                // inspected Character Clip use different coordinate spaces/render owners here, so
-                // keep their renderers separate but coordinate the phases: every soft-depth grab
-                // happens before particle colour, then all colour/wire draws land before either
-                // renderer captures the frame used by distortion.
-                _mapParticleRenderer?.SetSun(EffectiveMapSun());
-                _vfxRenderer?.SetSun(EffectiveMapSun());
+                // LTK has one global particle pass block for the scene. MAP placements and every
+                // Character session use different coordinate spaces/render owners here, so keep their
+                // renderers separate but coordinate the phases: every soft-depth grab happens before
+                // particle colour, then all colour/wire draws land before any renderer captures the
+                // frame used by distortion.
+                MapSunData sun = EffectiveMapSun();
+                _mapParticleRenderer?.SetSun(sun);
                 bool mapParticlesPrepared = _mapSceneRuntime.ShowParticles &&
                     _mapParticleRenderer?.PrepareRenderFrame(
                         _mapSceneRuntime.Particles.VisibleRuntimes,
@@ -1974,42 +2086,16 @@ namespace AssetsManager.Views.Controls.Viewer
                         mapViewportHeight,
                         _model.PreviewViewMode,
                         _model.EffectivePreviewWireOverlay) == true;
+                if (mapParticlesPrepared)
+                    _preparedParticlePasses.Add(_mapParticleRenderer);
 
-                bool sceneVfxPrepared = false;
                 bool shouldDrawSceneVfx = HasSelectedMapClipReady() ||
-                    (characterBackdrop && ShouldRenderCharacterVfx());
+                    (characterBackdrop && ShouldRenderCharacterVfx() && IsFocusedActorVisible && !_championAwaitingFirstPose);
                 if (shouldDrawSceneVfx && _vfxRenderer?.ActiveSystem != null)
-                {
-                    _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
-                    sceneVfxPrepared = _vfxRenderer.PrepareRenderFrame(
-                        viewProj,
-                        view,
-                        _model.PreviewViewMode,
-                        _model.EffectivePreviewWireOverlay);
-                }
-
-                using IDisposable mapParticleBatch = mapParticlesPrepared
-                    ? _mapParticleRenderer.BeginPreparedRenderBatch()
-                    : null;
-                using IDisposable sceneVfxBatch = sceneVfxPrepared
-                    ? _vfxRenderer.BeginPreparedRenderBatch()
-                    : null;
-
-                if (mapParticlesPrepared)
-                    _mapParticleRenderer.RenderPreparedColorPass();
-                if (sceneVfxPrepared)
-                    _vfxRenderer.RenderPreparedColorPass();
-
-                // Both captures see the exact same completed colour frame, before any warp draw.
-                if (mapParticlesPrepared)
-                    _mapParticleRenderer.CapturePreparedDistortionFrame();
-                if (sceneVfxPrepared)
-                    _vfxRenderer.CapturePreparedDistortionFrame();
-
-                if (mapParticlesPrepared)
-                    _mapParticleRenderer.RenderPreparedDistortionPass();
-                if (sceneVfxPrepared)
-                    _vfxRenderer.RenderPreparedDistortionPass();
+                    PrepareParticleSession(_vfxRenderer, sun, viewProj, view);
+                if (characterBackdrop)
+                    PrepareSceneActorParticles(sun, viewProj, view);
+                RenderPreparedParticlePasses();
             }
             else
                 _previewSurfaceRenderer?.Render(
@@ -2020,26 +2106,23 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (!characterBackdrop)
             {
-                _vfxRenderer?.SetSun(null);
                 AdvanceCurrentVfxPlayback(dt);
                 UpdateChampionPoseForFrame();
+                AdvanceSceneActors(dt);
                 RenderChampionMesh(viewProj, view, proj, eye);
+                RenderSceneActorMeshes(viewProj, view, proj, eye);
                 UpdateCharacterArmatureOverlay(viewProj);
             }
 
-            if (_vfxRenderer != null)
+            // Without a MAP, every Character session still shares one particle pass after all meshes.
+            if (_mapSceneRuntime == null)
             {
-                if (_mapSceneRuntime == null && ShouldRenderCharacterVfx())
-                {
-                    _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
-                    _vfxRenderer.Render(viewProj, view, _model.PreviewViewMode, _model.EffectivePreviewWireOverlay);
-                }
-                _model.LiveParticleCount = _vfxRenderer.LiveParticleCount;
+                if (_vfxRenderer != null && ShouldRenderCharacterVfx() && IsFocusedActorVisible && !_championAwaitingFirstPose)
+                    PrepareParticleSession(_vfxRenderer, null, viewProj, view);
+                PrepareSceneActorParticles(null, viewProj, view);
+                RenderPreparedParticlePasses();
             }
-            else
-            {
-                _model.LiveParticleCount = 0;
-            }
+            _model.LiveParticleCount = (_vfxRenderer?.LiveParticleCount ?? 0) + SceneActorParticleCount();
 
             if (_mapSceneRuntime != null)
             {
@@ -2155,15 +2238,29 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_activeMapCharacterClip != null ||
                 !_model.ShowChampionMesh ||
-                _championModel == null ||
-                _championMeshRenderer == null)
+                !IsFocusedActorVisible ||
+                _championAwaitingFirstPose ||
+                _championModel == null)
             {
                 return;
             }
 
+            RenderCharacterMesh(_championModel, viewProjection, view, projection, eye);
+        }
+
+        /// <summary>Draws one Studio Character with the reference lighting and the active preview modes.</summary>
+        private void RenderCharacterMesh(
+            SceneModel model,
+            Matrix4x4 viewProjection,
+            Matrix4x4 view,
+            Matrix4x4 projection,
+            Vector3 eye)
+        {
+            if (_championMeshRenderer == null || model == null) return;
+
             var lighting = GlMeshRenderer.ReferenceCharacterLighting();
             _championMeshRenderer.Render(
-                _championModel,
+                model,
                 viewProjection,
                 view,
                 projection,
@@ -2359,10 +2456,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private VfxDefinitionBounds CurrentPreviewBounds()
         {
-            if (_model.IsSkinWorkspace && _championModel != null)
+            if (_model.IsSkinWorkspace)
             {
-                VfxDefinitionBounds character = CharacterPreviewBounds();
-                if (IsFiniteBounds(character)) return character;
+                VfxDefinitionBounds characters = SceneCharacterBounds();
+                if (IsFiniteBounds(characters)) return characters;
             }
 
             if (_model.IsRawSystemsMode && _model.SelectedSystem?.Definition is { } definition)
@@ -2391,13 +2488,13 @@ namespace AssetsManager.Views.Controls.Viewer
                    (bounds.Max - bounds.Min).LengthSquared() > 1e-8f;
         }
 
-        private VfxDefinitionBounds CharacterPreviewBounds()
+        private static VfxDefinitionBounds CharacterPreviewBounds(SceneModel model)
         {
-            if (_championModel == null) return default;
-            Rect3D local = ViewerInteractionService.GetLocalBounds(_championModel);
+            if (model == null) return default;
+            Rect3D local = ViewerInteractionService.GetLocalBounds(model);
             if (local.IsEmpty) return default;
 
-            Matrix4x4 world = GlMeshRenderer.CreateWorldMatrix(_championModel, mirrorCharacterX: true);
+            Matrix4x4 world = GlMeshRenderer.CreateWorldMatrix(model, mirrorCharacterX: true);
             Vector3 min = new(float.PositiveInfinity);
             Vector3 max = new(float.NegativeInfinity);
             double[] xs = { local.X, local.X + local.SizeX };
@@ -2719,108 +2816,67 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ResetCharacterPlacement_Click(object sender, RoutedEventArgs e)
         {
-            if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
-            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
-            tab.CharacterPlacementCustomized = false;
-            _isApplyingCharacterViewportState = true;
-            try
-            {
-                _model.CharacterRotationX = 0d;
-                _model.CharacterRotationY = 0d;
-                _model.CharacterRotationZ = 0d;
-                _model.CharacterScaleMultiplier = 1d;
-                if (_model.HasActiveCharacterBackdrop && _mapSceneRuntime?.Scene != null)
-                {
-                    tab.CharacterPlacedOnKey = VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source);
-                }
-                else
-                {
-                    tab.CharacterPlacedOnKey = null;
-                    _model.CharacterPositionX = 0d;
-                    _model.CharacterPositionY = 0d;
-                    _model.CharacterPositionZ = 0d;
-                }
-            }
-            finally
-            {
-                _isApplyingCharacterViewportState = false;
-            }
-
-            if (_model.HasActiveCharacterBackdrop && _mapSceneRuntime?.Scene != null)
-                ApplyCharacterBackdropOrigin(_mapSceneRuntime.Scene, _model.SelectedCharacterBackdrop?.Source);
-            else
-                ApplyCharacterPlacement();
             e.Handled = true;
+            ResetFocusedPlacement(position: true, rotation: true, scale: true, pin: false);
         }
 
         private void ResetCharacterPosition_Click(object sender, RoutedEventArgs e)
         {
-            if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
-            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
-            tab.CharacterPlacementCustomized = true;
-            _isApplyingCharacterViewportState = true;
-            try
-            {
-                if (_model.HasActiveCharacterBackdrop && _mapSceneRuntime?.Scene != null)
-                {
-                    tab.CharacterPlacedOnKey = VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source);
-                }
-                else
-                {
-                    tab.CharacterPlacedOnKey = null;
-                    _model.CharacterPositionX = 0d;
-                    _model.CharacterPositionY = 0d;
-                    _model.CharacterPositionZ = 0d;
-                }
-            }
-            finally
-            {
-                _isApplyingCharacterViewportState = false;
-            }
-
-            if (_model.HasActiveCharacterBackdrop && _mapSceneRuntime?.Scene != null)
-                ApplyCharacterBackdropOrigin(_mapSceneRuntime.Scene, _model.SelectedCharacterBackdrop?.Source);
-            else
-                ApplyCharacterPlacement();
             e.Handled = true;
+            ResetFocusedPlacement(position: true, rotation: false, scale: false, pin: true);
         }
 
         private void ResetCharacterRotation_Click(object sender, RoutedEventArgs e)
         {
-            if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
-            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
-            tab.CharacterPlacementCustomized = true;
-            _isApplyingCharacterViewportState = true;
-            try
-            {
-                _model.CharacterRotationX = 0d;
-                _model.CharacterRotationY = 0d;
-                _model.CharacterRotationZ = 0d;
-            }
-            finally
-            {
-                _isApplyingCharacterViewportState = false;
-            }
-            ApplyCharacterPlacement();
             e.Handled = true;
+            ResetFocusedPlacement(position: false, rotation: true, scale: false, pin: true);
         }
 
         private void ResetCharacterScale_Click(object sender, RoutedEventArgs e)
         {
-            if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
-            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
-            tab.CharacterPlacementCustomized = true;
+            e.Handled = true;
+            ResetFocusedPlacement(position: false, rotation: false, scale: true, pin: true);
+        }
+
+        /// <summary>
+        /// Resets parts of the focused actor placement. Position returns to the stage origin: the
+        /// active MAP backdrop origin, or the preview origin without one. A full reset unpins the actor
+        /// so a later backdrop can re-anchor it; partial resets keep it pinned to the current stage.
+        /// </summary>
+        private void ResetFocusedPlacement(bool position, bool rotation, bool scale, bool pin)
+        {
+            VfxSceneActor actor = FocusedActor;
+            if (actor == null) return;
+
+            Vector3 stageOrigin = _model.HasActiveCharacterBackdrop &&
+                TryGetCharacterBackdropOrigin(_mapSceneRuntime?.Scene, out Vector3 backdropOrigin)
+                    ? backdropOrigin
+                    : Vector3.Zero;
             _isApplyingCharacterViewportState = true;
             try
             {
-                _model.CharacterScaleMultiplier = 1d;
+                if (position)
+                {
+                    _model.CharacterPositionX = stageOrigin.X;
+                    _model.CharacterPositionY = stageOrigin.Y;
+                    _model.CharacterPositionZ = stageOrigin.Z;
+                }
+                if (rotation)
+                {
+                    _model.CharacterRotationX = 0d;
+                    _model.CharacterRotationY = 0d;
+                    _model.CharacterRotationZ = 0d;
+                }
+                if (scale)
+                    _model.CharacterScaleMultiplier = 1d;
+                actor.PlacementCustomized = pin;
+                actor.PlacedOnKey = ActiveCharacterBackdropKey();
             }
             finally
             {
                 _isApplyingCharacterViewportState = false;
             }
             ApplyCharacterPlacement();
-            e.Handled = true;
         }
 
         private long _previewShowClosedTicks;
@@ -3999,13 +4055,37 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void BrowserItem_Expanded(object sender, RoutedEventArgs e)
         {
-            if (e.OriginalSource is TreeViewItem { DataContext: VfxSkinItem skin } &&
-                !ReferenceEquals(_model.SelectedSkin, skin))
+            if (e.OriginalSource is TreeViewItem { DataContext: VfxSkinItem skin })
+                TrySelectSceneSkin(skin);
+        }
+
+        /// <summary>
+        /// Browser clicks and expansion never open a Skin: that is an explicit Open in New Tab / Add to
+        /// Current Scene action. They only reach Characters already composed into the active scene.
+        /// </summary>
+        private bool TrySelectSceneSkin(VfxSkinItem skin)
+        {
+            if (skin == null) return false;
+            if (ReferenceEquals(_model.SelectedSkin, skin)) return true;
+
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            if (tab?.Kind == VfxWorkspaceTabKind.Skin && tab.Actors.Any(actor => actor.HasSkin(skin)))
+            {
                 _model.SelectedSkin = skin;
+                return true;
+            }
+
+            _model.StatusText = $"{skin.Title} · right-click to open it in a new tab or add it to the current scene.";
+            return false;
         }
 
         private void VfxBrowser_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
+            if (e.NewValue != null && !_isSceneFocusHandover)
+            {
+                _startNextPreviewPaused = false;
+                _startNextPreviewTime = 0d;
+            }
             if (e.NewValue is not MapBrowserNode)
             {
                 _model.SelectedMapNode = null;
@@ -4019,26 +4099,12 @@ namespace AssetsManager.Views.Controls.Viewer
                     HandleMapBrowserSelection(mapNode);
                     break;
                 case VfxSkinItem skin:
-                    if (!ReferenceEquals(_model.SelectedSkin, skin))
-                    {
-                        _model.SelectedSkin = skin;
-                    }
-                    else
-                    {
-                        // Returning to the Skin itself clears every explicit child preview. The owner
-                        // scene then opens exactly like the Skin viewport: first playable Idle in authored
-                        // AnimationGraph order, or bind pose when the graph has no Idle. A standalone
-                        // System is never selected implicitly by this path.
-                        BeginExclusivePreviewSelection();
-                        _model.SelectedSystem = null;
-                        _model.SelectedAnimation = null;
-                        _model.SelectedSpell = null;
-                        _model.IsAnimationMode = true;
-                        TrySelectOpeningSkinAnimation();
-                    }
+                    // Selecting (or collapsing) the Skin node never replaces the running System/Clip/Spell;
+                    // only a Character not yet focused in the active scene takes the focus.
+                    TrySelectSceneSkin(skin);
                     break;
                 case VfxBrowserSection section:
-                    if (!ReferenceEquals(_model.SelectedSkin, section.Owner)) _model.SelectedSkin = section.Owner;
+                    if (!TrySelectSceneSkin(section.Owner)) break;
                     _model.IsAnimationMode = section.Kind != VfxBrowserSectionKind.Systems;
                     break;
                 case VfxSystemDiagnosticItem system:
@@ -4056,8 +4122,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.SelectedAnimation = animation;
                     break;
                 case VfxSpellBrowserItem spell:
+                    if (!TrySelectSceneSkin(spell.Owner)) break;
                     _pendingSpell = spell;
-                    if (!ReferenceEquals(_model.SelectedSkin, spell.Owner)) _model.SelectedSkin = spell.Owner;
                     _model.SelectedSystem = null;
                     _model.SelectedAnimation = null;
                     _model.IsAnimationMode = true;
@@ -4778,6 +4844,8 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _championBundle = null;
+            _championSknPath = null;
+            _championAwaitingFirstPose = false;
             ClearCharacterFormState();
             _championAuthoredScale = 1d;
             _characterAuthoredHiddenSubmeshes.Clear();
@@ -4810,18 +4878,28 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (!File.Exists(binFilePath)) return;
 
+            VfxSceneActorRuntime adoption = TakePendingActorAdoption(binFilePath);
             ClearLoadedSkinState();
             _binCancellation = new System.Threading.CancellationTokenSource();
             var operation = _binCancellation;
             VfxWorkspaceTab restoreTab = _pendingWorkspaceRestoreTab;
+            bool servicesAdopted = false;
 
             try
             {
                 _model.LogMessages.Add($"[BIN] Loading BIN definitions from: {Path.GetFileName(binFilePath)}");
 
-                var bundle = await VfxLoadingService.LoadAsync(binFilePath, LogService, operation.Token);
+                // A promoted scene actor already carries this Skin's bundle, model and decoded clips.
+                var bundle = adoption?.Bundle ??
+                    await VfxLoadingService.LoadAsync(binFilePath, LogService, operation.Token);
                 if (operation.IsCancellationRequested || _isCleanedUp) return;
                 _activeBundle = bundle;
+                if (adoption != null)
+                {
+                    AdoptFocusedServices(adoption);
+                    servicesAdopted = true;
+                }
+                _championAnimationService ??= new AnimationService(LogService);
 
                 // AnimationGraph metadata is independent from the preview mesh. Populate the
                 // picker immediately; ANM payloads are decoded only when a clip/spell needs one.
@@ -4858,6 +4936,19 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.LogMessages.Add($"[BIN SUCCESS] Extracted {_model.Systems.Count} VFX systems.");
                 _model.StatusText = $"Loaded {_model.Systems.Count} systems from {Path.GetFileName(binFilePath)}.";
 
+                if (adoption != null)
+                {
+                    InstallChampionModel(adoption.Model, bundle, adoption.SknPath, _model.RootPath, startPreview: false);
+                    adoption = null;
+                    bool restored = restoreTab != null && ReferenceEquals(_pendingWorkspaceRestoreTab, restoreTab) &&
+                        RestoreWorkspaceSelection(restoreTab, binFilePath);
+                    _pendingWorkspaceRestoreTab = null;
+                    if (!restored)
+                        TrySelectOpeningSkinAnimation();
+                    TryPlayPendingSpell();
+                    return;
+                }
+
                 if (restoreTab != null && ReferenceEquals(_pendingWorkspaceRestoreTab, restoreTab))
                 {
                     _pendingWorkspaceRestoreTab = null;
@@ -4871,12 +4962,26 @@ namespace AssetsManager.Views.Controls.Viewer
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                    LogService?.LogError(ex, "Failed to load VFX BIN.");
+                LogService?.LogError(ex, "Failed to load VFX BIN.");
                 _model.StatusText = "Unable to load this BIN.";
                 _model.LogMessages.Add($"[ERROR] Failed to load BIN: {ex.Message}");
             }
             finally
             {
+                if (adoption != null)
+                {
+                    // Only the model is still ours once the pose/session services were adopted.
+                    if (servicesAdopted)
+                    {
+                        _championMeshRenderer?.QueueRelease(adoption.Model);
+                        adoption.Model.CurrentAnimation = null;
+                        RunReleaseStep("Scene actor model", adoption.Model.Dispose);
+                    }
+                    else
+                    {
+                        ReleaseSceneActorRuntime(adoption);
+                    }
+                }
                 if (ReferenceEquals(_binCancellation, operation)) _binCancellation = null;
                 operation.Dispose();
             }
@@ -5086,8 +5191,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.CurrentTime = _vfxRenderer.PlaybackTime;
             else
                 _model.CurrentTime = restoredTime;
-            _vfxRenderer?.Play();
-            _model.IsPlaying = true;
+            bool play = !TakeStartPreviewPaused();
+            if (play) _vfxRenderer?.Play();
+            _model.IsPlaying = play;
 
             TryLoadChampionModelAsync(searchDir);
 
@@ -5126,80 +5232,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     }
                     if (loaded != null)
                     {
-                        var oldModel = _championModel;
-                        _championModel = loaded;
-                        _championBundle = bundle;
-                        RefreshCharacterInteractionTarget();
-                        // Keep the owner mesh and its joint anchors in authored skinScale space. User
-                        // placement is an outer multiplier so attached VFX do not receive skinScale twice.
-                        _championAuthoredScale = _activeBundle?.OwnerSceneContext is { SkinScale: > 0f } owner
-                            ? owner.SkinScale
-                            : 1d;
-                        _championModel.Scale = _championAuthoredScale;
-                        IReadOnlyList<uint> initialHidden =
-                            _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>();
-                        ApplyOwnerSubmeshVisibility(initialHidden);
-                        if (oldModel != null)
-                        {
-                            _championMeshRenderer?.QueueRelease(oldModel);
-                            oldModel.Dispose();
-                        }
-                        _model.HasChampionMesh = true;
-                        RebuildCharacterSubmeshOptions();
-
-                        // Ensure skeleton is loaded
-                        if (_championModel.Skeleton == null)
-                        {
-                            string sklPath = ResolveSklPath(_activeBundle?.OwnerSceneContext?.SkeletonPath, sknPath, searchDir);
-                            if (!string.IsNullOrEmpty(sklPath) && File.Exists(sklPath))
-                            {
-                                using var sklStream = File.OpenRead(sklPath);
-                                _championModel.Skeleton = new LeagueToolkit.Core.Animation.RigResource(sklStream);
-                            }
-                        }
-
-                        _model.HasCharacterSkeleton = _championModel.Skeleton?.Joints?.Count > 0;
-
-                        if (_championModel.GpuSkinningData == null &&
-                            _championModel.Skeleton != null &&
-                            _championModel.SkinnedMesh != null)
-                        {
-                            _championModel.GpuSkinningData = GpuSkinningData.TryCreate(
-                                _championModel.Skeleton,
-                                _championModel.SkinnedMesh,
-                                _championModel.Parts,
-                                out string skinningFailure);
-                            if (_championModel.GpuSkinningData == null)
-                            {
-                                _model.LogMessages.Add(
-                                    $"[CHAMPION MESH] GPU skinning unavailable: {skinningFailure ?? "Unsupported skin data."}");
-                            }
-                        }
-
-                        int boneCount = _championModel.Skeleton?.Joints?.Count ?? 0;
-                        ApplyCharacterPlacement();
-                        _model.LogMessages.Add($"[CHAMPION MESH] Model loaded for VFX studio: {Path.GetFileName(sknPath)} (Skeleton: {(boneCount > 0 ? $"{boneCount} bones" : "None")})");
-                        InvalidateChampionBindPose();
-                        if (_model.SelectedSystem != null && _model.SelectedAnimation == null && _model.SelectedSpell == null)
-                            ApplyChampionBindPose();
-
-                        // The catalog may already be available from BIN load. Rebuild only when needed.
-                        // A restored explicit System/Clip/Spell keeps ownership; otherwise the Skin opens
-                        // on its first playable Idle, matching the authored AnimationGraph order.
-                        if (_model.DetectedAnimations.Count == 0)
-                            BindAnimationCatalog(searchDir);
-                        if (_model.SelectedAnimation != null)
-                        {
-                            _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
-                        }
-                        else if (_model.SelectedSystem == null && _model.SelectedSpell == null)
-                        {
-                            TrySelectOpeningSkinAnimation();
-                        }
-                        else
-                        {
-                            TryPlayPendingSpell();
-                        }
+                        InstallChampionModel(loaded, bundle, sknPath, searchDir, startPreview: true);
                         return;
                     }
                 }
@@ -5209,6 +5242,99 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 LogService?.LogDebug($"Champion mesh not loaded: {ex.Message}");
                 _model.HasChampionMesh = false;
+            }
+        }
+
+        /// <summary>
+        /// Makes a loaded Character the focused owner mesh: authored scale and submeshes, skeleton,
+        /// GPU skinning, forms and placement. With startPreview the Skin opens on its restored or
+        /// opening clip; scene actor adoption restores its own selection afterwards instead.
+        /// </summary>
+        private void InstallChampionModel(
+            SceneModel loaded,
+            VfxLoadingService.Bundle bundle,
+            string sknPath,
+            string searchDir,
+            bool startPreview)
+        {
+            var oldModel = _championModel;
+            _championModel = loaded;
+            _championBundle = bundle;
+            _championSknPath = sknPath;
+            _championAwaitingFirstPose = true;
+            RefreshCharacterInteractionTarget();
+            // Keep the owner mesh and its joint anchors in authored skinScale space. User
+            // placement is an outer multiplier so attached VFX do not receive skinScale twice.
+            _championAuthoredScale = bundle?.OwnerSceneContext is { SkinScale: > 0f } owner
+                ? owner.SkinScale
+                : 1d;
+            _championModel.Scale = _championAuthoredScale;
+            IReadOnlyList<uint> initialHidden =
+                bundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes ?? Array.Empty<uint>();
+            ApplyOwnerSubmeshVisibility(initialHidden);
+            if (oldModel != null && !ReferenceEquals(oldModel, loaded))
+            {
+                _championMeshRenderer?.QueueRelease(oldModel);
+                oldModel.Dispose();
+            }
+            _model.HasChampionMesh = true;
+            RebuildCharacterSubmeshOptions();
+
+            // Ensure skeleton is loaded
+            if (_championModel.Skeleton == null && !string.IsNullOrEmpty(sknPath))
+            {
+                string sklPath = ResolveSklPath(bundle?.OwnerSceneContext?.SkeletonPath, sknPath, searchDir);
+                if (!string.IsNullOrEmpty(sklPath) && File.Exists(sklPath))
+                {
+                    using var sklStream = File.OpenRead(sklPath);
+                    _championModel.Skeleton = new LeagueToolkit.Core.Animation.RigResource(sklStream);
+                }
+            }
+
+            _model.HasCharacterSkeleton = _championModel.Skeleton?.Joints?.Count > 0;
+
+            if (_championModel.GpuSkinningData == null &&
+                _championModel.Skeleton != null &&
+                _championModel.SkinnedMesh != null)
+            {
+                _championModel.GpuSkinningData = GpuSkinningData.TryCreate(
+                    _championModel.Skeleton,
+                    _championModel.SkinnedMesh,
+                    _championModel.Parts,
+                    out string skinningFailure);
+                if (_championModel.GpuSkinningData == null)
+                {
+                    _model.LogMessages.Add(
+                        $"[CHAMPION MESH] GPU skinning unavailable: {skinningFailure ?? "Unsupported skin data."}");
+                }
+            }
+
+            int boneCount = _championModel.Skeleton?.Joints?.Count ?? 0;
+            ApplyCharacterPlacement();
+            _model.LogMessages.Add($"[CHAMPION MESH] Model loaded for VFX studio: {Path.GetFileName(sknPath)} (Skeleton: {(boneCount > 0 ? $"{boneCount} bones" : "None")})");
+            InvalidateChampionBindPose();
+            if (_model.SelectedSystem != null && _model.SelectedAnimation == null && _model.SelectedSpell == null)
+                ApplyChampionBindPose();
+
+            // The catalog may already be available from BIN load. Rebuild only when needed.
+            if (_model.DetectedAnimations.Count == 0)
+                BindAnimationCatalog(searchDir);
+            if (!startPreview)
+                return;
+
+            // A restored explicit System/Clip/Spell keeps ownership; otherwise the Skin opens
+            // on its first playable Idle, matching the authored AnimationGraph order.
+            if (_model.SelectedAnimation != null)
+            {
+                _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
+            }
+            else if (_model.SelectedSystem == null && _model.SelectedSpell == null)
+            {
+                TrySelectOpeningSkinAnimation();
+            }
+            else
+            {
+                TryPlayPendingSpell();
             }
         }
 
@@ -5228,9 +5354,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 _isUpdatingAnimationParameter = false;
             }
 
-            if (_championModel != null) _championModel.CurrentAnimation = null;
-            _clipCatalog?.Dispose();
-            _clipCatalog = new VfxClipCatalog();
+            // Skin changes dispose the previous catalog; one adopted from a scene actor already owns
+            // this bundle's decoded clips and is kept.
+            _clipCatalog ??= new VfxClipCatalog();
             if (_activeBundle == null || VfxLoadingService == null)
                 return;
 
@@ -5353,6 +5479,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
+            bool startPaused = TakeStartPreviewPaused();
+            double startTime = TakeStartPreviewTime();
             _animationClipCancellation?.Cancel();
             var operation = new System.Threading.CancellationTokenSource();
             _animationClipCancellation = operation;
@@ -5420,14 +5548,19 @@ namespace AssetsManager.Views.Controls.Viewer
                         dur,
                         bundle.OwnerSceneContext);
                     _vfxRenderer.SetOwnerSkinningMatrices(_championAnimationService?.FinalBoneTransforms);
-                    _vfxRenderer.Play();
+                    if (startTime > 0d)
+                    {
+                        _model.CurrentTime = VfxClipCueEvaluator.FoldedTime(startTime, dur);
+                        _vfxRenderer.Seek(_model.CurrentTime);
+                    }
+                    if (!startPaused) _vfxRenderer.Play();
                 }
 
                 int resolvedIdleVfx = VfxAbilityCompositionBuilder.CountResolvedIdleEffects(
                     playbackBundle.IdleEffects,
                     bundle.Systems,
                     playbackBundle.ResourceMap);
-                _model.IsPlaying = true;
+                _model.IsPlaying = !startPaused;
                 _model.StatusText = $"{animItem.DisplayName} ({dur:F2}s) · {(animItem.HasVfx ? animItem.VfxSummary : "Animation only")}";
                 _model.LogMessages.Add($"[PLAY ANIMATION] {animItem.DisplayName} ({dur:F2}s) with {(animItem.Composition?.ResolvedCount ?? 0)} VFX events & {resolvedIdleVfx} resolved idle auras.");
                 UpdateTimelineTrackMetrics();
@@ -5498,7 +5631,10 @@ namespace AssetsManager.Views.Controls.Viewer
             // A context switch must not leave the old Clip pose driving the owner. While the
             // next Clip/Spell loads, on a neutral Skin selection, or for a standalone System,
             // the Champion returns to bind pose and owner-joint attachments resolve from it.
-            ResetChampionToBindPose();
+            // A Character that just entered the viewport keeps the pose it arrived with (none, or
+            // the one a promoted scene actor was playing) until its opening clip is ready.
+            if (!_championAwaitingFirstPose)
+                ResetChampionToBindPose();
         }
 
         private void BeginExclusivePreviewSelection()
@@ -5569,6 +5705,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (spell == null || _activeBundle == null || _championModel == null) return;
             _pendingSpell = null;
+            bool startPaused = TakeStartPreviewPaused();
 
             if (spell.Availability != VfxSpellAvailability.Supported)
             {
@@ -5689,14 +5826,14 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_vfxRenderer != null)
                 {
                     _vfxRenderer.SetOwnerSkinningMatrices(_championModel.SkinningMatrices);
-                    if (ready) _vfxRenderer.Play();
+                    if (ready && !startPaused) _vfxRenderer.Play();
                 }
 
                 double duration = _vfxRenderer?.RigDuration ?? Math.Max(
                     animation?.Duration ?? 0d,
                     plan.Arrival + VfxSpellPreviewComposer.ImpactDuration);
                 ResetPreviewLoopRange(duration);
-                _model.IsPlaying = ready;
+                _model.IsPlaying = ready && !startPaused;
                 _model.StatusText = $"{spell.Name} · {plan.Status} · release {plan.Release:F2}s / arrival {plan.Arrival:F2}s";
                 _model.LogMessages.Add($"[PLAY SPELL] {spell.ObjectPath} · {plan.Status}.");
                 UpdateTimelineTrackMetrics();
@@ -5832,9 +5969,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ApplyEffectiveCharacterSubmeshes()
         {
             if (_championModel == null) return;
-            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin
-                ? _model.SelectedWorkspaceTab
-                : null;
+            VfxSceneActor actor = FocusedActor;
             var effectiveHidden = new HashSet<uint>();
             foreach (ModelPart part in _championModel.Parts)
             {
@@ -5842,7 +5977,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 uint hash = Fnv1a.HashLower(part.Name);
                 bool inheritedVisible = !_characterAuthoredHiddenSubmeshes.Contains(hash);
                 bool manualVisible = false;
-                bool overridden = tab != null && tab.CharacterSubmeshOverrides.TryGetValue(hash, out manualVisible);
+                bool overridden = actor != null && actor.SubmeshOverrides.TryGetValue(hash, out manualVisible);
                 bool visible = VfxCharacterViewportSemantics.ResolveSubmeshVisibility(
                     inheritedVisible,
                     overridden,
@@ -5884,12 +6019,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void CharacterSubmesh_VisibilityChanged(object sender, EventArgs e)
         {
-            if (sender is not VfxCharacterSubmeshOption option ||
-                _model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin)
-            {
+            if (sender is not VfxCharacterSubmeshOption option || FocusedActor is not VfxSceneActor actor)
                 return;
-            }
-            _model.SelectedWorkspaceTab.CharacterSubmeshOverrides[option.NameHash] = option.IsVisible;
+            actor.SubmeshOverrides[option.NameHash] = option.IsVisible;
             ApplyEffectiveCharacterSubmeshes();
             OpenTkControl?.InvalidateVisual();
         }
@@ -5901,8 +6033,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ResetCharacterSubmeshOverrides_Click(object sender, RoutedEventArgs e)
         {
-            if (_model.SelectedWorkspaceTab?.Kind != VfxWorkspaceTabKind.Skin) return;
-            _model.SelectedWorkspaceTab.CharacterSubmeshOverrides.Clear();
+            if (FocusedActor is not VfxSceneActor actor) return;
+            actor.SubmeshOverrides.Clear();
             if (_championModel != null)
                 VfxCharacterFormSemantics.RestoreAuthoredTextures(_championModel.Parts);
             ApplyEffectiveCharacterSubmeshes();
@@ -7534,9 +7666,7 @@ namespace AssetsManager.Views.Controls.Viewer
             double ratio = Math.Clamp(mouseX / availableWidth, 0.0, 1.0);
             double seekTime = ratio * _model.TotalDuration;
 
-            _model.CurrentTime = seekTime;
-            SyncMapCharacterClipTime(seekTime);
-            _vfxRenderer?.Seek(seekTime);
+            SeekTimeline(seekTime);
         }
 
         private void StepBack_Click(object sender, RoutedEventArgs e)
@@ -7556,10 +7686,19 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.CurrentTime,
                 frames,
                 _model.TotalDuration);
-            _model.CurrentTime = newTime;
-            SyncMapCharacterClipTime(newTime);
-            _vfxRenderer?.Seek(newTime);
+            SeekTimeline(newTime);
             UpdatePlayheadPosition();
+        }
+
+        /// <summary>
+        /// Moves the timeline of the focused preview and its MAP Character clip. Background scene
+        /// actors keep their own transport.
+        /// </summary>
+        private void SeekTimeline(double time)
+        {
+            _model.CurrentTime = time;
+            SyncMapCharacterClipTime(time);
+            _vfxRenderer?.Seek(time);
         }
 
         internal static double PlaybackStepTarget(double currentTime, int frames, double span)
@@ -7625,9 +7764,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_model == null) return;
             bool wasPlaying = _model.IsPlaying;
-            _vfxRenderer?.Seek(0d);
-            _model.CurrentTime = 0d;
-            SyncMapCharacterClipTime(0d);
+            SeekTimeline(0d);
             if (wasPlaying) _vfxRenderer?.Play();
             UpdatePlayheadPosition();
         }
@@ -7941,11 +8078,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 else
                 {
                     if (restart)
-                    {
-                        _model.CurrentTime = 0d;
-                        _vfxRenderer?.Seek(0d);
-                        SyncMapCharacterClipTime(0d);
-                    }
+                        SeekTimeline(0d);
                     _model.IsPlaying = true;
                     _vfxRenderer?.Play();
                 }
@@ -7978,11 +8111,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ResumeTimedPreview(bool restartFromBeginning)
         {
             if (restartFromBeginning)
-            {
-                _model.CurrentTime = 0d;
-                SyncMapCharacterClipTime(0d);
-                _vfxRenderer?.Seek(0d);
-            }
+                SeekTimeline(0d);
             _model.IsPlaying = true;
             _vfxRenderer?.Play();
         }
@@ -8047,11 +8176,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void TimeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (!_model.IsPlaying || _isUserSeeking)
-            {
-                _model.CurrentTime = e.NewValue;
-                SyncMapCharacterClipTime(e.NewValue);
-                _vfxRenderer?.Seek(e.NewValue);
-            }
+                SeekTimeline(e.NewValue);
         }
 
         private void TimeSlider_PreviewMouseDown(object sender, MouseButtonEventArgs e)

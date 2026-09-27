@@ -1,0 +1,119 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.CompilerServices;
+
+namespace AssetsManager.Views.Models.Viewer
+{
+    /// <summary>
+    /// One Character placed in a Skin workspace scene. It keeps only lightweight identity, placement
+    /// and navigation memory; decoded models, animation state and VFX sessions stay owned by the Studio
+    /// viewport so a scene can switch its focused actor without reloading any of them.
+    /// </summary>
+    public sealed class VfxSceneActor : INotifyPropertyChanged
+    {
+        private bool _isFocused;
+        private bool _isVisible = true;
+        private bool _isLoading;
+        private string _statusText;
+
+        internal VfxSceneActor(VfxSkinItem skin)
+        {
+            Skin = skin ?? throw new ArgumentNullException(nameof(skin));
+        }
+
+        internal VfxSkinItem Skin { get; }
+
+        public string Title => string.IsNullOrWhiteSpace(Skin.OwnerName)
+            ? Skin.Title
+            : $"{Skin.OwnerName} · {Skin.Title}";
+
+        public string Subtitle => Skin.DisplayName ?? Skin.BinPath;
+
+        public bool IsFocused
+        {
+            get => _isFocused;
+            internal set
+            {
+                if (_isFocused == value) return;
+                _isFocused = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsVisible
+        {
+            get => _isVisible;
+            set
+            {
+                if (_isVisible == value) return;
+                _isVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsLoading
+        {
+            get => _isLoading;
+            internal set
+            {
+                if (_isLoading == value) return;
+                _isLoading = value;
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>Short playback summary shown under the actor title (active clip or load state).</summary>
+        public string StatusText
+        {
+            get => _statusText;
+            internal set
+            {
+                if (string.Equals(_statusText, value, StringComparison.Ordinal)) return;
+                _statusText = value;
+                OnPropertyChanged();
+            }
+        }
+
+        // Placement in preview space. The focused actor mirrors these values through the Inspector.
+        internal double PositionX { get; set; }
+        internal double PositionY { get; set; }
+        internal double PositionZ { get; set; }
+        internal double RotationX { get; set; }
+        internal double RotationY { get; set; }
+        internal double RotationZ { get; set; }
+        internal double ScaleMultiplier { get; set; } = 1d;
+        internal bool PlacementCustomized { get; set; }
+        internal string PlacedOnKey { get; set; }
+        internal Dictionary<uint, bool> SubmeshOverrides { get; } = new();
+
+        /// <summary>Each Character keeps its own transport: a paused actor stays paused off focus.</summary>
+        internal bool IsPlaybackPaused { get; set; }
+        internal uint? SelectedCharacterFormPathHash { get; set; }
+
+        // Navigation memory restored when the actor regains focus.
+        internal uint? SelectedSystemPathHash { get; set; }
+        internal string SelectedAnimationFilePath { get; set; }
+        internal uint? SelectedAnimationGraphPathHash { get; set; }
+        internal uint? SelectedAnimationOwnerPathHash { get; set; }
+        internal uint? SelectedSpellPathHash { get; set; }
+        internal float? AnimationParameter { get; set; }
+
+        internal bool HasSkin(VfxSkinItem skin) => IsSameSkin(Skin, skin);
+
+        internal static bool IsSameSkin(VfxSkinItem left, VfxSkinItem right)
+        {
+            if (ReferenceEquals(left, right)) return true;
+            if (string.IsNullOrWhiteSpace(left?.BinPath) || string.IsNullOrWhiteSpace(right?.BinPath)) return false;
+            return string.Equals(
+                Path.GetFullPath(left.BinPath),
+                Path.GetFullPath(right.BinPath),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}

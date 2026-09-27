@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Scenes can now hold several Characters: add skins with + or right-click in the browser, then pick any of them in Scene Actors or the viewport to edit it.
   - VFX Studio / Added shimmerEmitterDefinitionData parsing with constant driver graph evaluations for modern mesh particle systems.
   - VFX Studio / Added a styled form selector for compatible champion skins with authored submeshes, textures, animations, and VFX.
   - VFX Studio / Persisted Champion VFX, Map Effects VFX, and Map Structures visibility toggles across sessions in VfxStudio settings.

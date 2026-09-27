@@ -70,7 +70,8 @@ namespace AssetsManager.Services.Viewer.Interaction
             System.Windows.Point screenPoint,
             double viewportWidth,
             double viewportHeight,
-            PerspectiveCamera camera)
+            PerspectiveCamera camera,
+            Func<SceneModel, Matrix4x4> worldMatrix = null)
         {
             if (models == null || camera == null || viewportWidth <= 0 || viewportHeight <= 0)
                 return null;
@@ -85,7 +86,7 @@ namespace AssetsManager.Services.Viewer.Interaction
                 Rect3D bounds = GetLocalBounds(model);
                 if (bounds.IsEmpty) continue;
 
-                Matrix4x4 world = CreateWorldMatrix(model);
+                Matrix4x4 world = worldMatrix?.Invoke(model) ?? CreateWorldMatrix(model);
                 if (!Matrix4x4.Invert(world, out Matrix4x4 inverseWorld)) continue;
 
                 Vector3 localOrigin = Vector3.Transform(origin, inverseWorld);

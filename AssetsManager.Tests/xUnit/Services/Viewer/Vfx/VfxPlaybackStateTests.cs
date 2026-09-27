@@ -147,6 +147,63 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void SkinSceneTabFollowsItsFocusedActorAndCountsExtraCharacters()
+        {
+            var kayn = new VfxSceneActor(new VfxSkinItem { OwnerName = "Kayn", BrowserTitle = "Base", BinPath = @"C:\p\kayn\skin0.bin" });
+            var rhaast = new VfxSceneActor(new VfxSkinItem { OwnerName = "Kayn", BrowserTitle = "Rhaast", BinPath = @"C:\p\kayn\skin8.bin" });
+            var tab = new VfxWorkspaceTab { Key = "skin:kayn", Kind = VfxWorkspaceTabKind.Skin };
+            var changed = new List<string>();
+            tab.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+            tab.Actors.Add(kayn);
+            tab.FocusedActor = kayn;
+            Assert.False(tab.HasExtraActors);
+            Assert.Equal("Kayn · Base", tab.Title);
+
+            tab.Actors.Add(rhaast);
+            tab.FocusedActor = rhaast;
+
+            Assert.True(tab.HasExtraActors);
+            Assert.Equal(1, tab.ExtraActorCount);
+            Assert.Equal("Kayn · Rhaast", tab.Title);
+            Assert.True(rhaast.IsFocused);
+            Assert.False(kayn.IsFocused);
+            Assert.Contains(nameof(VfxWorkspaceTab.HasExtraActors), changed);
+            Assert.Contains(nameof(VfxWorkspaceTab.ExtraActorCount), changed);
+            Assert.Contains(nameof(VfxWorkspaceTab.FocusedActor), changed);
+        }
+
+        [Fact]
+        public void SceneActorSkinIdentityUsesTheCanonicalBinPath()
+        {
+            var skin = new VfxSkinItem { BinPath = @"C:\p\kayn\skins\skin0.bin" };
+            var sameFile = new VfxSkinItem { BinPath = @"C:\P\Kayn\skins\..\skins\SKIN0.bin" };
+            var other = new VfxSkinItem { BinPath = @"C:\p\kayn\skins\skin8.bin" };
+            var actor = new VfxSceneActor(skin);
+
+            Assert.True(actor.HasSkin(skin));
+            Assert.True(actor.HasSkin(sameFile));
+            Assert.False(actor.HasSkin(other));
+            Assert.False(actor.HasSkin(null));
+        }
+
+        [Fact]
+        public void CompatibleFormsExcludeMaterialOverridesAndOtherMeshes()
+        {
+            var owner = new VfxOwnerSceneContext("ASSETS/Kayn/Skin0/Kayn.skn", "ASSETS/Kayn/Skin0/Kayn.skl", 1f);
+            var shared = new VfxCharacterFormDefinition(1, 0, "Darkin", null, null, MeshPath: @"assets\kayn\skin0\kayn.skn");
+            var materials = new VfxCharacterFormDefinition(2, 1, "Shadow", null, null, HasMaterialOverrides: true);
+            var otherMesh = new VfxCharacterFormDefinition(3, 2, "Other", null, null, MeshPath: "ASSETS/Kayn/Skin8/Rhaast.skn");
+            var otherSkeleton = new VfxCharacterFormDefinition(4, 3, "Rig", null, null, SkeletonPath: "ASSETS/Kayn/Skin8/Rhaast.skl");
+
+            IReadOnlyList<VfxCharacterFormDefinition> compatible = VfxCharacterFormSemantics.CompatibleForms(
+                new[] { shared, materials, otherMesh, otherSkeleton, null },
+                owner);
+
+            Assert.Equal(new[] { shared }, compatible);
+        }
+
+        [Fact]
         public void MapVariantPickerRequiresAnActiveMapPreview()
         {
             var model = new VfxInspectorModel();

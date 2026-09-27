@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Resources;
@@ -20,7 +21,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
     /// Resource decoding stays on the loader side and all GL uploads happen on
     /// the active viewport context during Render.
     /// </summary>
-    public sealed class VfxRenderSession : IDisposable
+    public sealed class VfxRenderSession : IDisposable, IPreparedParticlePass
     {
         // LTK creates each Animation Clip particle cue and each idle effect with fixed,
         // independent deterministic driver seeds.
@@ -133,6 +134,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         internal int LiveChildSystemCount
             => _graphs.Sum(static graph => graph.LiveChildSystemCount);
+
+        /// <summary>
+        /// A session can be composed before the viewport has a GL context; the renderer is created by
+        /// Initialize on the render callback before its first frame.
+        /// </summary>
+        internal bool IsInitialized => _ready;
 
         public VfxSystemModel ActiveSystem => _activeSystem;
         public IReadOnlyList<VfxPlaybackGraphRuntime> Graphs => _graphs;
@@ -1405,9 +1412,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             return _renderQueue.Count > 0;
         }
 
-        internal IDisposable BeginPreparedRenderBatch() => _renderer.BeginRenderBatch();
+        public IDisposable BeginPreparedRenderBatch() => _renderer.BeginRenderBatch();
 
-        internal void RenderPreparedColorPass()
+        public void RenderPreparedColorPass()
         {
             if (_preparedShaded && _shadedRenderQueue.Count > 0)
                 _renderer.Render(_shadedRenderQueue, _preparedViewProjection, _preparedView);
@@ -1429,13 +1436,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         internal bool HasPreparedDistortionPass =>
             _preparedShaded && _distortionRenderQueue.Count > 0;
 
-        internal void CapturePreparedDistortionFrame()
+        public void CapturePreparedDistortionFrame()
         {
             if (HasPreparedDistortionPass)
                 _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
         }
 
-        internal void RenderPreparedDistortionPass()
+        public void RenderPreparedDistortionPass()
         {
             if (HasPreparedDistortionPass)
                 _renderer.Render(_distortionRenderQueue, _preparedViewProjection, _preparedView);

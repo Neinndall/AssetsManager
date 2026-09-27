@@ -70,6 +70,12 @@ namespace AssetsManager.Services.Viewer.Interaction
         public event Action<SceneModel, ModifierKeys> SelectionRequested;
 
         /// <summary>
+        /// World transform used for picking. Consumers that draw models in another convention (VFX
+        /// Studio mirrors Characters on X) supply it so hits match what is on screen.
+        /// </summary>
+        public Func<SceneModel, Matrix4x4> WorldMatrixProvider { get; set; }
+
+        /// <summary>
         /// Raised while the active selection is translated through the shared viewport gizmo.
         /// Consumers with their own placement ViewModel can mirror the SceneModel transform without
         /// duplicating the interaction controller.
@@ -240,7 +246,8 @@ namespace AssetsManager.Services.Viewer.Interaction
                 e.GetPosition(_inputSurface),
                 _inputSurface.ActualWidth,
                 _inputSurface.ActualHeight,
-                camera);
+                camera,
+                WorldMatrixProvider);
             SelectionRequested?.Invoke(picked, Keyboard.Modifiers);
         }
 

@@ -8,6 +8,32 @@ namespace AssetsManager.Views.Models.Viewer
 {
     internal static class VfxCharacterFormSemantics
     {
+        /// <summary>
+        /// Forms the Studio can preview on the already loaded owner mesh: material overrides and
+        /// forms authored on a different SKN/SKL require a different model and are excluded.
+        /// </summary>
+        internal static IReadOnlyList<VfxCharacterFormDefinition> CompatibleForms(
+            IEnumerable<VfxCharacterFormDefinition> forms,
+            VfxOwnerSceneContext owner)
+        {
+            var compatible = new List<VfxCharacterFormDefinition>();
+            foreach (VfxCharacterFormDefinition form in forms ?? Array.Empty<VfxCharacterFormDefinition>())
+            {
+                if (form == null || form.HasMaterialOverrides)
+                    continue;
+                if (!string.IsNullOrWhiteSpace(form.MeshPath) && !SameCharacterAsset(form.MeshPath, owner?.MeshPath))
+                    continue;
+                if (!string.IsNullOrWhiteSpace(form.SkeletonPath) && !SameCharacterAsset(form.SkeletonPath, owner?.SkeletonPath))
+                    continue;
+                compatible.Add(form);
+            }
+            return compatible;
+        }
+
+        private static bool SameCharacterAsset(string left, string right) =>
+            !string.IsNullOrWhiteSpace(right) && string.Equals(
+                left.Replace('\\', '/'), right.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
+
         internal static IReadOnlySet<uint> HiddenSubmeshes(
             IEnumerable<uint> initiallyHidden,
             VfxCharacterFormDefinition form,

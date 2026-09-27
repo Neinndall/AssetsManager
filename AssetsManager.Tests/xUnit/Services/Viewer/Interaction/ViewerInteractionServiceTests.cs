@@ -71,6 +71,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Interaction
             offset.Dispose();
         }
 
+        [Fact]
+        public void PickingUsesTheConsumerWorldMatrixWhenSupplied()
+        {
+            // The consumer draws this model at the origin even though its placement is off-screen.
+            SceneModel drawnAtOrigin = CreateModel("Mirrored", 500);
+            var camera = new PerspectiveCamera(
+                new Point3D(0, 0, 1000),
+                new Vector3D(0, 0, -1000),
+                new Vector3D(0, 1, 0),
+                45);
+
+            SceneModel withDefault = ViewerInteractionService.PickModel(
+                new[] { drawnAtOrigin }, new Point(400, 300), 800, 600, camera);
+            SceneModel withProvider = ViewerInteractionService.PickModel(
+                new[] { drawnAtOrigin }, new Point(400, 300), 800, 600, camera,
+                _ => Matrix4x4.CreateScale(-1f, 1f, 1f));
+
+            Assert.Null(withDefault);
+            Assert.Same(drawnAtOrigin, withProvider);
+            drawnAtOrigin.Dispose();
+        }
+
         private static SceneModel CreateModel(string name, double positionX)
         {
             var geometry = new MeshGeometry3D
