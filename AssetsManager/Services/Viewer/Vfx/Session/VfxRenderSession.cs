@@ -31,6 +31,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private readonly VfxLoadingService _loadingService;
         private readonly bool _ownsLoadingService;
         private readonly VfxGpuResourceUploader _gpuResourceUploader = new();
+        private readonly TimeProvider _timeProvider;
+        private bool _waitForInitialResources;
+        private long? _initialResourceWaitStarted;
+        internal static readonly TimeSpan InitialResourceWaitLimit = TimeSpan.FromSeconds(4);
         private VfxOpenGlRenderer _renderer;
         private VfxPlaybackGraphRuntime _graph;
         private bool _purgeGpuResourcesBeforeNextFrame;
@@ -111,8 +115,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public VfxRenderSession(
             LogService logService = null,
-            VfxLoadingService loadingService = null)
+            VfxLoadingService loadingService = null,
+            TimeProvider timeProvider = null)
         {
+            _timeProvider = timeProvider ?? TimeProvider.System;
             _logService = logService;
             _loadingService = loadingService ?? new VfxLoadingService();
             _ownsLoadingService = loadingService is null;
@@ -258,6 +264,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void SetVfxSystem(VfxSystemModel system) => SetSystem(system);
         public void SetSystem(VfxSystemModel system)
         {
+            _waitForInitialResources = system != null;
+            _initialResourceWaitStarted = null;
             ClearCheckpoints();
             _isPlaying = false;
             _usesStandaloneRig = system != null;
@@ -930,6 +938,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (!_isPlaying || _activeSystem == null) return;
             float frameTime = NormalizeFrameTime(deltaTime);
             if (frameTime <= 0f) return;
+            if (WaitForInitialResources()) return;
 
             float speed = NormalizePlaybackSpeed(_activeSystem.Speed);
             float elapsed = frameTime * speed;
@@ -949,6 +958,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     _activeSystem.CurrentTime = RigDuration;
                 _isPlaying = false;
             }
+        }
+
+        private bool WaitForInitialResources()
+        {
+            // Only a newly opened standalone System waits. Clip/spell clocks and explicit seeks
+            // retain their authored synchronization; uploads continue on the render callback.
+            if (!_usesStandaloneRig || !_waitForInitialResources) return false;
+            if (VfxGpuResourceUploader.HasPendingResources(_graphs))
+            {
+                long now = _timeProvider.GetTimestamp();
+                _initialResourceWaitStarted ??= now;
+                if (_timeProvider.GetElapsedTime(_initialResourceWaitStarted.Value, now) < InitialResourceWaitLimit)
+                    return true;
+            }
+            _waitForInitialResources = false;
+            _initialResourceWaitStarted = null;
+            return false;
         }
 
         internal static bool ShouldFinishPlayback(
@@ -991,6 +1017,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void Seek(double seconds)
         {
             if (_activeSystem == null || !double.IsFinite(seconds)) return;
+            if (seconds > 0d)
+            {
+                _waitForInitialResources = false;
+                _initialResourceWaitStarted = null;
+            }
             SeekExact(QuantizeLtkSeek(seconds));
         }
 

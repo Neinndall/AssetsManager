@@ -48,6 +48,29 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             }
         }
 
+        internal static bool HasPendingResources(IEnumerable<VfxPlaybackGraphRuntime> graphs)
+        {
+            foreach (VfxPlaybackGraphRuntime graph in graphs)
+                foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
+                    foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+                    {
+                        if (!emitter.IsVisible || emitter.Def.Disabled) continue;
+                        if (emitter.PendingTexture is BitmapSource ||
+                            emitter.PendingTextureMult is BitmapSource ||
+                            emitter.PendingDistortionTexture is BitmapSource ||
+                            emitter.PendingErosionTexture is BitmapSource ||
+                            emitter.PendingReflectionTexture is VfxCubeMapData { IsValid: true } ||
+                            emitter.PendingPaletteTexture is BitmapSource ||
+                            emitter.PendingColorGradient is BitmapSource ||
+                            emitter.PendingMesh != null)
+                            return true;
+                        foreach (object resource in emitter.PendingProgramTextures.Values)
+                            if (resource is BitmapSource or VfxCubeMapData { IsValid: true })
+                                return true;
+                    }
+            return false;
+        }
+
         internal void Clear() =>
             ClearHandlesOnly();
 

@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Models.Viewer;
@@ -442,6 +445,140 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             // After moving forward in time, the active system has advanced and the graph has a valid transform
             Assert.True(session.ActiveSystem.CurrentTime > 0);
+        }
+
+        [Theory]
+        [InlineData("texture")]
+        [InlineData("material")]
+        [InlineData("mesh")]
+        public void InitialPendingResourcesHoldClockWithoutLosingFirstBurst(string resource)
+        {
+            var clock = new ResourceWaitClock();
+            using var session = new VfxRenderSession(timeProvider: clock);
+            session.SetSystem(ResourceWaitModel());
+            VfxPlaybackRuntime.EmitterState emitter = Assert.Single(Assert.Single(session.Graphs).Root.Emitters);
+            SetPendingResource(emitter, resource);
+            session.Play();
+            session.Update(0.1f);
+            Assert.Equal(0d, session.PlaybackTime);
+            clock.Advance(TimeSpan.FromSeconds(3.9));
+            session.Update(0.1f);
+            Assert.Equal(0d, session.PlaybackTime);
+            Assert.Empty(emitter.Particles);
+
+            emitter.PendingTexture = null;
+            emitter.PendingMesh = null;
+            emitter.PendingProgramTextures.Clear();
+            session.Update(0.1f);
+            Assert.InRange(session.PlaybackTime, 0.099, 0.101);
+            Assert.NotEmpty(emitter.Particles);
+
+            // Later resources must not stall an already running effect.
+            SetPendingResource(emitter, resource);
+            session.Update(0.1f);
+            Assert.InRange(session.PlaybackTime, 0.199, 0.201);
+        }
+
+        [Fact]
+        public void InitialResourceTimeoutDoesNotCatchUpAndNewSystemGetsItsOwnWait()
+        {
+            var clock = new ResourceWaitClock();
+            using var session = new VfxRenderSession(timeProvider: clock);
+            session.SetSystem(ResourceWaitModel());
+            SetPendingResource(Assert.Single(Assert.Single(session.Graphs).Root.Emitters), "texture");
+            session.Play();
+            session.Update(0.1f);
+            clock.Advance(VfxRenderSession.InitialResourceWaitLimit);
+            session.Update(0.1f);
+            Assert.InRange(session.PlaybackTime, 0.099, 0.101);
+            session.Update(0.1f);
+            Assert.InRange(session.PlaybackTime, 0.199, 0.201);
+
+            session.SetSystem(ResourceWaitModel());
+            SetPendingResource(Assert.Single(Assert.Single(session.Graphs).Root.Emitters), "texture");
+            session.Play();
+            session.Update(0.1f);
+            Assert.Equal(0d, session.PlaybackTime);
+        }
+
+        [Fact]
+        public void ExplicitSeekBypassesInitialResourceWaitAndPauseStillStopsClock()
+        {
+            using var session = new VfxRenderSession();
+            session.SetSystem(ResourceWaitModel());
+            SetPendingResource(Assert.Single(Assert.Single(session.Graphs).Root.Emitters), "texture");
+            session.Play();
+            session.Update(0.1f);
+            Assert.Equal(0d, session.PlaybackTime);
+            session.Seek(0.5);
+            Assert.Equal(0.5, session.PlaybackTime, precision: 6);
+            session.Pause();
+            session.Update(0.1f);
+            Assert.Equal(0.5, session.PlaybackTime, precision: 6);
+            session.Play();
+            session.Update(0.1f);
+            Assert.InRange(session.PlaybackTime, 0.599, 0.601);
+        }
+
+        [Fact]
+        public void MissingOrHiddenResourcesDoNotDelayPlayback()
+        {
+            using var session = new VfxRenderSession();
+            session.SetSystem(ResourceWaitModel());
+            VfxPlaybackRuntime.EmitterState emitter = Assert.Single(Assert.Single(session.Graphs).Root.Emitters);
+            emitter.PendingTexture = new object();
+            session.Play();
+            session.Update(0.1f);
+            Assert.InRange(session.PlaybackTime, 0.099, 0.101);
+
+            session.SetSystem(ResourceWaitModel());
+            emitter = Assert.Single(Assert.Single(session.Graphs).Root.Emitters);
+            SetPendingResource(emitter, "texture");
+            emitter.IsVisible = false;
+            session.Play();
+            session.Update(0.1f);
+            Assert.InRange(session.PlaybackTime, 0.099, 0.101);
+        }
+
+        private static VfxSystemModel ResourceWaitModel()
+        {
+            var emitter = CreateEmitter(Vector3.One) with
+            {
+                TexturePath = null,
+                Rate = VfxCurveF.Const(20f),
+                ParticleLifetime = VfxCurveF.Const(10f)
+            };
+            var definition = new VfxSystemDefinition(0xA11CEu, "resources", "resources", new[] { emitter });
+            return new VfxSystemModel
+            {
+                Name = "resources",
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [definition.PathHash] = definition },
+                ResourceMap = new Dictionary<uint, uint>()
+            };
+        }
+
+        private static void SetPendingResource(VfxPlaybackRuntime.EmitterState emitter, string kind)
+        {
+            if (kind == "mesh")
+            {
+                emitter.PendingMesh = new VfxMeshData(
+                    new float[9], new float[9], new float[6], null, new uint[] { 0, 1, 2 });
+                return;
+            }
+            BitmapSource bitmap = BitmapSource.Create(
+                1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[] { 255, 255, 255, 255 }, 4);
+            bitmap.Freeze();
+            if (kind == "material") emitter.PendingProgramTextures["authored.dds"] = bitmap;
+            else emitter.PendingTexture = bitmap;
+        }
+
+        private sealed class ResourceWaitClock : TimeProvider
+        {
+            private long _timestamp;
+            public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+            public override long GetTimestamp() => _timestamp;
+            internal void Advance(TimeSpan elapsed) => _timestamp += elapsed.Ticks;
         }
 
         private static VfxEmitterDefinition CreateEmitter(Vector3 birthScale)
