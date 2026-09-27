@@ -423,6 +423,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Opened Inspector sections collapsed and added a Collapse all button to its header.
+  - Viewer / Shared a stable gizmo overlay across both viewports so changing actors redraws its axes immediately.
   - Viewer / Kept transform gizmo axes readable at the selected model depth and cleared stale drags when changing actors.
   - Viewer / Fixed incorrect glow, iridescence, and material colors when switching champion forms.
   - VFX Studio / Fixed incorrect textures when switching champion forms, including Ahri Hall of Legends.

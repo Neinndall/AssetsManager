@@ -929,7 +929,11 @@ namespace AssetsManager.Views.Controls.Viewer
                     RefreshCharacterInteractionTarget();
                 if (e.PropertyName == nameof(VfxInspectorModel.InspectorVisible) ||
                     e.PropertyName == nameof(VfxInspectorModel.IsInspectorPanelVisible))
+                {
+                    if (_model.IsInspectorPanelVisible)
+                        CollapseInspectorSections();
                     UpdateInspectorColumnVisibility();
+                }
                 OpenTkControl?.InvalidateVisual();
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.PreviewCameraPreset))
@@ -1157,6 +1161,19 @@ namespace AssetsManager.Views.Controls.Viewer
                 _vfxRenderer?.SetWorldTransform(placement);
             }
             OpenTkControl?.InvalidateVisual();
+        }
+
+        private void CollapseInspectorSections_Click(object sender, RoutedEventArgs e) =>
+            CollapseInspectorSections();
+
+        private void CollapseInspectorSections()
+        {
+            VfxSceneActorsSection.IsChecked = false;
+            VfxMapBackdropSection.IsChecked = false;
+            VfxCharacterTransformSection.IsChecked = false;
+            VfxCharacterGeometrySection.IsChecked = false;
+            VfxMapSceneSection.IsChecked = false;
+            VfxMapLookSection.IsChecked = false;
         }
 
         private void RefreshCharacterInteractionTarget()
@@ -1877,10 +1894,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     _characterInteractionController = new ViewportModelInteractionController(
                         CameraInputSurface,
                         CharacterTransformGizmoCanvas,
-                        CharacterGizmoXAxis,
-                        CharacterGizmoYAxis,
-                        CharacterGizmoZAxis,
-                        CharacterGizmoOrigin,
                         () => _dummyViewport.Camera as ProjectionCamera,
                         _characterInteractionModels);
                     _characterInteractionController.WorldMatrixProvider =

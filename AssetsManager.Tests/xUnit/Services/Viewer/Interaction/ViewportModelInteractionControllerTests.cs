@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
-using System.Windows.Shapes;
+using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
@@ -25,14 +25,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Interaction
                 {
                     var root = new Grid { Width = 800, Height = 600 };
                     var input = new Border();
-                    var canvas = new Canvas { Visibility = Visibility.Collapsed };
-                    Line Axis(Brush brush) => new() { Stroke = brush, StrokeThickness = 4,
-                        StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Triangle };
-                    var x = Axis(Brushes.Red);
-                    var y = Axis(Brushes.Lime);
-                    var z = Axis(Brushes.Blue);
-                    var marker = new Ellipse { Width = 10, Height = 10, Fill = Brushes.White };
-                    canvas.Children.Add(x); canvas.Children.Add(y); canvas.Children.Add(z); canvas.Children.Add(marker);
+                    var canvas = new ViewportTransformGizmo();
                     root.Children.Add(input); root.Children.Add(canvas);
                     var camera = new PerspectiveCamera(new Point3D(0, 150, 800),
                         new Vector3D(0, -50, -800), new Vector3D(0, 1, 0), 45);
@@ -40,7 +33,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Interaction
                     var projection = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4, 4f / 3, 1, 10000);
                     using var first = new SceneModel { PositionX = -150 };
                     using var second = new SceneModel { PositionX = 150 };
-                    using var controller = new ViewportModelInteractionController(input, canvas, x, y, z, marker,
+                    using var controller = new ViewportModelInteractionController(input, canvas,
                         () => camera, new[] { first, second });
                     root.Measure(new Size(800, 600)); root.Arrange(new Rect(0, 0, 800, 600));
                     bool firstFrame = true;
@@ -62,8 +55,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Interaction
                             int px = (i / 4) % 800;
                             int py = (i / 4) / 800;
                             if (Math.Abs(px - expectedOrigin.X) > 120 || Math.Abs(py - expectedOrigin.Y) > 120) continue;
-                            if (pixels[i + 2] > 200 && pixels[i + 1] < 50) red++;
-                            if (pixels[i + 1] > 200 && pixels[i + 2] < 50) green++;
+                            if (pixels[i + 2] > 200 && pixels[i + 1] < 150) red++;
+                            if (pixels[i + 1] > 200 && pixels[i + 2] < 100) green++;
                         }
                         Assert.True(red > 100, $"Missing red axis for actor X={actor.PositionX}: {red} pixels");
                         Assert.True(green > 100, $"Missing green axis for actor X={actor.PositionX}: {green} pixels");

@@ -26,6 +26,11 @@ namespace AssetsManager.Tests.Diagnostics
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && string.Equals(args[0], "character-form-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                CharacterFormAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "map-layers-audit", StringComparison.OrdinalIgnoreCase))
             {
                 MapLayersAuditDiagnostic.Run(args.Skip(1).ToArray());

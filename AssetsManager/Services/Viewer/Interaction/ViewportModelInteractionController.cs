@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Media3D;
-using System.Windows.Shapes;
+using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Models.Viewer;
 using WpfVector = System.Windows.Vector;
 
@@ -23,11 +22,7 @@ namespace AssetsManager.Services.Viewer.Interaction
         }
 
         private readonly FrameworkElement _inputSurface;
-        private readonly Canvas _gizmoCanvas;
-        private readonly Line _xAxis;
-        private readonly Line _yAxis;
-        private readonly Line _zAxis;
-        private readonly Ellipse _originMarker;
+        private readonly ViewportTransformGizmo _gizmoCanvas;
         private readonly Func<ProjectionCamera> _cameraProvider;
         private readonly IReadOnlyList<SceneModel> _sceneModels;
         private readonly List<SceneModel> _selectedModels = new();
@@ -45,20 +40,12 @@ namespace AssetsManager.Services.Viewer.Interaction
 
         public ViewportModelInteractionController(
             FrameworkElement inputSurface,
-            Canvas gizmoCanvas,
-            Line xAxis,
-            Line yAxis,
-            Line zAxis,
-            Ellipse originMarker,
+            ViewportTransformGizmo gizmoCanvas,
             Func<ProjectionCamera> cameraProvider,
             IReadOnlyList<SceneModel> sceneModels)
         {
             _inputSurface = inputSurface ?? throw new ArgumentNullException(nameof(inputSurface));
             _gizmoCanvas = gizmoCanvas ?? throw new ArgumentNullException(nameof(gizmoCanvas));
-            _xAxis = xAxis ?? throw new ArgumentNullException(nameof(xAxis));
-            _yAxis = yAxis ?? throw new ArgumentNullException(nameof(yAxis));
-            _zAxis = zAxis ?? throw new ArgumentNullException(nameof(zAxis));
-            _originMarker = originMarker ?? throw new ArgumentNullException(nameof(originMarker));
             _cameraProvider = cameraProvider ?? throw new ArgumentNullException(nameof(cameraProvider));
             _sceneModels = sceneModels ?? throw new ArgumentNullException(nameof(sceneModels));
 
@@ -88,7 +75,7 @@ namespace AssetsManager.Services.Viewer.Interaction
             set
             {
                 _isEnabled = value;
-                if (!value) _gizmoCanvas.Visibility = Visibility.Collapsed;
+                if (!value) _gizmoCanvas.Clear();
             }
         }
 
@@ -100,7 +87,7 @@ namespace AssetsManager.Services.Viewer.Interaction
                 _dragAxis = TransformAxis.None;
                 _dragStartPositions.Clear();
                 _axisEndpoints.Clear();
-                _gizmoCanvas.Visibility = Visibility.Collapsed;
+                _gizmoCanvas.Clear();
                 if (_inputSurface.IsMouseCaptured)
                     _inputSurface.ReleaseMouseCapture();
                 _inputSurface.Cursor = Cursors.Arrow;
@@ -110,7 +97,7 @@ namespace AssetsManager.Services.Viewer.Interaction
                 _selectedModels.AddRange(models.Where(model => model != null));
             _activeModel = activeModel;
             if (_activeModel == null)
-                _gizmoCanvas.Visibility = Visibility.Collapsed;
+                _gizmoCanvas.Clear();
         }
 
         public void Update(Matrix4x4 viewProjection)
@@ -123,7 +110,7 @@ namespace AssetsManager.Services.Viewer.Interaction
                 _inputSurface.ActualHeight <= 0 ||
                 camera == null)
             {
-                _gizmoCanvas.Visibility = Visibility.Collapsed;
+                _gizmoCanvas.Clear();
                 return;
             }
 
@@ -134,7 +121,7 @@ namespace AssetsManager.Services.Viewer.Interaction
             if (!ViewerInteractionService.TryCalculateGizmoAxisLength(
                     origin, viewProjection, _inputSurface.ActualHeight, out _axisWorldLength))
             {
-                _gizmoCanvas.Visibility = Visibility.Collapsed;
+                _gizmoCanvas.Clear();
                 return;
             }
             if (!ViewerInteractionService.TryProject(
@@ -144,7 +131,7 @@ namespace AssetsManager.Services.Viewer.Interaction
                     _inputSurface.ActualHeight,
                     out _originScreen))
             {
-                _gizmoCanvas.Visibility = Visibility.Collapsed;
+                _gizmoCanvas.Clear();
                 return;
             }
 
@@ -155,12 +142,10 @@ namespace AssetsManager.Services.Viewer.Interaction
             _axisEndpoints[TransformAxis.Z] =
                 Project(origin + Vector3.UnitZ * (float)_axisWorldLength, viewProjection);
 
-            SetLine(_xAxis, _originScreen, _axisEndpoints[TransformAxis.X]);
-            SetLine(_yAxis, _originScreen, _axisEndpoints[TransformAxis.Y]);
-            SetLine(_zAxis, _originScreen, _axisEndpoints[TransformAxis.Z]);
-            Canvas.SetLeft(_originMarker, _originScreen.X - _originMarker.Width / 2);
-            Canvas.SetTop(_originMarker, _originScreen.Y - _originMarker.Height / 2);
-            _gizmoCanvas.Visibility = Visibility.Visible;
+            _gizmoCanvas.SetPoints(_originScreen,
+                _axisEndpoints[TransformAxis.X],
+                _axisEndpoints[TransformAxis.Y],
+                _axisEndpoints[TransformAxis.Z]);
         }
 
         public void Dispose()
@@ -307,12 +292,6 @@ namespace AssetsManager.Services.Viewer.Interaction
             return (point - projection).Length;
         }
 
-        private static void SetLine(Line line, Point start, Point end)
-        {
-            line.X1 = start.X;
-            line.Y1 = start.Y;
-            line.X2 = end.X;
-            line.Y2 = end.Y;
-        }
+
     }
 }

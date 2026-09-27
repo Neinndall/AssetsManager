@@ -332,10 +332,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _modelInteractionController = new ViewportModelInteractionController(
                 CameraInputSurface,
                 TransformGizmoCanvas,
-                GizmoXAxis,
-                GizmoYAxis,
-                GizmoZAxis,
-                GizmoOrigin,
                 () => Viewport3D.Camera as PerspectiveCamera,
                 _loadedModels);
             _modelInteractionController.SelectionRequested += OnModelSelectionRequested;
