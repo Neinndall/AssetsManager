@@ -23,6 +23,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 return DecodeSkinnedMesh(path, submeshesToDraw, submeshesToDrawAlways);
 
             using var stream = File.OpenRead(path);
+            if (path.EndsWith(".gmesh", StringComparison.OrdinalIgnoreCase) ||
+                path.EndsWith(".tmesh", StringComparison.OrdinalIgnoreCase) ||
+                LeagueToolkit.Utils.LeagueFile.GetFileType(stream) == LeagueToolkit.Utils.LeagueFileType.RenderMeshGmesh)
+                return DecodeRenderMesh(RenderMesh.Read(stream), submeshesToDraw, submeshesToDrawAlways);
+
             var source = path.EndsWith(".sco", StringComparison.OrdinalIgnoreCase)
                 ? LeagueToolkit.Core.Mesh.StaticMesh.ReadAscii(stream)
                 : LeagueToolkit.Core.Mesh.StaticMesh.ReadBinary(stream);
@@ -146,6 +151,54 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             if (indices.Length == 0) return null;
             float[] normals = ReadSkinnedNormals(mesh, positions, indices);
             return new VfxMeshData(positions, normals, uvs, colors, indices);
+        }
+
+        private static VfxMeshData? DecodeRenderMesh(RenderMesh mesh, IReadOnlyList<uint> draw, IReadOnlyList<uint> always)
+        {
+            if (mesh.VertexCount == 0 || mesh.Indices.Count == 0) return null;
+            int count = mesh.VertexCount;
+            var positions = new float[checked(count * 3)];
+            var normals = new float[checked(count * 3)];
+            var uvs = new float[checked(count * 2)];
+            var colors = new float[checked(count * 4)];
+            bool hasNormals = mesh.TryGetAccessor(ElementName.Normal, out var normal) &&
+                normal.Element.Format is ElementFormat.XYZ_Float32 or ElementFormat.XYZW_Float32 or ElementFormat.XYZW_Packed16161616;
+            bool hasUvs = mesh.TryGetAccessor(ElementName.Texcoord0, out var uv) &&
+                uv.Element.Format is ElementFormat.XY_Float32 or ElementFormat.XYZ_Float32 or ElementFormat.XYZW_Float32 or
+                    ElementFormat.XY_Packed1616 or ElementFormat.XYZW_Packed16161616;
+            for (int v = 0; v < count; v++)
+            {
+                Vector3 p = mesh.ReadVector3(ElementName.Position, v);
+                positions[v * 3] = p.X; positions[v * 3 + 1] = p.Y; positions[v * 3 + 2] = p.Z;
+                if (hasNormals)
+                {
+                    Vector3 n = mesh.ReadVector3(ElementName.Normal, v);
+                    normals[v * 3] = n.X; normals[v * 3 + 1] = n.Y; normals[v * 3 + 2] = n.Z;
+                }
+                if (hasUvs)
+                {
+                    Vector2 t = mesh.ReadVector2(ElementName.Texcoord0, v);
+                    uvs[v * 2] = t.X; uvs[v * 2 + 1] = t.Y;
+                }
+            }
+            uint[] hashes = mesh.Submeshes.Select(range => Fnv1a.HashLower(range.Material.TrimEnd('\0'))).ToArray();
+            bool[] selected = SelectMeshSubmeshRanges(hashes, draw, always);
+            var indices = new List<uint>();
+            var ranges = new List<VfxMeshRangeData>();
+            if (mesh.Submeshes.Count == 0) indices.AddRange(mesh.Indices.Select(index => (uint)index));
+            for (int s = 0; s < mesh.Submeshes.Count; s++)
+            {
+                RenderMeshSubmesh range = mesh.Submeshes[s];
+                if (!selected[s] || range.IndexCount == 0) continue;
+                ranges.Add(new VfxMeshRangeData(hashes[s], indices.Count, checked((int)range.IndexCount)));
+                for (uint i = range.StartIndex; i < range.StartIndex + range.IndexCount; i++)
+                    indices.Add(mesh.Indices[(int)i]);
+            }
+            if (indices.Count == 0) return null;
+            uint[] flattened = indices.ToArray();
+            Array.Fill(colors, 1f);
+            return new VfxMeshData(positions, hasNormals ? normals : ComputeNormals(positions, flattened),
+                uvs, colors, flattened, Ranges: ranges.ToArray());
         }
 
         internal static bool[] SelectMeshSubmeshRanges(

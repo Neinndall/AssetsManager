@@ -122,9 +122,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 }
                 catch
                 {
-                    // LTK reports unsupported/corrupt geometry as a failed asset load instead
-                    // of aborting the VFX system. This also covers authored .tmesh/.gmesh files,
-                    // which current LTK main recognizes but does not decode.
+                    // Corrupt geometry is a failed asset load, not a failure of the whole VFX system.
                     mesh = null;
                 }
             }
