@@ -256,7 +256,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     }
                 }
 
-                bundle.CharacterForms = VfxCharacterFormParser.Resolve(characterFormDocuments, ResolveBinEntryPath);
+                bundle.CharacterForms = VfxCharacterFormParser.Resolve(
+                    characterFormDocuments, ResolveBinEntryPath, bundle.OwnerSceneContext);
                 log?.Log($"Loaded {bundle.Systems.Count} VFX systems.");
             }
             catch (OperationCanceledException)

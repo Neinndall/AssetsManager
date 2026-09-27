@@ -9,8 +9,8 @@ namespace AssetsManager.Views.Models.Viewer
     internal static class VfxCharacterFormSemantics
     {
         /// <summary>
-        /// Forms the Studio can preview on the already loaded owner mesh: material overrides and
-        /// forms authored on a different SKN/SKL require a different model and are excluded.
+        /// Forms the Studio can preview: model-swap forms load their own SKN/SKL; the rest must fit the
+        /// loaded owner mesh, so material overrides and other SKN/SKL paths on it are excluded.
         /// </summary>
         internal static IReadOnlyList<VfxCharacterFormDefinition> CompatibleForms(
             IEnumerable<VfxCharacterFormDefinition> forms,
@@ -19,7 +19,15 @@ namespace AssetsManager.Views.Models.Viewer
             var compatible = new List<VfxCharacterFormDefinition>();
             foreach (VfxCharacterFormDefinition form in forms ?? Array.Empty<VfxCharacterFormDefinition>())
             {
-                if (form == null || form.HasMaterialOverrides)
+                if (form == null)
+                    continue;
+                // Model-swap forms load their own SKN/SKL and that skin's materials when selected.
+                if (form.IsModelSwap)
+                {
+                    compatible.Add(form);
+                    continue;
+                }
+                if (form.HasMaterialOverrides)
                     continue;
                 if (!string.IsNullOrWhiteSpace(form.MeshPath) && !SameCharacterAsset(form.MeshPath, owner?.MeshPath))
                     continue;
@@ -40,7 +48,7 @@ namespace AssetsManager.Views.Models.Viewer
             IEnumerable<ModelPart> parts = null)
         {
             var hidden = new HashSet<uint>(initiallyHidden ?? Array.Empty<uint>());
-            if (form == null || form.IsBase)
+            if (form == null || form.IsBase || form.IsModelSwap)
                 return hidden;
 
             // Authored show/hide lists in GearData take absolute priority

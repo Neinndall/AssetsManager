@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Views.Models.Viewer;
 
@@ -104,7 +106,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (clearManualOverrides)
                     actor.SubmeshOverrides.Clear();
             }
-            int gearIndex = _model.SelectedCharacterForm?.Definition.GearIndex ?? -1;
+            // A model-swap form (or returning to Base from one) reinstalls the owner mesh; the
+            // reinstall rebuilds the form options and re-enters here with the matching SKN loaded.
+            if (TrySwapCharacterFormModel())
+                return;
+            int gearIndex = _model.SelectedCharacterForm?.Definition.EquippedGearIndex ?? -1;
             bool gearChanged = _championModel.Parts.Any(part => part.EquippedGearIndex != gearIndex);
             foreach (var part in _championModel.Parts) part.EquippedGearIndex = gearIndex;
             if (restoreTextures || gearChanged)
@@ -130,6 +136,61 @@ namespace AssetsManager.Views.Controls.Viewer
                     _ = RefreshCharacterFormAnimationAsync(selected);
             }
             OpenTkControl?.InvalidateVisual();
+        }
+
+        private bool TrySwapCharacterFormModel()
+        {
+            VfxCharacterFormDefinition form = _model.SelectedCharacterForm?.Definition;
+            string authoredMesh = form is { IsModelSwap: true }
+                ? form.MeshPath
+                : _championBundle?.OwnerSceneContext?.MeshPath;
+            string sknPath = ResolveSknPath(authoredMesh, _championSearchDir);
+            if (string.IsNullOrEmpty(sknPath) || !File.Exists(sknPath) || SknLoadingService == null ||
+                string.Equals(Path.GetFullPath(sknPath), Path.GetFullPath(_championSknPath ?? sknPath),
+                    StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            _ = LoadCharacterFormModelAsync(form, sknPath);
+            return true;
+        }
+
+        private async Task LoadCharacterFormModelAsync(VfxCharacterFormDefinition form, string sknPath)
+        {
+            int generation = ++_championLoadGeneration;
+            var bundle = _championBundle;
+            string searchDir = _championSearchDir;
+            bool swapped = form is { IsModelSwap: true };
+            string skinBinPath = swapped
+                ? SknMaterialTextureResolver.TryResolveBinPath(sknPath) ?? bundle?.PrimaryBinPath
+                : bundle?.PrimaryBinPath;
+            try
+            {
+                SceneModel loaded = await SknLoadingService.LoadModelWithSkinBin(sknPath, skinBinPath, searchDir);
+                if (generation != _championLoadGeneration || !ReferenceEquals(bundle, _activeBundle) || _isCleanedUp)
+                {
+                    loaded?.Dispose();
+                    return;
+                }
+                if (loaded == null)
+                {
+                    _model.LogMessages.Add($"[CHAMPION MESH] Form model could not be loaded: {Path.GetFileName(sknPath)}");
+                    return;
+                }
+
+                InstallChampionModel(loaded, bundle, sknPath, searchDir, startPreview: false,
+                    authoredSkeletonPath: swapped ? form.SkeletonPath : null);
+
+                _animationClipCancellation?.Cancel();
+                if (_model.SelectedSpell != null)
+                    _ = PlaySelectedSpellAsync(_model.SelectedSpell);
+                else if (_model.SelectedAnimation is { IsBindPose: false } animation)
+                    _ = PlaySelectedAnimationAsync(animation);
+                OpenTkControl?.InvalidateVisual();
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogDebug($"Form model not loaded: {ex.Message}");
+            }
         }
 
         private AnimationClipCatalogItem RebuildCharacterFormAnimationCatalog()

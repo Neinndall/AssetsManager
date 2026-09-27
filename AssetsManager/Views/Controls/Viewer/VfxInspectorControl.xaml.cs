@@ -78,6 +78,7 @@ namespace AssetsManager.Views.Controls.Viewer
             Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
         private VfxLoadingService.Bundle _championBundle;
         private string _championSknPath;
+        private string _championSearchDir;
         // Like LTK's Skin preview, a freshly installed Character is not drawn until the clip it opens
         // on has its pose, instead of flashing the bind pose while the ANM is prepared.
         private bool _championAwaitingFirstPose;
@@ -5268,12 +5269,14 @@ namespace AssetsManager.Views.Controls.Viewer
             VfxLoadingService.Bundle bundle,
             string sknPath,
             string searchDir,
-            bool startPreview)
+            bool startPreview,
+            string authoredSkeletonPath = null)
         {
             var oldModel = _championModel;
             _championModel = loaded;
             _championBundle = bundle;
             _championSknPath = sknPath;
+            _championSearchDir = searchDir;
             _championAwaitingFirstPose = true;
             RefreshCharacterInteractionTarget();
             // Keep the owner mesh and its joint anchors in authored skinScale space. User
@@ -5296,7 +5299,8 @@ namespace AssetsManager.Views.Controls.Viewer
             // Ensure skeleton is loaded
             if (_championModel.Skeleton == null && !string.IsNullOrEmpty(sknPath))
             {
-                string sklPath = ResolveSklPath(bundle?.OwnerSceneContext?.SkeletonPath, sknPath, searchDir);
+                string sklPath = ResolveSklPath(
+                    authoredSkeletonPath ?? bundle?.OwnerSceneContext?.SkeletonPath, sknPath, searchDir);
                 if (!string.IsNullOrEmpty(sklPath) && File.Exists(sklPath))
                 {
                     using var sklStream = File.OpenRead(sklPath);

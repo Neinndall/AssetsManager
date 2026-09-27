@@ -76,9 +76,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return new VfxCharacterFormDocumentData(primaryLinks, gearForms);
         }
 
+        /// <summary>
+        /// Resolves the primary gear links. A GearData authored on another skin's SKN (Elementalist Lux:
+        /// ASSETS/Characters/LuxFire/Skins/Skin07/...) is a model-swap form that loads that model.
+        /// </summary>
         internal static IReadOnlyList<VfxCharacterFormDefinition> Resolve(
             IReadOnlyList<VfxCharacterFormDocumentData> documents,
-            Func<uint, string> binEntryResolver)
+            Func<uint, string> binEntryResolver,
+            VfxOwnerSceneContext owner = null)
         {
             if (documents == null || documents.Count == 0 || documents[0] == null)
                 return Array.Empty<VfxCharacterFormDefinition>();
@@ -95,6 +100,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             if (links == null || links.Count == 0)
                 return Array.Empty<VfxCharacterFormDefinition>();
 
+            string ownerCharacter = CharacterFolder(owner?.MeshPath);
             var forms = new List<VfxCharacterFormDefinition>(links.Count);
             for (int index = 0; index < links.Count; index++)
             {
@@ -102,10 +108,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     !gearForms.TryGetValue(links[index].Value, out VfxCharacterFormDataProjection data))
                     continue;
 
+                bool modelSwap = IsOtherModel(data.MeshPath, owner?.MeshPath);
+                string name = ResolveName(links[index].Value, index, binEntryResolver);
+                if (modelSwap && name.StartsWith("Form ", StringComparison.Ordinal))
+                    name = ModelFormName(data.MeshPath, ownerCharacter) ?? name;
+
                 forms.Add(new VfxCharacterFormDefinition(
                     links[index].Value,
                     index,
-                    ResolveName(links[index].Value, index, binEntryResolver),
+                    name,
                     data.ShowSubmeshHashes,
                     data.HideSubmeshHashes,
                     data.MeshPath,
@@ -114,9 +125,40 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     data.ResourceMap,
                     data.OverrideIdleEffects,
                     data.EnableOverrideIdleEffects,
-                    data.HasMaterialOverrides));
+                    data.HasMaterialOverrides,
+                    modelSwap));
             }
             return forms.ToArray();
+        }
+
+        private static bool IsOtherModel(string formMesh, string ownerMesh) =>
+            !string.IsNullOrWhiteSpace(formMesh) && !string.IsNullOrWhiteSpace(ownerMesh) &&
+            !string.Equals(formMesh.Replace('\\', '/'), ownerMesh.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>"ASSETS/Characters/LuxFire/..." on owner "Lux" gives "Fire".</summary>
+        private static string ModelFormName(string meshPath, string ownerCharacter)
+        {
+            string character = CharacterFolder(meshPath);
+            if (string.IsNullOrEmpty(character)) return null;
+            string suffix = !string.IsNullOrEmpty(ownerCharacter) &&
+                character.Length > ownerCharacter.Length &&
+                character.StartsWith(ownerCharacter, StringComparison.OrdinalIgnoreCase)
+                    ? character[ownerCharacter.Length..].TrimStart('_')
+                    : character;
+            return char.ToUpperInvariant(suffix[0]) + suffix[1..];
+        }
+
+        /// <summary>Character folder of an authored "ASSETS/Characters/{Name}/..." asset path.</summary>
+        private static string CharacterFolder(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            string[] segments = path.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            for (int index = 0; index + 1 < segments.Length; index++)
+            {
+                if (string.Equals(segments[index], "Characters", StringComparison.OrdinalIgnoreCase))
+                    return segments[index + 1];
+            }
+            return null;
         }
 
         private static VfxCharacterFormDataProjection ParseGearData(

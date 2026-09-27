@@ -19,6 +19,30 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new Dictionary<uint, uint>(), Array.Empty<VfxIdleEffectDefinition>(), false);
 
         [Fact]
+        public void GearFormsAuthoredOnAnotherSkinModelAreCompatibleModelSwaps()
+        {
+            // Elementalist Lux (Skin07): each GearData points at another skin's SKN/SKL with material overrides.
+            var owner = new VfxOwnerSceneContext("ASSETS/Characters/Lux/Skins/Skin07/Lux_Skin07.skn", "", 1f);
+            var projection = new VfxCharacterFormDataProjection(
+                Array.Empty<uint>(), Array.Empty<uint>(),
+                "ASSETS/Characters/LuxFire/Skins/Skin07/Lux_Skin07_Fire.skn",
+                "ASSETS/Characters/LuxFire/Skins/Skin07/Lux_Skin07_Fire.skl",
+                null, new Dictionary<uint, uint>(), Array.Empty<VfxIdleEffectDefinition>(), false, true);
+            var sameModel = projection with { MeshPath = owner.MeshPath };
+            var document = new VfxCharacterFormDocumentData(
+                new uint?[] { 10, 20 },
+                new Dictionary<uint, VfxCharacterFormDataProjection> { [10] = sameModel, [20] = projection });
+
+            var forms = VfxCharacterFormParser.Resolve(new[] { document }, null, owner);
+
+            Assert.False(forms[0].IsModelSwap);
+            Assert.True(forms[1].IsModelSwap);
+            Assert.Equal("Fire", forms[1].Name);
+            Assert.Equal(-1, forms[1].EquippedGearIndex);
+            Assert.Equal(new[] { forms[1] }, VfxCharacterFormSemantics.CompatibleForms(forms, owner));
+        }
+
+        [Fact]
         public void SwitchingFormsStartsFromSkinBaselineAndDoesNotAccumulatePreviousHides()
         {
             uint[] baseline = { 2, 9 };
