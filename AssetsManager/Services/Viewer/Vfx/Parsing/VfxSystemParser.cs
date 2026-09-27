@@ -864,7 +864,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return values;
         }
 
-        private static readonly string[] ShimmerMeshExtensions = { ".gmesh", ".tmesh", ".scb", ".skn" };
+        private static readonly string[] ShimmerMeshExtensions = { ".gmesh", ".tmesh", ".scb" };
         private static readonly string[] ShimmerTextureExtensions = { ".dds", ".tex" };
 
         private static readonly uint[] ShimmerColorFieldHashes =
