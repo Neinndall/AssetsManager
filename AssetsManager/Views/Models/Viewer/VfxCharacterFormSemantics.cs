@@ -2,21 +2,138 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AssetsManager.Services.Viewer.Resolvers;
+using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Views.Models.Viewer
 {
     internal static class VfxCharacterFormSemantics
     {
         internal static IReadOnlySet<uint> HiddenSubmeshes(
-            IEnumerable<uint> initiallyHidden, VfxCharacterFormDefinition form)
+            IEnumerable<uint> initiallyHidden,
+            VfxCharacterFormDefinition form,
+            IEnumerable<ModelPart> parts = null)
         {
             var hidden = new HashSet<uint>(initiallyHidden ?? Array.Empty<uint>());
-            if (form != null)
+            if (form == null || form.IsBase)
+                return hidden;
+
+            // Authored show/hide lists in GearData take absolute priority
+            if ((form.ShowSubmeshHashes != null && form.ShowSubmeshHashes.Count > 0) ||
+                (form.HideSubmeshHashes != null && form.HideSubmeshHashes.Count > 0))
             {
-                hidden.ExceptWith(form.ShowSubmeshHashes);
-                hidden.UnionWith(form.HideSubmeshHashes);
+                if (form.ShowSubmeshHashes != null)
+                    hidden.ExceptWith(form.ShowSubmeshHashes);
+                if (form.HideSubmeshHashes != null)
+                    hidden.UnionWith(form.HideSubmeshHashes);
+                return hidden;
             }
+
+            // Fallback for skins where Riot authored no submesh lists in GearData (e.g. Sett 66)
+            if (parts != null && form.GearIndex >= 0)
+            {
+                var (inferredShow, inferredHide) = InferFormSubmeshes(form, initiallyHidden, parts);
+                hidden.ExceptWith(inferredShow);
+                hidden.UnionWith(inferredHide);
+            }
+
             return hidden;
+        }
+
+        private static (IReadOnlyList<uint> Show, IReadOnlyList<uint> Hide) InferFormSubmeshes(
+            VfxCharacterFormDefinition form,
+            IEnumerable<uint> initiallyHidden,
+            IEnumerable<ModelPart> parts)
+        {
+            var partsList = parts as IReadOnlyList<ModelPart> ?? parts.ToArray();
+            string keyword = form.Name?.ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(keyword) || keyword.StartsWith("form ", StringComparison.Ordinal))
+            {
+                foreach (var part in partsList)
+                {
+                    string path = part.MaterialDefinition?.ResolveTextureSwap(
+                        part.MaterialDefinition.BaseSamplerName, form.GearIndex);
+                    string token = VfxCharacterFormOption.ExtractFormTokenFromTexturePath(path);
+                    if (!string.IsNullOrWhiteSpace(token))
+                    {
+                        keyword = token.ToLowerInvariant();
+                        break;
+                    }
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(keyword))
+                return (Array.Empty<uint>(), Array.Empty<uint>());
+
+            // Collect keywords for other gear forms so we don't accidentally show their submeshes
+            var otherKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var part in partsList)
+            {
+                if (part.MaterialDefinition?.TextureSwaps == null) continue;
+                foreach (var swap in part.MaterialDefinition.TextureSwaps)
+                {
+                    foreach (var opt in swap.Options)
+                    {
+                        if (opt.Condition.Kind == GameMaterialBoolKind.Gear && opt.Condition.GearIndex != form.GearIndex)
+                        {
+                            string otherToken = VfxCharacterFormOption.ExtractFormTokenFromTexturePath(opt.TexturePath);
+                            if (!string.IsNullOrWhiteSpace(otherToken) &&
+                                !string.Equals(otherToken, keyword, StringComparison.OrdinalIgnoreCase))
+                            {
+                                otherKeywords.Add(otherToken.ToLowerInvariant());
+                            }
+                        }
+                    }
+                }
+            }
+
+            var initiallyHiddenSet = new HashSet<uint>(initiallyHidden ?? Array.Empty<uint>());
+            var show = new List<uint>();
+            var hide = new List<uint>();
+
+            foreach (var part in partsList)
+            {
+                uint hash = Fnv1a.HashLower(part.Name);
+                string nameLower = part.Name.ToLowerInvariant();
+
+                // Persistent geometry remains always visible
+                if (nameLower.Contains("persistent"))
+                    continue;
+
+                // Base-specific submeshes must be hidden when an upgraded form is active
+                if (nameLower.Contains("base"))
+                {
+                    hide.Add(hash);
+                    continue;
+                }
+
+                // If submesh belongs to another known form, keep it hidden
+                bool belongsToOtherForm = otherKeywords.Any(k => nameLower.Contains(k));
+                if (belongsToOtherForm)
+                {
+                    hide.Add(hash);
+                    continue;
+                }
+
+                // If submesh contains the form's keyword, show it
+                if (nameLower.Contains(keyword))
+                {
+                    show.Add(hash);
+                    continue;
+                }
+
+                // Submeshes authored in initialSubmeshToHide that are not spell effects
+                // and do not belong to other forms belong to this transformation
+                if (initiallyHiddenSet.Contains(hash) && !nameLower.Contains("snakew"))
+                {
+                    // Check if this submesh is associated with this form
+                    if (keyword.Contains("gold") && (nameLower.Contains("emblem") || nameLower.Contains("envelope")))
+                    {
+                        show.Add(hash);
+                    }
+                }
+            }
+
+            return (show, hide);
         }
 
         internal static void RestoreAuthoredTextures(IEnumerable<ModelPart> parts)

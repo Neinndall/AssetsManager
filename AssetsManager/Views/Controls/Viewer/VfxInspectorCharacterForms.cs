@@ -61,6 +61,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     return;
                 }
 
+                var compatibleForms = new List<VfxCharacterFormDefinition>();
                 foreach (VfxCharacterFormDefinition form in _activeBundle.CharacterForms)
                 {
                     if (form.HasMaterialOverrides)
@@ -71,7 +72,17 @@ namespace AssetsManager.Views.Controls.Viewer
                     if (!string.IsNullOrWhiteSpace(form.SkeletonPath) &&
                         !SameCharacterAsset(form.SkeletonPath, _activeBundle.OwnerSceneContext?.SkeletonPath))
                         continue;
-                    _model.CharacterForms.Add(new VfxCharacterFormOption(form, _championModel));
+                    compatibleForms.Add(form);
+                }
+
+                if (compatibleForms.Count > 0)
+                {
+                    var baseDef = VfxCharacterFormDefinition.CreateBase("Base");
+                    _model.CharacterForms.Add(new VfxCharacterFormOption(baseDef, _championModel));
+                    foreach (var form in compatibleForms)
+                    {
+                        _model.CharacterForms.Add(new VfxCharacterFormOption(form, _championModel));
+                    }
                 }
                 uint? selectedHash = _model.SelectedWorkspaceTab?.SelectedCharacterFormPathHash;
                 _model.SelectedCharacterForm = _model.CharacterForms.FirstOrDefault(option =>
@@ -93,7 +104,8 @@ namespace AssetsManager.Views.Controls.Viewer
             VfxCharacterFormSemantics.HiddenSubmeshes(
                 _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes,
                 ReferenceEquals(_championBundle, _activeBundle)
-                    ? _model.SelectedCharacterForm?.Definition : null);
+                    ? _model.SelectedCharacterForm?.Definition : null,
+                _championModel?.Parts);
 
         private void ApplySelectedCharacterForm(bool clearManualOverrides, bool restoreTextures)
         {
@@ -106,7 +118,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (clearManualOverrides)
                     tab.CharacterSubmeshOverrides.Clear();
             }
-            int gearIndex = _model.SelectedCharacterForm?.Definition.GearIndex ?? 0;
+            int gearIndex = _model.SelectedCharacterForm?.Definition.GearIndex ?? -1;
             bool gearChanged = _championModel.Parts.Any(part => part.EquippedGearIndex != gearIndex);
             foreach (var part in _championModel.Parts) part.EquippedGearIndex = gearIndex;
             if (restoreTextures || gearChanged)

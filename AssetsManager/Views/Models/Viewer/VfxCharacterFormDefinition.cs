@@ -15,5 +15,16 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyDictionary<uint, uint> ResourceMap = null,
         IReadOnlyList<VfxIdleEffectDefinition> OverrideIdleEffects = null,
         bool EnableOverrideIdleEffects = false,
-        bool HasMaterialOverrides = false);
+        bool HasMaterialOverrides = false)
+    {
+        public bool IsBase => GearIndex < 0;
+
+        public static VfxCharacterFormDefinition CreateBase(string name = "Base") =>
+            new(
+                PathHash: 0,
+                GearIndex: -1,
+                Name: name,
+                ShowSubmeshHashes: System.Array.Empty<uint>(),
+                HideSubmeshHashes: System.Array.Empty<uint>());
+    }
 }

@@ -78,7 +78,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         // SKN loaders attach the authored material here; other mesh pipelines keep their own material semantics.
         public ModelMaterialDefinition MaterialDefinition { get; set; }
-        internal int EquippedGearIndex { get; set; }
+        internal int EquippedGearIndex { get; set; } = -1;
 
         public Dictionary<string, BitmapSource> AllTextures
         {
