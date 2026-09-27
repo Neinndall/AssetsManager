@@ -423,6 +423,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Kept transform gizmo axes readable at the selected model depth and cleared stale drags when changing actors.
   - Viewer / Fixed incorrect glow, iridescence, and material colors when switching champion forms.
   - VFX Studio / Fixed incorrect textures when switching champion forms, including Ahri Hall of Legends.
   - Chroma Library / Fixed chromas loading an unrelated skin model and made scene names identify the selected chroma.

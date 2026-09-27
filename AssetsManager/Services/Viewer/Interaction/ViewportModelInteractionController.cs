@@ -94,6 +94,17 @@ namespace AssetsManager.Services.Viewer.Interaction
 
         public void SetSelection(IEnumerable<SceneModel> models, SceneModel activeModel)
         {
+            if (!ReferenceEquals(_activeModel, activeModel))
+            {
+                _isDragging = false;
+                _dragAxis = TransformAxis.None;
+                _dragStartPositions.Clear();
+                _axisEndpoints.Clear();
+                _gizmoCanvas.Visibility = Visibility.Collapsed;
+                if (_inputSurface.IsMouseCaptured)
+                    _inputSurface.ReleaseMouseCapture();
+                _inputSurface.Cursor = Cursors.Arrow;
+            }
             _selectedModels.Clear();
             if (models != null)
                 _selectedModels.AddRange(models.Where(model => model != null));
@@ -120,9 +131,12 @@ namespace AssetsManager.Services.Viewer.Interaction
                 (float)_activeModel.PositionX,
                 (float)_activeModel.PositionY,
                 (float)_activeModel.PositionZ);
-            _axisWorldLength = camera is OrthographicCamera orthographic
-                ? Math.Max(35, orthographic.Width * 0.12)
-                : Math.Max(35, camera.LookDirection.Length * 0.12);
+            if (!ViewerInteractionService.TryCalculateGizmoAxisLength(
+                    origin, viewProjection, _inputSurface.ActualHeight, out _axisWorldLength))
+            {
+                _gizmoCanvas.Visibility = Visibility.Collapsed;
+                return;
+            }
             if (!ViewerInteractionService.TryProject(
                     origin,
                     viewProjection,

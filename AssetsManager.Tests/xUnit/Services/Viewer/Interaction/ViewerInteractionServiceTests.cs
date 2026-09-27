@@ -93,6 +93,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Interaction
             drawnAtOrigin.Dispose();
         }
 
+        [Theory]
+        [InlineData(200, false)]
+        [InlineData(2000, false)]
+        [InlineData(200, true)]
+        [InlineData(2000, true)]
+        public void GizmoAxisKeepsScreenSizeAtSelectedActorDepth(float depth, bool orthographic)
+        {
+            var origin = new Vector3(120, 0, -depth);
+            var projection = orthographic
+                ? Matrix4x4.CreateOrthographic(1600, 1200, 1, 10000)
+                : Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4, 4f / 3, 1, 10000);
+            Assert.True(ViewerInteractionService.TryCalculateGizmoAxisLength(origin, projection, 600, out double length));
+            Assert.True(ViewerInteractionService.TryProject(origin, projection, 800, 600, out Point start));
+            Assert.True(ViewerInteractionService.TryProject(origin + Vector3.UnitY * (float)length,
+                projection, 800, 600, out Point end));
+            Assert.InRange((end - start).Length, 79.95, 80.05);
+        }
+
+        [Fact]
+        public void GizmoRejectsInvalidProjectionAndActorBehindCamera()
+        {
+            Assert.False(ViewerInteractionService.TryCalculateGizmoAxisLength(Vector3.Zero,
+                default, 600, out _));
+            var projection = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4, 1, 1, 10000);
+            Assert.False(ViewerInteractionService.TryCalculateGizmoAxisLength(Vector3.UnitZ,
+                projection, 600, out _));
+        }
+
         private static SceneModel CreateModel(string name, double positionX)
         {
             var geometry = new MeshGeometry3D

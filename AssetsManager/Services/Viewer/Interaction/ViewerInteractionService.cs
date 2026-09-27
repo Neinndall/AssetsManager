@@ -127,6 +127,25 @@ namespace AssetsManager.Services.Viewer.Interaction
             return float.IsFinite(ndc.X) && float.IsFinite(ndc.Y);
         }
 
+        internal static bool TryCalculateGizmoAxisLength(
+            Vector3 origin, Matrix4x4 viewProjection, double viewportHeight, out double length)
+        {
+            length = 0;
+            if (!double.IsFinite(viewportHeight) || viewportHeight <= 0 ||
+                !Matrix4x4.Invert(viewProjection, out var inverse))
+                return false;
+            Vector4 clip = Vector4.Transform(new Vector4(origin, 1), viewProjection);
+            if (!float.IsFinite(clip.W) || clip.W <= float.Epsilon) return false;
+            Vector4 offset = clip / clip.W;
+            // Unproject 80 screen DIPs at the actor's depth, independent of the camera's look-vector length.
+            offset.Y += (float)(160d / viewportHeight);
+            Vector4 world = Vector4.Transform(offset, inverse);
+            if (!float.IsFinite(world.W) || Math.Abs(world.W) <= float.Epsilon) return false;
+            var point = new Vector3(world.X, world.Y, world.Z) / world.W;
+            length = Vector3.Distance(origin, point);
+            return double.IsFinite(length) && length > 0;
+        }
+
         public static Matrix4x4 CreateWorldMatrix(SceneModel model)
         {
             float pitch = (float)(model.RotationX * Math.PI / 180);
