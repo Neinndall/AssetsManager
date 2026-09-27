@@ -908,16 +908,32 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             string name = GetString(p, F_emitterName) ?? $"[{index}]";
             bool disabled = GetBool(p, F_disabled);
 
-            string meshPath = FindFirstAsset(s, ShimmerMeshExtensions);
+            var components = p.GetValueOrDefault(VfxParsingHash.Fnv1a("VfxComponents")) as BinTreeStruct;
+            BinTreeProperty geometry = components?.Properties.GetValueOrDefault(VfxParsingHash.Fnv1a("GeometryComponent"));
+            BinTreeProperty render = components?.Properties.GetValueOrDefault(VfxParsingHash.Fnv1a("RenderComponent"));
+            BinTreeProperty physics = components?.Properties.GetValueOrDefault(VfxParsingHash.Fnv1a("PhysicsComponent"));
+            string meshPath = FindFirstAsset(components is null ? s : geometry, ShimmerMeshExtensions);
             if (string.IsNullOrWhiteSpace(meshPath))
                 return null;
 
-            string texturePath = FindFirstAsset(s, ShimmerTextureExtensions);
+            string texturePath = components is null ? FindFirstAsset(s, ShimmerTextureExtensions)
+                : FindFirstAsset(geometry, ShimmerTextureExtensions) ?? FindFirstAsset(render, ShimmerTextureExtensions);
 
-            Vector4 color = FindNamedDriverVector4(s, ShimmerColorFieldHashes) ?? Vector4.One;
-            Vector3 scale = FindNamedDriverVector3(s, ShimmerScaleFieldHashes) ?? Vector3.One;
-            Vector3 offset = FindNamedDriverVector3(s, ShimmerPositionFieldHashes) ?? Vector3.Zero;
-            Vector3 rotation = FindNamedDriverVector3(s, ShimmerRotationFieldHashes) ?? Vector3.Zero;
+            float[] DriverValue(uint[] hashes, int width)
+            {
+                if (components is null) return FindNamedDriver(s, hashes, width, out _);
+                float[] value = FindNamedDriver(render, hashes, width, out bool matched);
+                return matched ? value : FindNamedDriver(physics, hashes, width, out _);
+            }
+
+            float[] colorValue = DriverValue(ShimmerColorFieldHashes, 4);
+            Vector4 color = colorValue is null ? Vector4.One : new Vector4(colorValue[0], colorValue[1], colorValue[2], colorValue[3]);
+            float[] scaleValue = DriverValue(ShimmerScaleFieldHashes, 3);
+            Vector3 scale = scaleValue is null ? Vector3.One : new Vector3(scaleValue[0], scaleValue[1], scaleValue[2]);
+            float[] offsetValue = DriverValue(ShimmerPositionFieldHashes, 3);
+            Vector3 offset = offsetValue is null ? Vector3.Zero : new Vector3(offsetValue[0], offsetValue[1], offsetValue[2]);
+            float[] rotationValue = DriverValue(ShimmerRotationFieldHashes, 3);
+            Vector3 rotation = rotationValue is null ? Vector3.Zero : new Vector3(rotationValue[0], rotationValue[1], rotationValue[2]);
             Vector3 rotationRad = rotation * (MathF.PI / 180f);
 
             return new VfxEmitterDefinition(
@@ -996,116 +1012,37 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return null;
         }
 
-        private static Vector4? FindNamedDriverVector4(BinTreeProperty root, uint[] targetHashes, int depth = 0)
+        private static float[] FindNamedDriver(BinTreeProperty root, uint[] targetHashes, int width, out bool matched, int depth = 0)
         {
+            matched = false;
             if (root is null || depth > 24) return null;
-            if (root is BinTreeOptional opt) root = opt.Value;
-            if (root is not BinTreeStruct s) return null;
-
-            foreach (uint hash in targetHashes)
+            if (root is BinTreeOptional optional) root = optional.Value;
+            if (root is BinTreeStruct node)
             {
-                if (s.Properties.TryGetValue(hash, out var prop))
+                foreach (var field in node.Properties)
                 {
-                    var val = ExtractDriverVector4(prop);
-                    if (val.HasValue) return val;
-                }
-            }
-
-            foreach (var child in s.Properties.Values)
-            {
-                if (child is BinTreeStruct childStruct)
-                {
-                    var found = FindNamedDriverVector4(childStruct, targetHashes, depth + 1);
-                    if (found.HasValue) return found;
-                }
-                else if (child is BinTreeContainer container)
-                {
-                    foreach (var elem in container.Elements)
+                    BinTreeProperty held = field.Value is BinTreeOptional opt ? opt.Value : field.Value;
+                    bool direct = width == 3 ? held is BinTreeVector3 : held is BinTreeVector4 or BinTreeColor;
+                    if (targetHashes.Contains(field.Key) && (direct || VfxShimmerDriverEvaluator.IsDriver(held, width)))
                     {
-                        var found = FindNamedDriverVector4(elem, targetHashes, depth + 1);
-                        if (found.HasValue) return found;
+                        matched = true;
+                        return VfxShimmerDriverEvaluator.Evaluate(held, width);
                     }
+                    // Graph inputs are not independent component properties.
+                    if (VfxShimmerDriverEvaluator.IsGraphRoot(held)) continue;
+                    float[] value = FindNamedDriver(held, targetHashes, width, out matched, depth + 1);
+                    if (matched) return value;
                 }
             }
-
+            else if (root is BinTreeContainer container)
+            {
+                foreach (BinTreeProperty held in container.Elements)
+                {
+                    float[] value = FindNamedDriver(held, targetHashes, width, out matched, depth + 1);
+                    if (matched) return value;
+                }
+            }
             return null;
         }
-
-        private static Vector3? FindNamedDriverVector3(BinTreeProperty root, uint[] targetHashes, int depth = 0)
-        {
-            if (root is null || depth > 24) return null;
-            if (root is BinTreeOptional opt) root = opt.Value;
-            if (root is not BinTreeStruct s) return null;
-
-            foreach (uint hash in targetHashes)
-            {
-                if (s.Properties.TryGetValue(hash, out var prop))
-                {
-                    var val = ExtractDriverVector3(prop);
-                    if (val.HasValue) return val;
-                }
-            }
-
-            foreach (var child in s.Properties.Values)
-            {
-                if (child is BinTreeStruct childStruct)
-                {
-                    var found = FindNamedDriverVector3(childStruct, targetHashes, depth + 1);
-                    if (found.HasValue) return found;
-                }
-                else if (child is BinTreeContainer container)
-                {
-                    foreach (var elem in container.Elements)
-                    {
-                        var found = FindNamedDriverVector3(elem, targetHashes, depth + 1);
-                        if (found.HasValue) return found;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        private static Vector4? ExtractDriverVector4(BinTreeProperty prop)
-        {
-            if (prop is null) return null;
-            if (prop is BinTreeOptional opt) prop = opt.Value;
-            if (prop is null) return null;
-
-            if (prop is BinTreeVector4 v4) return v4.Value;
-            if (prop is BinTreeColor c) return c.Value;
-
-            if (prop is BinTreeStruct s)
-            {
-                foreach (var inner in s.Properties.Values)
-                {
-                    var res = ExtractDriverVector4(inner);
-                    if (res.HasValue) return res;
-                }
-            }
-
-            return null;
-        }
-
-        private static Vector3? ExtractDriverVector3(BinTreeProperty prop)
-        {
-            if (prop is null) return null;
-            if (prop is BinTreeOptional opt) prop = opt.Value;
-            if (prop is null) return null;
-
-            if (prop is BinTreeVector3 v3) return v3.Value;
-
-            if (prop is BinTreeStruct s)
-            {
-                foreach (var inner in s.Properties.Values)
-                {
-                    var res = ExtractDriverVector3(inner);
-                    if (res.HasValue) return res;
-                }
-            }
-
-            return null;
-        }
-
     }
 }

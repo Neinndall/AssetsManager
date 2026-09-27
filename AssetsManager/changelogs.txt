@@ -427,6 +427,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Corrected Shimmer mesh colors and transforms built from combined drivers.
   - Maps / Material parameter values now take priority over their shader pass values when shaders are off.
   - VFX Studio / Champion materials with two passes draw the second pass in the same order as LTK Manager.
   - Maps / Apply authored ambient grid lighting to placed structures and characters.
