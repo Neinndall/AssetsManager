@@ -4954,7 +4954,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (adoption != null)
                 {
-                    InstallChampionModel(adoption.Model, bundle, adoption.SknPath, _model.RootPath, startPreview: false);
+                    VfxCharacterFormDefinition adoptedForm = adoption.Form;
+                    // Keep the installed form identity so rebuilding the picker reuses this model.
+                    InstallChampionModel(
+                        adoption.Model, bundle, adoption.SknPath, adoption.SearchDirectory, startPreview: false,
+                        formPathHash: adoptedForm is { ReloadsModel: true } ? adoptedForm.PathHash : 0u,
+                        formSkinScale: adoptedForm is { ReloadsModel: true } ? adoptedForm.SkinScale : null);
                     adoption = null;
                     bool restored = restoreTab != null && ReferenceEquals(_pendingWorkspaceRestoreTab, restoreTab) &&
                         RestoreWorkspaceSelection(restoreTab, binFilePath);

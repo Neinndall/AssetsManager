@@ -423,6 +423,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Switching scene actors preserves their selected form and scale without reloading the model.
   - VFX Studio / Opened Inspector sections collapsed and added a Collapse all button to its header.
   - Viewer / Shared a stable gizmo overlay across both viewports so changing actors redraws its axes immediately.
   - Viewer / Kept transform gizmo axes readable at the selected model depth and cleared stale drags when changing actors.
