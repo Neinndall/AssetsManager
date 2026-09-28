@@ -164,12 +164,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void TextureOnlyBindingKeepsThreeDefaultClampLikeLtk()
+        public void TextureOnlyBindingRepeatsLikeLtkAssetTextures()
         {
+            // LTK loads model textures with RepeatWrapping (useAssetTextures); critters author UVs past 0..1.
             ModelMaterialDefinition material = ModelMaterialDefinition.TextureOnly("test_tx_cm");
 
-            Assert.Equal(ModelMaterialWrapMode.Clamp, material.WrapU);
-            Assert.Equal(ModelMaterialWrapMode.Clamp, material.WrapV);
+            Assert.Equal(ModelMaterialWrapMode.Repeat, material.WrapU);
+            Assert.Equal(ModelMaterialWrapMode.Repeat, material.WrapV);
         }
 
         [Fact]
@@ -208,8 +209,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Equal("skin_tx_cm", resolved.BaseTextureName);
             Assert.Equal(ModelMaterialBaseRule.None, resolved.BaseRule);
             Assert.Equal(Vector2.One, resolved.UvRepeat);
-            Assert.Equal(ModelMaterialWrapMode.Clamp, resolved.WrapU);
-            Assert.Equal(ModelMaterialWrapMode.Clamp, resolved.WrapV);
+            Assert.Equal(ModelMaterialWrapMode.Repeat, resolved.WrapU);
+            Assert.Equal(ModelMaterialWrapMode.Repeat, resolved.WrapV);
         }
 
         [Fact]

@@ -222,8 +222,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 alphaCutoff,
                 uvRepeat,
                 uvScroll,
-                baseSampler?.WrapU ?? ModelMaterialWrapMode.Clamp,
-                baseSampler?.WrapV ?? ModelMaterialWrapMode.Clamp,
+                // Like LTK, a material without a base sampler samples its fallback texture with repeat.
+                baseSampler?.WrapU ?? ModelMaterialWrapMode.Repeat,
+                baseSampler?.WrapV ?? ModelMaterialWrapMode.Repeat,
                 renderState,
                 ModelMaterialBindingKind.Authored,
                 material.IsAnimated,

@@ -51,6 +51,7 @@ namespace AssetsManager.Views.Models.Viewer
         public static ModelMaterialDefinition TextureOnly(string baseTextureName) =>
             TextureOnly(baseTextureName, null);
 
+        // Skins without a material (map critters) author UVs past 0..1 and rely on repeat, as LTK samples them.
         internal static ModelMaterialDefinition TextureOnly(string baseTextureName, GameMaterialProgram program) =>
             new(
                 baseTextureName,
@@ -59,8 +60,8 @@ namespace AssetsManager.Views.Models.Viewer
                 0f,
                 Vector2.One,
                 Vector2.Zero,
-                ModelMaterialWrapMode.Clamp,
-                ModelMaterialWrapMode.Clamp,
+                ModelMaterialWrapMode.Repeat,
+                ModelMaterialWrapMode.Repeat,
                 ModelMaterialRenderState.TextureOnly,
                 ModelMaterialBindingKind.TextureOnly,
                 false,

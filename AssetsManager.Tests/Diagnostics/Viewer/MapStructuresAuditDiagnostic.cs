@@ -109,6 +109,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                         Console.WriteLine(
                             $"   {range.Name,-28} {color,-22} kind={material.BindingKind} tex={material.BaseTextureName ?? "-"} " +
                             $"blend={material.RenderState.Blending} cutout={material.RenderState.Cutout} alphaCut={material.AlphaCutoff:0.###} " +
+                            $"wrap={material.WrapU}/{material.WrapV} uv={UvRange(asset.Mesh, range)} " +
                             $"shader={material.ShaderPath ?? "-"}");
                     }
                 }
@@ -118,6 +119,24 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 foreach (MapCharacterRuntimeGroup group in groups)
                     group.Dispose();
             }
+        }
+
+        private static string UvRange(MapCharacterMeshData mesh, MapCharacterMeshRange range)
+        {
+            if (mesh?.Uv == null || mesh.Indices == null)
+                return "-";
+            float minU = float.MaxValue, minV = float.MaxValue, maxU = float.MinValue, maxV = float.MinValue;
+            int outside = 0;
+            int end = Math.Min(range.StartIndex + range.IndexCount, mesh.Indices.Length);
+            for (int at = range.StartIndex; at < end; at++)
+            {
+                System.Numerics.Vector2 uv = mesh.Uv[mesh.Indices[at]];
+                minU = Math.Min(minU, uv.X); maxU = Math.Max(maxU, uv.X);
+                minV = Math.Min(minV, uv.Y); maxV = Math.Max(maxV, uv.Y);
+                if (uv.X < -0.001f || uv.X > 1.001f || uv.Y < -0.001f || uv.Y > 1.001f)
+                    outside++;
+            }
+            return $"[{minU:0.##}..{maxU:0.##}]x[{minV:0.##}..{maxV:0.##}] outside01={outside * 100.0 / Math.Max(1, end - range.StartIndex):0.#}%";
         }
     }
 }
