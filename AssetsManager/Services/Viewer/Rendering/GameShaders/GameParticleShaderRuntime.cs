@@ -66,6 +66,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             UpdateBlocks(entry.Program, entry.Globals, null, frame, null, emitter, parameters);
             foreach (var sampler in entry.Program.Samplers)
             {
+                // A texture resolved on demand may upload, which binds on the active unit: activate this one first.
+                _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + sampler.Unit));
                 string own = sampler.TextureName.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
                     ? sampler.TextureName[..^MaterialTextureSuffix.Length] : sampler.TextureName;
                 var declared = entry.Pass.Textures?.FirstOrDefault(texture => string.Equals(texture.Name, own, StringComparison.Ordinal));

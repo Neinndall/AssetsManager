@@ -30,7 +30,9 @@ namespace AssetsManager.Services.Viewer.Loading
             await using Stream stream = await _resolver.OpenReadAsync(asset, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (stream == null) return null;
-            try { return MapLightGridParser.Decode(stream); }
+            float rmaIntensityScale = MapLightGridParser.FindRmaIntensityScale(materials, source.Map)
+                                      ?? MapLightGridData.DefaultRmaIntensityScale;
+            try { return MapLightGridParser.Decode(stream, rmaIntensityScale); }
             catch (IOException ex)
             {
                 _log?.LogDebug($"Map light grid unavailable: {path}: {ex.Message}");

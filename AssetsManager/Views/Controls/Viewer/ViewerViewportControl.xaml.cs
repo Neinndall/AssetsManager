@@ -183,6 +183,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             }
 
+            // PBR game shaders light models from the environment the sky shows.
+            if (_meshRenderer != null)
+                _meshRenderer.ImageLight = _genericSkyCube;
+
             // 3. Setup lighting from view model settings. The default values reproduce the
             // character preview sun/ambient split while still allowing explicit studio overrides.
             var lighting = GlMeshRenderer.StudioCharacterLighting(

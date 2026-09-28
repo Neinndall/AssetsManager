@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
@@ -92,7 +93,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             Vector3 CharacterPosition = default,
             EnvironmentFrame Environment = default,
             uint SceneColor = 0,
-            uint SceneDepth = 0);
+            uint SceneDepth = 0,
+            VfxCubeMapData ImageLight = null);
 
         internal const string SceneColorTexture = "SAMPLER_BACK_BUFFER_COPY_SharedTexture";
         internal const string SceneDepthTexture = "sDepthTexture_SharedTexture";
@@ -115,6 +117,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal const string GrassTintAlternateTexture = "GRASS_TINT_MAP_ALTERNATE_SharedTexture";
         internal const string EnvironmentCubeTexture = "ENV_CUBE_SharedTexture";
         internal const string TerrainPaintTexture = "TERRAIN_BLEND_SharedTexture";
+        internal const string LightGridTexture = "LIGHT_GRID_TEXTURE_SharedTexture";
+        internal const string ImageLightTexture = "IBL_CUBEMAP_SharedTexture";
+        private GameShaderLightGridTexture _lightGridTexture;
+        private GameShaderImageLight _imageLight;
         private const string MeshCenter = "MESH_CENTER";
 
         private readonly record struct CharacterDraw(
@@ -368,7 +374,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents);
             UpdateBlocks(runtime, passEntry.Globals, null, frame, new CharacterDraw(world, bones, selfIllumination),
                 overrides: entry.DynamicParameters(material, gearIndex));
-            BindSkinnedTextures(runtime, passEntry.Pass, programTexture, material, gearIndex);
+            BindSkinnedTextures(runtime, passEntry.Pass, programTexture, material, gearIndex, frame);
             ApplyPassState(passEntry.Pass.State, meshDoubleSided: false);
             return true;
         }
@@ -704,6 +710,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         WriteVector4(block.Data, 4, 4, Vector4.One);
                         Set(block.Data, 10, particle.DepthPushPull);
                         break;
+                    case "IBL_CUBEMAP_SCALES_BUFFER":
+                        // Scale of cube 0, the only cube the preview binds (IBL_CUBEMAP_INDEX stays 0).
+                        Set(block.Data, 0, 1f);
+                        break;
                     case "EnvironmentTransitionVertexCB":
                     case "EnvironmentTransitionPixelCB":
                         // TransitionFactorAndDirection: the shaders read the factor from z; x marks an entering state.
@@ -854,8 +864,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 Set(data, 41, FogEnd);
             }
             WriteMatrixRows(data, 68, frame.View);
-            // GRASS_INTERP (float4 at 64): VertexDeform blends the two grass tints by its y component.
+            // m[16]: LIGHT_GRID_TEXTURE_SCALE (x, PBR characters) and GRASS_INTERP (y, VertexDeform).
+            // LIGHT_GRID_WORLD_TO_GRID (60) stays zero, so the one-texel grid texture is read at its origin.
+            Set(data, 64, frame.LightGrid?.RmaIntensityScale ?? MapLightGridData.DefaultRmaIntensityScale);
             Set(data, 65, frame.Environment.GrassInterp);
+            // HDR_ENV_DIFFUSE_SCALE (88): weight of the IBL diffuse term PBR shaders add to the light grid.
+            Set(data, 88, 1f);
             WriteMatrixRows(data, 104, cameraWorld);
         }
 
@@ -871,16 +885,25 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal static void WriteCharacterPerDrawVertex(float[] data, in Frame frame)
         {
             WriteIdentityRows(data, 0, 16);
+            Span<Vector3> cube = stackalloc Vector3[6];
+            ResolveAmbientCube(frame, cube);
+            for (int face = 0; face < 6; face++)
+            {
+                WriteVector3(data, 16 + face * 4, cube[face]);
+                Set(data, 19 + face * 4, 1f);
+            }
+            WriteIdentityRows(data, 44, 16);
+        }
+
+        /// <summary>
+        /// The ambient light cube (+X, -X, +Y, -Y, +Z, -Z) around the character: the map light grid at its
+        /// position, or the preview sun and sky when no grid is loaded.
+        /// </summary>
+        internal static void ResolveAmbientCube(in Frame frame, Span<Vector3> cube)
+        {
             if (frame.LightGrid != null)
             {
-                Span<Vector3> cube = stackalloc Vector3[6];
                 frame.LightGrid.SampleSceneCube(frame.CharacterPosition, cube);
-                for (int face = 0; face < 6; face++)
-                {
-                    WriteVector3(data, 16 + face * 4, cube[face]);
-                    Set(data, 19 + face * 4, 1f);
-                }
-                WriteIdentityRows(data, 44, 16);
                 return;
             }
             ResolveSun(
@@ -918,14 +941,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             {
                 Vector3 axis = faces[face];
                 Vector3 basis = axis.Y > 0f ? sky : axis.Y < 0f ? ground : horizon;
-                Vector3 shaded = basis * skyScale;
                 float facing = MathF.Max(Vector3.Dot(axis, direction), 0f);
-                Vector3 lit = shaded + sun * facing;
-                int at = 16 + face * 4;
-                WriteVector3(data, at, lit);
-                Set(data, at + 3, 1f);
+                cube[face] = basis * skyScale + sun * facing;
             }
-            WriteIdentityRows(data, 44, 16);
         }
 
         private static void WriteCharacterPerDrawPixel(float[] data, in CharacterDraw character, MapLightGridData lightGrid)
@@ -962,16 +980,38 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             GameMaterialPass pass,
             Func<string, uint?> programTexture,
             ModelMaterialDefinition material,
-            int gearIndex)
+            int gearIndex,
+            in Frame frame)
         {
             foreach (SamplerRuntime sampler in runtime.Samplers)
             {
+                // Resolving a texture may upload it, and an upload binds on the active unit. Activating this
+                // sampler's unit first keeps a lazy upload from replacing the previous sampler's texture.
+                _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + sampler.Unit));
                 string name = sampler.TextureName;
                 uint texture;
                 TextureTarget target;
                 uint samplerObject;
 
-                if (name.EndsWith(SharedTextureSuffix, StringComparison.Ordinal))
+                if (name == ImageLightTexture &&
+                    sampler.Dimension == GameShaderTranslator.TextureDimension.CubeArray &&
+                    (_imageLight ??= new GameShaderImageLight(_gl)).Resolve(frame.ImageLight) is uint imageLight &&
+                    imageLight != 0)
+                {
+                    texture = imageLight;
+                    target = TextureTarget.Texture2DArray;
+                    samplerObject = ResolveSampler(new GameMaterialSamplerState(
+                        null, MapTextureWrap.Clamp, MapTextureWrap.Clamp, MapTextureWrap.Clamp, true, true));
+                }
+                else if (name == LightGridTexture && sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2DArray)
+                {
+                    Span<Vector3> cube = stackalloc Vector3[6];
+                    ResolveAmbientCube(frame, cube);
+                    texture = (_lightGridTexture ??= new GameShaderLightGridTexture(_gl)).Update(cube);
+                    target = TextureTarget.Texture2DArray;
+                    samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
+                }
+                else if (name.EndsWith(SharedTextureSuffix, StringComparison.Ordinal))
                 {
                     (texture, target) = NeutralFor(sampler.Dimension, black: true);
                     samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
@@ -1027,6 +1067,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         {
             foreach (SamplerRuntime sampler in runtime.Samplers)
             {
+                // Resolving a texture may upload it, and an upload binds on the active unit. Activating this
+                // sampler's unit first keeps a lazy upload from replacing the previous sampler's texture.
+                _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + sampler.Unit));
                 string name = sampler.TextureName;
                 uint texture;
                 TextureTarget target;
@@ -1629,6 +1672,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 program?.Dispose();
             _sharedPrograms.Clear();
             _shaderCache?.Dispose();
+            _lightGridTexture?.Dispose();
+            _lightGridTexture = null;
+            _imageLight?.Dispose();
+            _imageLight = null;
             foreach (uint sampler in _samplers.Values)
                 if (sampler != 0)
                     _gl.DeleteSampler(sampler);

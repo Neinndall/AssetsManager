@@ -101,6 +101,30 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     .ToArray();
                 foreach (ModelMaterialDefinition material in materials)
                     skinUsage.Collect(material.Program, name, settings);
+                if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AM_SHADER_PARAMS")))
+                {
+                    var submeshes = (asset.Materials?.MaterialDefinitions ?? new Dictionary<string, ModelMaterialDefinition>())
+                        .Select(pair => (Submesh: pair.Key, Material: pair.Value))
+                        .Prepend(("<default>", asset.Materials?.DefaultMaterialDefinition));
+                    foreach ((string submesh, ModelMaterialDefinition material) in submeshes)
+                        Console.WriteLine(
+                            $"[Submesh] {name} {submesh}: shader={material?.Program?.Passes.FirstOrDefault()?.ShaderPath ?? "-"} " +
+                            $"state={material?.Program?.Passes.FirstOrDefault()?.State} " +
+                            $"textures={string.Join(", ", material?.Program?.Passes.FirstOrDefault()?.Textures?.Select(texture => $"{texture.Name}=0x{texture.Texture?.PathHash:x16}") ?? Array.Empty<string>())}");
+                    Console.WriteLine($"[Submesh] {name} hidden={string.Join(", ", asset.Materials?.InitialHiddenSubmeshes ?? Array.Empty<string>())}");
+                    foreach ((string submesh, ModelMaterialDefinition material) in submeshes)
+                        foreach (GameMaterialDynamicParameter dynamic in material?.DynamicParameters ?? Array.Empty<GameMaterialDynamicParameter>())
+                            Console.WriteLine($"[Submesh] {name} {submesh} dynamic {dynamic}");
+                    foreach (MapCharacterMeshRange range in asset.Mesh?.Ranges ?? Array.Empty<MapCharacterMeshRange>())
+                    {
+                        // Farthest bind-pose vertex from the model origin, which dissolve radii are measured against.
+                        float farthest = Enumerable.Range(range.StartIndex, range.IndexCount)
+                            .Select(at => asset.Mesh.Positions[asset.Mesh.Indices[at]].Length())
+                            .DefaultIfEmpty(0f)
+                            .Max();
+                        Console.WriteLine($"[Submesh] {name} mesh {range.Name} indices={range.IndexCount} farthest={farthest:0}");
+                    }
+                }
 
                 VfxEmitterDefinition[] emitters = (asset.Vfx?.Systems?.Values ?? Enumerable.Empty<VfxSystemDefinition>())
                     .SelectMany(system => system.Emitters)

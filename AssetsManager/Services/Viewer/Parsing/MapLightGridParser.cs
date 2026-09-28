@@ -15,7 +15,19 @@ namespace AssetsManager.Services.Viewer.Parsing
                 ? (property as BinTreeString)?.Value : null;
         }
 
-        internal static MapLightGridData Decode(Stream stream)
+        /// <summary>The <c>RmaStaticLightGridIntensityScale</c> of the container's MapBakeProperties, if stated.</summary>
+        internal static float? FindRmaIntensityScale(BinTree materials, MapPath map)
+        {
+            BinTreeStruct bake = MapPostEffectsParser.FindComponent(materials, map, 0x6a4a3409);
+            return bake?.Properties.TryGetValue(RmaIntensityScaleField, out var property) == true &&
+                   property is BinTreeF32 value && float.IsFinite(value.Value) && value.Value > 0f
+                ? value.Value
+                : null;
+        }
+
+        private static readonly uint RmaIntensityScaleField = LeagueToolkit.Hashing.Fnv1a.HashLower("RmaStaticLightGridIntensityScale");
+
+        internal static MapLightGridData Decode(Stream stream, float rmaIntensityScale = MapLightGridData.DefaultRmaIntensityScale)
         {
             using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true);
             if (reader.ReadUInt32() != 3) throw new InvalidDataException("Unsupported light grid version.");
@@ -35,7 +47,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             stream.Position = offset;
             byte[] cells = reader.ReadBytes((int)length);
             if (cells.Length != length) throw new EndOfStreamException("Truncated light grid cells.");
-            return new MapLightGridData(width, height, extentX, extentZ, scale, fullBright, cells);
+            return new MapLightGridData(width, height, extentX, extentZ, scale, fullBright, cells, rmaIntensityScale);
         }
     }
 }

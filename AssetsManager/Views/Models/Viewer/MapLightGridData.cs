@@ -13,8 +13,17 @@ namespace AssetsManager.Views.Models.Viewer
         internal float Scale { get; }
         internal float FullBright { get; }
 
+        /// <summary>
+        /// PBR light grid scale (<c>LIGHT_GRID_TEXTURE_SCALE</c>) when the map does not state one: pi cancels the
+        /// Lambert normalization, close to the 3.22 <c>RmaStaticLightGridIntensityScale</c> Riot maps author.
+        /// </summary>
+        internal const float DefaultRmaIntensityScale = MathF.PI;
+
+        /// <summary>The map's <c>RmaStaticLightGridIntensityScale</c>, or <see cref="DefaultRmaIntensityScale"/>.</summary>
+        internal float RmaIntensityScale { get; }
+
         internal MapLightGridData(int width, int height, float extentX, float extentZ,
-            float scale, float fullBright, byte[] cells)
+            float scale, float fullBright, byte[] cells, float rmaIntensityScale = DefaultRmaIntensityScale)
         {
             Width = width;
             Height = height;
@@ -22,6 +31,7 @@ namespace AssetsManager.Views.Models.Viewer
             ExtentZ = extentZ;
             Scale = scale;
             FullBright = fullBright;
+            RmaIntensityScale = rmaIntensityScale;
             _cells = cells;
         }
 

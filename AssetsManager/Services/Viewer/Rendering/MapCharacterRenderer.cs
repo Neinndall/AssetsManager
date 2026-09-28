@@ -13,6 +13,7 @@ using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Hashing;
@@ -26,6 +27,9 @@ namespace AssetsManager.Services.Viewer.Rendering
     /// </summary>
     internal sealed class MapCharacterRenderer : IDisposable
     {
+        /// <summary>Environment cube PBR game shaders light from (IBL); the preview sky the viewport shows.</summary>
+        internal VfxCubeMapData ImageLight { get; set; }
+
         private sealed class SkinResources
         {
             internal MapCharacterAssetData Asset;
@@ -226,7 +230,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 cameraPosition,
                 timeSeconds,
                 sun,
-                lightGrid);
+                lightGrid,
+                ImageLight: ImageLight);
             UseStockProgram(viewProjection, gameFrame.Sun);
             _gl.DepthFunc(DepthFunction.Lequal);
 

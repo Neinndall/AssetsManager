@@ -432,6 +432,176 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.True(linked > 0, "Map11 must supply translated programs for the GPU check.");
         }
 
+        [Theory]
+        [InlineData("Characters/Aatrox/Skins/Skin5", "Sword")]
+        [InlineData("Characters/Aatrox/Skins/Skin5", "Body")]
+        public async System.Threading.Tasks.Task InstalledSkinSubmeshDrawsVisiblePixelsWithItsGameProgram(string skin, string submesh)
+        {
+            string install = FindInstalledShaderCacheRoot();
+            if (install == null)
+                return;
+
+            var settings = AssetsManager.Utils.AppSettings.GetDefaultSettings();
+            settings.PreferredClient = AssetsManager.Views.Models.Settings.PreferredClient.PBE;
+            settings.LolPbeDirectory = install;
+            settings.LolLiveDirectory = null;
+            var log = new AssetsManager.Services.Core.LogService(new Serilog.LoggerConfiguration().CreateLogger());
+            var resolver = new AssetsManager.Services.Viewer.Resolvers.MapAssetResolver(
+                new AssetsManager.Services.Explorer.WadContentProvider(
+                    log,
+                    new AssetsManager.Services.Explorer.WadNodeLoaderService(null, log),
+                    new AssetsManager.Utils.DirectoriesCreator(),
+                    new AssetsManager.Services.Parsers.SvgParser()),
+                settings);
+            var loader = new AssetsManager.Services.Viewer.Loading.MapCharacterLoadingService(
+                resolver,
+                new AssetsManager.Services.Viewer.Parsing.MapCharacterSkinParser(),
+                new AssetsManager.Services.Viewer.Parsing.MapCharacterMeshDecoder(),
+                null,
+                null);
+            string projectRoot = Path.Combine(Path.GetTempPath(), "am-skin-gpu-probe");
+            Directory.CreateDirectory(projectRoot);
+            MapCharacterAssetData asset = await loader.LoadAsync(skin, projectRoot);
+            Assert.NotNull(asset);
+
+            MapCharacterMeshRange range = asset.Mesh.Ranges.Single(item => item.Name == submesh);
+            ModelMaterialDefinition material = asset.Materials.ResolveMaterialDefinition(submesh);
+            Vector3[] used = Enumerable.Range(range.StartIndex, range.IndexCount)
+                .Select(at => asset.Mesh.Positions[asset.Mesh.Indices[at]])
+                .ToArray();
+            Vector3 min = used.Aggregate(Vector3.Min);
+            Vector3 max = used.Aggregate(Vector3.Max);
+            Vector3 center = (min + max) * 0.5f;
+            float radius = Math.Max((max - min).Length() * 0.5f, 1f);
+
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            const uint Size = 256;
+            uint colour = gl.GenTexture();
+            gl.BindTexture(TextureTarget.Texture2D, colour);
+            gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, Size, Size, 0, PixelFormat.Rgba, PixelType.UnsignedByte, ReadOnlySpan<byte>.Empty);
+            uint depth = gl.GenRenderbuffer();
+            gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, depth);
+            gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.DepthComponent24, Size, Size);
+            uint framebuffer = gl.GenFramebuffer();
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, colour, 0);
+            gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, RenderbufferTarget.Renderbuffer, depth);
+            gl.Viewport(0, 0, Size, Size);
+            gl.ClearColor(0f, 0f, 1f, 0f);
+            gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            gl.Enable(EnableCap.DepthTest);
+
+            uint vao = gl.GenVertexArray();
+            gl.BindVertexArray(vao);
+            void Buffer(uint location, float[] data, int components)
+            {
+                uint vbo = gl.GenBuffer();
+                gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
+                gl.BufferData(BufferTargetARB.ArrayBuffer, new ReadOnlySpan<float>(data), BufferUsageARB.StaticDraw);
+                gl.EnableVertexAttribArray(location);
+                gl.VertexAttribPointer(location, components, VertexAttribPointerType.Float, false, 0, IntPtr.Zero);
+            }
+            // The submesh's triangles expanded to plain vertices, drawn with DrawArrays.
+            uint[] corners = Enumerable.Range(range.StartIndex, range.IndexCount).Select(at => asset.Mesh.Indices[at]).ToArray();
+            Buffer(0, corners.SelectMany(v => new[] { asset.Mesh.Positions[v].X, asset.Mesh.Positions[v].Y, asset.Mesh.Positions[v].Z }).ToArray(), 3);
+            Buffer(1, corners.SelectMany(v => new[] { asset.Mesh.Normals[v].X, asset.Mesh.Normals[v].Y, asset.Mesh.Normals[v].Z }).ToArray(), 3);
+            Buffer(2, corners.SelectMany(v => new[] { asset.Mesh.Uv[v].X, asset.Mesh.Uv[v].Y }).ToArray(), 2);
+            Buffer(6, corners.SelectMany(v => asset.Mesh.SkinWeights.Skip((int)v * 4).Take(4)).ToArray(), 4);
+            uint indicesVbo = gl.GenBuffer();
+            gl.BindBuffer(BufferTargetARB.ArrayBuffer, indicesVbo);
+            gl.BufferData(BufferTargetARB.ArrayBuffer,
+                new ReadOnlySpan<byte>(corners.SelectMany(v => asset.Mesh.SkinIndices.Skip((int)v * 4).Take(4)).ToArray()),
+                BufferUsageARB.StaticDraw);
+            gl.EnableVertexAttribArray(5);
+            gl.VertexAttribIPointer(5, 4, VertexAttribIType.UnsignedByte, 0, IntPtr.Zero);
+
+            var textures = new System.Collections.Generic.Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase);
+            var missing = new System.Collections.Generic.List<string>();
+            uint? Texture(string path)
+            {
+                if (textures.TryGetValue(path, out uint cached))
+                    return cached;
+                System.Windows.Media.Imaging.BitmapSource bitmap = asset.Textures
+                    .FirstOrDefault(pair => string.Equals(pair.Key, path, StringComparison.OrdinalIgnoreCase)).Value;
+                if (bitmap == null)
+                {
+                    missing.Add(path);
+                    return null;
+                }
+                (int width, int height, byte[] pixels) = AssetsManager.Services.Viewer.Rendering.Core.GlBitmapPixels.ToBgra32(bitmap);
+                uint id = gl.GenTexture();
+                gl.BindTexture(TextureTarget.Texture2D, id);
+                gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0, PixelFormat.Bgra, PixelType.UnsignedByte, new ReadOnlySpan<byte>(pixels));
+                gl.GenerateMipmap(TextureTarget.Texture2D);
+                textures[path] = id;
+                return id;
+            }
+
+            Vector3 eye = center + new Vector3(radius * 2.2f, radius * 0.4f, radius * 1.2f);
+            Matrix4x4 view = Matrix4x4.CreateLookAt(eye, center, Vector3.UnitY);
+            Matrix4x4 projection = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, 1f, radius * 0.1f, radius * 10f);
+            // The generic sky the viewport shows is also the environment PBR materials light from.
+            var sky = AssetsManager.Views.Helpers.SceneElements.LoadGenericSkyCube(settings, log);
+            var frame = new GameShaderRuntime.Frame(view, projection, eye, 1f, null, ImageLight: sky);
+            Console.WriteLine($"[SkinGpu] imageLight={(sky?.IsValid == true ? $"{sky.Width}px" : "none")}");
+            var bones = Enumerable.Repeat(Matrix4x4.Identity, 256).ToArray();
+            using var runtime = new GameShaderRuntime(gl, false, settings);
+            bool bound = runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, bones, false, in frame, Texture);
+            Assert.True(bound, $"{submesh}: the game program did not bind.");
+            gl.BindVertexArray(vao);
+            // Blending off: a pixel that survives with alpha 0 still shows, only a discard leaves the clear colour.
+            gl.Disable(EnableCap.Blend);
+            gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)corners.Length);
+            byte[] pixels = new byte[Size * Size * 4];
+            gl.ReadPixels(0, 0, Size, Size, PixelFormat.Rgba, PixelType.UnsignedByte, new Span<byte>(pixels));
+            int covered = 0;
+            long red = 0, green = 0, blue = 0, alpha = 0;
+            for (int at = 0; at < pixels.Length; at += 4)
+            {
+                if (pixels[at] == 0 && pixels[at + 1] == 0 && pixels[at + 2] == 255 && pixels[at + 3] == 0)
+                    continue;
+                covered++;
+                red += pixels[at]; green += pixels[at + 1]; blue += pixels[at + 2]; alpha += pixels[at + 3];
+            }
+            string snapshots = Environment.GetEnvironmentVariable("AM_SKIN_GPU_SNAPSHOTS");
+            if (!string.IsNullOrWhiteSpace(snapshots))
+            {
+                // Rows come bottom-up from ReadPixels; flip them and swap to BGRA for the encoder.
+                byte[] bgra = new byte[pixels.Length];
+                for (int row = 0; row < Size; row++)
+                    for (int column = 0; column < Size; column++)
+                    {
+                        int from = ((int)(Size - 1 - row) * (int)Size + column) * 4;
+                        int to = (row * (int)Size + column) * 4;
+                        bgra[to] = pixels[from + 2];
+                        bgra[to + 1] = pixels[from + 1];
+                        bgra[to + 2] = pixels[from];
+                        bgra[to + 3] = 255;
+                    }
+                var image = System.Windows.Media.Imaging.BitmapSource.Create(
+                    (int)Size, (int)Size, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, bgra, (int)Size * 4);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+                Directory.CreateDirectory(snapshots);
+                using (FileStream file = File.Create(Path.Combine(snapshots, $"{skin.Replace('/', '_')}_{submesh}.png")))
+                    encoder.Save(file);
+                foreach (string texturePath in textures.Keys)
+                {
+                    var textureEncoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                    textureEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(asset.Textures
+                        .First(pair => string.Equals(pair.Key, texturePath, StringComparison.OrdinalIgnoreCase)).Value));
+                    using FileStream textureFile = File.Create(Path.Combine(snapshots, $"{submesh}_{texturePath}.png"));
+                    textureEncoder.Save(textureFile);
+                }
+            }
+            string summary = covered == 0
+                ? "no covered pixels"
+                : $"covered={covered} mean rgba=({red / covered},{green / covered},{blue / covered},{alpha / covered})";
+            Console.WriteLine($"[SkinGpu] {skin} {submesh} shader={material.Program?.Passes[0].ShaderPath} {summary} missingTextures={string.Join(",", missing)}");
+            Assert.True(covered > 0, $"{submesh}: {summary}");
+        }
+
         [Fact]
         public void MapPostEffectProgramsCompileAndLinkOnDesktopOpenGl()
         {

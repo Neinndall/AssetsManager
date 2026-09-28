@@ -19,7 +19,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         private readonly Dictionary<string, HashSet<string>> _attributes = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<string>> _members = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<string>> _sharedTextures = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, int> _failures = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HashSet<string>> _failures = new(StringComparer.Ordinal);
         private readonly HashSet<string> _seenParticlePrograms = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<string>> _shaders = new(StringComparer.Ordinal);
         // Identical bytecode pairs translate once; later owners reuse the result.
@@ -41,12 +41,21 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     GameShaderProgramResolver.Read(pass, program.Kind, settings);
                 if (!read.Ready)
                 {
-                    Fail("bytecode: " + read.Failure);
+                    Fail("bytecode: " + read.Failure, owner);
                     continue;
                 }
 
                 string label = $"{owner}[{pass.ShaderPath?.Split('/').LastOrDefault()}]";
                 Add(_shaders, pass.ShaderPath ?? "?", owner);
+                string parameterFilter = Environment.GetEnvironmentVariable("AM_SHADER_PARAMS");
+                if (!string.IsNullOrWhiteSpace(parameterFilter) && label.Contains(parameterFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"[Params] {label} defines={string.Join(";", read.Program.Defines.Select(define => define.Name + "=" + define.Value))}");
+                    foreach (GameMaterialParameter parameter in pass.Parameters ?? Array.Empty<GameMaterialParameter>())
+                        Console.WriteLine($"[Params] {label} {parameter}");
+                    foreach (GameMaterialTexture texture in pass.Textures ?? Array.Empty<GameMaterialTexture>())
+                        Console.WriteLine($"[Params] {label} texture {texture.Name}={texture.Texture?.VirtualPath}");
+                }
                 var key = (System.IO.Hashing.XxHash64.HashToUInt64(read.Program.Vertex),
                            System.IO.Hashing.XxHash64.HashToUInt64(read.Program.Pixel));
                 if (!_translations.TryGetValue(key, out GameShaderTranslator.TranslatedProgram stages))
@@ -58,7 +67,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                         read.Program.PixelReflection);
                     if (!translated.Ready)
                     {
-                        Fail($"translate {pass.ShaderPath}: {translated.Failure}");
+                        Fail($"translate {pass.ShaderPath}: {translated.Failure}", owner);
                         continue;
                     }
                     _translations[key] = stages = translated.Program;
@@ -107,8 +116,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         public void Print(string tag)
         {
             Console.WriteLine($"[{tag}] passes={Passes} translated={Translated}/{Passes} uniquePrograms={_translations.Count}.");
-            foreach ((string failure, int count) in _failures.OrderByDescending(pair => pair.Value).Take(10))
-                Console.WriteLine($"[{tag}] FAIL x{count}: {failure}");
+            foreach ((string failure, HashSet<string> owners) in _failures.OrderByDescending(pair => pair.Value.Count).Take(10))
+                Console.WriteLine($"[{tag}] FAIL x{owners.Count}: {failure} e.g. {string.Join(", ", owners.Take(5))}");
             Print(tag, "shader", _shaders);
             Print(tag, "attribute", _attributes);
             Print(tag, "engine", _members);
@@ -128,13 +137,13 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             string stem = Path.Combine(directory, string.Concat(label.Split(Path.GetInvalidFileNameChars())));
             File.WriteAllText(stem + ".vs.glsl", program.Vertex.Glsl);
             File.WriteAllText(stem + ".ps.glsl", program.Pixel.Glsl);
+            File.WriteAllLines(stem + ".blocks.txt", new[] { ("vs", program.Vertex), ("ps", program.Pixel) }
+                .SelectMany(stage => stage.Item2.Sidecar.Blocks.SelectMany(block => block.Members.Select(member =>
+                    $"{stage.Item1} {block.Name} m[{member.Offset / 16}].{"xyzw"[(int)(member.Offset % 16 / 4)]} {member.Name} size={member.Size} used={member.Used}"))));
         }
 
-        private void Fail(string failure)
-        {
-            string key = string.IsNullOrWhiteSpace(failure) ? "unknown" : failure;
-            _failures[key] = _failures.GetValueOrDefault(key) + 1;
-        }
+        private void Fail(string failure, string owner) =>
+            Add(_failures, string.IsNullOrWhiteSpace(failure) ? "unknown" : failure, owner);
 
         private static void Add(IDictionary<string, HashSet<string>> map, string key, string owner)
         {

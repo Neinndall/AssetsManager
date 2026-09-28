@@ -9,6 +9,7 @@ using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Rendering
@@ -18,6 +19,9 @@ namespace AssetsManager.Services.Viewer.Rendering
     /// </summary>
     public sealed class GlMeshRenderer : IDisposable
     {
+        /// <summary>Environment cube PBR game shaders light from (IBL); the preview sky the viewport shows.</summary>
+        internal VfxCubeMapData ImageLight { get; set; }
+
         private static readonly Vector3 ReferenceCharacterLightDirection =
             Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
         private static readonly Vector3 ReferenceCharacterLightColor = new(0.4f, 0.4f, 0.4f);
@@ -153,7 +157,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 materialTimeSeconds,
                 mapSun,
                 lightGrid,
-                Vector3.Transform(model.SkinnedMesh?.BoundingSphere.Position ?? Vector3.Zero, world));
+                Vector3.Transform(model.SkinnedMesh?.BoundingSphere.Position ?? Vector3.Zero, world),
+                ImageLight: ImageLight);
             (bool solids, bool wireframe, float wireOpacity) =
                 MapGeometryRenderer.ResolveViewPasses(viewMode, wireOverlay, supportsWireframe: !_gles);
             VfxPreviewViewMode solidMode = viewMode == VfxPreviewViewMode.Wireframe

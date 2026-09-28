@@ -2060,6 +2060,13 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_model.ShowPreviewSky)
                 _skyRenderer?.Render(view, proj);
 
+            // PBR game shaders light characters and structures from the same environment the sky shows.
+            VfxCubeMapData imageLight = ActiveSkyCube;
+            if (_championMeshRenderer != null)
+                _championMeshRenderer.ImageLight = imageLight;
+            if (_mapCharacterRenderer != null)
+                _mapCharacterRenderer.ImageLight = imageLight;
+
             // Ground navigation belongs to the MAP workspace; a Character backdrop keeps orbiting its subject.
             if (_cameraController != null)
             {
@@ -3964,12 +3971,15 @@ namespace AssetsManager.Views.Controls.Viewer
             if (!_skyCubeDirty || _skyRenderer == null)
                 return;
 
-            VfxCubeMapData activeSky = _mapSceneRuntime != null && _mapSkyCube?.IsValid == true
-                ? _mapSkyCube
-                : _genericSkyCube;
-            _skyRenderer.SetCube(activeSky);
+            _skyRenderer.SetCube(ActiveSkyCube);
             _skyCubeDirty = false;
         }
+
+        /// <summary>The sky the viewport shows: the MAP's authored cube, else the generic environment.</summary>
+        private VfxCubeMapData ActiveSkyCube =>
+            _mapSceneRuntime != null && _mapSkyCube?.IsValid == true
+                ? _mapSkyCube
+                : _genericSkyCube;
 
         private void ApplyPendingMapGpuState()
         {
