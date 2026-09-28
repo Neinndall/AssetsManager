@@ -171,6 +171,64 @@ public sealed class SknDynamicMaterialParserTests
         Assert.Equal(1f, parameter.Evaluate(GameMaterialState.From(0, null, new[] { GameMaterialState.AnimationHash("Recall") }))!.Value.X);
     }
 
+    private static GameMaterialDynamicParameter Single(BinTreeStruct driver)
+    {
+        var dynamicMaterial = new BinTreeStruct(Hash("dynamicMaterial"), Hash("DynamicMaterialDef"), new BinTreeProperty[]
+        {
+            new BinTreeContainer(Hash("parameters"), BinPropertyType.Struct, new BinTreeProperty[]
+            {
+                new BinTreeStruct(0, Hash("DynamicMaterialParameterDef"), new BinTreeProperty[] { new BinTreeString(Hash("name"), "Value"), driver })
+            })
+        });
+        return Assert.Single(SknDynamicMaterialParser.ReadParameters(
+            new Dictionary<uint, BinTreeProperty> { [dynamicMaterial.NameHash] = dynamicMaterial }));
+    }
+
+    private static BinTreeStruct Buff(uint field, string script) => new(field, Hash("HasBuffDynamicMaterialBoolDriver"),
+        new BinTreeProperty[] { new BinTreeString(Hash("mScriptName"), script) });
+
+    [Fact]
+    public void ColorChooserOverOneTruePicksTheOnColorWhileAnyBuffIsOn()
+    {
+        var anyBuff = new BinTreeStruct(Hash("mBoolDriver"), Hash("OneTrueMaterialDriver"), new BinTreeProperty[]
+        {
+            new BinTreeContainer(Hash("mDrivers"), BinPropertyType.Struct, new BinTreeProperty[]
+            {
+                Buff(0, "First"),
+                new BinTreeStruct(0, Hash("IsInGrassDynamicMaterialBoolDriver"), Array.Empty<BinTreeProperty>())
+            })
+        });
+        GameMaterialDynamicParameter parameter = Single(new BinTreeStruct(Hash("driver"), Hash("ColorChooserMaterialDriver"), new BinTreeProperty[]
+        {
+            anyBuff,
+            new BinTreeVector4(Hash("mColorOn"), new System.Numerics.Vector4(1, 1, 0, 1))
+        }));
+
+        Assert.Equal(new[] { "First" }, parameter.Buffs);
+        // mColorOff keeps LeagueToolkit's default, blue.
+        Assert.Equal(new System.Numerics.Vector4(0, 0, 1, 1), parameter.Evaluate(GameMaterialState.Resting));
+        Assert.Equal(new System.Numerics.Vector4(1, 1, 0, 1), parameter.Evaluate(GameMaterialState.From(0, new[] { "First" }, null)));
+    }
+
+    [Fact]
+    public void RemapOfABuffCounterMapsItsStackIntoTheOutputRange()
+    {
+        GameMaterialDynamicParameter parameter = Single(new BinTreeStruct(Hash("driver"), Hash("RemapFloatMaterialDriver"), new BinTreeProperty[]
+        {
+            new BinTreeStruct(Hash("mDriver"), Hash("BuffCounterDynamicMaterialFloatDriver"), new BinTreeProperty[]
+            {
+                new BinTreeString(Hash("mScriptName"), "Stacks")
+            }),
+            new BinTreeF32(Hash("mOutputMinValue"), 0.25f),
+            new BinTreeF32(Hash("mOutputMaxValue"), 0.75f)
+        }));
+
+        Assert.Equal(new[] { "Stacks" }, parameter.Buffs);
+        Assert.Equal(0.25f, parameter.Evaluate(GameMaterialState.Resting)!.Value.X, 5);
+        Assert.Equal(0.75f, parameter.Evaluate(GameMaterialState.From(0, new[] { "Stacks" }, null))!.Value.X, 5);
+        Assert.Equal(1f, SknDynamicMaterialParser.Remap(5f, 0f, 1f, 0f, 1f));
+    }
+
     [Theory]
     [InlineData(-1f, 0f)]
     [InlineData(0.25f, 5f)]

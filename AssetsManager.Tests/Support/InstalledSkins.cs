@@ -71,7 +71,8 @@ namespace AssetsManager.Tests.Support
                 .Where(name => !name.Contains('.') && !name.StartsWith("TFT", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            var byChampion = champions.ToDictionary(name => name.ToLowerInvariant(), _ => new SortedSet<int>());
+            // The hash list also names skins the installed client does not ship; each id keeps its BIN's chunk hash.
+            var byChampion = champions.ToDictionary(name => name.ToLowerInvariant(), _ => new SortedDictionary<int, ulong>());
             var pattern = new System.Text.RegularExpressions.Regex(@"^data/characters/([a-z0-9_]+)/skins/skin(\d+)\.bin$");
             foreach (string line in File.ReadLines(hashes))
             {
@@ -79,13 +80,22 @@ namespace AssetsManager.Tests.Support
                 if (space < 0)
                     continue;
                 var match = pattern.Match(line[(space + 1)..]);
-                if (match.Success && byChampion.TryGetValue(match.Groups[1].Value, out SortedSet<int> ids))
-                    ids.Add(int.Parse(match.Groups[2].Value));
+                if (match.Success && byChampion.TryGetValue(match.Groups[1].Value, out SortedDictionary<int, ulong> ids) &&
+                    ulong.TryParse(line.AsSpan(0, space), System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
+                    ids[int.Parse(match.Groups[2].Value)] = hash;
             }
 
             foreach (string champion in champions)
-                foreach (int id in byChampion[champion.ToLowerInvariant()].Take(maxSkins))
+            {
+                using var wad = new LeagueToolkit.Core.Wad.WadFile(Path.Combine(install, @"Game\DATA\FINAL\Champions", champion + ".wad.client"));
+                int[] shipped = byChampion[champion.ToLowerInvariant()]
+                    .Where(pair => wad.Chunks.ContainsKey(pair.Value))
+                    .Select(pair => pair.Key)
+                    .Take(maxSkins)
+                    .ToArray();
+                foreach (int id in shipped)
                     yield return $"Characters/{champion}/Skins/Skin{id}";
+            }
         }
     }
 }

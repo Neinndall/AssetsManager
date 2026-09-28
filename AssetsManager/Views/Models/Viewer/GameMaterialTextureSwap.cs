@@ -4,8 +4,9 @@ using System.Linq;
 namespace AssetsManager.Views.Models.Viewer
 {
     // Buff, Dead and Animation read the preview's game state; the resting preview has no buff, is alive and
-    // plays no scripted animation.
-    internal enum GameMaterialBoolKind { Unsupported, Gear, Buff, Dead, Animation, All, Not }
+    // plays no scripted animation. Inactive covers what it never does: cast, attack, move, stand in grass,
+    // belong to the enemy team or carry buffs picked by type or attribute.
+    internal enum GameMaterialBoolKind { Unsupported, Gear, Buff, Dead, Animation, Inactive, All, Any, Not }
 
     /// <param name="Name">The buff script a Buff condition checks.</param>
     /// <param name="Animations">The clip name hashes an Animation condition checks.</param>
@@ -21,6 +22,8 @@ namespace AssetsManager.Views.Models.Viewer
             GameMaterialBoolKind.Buff => state.HasBuff(Name),
             GameMaterialBoolKind.Dead => state.Dead,
             GameMaterialBoolKind.Animation => Animations?.Any(state.IsPlaying) == true,
+            GameMaterialBoolKind.Inactive => false,
+            GameMaterialBoolKind.Any => EvaluateAny(state),
             GameMaterialBoolKind.Not when Children?.Count == 1 => !Children[0].Evaluate(state),
             GameMaterialBoolKind.All => EvaluateAll(state),
             _ => null
@@ -30,6 +33,18 @@ namespace AssetsManager.Views.Models.Viewer
         internal IEnumerable<string> Buffs() =>
             (Kind == GameMaterialBoolKind.Buff && !string.IsNullOrEmpty(Name) ? new[] { Name } : Enumerable.Empty<string>())
             .Concat((Children ?? System.Array.Empty<GameMaterialBoolCondition>()).SelectMany(child => child.Buffs()));
+
+        private bool? EvaluateAny(GameMaterialState state)
+        {
+            bool unknown = false;
+            foreach (var child in Children ?? System.Array.Empty<GameMaterialBoolCondition>())
+            {
+                bool? value = child.Evaluate(state);
+                if (value == true) return true;
+                unknown |= !value.HasValue;
+            }
+            return unknown ? null : false;
+        }
 
         private bool? EvaluateAll(GameMaterialState state)
         {

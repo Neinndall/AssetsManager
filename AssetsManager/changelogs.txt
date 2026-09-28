@@ -454,6 +454,7 @@ Bug Fixes
   - VFX Studio / With shaders on, object-space skin effects such as matcaps stay on champions placed in a map.
   - VFX Studio / With shaders on, glowing skin parts such as swords and runes now shine with the bloom their shaders define.
   - VFX Studio / Inspector: a new Game State section turns on the buffs a skin's shaders react to (in combat, R form...), and skins no longer glow at rest where the game shows no glow.
+  - VFX Studio / With shaders on, more skin materials show their game colours and states (colour curves, passive stacks such as Irelia's blades, ultimate tints).
   - VFX Studio / With shaders on, map brush no longer disappears and map critters keep their full textures.
   - Viewer / Map critters and skins without a material no longer show stretched, half-missing textures.
   - VFX Studio / Esports banners on Summoner's Rift now show their holders and default flag instead of solid red.

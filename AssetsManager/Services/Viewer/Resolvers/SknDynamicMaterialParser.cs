@@ -58,6 +58,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return result;
         }
 
+        /// <summary>The stack count a buff turned on in the preview reports; authored ranges top out well below it.</summary>
+        internal const float FullStacks = 100f;
+
         internal static IReadOnlyList<GameMaterialDynamicParameter> ReadParameters(
             IReadOnlyDictionary<uint, BinTreeProperty> properties)
         {
@@ -117,7 +120,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 // The preview switches states instantly; the authored turn-on/off times are not replayed.
                 return state => condition.Evaluate(state) is bool active ? active ? on : off : null;
             }
-            if (driver.ClassHash == Hash("SwitchMaterialDriver"))
+            // BlendingSwitch is a Switch that fades between its values; the preview switches instantly.
+            if (driver.ClassHash == Hash("SwitchMaterialDriver") || driver.ClassHash == Hash("BlendingSwitchMaterialDriver"))
             {
                 var options = new List<(GameMaterialBoolCondition Condition, Func<GameMaterialState, Vector4?> Value)>();
                 if (fields.TryGetValue(Hash("mElements"), out var elementsProperty) && elementsProperty is BinTreeContainer elements)
@@ -176,7 +180,102 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     return null;
                 return state => inner(state) is Vector4 at ? new Vector4(SampleCurve(times, values, at.X)) : null;
             }
+            if (driver.ClassHash == Hash("ColorGraphMaterialDriver"))
+            {
+                fields.TryGetValue(Hash("driver"), out var innerProperty);
+                var inner = ReadValueDriver(innerProperty, depth + 1, conditions);
+                if (inner == null ||
+                    !fields.TryGetValue(Hash("colors"), out var graphProperty) || graphProperty is not BinTreeStruct graph ||
+                    !TryReadFloats(graph.Properties, "times", out float[] times) ||
+                    !TryReadVectors(graph.Properties, "values", out Vector4[] colors) ||
+                    times.Length == 0 || times.Length != colors.Length)
+                    return null;
+                return state => inner(state) is Vector4 at ? SampleColor(times, colors, at.X) : null;
+            }
+            if (driver.ClassHash == Hash("SpecificColorMaterialDriver"))
+            {
+                Vector4 color = Vector(fields, "mColor", new(1, 0, 0, 1));
+                return _ => color;
+            }
+            if (driver.ClassHash == Hash("ColorChooserMaterialDriver"))
+            {
+                fields.TryGetValue(Hash("mBoolDriver"), out var conditionProperty);
+                var condition = ReadCondition(conditionProperty, depth + 1);
+                conditions.Add(condition);
+                Vector4 on = Vector(fields, "mColorOn", new(1, 0, 0, 1));
+                Vector4 off = Vector(fields, "mColorOff", new(0, 0, 1, 1));
+                return state => condition.Evaluate(state) is bool active ? active ? on : off : null;
+            }
+            if (driver.ClassHash == Hash("RemapFloatMaterialDriver"))
+            {
+                fields.TryGetValue(Hash("mDriver"), out var innerProperty);
+                var inner = ReadValueDriver(innerProperty, depth + 1, conditions);
+                if (inner == null)
+                    return null;
+                float min = Scalar(fields, "mMinValue", 0f), max = Scalar(fields, "mMaxValue", 1f);
+                float outMin = Scalar(fields, "mOutputMinValue", 0f), outMax = Scalar(fields, "mOutputMaxValue", 1f);
+                return state => inner(state) is Vector4 at ? new Vector4(Remap(at.X, min, max, outMin, outMax)) : null;
+            }
+            if (driver.ClassHash == Hash("RemapVec4MaterialDriver"))
+            {
+                fields.TryGetValue(Hash("driver"), out var innerProperty);
+                var inner = ReadValueDriver(innerProperty, depth + 1, conditions);
+                if (inner == null)
+                    return null;
+                Vector4 min = Vector(fields, "MinValue", Vector4.Zero), max = Vector(fields, "MaxValue", Vector4.One);
+                Vector4 outMin = Vector(fields, "OutputMinValue", Vector4.Zero), outMax = Vector(fields, "OutputMaxValue", Vector4.One);
+                return state => inner(state) is Vector4 at
+                    ? new Vector4(
+                        Remap(at.X, min.X, max.X, outMin.X, outMax.X),
+                        Remap(at.Y, min.Y, max.Y, outMin.Y, outMax.Y),
+                        Remap(at.Z, min.Z, max.Z, outMin.Z, outMax.Z),
+                        Remap(at.W, min.W, max.W, outMin.W, outMax.W))
+                    : null;
+            }
+            if (driver.ClassHash == Hash("BuffCounterDynamicMaterialFloatDriver"))
+            {
+                // A buff the preview turns on counts as fully stacked (Irelia's passive: stepValue remaps 0..3 stacks to
+                // -3..0); drivers remap or compare the count, so an ample one reaches their maximum.
+                var buff = new GameMaterialBoolCondition(GameMaterialBoolKind.Buff,
+                    Name: fields.TryGetValue(Hash("mScriptName"), out var script) && script is BinTreeString name ? name.Value : null);
+                conditions.Add(buff);
+                return state => new Vector4(buff.Evaluate(state) == true ? FullStacks : 0f);
+            }
+            // The resting preview: no death or ability animation has progressed, health is full and the character stands still.
+            if (driver.ClassHash == Hash("AnimationFractionDynamicMaterialFloatDriver") ||
+                driver.ClassHash == Hash("VelocityDynamicMaterialFloatDriver"))
+                return _ => Vector4.Zero;
+            if (driver.ClassHash == Hash("HealthDynamicMaterialFloatDriver"))
+                return _ => Vector4.One;
             return null;
+        }
+
+        private static bool TryReadVectors(IReadOnlyDictionary<uint, BinTreeProperty> fields, string name, out Vector4[] result)
+        {
+            result = null;
+            if (!fields.TryGetValue(Hash(name), out var property) || property is not BinTreeContainer container)
+                return false;
+            var values = new List<Vector4>();
+            foreach (var element in container.Elements)
+            {
+                if (element is not BinTreeVector4 vector) return false;
+                values.Add(vector.Value);
+            }
+            result = values.ToArray();
+            return true;
+        }
+
+        private static Vector4 SampleColor(float[] times, Vector4[] colors, float at) => new(
+            SampleCurve(times, colors.Select(color => color.X).ToArray(), at),
+            SampleCurve(times, colors.Select(color => color.Y).ToArray(), at),
+            SampleCurve(times, colors.Select(color => color.Z).ToArray(), at),
+            SampleCurve(times, colors.Select(color => color.W).ToArray(), at));
+
+        /// <summary>Maps <paramref name="value"/> from [min, max] onto [outMin, outMax], clamped to that range.</summary>
+        internal static float Remap(float value, float min, float max, float outMin, float outMax)
+        {
+            float t = max != min ? Math.Clamp((value - min) / (max - min), 0f, 1f) : 0f;
+            return outMin + (outMax - outMin) * t;
         }
 
         private static bool TryReadFloats(IReadOnlyDictionary<uint, BinTreeProperty> fields, string name, out float[] result)
@@ -238,6 +337,22 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         if (clip is BinTreeHash hash)
                             animations.Add(hash.Value);
                 return new(GameMaterialBoolKind.Animation, Animations: animations);
+            }
+            if (driver.ClassHash == Hash("IsCastingBoolDriver") ||
+                driver.ClassHash == Hash("IsAttackingBoolDriver") ||
+                driver.ClassHash == Hash("IsMovingBoolDriver") ||
+                driver.ClassHash == Hash("IsInGrassDynamicMaterialBoolDriver") ||
+                driver.ClassHash == Hash("IsEnemyDynamicMaterialBoolDriver") ||
+                driver.ClassHash == Hash("HasBuffWithAttributeBoolDriver") ||
+                driver.ClassHash == Hash("HasBuffOfTypeBoolDriver") ||
+                driver.ClassHash == Hash("FixedDurationTriggeredBoolDriver"))
+                return new(GameMaterialBoolKind.Inactive);
+            if (driver.ClassHash == Hash("OneTrueMaterialDriver") &&
+                driver.Properties.TryGetValue(Hash("mDrivers"), out var anyChildren) && anyChildren is BinTreeContainer anyList)
+            {
+                var conditions = new List<GameMaterialBoolCondition>();
+                foreach (var child in anyList.Elements) conditions.Add(ReadCondition(child, depth + 1));
+                return new(GameMaterialBoolKind.Any, Children: conditions);
             }
             if (driver.ClassHash == Hash("AllTrueMaterialDriver") &&
                 driver.Properties.TryGetValue(Hash("mDrivers"), out var children) && children is BinTreeContainer list)
