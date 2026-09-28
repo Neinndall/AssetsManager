@@ -21,6 +21,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         private readonly Dictionary<string, HashSet<string>> _sharedTextures = new(StringComparer.Ordinal);
         private readonly Dictionary<string, int> _failures = new(StringComparer.Ordinal);
         private readonly HashSet<string> _seenParticlePrograms = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HashSet<string>> _shaders = new(StringComparer.Ordinal);
+        // Identical bytecode pairs translate once; later owners reuse the result.
+        private readonly Dictionary<(ulong Vertex, ulong Pixel), GameShaderTranslator.TranslatedProgram> _translations = new();
 
         public int Passes { get; private set; }
         public int Translated { get; private set; }
@@ -42,21 +45,28 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     continue;
                 }
 
-                GameShaderTranslator.TranslationRead translated = GameShaderTranslator.Translate(
-                    read.Program.Vertex,
-                    read.Program.VertexReflection,
-                    read.Program.Pixel,
-                    read.Program.PixelReflection);
-                if (!translated.Ready)
+                string label = $"{owner}[{pass.ShaderPath?.Split('/').LastOrDefault()}]";
+                Add(_shaders, pass.ShaderPath ?? "?", owner);
+                var key = (System.IO.Hashing.XxHash64.HashToUInt64(read.Program.Vertex),
+                           System.IO.Hashing.XxHash64.HashToUInt64(read.Program.Pixel));
+                if (!_translations.TryGetValue(key, out GameShaderTranslator.TranslatedProgram stages))
                 {
-                    Fail("translate: " + translated.Failure);
-                    continue;
+                    GameShaderTranslator.TranslationRead translated = GameShaderTranslator.Translate(
+                        read.Program.Vertex,
+                        read.Program.VertexReflection,
+                        read.Program.Pixel,
+                        read.Program.PixelReflection);
+                    if (!translated.Ready)
+                    {
+                        Fail($"translate {pass.ShaderPath}: {translated.Failure}");
+                        continue;
+                    }
+                    _translations[key] = stages = translated.Program;
+                    Dump(stages, label);
                 }
 
                 Translated++;
-                string label = $"{owner}[{pass.ShaderPath?.Split('/').LastOrDefault()}]";
-                Dump(translated.Program, label);
-                Track(translated.Program, label);
+                Track(stages, label);
             }
         }
 
@@ -96,9 +106,10 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 
         public void Print(string tag)
         {
-            Console.WriteLine($"[{tag}] passes={Passes} translated={Translated}/{Passes}.");
+            Console.WriteLine($"[{tag}] passes={Passes} translated={Translated}/{Passes} uniquePrograms={_translations.Count}.");
             foreach ((string failure, int count) in _failures.OrderByDescending(pair => pair.Value).Take(10))
                 Console.WriteLine($"[{tag}] FAIL x{count}: {failure}");
+            Print(tag, "shader", _shaders);
             Print(tag, "attribute", _attributes);
             Print(tag, "engine", _members);
             Print(tag, "shared", _sharedTextures);
