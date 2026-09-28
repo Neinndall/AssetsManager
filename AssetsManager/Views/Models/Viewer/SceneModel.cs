@@ -31,6 +31,12 @@ namespace AssetsManager.Views.Models.Viewer
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
         public float SelfIllumination { get; set; }
+
+        /// <summary>
+        /// Buffs, playing clips and death the character's dynamic materials read; each part adds its own gear.
+        /// Null is the resting state.
+        /// </summary>
+        internal GameMaterialState GameState { get; set; }
         public string EmissiveTexturePath { get; set; }
 
         private double _positionX;

@@ -123,6 +123,54 @@ public sealed class SknDynamicMaterialParserTests
         Assert.Equal(value.X, value.W);
     }
 
+    // Aatrox Skin33 sword fire: DissolveValue = Recall playing ? 1 : (AatroxInCombat ? 1 : 0).
+    [Fact]
+    public void BuffAndAnimationConditionsFollowTheGameState()
+    {
+        var recall = new BinTreeStruct(Hash("mCondition"), Hash("IsAnimationPlayingDynamicMaterialBoolDriver"), new BinTreeProperty[]
+        {
+            new BinTreeContainer(Hash("mAnimationNames"), BinPropertyType.Hash, new BinTreeProperty[] { new BinTreeHash(0, Hash("Recall")) })
+        });
+        var combat = new BinTreeStruct(Hash("mDefaultValue"), Hash("LerpMaterialDriver"), new BinTreeProperty[]
+        {
+            new BinTreeStruct(Hash("mBoolDriver"), Hash("HasBuffDynamicMaterialBoolDriver"), new BinTreeProperty[]
+            {
+                new BinTreeString(Hash("mScriptName"), "AatroxInCombat")
+            })
+        });
+        var driver = new BinTreeStruct(Hash("driver"), Hash("SwitchMaterialDriver"), new BinTreeProperty[]
+        {
+            new BinTreeContainer(Hash("mElements"), BinPropertyType.Embedded, new BinTreeProperty[]
+            {
+                new BinTreeEmbedded(0, Hash("SwitchMaterialDriverElement"), new BinTreeProperty[]
+                {
+                    recall,
+                    new BinTreeStruct(Hash("mValue"), Hash("Float4LiteralMaterialDriver"), Array.Empty<BinTreeProperty>())
+                })
+            }),
+            combat
+        });
+        var dynamicMaterial = new BinTreeStruct(Hash("dynamicMaterial"), Hash("DynamicMaterialDef"), new BinTreeProperty[]
+        {
+            new BinTreeContainer(Hash("parameters"), BinPropertyType.Struct, new BinTreeProperty[]
+            {
+                new BinTreeStruct(0, Hash("DynamicMaterialParameterDef"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Hash("name"), "DissolveValue"),
+                    driver
+                })
+            })
+        });
+
+        GameMaterialDynamicParameter parameter = Assert.Single(SknDynamicMaterialParser.ReadParameters(
+            new Dictionary<uint, BinTreeProperty> { [dynamicMaterial.NameHash] = dynamicMaterial }));
+
+        Assert.Equal(new[] { "AatroxInCombat" }, parameter.Buffs);
+        Assert.Equal(0f, parameter.Evaluate(GameMaterialState.Resting)!.Value.X);
+        Assert.Equal(1f, parameter.Evaluate(GameMaterialState.From(0, new[] { "aatroxincombat" }, null))!.Value.X);
+        Assert.Equal(1f, parameter.Evaluate(GameMaterialState.From(0, null, new[] { GameMaterialState.AnimationHash("Recall") }))!.Value.X);
+    }
+
     [Theory]
     [InlineData(-1f, 0f)]
     [InlineData(0.25f, 5f)]

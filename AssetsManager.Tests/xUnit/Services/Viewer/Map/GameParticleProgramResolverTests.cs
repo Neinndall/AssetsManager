@@ -438,7 +438,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [InlineData("Characters/Aatrox/Skins/Skin5", "Body")]
         // LLM_BASE reflects ENV_CUBE by glossiness.
         [InlineData("Characters/Aatrox/Skins/Skin11", "Body")]
-        [InlineData("Characters/Aatrox/Skins/Skin11", "Wings")]
+        // The R wings rest dissolved (Dissolve_Bias 0.7) and show with the AatroxRFX buff.
+        [InlineData("Characters/Aatrox/Skins/Skin11", "Wings", "AatroxRFX")]
         // Matcap_Iridescent_Holographic: matcap, iridescence and holographic noise over the diffuse. At rest the
         // body's dynamic Dissolve_Bias/Gradient_Sharpness leave it whole; Shadow_Form (the R form) has TintColor 0.
         [InlineData("Characters/Aatrox/Skins/Skin40", "Body")]
@@ -450,7 +451,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [InlineData("Characters/KSante/Skins/Skin18", "Recall_Body")]
         [InlineData("Characters/Kayn/Skins/Skin32", "Flipbook_Assassin")]
         [InlineData("Characters/Sett/Skins/Skin76", "Body")]
-        public async System.Threading.Tasks.Task InstalledSkinSubmeshDrawsVisiblePixelsWithItsGameProgram(string skin, string submesh)
+        public async System.Threading.Tasks.Task InstalledSkinSubmeshDrawsVisiblePixelsWithItsGameProgram(string skin, string submesh, string buff = null)
         {
             string install = InstalledSkins.FindInstall();
             if (install == null)
@@ -473,7 +474,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 : AssetsManager.Views.Helpers.SceneElements.LoadGenericSkyCube(settings, log);
             using var renderer = new SkinSubmeshRenderer(gl, settings, sky, 256);
             string snapshots = Environment.GetEnvironmentVariable("AM_SKIN_GPU_SNAPSHOTS");
-            SkinSubmeshRenderer.Result result = renderer.Render(asset, range, material, keepPixels: !string.IsNullOrWhiteSpace(snapshots));
+            SkinSubmeshRenderer.Result result = renderer.Render(asset, range, material, keepPixels: !string.IsNullOrWhiteSpace(snapshots),
+                state: buff == null ? null : GameMaterialState.From(0, new[] { buff }, null));
             Assert.True(result.Bound, $"{submesh}: the game program did not bind.");
             if (result.Pixels != null)
                 renderer.SavePng(result.Pixels, Path.Combine(snapshots, $"{skin.Replace('/', '_')}_{submesh}.png"));
@@ -481,6 +483,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             string summary = $"covered={result.Covered} nonFinite={result.NonFinite} mean={result.Mean} missingTextures={string.Join(",", result.MissingTextures)}";
             Console.WriteLine($"[SkinGpu] {skin} {submesh} shader={material.Program?.Passes[0].ShaderPath} {summary}");
             Assert.True(result.Covered > 0 && result.NonFinite == 0, $"{submesh}: {summary}");
+        }
+
+        // Aatrox Skin33 lights its sword fire (Sword_VFX, DissolveValue) only with the AatroxInCombat buff.
+        [Fact]
+        public async System.Threading.Tasks.Task InstalledSkinBuffStateRevealsItsDissolvedSubmesh()
+        {
+            string install = InstalledSkins.FindInstall();
+            if (install == null)
+                return;
+
+            var settings = InstalledSkins.Settings(install);
+            var log = new AssetsManager.Services.Core.LogService(new Serilog.LoggerConfiguration().CreateLogger());
+            string projectRoot = Path.Combine(Path.GetTempPath(), "am-skin-gpu-probe");
+            Directory.CreateDirectory(projectRoot);
+            MapCharacterAssetData asset = await InstalledSkins.CreateLoader(settings, log).LoadAsync("Characters/Aatrox/Skins/Skin33", projectRoot);
+            MapCharacterMeshRange range = asset.Mesh.Ranges.Single(item => item.Name == "Sword_VFX");
+            ModelMaterialDefinition material = asset.Materials.ResolveMaterialDefinition("Sword_VFX");
+
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var renderer = new SkinSubmeshRenderer(gl, settings, null, 128);
+            SkinSubmeshRenderer.Result resting = renderer.Render(asset, range, material);
+            SkinSubmeshRenderer.Result combat = renderer.Render(asset, range, material,
+                state: GameMaterialState.From(0, new[] { "AatroxInCombat" }, null));
+
+            Console.WriteLine($"[SkinState] resting covered={resting.Covered} combat covered={combat.Covered} mean={combat.Mean} peak={combat.MaxComponent}");
+            Assert.Equal(0, resting.Covered);
+            Assert.True(combat.Covered > 0);
         }
 
         // FEATURE_BLOOM skin shaders write glow to SV_Target1; GameShaderBloom routes it, blurs it and adds it.

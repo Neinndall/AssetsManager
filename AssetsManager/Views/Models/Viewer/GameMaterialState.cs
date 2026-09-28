@@ -1,0 +1,40 @@
+using System;
+using System.Collections.Generic;
+using LeagueToolkit.Hashing;
+
+namespace AssetsManager.Views.Models.Viewer
+{
+    /// <summary>
+    /// The game state dynamic materials read: the equipped gear, the buffs the preview turns on, the animation
+    /// clips playing and whether the character is dead. An int converts to the resting state with that gear.
+    /// </summary>
+    internal sealed record GameMaterialState(
+        int Gear,
+        IReadOnlySet<string> Buffs,
+        IReadOnlySet<uint> Animations,
+        bool Dead = false)
+    {
+        private static readonly IReadOnlySet<string> NoBuffs = new HashSet<string>();
+        private static readonly IReadOnlySet<uint> NoAnimations = new HashSet<uint>();
+
+        internal static GameMaterialState Resting { get; } = new(0, NoBuffs, NoAnimations);
+
+        public static implicit operator GameMaterialState(int gear) =>
+            gear == 0 ? Resting : new GameMaterialState(gear, NoBuffs, NoAnimations);
+
+        internal bool HasBuff(string script) =>
+            !string.IsNullOrEmpty(script) && Buffs != null && Buffs.Contains(script);
+
+        internal bool IsPlaying(uint animationHash) => Animations != null && Animations.Contains(animationHash);
+
+        /// <summary>The hash animation conditions name a clip by: its name, or the hex hash an unresolved name keeps.</summary>
+        internal static uint AnimationHash(string clipName) =>
+            clipName?.Length == 8 && uint.TryParse(clipName, System.Globalization.NumberStyles.HexNumber, null, out uint hash)
+                ? hash
+                : Fnv1a.HashLower(clipName ?? string.Empty);
+
+        internal static GameMaterialState From(int gear, IEnumerable<string> buffs, IEnumerable<uint> animations, bool dead = false) =>
+            new(gear, new HashSet<string>(buffs ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase),
+                new HashSet<uint>(animations ?? Array.Empty<uint>()), dead);
+    }
+}

@@ -3,29 +3,40 @@ using System.Linq;
 
 namespace AssetsManager.Views.Models.Viewer
 {
-    // Buff and Gameplay (death, a named animation playing) are states the resting preview is never in.
-    internal enum GameMaterialBoolKind { Unsupported, Gear, Buff, Gameplay, All, Not }
+    // Buff, Dead and Animation read the preview's game state; the resting preview has no buff, is alive and
+    // plays no scripted animation.
+    internal enum GameMaterialBoolKind { Unsupported, Gear, Buff, Dead, Animation, All, Not }
 
+    /// <param name="Name">The buff script a Buff condition checks.</param>
+    /// <param name="Animations">The clip name hashes an Animation condition checks.</param>
     internal sealed record GameMaterialBoolCondition(
         GameMaterialBoolKind Kind, int GearIndex = 0,
-        IReadOnlyList<GameMaterialBoolCondition> Children = null)
+        IReadOnlyList<GameMaterialBoolCondition> Children = null,
+        string Name = null,
+        IReadOnlyList<uint> Animations = null)
     {
-        internal bool? Evaluate(int gearIndex) => Kind switch
+        internal bool? Evaluate(GameMaterialState state) => Kind switch
         {
-            GameMaterialBoolKind.Gear => gearIndex == GearIndex,
-            // The model preview has no active gameplay buffs, is alive and rests outside scripted animations.
-            GameMaterialBoolKind.Buff or GameMaterialBoolKind.Gameplay => false,
-            GameMaterialBoolKind.Not when Children?.Count == 1 => !Children[0].Evaluate(gearIndex),
-            GameMaterialBoolKind.All => EvaluateAll(gearIndex),
+            GameMaterialBoolKind.Gear => state.Gear == GearIndex,
+            GameMaterialBoolKind.Buff => state.HasBuff(Name),
+            GameMaterialBoolKind.Dead => state.Dead,
+            GameMaterialBoolKind.Animation => Animations?.Any(state.IsPlaying) == true,
+            GameMaterialBoolKind.Not when Children?.Count == 1 => !Children[0].Evaluate(state),
+            GameMaterialBoolKind.All => EvaluateAll(state),
             _ => null
         };
 
-        private bool? EvaluateAll(int gearIndex)
+        /// <summary>The buff scripts this condition, or any it nests, checks.</summary>
+        internal IEnumerable<string> Buffs() =>
+            (Kind == GameMaterialBoolKind.Buff && !string.IsNullOrEmpty(Name) ? new[] { Name } : Enumerable.Empty<string>())
+            .Concat((Children ?? System.Array.Empty<GameMaterialBoolCondition>()).SelectMany(child => child.Buffs()));
+
+        private bool? EvaluateAll(GameMaterialState state)
         {
             bool unknown = false;
             foreach (var child in Children ?? System.Array.Empty<GameMaterialBoolCondition>())
             {
-                bool? value = child.Evaluate(gearIndex);
+                bool? value = child.Evaluate(state);
                 if (value == false) return false;
                 unknown |= !value.HasValue;
             }
@@ -38,7 +49,7 @@ namespace AssetsManager.Views.Models.Viewer
     internal sealed record GameMaterialTextureSwap(string SamplerName, IReadOnlyList<GameMaterialTextureSwapOption> Options)
     {
         // Preserve authored ordering, including specific buff conditions before the generic gear option.
-        internal string Resolve(int gearIndex) => Options.FirstOrDefault(
-            option => option.Condition.Evaluate(gearIndex) == true)?.TexturePath;
+        internal string Resolve(GameMaterialState state) => Options.FirstOrDefault(
+            option => option.Condition.Evaluate(state) == true)?.TexturePath;
     }
 }

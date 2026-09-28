@@ -5020,6 +5020,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.HasChampionMesh = false;
             _model.HasCharacterSkeleton = false;
             RebuildCharacterSubmeshOptions();
+            RebuildCharacterGameStates();
             ClearCharacterArmatureOverlay();
             RunReleaseStep("Champion animation cache", () => _championAnimationService?.ClearCache());
 
@@ -5458,6 +5459,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             _model.HasChampionMesh = true;
             RebuildCharacterSubmeshOptions();
+            RebuildCharacterGameStates();
 
             // Ensure skeleton is loaded; a form's authored SKL replaces the one found beside the SKN.
             if ((_championModel.Skeleton == null || authoredSkeletonPath != null) && !string.IsNullOrEmpty(sknPath))
@@ -6114,6 +6116,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (clip == null || _championModel == null) return;
 
             _activeAnimationClip = clip;
+            SetPlayingAnimation(clip);
             foreach (ModelPart part in _championModel.Parts)
                 _animationBasePartVisibility[part] = part.IsVisible;
             foreach (uint hash in GetCharacterFormHiddenSubmeshes())
@@ -6233,6 +6236,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _activeAnimationClip = null;
+            SetPlayingAnimation(null);
             _animationBasePartVisibility.Clear();
             _animationBaseHiddenSubmeshes.Clear();
             _animationVisibilityTimeline = Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();

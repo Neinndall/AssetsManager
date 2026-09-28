@@ -676,6 +676,35 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsCustom { get; }
     }
 
+    /// <summary>A buff the champion's dynamic materials read (e.g. AatroxInCombat), offered as a preview game state.</summary>
+    public sealed class CharacterGameStateOption : INotifyPropertyChanged
+    {
+        private readonly Action _changed;
+        private bool _isEnabled;
+
+        internal CharacterGameStateOption(string name, Action changed)
+        {
+            Name = name;
+            _changed = changed;
+        }
+
+        public string Name { get; }
+
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                if (_isEnabled == value) return;
+                _isEnabled = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEnabled)));
+                _changed?.Invoke();
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+    }
+
     /// <summary>A mutator some visibility controller of the map reads.</summary>
     public sealed class MapMutatorOption : INotifyPropertyChanged
     {
@@ -869,6 +898,7 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<MapVisibilityStateOption> MapTransformations { get; } = new();
         public ObservableCollection<MapVisibilityStateOption> MapSecondaryStates { get; } = new();
         public ObservableCollection<MapMutatorOption> MapMutators { get; } = new();
+        public ObservableCollection<CharacterGameStateOption> CharacterGameStates { get; } = new();
         public ObservableCollection<VfxCharacterBackdropOption> CharacterBackdrops { get; } = new();
         public ObservableCollection<VfxCharacterSubmeshOption> CharacterSubmeshes { get; } = new();
         public ObservableCollection<VfxCharacterFormOption> CharacterForms { get; } = new();
@@ -950,6 +980,16 @@ namespace AssetsManager.Views.Models.Viewer
         public bool HasMapTransformations => MapTransformations.Count > 1;
         public bool HasMapSecondaryStates => MapSecondaryStates.Count > 1;
         public bool HasMapMutators => MapMutators.Count > 0;
+        public bool HasCharacterGameStates => CharacterGameStates.Count > 0;
+
+        /// <summary>Offers <paramref name="buffs"/> as toggles, all off: the resting state.</summary>
+        internal void SetCharacterGameStates(IEnumerable<string> buffs, Action changed)
+        {
+            CharacterGameStates.Clear();
+            foreach (string buff in buffs ?? Array.Empty<string>())
+                CharacterGameStates.Add(new CharacterGameStateOption(buff, changed));
+            OnPropertyChanged(nameof(HasCharacterGameStates));
+        }
 
         /// <summary>Raised when the user asks for another map state; the owner loads and applies it.</summary>
         internal event Action<MapVisibilityState> MapVisibilityRequested;

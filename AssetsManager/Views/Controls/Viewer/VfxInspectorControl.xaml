@@ -1166,6 +1166,7 @@
                                             <CheckBox Content="Sky" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
                                                       IsChecked="{Binding ShowPreviewSky, Mode=TwoWay}"/>
 
+
                                             <StackPanel Orientation="Horizontal" Margin="0,12,0,6">
                                                 <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"
                                                                             Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"
@@ -2304,6 +2305,45 @@
                                         </Grid>
                                     </StackPanel>
                                 </Border>
+                            </StackPanel>
+
+                            <!-- GAME STATE: buffs the skin's dynamic materials read (in combat, R form, passive ready...) -->
+                            <StackPanel Visibility="{Binding HasCharacterGameStates, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <ToggleButton x:Name="VfxCharacterGameStateSection" IsChecked="True" Style="{StaticResource CollapsibleSectionHeaderStyle}" Margin="0,0,0,4">
+                                    <Grid Margin="8,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Background="#15FFFFFF" CornerRadius="7" Width="26" Height="26" Margin="0,0,8,0" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="LightningBoltOutline" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="GAME STATE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="Buffs the skin's shaders react to" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                        </StackPanel>
+                                        <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
+                                    </Grid>
+                                </ToggleButton>
+
+                                <StackPanel Visibility="{Binding IsChecked, ElementName=VfxCharacterGameStateSection, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,0,12">
+                                    <Border Background="{StaticResource CardBackground}" CornerRadius="12"
+                                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,10">
+                                        <StackPanel>
+                                            <ItemsControl ItemsSource="{Binding CharacterGameStates}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox Content="{Binding Name}" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
+                                                                  IsChecked="{Binding IsEnabled, Mode=TwoWay}"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBlock Text="Needs game shaders on. States tied to an animation follow the playing clip."
+                                                       FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
                             </StackPanel>
 
                             <!-- GEOMETRY HEADER -->

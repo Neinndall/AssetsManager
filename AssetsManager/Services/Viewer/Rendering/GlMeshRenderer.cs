@@ -487,7 +487,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     in gameFrame,
                     path => _resources.ResolveProgramTexture(part, resources, path),
                     model.SelfIllumination,
-                    part.EquippedGearIndex))
+                    model.GameState is { } game ? game with { Gear = part.EquippedGearIndex } : part.EquippedGearIndex))
             {
                 return false;
             }

@@ -28,11 +28,11 @@ namespace AssetsManager.Views.Models.Viewer
         internal System.Collections.Generic.IReadOnlyList<GameMaterialDynamicParameter> DynamicParameters { get; init; } =
             System.Array.Empty<GameMaterialDynamicParameter>();
 
-        internal string ResolveTextureSwap(string samplerName, int gearIndex)
+        internal string ResolveTextureSwap(string samplerName, GameMaterialState state)
         {
             foreach (var swap in TextureSwaps)
                 if (string.Equals(swap.SamplerName, samplerName, System.StringComparison.Ordinal))
-                    return swap.Resolve(gearIndex);
+                    return swap.Resolve(state);
             return null;
         }
 

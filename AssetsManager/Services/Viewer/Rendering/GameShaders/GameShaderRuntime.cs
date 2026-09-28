@@ -208,17 +208,21 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             IReadOnlyList<PassRuntimeEntry> Passes,
             string Failure)
         {
-            private int? _dynamicGear;
+            private GameMaterialState _dynamicState;
             private readonly Dictionary<string, Vector4> _dynamicParameters = new(StringComparer.Ordinal);
 
-            internal IReadOnlyDictionary<string, Vector4> DynamicParameters(ModelMaterialDefinition material, int gear)
+            // Re-evaluated only when the preview hands over a different game state.
+            internal IReadOnlyDictionary<string, Vector4> DynamicParameters(ModelMaterialDefinition material, GameMaterialState state)
             {
-                if (_dynamicGear != gear)
+                if (!ReferenceEquals(_dynamicState, state))
                 {
                     _dynamicParameters.Clear();
+                    // A state whose branch uses drivers the preview cannot evaluate keeps the resting value, never the
+                    // static authoring value (Aatrox Skin33's body: Bloom_Intensity 10 static, 0 at rest).
                     foreach (var parameter in material.DynamicParameters)
-                        if (parameter.Evaluate(gear) is Vector4 value) _dynamicParameters[parameter.Name] = value;
-                    _dynamicGear = gear;
+                        if ((parameter.Evaluate(state) ?? parameter.Evaluate(GameMaterialState.Resting with { Gear = state.Gear })) is Vector4 value)
+                            _dynamicParameters[parameter.Name] = value;
+                    _dynamicState = state;
                 }
                 return _dynamicParameters;
             }
@@ -370,7 +374,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             in Frame frame,
             Func<string, uint?> programTexture,
             float selfIllumination = 0f,
-            int gearIndex = 0)
+            GameMaterialState state = null)
         {
             if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.SkinnedMesh)
                 return false;
@@ -387,8 +391,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             _gl.UseProgram(runtime.Program);
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents);
             UpdateBlocks(runtime, passEntry.Globals, null, frame, new CharacterDraw(world, bones, selfIllumination),
-                overrides: entry.DynamicParameters(material, gearIndex));
-            BindSkinnedTextures(runtime, passEntry.Pass, programTexture, material, gearIndex, frame);
+                overrides: entry.DynamicParameters(material, state ?? GameMaterialState.Resting));
+            BindSkinnedTextures(runtime, passEntry.Pass, programTexture, material, state ?? GameMaterialState.Resting, frame);
             ApplyPassState(passEntry.Pass.State, meshDoubleSided: false);
             return true;
         }
@@ -1004,7 +1008,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             GameMaterialPass pass,
             Func<string, uint?> programTexture,
             ModelMaterialDefinition material,
-            int gearIndex,
+            GameMaterialState state,
             in Frame frame)
         {
             foreach (SamplerRuntime sampler in runtime.Samplers)
@@ -1057,7 +1061,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         : name;
                     GameMaterialTexture declared = pass.Textures?
                         .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
-                    string authoredPath = material.ResolveTextureSwap(own, gearIndex) ?? declared?.Texture?.VirtualPath;
+                    string authoredPath = material.ResolveTextureSwap(own, state) ?? declared?.Texture?.VirtualPath;
                     if (string.IsNullOrWhiteSpace(authoredPath) && declared?.Texture?.PathHash > 0)
                         authoredPath = declared.Texture.PathHash.ToString("x16");
                     uint? loaded = sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D &&
