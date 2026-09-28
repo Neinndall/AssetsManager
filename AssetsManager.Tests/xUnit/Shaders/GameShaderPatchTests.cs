@@ -33,6 +33,23 @@ namespace AssetsManager.Tests.xUnit.Shaders
         }
 
         [Fact]
+        public void ReciprocalsKeepTheD3DResultOfDividingByZero()
+        {
+            string source = Preamble +
+                "\nvoid main()\n{\n    float a = clamp((1.0 / (u.y - (u.x * 2.0))) * b, 0.0, 1.0);\n    float c = 11.0 / (d);\n}\n";
+
+            (string output, var applied) = GameShaderTranslator.PatchGlsl(
+                source,
+                GameShaderTranslator.Stage.Pixel,
+                System.Array.Empty<(string, uint)>());
+
+            Assert.Contains("clamp((dxbcRcp(u.y - (u.x * 2.0))) * b, 0.0, 1.0)", output);
+            Assert.Contains("float c = 11.0 / (d);", output);
+            Assert.Contains("float dxbcRcp(float v)", output);
+            Assert.Contains(GameShaderTranslator.AppliedPatch.SafeReciprocal, applied);
+        }
+
+        [Fact]
         public void CbufferNarrowerThanReflectionIsLeftAlone()
         {
             string source = "layout(std140) uniform Globals\n{\n    vec4 m[1];\n} Globals_i;\n";

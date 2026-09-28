@@ -57,7 +57,8 @@ namespace AssetsManager.Shaders
             CubeArray,
             ShadowLevelZero,
             BaseVertexZero,
-            MipLevelsOne
+            MipLevelsOne,
+            SafeReciprocal
         }
 
         public enum MemberScalar
@@ -824,6 +825,9 @@ namespace AssetsManager.Shaders
             (result, int shadowed) = ShadowLevelZero(result);
             if (shadowed > 0)
                 applied.Add(AppliedPatch.ShadowLevelZero);
+            (result, int reciprocals) = SafeReciprocal(result);
+            if (reciprocals > 0)
+                applied.Add(AppliedPatch.SafeReciprocal);
             result = LinkFixup(result, stage);
             return (result, applied.Distinct().OrderBy(value => value).ToArray());
         }
@@ -917,6 +921,62 @@ namespace AssetsManager.Shaders
             }
 
             return (result, applied.Distinct().OrderBy(value => value).ToArray());
+        }
+
+        // D3D's rcp of ±0 is ±inf. GLSL leaves it undefined, and drivers that distribute `(1/x) * (a - b)`
+        // produce 0 * inf = NaN (Aatrox Skin5's sword dissolve discarded every pixel). A finite extreme with
+        // the zero's sign keeps the D3D result after saturation without ever creating an infinity.
+        private const string SafeReciprocalHelper =
+            "float dxbcRcp(float v) { return v == 0.0 ? ((floatBitsToUint(v) & 0x80000000u) != 0u ? -3.402823466e38 : 3.402823466e38) : 1.0 / v; }\n";
+
+        /// <summary>Routes every scalar <c>1.0 / (x)</c> SPIRV-Cross emits for DXBC <c>rcp</c> through <c>dxbcRcp</c>.</summary>
+        internal static (string Source, int Count) SafeReciprocal(string source)
+        {
+            const string token = "1.0 / (";
+            var builder = new StringBuilder(source.Length + 64);
+            int count = 0;
+            int at = 0;
+            while (true)
+            {
+                int found = source.IndexOf(token, at, StringComparison.Ordinal);
+                if (found < 0)
+                    break;
+
+                char before = found > 0 ? source[found - 1] : ' ';
+                int open = found + token.Length - 1;
+                int close = MatchingParenthesis(source, open);
+                if (char.IsLetterOrDigit(before) || before is '.' or '_' || close < 0)
+                {
+                    builder.Append(source, at, open + 1 - at);
+                    at = open + 1;
+                    continue;
+                }
+
+                builder.Append(source, at, found - at)
+                    .Append("dxbcRcp(")
+                    .Append(source, open + 1, close - open - 1)
+                    .Append(')');
+                at = close + 1;
+                count++;
+            }
+            if (count == 0)
+                return (source, 0);
+
+            builder.Append(source, at, source.Length - at);
+            return (WithHelpers(builder.ToString(), SafeReciprocalHelper), count);
+        }
+
+        private static int MatchingParenthesis(string source, int open)
+        {
+            int depth = 0;
+            for (int index = open; index < source.Length; index++)
+            {
+                if (source[index] == '(')
+                    depth++;
+                else if (source[index] == ')' && --depth == 0)
+                    return index;
+            }
+            return -1;
         }
 
         private static string WithHelpers(string source, string helpers)
