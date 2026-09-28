@@ -2063,6 +2063,14 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_model.ShowPreviewSky)
                 _skyRenderer?.Render(view, proj);
 
+            // Ground navigation belongs to the MAP workspace; a Character backdrop keeps orbiting its subject.
+            if (_cameraController != null)
+            {
+                _cameraController.MapNavigationGroundHeight = _mapSceneRuntime != null && !_mapSceneIsCharacterBackdrop
+                    ? _mapSceneRuntime.Scene.Origin?.Y
+                    : null;
+            }
+
             // A MAP scene owns the world backdrop. In Character-backdrop mode the selected Skin remains
             // the subject and is composited into the same depth/particle/post-processing frame.
             if (_mapSceneRuntime != null)
@@ -7870,6 +7878,14 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void RunKeys_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // WASD over the MAP viewport moves the camera (polled each frame); swallow the key so a
+            // focused browser tree does not jump to items by letter.
+            if (_cameraController?.IsMapNavigationKey(e.Key) == true)
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (ShouldIgnoreRunHotkey(Keyboard.FocusedElement as DependencyObject)) return;
 
             ModifierKeys modifiers = Keyboard.Modifiers;

@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Controls;
@@ -14,6 +16,9 @@ namespace AssetsManager.Views.Helpers
         private ProjectionCamera _subscribedCamera;
         private bool _isRotating;
         private bool _isPanning;
+        private bool _isGroundDragging;
+        private Point3D _groundGrab;
+        private long _lastWalkTimestamp;
         private System.Windows.Point _lastMousePosition;
         
         // Smooth Zoom and Transition variables
@@ -31,6 +36,15 @@ namespace AssetsManager.Views.Helpers
         public double OrthographicMaxWidth { get; set; } = 20000.0;
         public double PerspectiveMinDistance { get; set; }
         public double PerspectiveMaxDistance { get; set; } = double.PositiveInfinity;
+
+        /// <summary>
+        /// Height of the MAP ground plane while a map scene is navigated. When set, the wheel zooms toward
+        /// the terrain under the cursor, right-drag moves over the ground, WASD travels and a double click
+        /// flies to the clicked point. Null keeps the object-orbit controls unchanged.
+        /// </summary>
+        public double? MapNavigationGroundHeight { get; set; }
+
+        private bool IsMapNavigation => MapNavigationGroundHeight.HasValue;
         public event EventHandler RotationStarted;
         public event EventHandler RotationEnded;
 
@@ -150,7 +164,9 @@ namespace AssetsManager.Views.Helpers
 
         private void OnRendering(object sender, EventArgs e)
         {
-            if (!_isTransitioning || _viewport?.Camera is not ProjectionCamera camera) return;
+            if (_viewport?.Camera is not ProjectionCamera camera) return;
+            WalkMap(camera);
+            if (!_isTransitioning) return;
 
             // Interpolate Position
             var currentPos = camera.Position;
@@ -188,8 +204,30 @@ namespace AssetsManager.Views.Helpers
                 e.Handled = true;
             }
 
+            if (IsMapNavigation && e.ChangedButton == MouseButton.Left && e.ClickCount == 2 &&
+                TryFlyToGroundPoint(e.GetPosition(_inputSurface)))
+            {
+                e.Handled = true;
+                return;
+            }
+
             // Stop transitions if user starts interacting with any mouse gesture (like panning or zooming or rotation)
             _isTransitioning = false;
+
+            if (e.RightButton == MouseButtonState.Pressed && IsMapNavigation &&
+                _viewport.Camera is ProjectionCamera groundCamera &&
+                MapCameraNavigation.TryGetGroundPoint(
+                    Pose(groundCamera),
+                    SurfaceSize,
+                    e.GetPosition(_inputSurface),
+                    MapNavigationGroundHeight.Value,
+                    out _groundGrab))
+            {
+                _isGroundDragging = true;
+                _inputSurface.Cursor = System.Windows.Input.Cursors.Hand;
+                _inputSurface.CaptureMouse();
+                return;
+            }
 
             if (e.LeftButton == MouseButtonState.Pressed)
             {
@@ -222,9 +260,10 @@ namespace AssetsManager.Views.Helpers
             }
             if (e.RightButton == MouseButtonState.Released)
             {
-                if (_isPanning)
+                if (_isPanning || _isGroundDragging)
                 {
                     _isPanning = false;
+                    _isGroundDragging = false;
                     _inputSurface.Cursor = System.Windows.Input.Cursors.Arrow;
                     _inputSurface.ReleaseMouseCapture();
                 }
@@ -251,6 +290,10 @@ namespace AssetsManager.Views.Helpers
                     _targetLookDirection = camera.LookDirection;
                     _targetUpDirection = camera.UpDirection;
                 }
+            }
+            else if (_isGroundDragging && e.RightButton == MouseButtonState.Pressed)
+            {
+                DragGround(e.GetPosition(_inputSurface));
             }
             else if (_isPanning && e.RightButton == MouseButtonState.Pressed)
             {
@@ -286,6 +329,13 @@ namespace AssetsManager.Views.Helpers
             else if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
             {
                 speedMultiplier = 0.2; // Precision Mode
+            }
+
+            if (IsMapNavigation)
+            {
+                ZoomMap(camera, e.GetPosition(_inputSurface), delta, speedMultiplier);
+                e.Handled = true;
+                return;
             }
 
             if (camera is OrthographicCamera orthographic)
@@ -388,6 +438,145 @@ namespace AssetsManager.Views.Helpers
 
             camera.Position = ConstrainMapPosition(nextPosition);
         }
+
+        /// <summary>
+        /// True when a navigation key should move the map camera instead of reaching the focused
+        /// control (e.g. tree type-ahead): the cursor is over the viewport and no text input has focus.
+        /// </summary>
+        public bool IsMapNavigationKey(Key key) =>
+            key is (Key.W or Key.A or Key.S or Key.D) && IsWalkInputAvailable();
+
+        private bool IsWalkInputAvailable() =>
+            IsMapNavigation &&
+            _inputSurface?.IsMouseOver == true &&
+            (Keyboard.Modifiers & (ModifierKeys.Alt | ModifierKeys.Windows)) == 0 &&
+            Keyboard.FocusedElement is not (TextBoxBase or PasswordBox or System.Windows.Controls.ComboBox { IsEditable: true });
+
+        private MapCameraPose Pose(ProjectionCamera camera) => Pose(camera, camera.Position, camera.LookDirection);
+
+        private static MapCameraPose Pose(ProjectionCamera camera, Point3D position, Vector3D look) => new(
+            position,
+            look,
+            camera.UpDirection,
+            (camera as PerspectiveCamera)?.FieldOfView ?? 45.0,
+            (camera as OrthographicCamera)?.Width ?? 0.0,
+            camera is OrthographicCamera);
+
+        private Size SurfaceSize => new(_inputSurface.ActualWidth, _inputSurface.ActualHeight);
+
+        private void ZoomMap(ProjectionCamera camera, System.Windows.Point cursor, int delta, double speed)
+        {
+            double ground = MapNavigationGroundHeight.Value;
+            if (camera is OrthographicCamera orthographic)
+            {
+                _isTransitioning = false;
+                double width = Math.Clamp(
+                    orthographic.Width * Math.Pow(1.12, -delta * speed),
+                    OrthographicMinWidth,
+                    OrthographicMaxWidth);
+                if (MapCameraNavigation.TryGetRay(Pose(camera), SurfaceSize, cursor, out Point3D anchor, out _))
+                {
+                    camera.Position = MapCameraNavigation.OrthographicZoomPosition(
+                        camera.Position, anchor, width / orthographic.Width);
+                }
+                orthographic.Width = width;
+                SyncTargetsToCamera(camera);
+                return;
+            }
+
+            // Successive wheel notches accumulate on the pending target, like the orbit zoom.
+            if (!_isTransitioning)
+                SyncTargetsToCamera(camera);
+            MapCameraPose pose = Pose(camera, _targetPosition, _targetLookDirection);
+            Point3D focus = MapCameraNavigation.TryGetGroundPoint(pose, SurfaceSize, cursor, ground, out Point3D hit)
+                ? hit
+                : _targetPosition + _targetLookDirection;
+            Point3D next = MapCameraNavigation.Zoom(
+                _targetPosition, focus, delta, speed, ground, PerspectiveMaxDistance);
+            _targetPosition = next;
+            _targetLookDirection = MapCameraNavigation.GroundedLook(next, _targetLookDirection, ground);
+            _isTransitioning = true;
+        }
+
+        private void DragGround(System.Windows.Point cursor)
+        {
+            if (_viewport.Camera is not ProjectionCamera camera ||
+                !MapCameraNavigation.TryGetGroundPoint(Pose(camera), SurfaceSize, cursor, MapNavigationGroundHeight.Value, out Point3D current))
+            {
+                return;
+            }
+
+            // Near the horizon a pixel spans kilometres; ignore those rays instead of jumping away.
+            if ((current - camera.Position).Length > MapFarDragDistance)
+                return;
+
+            camera.Position += MapCameraNavigation.DragTranslation(_groundGrab, current);
+            SyncTargetsToCamera(camera);
+        }
+
+        private bool TryFlyToGroundPoint(System.Windows.Point cursor)
+        {
+            if (_viewport?.Camera is not PerspectiveCamera camera ||
+                !MapCameraNavigation.TryGetGroundPoint(Pose(camera), SurfaceSize, cursor, MapNavigationGroundHeight.Value, out Point3D hit))
+            {
+                return false;
+            }
+
+            Vector3D direction = camera.LookDirection;
+            direction.Normalize();
+            double distance = Math.Clamp(camera.LookDirection.Length, MapFlyMinimumDistance, MapFlyMaximumDistance);
+            Vector3D look = direction * distance;
+            FlyTo(hit - look, look, camera.UpDirection);
+            return true;
+        }
+
+        private void WalkMap(ProjectionCamera camera)
+        {
+            long now = Stopwatch.GetTimestamp();
+            double seconds = _lastWalkTimestamp == 0
+                ? 0
+                : Math.Min((now - _lastWalkTimestamp) / (double)Stopwatch.Frequency, MaximumWalkStep);
+            if (!IsWalkInputAvailable())
+            {
+                _lastWalkTimestamp = 0;
+                return;
+            }
+
+            double forward = (Keyboard.IsKeyDown(Key.W) ? 1 : 0) - (Keyboard.IsKeyDown(Key.S) ? 1 : 0);
+            double strafe = (Keyboard.IsKeyDown(Key.D) ? 1 : 0) - (Keyboard.IsKeyDown(Key.A) ? 1 : 0);
+            if (forward == 0 && strafe == 0)
+            {
+                _lastWalkTimestamp = 0;
+                return;
+            }
+
+            _lastWalkTimestamp = now;
+            double speed = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift) ? 3.0
+                : Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl) ? 0.25
+                : 1.0;
+            Vector3D move = MapCameraNavigation.Walk(
+                Pose(camera), forward, strafe, seconds, speed, MapNavigationGroundHeight.Value);
+            if (move.LengthSquared < 1e-12)
+                return;
+
+            camera.Position += move;
+            if (_isTransitioning)
+                _targetPosition += move;
+            else
+                SyncTargetsToCamera(camera);
+        }
+
+        private void SyncTargetsToCamera(ProjectionCamera camera)
+        {
+            _targetPosition = camera.Position;
+            _targetLookDirection = camera.LookDirection;
+            _targetUpDirection = camera.UpDirection;
+        }
+
+        private const double MapFarDragDistance = 60000.0;
+        private const double MapFlyMinimumDistance = 400.0;
+        private const double MapFlyMaximumDistance = 4000.0;
+        private const double MaximumWalkStep = 0.1;
 
         internal static Point3D ConstrainMapPosition(Point3D position, bool collisionEnabled)
         {
