@@ -151,6 +151,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             internal readonly IReadOnlyList<SamplerRuntime> Samplers;
             internal readonly IReadOnlyDictionary<uint, string> Attributes;
 
+            /// <summary>The pixel stage writes a second target: the glow <c>FEATURE_BLOOM</c> shaders output.</summary>
+            internal bool WritesBloom { get; set; }
+
             internal ProgramRuntime(
                 GL gl,
                 uint program,
@@ -271,6 +274,17 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             GetStaticPassCount(material) > 0
                 ? GetOrCreate(material, material.Program).Passes[0].Pass.State
                 : null;
+
+        /// <returns>Whether the pass's pixel shader writes glow to its second target (<see cref="GameShaderBloom"/>).</returns>
+        internal bool WritesBloom(ModelMaterialDefinition material, int passIndex)
+        {
+            int count = GetSkinnedPassCount(material);
+            return passIndex >= 0 && passIndex < count &&
+                   GetOrCreate(material, material.Program).Passes[passIndex].Program?.WritesBloom == true;
+        }
+
+        internal static bool WritesSecondTarget(string pixelGlsl) =>
+            pixelGlsl?.Contains("layout(location = 1) out", StringComparison.Ordinal) == true;
 
         internal GameMaterialPassState GetSkinnedPassState(ModelMaterialDefinition material, int passIndex)
         {
@@ -451,6 +465,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                                     ready = CreateProgram(particleMesh.HasValue
                                         ? GameParticleShaderPrelude.Compose(translated.Program, particleMesh.Value)
                                         : translated.Program, program.Kind, particleMesh.HasValue);
+                                    ready.WritesBloom = WritesSecondTarget(translated.Program.Pixel.Glsl);
                                     _sharedPrograms[key] = ready;
                                 }
                                 catch (Exception ex)

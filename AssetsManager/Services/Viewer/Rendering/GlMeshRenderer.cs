@@ -33,6 +33,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private GL _gl = null!;
         private GlMeshResourceCache _resources = null!;
         private GameShaderRuntime _gameShaderRuntime;
+        private GameShaderBloom _bloom;
         private uint _program;
         private uint _boneBuffer;
         private readonly List<ModelPart> _alphaRenderQueue = new();
@@ -83,6 +84,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
 
             _gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
+            _bloom = new GameShaderBloom();
+            _bloom.Initialize(gl);
             _program = GlShaderCompiler.CreateProgram(
                 gl,
                 _gles,
@@ -426,10 +429,44 @@ namespace AssetsManager.Services.Viewer.Rendering
                 }
             }
 
+            if (_bloom != null && UsesGameShaders(viewMode, shadersEnabled))
+                RenderBloomPasses(model, world, in gameFrame, gameSkinningMatrices);
+
             _opaqueDraws.Clear();
             _transparentDraws.Clear();
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
+
+        /// <summary>Redraws the game passes whose shaders write glow, routing it into the bloom texture.</summary>
+        private void RenderBloomPasses(
+            SceneModel model,
+            Matrix4x4 world,
+            in GameShaderRuntime.Frame gameFrame,
+            IReadOnlyList<Matrix4x4> gameSkinningMatrices)
+        {
+            bool begun = false;
+            for (int queueIndex = 0; queueIndex < 2; queueIndex++)
+            {
+                foreach (PartDraw draw in queueIndex == 0 ? _opaqueDraws : _transparentDraws)
+                {
+                    if (draw.PassIndex < 0 || !_gameShaderRuntime.WritesBloom(draw.Part.MaterialDefinition, draw.PassIndex))
+                        continue;
+                    if (!begun)
+                    {
+                        if (!_bloom.BeginPasses())
+                            return;
+                        begun = true;
+                    }
+                    _gl.BindVertexArray(draw.Resources.Vao);
+                    TryDrawProgramPass(model, draw, world, in gameFrame, gameSkinningMatrices);
+                }
+            }
+            if (begun)
+                _bloom.EndPasses();
+        }
+
+        /// <summary>Adds the glow the game passes of this frame wrote; the viewport calls it once, after every model.</summary>
+        internal void ComposeBloom() => _bloom?.Compose();
 
         private bool TryDrawProgramPass(
             SceneModel model,
@@ -960,6 +997,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             {
                 _gameShaderRuntime?.Dispose();
                 _gameShaderRuntime = null;
+                _bloom?.Dispose();
+                _bloom = null;
                 _resources?.Dispose();
                 _materialTimeOrigins.Clear();
                 _bindSkinningPalettes.Clear();

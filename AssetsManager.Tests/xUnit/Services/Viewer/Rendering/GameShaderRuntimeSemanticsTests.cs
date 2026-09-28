@@ -78,6 +78,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             Assert.Null(GameShaderRuntime.ResolveStaticProgramTexture("terrain", 2, "Diffuse", Lookup));
         }
 
+        [Fact]
+        public void WritesSecondTarget_OnlyForPixelShadersThatDeclareOutputOne()
+        {
+            Assert.True(GameShaderRuntime.WritesSecondTarget("layout(location = 0) out vec4 SV_Target;\nlayout(location = 1) out vec4 SV_Target1;"));
+            Assert.False(GameShaderRuntime.WritesSecondTarget("layout(location = 0) out vec4 SV_Target;"));
+            Assert.False(GameShaderRuntime.WritesSecondTarget(null));
+        }
+
         // Object-space shaders (HKG_MatCap_LuLu) subtract mWorld * point from the skinned, already placed position.
         [Fact]
         public void WriteCharacterPerDrawVertex_WritesTheCharacterPlacementAndItsInverse()

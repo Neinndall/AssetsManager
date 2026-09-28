@@ -242,6 +242,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     ambientColor);
             }
 
+            // Glow the game shaders wrote, once every model is drawn and before anti-aliasing.
+            _meshRenderer?.ComposeBloom();
+
             if (_fxaaRenderer != null && _viewModel.IsFxaaEnabled)
             {
                 if (AppSettings?.StudioParameters?.AntiAliasingMode == "Smaa")

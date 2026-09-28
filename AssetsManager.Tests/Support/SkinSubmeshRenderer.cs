@@ -45,6 +45,7 @@ namespace AssetsManager.Tests.Support
         private readonly uint _depth;
         private readonly Dictionary<string, uint> _textures = new(StringComparer.OrdinalIgnoreCase);
         private GameShaderRuntime _runtime;
+        private GameShaderBloom _bloom;
         private MapCharacterAssetData _asset;
         private Dictionary<string, BitmapSource> _bitmaps;
 
@@ -81,7 +82,16 @@ namespace AssetsManager.Tests.Support
             _runtime = new GameShaderRuntime(_gl, false, _settings);
         }
 
-        internal Result Render(MapCharacterAssetData asset, MapCharacterMeshRange range, ModelMaterialDefinition material, bool keepPixels = false)
+        /// <param name="glowOnly">
+        /// Draws the submesh, clears its colour and adds only the glow <see cref="GameShaderBloom"/> composes from
+        /// the pass's second target, so the pixels are exactly what bloom adds to the frame.
+        /// </param>
+        internal Result Render(
+            MapCharacterAssetData asset,
+            MapCharacterMeshRange range,
+            ModelMaterialDefinition material,
+            bool keepPixels = false,
+            bool glowOnly = false)
         {
             if (!ReferenceEquals(asset, _asset))
             {
@@ -146,6 +156,22 @@ namespace AssetsManager.Tests.Support
                 _gl.BindVertexArray(vao);
                 _gl.Disable(EnableCap.Blend);
                 _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)corners.Length);
+                if (glowOnly)
+                {
+                    _gl.ClearColor(0f, 0f, 0f, 0f);
+                    _gl.Clear(ClearBufferMask.ColorBufferBit);
+                    if (_bloom == null)
+                    {
+                        _bloom = new GameShaderBloom();
+                        _bloom.Initialize(_gl);
+                    }
+                    _bloom.BeginPasses();
+                    _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, BindPose, false, in frame, path => Texture(path, missing));
+                    _gl.BindVertexArray(vao);
+                    _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)corners.Length);
+                    _bloom.EndPasses();
+                    _bloom.Compose();
+                }
             }
 
             float[] pixels = new float[Size * Size * 4];
@@ -242,6 +268,7 @@ namespace AssetsManager.Tests.Support
         {
             ReleaseTextures();
             _runtime?.Dispose();
+            _bloom?.Dispose();
             _gl.DeleteFramebuffer(_framebuffer);
             _gl.DeleteTexture(_colour);
             _gl.DeleteRenderbuffer(_depth);

@@ -2191,6 +2191,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     (uint)Math.Max(1d, OpenTkControl.ActualHeight));
             }
 
+            // Glow the champion's game shaders wrote, once every mesh, particle and post effect is drawn.
+            _championMeshRenderer?.ComposeBloom();
+
             if (AppSettings?.StudioParameters?.EnableFxaa ?? true)
             {
                 int aaWidth = (int)Math.Max(1d, OpenTkControl.ActualWidth);

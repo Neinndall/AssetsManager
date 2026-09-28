@@ -483,6 +483,39 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.True(result.Covered > 0 && result.NonFinite == 0, $"{submesh}: {summary}");
         }
 
+        // FEATURE_BLOOM skin shaders write glow to SV_Target1; GameShaderBloom routes it, blurs it and adds it.
+        [Theory]
+        [InlineData("Characters/Aatrox/Skins/Skin40", "Sword")]
+        [InlineData("Characters/KSante/Skins/Skin18", "LWeaponBlade")]
+        [InlineData("Characters/Aatrox/Skins/Skin30", "FX")]
+        public async System.Threading.Tasks.Task InstalledSkinSubmeshGlowsWhereItsShaderWritesBloom(string skin, string submesh)
+        {
+            string install = InstalledSkins.FindInstall();
+            if (install == null)
+                return;
+
+            var settings = InstalledSkins.Settings(install);
+            var log = new AssetsManager.Services.Core.LogService(new Serilog.LoggerConfiguration().CreateLogger());
+            string projectRoot = Path.Combine(Path.GetTempPath(), "am-skin-gpu-probe");
+            Directory.CreateDirectory(projectRoot);
+            MapCharacterAssetData asset = await InstalledSkins.CreateLoader(settings, log).LoadAsync(skin, projectRoot);
+            MapCharacterMeshRange range = asset.Mesh.Ranges.Single(item => item.Name == submesh);
+            ModelMaterialDefinition material = asset.Materials.ResolveMaterialDefinition(submesh);
+
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var renderer = new SkinSubmeshRenderer(gl, settings, AssetsManager.Views.Helpers.SceneElements.LoadGenericSkyCube(settings, log), 256);
+            string snapshots = Environment.GetEnvironmentVariable("AM_SKIN_GPU_SNAPSHOTS");
+            SkinSubmeshRenderer.Result glow = renderer.Render(asset, range, material, keepPixels: !string.IsNullOrWhiteSpace(snapshots), glowOnly: true);
+            if (glow.Pixels != null)
+                renderer.SavePng(glow.Pixels, Path.Combine(snapshots, $"{skin.Replace('/', '_')}_{submesh}_glow.png"));
+
+            Console.WriteLine($"[SkinGlow] {skin} {submesh} shader={material.Program?.Passes[0].ShaderPath} mean={glow.Mean} peak={glow.MaxComponent} nonFinite={glow.NonFinite}");
+            Assert.True(glow.Bound);
+            Assert.Equal(0, glow.NonFinite);
+            Assert.True(glow.MaxComponent > 0.01f, $"{submesh}: no glow, peak {glow.MaxComponent}");
+        }
+
         [Fact]
         public void MapPostEffectProgramsCompileAndLinkOnDesktopOpenGl()
         {
