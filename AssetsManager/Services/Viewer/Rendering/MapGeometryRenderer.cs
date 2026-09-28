@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Semantics;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
@@ -130,6 +131,16 @@ namespace AssetsManager.Services.Viewer.Rendering
         private MapSunData _previewSun;
         private DrawPlan _plan;
         private int _visibilityFlags;
+        private string _mapSkin;
+        private readonly Dictionary<MapTextureReference, uint> _environmentCubes = new();
+        private MapTextureImage _terrainPaintImage;
+        private uint _terrainPaint;
+        // Meshes a state change brought in, drawn with ENV_TRANSITION until the flag's TransitionTime runs out.
+        private readonly HashSet<int> _enteringMeshes = new();
+        private long _transitionStartMs;
+        private long _transitionDurationMs;
+        private readonly Dictionary<MapMaterialDefinition, MapMaterialDefinition> _transitionMaterials =
+            new(ReferenceEqualityComparer.Instance);
         private DrawPlan _programPlan;
         private DrawPlan _programPlanSource;
         private DrawPlan _screenPlanSource;
@@ -236,11 +247,50 @@ namespace AssetsManager.Services.Viewer.Rendering
             _previewSun = scene.Sun;
             _plan = BuildDrawPlan(scene, scene.OpeningVisibility);
             _visibilityFlags = scene.OpeningVisibilityFlags;
+            _enteringMeshes.Clear();
+            _transitionMaterials.Clear();
             _light = ResolveLight(scene.Sun);
             AcquireGeometry(scene);
             UpdateTextures(scene.Textures);
             UpdateProgramTextures(scene.ProgramTextures);
             UpdateLightmaps(scene.Lightmaps);
+            UploadEnvironmentCubes(scene.EnvironmentCubes);
+        }
+
+        /// <summary>
+        /// Selects the MapSkin (Variant) whose environment assets the shaders read. Skins sharing the
+        /// loaded container switch instantly, without reloading geometry.
+        /// </summary>
+        internal void SetMapSkin(string skin) => _mapSkin = skin;
+
+        private MapSkinEnvironmentData SelectedSkin() => _scene?.Terrain?.SkinFor(_mapSkin);
+
+        /// <summary>Uploads the terrain paint as the one-layer array TERRAIN_BLEND samples, replacing a sharper wave's predecessor.</summary>
+        private void UpdateTerrainPaint(MapTextureImage image)
+        {
+            if (ReferenceEquals(_terrainPaintImage, image))
+                return;
+            ReleaseTerrainPaint();
+            _terrainPaint = GlTextureArrayUploader.UploadSingleLayer(_gl, image);
+            _terrainPaintImage = image;
+        }
+
+        private void ReleaseTerrainPaint()
+        {
+            if (_terrainPaint != 0)
+                _gl.DeleteTexture(_terrainPaint);
+            _terrainPaint = 0;
+            _terrainPaintImage = null;
+        }
+
+        private void UploadEnvironmentCubes(IReadOnlyDictionary<MapTextureReference, VfxCubeMapData> cubes)
+        {
+            foreach ((MapTextureReference reference, VfxCubeMapData cube) in cubes ?? new Dictionary<MapTextureReference, VfxCubeMapData>())
+            {
+                uint texture = GlCubeMapUploader.Upload(_gl, cube, srgb: false);
+                if (texture != 0)
+                    _environmentCubes[reference] = texture;
+            }
         }
 
         internal void SetPreviewSun(MapSunData effectiveSun, MapSunPreviewOverride? previewOverride)
@@ -292,6 +342,11 @@ namespace AssetsManager.Services.Viewer.Rendering
             {
                 if (string.IsNullOrWhiteSpace(key) || image == null)
                     continue;
+                if (key == MapTerrainData.TerrainPaintKey)
+                {
+                    UpdateTerrainPaint(image);
+                    continue;
+                }
                 if (_programTextures.TryGetValue(key, out MaterialTexture current) &&
                     ReferenceEquals(current.Image, image))
                 {
@@ -375,7 +430,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 eye,
                 timeSeconds,
                 _previewSun,
-                Terrain: ResolveTerrainFrame());
+                Environment: ResolveEnvironmentFrame());
 
             DrawPlan solidPlan = _plan;
             if (shadersEnabled && solidMode == VfxPreviewViewMode.Lit && _gameShaderRuntime != null)
@@ -556,11 +611,14 @@ namespace AssetsManager.Services.Viewer.Rendering
                 MapGeometryMeshData mesh = group.MeshIndex >= 0 && group.MeshIndex < _scene.Geometry.Meshes.Count
                     ? _scene.Geometry.Meshes[group.MeshIndex]
                     : null;
+                MapMaterialDefinition material = _enteringMeshes.Count > 0 && _enteringMeshes.Contains(group.MeshIndex)
+                    ? TransitionMaterial(bound.Material)
+                    : bound.Material;
                 int passCount = shadersEnabled &&
                                 viewMode == VfxPreviewViewMode.Lit &&
                                 _gameShaderRuntime != null &&
-                                bound.Material?.Program != null
-                    ? _gameShaderRuntime.GetStaticPassCount(bound.Material)
+                                material?.Program != null
+                    ? _gameShaderRuntime.GetStaticPassCount(material)
                     : 0;
 
                 if (passCount > 0)
@@ -569,7 +627,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     for (int passIndex = 0; passIndex < passCount; passIndex++)
                     {
                         if (_gameShaderRuntime.TryBind(
-                                bound.Material,
+                                material,
                                 passIndex,
                                 mesh,
                                 bound.MeshDoubleSided,
@@ -626,25 +684,27 @@ namespace AssetsManager.Services.Viewer.Rendering
                 : null;
 
         /// <summary>
-        /// Terrain inputs for the current state: the base grass tint, and the tint of the active state
-        /// (e.g. Infernal) at full weight once it has loaded.
+        /// MapSkin inputs for the current state: the selected skin's grass tint for the active flags, at
+        /// full weight in the alternate sampler, and its environment cube. The tint switches with the
+        /// state, like the geometry of the preview's Layers.
         /// </summary>
-        private GameShaderRuntime.TerrainFrame ResolveTerrainFrame()
+        private GameShaderRuntime.EnvironmentFrame ResolveEnvironmentFrame()
         {
             MapTerrainData terrain = _scene?.Terrain;
             if (terrain == null)
                 return default;
 
-            uint grassTint = ResolveProgramTexture(MapTerrainData.GrassTintKey) ?? 0;
-            MapGrassTintAlternate alternate = terrain.AlternateFor(_visibilityFlags);
-            uint alternateTint = alternate == null
-                ? 0
-                : ResolveProgramTexture(MapTerrainData.AlternateGrassTintKey(alternate.Flag)) ?? 0;
-            return new GameShaderRuntime.TerrainFrame(
+            MapSkinEnvironmentData skin = SelectedSkin();
+            uint grassTint = ResolveProgramTexture(MapTerrainData.GrassTintKey(skin?.GrassTintFor(_visibilityFlags))) ?? 0;
+            MapTextureReference cube = skin?.EnvironmentCube;
+            return new GameShaderRuntime.EnvironmentFrame(
                 terrain.TerrainTransform,
                 grassTint,
-                alternateTint,
-                alternateTint != 0 ? 1f : 0f);
+                grassTint,
+                1f,
+                cube != null && _environmentCubes.TryGetValue(cube, out uint texture) ? texture : 0,
+                _terrainPaint,
+                SampleEnvironmentTransition());
         }
 
         private uint? ResolveLightmapTexture(string path) =>
@@ -1047,23 +1107,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UploadTextureLevel(BitmapSource source, int level, TextureSamplingSpace samplingSpace)
         {
-            BitmapSource bitmap = source;
-            if (bitmap.Format != PixelFormats.Bgra32)
-            {
-                var converted = new FormatConvertedBitmap();
-                converted.BeginInit();
-                converted.Source = bitmap;
-                converted.DestinationFormat = PixelFormats.Bgra32;
-                converted.EndInit();
-                converted.Freeze();
-                bitmap = converted;
-            }
-
-            int width = bitmap.PixelWidth;
-            int height = bitmap.PixelHeight;
-            int stride = checked(width * 4);
-            byte[] pixels = new byte[checked(height * stride)];
-            bitmap.CopyPixels(pixels, stride, 0);
+            (int width, int height, byte[] pixels) = GlBitmapPixels.ToBgra32(source);
             _gl.TexImage2D(
                 TextureTarget.Texture2D,
                 level,
@@ -1122,8 +1166,64 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             if (!_ready || _scene == null || state == null)
                 return;
+            DrawPlan previous = _plan;
+            int previousFlags = _visibilityFlags;
             _plan = BuildDrawPlan(_scene, state);
             _visibilityFlags = state.Flags;
+            StartEnvironmentTransition(
+                previous,
+                _plan,
+                _scene.Terrain?.TransitionSecondsFor(previousFlags, state.Flags) ?? 0f);
+        }
+
+        /// <summary>
+        /// Marks the meshes the new state adds whose material has the transition permutation, so they rise
+        /// into place as the game draws an entered state. Everything else switches immediately.
+        /// </summary>
+        private void StartEnvironmentTransition(DrawPlan previous, DrawPlan next, float seconds)
+        {
+            _enteringMeshes.Clear();
+            if (previous == null || next == null || seconds <= 0f)
+                return;
+
+            var before = previous.OpaqueGroups.Concat(previous.TransparentGroups)
+                .Select(group => group.MeshIndex)
+                .ToHashSet();
+            foreach (DrawGroup group in next.OpaqueGroups.Concat(next.TransparentGroups))
+            {
+                if (before.Contains(group.MeshIndex) ||
+                    group.BoundMaterialIndex < 0 ||
+                    group.BoundMaterialIndex >= next.Materials.Count ||
+                    !MapEnvironmentTransition.Supports(next.Materials[group.BoundMaterialIndex].Material?.Program))
+                {
+                    continue;
+                }
+                _enteringMeshes.Add(group.MeshIndex);
+            }
+
+            _transitionStartMs = Environment.TickCount64;
+            _transitionDurationMs = (long)(seconds * 1000f);
+        }
+
+        /// <summary>The transition factor this frame; the transition ends once it reaches 1.</summary>
+        private float SampleEnvironmentTransition()
+        {
+            if (_enteringMeshes.Count == 0)
+                return 1f;
+            float factor = MapEnvironmentTransition.Progress(_transitionStartMs, _transitionDurationMs, Environment.TickCount64);
+            if (factor >= 1f)
+                _enteringMeshes.Clear();
+            return factor;
+        }
+
+        private MapMaterialDefinition TransitionMaterial(MapMaterialDefinition material)
+        {
+            if (!_transitionMaterials.TryGetValue(material, out MapMaterialDefinition transitioning))
+            {
+                transitioning = material with { Program = MapEnvironmentTransition.Transitioning(material.Program) };
+                _transitionMaterials[material] = transitioning;
+            }
+            return transitioning;
         }
 
         internal static DrawPlan BuildDrawPlan(MapSceneData scene)
@@ -1348,6 +1448,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             foreach (MaterialTexture texture in _lightmapTextures.Values)
                 ReleaseRawTexture(texture.Image);
             _lightmapTextures.Clear();
+            foreach (uint cube in _environmentCubes.Values)
+                _gl.DeleteTexture(cube);
+            _environmentCubes.Clear();
+            ReleaseTerrainPaint();
 
             ReleaseGeometry();
 

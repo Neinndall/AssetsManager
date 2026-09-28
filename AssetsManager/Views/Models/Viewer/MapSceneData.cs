@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Vfx.Resources;
 using LeagueToolkit.Core.Meta;
 
 namespace AssetsManager.Views.Models.Viewer
@@ -38,8 +39,11 @@ namespace AssetsManager.Views.Models.Viewer
         public MapPostEffectsData PostEffects { get; }
         public MapSsaoData AmbientOcclusion { get; }
 
-        /// <summary>Terrain bounds and MapSkin grass tints read by the map shaders; null when the map declares none.</summary>
+        /// <summary>Terrain bounds and MapSkin environment assets read by the map shaders; null when the map declares none.</summary>
         public MapTerrainData Terrain { get; }
+
+        /// <summary>Decoded MapSkin environment cubes, keyed by the reference each skin declares.</summary>
+        public IReadOnlyDictionary<MapTextureReference, VfxCubeMapData> EnvironmentCubes { get; }
 
         public MapSceneData(
             MapSceneSource source,
@@ -64,7 +68,8 @@ namespace AssetsManager.Views.Models.Viewer
             MapLightGridData lightGrid = null,
             MapSceneVisibility visibility = null,
             BinTree sharedMaterials = null,
-            MapTerrainData terrain = null)
+            MapTerrainData terrain = null,
+            IReadOnlyDictionary<MapTextureReference, VfxCubeMapData> environmentCubes = null)
         {
             Source = source;
             Assets = assets;
@@ -89,6 +94,7 @@ namespace AssetsManager.Views.Models.Viewer
             PostEffects = postEffects;
             AmbientOcclusion = ambientOcclusion;
             Terrain = terrain;
+            EnvironmentCubes = environmentCubes ?? new Dictionary<MapTextureReference, VfxCubeMapData>();
         }
     }
 }

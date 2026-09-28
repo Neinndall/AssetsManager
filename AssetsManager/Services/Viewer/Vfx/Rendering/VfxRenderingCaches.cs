@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
@@ -54,33 +55,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal uint UploadCube(VfxCubeMapData cube)
         {
-            if (cube?.IsValid != true) return 0;
-
-            uint texture = _gl.GenTexture();
-            _gl.BindTexture(TextureTarget.TextureCubeMap, texture);
-            for (int face = 0; face < 6; face++)
-            {
-                TextureTarget target = (TextureTarget)((int)TextureTarget.TextureCubeMapPositiveX + face);
-                _gl.TexImage2D(
-                    target,
-                    0,
-                    InternalFormat.Rgba8,
-                    (uint)cube.Width,
-                    (uint)cube.Height,
-                    0,
-                    PixelFormat.Rgba,
-                    PixelType.UnsignedByte,
-                    new ReadOnlySpan<byte>(cube.Faces[face]));
-            }
-
-            // LTK uploads the six DDS faces in file order, without mipmaps or a face flip.
-            _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-            _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-            _gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapR, (int)TextureWrapMode.ClampToEdge);
-            _gl.BindTexture(TextureTarget.TextureCubeMap, 0);
-            _ownedTextures.Add(texture);
+            uint texture = GlCubeMapUploader.Upload(_gl, cube, srgb: false);
+            if (texture != 0)
+                _ownedTextures.Add(texture);
             return texture;
         }
 

@@ -433,6 +433,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void MapPostEffectProgramsCompileAndLinkOnDesktopOpenGl()
+        {
+            using var context = new HiddenWglContext();
+            using Silk.NET.OpenGL.GL gl = Silk.NET.OpenGL.GL.GetApi(context.GetProcAddress);
+            foreach (string fragment in new[]
+                     {
+                         AssetsManager.Services.Viewer.Rendering.MapPostEffectsRenderer.OcclusionFragment,
+                         AssetsManager.Services.Viewer.Rendering.MapPostEffectsRenderer.BlurFragment,
+                         AssetsManager.Services.Viewer.Rendering.MapPostEffectsRenderer.PostFragment
+                     })
+            {
+                uint program = AssetsManager.Utils.Rendering.GlShaderCompiler.CreateProgram(
+                    gl,
+                    false,
+                    AssetsManager.Services.Viewer.Rendering.MapPostEffectsRenderer.FullscreenVertex,
+                    fragment);
+                Assert.NotEqual(0u, program);
+                gl.DeleteProgram(program);
+            }
+        }
+
+        [Fact]
         public void ScreenTexturesFlipUvReadsAndKeepFragCoordFetches()
         {
             const string source =

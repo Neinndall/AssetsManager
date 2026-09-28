@@ -90,7 +90,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             MapSunData Sun,
             MapLightGridData LightGrid = null,
             Vector3 CharacterPosition = default,
-            TerrainFrame Terrain = default,
+            EnvironmentFrame Environment = default,
             uint SceneColor = 0,
             uint SceneDepth = 0);
 
@@ -98,18 +98,23 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal const string SceneDepthTexture = "sDepthTexture_SharedTexture";
 
         /// <summary>
-        /// Terrain inputs of the map shaders: <c>TERRAIN_XFORM</c>, the grass tint maps it addresses and
-        /// the <c>GRASS_INTERP</c> weight from the base tint to the tint of the active map state.
-        /// Zero textures fall back to the neutral white tint.
+        /// MapSkin inputs of the map shaders: <c>TERRAIN_XFORM</c>, the grass tint maps it addresses with
+        /// the <c>GRASS_INTERP</c> weight of the alternate tint, and the environment cube of reflective
+        /// materials. Zero textures fall back to the neutral tint and a black cube.
         /// </summary>
-        internal readonly record struct TerrainFrame(
-            Vector4 Transform,
+        internal readonly record struct EnvironmentFrame(
+            Vector4 TerrainTransform,
             uint GrassTint,
             uint GrassTintAlternate,
-            float GrassInterp);
+            float GrassInterp,
+            uint EnvironmentCube = 0,
+            uint TerrainPaint = 0,
+            float TransitionFactor = 1f);
 
         internal const string GrassTintTexture = "GRASS_TINT_MAP_SharedTexture";
         internal const string GrassTintAlternateTexture = "GRASS_TINT_MAP_ALTERNATE_SharedTexture";
+        internal const string EnvironmentCubeTexture = "ENV_CUBE_SharedTexture";
+        internal const string TerrainPaintTexture = "TERRAIN_BLEND_SharedTexture";
         private const string MeshCenter = "MESH_CENTER";
 
         private readonly record struct CharacterDraw(
@@ -699,6 +704,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         WriteVector4(block.Data, 4, 4, Vector4.One);
                         Set(block.Data, 10, particle.DepthPushPull);
                         break;
+                    case "EnvironmentTransitionVertexCB":
+                    case "EnvironmentTransitionPixelCB":
+                        // TransitionFactorAndDirection: the shaders read the factor from z; x marks an entering state.
+                        WriteVector3(block.Data, 0, new Vector3(1f, 0f, frame.Environment.TransitionFactor));
+                        break;
                     case "BonesCB" when character.HasValue:
                         WriteBones(block.Data, character.Value);
                         break;
@@ -791,7 +801,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             WriteClipRows(data, 0, clip);
             WriteVector3(data, 16, eye);
             Set(data, 20, frame.TimeSeconds);
-            WriteVector4(data, 24, 4, frame.Terrain.Transform);
+            WriteVector4(data, 24, 4, frame.Environment.TerrainTransform);
             WriteClipRows(data, 28, clip);
             WriteMatrixRows(data, 96, frame.View);
             WriteMatrixRows(data, 112, cameraWorld);
@@ -815,7 +825,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
             WriteVector3(data, 0, eye);
             Set(data, 4, frame.TimeSeconds);
-            WriteVector4(data, 8, 4, frame.Terrain.Transform);
+            WriteVector4(data, 8, 4, frame.Environment.TerrainTransform);
             WriteVector3(data, 12, shadow);
             Set(data, 15, 1f);
             WriteVector3(data, 16, complement);
@@ -845,7 +855,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             }
             WriteMatrixRows(data, 68, frame.View);
             // GRASS_INTERP (float4 at 64): VertexDeform blends the two grass tints by its y component.
-            Set(data, 65, frame.Terrain.GrassInterp);
+            Set(data, 65, frame.Environment.GrassInterp);
             WriteMatrixRows(data, 104, cameraWorld);
         }
 
@@ -1042,9 +1052,25 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     target = TextureTarget.Texture2D;
                     samplerObject = ResolveNeutralSampler(clamp: true);
                 }
+                else if (name == EnvironmentCubeTexture &&
+                         sampler.Dimension == GameShaderTranslator.TextureDimension.Cube &&
+                         frame.Environment.EnvironmentCube != 0)
+                {
+                    texture = frame.Environment.EnvironmentCube;
+                    target = TextureTarget.TextureCubeMap;
+                    samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
+                }
+                else if (name == TerrainPaintTexture &&
+                         sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2DArray &&
+                         frame.Environment.TerrainPaint != 0)
+                {
+                    texture = frame.Environment.TerrainPaint;
+                    target = TextureTarget.Texture2DArray;
+                    samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
+                }
                 else if (IsMultiplicativeSharedTexture(name, sampler.Dimension))
                 {
-                    uint tint = GrassTintFor(name, frame.Terrain);
+                    uint tint = GrassTintFor(name, frame.Environment);
                     texture = tint != 0 ? tint : NeutralWhite2D();
                     target = TextureTarget.Texture2D;
                     samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
@@ -1113,10 +1139,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         }
 
         /// <summary>The MapSkin grass tint bound to a grass tint sampler; the alternate falls back to the base tint.</summary>
-        internal static uint GrassTintFor(string name, in TerrainFrame terrain) => name switch
+        internal static uint GrassTintFor(string name, in EnvironmentFrame environment) => name switch
         {
-            GrassTintTexture => terrain.GrassTint,
-            GrassTintAlternateTexture => terrain.GrassTintAlternate != 0 ? terrain.GrassTintAlternate : terrain.GrassTint,
+            GrassTintTexture => environment.GrassTint,
+            GrassTintAlternateTexture => environment.GrassTintAlternate != 0 ? environment.GrassTintAlternate : environment.GrassTint,
             _ => 0
         };
 

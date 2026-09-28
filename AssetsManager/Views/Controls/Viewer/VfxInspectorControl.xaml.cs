@@ -983,9 +983,14 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ReloadSelectedMapVariant()
         {
-            // Skins sharing the loaded container draw the same geometry; reloading it would change nothing.
+            // Skins sharing the loaded container draw the same geometry; only their environment assets
+            // (grass tint, reflection cube) change, so switch those instead of reloading the map.
             if (MapVariantData.Draws(_model.SelectedMapVariant, _mapSceneRuntime?.Scene?.Source?.Map))
+            {
+                _mapGeometryRenderer?.SetMapSkin(_model.SelectedMapVariant.Skin);
+                OpenTkControl?.InvalidateVisual();
                 return;
+            }
 
             MapSceneSource source = ResolveMapVariantSource(_model.SelectedMapVariant);
             if (source == null)
@@ -3979,6 +3984,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     _mapGeometryRenderer.LoadScene(_mapSceneRuntime.Scene);
                     _mapGeometryRenderer.SetVisibility(_mapSceneRuntime.Visibility);
+                    _mapGeometryRenderer.SetMapSkin(
+                        MapVariantData.Draws(_model.SelectedMapVariant, _mapSceneRuntime.Scene.Source?.Map)
+                            ? _model.SelectedMapVariant.Skin
+                            : null);
                     _mapGeometryRenderer.SetPreviewSun(EffectiveMapSun(), _mapSunPreviewOverride);
                     // Backdrop loads publish geometry before texture waves. A preview wave may finish
                     // before the first GL frame, so LoadScene's immutable scene dictionaries can still

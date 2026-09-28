@@ -166,6 +166,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 mapDocument,
                 source.Map,
                 _hashResolver == null ? null : _hashResolver.ResolveHash);
+            IReadOnlyDictionary<MapTextureReference, VfxCubeMapData> environmentCubes =
+                await LoadEnvironmentCubesAsync(terrain, source.ProjectRoot, cancellationToken);
             IReadOnlyDictionary<string, MapTextureImage> textures = includePreviewTextures
                 ? await _textureLoadingService.LoadPreviewAsync(
                     materialDefinitions,
@@ -222,7 +224,39 @@ namespace AssetsManager.Services.Viewer.Loading
                 lightGrid,
                 visibility,
                 sharedMaterials,
-                terrain);
+                terrain,
+                environmentCubes);
+        }
+
+        /// <summary>
+        /// Decodes the environment cube of every MapSkin drawing the container. A missing or flat
+        /// texture leaves that skin without reflections instead of failing the scene.
+        /// </summary>
+        private async Task<IReadOnlyDictionary<MapTextureReference, VfxCubeMapData>> LoadEnvironmentCubesAsync(
+            MapTerrainData terrain,
+            string projectRoot,
+            CancellationToken cancellationToken)
+        {
+            var cubes = new Dictionary<MapTextureReference, VfxCubeMapData>();
+            foreach (MapTextureReference reference in terrain?.EnvironmentCubes ?? Enumerable.Empty<MapTextureReference>())
+            {
+                MapResolvedAsset asset = await _assetResolver.ResolveReferenceAsync(
+                    new MapAssetReference(reference.VirtualPath, reference.PathHash),
+                    projectRoot,
+                    cancellationToken);
+                if (asset == null)
+                    continue;
+
+                await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
+                if (stream == null)
+                    continue;
+                VfxCubeMapData cube = await Task.Run(() => VfxCubeMapDecoder.Decode(stream), cancellationToken);
+                if (cube?.IsValid == true)
+                    cubes[reference] = cube;
+                else
+                    _logService?.LogDebug($"MAP environment cube '{reference.VirtualPath ?? $"0x{reference.PathHash:x16}"}' is not a six-face DDS.");
+            }
+            return cubes;
         }
 
         /// <summary>

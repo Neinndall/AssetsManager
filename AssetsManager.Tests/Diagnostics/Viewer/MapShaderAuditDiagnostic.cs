@@ -152,13 +152,22 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             Console.WriteLine($"[MapShader] bakedLightMeshes={scene.Geometry.Meshes.Count(mesh => mesh.BakedLight?.IsEmpty == false)} stationaryLightMeshes={scene.Geometry.Meshes.Count(mesh => mesh.StationaryLight?.IsEmpty == false)} lightGrid={lightGrid ?? "-"} loadedGrid={(scene.LightGrid == null ? "-" : $"{scene.LightGrid.Width}x{scene.LightGrid.Height} scale={scene.LightGrid.Scale} fullBright={scene.LightGrid.FullBright}")}.");
 
             MapTerrainData terrain = scene.Terrain;
+            static string Name(MapTextureReference texture) =>
+                texture == null ? "-" : texture.VirtualPath ?? $"0x{texture.PathHash:x16}";
             Console.WriteLine(terrain == null
                 ? "[MapShader] terrain=-"
                 : $"[MapShader] terrain bounds={terrain.BoundsMin}..{terrain.BoundsMax} xform={terrain.TerrainTransform} " +
-                  $"grassTint={terrain.GrassTint?.VirtualPath ?? $"0x{terrain.GrassTint?.PathHash:x16}"} " +
-                  $"alternates={string.Join(", ", terrain.GrassTintAlternates.Select(alternate => $"0x{alternate.Flag:x2}:{alternate.Texture.VirtualPath ?? $"0x{alternate.Texture.PathHash:x16}"}"))}.");
+                  $"transitions={string.Join(", ", terrain.TransitionSeconds.Select(pair => $"0x{pair.Key:x2}:{pair.Value}s"))} " +
+                  $"opening={terrain.SkinFor(null)?.Name}.");
             if (terrain != null)
             {
+                foreach (MapSkinEnvironmentData skin in terrain.Skins)
+                {
+                    Console.WriteLine(
+                        $"[MapShader] skin {skin.Name}: grassTint={Name(skin.GrassTint)} cube={Name(skin.EnvironmentCube)} " +
+                        $"cubeLoaded={(skin.EnvironmentCube != null && scene.EnvironmentCubes.TryGetValue(skin.EnvironmentCube, out var cube) ? $"{cube.Width}px" : "no")} " +
+                        $"alternates={string.Join(", ", skin.GrassTintAlternates.Select(alternate => $"0x{alternate.Flag:x2}:{Name(alternate.Texture)}"))}.");
+                }
                 IReadOnlyDictionary<string, MapTextureImage> programTextures = await sceneLoader.LoadPreviewProgramTexturesAsync(scene);
                 Console.WriteLine("[MapShader] terrainTextures=" + string.Join(", ", terrain.TextureRequests.Select(request =>
                     $"{request.Key}:{(programTextures.TryGetValue(request.Key, out MapTextureImage image) ? $"{image.BaseLevel.PixelWidth}px" : "missing")}")));
@@ -193,8 +202,11 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 
                 materialPrograms++;
                 bool materialReady = false;
-                foreach (GameMaterialPass pass in program.Passes)
+                // AM_SHADER_DEFINES=NAME=VALUE;... overrides pass defines, to read the inputs of other permutations.
+                string overrides = Environment.GetEnvironmentVariable("AM_SHADER_DEFINES");
+                foreach (GameMaterialPass authored in program.Passes)
                 {
+                    GameMaterialPass pass = WithDefines(authored, overrides);
                     passes++;
                     GameShaderProgramResolver.ShaderBytecodeRead read =
                         GameShaderProgramResolver.Read(pass, program.Kind, settings);
@@ -274,6 +286,20 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var particleUsage = new ShaderInputUsage();
             particleUsage.CollectParticles(runtimeEmitters.Where(emitter => !emitter.Disabled), "map", settings);
             particleUsage.Print("MapParticleShader");
+        }
+
+        private static GameMaterialPass WithDefines(GameMaterialPass pass, string overrides)
+        {
+            if (string.IsNullOrWhiteSpace(overrides))
+                return pass;
+
+            var defines = pass.Defines.ToDictionary(define => define.Name, StringComparer.Ordinal);
+            foreach (string entry in overrides.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] parts = entry.Split('=', 2);
+                defines[parts[0]] = new GameMaterialDefine(parts[0], parts.Length > 1 ? parts[1] : "1", GameMaterialDefineSource.Pass);
+            }
+            return pass with { Defines = defines.Values.ToArray() };
         }
 
         private static void AddFailure(IDictionary<string, int> failures, string failure)

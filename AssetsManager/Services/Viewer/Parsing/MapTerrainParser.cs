@@ -11,8 +11,9 @@ using LeagueToolkit.Hashing;
 namespace AssetsManager.Services.Viewer.Parsing
 {
     /// <summary>
-    /// Reads the terrain inputs of the map shaders: the MapContainer bounds and the grass tint maps of
-    /// the MapSkin that draws the container, including its per-state <c>mAlternateAssets</c> tints.
+    /// Reads the terrain inputs of the map shaders: the MapContainer bounds, the environment assets of
+    /// every MapSkin that draws the container (grass tints, per-state <c>mAlternateAssets</c> tints and
+    /// environment cube) and the transition time of each primary visibility flag.
     /// </summary>
     internal static class MapTerrainParser
     {
@@ -26,6 +27,12 @@ namespace AssetsManager.Services.Viewer.Parsing
         private static readonly uint FlagDefinitionsField = Fnv1a.HashLower("FlagDefinitions");
         private static readonly uint FlagNameField = Fnv1a.HashLower("name");
         private static readonly uint BitIndexField = Fnv1a.HashLower("BitIndex");
+        private static readonly uint TransitionTimeField = Fnv1a.HashLower("TransitionTime");
+        private static readonly uint TerrainPaintClass = Fnv1a.HashLower("MapTerrainPaint");
+        private static readonly uint TerrainPaintTextureField = Fnv1a.HashLower("TerrainPaintTexturePath");
+
+        // Unnamed MapSkin field holding the environment cube (assets/maps/deprecated/<map>/env_cubemap.dds).
+        internal const uint EnvironmentCubeField = 0xd0a4e40b;
 
         internal static MapTerrainData Parse(
             BinTree materials,
@@ -36,28 +43,53 @@ namespace AssetsManager.Services.Viewer.Parsing
             if (map == null)
                 return null;
 
-            BinTreeObject skin = FindSkin(mapDocument, map);
-            MapTextureReference grassTint = skin == null ? null : ReadTexture(skin.Properties, GrassTintField, resolveWadPath);
-            IReadOnlyList<MapGrassTintAlternate> alternates = skin == null
-                ? Array.Empty<MapGrassTintAlternate>()
-                : ReadAlternates(skin.Properties, PrimaryFlagsByName(mapDocument), resolveWadPath);
-            if (grassTint == null && alternates.Count == 0)
+            IReadOnlyList<FlagDefinition> flags = ReadPrimaryFlags(mapDocument);
+            var flagsByName = new Dictionary<uint, int>();
+            foreach (FlagDefinition flag in flags)
+                flagsByName.TryAdd(flag.NameHash, flag.Flag);
+
+            MapSkinEnvironmentData[] skins = FindSkins(mapDocument, map)
+                .Select(skin => ReadSkin(skin, flagsByName, resolveWadPath))
+                .Where(skin => skin.GrassTint != null || skin.GrassTintAlternates.Count > 0 || skin.EnvironmentCube != null)
+                .ToArray();
+            BinTreeObject container = FindContainer(materials, map);
+            MapTextureReference terrainPaint = ReadTerrainPaint(container, resolveWadPath);
+            if (skins.Length == 0 && terrainPaint == null)
                 return null;
 
-            BinTreeObject container = FindContainer(materials, map);
             Vector2 min = ReadVector2(container?.Properties, BoundsMinField) ?? Vector2.Zero;
             Vector2 max = ReadVector2(container?.Properties, BoundsMaxField) ?? Vector2.Zero;
-            return new MapTerrainData(min, max, grassTint, alternates);
+            var transitions = flags
+                .Where(flag => flag.TransitionSeconds > 0f)
+                .GroupBy(flag => flag.Flag)
+                .ToDictionary(group => group.Key, group => group.First().TransitionSeconds);
+            return new MapTerrainData(min, max, skins, transitions, terrainPaint);
         }
 
-        /// <summary>
-        /// The MapSkin drawing the container, chosen with the variant opening rule (Default first,
-        /// then authored order of the Map object's skin list).
-        /// </summary>
-        private static BinTreeObject FindSkin(BinTree mapDocument, MapPath map)
+        /// <summary>The MapTerrainPaint component of the container: the texture TERRAIN_BLEND samples.</summary>
+        private static MapTextureReference ReadTerrainPaint(BinTreeObject container, Func<ulong, string> resolveWadPath)
+        {
+            if (container == null ||
+                !container.Properties.TryGetValue(MapSunParser.ComponentsField, out BinTreeProperty property) ||
+                property is not BinTreeContainer components)
+            {
+                return null;
+            }
+
+            return components.Elements
+                .OfType<BinTreeStruct>()
+                .Where(component => component.ClassHash == TerrainPaintClass)
+                .Select(component => ReadTexture(component.Properties, TerrainPaintTextureField, resolveWadPath))
+                .FirstOrDefault(texture => texture != null);
+        }
+
+        private readonly record struct FlagDefinition(uint NameHash, int Flag, float TransitionSeconds);
+
+        /// <summary>MapSkins drawing the container, in the authored order of the Map object's skin list.</summary>
+        private static IEnumerable<BinTreeObject> FindSkins(BinTree mapDocument, MapPath map)
         {
             if (mapDocument?.Objects == null)
-                return null;
+                return Array.Empty<BinTreeObject>();
 
             BinTreeObject owner = mapDocument.Objects.Values.FirstOrDefault(entry => entry.ClassHash == MapVariantParser.MapClass);
             IEnumerable<BinTreeObject> authored = owner != null &&
@@ -67,19 +99,25 @@ namespace AssetsManager.Services.Viewer.Parsing
                     .OfType<BinTreeObjectLink>()
                     .Select(link => mapDocument.Objects.GetValueOrDefault(link.Value))
                 : mapDocument.Objects.Values;
-            BinTreeObject[] drawing = authored
-                .Where(entry => entry?.ClassHash == MapVariantParser.MapSkinClass && Draws(entry, map))
+            return authored
+                .Where(entry => entry?.ClassHash == MapVariantParser.MapSkinClass &&
+                                string.Equals(
+                                    ReadString(entry.Properties, MapVariantParser.ContainerLinkField),
+                                    map.Value,
+                                    StringComparison.OrdinalIgnoreCase))
+                .Distinct()
                 .ToArray();
-            return drawing.FirstOrDefault(entry =>
-                       string.Equals(ReadString(entry.Properties, MapVariantParser.SkinNameField), "default", StringComparison.OrdinalIgnoreCase)) ??
-                   drawing.FirstOrDefault();
         }
 
-        private static bool Draws(BinTreeObject skin, MapPath map) =>
-            string.Equals(
-                ReadString(skin.Properties, MapVariantParser.ContainerLinkField),
-                map.Value,
-                StringComparison.OrdinalIgnoreCase);
+        private static MapSkinEnvironmentData ReadSkin(
+            BinTreeObject skin,
+            IReadOnlyDictionary<uint, int> flagsByName,
+            Func<ulong, string> resolveWadPath) =>
+            new(
+                ReadString(skin.Properties, MapVariantParser.SkinNameField),
+                ReadTexture(skin.Properties, GrassTintField, resolveWadPath),
+                ReadAlternates(skin.Properties, flagsByName, resolveWadPath),
+                ReadTexture(skin.Properties, EnvironmentCubeField, resolveWadPath));
 
         private static BinTreeObject FindContainer(BinTree materials, MapPath map)
         {
@@ -91,10 +129,9 @@ namespace AssetsManager.Services.Viewer.Parsing
                 : materials.Objects.Values.FirstOrDefault(entry => entry.ClassHash == MapVariantParser.MapContainerClass);
         }
 
-        /// <summary>Primary visibility flag bits of the Map object, keyed by their hashed name.</summary>
-        private static IReadOnlyDictionary<uint, int> PrimaryFlagsByName(BinTree mapDocument)
+        /// <summary>Primary visibility flags of the Map object: hashed name, bit and transition time.</summary>
+        private static IReadOnlyList<FlagDefinition> ReadPrimaryFlags(BinTree mapDocument)
         {
-            var flags = new Dictionary<uint, int>();
             BinTreeObject owner = mapDocument?.Objects?.Values.FirstOrDefault(entry => entry.ClassHash == MapVariantParser.MapClass);
             if (owner == null ||
                 !owner.Properties.TryGetValue(VisibilityFlagDefinesField, out BinTreeProperty definesProperty) ||
@@ -102,9 +139,10 @@ namespace AssetsManager.Services.Viewer.Parsing
                 !defines.Properties.TryGetValue(FlagDefinitionsField, out BinTreeProperty listProperty) ||
                 listProperty is not BinTreeContainer list)
             {
-                return flags;
+                return Array.Empty<FlagDefinition>();
             }
 
+            var flags = new List<FlagDefinition>();
             foreach (BinTreeStruct definition in list.Elements.OfType<BinTreeStruct>())
             {
                 if (!definition.Properties.TryGetValue(FlagNameField, out BinTreeProperty nameProperty) ||
@@ -116,8 +154,12 @@ namespace AssetsManager.Services.Viewer.Parsing
                           bitProperty is BinTreeU8 value
                     ? value.Value
                     : 0;
+                float seconds = definition.Properties.TryGetValue(TransitionTimeField, out BinTreeProperty timeProperty) &&
+                                timeProperty is BinTreeF32 time
+                    ? time.Value
+                    : 0f;
                 if (bit is >= 0 and <= 7)
-                    flags.TryAdd(name.Value, 1 << bit);
+                    flags.Add(new FlagDefinition(name.Value, 1 << bit, seconds));
             }
             return flags;
         }
