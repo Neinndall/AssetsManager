@@ -326,6 +326,11 @@ namespace AssetsManager.Tests.Diagnostics
                 ShaderSpirvInspectDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "shader-permutation-probe", StringComparison.OrdinalIgnoreCase))
+            {
+                ShaderPermutationProbeDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "shader-cache-sweep", StringComparison.OrdinalIgnoreCase))
             {
                 ShaderCacheSweepDiagnostic.Run(args.Skip(1).ToArray());

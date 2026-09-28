@@ -34,7 +34,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             byte[] Pixel,
             ShaderReflectionData VertexReflection,
             ShaderReflectionData PixelReflection,
-            string ShaderCachePath);
+            string ShaderCachePath,
+            string Fallback = null);
 
         internal sealed record ShaderBytecodeRead(ShaderBytecodeProgram Program, string Failure)
         {
@@ -188,20 +189,38 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 return new ShaderBytecodeRead(null, "The pass links no shader the defs declare.");
 
             IReadOnlyList<GameMaterialDefine> defines = BuildDefineList(pass, kind, lowQuality);
+            string vertexPath = ShaderPathForStage(pass, vertexStage: true);
+            string pixelPath = ShaderPathForStage(pass, vertexStage: false);
             try
             {
-                byte[] vertex = ReadStage(wad, ShaderPathForStage(pass, vertexStage: true), "vs", defines);
-                byte[] pixel = ReadStage(wad, ShaderPathForStage(pass, vertexStage: false), "ps", defines);
-                ShaderReflectionData vertexReflection = DxbcReflection.Reflect(vertex);
-                ShaderReflectionData pixelReflection = DxbcReflection.Reflect(pixel);
+                // The pixel stage declares the most switches, so it picks any fallback first and the vertex
+                // stage follows those defines, keeping the varyings both stages agree on.
+                StageRead pixel = ReadStage(wad, pixelPath, "ps", defines);
+                IReadOnlyList<GameMaterialDefine> resolved = Apply(defines, pixel.Match);
+                StageRead vertex = ReadStage(wad, vertexPath, "vs", resolved);
+                if (!vertex.Match.Exact)
+                {
+                    resolved = Apply(resolved, vertex.Match);
+                    StageRead aligned = ReadStage(wad, pixelPath, "ps", resolved, fallback: false);
+                    if (aligned != null)
+                        pixel = aligned;
+                }
+
+                ShaderReflectionData vertexReflection = DxbcReflection.Reflect(vertex.Bytecode);
+                ShaderReflectionData pixelReflection = DxbcReflection.Reflect(pixel.Bytecode);
+                string[] changes = pixel.Match.Changes.Concat(vertex.Match.Changes)
+                    .Select(change => change.ToString())
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
                 return new ShaderBytecodeRead(
                     new ShaderBytecodeProgram(
-                        defines,
-                        vertex,
-                        pixel,
+                        resolved,
+                        vertex.Bytecode,
+                        pixel.Bytecode,
                         vertexReflection,
                         pixelReflection,
-                        cachePath),
+                        cachePath,
+                        changes.Length == 0 ? null : string.Join(" ", changes)),
                     null);
             }
             catch (Exception ex)
@@ -269,40 +288,57 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal static string BundlePath(string tocPath, uint shaderId) =>
             $"{tocPath}_{RecordsPerBundle * (shaderId / RecordsPerBundle)}";
 
-        private static byte[] ReadStage(
+        private sealed record StageRead(byte[] Bytecode, GameShaderPermutationLookup.Match Match);
+
+        /// <returns>
+        /// The stage bytecode of the exact permutation, or of the nearest one when the game never compiled the
+        /// requested define set. Without <paramref name="fallback"/>, a missing exact permutation returns null.
+        /// </returns>
+        private static StageRead ReadStage(
             WadFile wad,
             string shaderObjectPath,
             string stage,
-            IReadOnlyList<GameMaterialDefine> defines)
+            IReadOnlyList<GameMaterialDefine> defines,
+            bool fallback = true)
         {
             string tocPath = TocPath(shaderObjectPath, stage);
             using var tocBytes = wad.LoadChunkDecompressed(XxHash64Ext.Hash(tocPath));
             using var tocStream = new MemoryStream(tocBytes.Span.ToArray(), writable: false);
             var toc = new ShaderToc(tocStream);
 
-            var requested = defines
-                .Select(define => new ShaderMacroDefinition(define.Name, define.Value))
-                .Where(define => toc.BaseDefines.Any(baseDefine => baseDefine.Hash == define.Hash))
-                .OrderBy(define => define.Name, StringComparer.Ordinal)
-                .ToArray();
-            string key = string.Concat(requested.Select(define => define.ToString()));
-            ulong permutationHash = XxHash64Ext.Hash(key);
-            int permutationIndex = -1;
-            for (int index = 0; index < toc.ShaderHashes.Count; index++)
+            var pairs = defines.Select(define => new KeyValuePair<string, string>(define.Name, define.Value)).ToArray();
+            GameShaderPermutationLookup.Match match = GameShaderPermutationLookup.Find(toc, pairs, fallback);
+            if (match == null)
             {
-                if (toc.ShaderHashes[index] == permutationHash)
-                {
-                    permutationIndex = index;
-                    break;
-                }
+                if (!fallback)
+                    return null;
+                throw new InvalidOperationException(
+                    $"Shader permutation not found for {shaderObjectPath}.{stage}: {GameShaderPermutationLookup.Key(pairs, toc.BaseDefines)}");
             }
-            if (permutationIndex < 0)
-                throw new InvalidOperationException($"Shader permutation not found for {shaderObjectPath}.{stage}: {key}");
 
-            uint shaderId = toc.ShaderIds[permutationIndex];
+            uint shaderId = toc.ShaderIds[match.Index];
             string bundlePath = BundlePath(tocPath, shaderId);
             using var bundleBytes = wad.LoadChunkDecompressed(XxHash64Ext.Hash(bundlePath));
-            return ReadBundleRecord(bundleBytes.Span, shaderId % RecordsPerBundle);
+            return new StageRead(ReadBundleRecord(bundleBytes.Span, shaderId % RecordsPerBundle), match);
+        }
+
+        /// <returns><paramref name="defines"/> with the define changes a permutation fallback made.</returns>
+        private static IReadOnlyList<GameMaterialDefine> Apply(
+            IReadOnlyList<GameMaterialDefine> defines,
+            GameShaderPermutationLookup.Match match)
+        {
+            if (match.Exact)
+                return defines;
+
+            var byName = defines.ToDictionary(define => define.Name, StringComparer.Ordinal);
+            foreach (GameShaderPermutationLookup.Change change in match.Changes)
+            {
+                if (change.Value == null)
+                    byName.Remove(change.Name);
+                else
+                    byName[change.Name] = new GameMaterialDefine(change.Name, change.Value, GameMaterialDefineSource.Feature);
+            }
+            return byName.Values.OrderBy(define => define.Name, StringComparer.Ordinal).ToArray();
         }
 
         internal static byte[] ReadBundleRecord(ReadOnlySpan<byte> bundle, uint index)

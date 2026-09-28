@@ -20,6 +20,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         private readonly Dictionary<string, HashSet<string>> _members = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<string>> _sharedTextures = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<string>> _failures = new(StringComparer.Ordinal);
+        // Passes whose requested define set the game never compiled, keyed by the nearest permutation's changes.
+        private readonly Dictionary<string, HashSet<string>> _fallbacks = new(StringComparer.Ordinal);
         private readonly HashSet<string> _seenParticlePrograms = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<string>> _shaders = new(StringComparer.Ordinal);
         // Identical bytecode pairs translate once; later owners reuse the result.
@@ -45,6 +47,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     continue;
                 }
 
+                if (read.Program.Fallback != null)
+                    Add(_fallbacks, $"{pass.ShaderPath}: {read.Program.Fallback}", owner);
                 string label = $"{owner}[{pass.ShaderPath?.Split('/').LastOrDefault()}]";
                 Add(_shaders, pass.ShaderPath ?? "?", owner);
                 string parameterFilter = Environment.GetEnvironmentVariable("AM_SHADER_PARAMS");
@@ -54,7 +58,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     foreach (GameMaterialParameter parameter in pass.Parameters ?? Array.Empty<GameMaterialParameter>())
                         Console.WriteLine($"[Params] {label} {parameter}");
                     foreach (GameMaterialTexture texture in pass.Textures ?? Array.Empty<GameMaterialTexture>())
-                        Console.WriteLine($"[Params] {label} texture {texture.Name}={texture.Texture?.VirtualPath}");
+                        Console.WriteLine($"[Params] {label} texture {texture.Name}={texture.Texture?.VirtualPath} sampler={texture.Sampler}");
                 }
                 var key = (System.IO.Hashing.XxHash64.HashToUInt64(read.Program.Vertex),
                            System.IO.Hashing.XxHash64.HashToUInt64(read.Program.Pixel));
@@ -71,7 +75,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                         continue;
                     }
                     _translations[key] = stages = translated.Program;
-                    Dump(stages, label);
+                    Dump(stages, $"{label}_{key.Item2:x16}");
                 }
 
                 Translated++;
@@ -118,6 +122,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             Console.WriteLine($"[{tag}] passes={Passes} translated={Translated}/{Passes} uniquePrograms={_translations.Count}.");
             foreach ((string failure, HashSet<string> owners) in _failures.OrderByDescending(pair => pair.Value.Count).Take(10))
                 Console.WriteLine($"[{tag}] FAIL x{owners.Count}: {failure} e.g. {string.Join(", ", owners.Take(5))}");
+            foreach ((string fallback, HashSet<string> owners) in _fallbacks.OrderByDescending(pair => pair.Value.Count))
+                Console.WriteLine($"[{tag}] FALLBACK x{owners.Count}: {fallback} e.g. {string.Join(", ", owners.Take(5))}");
             Print(tag, "shader", _shaders);
             Print(tag, "attribute", _attributes);
             Print(tag, "engine", _members);
