@@ -323,6 +323,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             throw new InvalidDataException($"Shader bundle ends before record {index}.");
         }
 
+        // The engine's default sampler state wraps on every axis (LTK SamplerState::default); critter UVs span 0..2.
         public static GameMaterialProgram CreateDefaultSkinnedProgram(
             string diffuseTextureKey,
             string emissiveTextureKey = null)
@@ -337,9 +338,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     GameMaterialTextureSource.Fallback,
                     new GameMaterialSamplerState(
                         null,
-                        MapTextureWrap.Clamp,
-                        MapTextureWrap.Clamp,
-                        MapTextureWrap.Clamp,
+                        MapTextureWrap.Repeat,
+                        MapTextureWrap.Repeat,
+                        MapTextureWrap.Repeat,
                         FilterMin: true,
                         FilterMag: true))
             };
@@ -352,9 +353,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     GameMaterialTextureSource.Fallback,
                     new GameMaterialSamplerState(
                         null,
-                        MapTextureWrap.Clamp,
-                        MapTextureWrap.Clamp,
-                        MapTextureWrap.Clamp,
+                        MapTextureWrap.Repeat,
+                        MapTextureWrap.Repeat,
+                        MapTextureWrap.Repeat,
                         FilterMin: true,
                         FilterMag: true)));
             }
