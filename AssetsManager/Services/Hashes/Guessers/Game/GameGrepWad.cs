@@ -178,6 +178,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessSkinRoleTextures(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessSkinCharacterBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
+                    GuessSiblingLinkPaths(engine, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                 }
 
                 GuessChampionSpecialBins(engine, sourceWadPath, cancellationToken);
@@ -254,6 +255,108 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             }
 
             CheckGameCandidates(GrepFile(data, cancellationToken));
+        }
+
+        /// <summary>
+        /// An unresolved texture link often lives next to its own name and to files in its folder
+        /// (TFT shop data carries its item name and paths under the unit's images folder). Every
+        /// sibling folder is combined with every sibling identifier of the same struct.
+        /// </summary>
+        private void GuessSiblingLinkPaths(
+            HashGuessEngine engine,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken,
+            Func<BinTree> binTreeFactory)
+        {
+            BinTree tree;
+            try
+            {
+                tree = binTreeFactory();
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                return;
+            }
+            if (tree == null) return;
+            IReadOnlyDictionary<ulong, string> knownPaths = null;
+
+            foreach (BinTreeObject item in tree.Objects.Values)
+                VisitScope(item.Properties.Values);
+
+            void VisitScope(IEnumerable<BinTreeProperty> properties)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                bool hasUnresolvedLink = false;
+                foreach (BinTreeProperty property in properties)
+                    if (property is BinTreeWadChunkLink link && link.Value != 0 && engine.UnknownHashes.Contains(link.Value))
+                        hasUnresolvedLink = true;
+                if (hasUnresolvedLink) GuessScope(properties);
+
+                foreach (BinTreeProperty property in properties)
+                {
+                    switch (property)
+                    {
+                        case BinTreeStruct structure:
+                            VisitScope(structure.Properties.Values);
+                            break;
+                        case BinTreeContainer container:
+                            foreach (BinTreeStruct element in container.Elements.OfType<BinTreeStruct>())
+                                VisitScope(element.Properties.Values);
+                            break;
+                        case BinTreeOptional { Value: BinTreeStruct optional }:
+                            VisitScope(optional.Properties.Values);
+                            break;
+                        case BinTreeMap map:
+                            foreach (BinTreeStruct value in map.Select(pair => pair.Value).OfType<BinTreeStruct>())
+                                VisitScope(value.Properties.Values);
+                            break;
+                    }
+                }
+            }
+
+            void GuessScope(IEnumerable<BinTreeProperty> properties)
+            {
+                var folders = new HashSet<string>(StringComparer.Ordinal);
+                var names = new HashSet<string>(StringComparer.Ordinal);
+                foreach (BinTreeProperty property in properties)
+                {
+                    string siblingPath = property switch
+                    {
+                        BinTreeString text => text.Value,
+                        BinTreeWadChunkLink link when link.Value != 0 &&
+                            (knownPaths ??= HashFile.Load()).TryGetValue(link.Value, out string path) => path,
+                        _ => null
+                    };
+                    if (string.IsNullOrWhiteSpace(siblingPath)) continue;
+                    string normalized = NormalizePath(siblingPath);
+                    int slash = normalized.LastIndexOf('/');
+                    if (slash > 0 && normalized.IndexOf('.', slash) > slash)
+                    {
+                        string folder = normalized[..slash];
+                        folders.Add(folder);
+                        // Unit art sits in the character's base images folder whatever the referencing path.
+                        Match character = Regex.Match(folder, @"^assets/characters/[^/]+", RegexOptions.CultureInvariant);
+                        if (character.Success) folders.Add($"{character.Value}/skins/base/images");
+                    }
+                    else if (property is BinTreeString && IsSiblingName(normalized))
+                    {
+                        names.Add(normalized);
+                    }
+                }
+
+                foreach (string folder in folders)
+                foreach (string name in names)
+                {
+                    Check(engine, $"{folder}/{name}.tex", HashGuessStrategy.BinLinkSibling, sourceWadPath, sourceChunkHash);
+                    Check(engine, $"{folder}/{name}.dds", HashGuessStrategy.BinLinkSibling, sourceWadPath, sourceChunkHash);
+                    if (engine.RemainingUnknownCount == 0) return;
+                }
+            }
+
+            static bool IsSiblingName(string value) =>
+                value.Length is >= 3 and <= 64 &&
+                value.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-');
         }
 
         private void GuessDottedBinPaths(

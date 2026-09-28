@@ -457,6 +457,88 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             return checkedCount;
         }
 
+        /// <summary>
+        /// Skins reuse other characters' files unchanged and keep their file name
+        /// (sett/skins/skin76/brand_skin53_additivescroll_tx_cm.tex). An unresolved chunk whose WAD
+        /// checksum equals a named chunk is tried with every copy's file name, in the copies' folders
+        /// and in every known folder of the character its WAD belongs to.
+        /// </summary>
+        internal int GuessIdenticalCopies(
+            HashGuessEngine engine,
+            string rootDirectory,
+            CancellationToken cancellationToken,
+            Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (engine.RemainingUnknownCount == 0 || string.IsNullOrWhiteSpace(rootDirectory)) return 0;
+
+            IReadOnlyDictionary<ulong, string> knownPaths = HashFile.Load();
+            var copiesByChecksum = new Dictionary<ulong, List<string>>();
+            var unresolved = new List<(ulong Hash, ulong Checksum, string Character)>();
+            foreach (string wadPath in FindWads(rootDirectory))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string character = Path.GetFileName(wadPath).Split('.')[0].ToLowerInvariant();
+                try
+                {
+                    using var wad = new LeagueToolkit.Core.Wad.WadFile(wadPath);
+                    foreach (var (hash, chunk) in wad.Chunks)
+                    {
+                        if (chunk.Compression == LeagueToolkit.Core.Wad.WadChunkCompression.Satellite) continue;
+                        if (engine.UnknownHashes.Contains(hash))
+                        {
+                            unresolved.Add((hash, chunk.Checksum, character));
+                        }
+                        else if (knownPaths.TryGetValue(hash, out string path))
+                        {
+                            if (!copiesByChecksum.TryGetValue(chunk.Checksum, out List<string> copies))
+                                copiesByChecksum[chunk.Checksum] = copies = new List<string>();
+                            if (copies.Count < 64) copies.Add(path);
+                        }
+                    }
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    _logService?.LogDebug($"GAME identical copies skipped '{wadPath}': {exception.Message}");
+                }
+            }
+
+            IReadOnlyDictionary<string, List<string>> foldersByCharacter = Corpus.GetOrCreate(
+                "character-folders",
+                paths => paths
+                    .Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase))
+                    .Select(path => path[..path.LastIndexOf('/')].ToLowerInvariant())
+                    .Distinct(StringComparer.Ordinal)
+                    .GroupBy(folder => folder.Split('/')[2], StringComparer.Ordinal)
+                    .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal));
+
+            int checkedCount = 0;
+            foreach (var (hash, checksum, character) in unresolved)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!engine.UnknownHashes.Contains(hash) || !copiesByChecksum.TryGetValue(checksum, out List<string> copies)) continue;
+                var names = new HashSet<string>(copies.Select(GetBasename), StringComparer.OrdinalIgnoreCase);
+                var folders = new HashSet<string>(copies.Select(path => path[..Math.Max(0, path.LastIndexOf('/'))].ToLowerInvariant()), StringComparer.Ordinal);
+                foreach (string owner in new[] { character, $"jade_{character}" })
+                    if (foldersByCharacter.TryGetValue(owner, out List<string> ownerFolders)) folders.UnionWith(ownerFolders);
+
+                foreach (string folder in folders)
+                {
+                    foreach (string name in names)
+                    {
+                        Check(engine, $"{folder}/{name}", HashGuessStrategy.IdenticalContentCopy, "GAME identical copies");
+                        checkedCount++;
+                    }
+                    if (!engine.UnknownHashes.Contains(hash)) break;
+                }
+                if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+
+            progress?.Invoke(checkedCount);
+            return checkedCount;
+        }
+
         internal int GuessShaderVariants(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
@@ -495,10 +577,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
                 remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
                 if (remaining <= 0 || engine.RemainingUnknownCount == 0) break;
-                IEnumerable<int> shaderIndices = Enumerable.Range(0, 32)
-                    .Concat(Enumerable.Range(1, 200).Select(index => index * 100));
                 IEnumerable<HashGuessCandidate> numberedVariants =
-                    ShaderVariants.SelectMany(variant => shaderIndices.Select(index =>
+                    ShaderVariants.SelectMany(variant => ShaderPermutationIndices.Select(index =>
                         new HashGuessCandidate(
                             $"{path}{variant}_{index}",
                             HashGuessStrategy.ShaderVariant)));

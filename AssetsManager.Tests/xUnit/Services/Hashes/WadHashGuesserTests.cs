@@ -692,6 +692,33 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GameBinGrepNamesUnresolvedLinkFromSiblingFolderAndName()
+        {
+            const string expected = "assets/characters/tft18_krug/skins/base/images/da_krug18.tex";
+            ulong targetHash = XxHash64Ext.Hash(expected);
+            var tree = new BinTree(
+                new[]
+                {
+                    new BinTreeObject(0x22222222, Fnv1a.HashLower("TftShopData"), new BinTreeProperty[]
+                    {
+                        new BinTreeString(Fnv1a.HashLower("mName"), "DA_Krug18"),
+                        new BinTreeString(Fnv1a.HashLower("mIconPath"), "ASSETS/Characters/TFT18_Krug/HUD/TFT18_Krug_Square.tex"),
+                        new BinTreeWadChunkLink(Fnv1a.HashLower("PcSplashPath"), targetHash)
+                    })
+                },
+                Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()), "data/maps/shipping/map22/map22.bin", "Map22.wad.client", 1);
+
+            AssertResolved(engine, expected);
+            Assert.Equal(HashGuessStrategy.BinLinkSibling, Assert.Single(engine.Matches).Value.Strategy);
+        }
+
+        [Fact]
         public void GameBinGrepResolvesDottedBinsFromObjectPaths()
         {
             const string expected = "loadouts/tftdamageskins.79a3aef6.bin";

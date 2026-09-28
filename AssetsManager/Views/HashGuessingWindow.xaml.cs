@@ -125,6 +125,7 @@ namespace AssetsManager.Views
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-characters", Name = "GuessCharactersFiles", Description = "Champion and skin assets (characters/{champ}/skins/...)", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-regalia", Name = "GuessRegaliaAssets", Description = "Ranked banners, crests, borders, wings and loadout assets", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-shaders", Name = "GuessShaderVariants", Description = "Permutations across HLSL families and platform variants", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-copies", Name = "GuessIdenticalCopies", Description = "Reuse file names of known chunks with identical content in the owner's folders", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-locales", Name = "SubstituteLang", Description = "28 region and language translations", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-extensions", Name = "SubstituteExtensions", Description = "Cross-extension permutations (.dds, .tex, .bin, .anm)", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-prefixes", Name = "CheckBasenamePrefixes", Description = "Basename prefixes (2x_, 4x_, sd_, tft_, common_, base_, sru_, icon_)", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
@@ -517,12 +518,6 @@ namespace AssetsManager.Views
             switch (methodId)
             {
                 // GAME
-                case "game-prefixes":
-                    await RunAsync(HashGuessMode.GamePrefixes);
-                    break;
-                case "game-shaders":
-                    await RunAsync(HashGuessMode.GameShaders);
-                    break;
                 case "game-grep":
                     await RunAsync(HashGuessMode.GrepGame);
                     break;
@@ -843,8 +838,6 @@ namespace AssetsManager.Views
                 });
                 var result = mode switch
                 {
-                    HashGuessMode.GamePrefixes => await _hashGuessingService.RunGamePrefixGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                    HashGuessMode.GameShaders => await _hashGuessingService.RunGameShaderGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
                     HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
                     HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
                     HashGuessMode.BannerGuess => await _hashGuessingService.RunGameBannerGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
@@ -1208,8 +1201,6 @@ namespace AssetsManager.Views
         {
             GrepGame,
             GrepLcu,
-            GamePrefixes,
-            GameShaders,
             GameBasic,
             GameExtended,
             BannerGuess,

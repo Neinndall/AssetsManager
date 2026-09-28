@@ -105,6 +105,31 @@ namespace AssetsManager.Tests.Diagnostics
                 GameChunkLinkInspectorDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "game-anm-clip-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                await GameAnimationClipAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "game-shader-toc", StringComparison.OrdinalIgnoreCase))
+            {
+                GameShaderTocDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "game-grep-dryrun", StringComparison.OrdinalIgnoreCase))
+            {
+                await GameGrepDryRunDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "game-wad-text-search", StringComparison.OrdinalIgnoreCase))
+            {
+                await GameWadTextSearchDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "game-unknown-context", StringComparison.OrdinalIgnoreCase))
+            {
+                await GameUnknownContextDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "bin-schema-dryrun", StringComparison.OrdinalIgnoreCase))
             {
                 await BinSchemaDryRunDiagnostic.Run(args.Skip(1).ToArray());

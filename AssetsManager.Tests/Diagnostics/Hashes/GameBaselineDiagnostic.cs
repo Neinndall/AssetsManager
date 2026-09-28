@@ -76,8 +76,6 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 await RunSuiteAsync("GAME Basic", () => service.RunGameBasicGuessingAsync(pbeRoot, null, CancellationToken.None), summary, resolvedPaths);
                 await RunSuiteAsync("GAME Extended", () => service.RunGameExtendedGuessingAsync(pbeRoot, null, CancellationToken.None), summary, resolvedPaths);
                 await RunSuiteAsync("GAME Banners", () => service.RunGameBannerGuessingAsync(pbeRoot, null, CancellationToken.None), summary, resolvedPaths);
-                await RunSuiteAsync("GAME Prefixes", () => service.RunGamePrefixGuessingAsync(pbeRoot, null, CancellationToken.None), summary, resolvedPaths);
-                await RunSuiteAsync("GAME Shaders", () => service.RunGameShaderGuessingAsync(pbeRoot, null, CancellationToken.None), summary, resolvedPaths);
 
                 if (withGrep)
                 {

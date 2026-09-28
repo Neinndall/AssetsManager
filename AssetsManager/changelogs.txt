@@ -52,6 +52,9 @@ New Features
   - Hash Guessing Lab / BIN names built from game paths now keep Riot casing.
   - Hash Guessing Lab / BIN Context resolves animation event and clip keys from names already used by other characters.
   - Hash Guessing Lab / Fixed the same BIN hash being verified twice with different casing.
+  - Hash Guessing Lab / GAME GrepWad names unresolved texture links from the folders and names of their neighbouring fields.
+  - Hash Guessing Lab / GAME Basic Suite resolves files that are identical copies of known files reused by another character.
+  - Hash Guessing Lab / Removed the hidden standalone GAME Prefixes and Shaders actions, already covered by GAME Basic Suite.
   - Hash Guessing Lab / BIN Context and Schema findings with a high chance of being coincidental are kept as candidates instead of entering the BIN dictionaries.
   - Hash Guessing Lab / Added read-only champion texture and in-memory GAME diagnostics with WAD-local family/content/visual evidence, plus bounded typed BIN-reference candidates and per-run WAD context caching.
   - Hash Guessing Lab / Added background execution and global status bar progress reporting, allowing uninterrupted scans across app navigation with live status and percentage feedback.
