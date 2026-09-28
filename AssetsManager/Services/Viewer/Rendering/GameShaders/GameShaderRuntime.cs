@@ -257,6 +257,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             Func<string, uint?> lightmapTexture) =>
             TryBind(material, 0, mesh, meshDoubleSided, in frame, programTexture, lightmapTexture);
 
+        /// <summary>Static-mesh stream locations for COLOR and TEXCOORD5 (see <see cref="AttributeLocations"/>).</summary>
+        internal const uint StaticColorLocation = 4;
+        internal const uint StaticPivotLocation = 5;
+
         internal bool TryBind(
             MapMaterialDefinition material,
             int passIndex,
@@ -264,7 +268,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             bool meshDoubleSided,
             in Frame frame,
             Func<string, uint?> programTexture,
-            Func<string, uint?> lightmapTexture)
+            Func<string, uint?> lightmapTexture,
+            bool hasColors = false,
+            bool hasPivots = false)
         {
             if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.StaticMesh)
                 return false;
@@ -279,7 +285,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 return false;
 
             _gl.UseProgram(runtime.Program);
-            ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.StaticMesh, hasTangents: false);
+            ApplyGenericAttributeDefaults(
+                runtime.Attributes,
+                GameMaterialKind.StaticMesh,
+                hasTangents: false,
+                hasColors,
+                hasPivots);
             UpdateBlocks(runtime, passEntry.Globals, mesh, frame, null);
             BindTextures(runtime, passEntry.Pass, passEntry.PassIndex, material, mesh, programTexture, lightmapTexture);
             ApplyPassState(passEntry.Pass.State, meshDoubleSided);
@@ -606,13 +617,17 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         private void ApplyGenericAttributeDefaults(
             IReadOnlyDictionary<uint, string> attributes,
             GameMaterialKind kind,
-            bool hasTangents)
+            bool hasTangents,
+            bool hasColors = false,
+            bool hasPivots = false)
         {
             foreach ((uint location, string name) in attributes)
             {
                 bool provided = kind == GameMaterialKind.SkinnedMesh
                     ? location is 0 or 1 or 2 or 5 or 6 || (location == 3 && hasTangents)
-                    : location <= 3;
+                    : location <= 3 ||
+                      (location == StaticColorLocation && hasColors) ||
+                      (location == StaticPivotLocation && hasPivots);
                 if (provided)
                     continue;
 
@@ -983,6 +998,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     target = TextureTarget.Texture2D;
                     samplerObject = loaded.HasValue ? ResolveLightmapSampler() : ResolveNeutralSampler(clamp: true);
                 }
+                else if (IsMultiplicativeSharedTexture(name, sampler.Dimension))
+                {
+                    texture = NeutralWhite2D();
+                    target = TextureTarget.Texture2D;
+                    samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
+                }
                 else if (name.EndsWith(SharedTextureSuffix, StringComparison.Ordinal))
                 {
                     (texture, target) = NeutralFor(sampler.Dimension, black: true);
@@ -1017,6 +1038,16 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             }
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
+
+        /// <summary>
+        /// Engine textures the shader multiplies into the colour (the map's grass tint). The preview has
+        /// no map-skin tint to bind, and white leaves the albedo as authored where black would draw nothing.
+        /// </summary>
+        internal static bool IsMultiplicativeSharedTexture(string name, GameShaderTranslator.TextureDimension dimension) =>
+            dimension == GameShaderTranslator.TextureDimension.Texture2D &&
+            name != null &&
+            name.StartsWith("GRASS_TINT_MAP", StringComparison.Ordinal) &&
+            name.EndsWith(SharedTextureSuffix, StringComparison.Ordinal);
 
         internal static uint? ResolveStaticProgramTexture(
             string material, int authoredPassIndex, string texture, Func<string, uint?> lookup) =>

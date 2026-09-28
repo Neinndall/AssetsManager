@@ -90,6 +90,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             internal uint NormalVbo;
             internal uint Uv0Vbo;
             internal uint Uv1Vbo;
+            internal uint ColorVbo;
+            internal uint PivotVbo;
             internal uint Ebo;
             internal int References;
             internal long ReleasedAtMs = -1;
@@ -134,6 +136,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _normalVbo;
         private uint _uv0Vbo;
         private uint _uv1Vbo;
+        private uint _colorVbo;
+        private uint _pivotVbo;
         private uint _ebo;
         private GeometryResources _activeGeometryResources;
         private uint _whiteTexture;
@@ -520,7 +524,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                                 bound.MeshDoubleSided,
                                 in gameFrame,
                                 ResolveProgramTexture,
-                                ResolveLightmapTexture))
+                                ResolveLightmapTexture,
+                                _scene.Geometry.HasColors,
+                                _scene.Geometry.HasPivots))
                         {
                             boundAny = true;
                             _gameShaderRuntime.DrawBoundPass(
@@ -713,6 +719,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 NormalVbo = _normalVbo,
                 Uv0Vbo = _uv0Vbo,
                 Uv1Vbo = _uv1Vbo,
+                ColorVbo = _colorVbo,
+                PivotVbo = _pivotVbo,
                 Ebo = _ebo,
                 References = 1
             };
@@ -727,6 +735,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _normalVbo = resources.NormalVbo;
             _uv0Vbo = resources.Uv0Vbo;
             _uv1Vbo = resources.Uv1Vbo;
+            _colorVbo = resources.ColorVbo;
+            _pivotVbo = resources.PivotVbo;
             _ebo = resources.Ebo;
         }
 
@@ -740,6 +750,11 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uv0Vbo = UploadAttribute(2, geometry.Uv0, 2);
             if (geometry.Uv1 != null)
                 _uv1Vbo = UploadAttribute(3, geometry.Uv1, 2);
+            // Streams only game shaders read (the stock program stops at location 3).
+            if (geometry.Colors != null)
+                _colorVbo = UploadAttribute(GameShaderRuntime.StaticColorLocation, geometry.Colors);
+            if (geometry.Pivots != null)
+                _pivotVbo = UploadAttribute(GameShaderRuntime.StaticPivotLocation, geometry.Pivots, 3);
 
             _ebo = _gl.GenBuffer();
             _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
@@ -767,6 +782,25 @@ namespace AssetsManager.Services.Viewer.Rendering
                 VertexAttribPointerType.Float,
                 false,
                 (uint)Marshal.SizeOf<Vector3>(),
+                IntPtr.Zero);
+            return buffer;
+        }
+
+        private uint UploadAttribute(uint location, Vector4[] values)
+        {
+            uint buffer = _gl.GenBuffer();
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, buffer);
+            _gl.BufferData(
+                BufferTargetARB.ArrayBuffer,
+                new ReadOnlySpan<Vector4>(values),
+                BufferUsageARB.StaticDraw);
+            _gl.EnableVertexAttribArray(location);
+            _gl.VertexAttribPointer(
+                location,
+                4,
+                VertexAttribPointerType.Float,
+                false,
+                (uint)Marshal.SizeOf<Vector4>(),
                 IntPtr.Zero);
             return buffer;
         }
@@ -1265,6 +1299,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _normalVbo = 0;
                 _uv0Vbo = 0;
                 _uv1Vbo = 0;
+                _colorVbo = 0;
+                _pivotVbo = 0;
                 _ebo = 0;
                 return;
             }
@@ -1273,6 +1309,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             DeleteBuffer(ref _normalVbo);
             DeleteBuffer(ref _uv0Vbo);
             DeleteBuffer(ref _uv1Vbo);
+            DeleteBuffer(ref _colorVbo);
+            DeleteBuffer(ref _pivotVbo);
             DeleteBuffer(ref _ebo);
             if (_vao != 0)
             {
@@ -1290,6 +1328,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             DeleteBuffer(ref resources.NormalVbo);
             DeleteBuffer(ref resources.Uv0Vbo);
             DeleteBuffer(ref resources.Uv1Vbo);
+            DeleteBuffer(ref resources.ColorVbo);
+            DeleteBuffer(ref resources.PivotVbo);
             DeleteBuffer(ref resources.Ebo);
             if (resources.Vao != 0)
             {

@@ -71,11 +71,26 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector3[] Normals { get; }
         public Vector2[] Uv0 { get; }
         public Vector2[] Uv1 { get; }
+
+        /// <summary>
+        /// Vertex colour (RGBA 0..1) for game shaders that read COLOR0, such as the grass deform weight.
+        /// Null when no mesh carries one; meshes without it hold white.
+        /// </summary>
+        public Vector4[] Colors { get; }
+
+        /// <summary>
+        /// TEXCOORD5 in world space: the per-blade pivot VertexDeform bends grass around. Null when no
+        /// mesh carries one; meshes without it hold their own position.
+        /// </summary>
+        public Vector3[] Pivots { get; }
+
         public uint[] Indices { get; }
         public IReadOnlyList<MapGeometryMeshData> Meshes { get; }
         public IReadOnlyList<MapGeometrySubmeshData> Submeshes { get; }
         public IReadOnlyList<string> Materials { get; }
         public bool HasUv1 => Uv1 != null;
+        public bool HasColors => Colors != null;
+        public bool HasPivots => Pivots != null;
 
         public IReadOnlyList<string> Lightmaps => Meshes
             .SelectMany(mesh => new[] { mesh.BakedLight, mesh.StationaryLight })
@@ -92,7 +107,9 @@ namespace AssetsManager.Views.Models.Viewer
             uint[] indices,
             IReadOnlyList<MapGeometryMeshData> meshes,
             IReadOnlyList<MapGeometrySubmeshData> submeshes,
-            IReadOnlyList<string> materials)
+            IReadOnlyList<string> materials,
+            Vector4[] colors = null,
+            Vector3[] pivots = null)
         {
             Positions = positions ?? throw new ArgumentNullException(nameof(positions));
             Normals = normals ?? throw new ArgumentNullException(nameof(normals));
@@ -102,6 +119,8 @@ namespace AssetsManager.Views.Models.Viewer
             Meshes = meshes ?? throw new ArgumentNullException(nameof(meshes));
             Submeshes = submeshes ?? throw new ArgumentNullException(nameof(submeshes));
             Materials = materials ?? throw new ArgumentNullException(nameof(materials));
+            Colors = colors;
+            Pivots = pivots;
         }
     }
 }

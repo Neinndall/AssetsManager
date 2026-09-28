@@ -289,6 +289,11 @@ namespace AssetsManager.Tests.Diagnostics
                 MapEnvironmentAuditDiagnostic.Run(targetPath);
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "mapgeo-elements", StringComparison.OrdinalIgnoreCase))
+            {
+                MapGeoElementsDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "tex-to-png", StringComparison.OrdinalIgnoreCase))
             {
                 TextureToPngDiagnostic.Run(args.Skip(1).ToArray());

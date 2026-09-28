@@ -37,6 +37,8 @@ namespace AssetsManager.Services.Viewer.Parsing
             int indexCount = 0;
             int submeshCount = 0;
             bool hasUv1 = false;
+            bool hasColors = false;
+            bool hasPivots = false;
             foreach (EnvironmentAssetMesh mesh in asset.Meshes)
             {
                 vertexCount = checked(vertexCount + mesh.VerticesView.VertexCount);
@@ -44,12 +46,16 @@ namespace AssetsManager.Services.Viewer.Parsing
                     indexCount = checked(indexCount + submesh.IndexCount);
                 submeshCount = checked(submeshCount + mesh.Submeshes.Count);
                 hasUv1 |= mesh.VerticesView.TryGetAccessor(ElementName.Texcoord7, out _);
+                hasColors |= mesh.VerticesView.TryGetAccessor(ElementName.PrimaryColor, out _);
+                hasPivots |= mesh.VerticesView.TryGetAccessor(ElementName.Texcoord5, out _);
             }
 
             var positions = new Vector3[vertexCount];
             var normals = new Vector3[vertexCount];
             var uv0 = new Vector2[vertexCount];
             Vector2[] uv1 = hasUv1 ? new Vector2[vertexCount] : null;
+            Vector4[] colors = hasColors ? new Vector4[vertexCount] : null;
+            Vector3[] pivots = hasPivots ? new Vector3[vertexCount] : null;
             var indices = new uint[indexCount];
             var meshes = new List<MapGeometryMeshData>(asset.Meshes.Count);
             var submeshes = new List<MapGeometrySubmeshData>(submeshCount);
@@ -64,6 +70,8 @@ namespace AssetsManager.Services.Viewer.Parsing
                 bool hasNormals = mesh.VerticesView.TryGetAccessor(ElementName.Normal, out VertexElementAccessor normalAccessor);
                 bool hasUv0 = mesh.VerticesView.TryGetAccessor(ElementName.Texcoord0, out VertexElementAccessor uv0Accessor);
                 bool meshHasUv1 = mesh.VerticesView.TryGetAccessor(ElementName.Texcoord7, out VertexElementAccessor uv1Accessor);
+                bool meshHasColor = mesh.VerticesView.TryGetAccessor(ElementName.PrimaryColor, out VertexElementAccessor colorAccessor);
+                bool meshHasPivot = mesh.VerticesView.TryGetAccessor(ElementName.Texcoord5, out VertexElementAccessor pivotAccessor);
 
                 Matrix4x4 transform = mesh.Transform;
                 Matrix4x4 normalTransform = CreateNormalTransform(transform);
@@ -93,6 +101,19 @@ namespace AssetsManager.Services.Viewer.Parsing
                         uv1[vertexBase + vertex] = meshHasUv1
                             ? ReadVector2(uv1Accessor, vertex)
                             : Vector2.Zero;
+                    }
+                    if (colors != null)
+                    {
+                        colors[vertexBase + vertex] = meshHasColor
+                            ? ReadColor(colorAccessor, vertex)
+                            : Vector4.One;
+                    }
+                    if (pivots != null)
+                    {
+                        // The pivot is authored in the mesh's local space like the position, which is baked to world.
+                        pivots[vertexBase + vertex] = meshHasPivot
+                            ? Vector3.Transform(ReadPivot(pivotAccessor, vertex), transform)
+                            : worldPosition;
                     }
                 }
 
@@ -160,7 +181,9 @@ namespace AssetsManager.Services.Viewer.Parsing
                 indices,
                 meshes,
                 submeshes,
-                materials);
+                materials,
+                colors,
+                pivots);
         }
 
         /// <summary>
@@ -224,6 +247,34 @@ namespace AssetsManager.Services.Viewer.Parsing
                 _ => Vector2.Zero
             };
         }
+
+        /// <summary>Colour as the shader samples it: BGRA8 memory reaches the shader as normalized RGBA.</summary>
+        private static Vector4 ReadColor(VertexElementAccessor accessor, int index)
+        {
+            switch (accessor.Element.Format)
+            {
+                case ElementFormat.BGRA_Packed8888:
+                {
+                    (byte b, byte g, byte r, byte a) = accessor.AsBgraU8Array()[index];
+                    return new Vector4(r, g, b, a) / 255f;
+                }
+                case ElementFormat.RGBA_Packed8888:
+                {
+                    (byte r, byte g, byte b, byte a) = accessor.AsRgbaU8Array()[index];
+                    return new Vector4(r, g, b, a) / 255f;
+                }
+                default:
+                    return Vector4.One;
+            }
+        }
+
+        private static Vector3 ReadPivot(VertexElementAccessor accessor, int index) =>
+            accessor.Element.Format switch
+            {
+                ElementFormat.XYZ_Float32 => accessor.AsVector3Array()[index],
+                ElementFormat.XY_Float32 => new Vector3(accessor.AsVector2Array()[index], 0f),
+                _ => Vector3.Zero
+            };
 
         private static Vector2 ReadHalfVector2(VertexElementAccessor accessor, int index)
         {

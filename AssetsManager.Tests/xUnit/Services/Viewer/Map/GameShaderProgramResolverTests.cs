@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Shaders;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Settings;
@@ -51,6 +52,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal("base_color", pass.Textures[0].Texture.VirtualPath);
             Assert.Equal(GameShaderProgramResolver.LitUberEmissiveTexture, pass.Textures[1].Name);
             Assert.Equal("base_emissive", pass.Textures[1].Texture.VirtualPath);
+            Assert.All(pass.Textures, texture =>
+            {
+                Assert.Equal(MapTextureWrap.Repeat, texture.Sampler.WrapU);
+                Assert.Equal(MapTextureWrap.Repeat, texture.Sampler.WrapV);
+            });
+        }
+
+        [Theory]
+        [InlineData("GRASS_TINT_MAP_SharedTexture", true)]
+        [InlineData("GRASS_TINT_MAP_ALTERNATE_SharedTexture", true)]
+        [InlineData("SAMPLER_BACK_BUFFER_COPY_SharedTexture", false)]
+        [InlineData("GRASS_TINT_MAP", false)]
+        public void OnlyGrassTintSharedTexturesDefaultToWhite(string name, bool white)
+        {
+            // The VertexDeform brush multiplies its albedo by the grass tint; black would draw it black.
+            Assert.Equal(white, GameShaderRuntime.IsMultiplicativeSharedTexture(name, GameShaderTranslator.TextureDimension.Texture2D));
         }
 
         [Fact]

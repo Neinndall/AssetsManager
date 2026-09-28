@@ -206,6 +206,24 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     translatedReady++;
                     materialReady = true;
                     GameShaderTranslator.TranslatedProgram ready = translated.Program;
+                    string dumpFilter = Environment.GetEnvironmentVariable("AM_SHADER_DUMP");
+                    string dumpDir = Environment.GetEnvironmentVariable("AM_SHADER_DUMP_DIR");
+                    if (!string.IsNullOrWhiteSpace(dumpFilter) && !string.IsNullOrWhiteSpace(dumpDir) &&
+                        material.Name?.Contains(dumpFilter, StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        Directory.CreateDirectory(dumpDir);
+                        string stem = Path.Combine(dumpDir, material.Name.Split('/').Last());
+                        File.WriteAllText(stem + ".vs.glsl", ready.Vertex.Glsl);
+                        File.WriteAllText(stem + ".ps.glsl", ready.Pixel.Glsl);
+                        File.WriteAllText(stem + ".sidecar.txt",
+                            "VS attributes: " + string.Join(", ", ready.Vertex.Sidecar.Attributes.Select(a => a.ToString())) + Environment.NewLine +
+                            "VS blocks: " + string.Join(" | ", ready.Vertex.Sidecar.Blocks.Select(b => b.Name + "{" + string.Join(",", b.Members.Select(m => m.ToString())) + "}")) + Environment.NewLine +
+                            "PS blocks: " + string.Join(" | ", ready.Pixel.Sidecar.Blocks.Select(b => b.Name + "{" + string.Join(",", b.Members.Select(m => m.ToString())) + "}")) + Environment.NewLine +
+                            "PS textures: " + string.Join(", ", ready.Pixel.Sidecar.Textures.Select(t => t.Name)) + Environment.NewLine +
+                            "VS textures: " + string.Join(", ", ready.Vertex.Sidecar.Textures.Select(t => t.Name)) + Environment.NewLine +
+                            "Defines: " + string.Join(";", read.Program.Defines.Select(d => d.Name + "=" + d.Value)));
+                        Console.WriteLine($"[MapShader] dumped {stem}");
+                    }
                     verifyProgram?.Invoke(ready);
                     foreach (GameShaderTranslator.TextureBinding texture in ready.Vertex.Sidecar.Textures.Concat(ready.Pixel.Sidecar.Textures))
                     {

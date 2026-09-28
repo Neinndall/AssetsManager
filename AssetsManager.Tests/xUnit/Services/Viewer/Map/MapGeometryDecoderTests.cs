@@ -133,5 +133,117 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Single(data.Indices);
             Assert.Equal(new Vector3(10f, 20f, 30f), data.Positions[0]);
         }
+
+        [Fact]
+        public void Decode_ReadsVertexColorAndWorldSpaceGrassPivot()
+        {
+            // VertexDeform grass bends each blade around TEXCOORD5 and weights it by COLOR0.
+            using MemoryStream stream = SingleVertexMapgeo(withGrassStreams: true, translation: new Vector3(100f, 0f, 0f));
+
+            MapGeometryData data = new MapGeometryDecoder().Decode(stream);
+
+            Assert.True(data.HasColors);
+            Assert.True(data.HasPivots);
+            Assert.Equal(new Vector3(110f, 20f, 30f), data.Positions[0]);
+            // BGRA memory (b=0, g=128, r=255, a=255) reaches the shader as RGBA.
+            Assert.Equal(new Vector4(1f, 128f / 255f, 0f, 1f), data.Colors[0]);
+            Assert.Equal(new Vector3(105f, 0f, 30f), data.Pivots[0]);
+        }
+
+        [Fact]
+        public void Decode_LeavesStreamsOutWhenNoMeshCarriesThem()
+        {
+            using MemoryStream stream = SingleVertexMapgeo(withGrassStreams: false, translation: Vector3.Zero);
+
+            MapGeometryData data = new MapGeometryDecoder().Decode(stream);
+
+            Assert.False(data.HasColors);
+            Assert.False(data.HasPivots);
+        }
+
+        private static MemoryStream SingleVertexMapgeo(bool withGrassStreams, Vector3 translation)
+        {
+            var ms = new MemoryStream();
+            using var bw = new BinaryWriter(ms, Encoding.UTF8, leaveOpen: true);
+            bw.Write(Encoding.ASCII.GetBytes("OEGM"));
+            bw.Write(17);
+            bw.Write(0);
+
+            (ElementName Name, ElementFormat Format)[] elements = withGrassStreams
+                ? new[]
+                {
+                    (ElementName.Position, ElementFormat.XYZ_Float32),
+                    (ElementName.PrimaryColor, ElementFormat.BGRA_Packed8888),
+                    (ElementName.Texcoord5, ElementFormat.XYZ_Float32)
+                }
+                : new[] { (ElementName.Position, ElementFormat.XYZ_Float32) };
+            bw.Write((uint)1);
+            bw.Write((uint)0);
+            bw.Write((uint)elements.Length);
+            foreach ((ElementName name, ElementFormat format) in elements)
+            {
+                bw.Write((uint)name);
+                bw.Write((uint)format);
+            }
+            for (int i = elements.Length; i < 15; i++)
+            {
+                bw.Write((uint)0);
+                bw.Write((uint)ElementFormat.XYZ_Float32);
+            }
+
+            bw.Write((uint)1);
+            bw.Write((byte)1);
+            bw.Write((uint)(withGrassStreams ? 28 : 12));
+            bw.Write(10f); bw.Write(20f); bw.Write(30f);
+            if (withGrassStreams)
+            {
+                bw.Write((byte)0); bw.Write((byte)128); bw.Write((byte)255); bw.Write((byte)255);
+                bw.Write(5f); bw.Write(0f); bw.Write(30f);
+            }
+
+            bw.Write((uint)1);
+            bw.Write((byte)1);
+            bw.Write(2);
+            bw.Write((ushort)0);
+
+            bw.Write((uint)1);
+            bw.Write(1);
+            bw.Write((uint)1);
+            bw.Write(0);
+            bw.Write(0);
+            bw.Write((uint)1);
+            bw.Write(0);
+            bw.Write((byte)1);
+            bw.Write((uint)0);
+            bw.Write((uint)1);
+            bw.Write((uint)0);
+            bw.Write(10);
+            bw.Write(Encoding.ASCII.GetBytes("Test/Mat01"));
+            bw.Write(0); bw.Write(1); bw.Write(0); bw.Write(0);
+            bw.Write(false);
+            bw.Write(0f); bw.Write(0f); bw.Write(0f);
+            bw.Write(10f); bw.Write(20f); bw.Write(30f);
+            bw.Write(1f); bw.Write(0f); bw.Write(0f); bw.Write(0f);
+            bw.Write(0f); bw.Write(1f); bw.Write(0f); bw.Write(0f);
+            bw.Write(0f); bw.Write(0f); bw.Write(1f); bw.Write(0f);
+            bw.Write(translation.X); bw.Write(translation.Y); bw.Write(translation.Z); bw.Write(1f);
+            bw.Write((byte)0xFF);
+            bw.Write((byte)0);
+            bw.Write((ushort)0);
+            for (int channel = 0; channel < 2; channel++)
+            {
+                bw.Write(0);
+                bw.Write(1f); bw.Write(1f);
+                bw.Write(0f); bw.Write(0f);
+            }
+            bw.Write(0);
+            bw.Write(1f); bw.Write(1f);
+            bw.Write(0f); bw.Write(0f);
+            bw.Write(0);
+            bw.Write((uint)0);
+            bw.Flush();
+            ms.Position = 0;
+            return ms;
+        }
     }
 }
