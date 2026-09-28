@@ -331,6 +331,11 @@ namespace AssetsManager.Tests.Diagnostics
                 ShaderPermutationProbeDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "dynamic-driver-census", StringComparison.OrdinalIgnoreCase))
+            {
+                DynamicDriverCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "skin-gpu-sweep", StringComparison.OrdinalIgnoreCase))
             {
                 SkinGpuSweepDiagnostic.Run(args.Skip(1).ToArray());

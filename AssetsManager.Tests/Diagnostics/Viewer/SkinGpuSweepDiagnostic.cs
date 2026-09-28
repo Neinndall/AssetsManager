@@ -101,7 +101,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                         continue;
 
                     Row row = Check(renderer, asset, range, material, skin, hidden.Contains(range.Name), snapshots != null);
-                    rows.Add(row);
+                    // Pixels are only kept long enough to snapshot a flagged row; a full sweep holds tens of thousands of rows.
+                    rows.Add(row with { Game = row.Game with { Pixels = null }, Reference = row.Reference with { Pixels = null } });
                     if (row.Flags.Count > 0)
                     {
                         Console.WriteLine(
@@ -156,13 +157,17 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     parameter.Name == "TintColor" && parameter.Evaluate(0) is Vector4 { W: 0f });
                 if (game.NonFinite > 0)
                     flags.Add("NONFINITE");
+                // Dynamic parameters (a dissolve, a zero tint) hide alternate forms and combat effects at rest.
                 if (game.Covered == 0 && reference.Covered > 0)
-                    flags.Add(tintHidden ? "TINT_HIDDEN" : "DISCARDED");
+                    flags.Add(tintHidden ? "TINT_HIDDEN" : material.DynamicParameters.Count > 0 ? "DYNAMIC_HIDDEN" : "DISCARDED");
                 else if (reference.Covered > 50 && game.Covered < reference.Covered / 4)
                     flags.Add("PARTIAL");
                 if (game.Covered > 0 && reference.Luminance > 0.05f && game.Luminance < reference.Luminance * 0.2f)
                     flags.Add("DARK");
-                if (game.Luminance > Math.Max(reference.Luminance, 0.05f) * 5f || game.MaxComponent > 16f)
+                // Without a base texture the shaders-off look draws nothing, so there is no brightness to compare.
+                if (reference.Covered == 0 && game.Covered > 0)
+                    flags.Add("SHADER_ONLY");
+                else if (game.Luminance > Math.Max(reference.Luminance, 0.05f) * 5f || game.MaxComponent > 16f)
                     flags.Add("BRIGHT");
                 if (game.MissingTextures.Count > 0)
                     flags.Add("MISSING_TEXTURE");
