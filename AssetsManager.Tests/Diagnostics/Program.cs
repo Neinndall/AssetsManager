@@ -321,6 +321,21 @@ namespace AssetsManager.Tests.Diagnostics
                 await MapFlowAuditDiagnostic.Run(targetPath, mapEntry);
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "shader-spirv-inspect", StringComparison.OrdinalIgnoreCase))
+            {
+                ShaderSpirvInspectDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "shader-cache-sweep", StringComparison.OrdinalIgnoreCase))
+            {
+                ShaderCacheSweepDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "skin-shader-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                await SkinShaderAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "map-shader-audit", StringComparison.OrdinalIgnoreCase))
             {
                 string targetPath = args.Length > 1 ? args[1] : null;

@@ -16,6 +16,13 @@ namespace AssetsManager.Shaders
     public static class GameShaderTranslator
     {
         private const uint OpName = 5;
+        private const uint OpExtension = 10;
+        private const uint OpEntryPoint = 15;
+        private const uint OpConstant = 43;
+        private const uint OpFunction = 54;
+        private const uint OpLoad = 61;
+        private const uint OpCopyObject = 83;
+        private const uint OpImageQueryLevels = 106;
         private const uint OpMemoryModel = 14;
         private const uint OpCapability = 17;
         private const uint OpTypePointer = 32;
@@ -27,6 +34,9 @@ namespace AssetsManager.Shaders
         private const uint CapabilityDerivativeControl = 51;
         private const uint CapabilityPhysicalStorageBufferAddresses = 5347;
         private const uint CapabilityDemoteToHelperInvocation = 5379;
+        private const uint CapabilityDrawParameters = 4427;
+        private const uint BuiltInBaseVertex = 4424;
+        private const string DrawParametersExtension = "SPV_KHR_shader_draw_parameters";
         private const uint DecorationBuiltIn = 11;
         private const uint DecorationComponent = 31;
         private const uint DecorationNoContraction = 42;
@@ -45,7 +55,9 @@ namespace AssetsManager.Shaders
             BitBuiltin,
             TexelBuffer,
             CubeArray,
-            ShadowLevelZero
+            ShadowLevelZero,
+            BaseVertexZero,
+            MipLevelsOne
         }
 
         public enum MemberScalar
@@ -153,7 +165,12 @@ namespace AssetsManager.Shaders
                 .Select(buffer => (Ident(buffer.Name), (buffer.Size + 15u) / 16u))
                 .ToArray();
             string normalizedGlsl = NormalizeConstantBuffers(crossed.Glsl, reflection);
-            (string glsl, IReadOnlyList<AppliedPatch> applied) = PatchGlsl(normalizedGlsl, stage, extents);
+            (string glsl, IReadOnlyList<AppliedPatch> glslApplied) = PatchGlsl(normalizedGlsl, stage, extents);
+            IReadOnlyList<AppliedPatch> applied = patched.Applied
+                .Concat(glslApplied)
+                .Distinct()
+                .OrderBy(value => value)
+                .ToArray();
             if (stage == Stage.Vertex)
             {
                 string[] labels = reflection.Outputs
@@ -173,7 +190,8 @@ namespace AssetsManager.Shaders
 
         private sealed record PatchedSpirv(
             uint[] Words,
-            IReadOnlyList<(string From, string To)> Renames);
+            IReadOnlyList<(string From, string To)> Renames,
+            IReadOnlyList<AppliedPatch> Applied);
 
         private sealed record CrossCompileResult(
             string Glsl,
@@ -221,6 +239,8 @@ namespace AssetsManager.Shaders
             var pointeeOf = new Dictionary<uint, uint>();
             var variables = new Dictionary<uint, (uint PointerType, uint Storage)>();
             var builtins = new HashSet<uint>();
+            // BaseVertex inputs (DX SV_VertexID = VertexIndex - BaseVertex) are not expressible in GLSL ES.
+            var baseVertex = new HashSet<uint>();
 
             foreach (SpirvInstruction instruction in instructions)
             {
@@ -232,7 +252,26 @@ namespace AssetsManager.Shaders
                 else if (instruction.Op == OpVariable && instruction.Count >= 4)
                     variables[inst[2]] = (inst[1], inst[3]);
                 else if (instruction.Op == OpDecorate && instruction.Count >= 3 && inst[2] == DecorationBuiltIn)
+                {
                     builtins.Add(inst[1]);
+                    if (instruction.Count >= 4 && inst[3] == BuiltInBaseVertex)
+                        baseVertex.Add(inst[1]);
+                }
+            }
+
+            // Constants replacing values GLSL ES cannot query, keyed by (result type, value):
+            // - BaseVertex reads 0: the preview never draws with a base vertex offset.
+            // - textureQueryLevels reads 1: the engine textures queried this way bind 1x1 neutrals.
+            uint bound = words[3];
+            var constants = new Dictionary<(uint Type, uint Value), uint>();
+            var applied = new List<AppliedPatch>();
+            foreach (SpirvInstruction instruction in instructions)
+            {
+                if (!TryConstantReplacement(words.AsSpan(instruction.At, instruction.Count), instruction.Op, baseVertex, out (uint Type, uint Value) key))
+                    continue;
+                if (!constants.ContainsKey(key))
+                    constants[key] = bound++;
+                applied.Add(instruction.Op == OpLoad ? AppliedPatch.BaseVertexZero : AppliedPatch.MipLevelsOne);
             }
 
             var newNames = new Dictionary<uint, string>();
@@ -293,17 +332,50 @@ namespace AssetsManager.Shaders
                 }
             }
 
-            var output = new List<uint>(words.Length + 8);
+            var output = new List<uint>(words.Length + 8 + constants.Count * 4);
             output.AddRange(words.AsSpan(0, 5).ToArray());
+            output[3] = bound;
             var renames = new List<(string From, string To)>();
+            bool constantsEmitted = false;
             foreach (SpirvInstruction instruction in instructions)
             {
                 ReadOnlySpan<uint> inst = words.AsSpan(instruction.At, instruction.Count);
                 if (instruction.Op == OpCapability &&
                     (inst[1] == CapabilityDerivativeControl ||
                      inst[1] == CapabilityPhysicalStorageBufferAddresses ||
-                     inst[1] == CapabilityDemoteToHelperInvocation))
+                     inst[1] == CapabilityDemoteToHelperInvocation ||
+                     (inst[1] == CapabilityDrawParameters && baseVertex.Count > 0)))
                 {
+                    continue;
+                }
+
+                if (baseVertex.Count > 0)
+                {
+                    if (instruction.Op == OpExtension && ReadSpirvString(inst[1..]) == DrawParametersExtension)
+                        continue;
+                    if ((instruction.Op is OpName or OpDecorate && instruction.Count >= 2 && baseVertex.Contains(inst[1])) ||
+                        (instruction.Op == OpVariable && instruction.Count >= 3 && baseVertex.Contains(inst[2])))
+                    {
+                        continue;
+                    }
+                    if (instruction.Op == OpEntryPoint)
+                    {
+                        EmitEntryPointWithout(output, inst, baseVertex);
+                        continue;
+                    }
+                }
+
+                // Module-scope constants must precede the first function body.
+                if (instruction.Op == OpFunction && !constantsEmitted)
+                {
+                    foreach (((uint type, uint value), uint id) in constants)
+                        output.AddRange(new[] { (4u << 16) | OpConstant, type, id, value });
+                    constantsEmitted = true;
+                }
+
+                if (TryConstantReplacement(inst, instruction.Op, baseVertex, out (uint Type, uint Value) replacement))
+                {
+                    output.AddRange(new[] { (4u << 16) | OpCopyObject, inst[1], inst[2], constants[replacement] });
                     continue;
                 }
 
@@ -353,8 +425,50 @@ namespace AssetsManager.Shaders
                     output.Add(inst[index]);
             }
 
-            return new PatchedSpirv(output.ToArray(), renames);
+            return new PatchedSpirv(output.ToArray(), renames, applied.Distinct().ToArray());
         }
+
+        private static bool TryConstantReplacement(
+            ReadOnlySpan<uint> inst,
+            uint op,
+            ISet<uint> baseVertex,
+            out (uint Type, uint Value) key)
+        {
+            key = default;
+            if (inst.Length < 4)
+                return false;
+            if (op == OpLoad && baseVertex.Contains(inst[3]))
+                key = (inst[1], 0u);
+            else if (op == OpImageQueryLevels)
+                key = (inst[1], 1u);
+            else
+                return false;
+            return true;
+        }
+
+        /// <summary>Copies an OpEntryPoint dropping the removed variables from its interface list.</summary>
+        private static void EmitEntryPointWithout(List<uint> output, ReadOnlySpan<uint> inst, ISet<uint> removed)
+        {
+            // Operands: execution model, entry id, null-terminated literal name, interface ids.
+            int interfaceAt = 3;
+            while (interfaceAt < inst.Length && !HasZeroByte(inst[interfaceAt]))
+                interfaceAt++;
+            interfaceAt = Math.Min(interfaceAt + 1, inst.Length);
+
+            var kept = new List<uint>(inst.Length);
+            for (int index = 1; index < interfaceAt; index++)
+                kept.Add(inst[index]);
+            for (int index = interfaceAt; index < inst.Length; index++)
+                if (!removed.Contains(inst[index]))
+                    kept.Add(inst[index]);
+
+            output.Add(((uint)(kept.Count + 1) << 16) | OpEntryPoint);
+            output.AddRange(kept);
+        }
+
+        private static bool HasZeroByte(uint word) =>
+            (word & 0x000000FFu) == 0 || (word & 0x0000FF00u) == 0 ||
+            (word & 0x00FF0000u) == 0 || (word & 0xFF000000u) == 0;
 
         private static IReadOnlyList<SpirvInstruction> ReadInstructions(uint[] words)
         {

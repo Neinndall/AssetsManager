@@ -329,6 +329,78 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             }
         }
 
+        [Theory]
+        [InlineData("ASSETS/Shaders/HLSL/ParticleSystem/QUAD_VS_FixedAlphaUV.vs", "vs", GameShaderTranslator.AppliedPatch.BaseVertexZero)]
+        [InlineData("Shaders/StaticMesh/Mantis_Env_Baked_PBR", "ps", GameShaderTranslator.AppliedPatch.MipLevelsOne)]
+        public void EsUnsupportedQueriesTranslateAndCompileOnDesktopOpenGl(
+            string shader,
+            string stage,
+            GameShaderTranslator.AppliedPatch expected)
+        {
+            // The only two causes the ShaderCache sweep found: BaseVertex and textureQueryLevels have no GLSL ES form.
+            string root = FindInstalledShaderCacheRoot();
+            if (root == null)
+                return;
+
+            string cachePath = Path.Combine(root, @"Game\DATA\FINAL\ShaderCache.dx11.wad.client");
+            using var wad = new WadFile(cachePath);
+            string toc = GameShaderProgramResolver.TocPath(shader, stage);
+            ulong tocHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(toc);
+            if (!wad.Chunks.ContainsKey(tocHash))
+                return;
+
+            LeagueToolkit.Core.Renderer.ShaderToc table;
+            using (var tocBytes = wad.LoadChunkDecompressed(tocHash))
+            using (var tocStream = new MemoryStream(tocBytes.Span.ToArray(), writable: false))
+                table = new LeagueToolkit.Core.Renderer.ShaderToc(tocStream);
+
+            using var context = new HiddenWglContext();
+            Silk.NET.OpenGL.GL gl = Silk.NET.OpenGL.GL.GetApi(context.GetProcAddress);
+            var failures = new System.Collections.Generic.List<string>();
+            int patched = 0;
+            try
+            {
+                foreach (uint shaderId in System.Linq.Enumerable.Distinct(table.ShaderIds))
+                {
+                    byte[] bundle;
+                    using (var bundleBytes = wad.LoadChunkDecompressed(
+                               LeagueToolkit.Hashing.XxHash64Ext.Hash(GameShaderProgramResolver.BundlePath(toc, shaderId))))
+                        bundle = bundleBytes.Span.ToArray();
+                    byte[] dxbc = GameShaderProgramResolver.ReadBundleRecord(bundle, shaderId % 100);
+
+                    GameShaderTranslator.TranslatedStage translated = GameShaderTranslator.TranslateStage(
+                        dxbc,
+                        DxbcReflection.Reflect(dxbc),
+                        stage == "vs" ? GameShaderTranslator.Stage.Vertex : GameShaderTranslator.Stage.Pixel);
+                    if (translated.Applied.Contains(expected))
+                        patched++;
+
+                    Silk.NET.OpenGL.ShaderType type = stage == "vs"
+                        ? Silk.NET.OpenGL.ShaderType.VertexShader
+                        : Silk.NET.OpenGL.ShaderType.FragmentShader;
+                    uint handle = gl.CreateShader(type);
+                    try
+                    {
+                        gl.ShaderSource(handle, ToDesktopGlsl(translated.Glsl));
+                        gl.CompileShader(handle);
+                        gl.GetShader(handle, Silk.NET.OpenGL.ShaderParameterName.CompileStatus, out int compiled);
+                        if (compiled == 0)
+                            failures.Add($"{toc}#{shaderId}: {gl.GetShaderInfoLog(handle)}");
+                    }
+                    finally
+                    {
+                        gl.DeleteShader(handle);
+                    }
+                }
+                Assert.Empty(failures);
+                Assert.True(patched > 0, $"No permutation of {toc} needed {expected}.");
+            }
+            finally
+            {
+                gl.Dispose();
+            }
+        }
+
         [Fact]
         public async System.Threading.Tasks.Task InstalledMap11ProgramsCompileAndLinkOnDesktopOpenGl()
         {
