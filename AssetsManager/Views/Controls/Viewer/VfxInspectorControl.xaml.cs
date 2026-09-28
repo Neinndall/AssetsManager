@@ -100,6 +100,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private MapParticleRenderer _mapParticleRenderer;
         private MapPostEffectsRenderer _mapPostEffectsRenderer;
         private FxaaPostEffectsRenderer _fxaaRenderer;
+        private CheckerboardBackgroundRenderer _checkerboardBackgroundRenderer;
         private SmaaPostEffectsRenderer _smaaRenderer;
         private SkyRenderer _skyRenderer;
         private VfxCubeMapData _genericSkyCube;
@@ -819,6 +820,11 @@ namespace AssetsManager.Views.Controls.Viewer
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedSystem))
             {
                 RequestSystemInspection(_model.SelectedSystem);
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.HasStandaloneSystem))
+            {
+                if (!_model.HasStandaloneSystem && ChancePinPopup != null) ChancePinPopup.IsOpen = false;
+                SyncChancePinControls();
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.SelectedEmitter))
             {
@@ -1585,6 +1591,7 @@ namespace AssetsManager.Views.Controls.Viewer
         /// </summary>
         public void Deactivate()
         {
+            CloseAllToolbarPopups();
             _isActive = false;
             _pendingSystem = null;
             // LTK stops the viewport frameloop while hidden. Keep the GL resources alive but stop
@@ -1681,6 +1688,10 @@ namespace AssetsManager.Views.Controls.Viewer
             var mapPostEffectsRenderer = _mapPostEffectsRenderer;
             _mapPostEffectsRenderer = null;
             RunReleaseStep(nameof(MapPostEffectsRenderer), () => mapPostEffectsRenderer?.Dispose(), gpuBound: true);
+
+            var checkerboardBackgroundRenderer = _checkerboardBackgroundRenderer;
+            _checkerboardBackgroundRenderer = null;
+            RunReleaseStep(nameof(CheckerboardBackgroundRenderer), () => checkerboardBackgroundRenderer?.Dispose(), gpuBound: true);
 
             var fxaaRenderer = _fxaaRenderer;
             _fxaaRenderer = null;
@@ -1975,6 +1986,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 case "Light":
                     _gl.ClearColor(0.85f, 0.85f, 0.88f, 1.0f);
                     break;
+                case "Alpha":
                 case "Transparent":
                     _gl.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
                     break;
@@ -1989,6 +2001,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit |
                 Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit |
                 Silk.NET.OpenGL.ClearBufferMask.StencilBufferBit);
+
+            if (_model.BgMode is "Alpha" or "Transparent")
+            {
+                _checkerboardBackgroundRenderer ??= new CheckerboardBackgroundRenderer(_gl);
+                _checkerboardBackgroundRenderer.Render(16f * (float)VisualTreeHelper.GetDpi(this).DpiScaleX);
+            }
 
             // Build view/projection matrices from the active preview camera. Orthographic presets
             // use the same camera controller but require their own projection matrix.
@@ -2926,6 +2944,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private long _previewViewModeClosedTicks;
         private long _previewCameraClosedTicks;
         private long _rigMenuClosedTicks;
+        private long _chancePinClosedTicks;
+        private long _timelineOptionsClosedTicks;
 
         private void CloseAllToolbarPopups(Popup exceptPopup = null)
         {
@@ -2935,6 +2955,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 PreviewViewModePopup.IsOpen = false;
             if (PreviewCameraPopup != null && PreviewCameraPopup != exceptPopup && PreviewCameraPopup.IsOpen)
                 PreviewCameraPopup.IsOpen = false;
+            if (ChancePinPopup != null && ChancePinPopup != exceptPopup && ChancePinPopup.IsOpen)
+                ChancePinPopup.IsOpen = false;
+            if (TimelineOptionsPopup != null && TimelineOptionsPopup != exceptPopup && TimelineOptionsPopup.IsOpen)
+                TimelineOptionsPopup.IsOpen = false;
             if (RigPresetButton?.ContextMenu != null && RigPresetButton.ContextMenu.IsOpen)
                 RigPresetButton.ContextMenu.IsOpen = false;
         }
@@ -8255,49 +8279,38 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void ChancePinSlider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        private void ChancePinButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_isUpdatingChancePinControls ||
-                _model?.HasStandaloneSystem != true ||
-                _vfxRenderer == null ||
-                ChancePinSlider == null)
-            {
-                return;
-            }
-
-            // Clicking the slider at its neutral 0.50 position must still create a pin even when
-            // ValueChanged does not fire because the thumb was already resting there.
-            ApplyPinnedBirthChance((float)ChancePinSlider.Value);
+            if (_model?.HasStandaloneSystem != true || ChancePinPopup == null ||
+                Environment.TickCount64 - _chancePinClosedTicks < 250) return;
+            SyncChancePinControls();
+            CloseAllToolbarPopups(ChancePinPopup);
+            ChancePinPopup.IsOpen = !ChancePinPopup.IsOpen;
         }
 
-        private void ChancePinSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (_isUpdatingChancePinControls ||
-                !IsLoaded ||
-                _model?.HasStandaloneSystem != true ||
-                _vfxRenderer == null)
-            {
-                return;
-            }
+        private void ChancePinPopup_Closed(object sender, EventArgs e)
+            => _chancePinClosedTicks = Environment.TickCount64;
 
-            ApplyPinnedBirthChance((float)e.NewValue);
+        private void TimelineOptionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (TimelineOptionsPopup == null || Environment.TickCount64 - _timelineOptionsClosedTicks < 250) return;
+            CloseAllToolbarPopups(TimelineOptionsPopup);
+            TimelineOptionsPopup.IsOpen = !TimelineOptionsPopup.IsOpen;
         }
 
-        private void ChancePinClear_Click(object sender, RoutedEventArgs e)
-        {
-            if (_vfxRenderer == null) return;
-            _vfxRenderer.SetPinnedBirthChance(null);
+        private void TimelineOptionsPopup_Closed(object sender, EventArgs e)
+            => _timelineOptionsClosedTicks = Environment.TickCount64;
 
+        private void SyncChancePinControls()
+        {
+            if (ChancePinToggle == null || ChancePinSlider == null) return;
             _isUpdatingChancePinControls = true;
             try
             {
-                if (ChancePinSlider != null)
-                {
-                    ChancePinSlider.Value = 0.5d;
-                    ChancePinSlider.Opacity = 0.5d;
-                }
-                if (ChancePinValueText != null) ChancePinValueText.Text = string.Empty;
-                if (ChancePinClearButton != null) ChancePinClearButton.Visibility = Visibility.Collapsed;
+                float? chance = _vfxRenderer?.PinnedBirthChance;
+                ChancePinToggle.IsChecked = chance.HasValue;
+                if (chance.HasValue) ChancePinSlider.Value = chance.Value;
+                ChancePinValueText.Text = ChancePinSlider.Value.ToString("F2", CultureInfo.InvariantCulture);
             }
             finally
             {
@@ -8305,14 +8318,28 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private void ChancePinToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model?.HasStandaloneSystem != true || _vfxRenderer == null) return;
+            if (ChancePinToggle.IsChecked == true)
+                ApplyPinnedBirthChance((float)ChancePinSlider.Value);
+            else
+                _vfxRenderer.SetPinnedBirthChance(null);
+        }
+
+        private void ChancePinSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingChancePinControls || !IsLoaded || ChancePinToggle?.IsChecked != true ||
+                _model?.HasStandaloneSystem != true || _vfxRenderer == null) return;
+            ApplyPinnedBirthChance((float)e.NewValue);
+        }
+
         private void ApplyPinnedBirthChance(float chance)
         {
             chance = Math.Clamp(chance, 0f, 1f);
             _vfxRenderer?.SetPinnedBirthChance(chance);
-            if (ChancePinSlider != null) ChancePinSlider.Opacity = 1d;
             if (ChancePinValueText != null)
                 ChancePinValueText.Text = chance.ToString("F2", CultureInfo.InvariantCulture);
-            if (ChancePinClearButton != null) ChancePinClearButton.Visibility = Visibility.Visible;
         }
 
         private void SetPlaybackSpeed(double speed, bool updateControl = true)
@@ -8365,7 +8392,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_model == null) return;
             if (BgComboBox?.SelectedItem is ComboBoxItem item)
             {
-                _model.BgMode = item.Content?.ToString() ?? "Dark";
+                _model.BgMode = item.Tag?.ToString() ?? item.Content?.ToString() ?? "Dark";
             }
         }
 

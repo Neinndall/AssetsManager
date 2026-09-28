@@ -143,6 +143,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio / Show the selected character, clip or spell in the viewport header and keep randomness and animation options compact, and move background selection to the viewport menu.
   - VFX Studio / Form selector now defaults to the untransformed Base form, shows friendly variant names, and automatically isolates form-specific submesh geometry to prevent overlapping meshes.
   - VFX Studio / Particle effects now use game shaders when available, including the textures of their custom materials.
   - VFX Studio / Timeline now starts at its minimum height to leave more space for the viewport.
@@ -436,6 +437,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Alpha background now shows a checkerboard instead of falling back to Dark.
   - VFX Studio / Corrected projectile effect orientation so ground offsets stay below flight and upward motion rises correctly.
   - VFX Studio / Corrected Shimmer mesh colors and transforms built from combined drivers.
   - Maps / Material parameter values now take priority over their shader pass values when shaders are off.

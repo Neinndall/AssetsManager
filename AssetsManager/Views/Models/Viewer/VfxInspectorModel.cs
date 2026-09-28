@@ -852,6 +852,7 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 _selectedAnimation = value;
                 OnPropertyChanged();
+                NotifyViewportSelectionChanged();
             }
         }
 
@@ -862,6 +863,7 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 _selectedSpell = value;
                 OnPropertyChanged();
+                NotifyViewportSelectionChanged();
             }
         }
 
@@ -912,17 +914,47 @@ namespace AssetsManager.Views.Models.Viewer
 
         public bool HasSelectedMapNode => _selectedMapNode != null;
 
+        private string CharacterSelectionTitle => IsSkinWorkspace
+            ? SelectedWorkspaceTab.FocusedActor?.Title ?? SelectedWorkspaceTab.Title
+            : HasChampionMesh && SelectedSkin != null
+                ? string.IsNullOrWhiteSpace(SelectedSkin.OwnerName)
+                    ? SelectedSkin.Title
+                    : $"{SelectedSkin.OwnerName} · {SelectedSkin.Title}"
+                : null;
+
         public string ViewportSelectionTitle =>
-            _selectedMapNode?.Title ?? _selectedSystem?.Name ?? "No asset selected";
+            _selectedMapNode?.Title ?? _selectedSpell?.Name ??
+            (_selectedAnimation is { IsBindPose: false } ? _selectedAnimation.DisplayName : null) ??
+            _selectedSystem?.Name ?? CharacterSelectionTitle ??
+            (IsMapWorkspace ? SelectedWorkspaceTab.Title : null) ?? "No asset selected";
 
         public string ViewportSelectionDetail =>
             !string.IsNullOrWhiteSpace(_selectedMapNode?.InspectorSummary)
                 ? _selectedMapNode.InspectorSummary
                 : _selectedMapNode != null
                     ? _selectedMapNode.Subtitle ?? _selectedMapNode.Kind.ToString()
-                    : _selectedSystem != null
-                        ? $"Particles: {_liveParticleCount}"
-                        : "Select an asset to inspect";
+                    : _selectedSpell != null
+                        ? $"Spell · Particles: {_liveParticleCount}"
+                        : _selectedAnimation is { IsBindPose: false }
+                            ? $"Animation clip · Particles: {_liveParticleCount}"
+                            : _selectedSystem != null
+                                ? $"Particles: {_liveParticleCount}"
+                                : CharacterSelectionTitle != null
+                                    ? _selectedAnimation?.IsBindPose == true ? "Character · Bind pose" : "Character"
+                                    : IsMapWorkspace ? "Map" : "Select an asset to inspect";
+
+        private void NotifyViewportSelectionChanged()
+        {
+            OnPropertyChanged(nameof(ViewportSelectionTitle));
+            OnPropertyChanged(nameof(ViewportSelectionDetail));
+        }
+
+        private void SelectedWorkspaceTab_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(VfxWorkspaceTab.FocusedActor) or
+                nameof(VfxWorkspaceTab.Title) or nameof(VfxWorkspaceTab.Subtitle))
+                NotifyViewportSelectionChanged();
+        }
 
         internal void SetMapVariants(IEnumerable<MapVariantData> variants)
         {
@@ -1002,6 +1034,7 @@ namespace AssetsManager.Views.Models.Viewer
                 if (_hasChampionMesh == value) return;
                 _hasChampionMesh = value;
                 OnPropertyChanged();
+                NotifyViewportSelectionChanged();
                 OnPropertyChanged(nameof(HasViewportContentControls));
                 OnPropertyChanged(nameof(HasMapOnlyWorkspace));
             }
@@ -1260,15 +1293,24 @@ namespace AssetsManager.Views.Models.Viewer
             set
             {
                 if (ReferenceEquals(_selectedWorkspaceTab, value)) return;
-                if (_selectedWorkspaceTab != null) _selectedWorkspaceTab.IsSelected = false;
+                if (_selectedWorkspaceTab != null)
+                {
+                    _selectedWorkspaceTab.PropertyChanged -= SelectedWorkspaceTab_PropertyChanged;
+                    _selectedWorkspaceTab.IsSelected = false;
+                }
                 _selectedWorkspaceTab = value;
-                if (_selectedWorkspaceTab != null) _selectedWorkspaceTab.IsSelected = true;
+                if (_selectedWorkspaceTab != null)
+                {
+                    _selectedWorkspaceTab.PropertyChanged += SelectedWorkspaceTab_PropertyChanged;
+                    _selectedWorkspaceTab.IsSelected = true;
+                }
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsSkinWorkspace));
                 OnPropertyChanged(nameof(IsMapWorkspace));
                 OnPropertyChanged(nameof(HasContextInspector));
                 OnPropertyChanged(nameof(IsInspectorPanelVisible));
                 OnPropertyChanged(nameof(HasActiveCharacterBackdrop));
+                NotifyViewportSelectionChanged();
             }
         }
 
@@ -1285,7 +1327,7 @@ namespace AssetsManager.Views.Models.Viewer
         public VfxSkinItem SelectedSkin
         {
             get => _selectedSkin;
-            set { _selectedSkin = value; OnPropertyChanged(); }
+            set { _selectedSkin = value; OnPropertyChanged(); NotifyViewportSelectionChanged(); }
         }
 
         public string SearchQuery

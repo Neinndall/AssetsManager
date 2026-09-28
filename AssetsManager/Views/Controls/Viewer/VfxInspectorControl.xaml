@@ -1111,6 +1111,21 @@
                                             <CheckBox Content="Sky" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
                                                       IsChecked="{Binding ShowPreviewSky, Mode=TwoWay}"/>
 
+                                            <StackPanel Orientation="Horizontal" Margin="0,12,0,6">
+                                                <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"
+                                                                            Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"
+                                                                            VerticalAlignment="Center"/>
+                                                <TextBlock Text="BACKGROUND" Foreground="{StaticResource TextSecondary}" FontSize="10"
+                                                           FontWeight="Bold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <ComboBox x:Name="BgComboBox" Style="{StaticResource ModernComboBox}" Height="28"
+                                                      SelectionChanged="BgMode_SelectionChanged" SelectedIndex="0"
+                                                      ToolTip="Preview backdrop. Sky and scene surfaces draw over it.">
+                                                <ComboBoxItem Content="Dark" Tag="Dark"/>
+                                                <ComboBoxItem Content="Light" Tag="Light"/>
+                                                <ComboBoxItem Content="Alpha (checkerboard)" Tag="Alpha"/>
+                                            </ComboBox>
+
                                         </StackPanel>
                                     </Border>
                                 </Popup>
@@ -1366,7 +1381,7 @@
                                 </Border>
                             </StackPanel>
 
-                            <!-- RIGHT: TRANSPORT ACTION BUTTONS, TIME READOUT, SPEED, LOOP, BG -->
+                            <!-- Playback controls and compact inspection options. -->
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <!-- Step Back Button (|<) -->
                                 <Button Click="StepBack_Click" Style="{StaticResource TimelineTransportButtonStyle}"
@@ -1425,17 +1440,6 @@
                                 <!-- Separator -->
                                 <Border Width="1" Height="18" Background="{StaticResource BorderColor}" Margin="0,0,10,0" VerticalAlignment="Center" Opacity="0.6"/>
 
-                                <!-- Parametric AnimationGraph clips choose one authored mValue at a time. -->
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0"
-                                            Visibility="{Binding HasAnimationParameters, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="PARAM:" Foreground="{StaticResource TextMuted}" FontSize="10.5"
-                                               FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                    <ComboBox Style="{StaticResource ModernComboBox}" Width="72" Height="26"
-                                              ItemsSource="{Binding AnimationParameterValues}"
-                                              SelectedItem="{Binding AnimationParameter, Mode=TwoWay}"
-                                              ItemStringFormat="{}{0:0.###}"/>
-                                </StackPanel>
-
                                 <!-- Speed Control -->
                                 <materialIcons:MaterialIcon Kind="Speedometer" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                 <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="76" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="4" Margin="0,0,8,0">
@@ -1448,25 +1452,61 @@
                                     <ComboBoxItem Content="2.0x" Tag="2.0"/>
                                 </ComboBox>
 
-                                <!-- Probability-table inspection chance belongs to a standalone run. -->
-                                <StackPanel x:Name="ChancePinPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0"
-                                            Visibility="{Binding HasStandaloneSystem, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="Chance" FontSize="10.5" Foreground="{StaticResource TextMuted}"
-                                               VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <Slider x:Name="ChancePinSlider" Width="86" Minimum="0" Maximum="1" Value="0.5"
-                                            TickFrequency="0.01" IsSnapToTickEnabled="True" Opacity="0.5"
-                                            Style="{StaticResource HUDSliderStyle}"
-                                            ValueChanged="ChancePinSlider_ValueChanged"
-                                            PreviewMouseDown="ChancePinSlider_PreviewMouseDown"/>
-                                    <TextBlock x:Name="ChancePinValueText" Width="34" Text="" FontSize="10" FontFamily="Consolas"
-                                               Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"
-                                               TextAlignment="Right" Margin="4,0,2,0"/>
-                                    <Button x:Name="ChancePinClearButton" Click="ChancePinClear_Click"
-                                            Style="{StaticResource TransparentIconButton}" Width="22" Height="22" Padding="0"
-                                            Visibility="Collapsed" ToolTip="Unpin probability chance">
-                                        <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12"/>
-                                    </Button>
-                                </StackPanel>
+                                <Button x:Name="ChancePinButton" Click="ChancePinButton_Click"
+                                        Width="30" Height="28" Padding="0" Margin="0,0,4,0"
+                                        Visibility="{Binding HasStandaloneSystem, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                            <Setter Property="ToolTip" Value="Particle randomness: random per birth"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=ChancePinToggle}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                    <Setter Property="Background" Value="#205B82FF"/>
+                                                    <Setter Property="ToolTip" Value="Particle randomness: fixed value for new births"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialIcons:MaterialIcon Kind="Dice5Outline" Width="17" Height="17"/>
+                                </Button>
+                                <Popup x:Name="ChancePinPopup" PlacementTarget="{Binding ElementName=ChancePinButton}"
+                                       Placement="Top" VerticalOffset="-6" StaysOpen="False" AllowsTransparency="True"
+                                       PopupAnimation="Fade" Closed="ChancePinPopup_Closed"
+                                       DataContext="{Binding DataContext, ElementName=ChancePinButton}">
+                                    <Grid Width="240">
+                                        <Border Background="{StaticResource CardBackground}" CornerRadius="7"/>
+                                        <StackPanel Margin="12">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                                <materialIcons:MaterialIcon Kind="Dice5Outline" Width="14" Height="14"
+                                                                            Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"/>
+                                                <TextBlock Text="PARTICLE RANDOMNESS" FontSize="10" FontWeight="Bold"
+                                                           Foreground="{StaticResource TextSecondary}"/>
+                                            </StackPanel>
+                                            <CheckBox x:Name="ChancePinToggle" Content="Fix random value" IsChecked="False"
+                                                      Style="{StaticResource ModernCheckBox}" Click="ChancePinToggle_Click"
+                                                      ToolTip="Use the chosen probability-table value for new particle births."/>
+                                            <TextBlock Text="Off: random per birth. On: repeat the chosen value."
+                                                       TextWrapping="Wrap" FontSize="10.5" Foreground="{StaticResource TextMuted}"
+                                                       Margin="0,7,0,10"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="40"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Slider x:Name="ChancePinSlider" Minimum="0" Maximum="1" Value="0.5"
+                                                        TickFrequency="0.01" IsSnapToTickEnabled="True"
+                                                        IsEnabled="{Binding IsChecked, ElementName=ChancePinToggle}"
+                                                        Style="{StaticResource HUDSliderStyle}" ToolTip="Probability-table draw (0 to 1)"
+                                                        ValueChanged="ChancePinSlider_ValueChanged"/>
+                                                <TextBlock x:Name="ChancePinValueText" Grid.Column="1" Text="0.50"
+                                                           FontSize="10" FontFamily="Consolas" Foreground="{StaticResource AccentBrush}"
+                                                           VerticalAlignment="Center" TextAlignment="Right"/>
+                                            </Grid>
+                                        </StackPanel>
+                                        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="7"
+                                                IsHitTestVisible="False"/>
+                                    </Grid>
+                                </Popup>
 
                                 <!-- One timeline loop control is shared by Systems, Clips, and Spells. -->
                                 <ToggleButton x:Name="TimelineLoopToggleButton"
@@ -1478,13 +1518,37 @@
                                     <materialIcons:MaterialIcon Kind="RepeatVariant" Width="17" Height="17"/>
                                 </ToggleButton>
 
-                                <!-- BG Mode Selector -->
-                                <TextBlock Text="BG:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <ComboBox x:Name="BgComboBox" Style="{StaticResource ModernComboBox}" Width="80" Height="26" SelectionChanged="BgMode_SelectionChanged" SelectedIndex="0">
-                                    <ComboBoxItem Content="Dark"/>
-                                    <ComboBoxItem Content="Light"/>
-                                    <ComboBoxItem Content="Alpha"/>
-                                </ComboBox>
+                                <Button x:Name="TimelineOptionsButton" Click="TimelineOptionsButton_Click"
+                                        Style="{StaticResource TransparentIconButton}" Width="30" Height="28" Padding="0"
+                                        Visibility="{Binding HasAnimationParameters, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTip="Animation options: authored parameter">
+                                    <materialIcons:MaterialIcon Kind="DotsHorizontal" Width="18" Height="18"/>
+                                </Button>
+                                <Popup x:Name="TimelineOptionsPopup" PlacementTarget="{Binding ElementName=TimelineOptionsButton}"
+                                       Placement="Top" VerticalOffset="-6" StaysOpen="False" AllowsTransparency="True"
+                                       PopupAnimation="Fade" Closed="TimelineOptionsPopup_Closed"
+                                       DataContext="{Binding DataContext, ElementName=TimelineOptionsButton}">
+                                    <Grid Width="220">
+                                        <Border Background="{StaticResource CardBackground}" CornerRadius="7"/>
+                                        <StackPanel Margin="12">
+                                            <TextBlock Text="ANIMATION OPTIONS" FontSize="10" FontWeight="Bold"
+                                                       Foreground="{StaticResource TextSecondary}" Margin="0,0,0,12"/>
+                                            <!-- Parametric AnimationGraph clips choose one authored mValue at a time. -->
+                                            <StackPanel Margin="0,0,0,12"
+                                                        Visibility="{Binding HasAnimationParameters, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <TextBlock Text="Animation parameter" Foreground="{StaticResource TextMuted}" FontSize="10.5"
+                                                           VerticalAlignment="Center" Margin="0,0,0,5"/>
+                                                <ComboBox Style="{StaticResource ModernComboBox}" Width="Auto" Height="28"
+                                                          ItemsSource="{Binding AnimationParameterValues}"
+                                                          SelectedItem="{Binding AnimationParameter, Mode=TwoWay}"
+                                                          ItemStringFormat="{}{0:0.###}"/>
+                                            </StackPanel>
+
+                                        </StackPanel>
+                                        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="7"
+                                                IsHitTestVisible="False"/>
+                                    </Grid>
+                                </Popup>
                             </StackPanel>
                         </Grid>
 
