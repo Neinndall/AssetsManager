@@ -331,6 +331,11 @@ namespace AssetsManager.Tests.Diagnostics
                 ShaderPermutationProbeDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "skin-gpu-sweep", StringComparison.OrdinalIgnoreCase))
+            {
+                SkinGpuSweepDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "shader-cache-sweep", StringComparison.OrdinalIgnoreCase))
             {
                 ShaderCacheSweepDiagnostic.Run(args.Skip(1).ToArray());

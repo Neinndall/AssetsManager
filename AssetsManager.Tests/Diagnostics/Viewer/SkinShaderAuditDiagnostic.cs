@@ -5,11 +5,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Explorer;
-using AssetsManager.Services.Parsers;
 using AssetsManager.Services.Viewer.Loading;
-using AssetsManager.Services.Viewer.Parsing;
-using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Tests.Support;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Viewer;
@@ -30,43 +27,22 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 return;
             }
 
-            string install = new[]
-                {
-                    @"C:\Riot Games\League of Legends (PBE)",
-                    @"C:\Riot Games\League of Legends"
-                }
-                .FirstOrDefault(candidate => File.Exists(Path.Combine(candidate, @"Game\DATA\FINAL\ShaderCache.dx11.wad.client")));
+            string install = InstalledSkins.FindInstall();
             if (install == null)
             {
                 Console.WriteLine("[SkinShader] No League install with ShaderCache.dx11.wad.client was found.");
                 return;
             }
 
-            var settings = AppSettings.GetDefaultSettings();
-            settings.PreferredClient = PreferredClient.PBE;
-            settings.LolPbeDirectory = install;
-            settings.LolLiveDirectory = null;
-
+            AppSettings settings = InstalledSkins.Settings(install);
             var log = new LogService(new Serilog.LoggerConfiguration().CreateLogger());
-            var wadProvider = new WadContentProvider(
-                log,
-                new WadNodeLoaderService(null, log),
-                new DirectoriesCreator(),
-                new SvgParser());
-            var resolver = new MapAssetResolver(wadProvider, settings);
-            var loader = new MapCharacterLoadingService(
-                resolver,
-                new MapCharacterSkinParser(),
-                new MapCharacterMeshDecoder(),
-                null,
-                null);
+            var loader = InstalledSkins.CreateLoader(settings, log);
 
             // An empty project root: every asset resolves from the install WADs.
             string projectRoot = Path.Combine(Path.GetTempPath(), "am-skin-shader-audit");
             Directory.CreateDirectory(projectRoot);
 
-            if (skins.Contains("--all", StringComparer.OrdinalIgnoreCase))
-                skins = AllSkins(install, skins).ToArray();
+            skins = InstalledSkins.FromArguments(install, skins);
             Console.WriteLine($"[SkinShader] skins={skins.Length}.");
 
             var skinUsage = new ShaderInputUsage();
@@ -140,40 +116,6 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             Console.WriteLine($"[SkinShader] loaded={loaded}/{skins.Length} elapsed={clock.Elapsed:hh\\:mm\\:ss}.");
             skinUsage.Print("SkinShader");
             particleUsage.Print("SkinParticleShader");
-        }
-
-        /// <summary>
-        /// Every champion WAD of the install (localized WADs excluded) with its skin BINs from the game hash
-        /// list, capped by `--max-skins N` per champion (all by default).
-        /// </summary>
-        private static IEnumerable<string> AllSkins(string install, string[] args)
-        {
-            int at = Array.IndexOf(args, "--max-skins");
-            int maxSkins = at >= 0 && at + 1 < args.Length && int.TryParse(args[at + 1], out int parsed) ? parsed : int.MaxValue;
-            string hashes = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "AssetsManager", "hashes", "hashes.game.txt");
-
-            string[] champions = Directory.GetFiles(Path.Combine(install, @"Game\DATA\FINAL\Champions"), "*.wad.client")
-                .Select(path => Path.GetFileName(path)[..^".wad.client".Length])
-                .Where(name => !name.Contains('.') && !name.StartsWith("TFT", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            var byChampion = champions.ToDictionary(name => name.ToLowerInvariant(), _ => new SortedSet<int>());
-            var pattern = new System.Text.RegularExpressions.Regex(@"^data/characters/([a-z0-9_]+)/skins/skin(\d+)\.bin$");
-            foreach (string line in File.ReadLines(hashes))
-            {
-                int space = line.IndexOf(' ');
-                if (space < 0)
-                    continue;
-                var match = pattern.Match(line[(space + 1)..]);
-                if (match.Success && byChampion.TryGetValue(match.Groups[1].Value, out SortedSet<int> ids))
-                    ids.Add(int.Parse(match.Groups[2].Value));
-            }
-
-            foreach (string champion in champions)
-                foreach (int id in byChampion[champion.ToLowerInvariant()].Take(maxSkins))
-                    yield return $"Characters/{champion}/Skins/Skin{id}";
         }
     }
 }

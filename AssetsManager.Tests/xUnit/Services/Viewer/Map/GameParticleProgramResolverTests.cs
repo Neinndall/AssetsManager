@@ -7,6 +7,7 @@ using AssetsManager.Shaders;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Wad;
+using AssetsManager.Tests.Support;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
@@ -451,171 +452,35 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [InlineData("Characters/Sett/Skins/Skin76", "Body")]
         public async System.Threading.Tasks.Task InstalledSkinSubmeshDrawsVisiblePixelsWithItsGameProgram(string skin, string submesh)
         {
-            string install = FindInstalledShaderCacheRoot();
+            string install = InstalledSkins.FindInstall();
             if (install == null)
                 return;
 
-            var settings = AssetsManager.Utils.AppSettings.GetDefaultSettings();
-            settings.PreferredClient = AssetsManager.Views.Models.Settings.PreferredClient.PBE;
-            settings.LolPbeDirectory = install;
-            settings.LolLiveDirectory = null;
+            var settings = InstalledSkins.Settings(install);
             var log = new AssetsManager.Services.Core.LogService(new Serilog.LoggerConfiguration().CreateLogger());
-            var resolver = new AssetsManager.Services.Viewer.Resolvers.MapAssetResolver(
-                new AssetsManager.Services.Explorer.WadContentProvider(
-                    log,
-                    new AssetsManager.Services.Explorer.WadNodeLoaderService(null, log),
-                    new AssetsManager.Utils.DirectoriesCreator(),
-                    new AssetsManager.Services.Parsers.SvgParser()),
-                settings);
-            var loader = new AssetsManager.Services.Viewer.Loading.MapCharacterLoadingService(
-                resolver,
-                new AssetsManager.Services.Viewer.Parsing.MapCharacterSkinParser(),
-                new AssetsManager.Services.Viewer.Parsing.MapCharacterMeshDecoder(),
-                null,
-                null);
             string projectRoot = Path.Combine(Path.GetTempPath(), "am-skin-gpu-probe");
             Directory.CreateDirectory(projectRoot);
-            MapCharacterAssetData asset = await loader.LoadAsync(skin, projectRoot);
+            MapCharacterAssetData asset = await InstalledSkins.CreateLoader(settings, log).LoadAsync(skin, projectRoot);
             Assert.NotNull(asset);
-
             MapCharacterMeshRange range = asset.Mesh.Ranges.Single(item => item.Name == submesh);
             ModelMaterialDefinition material = asset.Materials.ResolveMaterialDefinition(submesh);
-            Vector3[] used = Enumerable.Range(range.StartIndex, range.IndexCount)
-                .Select(at => asset.Mesh.Positions[asset.Mesh.Indices[at]])
-                .ToArray();
-            Vector3 min = used.Aggregate(Vector3.Min);
-            Vector3 max = used.Aggregate(Vector3.Max);
-            Vector3 center = (min + max) * 0.5f;
-            float radius = Math.Max((max - min).Length() * 0.5f, 1f);
 
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
-            const uint Size = 256;
-            uint colour = gl.GenTexture();
-            gl.BindTexture(TextureTarget.Texture2D, colour);
-            gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, Size, Size, 0, PixelFormat.Rgba, PixelType.UnsignedByte, ReadOnlySpan<byte>.Empty);
-            uint depth = gl.GenRenderbuffer();
-            gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, depth);
-            gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.DepthComponent24, Size, Size);
-            uint framebuffer = gl.GenFramebuffer();
-            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
-            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, colour, 0);
-            gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, RenderbufferTarget.Renderbuffer, depth);
-            gl.Viewport(0, 0, Size, Size);
-            gl.ClearColor(0f, 0f, 1f, 0f);
-            gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-            gl.Enable(EnableCap.DepthTest);
-
-            uint vao = gl.GenVertexArray();
-            gl.BindVertexArray(vao);
-            void Buffer(uint location, float[] data, int components)
-            {
-                uint vbo = gl.GenBuffer();
-                gl.BindBuffer(BufferTargetARB.ArrayBuffer, vbo);
-                gl.BufferData(BufferTargetARB.ArrayBuffer, new ReadOnlySpan<float>(data), BufferUsageARB.StaticDraw);
-                gl.EnableVertexAttribArray(location);
-                gl.VertexAttribPointer(location, components, VertexAttribPointerType.Float, false, 0, IntPtr.Zero);
-            }
-            // The submesh's triangles expanded to plain vertices, drawn with DrawArrays.
-            uint[] corners = Enumerable.Range(range.StartIndex, range.IndexCount).Select(at => asset.Mesh.Indices[at]).ToArray();
-            Buffer(0, corners.SelectMany(v => new[] { asset.Mesh.Positions[v].X, asset.Mesh.Positions[v].Y, asset.Mesh.Positions[v].Z }).ToArray(), 3);
-            Buffer(1, corners.SelectMany(v => new[] { asset.Mesh.Normals[v].X, asset.Mesh.Normals[v].Y, asset.Mesh.Normals[v].Z }).ToArray(), 3);
-            Buffer(2, corners.SelectMany(v => new[] { asset.Mesh.Uv[v].X, asset.Mesh.Uv[v].Y }).ToArray(), 2);
-            Buffer(6, corners.SelectMany(v => asset.Mesh.SkinWeights.Skip((int)v * 4).Take(4)).ToArray(), 4);
-            uint indicesVbo = gl.GenBuffer();
-            gl.BindBuffer(BufferTargetARB.ArrayBuffer, indicesVbo);
-            gl.BufferData(BufferTargetARB.ArrayBuffer,
-                new ReadOnlySpan<byte>(corners.SelectMany(v => asset.Mesh.SkinIndices.Skip((int)v * 4).Take(4)).ToArray()),
-                BufferUsageARB.StaticDraw);
-            gl.EnableVertexAttribArray(5);
-            gl.VertexAttribIPointer(5, 4, VertexAttribIType.UnsignedByte, 0, IntPtr.Zero);
-
-            var textures = new System.Collections.Generic.Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase);
-            var missing = new System.Collections.Generic.List<string>();
-            uint? Texture(string path)
-            {
-                if (textures.TryGetValue(path, out uint cached))
-                    return cached;
-                System.Windows.Media.Imaging.BitmapSource bitmap = asset.Textures
-                    .FirstOrDefault(pair => string.Equals(pair.Key, path, StringComparison.OrdinalIgnoreCase)).Value;
-                if (bitmap == null)
-                {
-                    missing.Add(path);
-                    return null;
-                }
-                (int width, int height, byte[] pixels) = AssetsManager.Services.Viewer.Rendering.Core.GlBitmapPixels.ToBgra32(bitmap);
-                uint id = gl.GenTexture();
-                gl.BindTexture(TextureTarget.Texture2D, id);
-                gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0, PixelFormat.Bgra, PixelType.UnsignedByte, new ReadOnlySpan<byte>(pixels));
-                gl.GenerateMipmap(TextureTarget.Texture2D);
-                textures[path] = id;
-                return id;
-            }
-
-            Vector3 eye = center + new Vector3(radius * 2.2f, radius * 0.4f, radius * 1.2f);
-            Matrix4x4 view = Matrix4x4.CreateLookAt(eye, center, Vector3.UnitY);
-            Matrix4x4 projection = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, 1f, radius * 0.1f, radius * 10f);
             // The generic sky the viewport shows is also the environment PBR materials light from.
             var sky = Environment.GetEnvironmentVariable("AM_SKIN_GPU_NO_SKY") == "1"
                 ? null
                 : AssetsManager.Views.Helpers.SceneElements.LoadGenericSkyCube(settings, log);
-            var frame = new GameShaderRuntime.Frame(view, projection, eye, 1f, null, ImageLight: sky);
-            Console.WriteLine($"[SkinGpu] imageLight={(sky?.IsValid == true ? $"{sky.Width}px" : "none")}");
-            var bones = Enumerable.Repeat(Matrix4x4.Identity, 256).ToArray();
-            using var runtime = new GameShaderRuntime(gl, false, settings);
-            bool bound = runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, bones, false, in frame, Texture);
-            Assert.True(bound, $"{submesh}: the game program did not bind.");
-            gl.BindVertexArray(vao);
-            // Blending off: a pixel that survives with alpha 0 still shows, only a discard leaves the clear colour.
-            gl.Disable(EnableCap.Blend);
-            gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)corners.Length);
-            byte[] pixels = new byte[Size * Size * 4];
-            gl.ReadPixels(0, 0, Size, Size, PixelFormat.Rgba, PixelType.UnsignedByte, new Span<byte>(pixels));
-            int covered = 0;
-            long red = 0, green = 0, blue = 0, alpha = 0;
-            for (int at = 0; at < pixels.Length; at += 4)
-            {
-                if (pixels[at] == 0 && pixels[at + 1] == 0 && pixels[at + 2] == 255 && pixels[at + 3] == 0)
-                    continue;
-                covered++;
-                red += pixels[at]; green += pixels[at + 1]; blue += pixels[at + 2]; alpha += pixels[at + 3];
-            }
+            using var renderer = new SkinSubmeshRenderer(gl, settings, sky, 256);
             string snapshots = Environment.GetEnvironmentVariable("AM_SKIN_GPU_SNAPSHOTS");
-            if (!string.IsNullOrWhiteSpace(snapshots))
-            {
-                // Rows come bottom-up from ReadPixels; flip them and swap to BGRA for the encoder.
-                byte[] bgra = new byte[pixels.Length];
-                for (int row = 0; row < Size; row++)
-                    for (int column = 0; column < Size; column++)
-                    {
-                        int from = ((int)(Size - 1 - row) * (int)Size + column) * 4;
-                        int to = (row * (int)Size + column) * 4;
-                        bgra[to] = pixels[from + 2];
-                        bgra[to + 1] = pixels[from + 1];
-                        bgra[to + 2] = pixels[from];
-                        bgra[to + 3] = 255;
-                    }
-                var image = System.Windows.Media.Imaging.BitmapSource.Create(
-                    (int)Size, (int)Size, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, bgra, (int)Size * 4);
-                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
-                Directory.CreateDirectory(snapshots);
-                using (FileStream file = File.Create(Path.Combine(snapshots, $"{skin.Replace('/', '_')}_{submesh}.png")))
-                    encoder.Save(file);
-                foreach (string texturePath in textures.Keys)
-                {
-                    var textureEncoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-                    textureEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(asset.Textures
-                        .First(pair => string.Equals(pair.Key, texturePath, StringComparison.OrdinalIgnoreCase)).Value));
-                    using FileStream textureFile = File.Create(Path.Combine(snapshots, $"{submesh}_{texturePath}.png"));
-                    textureEncoder.Save(textureFile);
-                }
-            }
-            string summary = covered == 0
-                ? "no covered pixels"
-                : $"covered={covered} mean rgba=({red / covered},{green / covered},{blue / covered},{alpha / covered})";
-            Console.WriteLine($"[SkinGpu] {skin} {submesh} shader={material.Program?.Passes[0].ShaderPath} {summary} missingTextures={string.Join(",", missing)}");
-            Assert.True(covered > 0, $"{submesh}: {summary}");
+            SkinSubmeshRenderer.Result result = renderer.Render(asset, range, material, keepPixels: !string.IsNullOrWhiteSpace(snapshots));
+            Assert.True(result.Bound, $"{submesh}: the game program did not bind.");
+            if (result.Pixels != null)
+                renderer.SavePng(result.Pixels, Path.Combine(snapshots, $"{skin.Replace('/', '_')}_{submesh}.png"));
+
+            string summary = $"covered={result.Covered} nonFinite={result.NonFinite} mean={result.Mean} missingTextures={string.Join(",", result.MissingTextures)}";
+            Console.WriteLine($"[SkinGpu] {skin} {submesh} shader={material.Program?.Passes[0].ShaderPath} {summary}");
+            Assert.True(result.Covered > 0 && result.NonFinite == 0, $"{submesh}: {summary}");
         }
 
         [Fact]
@@ -962,291 +827,6 @@ void main() { FragColor = vec4(0.4, 0.6, 0.8, 0.5); }";
             if (address == System.IntPtr.Zero || value is 1 or 2 or 3 or -1)
                 address = GetProcAddress(OpenGlModule, procName);
             return address;
-        }
-        private sealed class HiddenWglContext : System.IDisposable
-        {
-            private const uint ClassOwnDeviceContext = 0x0020;
-            private const uint WindowExToolWindow = 0x00000080;
-            private const uint WindowPopup = 0x80000000;
-            private const uint PixelFormatDrawToWindow = 0x00000004;
-            private const uint PixelFormatSupportOpenGl = 0x00000020;
-            private const uint PixelFormatDoubleBuffer = 0x00000001;
-            private const byte PixelTypeRgba = 0;
-            private const sbyte MainPlane = 0;
-            private const int WglContextMajorVersion = 0x2091;
-            private const int WglContextMinorVersion = 0x2092;
-            private const int WglContextProfileMask = 0x9126;
-            private const int WglContextCoreProfileBit = 0x00000001;
-
-            private readonly string _className = "AssetsManager.ParticleShaderCompile." + System.Guid.NewGuid().ToString("N");
-            private readonly System.IntPtr _instance = GetModuleHandle(null);
-            private readonly WindowProcedure _windowProcedure = DefWindowProc;
-            private System.IntPtr _window;
-            private System.IntPtr _deviceContext;
-            private System.IntPtr _legacyContext;
-            private System.IntPtr _renderContext;
-            private bool _disposed;
-
-            internal HiddenWglContext()
-            {
-                try
-                {
-                    CreateWindowAndContext();
-                }
-                catch
-                {
-                    Dispose();
-                    throw;
-                }
-            }
-
-            internal System.IntPtr GetProcAddress(string name)
-            {
-                System.IntPtr address = WglGetProcAddress(name);
-                long value = address.ToInt64();
-                return address == System.IntPtr.Zero || value is 1 or 2 or 3 or -1
-                    ? NativeGetProcAddress(GetModuleHandle("opengl32.dll"), name)
-                    : address;
-            }
-
-            public void Dispose()
-            {
-                if (_disposed)
-                    return;
-                _disposed = true;
-
-                WglMakeCurrent(System.IntPtr.Zero, System.IntPtr.Zero);
-                if (_renderContext != System.IntPtr.Zero)
-                    WglDeleteContext(_renderContext);
-                if (_legacyContext != System.IntPtr.Zero)
-                    WglDeleteContext(_legacyContext);
-                if (_deviceContext != System.IntPtr.Zero && _window != System.IntPtr.Zero)
-                    ReleaseDC(_window, _deviceContext);
-                if (_window != System.IntPtr.Zero)
-                    DestroyWindow(_window);
-                if (!string.IsNullOrWhiteSpace(_className))
-                    UnregisterClass(_className, _instance);
-            }
-
-            private void CreateWindowAndContext()
-            {
-                var windowClass = new WindowClassEx
-                {
-                    Size = checked((uint)System.Runtime.InteropServices.Marshal.SizeOf<WindowClassEx>()),
-                    Style = ClassOwnDeviceContext,
-                    WindowProcedure = System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(_windowProcedure),
-                    Instance = _instance,
-                    ClassName = System.Runtime.InteropServices.Marshal.StringToHGlobalUni(_className)
-                };
-                try
-                {
-                    if (RegisterClassEx(ref windowClass) == 0)
-                        ThrowLastWin32Error("RegisterClassExW");
-                }
-                finally
-                {
-                    System.Runtime.InteropServices.Marshal.FreeHGlobal(windowClass.ClassName);
-                }
-
-                _window = CreateWindowEx(
-                    WindowExToolWindow,
-                    _className,
-                    "AssetsManager shader validation",
-                    WindowPopup,
-                    -32000,
-                    -32000,
-                    1,
-                    1,
-                    System.IntPtr.Zero,
-                    System.IntPtr.Zero,
-                    _instance,
-                    System.IntPtr.Zero);
-                if (_window == System.IntPtr.Zero)
-                    ThrowLastWin32Error("CreateWindowExW");
-
-                _deviceContext = GetDC(_window);
-                if (_deviceContext == System.IntPtr.Zero)
-                    ThrowLastWin32Error("GetDC");
-
-                var descriptor = new PixelFormatDescriptor
-                {
-                    Size = checked((ushort)System.Runtime.InteropServices.Marshal.SizeOf<PixelFormatDescriptor>()),
-                    Version = 1,
-                    Flags = PixelFormatDrawToWindow | PixelFormatSupportOpenGl | PixelFormatDoubleBuffer,
-                    PixelType = PixelTypeRgba,
-                    ColorBits = 32,
-                    AlphaBits = 8,
-                    DepthBits = 24,
-                    StencilBits = 8,
-                    LayerType = MainPlane
-                };
-                int format = ChoosePixelFormat(_deviceContext, ref descriptor);
-                if (format == 0)
-                    ThrowLastWin32Error("ChoosePixelFormat");
-                if (!SetPixelFormat(_deviceContext, format, ref descriptor))
-                    ThrowLastWin32Error("SetPixelFormat");
-
-                _legacyContext = WglCreateContext(_deviceContext);
-                if (_legacyContext == System.IntPtr.Zero)
-                    ThrowLastWin32Error("wglCreateContext");
-                if (!WglMakeCurrent(_deviceContext, _legacyContext))
-                    ThrowLastWin32Error("wglMakeCurrent(legacy)");
-
-                System.IntPtr createContextAddress = GetProcAddress("wglCreateContextAttribsARB");
-                if (createContextAddress == System.IntPtr.Zero)
-                    throw new System.InvalidOperationException("WGL_ARB_create_context is unavailable.");
-                var createContext = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<WglCreateContextAttribs>(
-                    createContextAddress);
-                int[] attributes =
-                {
-                    WglContextMajorVersion, 3,
-                    WglContextMinorVersion, 3,
-                    WglContextProfileMask, WglContextCoreProfileBit,
-                    0
-                };
-                _renderContext = createContext(_deviceContext, System.IntPtr.Zero, attributes);
-                if (_renderContext == System.IntPtr.Zero)
-                    throw new System.InvalidOperationException("WGL failed to create an OpenGL 3.3 core context.");
-                if (!WglMakeCurrent(_deviceContext, _renderContext))
-                    ThrowLastWin32Error("wglMakeCurrent(core)");
-                WglDeleteContext(_legacyContext);
-                _legacyContext = System.IntPtr.Zero;
-            }
-
-            private static void ThrowLastWin32Error(string operation) =>
-                throw new System.ComponentModel.Win32Exception(
-                    System.Runtime.InteropServices.Marshal.GetLastWin32Error(),
-                    operation + " failed.");
-
-            [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
-            private delegate System.IntPtr WindowProcedure(
-                System.IntPtr window,
-                uint message,
-                System.IntPtr wParam,
-                System.IntPtr lParam);
-
-            [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
-            private delegate System.IntPtr WglCreateContextAttribs(
-                System.IntPtr deviceContext,
-                System.IntPtr shareContext,
-                [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPArray)] int[] attributes);
-
-            [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-            private struct WindowClassEx
-            {
-                internal uint Size;
-                internal uint Style;
-                internal System.IntPtr WindowProcedure;
-                internal int ClassExtra;
-                internal int WindowExtra;
-                internal System.IntPtr Instance;
-                internal System.IntPtr Icon;
-                internal System.IntPtr Cursor;
-                internal System.IntPtr Background;
-                internal System.IntPtr MenuName;
-                internal System.IntPtr ClassName;
-                internal System.IntPtr SmallIcon;
-            }
-
-            [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-            private struct PixelFormatDescriptor
-            {
-                internal ushort Size;
-                internal ushort Version;
-                internal uint Flags;
-                internal byte PixelType;
-                internal byte ColorBits;
-                internal byte RedBits;
-                internal byte RedShift;
-                internal byte GreenBits;
-                internal byte GreenShift;
-                internal byte BlueBits;
-                internal byte BlueShift;
-                internal byte AlphaBits;
-                internal byte AlphaShift;
-                internal byte AccumBits;
-                internal byte AccumRedBits;
-                internal byte AccumGreenBits;
-                internal byte AccumBlueBits;
-                internal byte AccumAlphaBits;
-                internal byte DepthBits;
-                internal byte StencilBits;
-                internal byte AuxiliaryBuffers;
-                internal sbyte LayerType;
-                internal byte Reserved;
-                internal uint LayerMask;
-                internal uint VisibleMask;
-                internal uint DamageMask;
-            }
-
-            [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "GetModuleHandleW", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
-            private static extern System.IntPtr GetModuleHandle(string moduleName);
-
-            [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "GetProcAddress", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
-            private static extern System.IntPtr NativeGetProcAddress(System.IntPtr module, string procName);
-
-            [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "RegisterClassExW", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-            private static extern ushort RegisterClassEx(ref WindowClassEx windowClass);
-
-            [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "UnregisterClassW", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
-            [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-            private static extern bool UnregisterClass(string className, System.IntPtr instance);
-
-            [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "DefWindowProcW", SetLastError = true)]
-            private static extern System.IntPtr DefWindowProc(
-                System.IntPtr window,
-                uint message,
-                System.IntPtr wParam,
-                System.IntPtr lParam);
-
-            [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "CreateWindowExW", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-            private static extern System.IntPtr CreateWindowEx(
-                uint extendedStyle,
-                string className,
-                string windowName,
-                uint style,
-                int x,
-                int y,
-                int width,
-                int height,
-                System.IntPtr parent,
-                System.IntPtr menu,
-                System.IntPtr instance,
-                System.IntPtr parameter);
-
-            [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetDC", SetLastError = true)]
-            private static extern System.IntPtr GetDC(System.IntPtr window);
-
-            [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "ReleaseDC", SetLastError = true)]
-            private static extern int ReleaseDC(System.IntPtr window, System.IntPtr deviceContext);
-
-            [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "DestroyWindow", SetLastError = true)]
-            [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-            private static extern bool DestroyWindow(System.IntPtr window);
-
-            [System.Runtime.InteropServices.DllImport("gdi32.dll", EntryPoint = "ChoosePixelFormat", SetLastError = true)]
-            private static extern int ChoosePixelFormat(System.IntPtr deviceContext, ref PixelFormatDescriptor descriptor);
-
-            [System.Runtime.InteropServices.DllImport("gdi32.dll", EntryPoint = "SetPixelFormat", SetLastError = true)]
-            [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-            private static extern bool SetPixelFormat(
-                System.IntPtr deviceContext,
-                int format,
-                ref PixelFormatDescriptor descriptor);
-
-            [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglCreateContext", SetLastError = true)]
-            private static extern System.IntPtr WglCreateContext(System.IntPtr deviceContext);
-
-            [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglDeleteContext", SetLastError = true)]
-            [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-            private static extern bool WglDeleteContext(System.IntPtr context);
-
-            [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglMakeCurrent", SetLastError = true)]
-            [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-            private static extern bool WglMakeCurrent(System.IntPtr deviceContext, System.IntPtr context);
-
-            [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
-            private static extern System.IntPtr WglGetProcAddress(string procName);
         }
         private static void AssertPair(
             GameParticleProgramResolver.ShaderPair pair,
