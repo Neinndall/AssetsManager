@@ -451,6 +451,7 @@ Bug Fixes
   - VFX Studio / With shaders on, PBR champion skins are lit by the scene, metallic skin materials reflect the sky, and materials no longer lose textures or vanish (Aatrox Mecha sword).
   - VFX Studio / With shaders on, skin materials whose exact shader variant the game never compiled now draw with the closest one (K'Sante, Kayn and Sett skins).
   - VFX Studio / With shaders on, skins whose materials change with the game state show their resting look: no stray dissolve streaks, and alternate forms stay hidden (Aatrox Skin40).
+  - VFX Studio / With shaders on, object-space skin effects such as matcaps stay on champions placed in a map.
   - VFX Studio / With shaders on, map brush no longer disappears and map critters keep their full textures.
   - Viewer / Map critters and skins without a material no longer show stretched, half-missing textures.
   - VFX Studio / Esports banners on Summoner's Rift now show their holders and default flag instead of solid red.

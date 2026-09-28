@@ -36,7 +36,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             var frame = new GameShaderRuntime.Frame(Matrix4x4.Identity, Matrix4x4.Identity,
                 Vector3.Zero, 0, null, grid, new Vector3(-75, 0, 0));
             var data = new float[64];
-            GameShaderRuntime.WriteCharacterPerDrawVertex(data, frame);
+            GameShaderRuntime.WriteCharacterPerDrawVertex(data, frame, System.Numerics.Matrix4x4.Identity);
             Assert.Equal(61 * (2f / 255f), data[16]);
             Assert.Equal(51 * (2f / 255f), data[17]);
             Assert.Equal(41 * (2f / 255f), data[18]);

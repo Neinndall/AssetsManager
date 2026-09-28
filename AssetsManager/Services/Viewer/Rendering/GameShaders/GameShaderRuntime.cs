@@ -701,7 +701,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         WritePerFramePixel(block.Data, frame, skinned);
                         break;
                     case "CharacterPerDrawVertexCB" when character.HasValue || particle != null:
-                        WriteCharacterPerDrawVertex(block.Data, frame);
+                        WriteCharacterPerDrawVertex(block.Data, frame, character?.World ?? Matrix4x4.Identity);
                         break;
                     case "CharacterPerDrawPS" when character.HasValue || particle != null:
                         WriteCharacterPerDrawPixel(block.Data, character ?? new CharacterDraw(Matrix4x4.Identity, Array.Empty<Matrix4x4>()), frame.LightGrid);
@@ -882,9 +882,13 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             return new Vector2(slope / span, -slope * slope / span);
         }
 
-        internal static void WriteCharacterPerDrawVertex(float[] data, in Frame frame)
+        /// <summary>
+        /// mWorld (0) and mWorldInv (44) are the character placement. The bone palette already carries it, and
+        /// shaders subtract mWorld-transformed authored points from the skinned position to work in object space.
+        /// </summary>
+        internal static void WriteCharacterPerDrawVertex(float[] data, in Frame frame, Matrix4x4 world)
         {
-            WriteIdentityRows(data, 0, 16);
+            WriteWorldRows(data, 0, 44, world);
             Span<Vector3> cube = stackalloc Vector3[6];
             ResolveAmbientCube(frame, cube);
             for (int face = 0; face < 6; face++)
@@ -892,7 +896,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 WriteVector3(data, 16 + face * 4, cube[face]);
                 Set(data, 19 + face * 4, 1f);
             }
-            WriteIdentityRows(data, 44, 16);
+        }
+
+        private static void WriteWorldRows(float[] data, int worldAt, int inverseAt, Matrix4x4 world)
+        {
+            WriteMatrixRows(data, worldAt, world);
+            WriteMatrixRows(data, inverseAt, Matrix4x4.Invert(world, out Matrix4x4 inverse) ? inverse : Matrix4x4.Identity);
         }
 
         /// <summary>
@@ -954,8 +963,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             Set(data, 7, 1f);
             Set(data, 8, 1f);
             Set(data, 9, lightGrid?.FullBright ?? 1f);
-            WriteIdentityRows(data, 16, 16);
-            WriteIdentityRows(data, 32, 16);
+            // mWorld (16) and mWorldInv (32).
+            WriteWorldRows(data, 16, 32, character.World);
         }
 
         private static void WriteBones(float[] data, in CharacterDraw character)

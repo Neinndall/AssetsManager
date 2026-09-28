@@ -78,6 +78,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             Assert.Null(GameShaderRuntime.ResolveStaticProgramTexture("terrain", 2, "Diffuse", Lookup));
         }
 
+        // Object-space shaders (HKG_MatCap_LuLu) subtract mWorld * point from the skinned, already placed position.
+        [Fact]
+        public void WriteCharacterPerDrawVertex_WritesTheCharacterPlacementAndItsInverse()
+        {
+            var frame = new GameShaderRuntime.Frame(Matrix4x4.Identity, Matrix4x4.Identity, Vector3.Zero, 0f, null);
+            Matrix4x4 world = Matrix4x4.CreateScale(2f) * Matrix4x4.CreateTranslation(100f, 0f, -50f);
+            float[] data = new float[64];
+
+            GameShaderRuntime.WriteCharacterPerDrawVertex(data, frame, world);
+
+            // Row r of the cbuffer is column r of the row-vector matrix: translation sits in each row's w.
+            Assert.Equal(new[] { 2f, 0f, 0f, 100f }, data[0..4]);
+            Assert.Equal(new[] { 0f, 0f, 2f, -50f }, data[8..12]);
+            Assert.Equal(new[] { 0.5f, 0f, 0f, -50f }, data[44..48]);
+        }
+
         [Fact]
         public void WriteCharacterPerDrawVertex_AmbientCubeAddsSunWhereItFalls()
         {
@@ -104,7 +120,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 sun);
 
             float[] data = new float[64];
-            GameShaderRuntime.WriteCharacterPerDrawVertex(data, frame);
+            GameShaderRuntime.WriteCharacterPerDrawVertex(data, frame, System.Numerics.Matrix4x4.Identity);
 
             // Face 2 is +Y: index 16 + 2 * 4 = 24
             // Lit = basis * skyScale + sun * facing
