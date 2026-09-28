@@ -1214,6 +1214,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                             && s.Age >= d.TimeBeforeFirstEmission
                             && (d.EmitterLifetime is not { } life || s.Age <= life);
             if (!emitting || (d.IsSingleParticle && s.BurstDone)) return -1;
+            if (d.EmissionPeriod is { } period && !period.IsActive(s.Age - d.TimeBeforeFirstEmission))
+            {
+                // A cycle's pause discards emission debt without stopping existing particles.
+                s.EmittedThrough = s.Age;
+                return -1;
+            }
             {
                 // LTK samples rate directly. Legacy rateIsPeriod is retained in the model
                 // for inspection but does not reinterpret the simulation rate.

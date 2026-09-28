@@ -370,6 +370,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 EmitterLifetime: GetOptionalF32(p, F_lifetime),
                 ParticleLinger: GetOptionalF32(p, F_particleLinger) ?? 0f,
                 TimeBeforeFirstEmission: GetF32(p, F_timeBefore) ?? 0f,
+                EmissionPeriod: VfxEmissionPeriod.FromAuthored(
+                    GetOptionalF32(p, F_period), GetOptionalF32(p, F_timeActiveDuringPeriod)),
                 IsSingleParticle: isSingle,
                 Disabled: disabled,
                 RateIsPeriod: GetBool(p, F_rateIsPeriod),

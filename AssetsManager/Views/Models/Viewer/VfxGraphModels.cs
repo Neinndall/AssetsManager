@@ -213,7 +213,8 @@ namespace AssetsManager.Views.Models.Viewer
         uint CustomMaterialPathHash = 0,
         ModelMaterialDefinition CustomMaterial = null,
         VfxCustomMaterialBlendFactor CustomMaterialSourceBlendFactor = VfxCustomMaterialBlendFactor.One,
-        VfxCustomMaterialBlendFactor CustomMaterialDestinationBlendFactor = VfxCustomMaterialBlendFactor.Zero)
+        VfxCustomMaterialBlendFactor CustomMaterialDestinationBlendFactor = VfxCustomMaterialBlendFactor.Zero,
+        VfxEmissionPeriod EmissionPeriod = null)
     {
         /// <summary>LTK drawKind.ts: this emitter reaches the quad renderer.</summary>
         public bool DrawsAsQuad => PrimitiveKind is
@@ -327,6 +328,18 @@ namespace AssetsManager.Views.Models.Viewer
 
     /// <summary>Riot's screen-space particle distortion stage (heat haze/refraction).</summary>
     public sealed record VfxDistortionDefinition(float Strength, int Mode, string NormalMapTexturePath);
+
+    /// <summary>The authored repeating emission window, relative to the first emission.</summary>
+    public sealed record VfxEmissionPeriod(float Length, float Active)
+    {
+        public static VfxEmissionPeriod FromAuthored(float? length, float? active)
+            => length is { } seconds && seconds > 0f
+                ? new(seconds, Math.Clamp(active ?? seconds, 0f, seconds))
+                : null;
+
+        public bool IsActive(float seconds)
+            => seconds < 0f || seconds % Length <= Active;
+    }
 
     public sealed record VfxFlexShapeDefinition(
         float ScaleBirthScaleByBoundObjectSize,
