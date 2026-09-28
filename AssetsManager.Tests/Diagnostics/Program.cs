@@ -289,6 +289,16 @@ namespace AssetsManager.Tests.Diagnostics
                 MapEnvironmentAuditDiagnostic.Run(targetPath);
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "bin-ritobin-file", StringComparison.OrdinalIgnoreCase))
+            {
+                await BinRitobinFileDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "map-structures-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                await MapStructuresAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "map-state-switch-bench", StringComparison.OrdinalIgnoreCase))
             {
                 await MapStateSwitchBenchDiagnostic.Run(args.Length > 1 ? args[1] : null, args.Length > 2 ? args[2] : null);

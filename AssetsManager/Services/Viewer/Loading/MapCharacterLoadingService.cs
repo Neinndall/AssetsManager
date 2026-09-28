@@ -53,10 +53,15 @@ namespace AssetsManager.Services.Viewer.Loading
             _logService = logService;
         }
 
+        /// <param name="sharedMaterials">
+        /// Scene-level StaticMaterialDef objects searched after the skin BIN closure, for structures whose
+        /// material links point into the Map BIN (e.g. esports banners).
+        /// </param>
         public async Task<MapCharacterAssetData> LoadAsync(
             string skinPath,
             string projectRoot,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            BinTree sharedMaterials = null)
         {
             if (string.IsNullOrWhiteSpace(skinPath))
                 return null;
@@ -141,8 +146,11 @@ namespace AssetsManager.Services.Viewer.Loading
             Func<uint, string> binEntryResolver = _hashResolver == null
                 ? null
                 : _hashResolver.ResolveBinEntry;
+            IEnumerable<BinTree> materialTrees = sharedMaterials == null
+                ? documents
+                : documents.Append(sharedMaterials);
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(
-                documents,
+                materialTrees,
                 shaderTrees,
                 wadChunkPathResolver,
                 binEntryResolver,

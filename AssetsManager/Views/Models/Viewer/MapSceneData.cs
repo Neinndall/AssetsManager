@@ -14,6 +14,12 @@ namespace AssetsManager.Views.Models.Viewer
         public MapGeometryData Geometry { get; }
         public BinTree MaterialsDocument { get; }
         public BinTree ShaderDefinitions { get; }
+
+        /// <summary>
+        /// StaticMaterialDef objects of the owning Map BIN (map&lt;id&gt;.bin). Map structures such as the
+        /// esports banners link their materials there instead of in their own skin BIN.
+        /// </summary>
+        public BinTree SharedMaterials { get; }
         public IReadOnlyList<MapMaterialDefinition> Materials { get; }
         public IReadOnlyDictionary<string, MapTextureImage> Textures { get; }
         public IReadOnlyDictionary<string, MapTextureImage> ProgramTextures { get; }
@@ -53,13 +59,15 @@ namespace AssetsManager.Views.Models.Viewer
             int openingVisibilityFlags = 1,
             BinTree shaderDefinitions = null,
             MapLightGridData lightGrid = null,
-            MapSceneVisibility visibility = null)
+            MapSceneVisibility visibility = null,
+            BinTree sharedMaterials = null)
         {
             Source = source;
             Assets = assets;
             Geometry = geometry;
             MaterialsDocument = materialsDocument;
             ShaderDefinitions = shaderDefinitions;
+            SharedMaterials = sharedMaterials;
             Materials = materials;
             Textures = textures;
             ProgramTextures = programTextures ?? new Dictionary<string, MapTextureImage>(System.StringComparer.Ordinal);

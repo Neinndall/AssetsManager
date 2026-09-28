@@ -107,7 +107,7 @@ namespace AssetsManager.Services.Viewer.Runtime
                 .Select(group => LoadCharacterGroupAsync(
                     group.Key,
                     group.ToArray(),
-                    scene.Source.ProjectRoot,
+                    scene,
                     cancellationToken))
                 .ToArray();
 
@@ -164,7 +164,7 @@ namespace AssetsManager.Services.Viewer.Runtime
                     loads[index] = LoadCharacterGroupAsync(
                         skins[index].Key,
                         placements[index],
-                        scene.Source.ProjectRoot,
+                        scene,
                         cancellationToken);
                 }
             }
@@ -327,15 +327,17 @@ namespace AssetsManager.Services.Viewer.Runtime
         private async Task<MapCharacterRuntimeGroup> LoadCharacterGroupAsync(
             string skin,
             IReadOnlyList<MapCharacterData> placements,
-            string projectRoot,
+            MapSceneData scene,
             CancellationToken cancellationToken)
         {
+            string projectRoot = scene.Source?.ProjectRoot;
             try
             {
                 MapCharacterAssetData asset = await _characterLoadingService.LoadAsync(
                     skin,
                     projectRoot,
-                    cancellationToken);
+                    cancellationToken,
+                    scene.SharedMaterials);
                 if (asset == null)
                     return null;
 

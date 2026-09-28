@@ -142,11 +142,9 @@ namespace AssetsManager.Services.Viewer.Loading
                 characters,
                 particles,
                 _hashResolver);
-            MapSceneVisibility visibility = await LoadVisibilityAsync(
-                source,
-                materials,
-                geometry,
-                cancellationToken);
+            BinTree mapDocument = await LoadMapDocumentAsync(source, cancellationToken);
+            MapSceneVisibility visibility = LoadVisibility(mapDocument, materials, geometry);
+            BinTree sharedMaterials = SharedMaterialDocument(mapDocument);
             int openingVisibilityFlags = visibility.Opening.Flags;
             IReadOnlyList<MapParticleData> playedParticles = MapParticleSemantics.PlayedFor(
                 particles,
@@ -216,40 +214,61 @@ namespace AssetsManager.Services.Viewer.Loading
                 openingVisibilityFlags,
                 shaders,
                 lightGrid,
-                visibility);
+                visibility,
+                sharedMaterials);
         }
 
         /// <summary>
-        /// Reads the controller graph of the container and the visibility domains of its owning
-        /// Map object (data/maps/shipping/&lt;map&gt;/&lt;map&gt;.bin), resolved project first, then WAD.
+        /// Owning Map object BIN (data/maps/shipping/&lt;map&gt;/&lt;map&gt;.bin), resolved project first, then WAD.
         /// </summary>
-        private async Task<MapSceneVisibility> LoadVisibilityAsync(
-            MapSceneSource source,
+        private async Task<BinTree> LoadMapDocumentAsync(MapSceneSource source, CancellationToken cancellationToken)
+        {
+            string mapBinPath = ShippingMapPath(source.Map);
+            if (mapBinPath == null)
+                return null;
+
+            MapResolvedAsset mapAsset = await _assetResolver.ResolveVirtualAsync(
+                mapBinPath,
+                source.ProjectRoot,
+                cancellationToken);
+            return await OpenOptionalBinTreeAsync(mapAsset, cancellationToken);
+        }
+
+        /// <summary>
+        /// Reads the controller graph of the container and the visibility domains of its owning Map object.
+        /// </summary>
+        private MapSceneVisibility LoadVisibility(
+            BinTree mapDocument,
             BinTree materials,
-            MapGeometryData geometry,
-            CancellationToken cancellationToken)
+            MapGeometryData geometry)
         {
             var parser = new MapVisibilityParser();
             IReadOnlyDictionary<uint, MapVisibilityControllerData> controllers = parser.ParseControllers(materials);
-            MapVisibilityDefinitions definitions = MapVisibilityDefinitions.Empty;
-            string mapBinPath = ShippingMapPath(source.Map);
-            if (mapBinPath != null)
-            {
-                MapResolvedAsset mapAsset = await _assetResolver.ResolveVirtualAsync(
-                    mapBinPath,
-                    source.ProjectRoot,
-                    cancellationToken);
-                BinTree mapDocument = await OpenOptionalBinTreeAsync(mapAsset, cancellationToken);
-                definitions = parser.ParseDefinitions(
-                    mapDocument,
-                    _hashResolver == null ? null : _hashResolver.ResolveBinHash);
-            }
+            MapVisibilityDefinitions definitions = parser.ParseDefinitions(
+                mapDocument,
+                _hashResolver == null ? null : _hashResolver.ResolveBinHash);
 
             return new MapSceneVisibility(
                 definitions,
                 controllers,
                 MapVisibilitySemantics.Opening(definitions, MapGeometrySemantics.OpeningFlags(geometry)));
         }
+
+        /// <summary>
+        /// Keeps only the StaticMaterialDef objects of the Map BIN, so structures can resolve materials
+        /// linked there without holding the whole document for the scene lifetime.
+        /// </summary>
+        internal static BinTree SharedMaterialDocument(BinTree mapDocument)
+        {
+            BinTreeObject[] materials = mapDocument?.Objects?.Values
+                .Where(entry => entry.ClassHash == StaticMaterialDefClass)
+                .ToArray();
+            return materials is { Length: > 0 }
+                ? new BinTree(materials, Array.Empty<string>())
+                : null;
+        }
+
+        private static readonly uint StaticMaterialDefClass = LeagueToolkit.Hashing.Fnv1a.HashLower("StaticMaterialDef");
 
         /// <summary>Maps/MapGeometry/Map11/Base_SRX → data/maps/shipping/map11/map11.bin.</summary>
         internal static string ShippingMapPath(MapPath map)

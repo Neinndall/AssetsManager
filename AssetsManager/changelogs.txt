@@ -443,6 +443,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Esports banners on Summoner's Rift now show their holders and default flag instead of solid red.
   - VFX Studio / The map Variant selector now shows Default for the loaded map and which map each skin uses, without reloading skins that share it.
   - VFX Studio / Summoner's Rift no longer overlaps every Baron pit variant at once.
   - VFX Studio / Quickly switching map layers no longer mixes structures or VFX from another selection nor moves the Character.
