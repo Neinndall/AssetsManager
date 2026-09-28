@@ -96,11 +96,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             MapCharacterData mountain = Character("Mountain", visibility: 4, controller: null, team: null);
             MapCharacterData banner = Character("Banner", visibility: 255, controller: 0x76c50391, team: null);
 
-            IReadOnlyList<MapCharacterData> stood = MapCharacterSemantics.StoodOnLayer(
-                new[] { order, chaos, dragon, mountain, banner },
-                0);
+            var visibility = new MapSceneVisibility(
+                MapVisibilityDefinitions.Empty,
+                new Dictionary<uint, MapVisibilityControllerData>
+                {
+                    [0x76c50391] = new(0x76c50391, MapVisibilityControllerKind.Mutator, MutatorName: "SR_Hall_Of_Legends")
+                },
+                MapVisibilityState.FromFlags(1));
+            MapCharacterData[] all = { order, chaos, dragon, mountain, banner };
 
-            Assert.Equal(new[] { order, chaos }, stood);
+            Assert.Equal(new[] { order, chaos }, MapCharacterSemantics.StoodFor(all, visibility, visibility.Opening));
+            Assert.Equal(
+                new[] { order, chaos, banner },
+                MapCharacterSemantics.StoodFor(all, visibility, visibility.Opening.WithMutator("sr_hall_of_legends", true)));
         }
 
         [Fact]

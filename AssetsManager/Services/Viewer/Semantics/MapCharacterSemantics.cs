@@ -21,6 +21,16 @@ namespace AssetsManager.Services.Viewer.Semantics
         public static IReadOnlyList<MapCharacterData> StoodForFlags(
             IEnumerable<MapCharacterData> characters,
             int flags)
+            => StoodFor(characters, null, MapVisibilityState.FromFlags(flags));
+
+        /// <summary>
+        /// Structures the previewed game state stands: mask and controller graph like the engine,
+        /// excluding the neutral team placeholders LTK also skips.
+        /// </summary>
+        public static IReadOnlyList<MapCharacterData> StoodFor(
+            IEnumerable<MapCharacterData> characters,
+            MapSceneVisibility visibility,
+            MapVisibilityState state)
         {
             if (characters == null)
                 return Array.Empty<MapCharacterData>();
@@ -28,9 +38,12 @@ namespace AssetsManager.Services.Viewer.Semantics
             return characters
                 .Where(character =>
                     character != null &&
-                    character.Placeable.IsVisibleForFlags(flags) &&
-                    !character.VisibilityController.HasValue &&
-                    character.Team != NeutralTeam)
+                    character.Team != NeutralTeam &&
+                    MapVisibilitySemantics.IsVisible(
+                        visibility,
+                        state,
+                        character.Placeable.Visibility,
+                        character.VisibilityController))
                 .ToArray();
         }
 

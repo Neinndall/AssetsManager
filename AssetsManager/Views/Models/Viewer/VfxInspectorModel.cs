@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Authoring;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Session;
@@ -660,20 +661,82 @@ namespace AssetsManager.Views.Models.Viewer
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
     }
 
+    /// <summary>One selectable map state: a primary transformation or a secondary-domain state.</summary>
+    public sealed class MapVisibilityStateOption
+    {
+        internal MapVisibilityStateOption(string label, int flags, bool isCustom = false)
+        {
+            Label = label;
+            Flags = flags;
+            IsCustom = isCustom;
+        }
+
+        public string Label { get; }
+        public int Flags { get; }
+        public bool IsCustom { get; }
+    }
+
+    /// <summary>A mutator some visibility controller of the map reads.</summary>
+    public sealed class MapMutatorOption : INotifyPropertyChanged
+    {
+        private static readonly IReadOnlyDictionary<string, string> KnownLabels =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["SR_Hall_Of_Legends"] = "Hall of Legends",
+                ["MSITrophy"] = "MSI Trophy",
+                ["MapObjectESportSponsorBanners"] = "Esports Banners"
+            };
+
+        private readonly Action _changed;
+        private bool _isEnabled;
+
+        internal MapMutatorOption(string name, bool isEnabled, Action changed)
+        {
+            Name = name;
+            _isEnabled = isEnabled;
+            _changed = changed;
+        }
+
+        public string Name { get; }
+        public string Label => KnownLabels.TryGetValue(Name ?? string.Empty, out string label) ? label : Name;
+
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                if (_isEnabled == value) return;
+                _isEnabled = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEnabled)));
+                _changed?.Invoke();
+            }
+        }
+
+        internal void Sync(bool isEnabled)
+        {
+            if (_isEnabled == isEnabled) return;
+            _isEnabled = isEnabled;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEnabled)));
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+    }
+
     public sealed class MapVisibilityLayerOption : INotifyPropertyChanged
     {
         private bool _isEnabled;
 
-        internal MapVisibilityLayerOption(MapGeometryLayerData layer, bool isEnabled)
+        internal MapVisibilityLayerOption(MapGeometryLayerData layer, bool isEnabled, string label = null)
         {
             Index = layer?.Index ?? 0;
             Triangles = layer?.Triangles ?? 0;
             _isEnabled = isEnabled;
+            Label = string.IsNullOrWhiteSpace(label) ? $"Layer {Index + 1}" : $"{Index + 1} · {label}";
         }
 
         public int Index { get; }
         public int Triangles { get; }
-        public string Label => $"Layer {Index + 1}";
+        public string Label { get; }
         public string TriangleText => $"{Triangles:N0} tris";
 
         public bool IsEnabled
@@ -803,6 +866,9 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<float> AnimationParameterValues { get; } = new();
         public ObservableCollection<MapVariantData> MapVariants { get; } = new();
         public ObservableCollection<MapVisibilityLayerOption> MapLayers { get; } = new();
+        public ObservableCollection<MapVisibilityStateOption> MapTransformations { get; } = new();
+        public ObservableCollection<MapVisibilityStateOption> MapSecondaryStates { get; } = new();
+        public ObservableCollection<MapMutatorOption> MapMutators { get; } = new();
         public ObservableCollection<VfxCharacterBackdropOption> CharacterBackdrops { get; } = new();
         public ObservableCollection<VfxCharacterSubmeshOption> CharacterSubmeshes { get; } = new();
         public ObservableCollection<VfxCharacterFormOption> CharacterForms { get; } = new();
@@ -881,6 +947,45 @@ namespace AssetsManager.Views.Models.Viewer
         public bool HasMultipleMapVariants => MapVariants.Count > 1;
         public bool CanSelectMapVariant => HasMapPreview && HasMultipleMapVariants;
         public bool HasMapLayers => MapLayers.Count > 0;
+        public bool HasMapTransformations => MapTransformations.Count > 1;
+        public bool HasMapSecondaryStates => MapSecondaryStates.Count > 1;
+        public bool HasMapMutators => MapMutators.Count > 0;
+
+        /// <summary>Raised when the user asks for another map state; the owner loads and applies it.</summary>
+        internal event Action<MapVisibilityState> MapVisibilityRequested;
+
+        private MapVisibilityState _mapVisibility;
+        private bool _isSyncingMapVisibility;
+        private MapVisibilityStateOption _selectedMapTransformation;
+        private MapVisibilityStateOption _selectedMapSecondaryState;
+
+        internal MapVisibilityState MapVisibility => _mapVisibility;
+
+        public MapVisibilityStateOption SelectedMapTransformation
+        {
+            get => _selectedMapTransformation;
+            set
+            {
+                if (ReferenceEquals(_selectedMapTransformation, value)) return;
+                _selectedMapTransformation = value;
+                OnPropertyChanged();
+                if (!_isSyncingMapVisibility && value is { IsCustom: false } && _mapVisibility != null)
+                    RequestMapVisibility(_mapVisibility.WithFlags(value.Flags));
+            }
+        }
+
+        public MapVisibilityStateOption SelectedMapSecondaryState
+        {
+            get => _selectedMapSecondaryState;
+            set
+            {
+                if (ReferenceEquals(_selectedMapSecondaryState, value)) return;
+                _selectedMapSecondaryState = value;
+                OnPropertyChanged();
+                if (!_isSyncingMapVisibility && value != null && _mapVisibility != null)
+                    RequestMapVisibility(_mapVisibility.WithSecondaryFlags(value.Flags));
+            }
+        }
         public int ActiveMapLayerCount => MapLayers.Count(layer => layer.IsEnabled);
         public bool HasViewportContentControls => HasChampionMesh || HasMapPreview;
         public bool HasMapOnlyWorkspace => HasMapPreview && !HasChampionMesh;
@@ -968,20 +1073,171 @@ namespace AssetsManager.Views.Models.Viewer
             OnPropertyChanged(nameof(CanSelectMapVariant));
         }
 
-        internal void SetMapLayers(IEnumerable<MapGeometryLayerData> layers, int flags)
+        /// <summary>
+        /// Rebuilds every map-state control for one scene: named transformations and secondary states
+        /// from the Map object, mutators from the controller graph and the raw mask bits as fallback.
+        /// </summary>
+        internal void SetMapVisibility(
+            MapSceneVisibility visibility,
+            IEnumerable<MapGeometryLayerData> layers,
+            MapVisibilityState state)
         {
-            MapLayers.Clear();
-            foreach (MapGeometryLayerData layer in layers ?? Array.Empty<MapGeometryLayerData>())
-                MapLayers.Add(new MapVisibilityLayerOption(layer, (flags & layer.Flag) != 0));
+            _isSyncingMapVisibility = true;
+            try
+            {
+                _mapVisibility = state;
+                MapLayers.Clear();
+                MapTransformations.Clear();
+                MapSecondaryStates.Clear();
+                MapMutators.Clear();
+                _selectedMapTransformation = null;
+                _selectedMapSecondaryState = null;
+
+                if (visibility != null && state != null)
+                {
+                    MapVisibilityDomainData primary = visibility.Definitions.Primary;
+                    MapGeometryLayerData[] layerList = (layers ?? Array.Empty<MapGeometryLayerData>()).ToArray();
+                    foreach (MapGeometryLayerData layer in layerList)
+                    {
+                        MapLayers.Add(new MapVisibilityLayerOption(
+                            layer,
+                            (state.Flags & layer.Flag) != 0,
+                            primary?.Find(layer.Index)?.Label));
+                    }
+
+                    if (primary is { IsEmpty: false })
+                    {
+                        MapTransformations.Add(new MapVisibilityStateOption(
+                            primary.Find(0)?.PublicName ?? "Base",
+                            primary.InitialMask));
+                        foreach (MapVisibilityFlagData flag in primary.Flags)
+                        {
+                            if ((primary.InitialMask & flag.Flag) != 0)
+                                continue;
+                            MapTransformations.Add(new MapVisibilityStateOption(
+                                flag.Label,
+                                MapVisibilitySemantics.TransformationFlags(primary, flag.BitIndex)));
+                        }
+                    }
+                    else
+                    {
+                        foreach (MapGeometryLayerData layer in layerList)
+                            MapTransformations.Add(new MapVisibilityStateOption($"Layer {layer.Index + 1}", layer.Flag));
+                    }
+
+                    MapVisibilityDomainData secondary = visibility.Definitions.Secondary;
+                    if (secondary is { IsEmpty: false })
+                    {
+                        foreach (MapVisibilityFlagData flag in secondary.Flags)
+                            MapSecondaryStates.Add(new MapVisibilityStateOption(flag.Label, flag.Flag));
+                    }
+                    else
+                    {
+                        int mask = visibility.SecondaryMaskInUse;
+                        for (int bit = 0; bit < 8; bit++)
+                        {
+                            if ((mask & (1 << bit)) != 0)
+                                MapSecondaryStates.Add(new MapVisibilityStateOption($"State {bit + 1}", 1 << bit));
+                        }
+                    }
+
+                    foreach (string mutator in visibility.MutatorNames)
+                        MapMutators.Add(new MapMutatorOption(mutator, state.HasMutator(mutator), OnMapMutatorChanged));
+                }
+
+                SyncMapVisibilitySelection();
+            }
+            finally
+            {
+                _isSyncingMapVisibility = false;
+            }
+
             OnPropertyChanged(nameof(HasMapLayers));
             OnPropertyChanged(nameof(ActiveMapLayerCount));
+            OnPropertyChanged(nameof(HasMapTransformations));
+            OnPropertyChanged(nameof(HasMapSecondaryStates));
+            OnPropertyChanged(nameof(HasMapMutators));
+            OnPropertyChanged(nameof(SelectedMapTransformation));
+            OnPropertyChanged(nameof(SelectedMapSecondaryState));
         }
 
-        internal void SetMapLayerFlags(int flags)
+        internal void ClearMapVisibility() =>
+            SetMapVisibility(null, Array.Empty<MapGeometryLayerData>(), null);
+
+        /// <summary>Reflects a state in the controls without raising a new request.</summary>
+        internal void SyncMapVisibility(MapVisibilityState state)
         {
-            foreach (MapVisibilityLayerOption layer in MapLayers)
-                layer.IsEnabled = (flags & (1 << layer.Index)) != 0;
+            if (state == null) return;
+            _isSyncingMapVisibility = true;
+            try
+            {
+                _mapVisibility = state;
+                SyncMapVisibilitySelection();
+            }
+            finally
+            {
+                _isSyncingMapVisibility = false;
+            }
             OnPropertyChanged(nameof(ActiveMapLayerCount));
+            OnPropertyChanged(nameof(SelectedMapTransformation));
+            OnPropertyChanged(nameof(SelectedMapSecondaryState));
+        }
+
+        /// <summary>Raw mask bits edited by the user; the transformation selector follows a matching preset.</summary>
+        internal void RequestMapLayerFlags(int flags)
+        {
+            if (_mapVisibility != null)
+                RequestMapVisibility(_mapVisibility.WithFlags(flags));
+        }
+
+        private void OnMapMutatorChanged()
+        {
+            if (_isSyncingMapVisibility || _mapVisibility == null)
+                return;
+            RequestMapVisibility(new MapVisibilityState(
+                _mapVisibility.Flags,
+                _mapVisibility.SecondaryFlags,
+                MapMutators.Where(option => option.IsEnabled).Select(option => option.Name)));
+        }
+
+        private void RequestMapVisibility(MapVisibilityState state)
+        {
+            SyncMapVisibility(state);
+            MapVisibilityRequested?.Invoke(state);
+        }
+
+        private void SyncMapVisibilitySelection()
+        {
+            MapVisibilityState state = _mapVisibility;
+            if (state == null)
+                return;
+
+            foreach (MapVisibilityLayerOption layer in MapLayers)
+                layer.IsEnabled = (state.Flags & (1 << layer.Index)) != 0;
+            foreach (MapMutatorOption mutator in MapMutators)
+                mutator.Sync(state.HasMutator(mutator.Name));
+
+            MapVisibilityStateOption custom = MapTransformations.FirstOrDefault(option => option.IsCustom);
+            MapVisibilityStateOption match = MapTransformations.FirstOrDefault(option =>
+                !option.IsCustom && option.Flags == state.Flags);
+            if (match != null)
+            {
+                if (custom != null)
+                    MapTransformations.Remove(custom);
+                _selectedMapTransformation = match;
+            }
+            else if (MapTransformations.Count > 0)
+            {
+                if (custom == null)
+                {
+                    custom = new MapVisibilityStateOption("Custom layers", state.Flags, isCustom: true);
+                    MapTransformations.Add(custom);
+                }
+                _selectedMapTransformation = custom;
+            }
+
+            _selectedMapSecondaryState = MapSecondaryStates.FirstOrDefault(option =>
+                option.Flags == state.SecondaryFlags);
         }
 
         public float? AnimationParameter

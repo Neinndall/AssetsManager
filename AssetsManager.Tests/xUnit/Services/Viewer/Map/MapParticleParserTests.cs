@@ -70,11 +70,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             MapParticleData scripted = Particle("Scripted", visibility: 255, startDisabled: true);
             MapParticleData trophy = Particle("Trophy", visibility: 255, controller: 0x8f1ab207);
 
-            IReadOnlyList<MapParticleData> played = MapParticleSemantics.PlayedOnLayer(
-                new[] { near, far, mountain, transition, scripted, trophy },
-                0);
+            var visibility = new MapSceneVisibility(
+                MapVisibilityDefinitions.Empty,
+                new Dictionary<uint, MapVisibilityControllerData>
+                {
+                    [0x8f1ab207] = new(0x8f1ab207, MapVisibilityControllerKind.Mutator, MutatorName: "MSITrophy")
+                },
+                MapVisibilityState.FromFlags(1));
+            MapParticleData[] all = { near, far, mountain, transition, scripted, trophy };
 
-            Assert.Equal(new[] { near, far }, played);
+            Assert.Equal(new[] { near, far }, MapParticleSemantics.PlayedFor(all, visibility, visibility.Opening));
+            Assert.Equal(
+                new[] { near, far, trophy },
+                MapParticleSemantics.PlayedFor(all, visibility, visibility.Opening.WithMutator("MSITrophy", true)));
         }
 
         [Fact]

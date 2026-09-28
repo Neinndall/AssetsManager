@@ -19,13 +19,15 @@ namespace AssetsManager.Services.Viewer.Semantics
         {
             ArgumentNullException.ThrowIfNull(runtime);
             MapSceneData scene = runtime.Scene;
+            // Particles list what the active map state plays; the opening catalog stands in until VFX load.
+            MapParticleSystemCatalog particles = runtime.Particles?.Catalog ?? scene.ParticleSystems;
 
             var root = new MapBrowserNode(
                 Leaf(scene.Source?.Map?.Value) ?? "Map",
                 MapBrowserNodeKind.Map,
                 "Map",
                 scene,
-                inspectorSummary: $"{scene.Geometry?.Meshes?.Count ?? 0} meshes · {scene.Materials?.Count ?? 0} materials · {runtime.CharacterGroups?.Count ?? 0} skins · {scene.ParticleSystems?.Groups?.Count ?? 0} VFX systems")
+                inspectorSummary: $"{scene.Geometry?.Meshes?.Count ?? 0} meshes · {scene.Materials?.Count ?? 0} materials · {runtime.CharacterGroups?.Count ?? 0} skins · {particles?.Groups?.Count ?? 0} VFX systems")
             {
                 IsExpanded = true
             };
@@ -40,7 +42,7 @@ namespace AssetsManager.Services.Viewer.Semantics
             root.Children.Add(BuildMaterials(scene));
             root.Children.Add(BuildChunks(scene));
             root.Children.Add(BuildCharacters(runtime));
-            root.Children.Add(BuildParticles(scene));
+            root.Children.Add(BuildParticles(particles));
             return root;
         }
 
@@ -159,9 +161,9 @@ namespace AssetsManager.Services.Viewer.Semantics
             return branch;
         }
 
-        private static MapBrowserNode BuildParticles(MapSceneData scene)
+        private static MapBrowserNode BuildParticles(MapParticleSystemCatalog catalog)
         {
-            IReadOnlyList<MapParticleSystemGroupData> groups = scene.ParticleSystems?.Groups ?? Array.Empty<MapParticleSystemGroupData>();
+            IReadOnlyList<MapParticleSystemGroupData> groups = catalog?.Groups ?? Array.Empty<MapParticleSystemGroupData>();
             var branch = new MapBrowserNode(
                 "Particles",
                 MapBrowserNodeKind.Particles,

@@ -25,13 +25,18 @@ namespace AssetsManager.Services.Viewer.Runtime
 
         internal MapParticleSceneRuntime(
             IReadOnlyList<MapParticleRuntime> runtimes,
-            IDisposable resourceOwner = null)
+            IDisposable resourceOwner = null,
+            MapParticleSystemCatalog catalog = null)
         {
             _runtimes = runtimes ?? Array.Empty<MapParticleRuntime>();
             _resourceOwner = resourceOwner;
+            Catalog = catalog;
         }
 
         internal IReadOnlyList<MapParticleRuntime> Runtimes => _runtimes;
+
+        /// <summary>Systems and placements this runtime was built for; null until placed VFX are loaded.</summary>
+        internal MapParticleSystemCatalog Catalog { get; }
         internal IReadOnlyList<MapParticleRuntime> VisibleRuntimes => _visible;
 
         internal static Task<MapParticleSceneRuntime> CreateAsync(
@@ -62,7 +67,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             ArgumentNullException.ThrowIfNull(assetResolver);
 
             if (catalog?.Groups == null || catalog.Groups.Count == 0)
-                return new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>());
+                return new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>(), catalog: catalog);
 
             VfxSceneResourceContext resources = await VfxSceneResourceContext.CreateAsync(
                 catalog,
@@ -74,7 +79,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             try
             {
                 IReadOnlyList<MapParticleRuntime> runtimes = resources.CreateMapRuntimes(catalog);
-                return new MapParticleSceneRuntime(runtimes, resources);
+                return new MapParticleSceneRuntime(runtimes, resources, catalog);
             }
             catch
             {

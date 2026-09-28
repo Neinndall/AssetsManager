@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Maps now switch rift transformations, Baron pit states and decorations like in game, with their terrain, structures and VFX.
   - VFX Studio / Particle emitters now respect their authored repeating emission windows and pauses.
   - VFX Studio / Added GMESH and TMESH particle meshes with their authored normals, UVs and submeshes.
   - VFX Studio / Standalone effects wait for their initial textures and meshes before playback, with a bounded wait to preserve short bursts.
@@ -441,6 +442,9 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / The map Variant selector now shows Default for the loaded map and which map each skin uses, without reloading skins that share it.
+  - VFX Studio / Summoner's Rift no longer overlaps every Baron pit variant at once.
+  - VFX Studio / Quickly switching map layers no longer mixes structures or VFX from another selection nor moves the Character.
   - VFX Studio / Alpha background now shows a checkerboard instead of falling back to Dark.
   - VFX Studio / Corrected projectile effect orientation so ground offsets stay below flight and upward motion rises correctly.
   - VFX Studio / Corrected Shimmer mesh colors and transforms built from combined drivers.

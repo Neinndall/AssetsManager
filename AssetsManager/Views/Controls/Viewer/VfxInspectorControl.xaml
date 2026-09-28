@@ -311,6 +311,61 @@
             <Setter Property="Padding" Value="0"/>
         </Style>
 
+        <!-- Map state controls shared by the MAP workspace and the Character backdrop. -->
+        <DataTemplate x:Key="MapStateControlsTemplate">
+            <StackPanel>
+                <StackPanel Visibility="{Binding HasMapTransformations, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="TRANSFORMATION" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                    <ComboBox ItemsSource="{Binding MapTransformations}" SelectedItem="{Binding SelectedMapTransformation, Mode=TwoWay}" DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}" Height="28" Margin="0,4,0,8"
+                              ToolTip="Rift state: terrain, structures and VFX a transformation shows or removes"/>
+                </StackPanel>
+                <StackPanel Visibility="{Binding HasMapSecondaryStates, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="OBJECTIVE PIT" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                    <ComboBox ItemsSource="{Binding MapSecondaryStates}" SelectedItem="{Binding SelectedMapSecondaryState, Mode=TwoWay}" DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}" Height="28" Margin="0,4,0,8"
+                              ToolTip="Secondary map state read by pit controllers (Summoner's Rift: Baron pit)"/>
+                </StackPanel>
+                <StackPanel Visibility="{Binding HasMapMutators, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,0,6">
+                    <TextBlock Text="DECORATIONS" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,2"/>
+                    <ItemsControl ItemsSource="{Binding MapMutators}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Margin="0,2" ToolTip="{Binding Name}">
+                                    <TextBlock Text="{Binding Label}" FontSize="9.5"/>
+                                </CheckBox>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+                <ToggleButton x:Name="MapLayerBitsToggle" IsChecked="False" Background="Transparent" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Left" Padding="0" Margin="0,2,0,4"
+                              Visibility="{Binding HasMapLayers, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <ToggleButton.Template>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <ContentPresenter/>
+                        </ControlTemplate>
+                    </ToggleButton.Template>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="LAYER BITS" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock Text="{Binding ActiveMapLayerCount, StringFormat=' · {0} active'}" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
+                    </StackPanel>
+                </ToggleButton>
+                <ItemsControl ItemsSource="{Binding MapLayers}" Visibility="{Binding IsChecked, ElementName=MapLayerBitsToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Click="MapLayerCheckBox_Click" Margin="0,2">
+                                <Grid Width="240">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Label}" FontSize="9.5"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding TriangleText}" FontSize="8.5" Foreground="{StaticResource TextMuted}" FontFamily="Consolas"/>
+                                </Grid>
+                            </CheckBox>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid Background="{StaticResource SidebarBackground}">
@@ -2034,6 +2089,8 @@
                                 <StackPanel>
                                     <CheckBox Content="Enable MAP backdrop" IsChecked="{Binding CharacterBackdropEnabled, Mode=TwoWay}" IsEnabled="{Binding HasCharacterBackdropOptions}" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,8"/>
                                     <ComboBox ItemsSource="{Binding CharacterBackdrops}" SelectedItem="{Binding SelectedCharacterBackdrop, Mode=TwoWay}" DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}" Height="28" Margin="0,0,0,10"/>
+                                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MapStateControlsTemplate}"
+                                                    Visibility="{Binding HasActiveCharacterBackdrop, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     <UniformGrid Columns="2" Visibility="{Binding CharacterBackdropEnabled, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <ToggleButton IsChecked="{Binding MapStructuresVisible, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Height="30" ToolTip="Toggle map structures (towers, bases, props)">
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -2384,7 +2441,7 @@
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="MAP SCENE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="Variant, content and layers" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                        <TextBlock Text="Variant, transformation and decorations" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
                                     </StackPanel>
                                     <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                                 </Grid>
@@ -2394,25 +2451,20 @@
                                 <StackPanel>
                                     <StackPanel Visibility="{Binding CanSelectMapVariant, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <TextBlock Text="VARIANT" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                                        <ComboBox ItemsSource="{Binding MapVariants}" SelectedItem="{Binding SelectedMapVariant, Mode=TwoWay}" DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}" Height="28" Margin="0,4,0,8"/>
+                                        <ComboBox ItemsSource="{Binding MapVariants}" SelectedItem="{Binding SelectedMapVariant, Mode=TwoWay}" Style="{StaticResource ModernComboBox}" Height="28" Margin="0,4,0,8"
+                                                  ToolTip="Map skin and the container it draws. Skins sharing a container use the same geometry.">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Label}" FontSize="10"/>
+                                                        <TextBlock Text="{Binding Detail, StringFormat=' · {0}'}" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"
+                                                                   Visibility="{Binding Detail, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
                                     </StackPanel>
-                                    <TextBlock Text="LAYERS" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,2,0,4" Visibility="{Binding HasMapLayers, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                    <ItemsControl ItemsSource="{Binding MapLayers}" Visibility="{Binding HasMapLayers, Converter={StaticResource BoolToVisibilityConverter}}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Click="MapLayerCheckBox_Click" Margin="0,2">
-                                                    <Grid Width="240">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Text="{Binding Label}" FontSize="9.5"/>
-                                                        <TextBlock Grid.Column="1" Text="{Binding TriangleText}" FontSize="8.5" Foreground="{StaticResource TextMuted}" FontFamily="Consolas"/>
-                                                    </Grid>
-                                                </CheckBox>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MapStateControlsTemplate}"/>
                                 </StackPanel>
                             </Border>
 

@@ -60,6 +60,26 @@ namespace AssetsManager.Services.Viewer.Semantics
             return geometry.Meshes.Where(mesh => mesh.IsVisibleForFlags(flags));
         }
 
+        internal static IEnumerable<MapGeometryMeshData> DrawnMeshesFor(
+            MapGeometryData geometry,
+            MapSceneVisibility visibility,
+            MapVisibilityState state)
+        {
+            ArgumentNullException.ThrowIfNull(geometry);
+            return geometry.Meshes.Where(mesh => IsDrawn(mesh, visibility, state));
+        }
+
+        internal static bool IsDrawn(
+            MapGeometryMeshData mesh,
+            MapSceneVisibility visibility,
+            MapVisibilityState state) =>
+            mesh != null &&
+            MapVisibilitySemantics.IsVisible(
+                visibility,
+                state,
+                mesh.Visibility,
+                mesh.VisibilityControllerPathHash);
+
         internal static IReadOnlyList<MapGeometryLayerData> Layers(MapGeometryData geometry)
         {
             ArgumentNullException.ThrowIfNull(geometry);

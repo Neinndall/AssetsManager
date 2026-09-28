@@ -24,6 +24,16 @@ namespace AssetsManager.Services.Viewer.Semantics
         public static IReadOnlyList<MapParticleData> PlayedForFlags(
             IEnumerable<MapParticleData> particles,
             int flags)
+            => PlayedFor(particles, null, MapVisibilityState.FromFlags(flags));
+
+        /// <summary>
+        /// Particles the previewed game state plays. Transitional and start-disabled placements
+        /// belong to gameplay events, so a static state never starts them.
+        /// </summary>
+        public static IReadOnlyList<MapParticleData> PlayedFor(
+            IEnumerable<MapParticleData> particles,
+            MapSceneVisibility visibility,
+            MapVisibilityState state)
         {
             if (particles == null)
                 return Array.Empty<MapParticleData>();
@@ -31,10 +41,13 @@ namespace AssetsManager.Services.Viewer.Semantics
             return particles
                 .Where(particle =>
                     particle != null &&
-                    particle.Placeable.IsVisibleForFlags(flags) &&
                     !particle.Transitional &&
                     !particle.StartDisabled &&
-                    !particle.VisibilityController.HasValue)
+                    MapVisibilitySemantics.IsVisible(
+                        visibility,
+                        state,
+                        particle.Placeable.Visibility,
+                        particle.VisibilityController))
                 .ToArray();
         }
 

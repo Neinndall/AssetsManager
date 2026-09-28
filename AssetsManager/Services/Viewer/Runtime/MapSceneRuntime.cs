@@ -21,7 +21,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         private float _characterTimeSeconds;
         private bool _showStructures = true;
         private bool _showParticles;
-        private int _visibilityFlags;
+        private MapVisibilityState _visibility;
 
         internal MapSceneRuntime(
             MapSceneData scene,
@@ -34,7 +34,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             BackdropLightmaps = scene.Lightmaps ?? new Dictionary<string, MapTextureImage>(StringComparer.OrdinalIgnoreCase);
             CharacterGroups = characterGroups ?? Array.Empty<MapCharacterRuntimeGroup>();
             Particles = particles ?? new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>());
-            _visibilityFlags = scene.OpeningVisibilityFlags;
+            _visibility = scene.OpeningVisibility;
         }
 
         internal MapSceneData Scene { get; }
@@ -46,7 +46,8 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal IReadOnlySet<string> Hidden => _hidden;
         internal float SceneTimeSeconds => _sceneTimeSeconds;
         internal float CharacterTimeSeconds => _characterTimeSeconds;
-        internal int VisibilityFlags => _visibilityFlags;
+        internal MapVisibilityState Visibility => _visibility;
+        internal int VisibilityFlags => _visibility.Flags;
         internal bool ShowStructures
         {
             get => _showStructures;
@@ -84,10 +85,12 @@ namespace AssetsManager.Services.Viewer.Runtime
                 Particles.Update(viewProjection, deltaSeconds, _hidden);
         }
 
-        internal void SetVisibilityFlags(int flags)
+        internal void SetVisibilityFlags(int flags) => SetVisibility(_visibility.WithFlags(flags));
+
+        internal void SetVisibility(MapVisibilityState visibility)
         {
             ThrowIfDisposed();
-            _visibilityFlags = flags;
+            _visibility = visibility ?? throw new ArgumentNullException(nameof(visibility));
         }
 
         internal void SetBackdropTextureRetainer(Func<MapTextureImage, Action> holdTexture)

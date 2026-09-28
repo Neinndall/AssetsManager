@@ -124,7 +124,8 @@
                                         <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.2" Color="Black"/>
                                     </Border.Effect>
                                 </Border>
-                                <ScrollViewer Margin="1,1,1,0" SnapsToDevicePixels="True">
+                                <!-- Pixel scrolling: item scrolling leaves a partial-item gap below the last entry. -->
+                                <ScrollViewer Margin="1,1,1,1" SnapsToDevicePixels="True" CanContentScroll="False">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" Margin="0"/>
                                 </ScrollViewer>
                             </Grid>

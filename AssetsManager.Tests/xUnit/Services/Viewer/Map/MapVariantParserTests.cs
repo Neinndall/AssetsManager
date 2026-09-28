@@ -46,6 +46,26 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void LoadedMapSelectsDefaultAmongSkinsSharingItsContainer()
+        {
+            MapPath baseSrx = MapPath.FromEntryPath(BaseSrx);
+            MapPath arcade = MapPath.FromEntryPath("Maps/MapGeometry/Map11/Arcade");
+            var variants = new[]
+            {
+                new MapVariantData("10Year", MapPath.FromEntryPath("Maps/MapGeometry/Map11/10Year")),
+                new MapVariantData("AprilFools2019", baseSrx),
+                new MapVariantData("Arcade", arcade),
+                new MapVariantData("Default", baseSrx),
+                new MapVariantData("LunarRevel", baseSrx)
+            };
+
+            Assert.Same(variants[3], MapVariantData.ForMap(variants, MapPath.FromEntryPath(BaseSrx.ToLowerInvariant()), null));
+            Assert.Same(variants[4], MapVariantData.ForMap(variants, baseSrx, variants[4]));
+            Assert.Same(variants[3], MapVariantData.ForMap(variants, baseSrx, variants[2]));
+            Assert.Equal("Base_SRX", variants[1].Detail);
+        }
+
+        [Fact]
         public void SkinWithoutContainerDrawsNothing()
         {
             BinTree tree = Tree(

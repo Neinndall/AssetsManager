@@ -142,10 +142,16 @@ namespace AssetsManager.Services.Viewer.Loading
                 characters,
                 particles,
                 _hashResolver);
-            int openingVisibilityFlags = MapGeometrySemantics.OpeningFlags(geometry);
-            IReadOnlyList<MapParticleData> playedParticles = MapParticleSemantics.PlayedForFlags(
+            MapSceneVisibility visibility = await LoadVisibilityAsync(
+                source,
+                materials,
+                geometry,
+                cancellationToken);
+            int openingVisibilityFlags = visibility.Opening.Flags;
+            IReadOnlyList<MapParticleData> playedParticles = MapParticleSemantics.PlayedFor(
                 particles,
-                openingVisibilityFlags);
+                visibility,
+                visibility.Opening);
             MapParticleSystemCatalog particleSystems = _particleSystemParser.Parse(
                 materials,
                 MapParticleSemantics.GroupBySystem(playedParticles),
@@ -186,7 +192,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 $"materials={geometry.Materials.Count}, textures={textureStatus}, programTextures={programTextureStatus}, lightmaps={lightmapStatus}, " +
                 $"chunks={placeables.Count}, placeables={placeables.Sum(chunk => chunk.Items.Count)}, " +
                 $"characters={characters.Count}, particles={particles.Count}, " +
-                $"openingFlags=0x{openingVisibilityFlags:x2}, particleSystems={particleSystems.Groups.Count}, sun={(sun == null ? "default" : "authored")}, " +
+                $"opening=({visibility.Opening}), controllers={visibility.Controllers.Count}, particleSystems={particleSystems.Groups.Count}, sun={(sun == null ? "default" : "authored")}, " +
                 $"postEffects={(postEffects?.DrawsAnything == true ? "on" : "off")}, " +
                 $"ssao={(ambientOcclusion?.DrawsAnything == true ? "on" : "off")}.");
             return new MapSceneData(
@@ -209,7 +215,55 @@ namespace AssetsManager.Services.Viewer.Loading
                 programTextures,
                 openingVisibilityFlags,
                 shaders,
-                lightGrid);
+                lightGrid,
+                visibility);
+        }
+
+        /// <summary>
+        /// Reads the controller graph of the container and the visibility domains of its owning
+        /// Map object (data/maps/shipping/&lt;map&gt;/&lt;map&gt;.bin), resolved project first, then WAD.
+        /// </summary>
+        private async Task<MapSceneVisibility> LoadVisibilityAsync(
+            MapSceneSource source,
+            BinTree materials,
+            MapGeometryData geometry,
+            CancellationToken cancellationToken)
+        {
+            var parser = new MapVisibilityParser();
+            IReadOnlyDictionary<uint, MapVisibilityControllerData> controllers = parser.ParseControllers(materials);
+            MapVisibilityDefinitions definitions = MapVisibilityDefinitions.Empty;
+            string mapBinPath = ShippingMapPath(source.Map);
+            if (mapBinPath != null)
+            {
+                MapResolvedAsset mapAsset = await _assetResolver.ResolveVirtualAsync(
+                    mapBinPath,
+                    source.ProjectRoot,
+                    cancellationToken);
+                BinTree mapDocument = await OpenOptionalBinTreeAsync(mapAsset, cancellationToken);
+                definitions = parser.ParseDefinitions(
+                    mapDocument,
+                    _hashResolver == null ? null : _hashResolver.ResolveBinHash);
+            }
+
+            return new MapSceneVisibility(
+                definitions,
+                controllers,
+                MapVisibilitySemantics.Opening(definitions, MapGeometrySemantics.OpeningFlags(geometry)));
+        }
+
+        /// <summary>Maps/MapGeometry/Map11/Base_SRX → data/maps/shipping/map11/map11.bin.</summary>
+        internal static string ShippingMapPath(MapPath map)
+        {
+            string[] segments = map?.Value?.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments == null || segments.Length < 3 ||
+                !segments[0].Equals("maps", StringComparison.OrdinalIgnoreCase) ||
+                !segments[1].Equals("mapgeometry", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            string id = segments[2].ToLowerInvariant();
+            return $"data/maps/shipping/{id}/{id}.bin";
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewTexturesAsync(

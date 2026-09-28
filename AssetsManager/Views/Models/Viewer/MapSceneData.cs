@@ -23,7 +23,9 @@ namespace AssetsManager.Views.Models.Viewer
         public IReadOnlyList<MapParticleData> Particles { get; }
         public MapParticleSystemCatalog ParticleSystems { get; }
         public IReadOnlyList<MapOutlineChunkData> Outline { get; }
-        public int OpeningVisibilityFlags { get; }
+        public MapSceneVisibility Visibility { get; }
+        public MapVisibilityState OpeningVisibility => Visibility.Opening;
+        public int OpeningVisibilityFlags => Visibility.Opening.Flags;
         public Vector3? Origin { get; }
         public MapSunData Sun { get; }
         public MapLightGridData LightGrid { get; }
@@ -50,7 +52,8 @@ namespace AssetsManager.Views.Models.Viewer
             IReadOnlyDictionary<string, MapTextureImage> programTextures = null,
             int openingVisibilityFlags = 1,
             BinTree shaderDefinitions = null,
-            MapLightGridData lightGrid = null)
+            MapLightGridData lightGrid = null,
+            MapSceneVisibility visibility = null)
         {
             Source = source;
             Assets = assets;
@@ -66,7 +69,8 @@ namespace AssetsManager.Views.Models.Viewer
             Particles = particles;
             ParticleSystems = particleSystems;
             Outline = outline ?? System.Array.Empty<MapOutlineChunkData>();
-            OpeningVisibilityFlags = openingVisibilityFlags;
+            Visibility = visibility ?? MapSceneVisibility.Empty.WithOpening(
+                MapVisibilityState.FromFlags(openingVisibilityFlags));
             Origin = origin;
             Sun = sun;
             LightGrid = lightGrid;

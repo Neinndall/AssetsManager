@@ -217,6 +217,7 @@ namespace AssetsManager.Views.Controls.Viewer
             InitializeComponent();
             DataContext = _model;
             _model.PropertyChanged += OnModelPropertyChanged;
+            _model.MapVisibilityRequested += OnMapVisibilityRequested;
 
             Loaded += OnControlLoaded;
             Unloaded += OnControlUnloaded;
@@ -227,7 +228,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private sealed record CharacterBackdropSeed(
             MapSceneSource Source,
-            int? VisibilityFlags,
+            MapVisibilityState Visibility,
             bool ShowParticles,
             bool ShowStructures);
 
@@ -237,7 +238,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 return new CharacterBackdropSeed(
                     loadedSource,
-                    _mapSceneRuntime.VisibilityFlags,
+                    _mapSceneRuntime.Visibility,
                     _mapSceneRuntime.ShowParticles,
                     _mapSceneRuntime.ShowStructures);
             }
@@ -310,7 +311,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     {
                         tab.CharacterBackdropEnabled = true;
                         tab.CharacterBackdropKey = backdropKey;
-                        tab.CharacterBackdropVisibilityFlags = inheritedBackdrop.VisibilityFlags;
+                        tab.CharacterBackdropVisibility = inheritedBackdrop.Visibility;
                     }
                 }
                 _model.WorkspaceTabs.Add(tab);
@@ -450,7 +451,7 @@ namespace AssetsManager.Views.Controls.Viewer
             tab.CharacterBackdropEnabled = _model.CharacterBackdropEnabled;
             tab.CharacterBackdropKey = VfxInstallationMapCatalog.BackdropKey(_model.SelectedCharacterBackdrop?.Source);
             if (_mapSceneIsCharacterBackdrop && _mapSceneRuntime != null)
-                tab.CharacterBackdropVisibilityFlags = _mapSceneRuntime.VisibilityFlags;
+                tab.CharacterBackdropVisibility = _mapSceneRuntime.Visibility;
             if (tab.FocusedActor != null)
                 StoreFocusedPlacement(tab.FocusedActor);
         }
@@ -530,22 +531,17 @@ namespace AssetsManager.Views.Controls.Viewer
             _mapSceneRuntime.ShowParticles = _model.MapParticlesVisible;
             _mapSceneRuntime.ShowStructures = _model.MapStructuresVisible;
             _model.HasMapPreview = true;
-            _model.SetMapLayers(
-                MapGeometrySemantics.Layers(_mapSceneRuntime.Scene.Geometry),
-                _mapSceneRuntime.VisibilityFlags);
+            PublishMapVisibilityControls(_mapSceneRuntime);
             ReplaceMapBrowserRoot(null);
             _mapGpuSceneDirty = true;
 
-            if (tab.CharacterBackdropVisibilityFlags is int wantedFlags &&
-                wantedFlags != _mapSceneRuntime.VisibilityFlags)
+            if (tab.CharacterBackdropVisibility is MapVisibilityState wanted &&
+                !wanted.Equals(_mapSceneRuntime.Visibility))
             {
-                _model.SetMapLayerFlags(wantedFlags);
-                _ = ApplyMapVisibilityFlagsAsync(wantedFlags);
+                _model.SyncMapVisibility(wanted);
+                _ = ApplyMapVisibilityAsync(wanted);
             }
-            else
-            {
-                ApplyCharacterBackdropOrigin(_mapSceneRuntime.Scene, _mapSceneRuntime.Scene.Source);
-            }
+            ApplyCharacterBackdropOrigin(_mapSceneRuntime.Scene, _mapSceneRuntime.Scene.Source);
 
             OpenTkControl?.InvalidateVisual();
             return true;
@@ -970,9 +966,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (source?.Map == null || _model.MapVariants.Count == 0)
                 return;
 
-            MapVariantData variant = _model.MapVariants.FirstOrDefault(candidate =>
-                candidate?.Map?.Equals(source.Map) == true ||
-                string.Equals(candidate?.Map?.Value, source.Map.Value, StringComparison.OrdinalIgnoreCase));
+            MapVariantData variant = MapVariantData.ForMap(_model.MapVariants, source.Map, _model.SelectedMapVariant);
             if (variant == null || ReferenceEquals(_model.SelectedMapVariant, variant))
                 return;
 
@@ -989,6 +983,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ReloadSelectedMapVariant()
         {
+            // Skins sharing the loaded container draw the same geometry; reloading it would change nothing.
+            if (MapVariantData.Draws(_model.SelectedMapVariant, _mapSceneRuntime?.Scene?.Source?.Map))
+                return;
+
             MapSceneSource source = ResolveMapVariantSource(_model.SelectedMapVariant);
             if (source == null)
                 return;
@@ -1015,7 +1013,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 tab.CharacterBackdropEnabled = true;
                 tab.CharacterBackdropKey = key;
-                tab.CharacterBackdropVisibilityFlags = null;
+                tab.CharacterBackdropVisibility = null;
                 _isApplyingCharacterViewportState = true;
                 try
                 {
@@ -1059,7 +1057,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (option?.Source == null || !_model.IsSkinWorkspace)
                 return Task.CompletedTask;
 
-            int? visibilityFlags = null;
+            MapVisibilityState visibility = null;
             VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
             if (tab?.Kind == VfxWorkspaceTabKind.Skin &&
                 string.Equals(
@@ -1067,13 +1065,13 @@ namespace AssetsManager.Views.Controls.Viewer
                     VfxInstallationMapCatalog.BackdropKey(option.Source),
                     StringComparison.OrdinalIgnoreCase))
             {
-                visibilityFlags = tab.CharacterBackdropVisibilityFlags;
+                visibility = tab.CharacterBackdropVisibility;
             }
 
             return LoadDetectedMapAsync(
                 option.Source,
                 asCharacterBackdrop: true,
-                initialVisibilityFlags: visibilityFlags);
+                initialVisibility: visibility);
         }
 
         private void ApplyCharacterBackdropOrigin(MapSceneData scene, MapSceneSource source)
@@ -1122,8 +1120,8 @@ namespace AssetsManager.Views.Controls.Viewer
             if (!_model.IsSkinWorkspace || scene?.Geometry == null)
                 return false;
 
-            int visibilityFlags = _mapSceneRuntime?.VisibilityFlags ?? scene.OpeningVisibilityFlags;
-            if (MapGeometrySemantics.CalculateOriginForFlags(scene.Geometry, visibilityFlags) is not Vector3 engineOrigin)
+            // Like LTK, the stand point comes from the opening state: switching map state never moves the subject.
+            if (StableMapOrigin(scene) is not Vector3 engineOrigin)
                 return false;
             origin = new Vector3(-engineOrigin.X, engineOrigin.Y, engineOrigin.Z);
             return true;
@@ -1646,6 +1644,7 @@ namespace AssetsManager.Views.Controls.Viewer
             Deactivate();
             _isCleanedUp = true;
             _model.PropertyChanged -= OnModelPropertyChanged;
+            _model.MapVisibilityRequested -= OnMapVisibilityRequested;
             _championLoadGeneration++;
 
             RunReleaseStep("VFX folder scan cancellation", () => _scanCancellation?.Cancel());
@@ -2498,10 +2497,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_mapSceneIsCharacterBackdrop || _mapSceneRuntime?.Scene?.Geometry == null)
                 return false;
 
-            int visibilityFlags = _mapSceneRuntime.VisibilityFlags;
-            Vector3? calculatedOrigin = MapGeometrySemantics.CalculateOriginForFlags(
-                _mapSceneRuntime.Scene.Geometry, visibilityFlags);
-            if (calculatedOrigin is not Vector3 engineOrigin)
+            if (StableMapOrigin(_mapSceneRuntime.Scene) is not Vector3 engineOrigin)
                 return false;
 
             center = new Vector3(-engineOrigin.X, engineOrigin.Y + 300f, engineOrigin.Z);
@@ -3481,7 +3477,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private async Task LoadDetectedMapAsync(
             MapSceneSource source,
             bool asCharacterBackdrop = false,
-            int? initialVisibilityFlags = null)
+            MapVisibilityState initialVisibility = null)
         {
             if (source == null || MapViewerSceneService == null || _isCleanedUp)
                 return;
@@ -3511,8 +3507,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_isCleanedUp || !ReferenceEquals(_mapCancellation, operation))
                     return;
 
-                if (asCharacterBackdrop && initialVisibilityFlags.HasValue)
-                    staged.SetVisibilityFlags(initialVisibilityFlags.Value);
+                if (asCharacterBackdrop && initialVisibility != null)
+                    staged.SetVisibility(initialVisibility);
 
                 _mapClipCancellation?.Cancel();
                 ClearMapCharacterClipPreview();
@@ -3528,7 +3524,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 backdrop.ShowStructures = _model.MapStructuresVisible;
                 backdrop.ShowParticles = _model.MapParticlesVisible;
                 _model.HasMapPreview = true;
-                _model.SetMapLayers(MapGeometrySemantics.Layers(scene.Geometry), backdrop.VisibilityFlags);
+                PublishMapVisibilityControls(backdrop);
                 _mapGpuSceneDirty = true;
                 _mapTexturesDirty = false;
                 previous?.Dispose();
@@ -3577,13 +3573,15 @@ namespace AssetsManager.Views.Controls.Viewer
                     new Dictionary<string, MapTextureImage>(StringComparer.OrdinalIgnoreCase),
                     "preview lightmaps",
                     operation.Token);
+                // Placeables prepared here belong to this state; a map-state switch that lands first owns the runtime.
+                MapVisibilityState placeableVisibility = backdrop.Visibility;
                 characterTask = LoadMapResourceSafelyAsync(
-                    MapViewerSceneService.LoadCharacterAssetsAsync(backdrop, operation.Token),
+                    MapViewerSceneService.LoadCharacterAssetsAsync(backdrop, placeableVisibility, operation.Token),
                     (IReadOnlyList<MapCharacterRuntimeGroup>)Array.Empty<MapCharacterRuntimeGroup>(),
                     "structures",
                     operation.Token);
                 particleTask = LoadMapResourceSafelyAsync(
-                    MapViewerSceneService.LoadParticleAssetsAsync(backdrop, operation.Token),
+                    MapViewerSceneService.LoadParticleAssetsAsync(backdrop, placeableVisibility, operation.Token),
                     new MapParticleSceneRuntime(Array.Empty<MapParticleRuntime>()),
                     "VFX placements",
                     operation.Token);
@@ -3679,6 +3677,12 @@ namespace AssetsManager.Views.Controls.Viewer
                             characterAssetsAdopted = true;
                             return;
                         }
+                        if (!placeableVisibility.Equals(backdrop.Visibility))
+                        {
+                            DisposeCharacterGroups(characters);
+                            characterAssetsAdopted = true;
+                            continue;
+                        }
 
                         backdrop.SetCharacterGroups(characters);
                         characterAssetsAdopted = true;
@@ -3701,6 +3705,12 @@ namespace AssetsManager.Views.Controls.Viewer
                             particles?.Dispose();
                             particleAssetsAdopted = true;
                             return;
+                        }
+                        if (!placeableVisibility.Equals(backdrop.Visibility))
+                        {
+                            particles?.Dispose();
+                            particleAssetsAdopted = true;
+                            continue;
                         }
 
                         backdrop.SetParticles(particles);
@@ -3912,7 +3922,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _mapLayerCancellation?.Cancel();
             _mapLayerCancellation = null;
             _model.HasMapPreview = false;
-            _model.SetMapLayers(Array.Empty<MapGeometryLayerData>(), 0);
+            _model.ClearMapVisibility();
             ClearPendingMapTextureUpdates();
             _mapClipCancellation?.Cancel();
             ClearMapCharacterClipPreview();
@@ -3968,7 +3978,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_mapSceneRuntime != null)
                 {
                     _mapGeometryRenderer.LoadScene(_mapSceneRuntime.Scene);
-                    _mapGeometryRenderer.SetVisibilityFlags(_mapSceneRuntime.VisibilityFlags);
+                    _mapGeometryRenderer.SetVisibility(_mapSceneRuntime.Visibility);
                     _mapGeometryRenderer.SetPreviewSun(EffectiveMapSun(), _mapSunPreviewOverride);
                     // Backdrop loads publish geometry before texture waves. A preview wave may finish
                     // before the first GL frame, so LoadScene's immutable scene dictionaries can still
@@ -3996,7 +4006,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _mapCharacterRenderer?.Clear();
                 _mapParticleRenderer?.Clear();
-                _mapGeometryRenderer.SetVisibilityFlags(_mapSceneRuntime.VisibilityFlags);
+                _mapGeometryRenderer.SetVisibility(_mapSceneRuntime.Visibility);
                 _mapVisibilityDirty = false;
             }
 
@@ -4076,11 +4086,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (scene?.Geometry == null || _cameraController == null)
                 return;
 
-            int visibilityFlags = ReferenceEquals(_mapSceneRuntime?.Scene, scene)
-                ? _mapSceneRuntime.VisibilityFlags
-                : scene.OpeningVisibilityFlags;
-            Vector3? calculatedOrigin = MapGeometrySemantics.CalculateOriginForFlags(scene.Geometry, visibilityFlags);
-            if (calculatedOrigin is not Vector3 engineOrigin)
+            if (StableMapOrigin(scene) is not Vector3 engineOrigin)
                 return;
 
             if (_dummyViewport.Camera is not PerspectiveCamera)
@@ -4211,58 +4217,87 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (option.IsEnabled)
                     flags |= 1 << option.Index;
             }
-            _model.SetMapLayerFlags(flags);
-            if (_mapSceneIsCharacterBackdrop && _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
-                _model.SelectedWorkspaceTab.CharacterBackdropVisibilityFlags = flags;
-            _ = ApplyMapVisibilityFlagsAsync(flags);
+            _model.RequestMapLayerFlags(flags);
         }
 
-        private async Task ApplyMapVisibilityFlagsAsync(int flags)
+        private void OnMapVisibilityRequested(MapVisibilityState state)
+        {
+            if (state != null)
+                _ = ApplyMapVisibilityAsync(state);
+        }
+
+        private void PublishMapVisibilityControls(MapSceneRuntime runtime)
+        {
+            if (runtime?.Scene == null)
+            {
+                _model.ClearMapVisibility();
+                return;
+            }
+
+            _model.SetMapVisibility(
+                runtime.Scene.Visibility,
+                MapGeometrySemantics.Layers(runtime.Scene.Geometry),
+                runtime.Visibility);
+        }
+
+        private static Vector3? StableMapOrigin(MapSceneData scene) =>
+            scene?.Origin ??
+            (scene?.Geometry == null
+                ? null
+                : MapGeometrySemantics.CalculateOriginForFlags(scene.Geometry, scene.OpeningVisibilityFlags));
+
+        /// <summary>
+        /// Switches the previewed map state. The latest request always owns the runtime: it cancels
+        /// any pending switch first, even when it returns to the state already applied.
+        /// </summary>
+        private async Task ApplyMapVisibilityAsync(MapVisibilityState state)
         {
             MapSceneRuntime runtime = _mapSceneRuntime;
-            if (runtime == null || MapViewerSceneService == null || runtime.VisibilityFlags == flags || _isCleanedUp)
+            if (runtime == null || MapViewerSceneService == null || state == null || _isCleanedUp)
                 return;
 
             _mapLayerCancellation?.Cancel();
+            _mapLayerCancellation = null;
+            if (state.Equals(runtime.Visibility))
+            {
+                _model.SyncMapVisibility(runtime.Visibility);
+                return;
+            }
+
             var operation = new System.Threading.CancellationTokenSource();
             _mapLayerCancellation = operation;
             Task<IReadOnlyList<MapCharacterRuntimeGroup>> characterTask = null;
             Task<MapParticleSceneRuntime> particleTask = null;
             bool charactersAdopted = false;
             bool particlesAdopted = false;
+            bool IsOwner() =>
+                !_isCleanedUp &&
+                ReferenceEquals(_mapLayerCancellation, operation) &&
+                ReferenceEquals(_mapSceneRuntime, runtime);
 
             try
             {
-                _model.StatusText = $"Switching MAP layers to 0x{flags:x2}...";
-                characterTask = MapViewerSceneService.LoadCharacterAssetsAsync(runtime, flags, operation.Token);
-                particleTask = MapViewerSceneService.LoadParticleAssetsAsync(runtime, flags, operation.Token);
+                _model.StatusText = $"Switching MAP state ({state})...";
+                characterTask = MapViewerSceneService.LoadCharacterAssetsAsync(runtime, state, operation.Token);
+                particleTask = MapViewerSceneService.LoadParticleAssetsAsync(runtime, state, operation.Token);
                 await Task.WhenAll(characterTask, particleTask);
                 operation.Token.ThrowIfCancellationRequested();
-                if (_isCleanedUp || !ReferenceEquals(_mapLayerCancellation, operation) ||
-                    !ReferenceEquals(_mapSceneRuntime, runtime))
-                {
+                if (!IsOwner())
                     return;
-                }
 
                 ClearMapCharacterClipPreview();
                 runtime.SetCharacterGroups(await characterTask);
                 charactersAdopted = true;
                 runtime.SetParticles(await particleTask);
                 particlesAdopted = true;
-                runtime.SetVisibilityFlags(flags);
-                _model.SetMapLayerFlags(flags);
+                runtime.SetVisibility(state);
+                _model.SyncMapVisibility(state);
                 if (_mapSceneIsCharacterBackdrop && _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
-                {
-                    _model.SelectedWorkspaceTab.CharacterBackdropVisibilityFlags = flags;
-                }
+                    _model.SelectedWorkspaceTab.CharacterBackdropVisibility = state;
                 else
-                {
                     ReplaceMapBrowserRoot(MapBrowserSemantics.Build(runtime));
-                }
                 _mapVisibilityDirty = true;
-                if (_mapSceneIsCharacterBackdrop && _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
-                    ApplyCharacterBackdropOrigin(runtime.Scene, runtime.Scene.Source);
-                _model.StatusText = $"MAP layers 0x{flags:x2} · {runtime.CharacterGroups.Count} structure skins · {runtime.Particles.Runtimes.Count} VFX placements.";
+                _model.StatusText = $"MAP state {DescribeMapVisibility(state)} · {runtime.CharacterGroups.Count} structure skins · {runtime.Particles.Runtimes.Count} VFX placements.";
                 OpenTkControl?.InvalidateVisual();
             }
             catch (OperationCanceledException)
@@ -4270,9 +4305,13 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
-                LogService?.LogError(ex, $"Failed to switch MAP visibility layers to 0x{flags:x2}.");
-                _model.SetMapLayerFlags(runtime.VisibilityFlags);
-                _model.StatusText = "Unable to switch MAP visibility layers.";
+                LogService?.LogError(ex, $"Failed to switch MAP visibility state ({state}).");
+                // A superseded switch must not roll back the controls of the request that replaced it.
+                if (IsOwner())
+                {
+                    _model.SyncMapVisibility(runtime.Visibility);
+                    _model.StatusText = "Unable to switch MAP state.";
+                }
             }
             finally
             {
@@ -4284,6 +4323,18 @@ namespace AssetsManager.Views.Controls.Viewer
                     _mapLayerCancellation = null;
                 operation.Dispose();
             }
+        }
+
+        private string DescribeMapVisibility(MapVisibilityState state)
+        {
+            var parts = new List<string>();
+            if (_model.SelectedMapTransformation?.Label is string transformation)
+                parts.Add(transformation);
+            if (_model.HasMapSecondaryStates && _model.SelectedMapSecondaryState?.Label is string secondary)
+                parts.Add(secondary);
+            if (state.Mutators.Count > 0)
+                parts.Add($"+{state.Mutators.Count} mutators");
+            return parts.Count == 0 ? $"0x{state.Flags:x2}" : string.Join(" · ", parts);
         }
 
         private void MapBrowserEye_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -4349,9 +4400,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         _mapSceneRuntime.ShowStructures = _model.MapStructuresVisible;
                         _mapSceneRuntime.ShowParticles = _model.MapParticlesVisible;
                         _model.HasMapPreview = true;
-                        _model.SetMapLayers(
-                            MapGeometrySemantics.Layers(_mapSceneRuntime.Scene.Geometry),
-                            _mapSceneRuntime.VisibilityFlags);
+                        PublishMapVisibilityControls(_mapSceneRuntime);
                         ReplaceMapBrowserRoot(MapBrowserSemantics.Build(_mapSceneRuntime));
                         _mapGpuSceneDirty = true;
                     }

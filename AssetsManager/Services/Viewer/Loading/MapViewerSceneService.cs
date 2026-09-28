@@ -121,16 +121,16 @@ namespace AssetsManager.Services.Viewer.Loading
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(backdrop);
-            return _runtimeFactory.LoadCharactersAsync(backdrop.Scene, backdrop.VisibilityFlags, cancellationToken);
+            return _runtimeFactory.LoadCharactersAsync(backdrop.Scene, backdrop.Visibility, cancellationToken);
         }
 
         internal Task<IReadOnlyList<MapCharacterRuntimeGroup>> LoadCharacterAssetsAsync(
             MapSceneRuntime backdrop,
-            int visibilityFlags,
+            MapVisibilityState visibility,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(backdrop);
-            return _runtimeFactory.LoadCharactersAsync(backdrop.Scene, visibilityFlags, cancellationToken);
+            return _runtimeFactory.LoadCharactersAsync(backdrop.Scene, visibility, cancellationToken);
         }
 
         internal Task<MapParticleSceneRuntime> LoadParticleAssetsAsync(
@@ -138,16 +138,16 @@ namespace AssetsManager.Services.Viewer.Loading
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(backdrop);
-            return _runtimeFactory.LoadParticlesAsync(backdrop.Scene, backdrop.VisibilityFlags, cancellationToken);
+            return _runtimeFactory.LoadParticlesAsync(backdrop.Scene, backdrop.Visibility, cancellationToken);
         }
 
         internal Task<MapParticleSceneRuntime> LoadParticleAssetsAsync(
             MapSceneRuntime backdrop,
-            int visibilityFlags,
+            MapVisibilityState visibility,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(backdrop);
-            return _runtimeFactory.LoadParticlesAsync(backdrop.Scene, visibilityFlags, cancellationToken);
+            return _runtimeFactory.LoadParticlesAsync(backdrop.Scene, visibility, cancellationToken);
         }
 
         private MapSceneRuntime AttachTextureRetention(MapSceneRuntime runtime)

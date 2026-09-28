@@ -36,6 +36,11 @@ namespace AssetsManager.Tests.Diagnostics
                 MapLayersAuditDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "map-controllers-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                await MapControllersAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && args[0] == "game-tail-recovery")
             {
                 GameTailRecoveryDiagnostic.Run(args.Skip(1).ToArray());

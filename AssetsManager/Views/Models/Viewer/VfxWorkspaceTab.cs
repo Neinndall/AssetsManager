@@ -86,7 +86,7 @@ namespace AssetsManager.Views.Models.Viewer
         // GPU resource.
         internal bool CharacterBackdropEnabled { get; set; }
         internal string CharacterBackdropKey { get; set; }
-        internal int? CharacterBackdropVisibilityFlags { get; set; }
+        internal MapVisibilityState CharacterBackdropVisibility { get; set; }
 
         /// <summary>Characters composed into this Skin scene, in insertion order.</summary>
         public ObservableCollection<VfxSceneActor> Actors { get; } = new();

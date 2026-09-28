@@ -224,7 +224,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             ReleaseSceneResources();
             _scene = scene;
             _previewSun = scene.Sun;
-            _plan = BuildDrawPlan(scene, scene.OpeningVisibilityFlags);
+            _plan = BuildDrawPlan(scene, scene.OpeningVisibility);
             _light = ResolveLight(scene.Sun);
             AcquireGeometry(scene);
             UpdateTextures(scene.Textures);
@@ -1011,19 +1011,23 @@ namespace AssetsManager.Services.Viewer.Rendering
             return sampler;
         }
 
-        internal void SetVisibilityFlags(int flags)
+        internal void SetVisibility(MapVisibilityState state)
         {
-            if (!_ready || _scene == null)
+            if (!_ready || _scene == null || state == null)
                 return;
-            _plan = BuildDrawPlan(_scene, flags);
+            _plan = BuildDrawPlan(_scene, state);
         }
 
         internal static DrawPlan BuildDrawPlan(MapSceneData scene)
-            => BuildDrawPlan(scene, scene?.OpeningVisibilityFlags ?? 0);
+            => BuildDrawPlan(scene, scene?.OpeningVisibility);
 
         internal static DrawPlan BuildDrawPlan(MapSceneData scene, int visibilityFlags)
+            => BuildDrawPlan(scene, scene?.OpeningVisibility.WithFlags(visibilityFlags));
+
+        internal static DrawPlan BuildDrawPlan(MapSceneData scene, MapVisibilityState visibility)
         {
             ArgumentNullException.ThrowIfNull(scene);
+            ArgumentNullException.ThrowIfNull(visibility);
             MapGeometryData geometry = scene.Geometry;
             IReadOnlyList<MapMaterialDefinition> materials = scene.Materials;
             var bound = new List<BoundMaterial>();
@@ -1035,7 +1039,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             for (int meshIndex = 0; meshIndex < geometry.Meshes.Count; meshIndex++)
             {
                 MapGeometryMeshData mesh = geometry.Meshes[meshIndex];
-                if (!mesh.IsVisibleForFlags(visibilityFlags) || mesh.SubmeshCount <= 0)
+                if (mesh.SubmeshCount <= 0 ||
+                    !MapGeometrySemantics.IsDrawn(mesh, scene.Visibility, visibility))
                     continue;
 
                 bool meshDoubleSided = (mesh.Flags & MapGeometryMeshFlags.CullDisabled) != 0;
