@@ -90,7 +90,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             MapSunData Sun,
             MapLightGridData LightGrid = null,
             Vector3 CharacterPosition = default,
-            TerrainFrame Terrain = default);
+            TerrainFrame Terrain = default,
+            uint SceneColor = 0,
+            uint SceneDepth = 0);
+
+        internal const string SceneColorTexture = "SAMPLER_BACK_BUFFER_COPY_SharedTexture";
+        internal const string SceneDepthTexture = "sDepthTexture_SharedTexture";
 
         /// <summary>
         /// Terrain inputs of the map shaders: <c>TERRAIN_XFORM</c>, the grass tint maps it addresses and
@@ -308,7 +313,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 hasColors,
                 hasPivots);
             UpdateBlocks(runtime, passEntry.Globals, mesh, frame, null);
-            BindTextures(runtime, passEntry.Pass, passEntry.PassIndex, material, mesh, frame.Terrain, programTexture, lightmapTexture);
+            BindTextures(runtime, passEntry.Pass, passEntry.PassIndex, material, mesh, frame, programTexture, lightmapTexture);
             ApplyPassState(passEntry.Pass.State, meshDoubleSided);
             return true;
         }
@@ -478,7 +483,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             IReadOnlyDictionary<uint, string> attributes = particle ? new Dictionary<uint, string>() :
                 AttributeLocations(translated.Vertex.Sidecar.Attributes, kind);
             string vertex = SourceForProfile(translated.Vertex.Glsl, vertexStage: true, preserveInputs: particle);
-            string pixel = SourceForProfile(translated.Pixel.Glsl, vertexStage: false);
+            // Particle programs are composed with the screen-copy helpers already; material programs
+            // (map water refraction) read the same framebuffer captures and need the same V flip.
+            string pixel = SourceForProfile(
+                particle ? translated.Pixel.Glsl : GameParticleShaderPrelude.WithScreenCopy(translated.Pixel.Glsl),
+                vertexStage: false);
             uint program = GlShaderCompiler.CreateRawProgram(_gl, vertex, pixel, attributes);
 
             try
@@ -1002,7 +1011,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             int passIndex,
             MapMaterialDefinition material,
             MapGeometryMeshData mesh,
-            in TerrainFrame terrain,
+            in Frame frame,
             Func<string, uint?> programTexture,
             Func<string, uint?> lightmapTexture)
         {
@@ -1027,9 +1036,15 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     target = TextureTarget.Texture2D;
                     samplerObject = loaded.HasValue ? ResolveLightmapSampler() : ResolveNeutralSampler(clamp: true);
                 }
+                else if (ScreenTextureFor(name, frame) is uint screen && screen != 0)
+                {
+                    texture = screen;
+                    target = TextureTarget.Texture2D;
+                    samplerObject = ResolveNeutralSampler(clamp: true);
+                }
                 else if (IsMultiplicativeSharedTexture(name, sampler.Dimension))
                 {
-                    uint tint = GrassTintFor(name, terrain);
+                    uint tint = GrassTintFor(name, frame.Terrain);
                     texture = tint != 0 ? tint : NeutralWhite2D();
                     target = TextureTarget.Texture2D;
                     samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
@@ -1078,6 +1093,24 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             name != null &&
             name.StartsWith("GRASS_TINT_MAP", StringComparison.Ordinal) &&
             name.EndsWith(SharedTextureSuffix, StringComparison.Ordinal);
+
+        /// <summary>The framebuffer capture bound to a scene colour/depth sampler, or 0 when none was taken.</summary>
+        internal static uint ScreenTextureFor(string name, in Frame frame) => name switch
+        {
+            SceneColorTexture => frame.SceneColor,
+            SceneDepthTexture => frame.SceneDepth,
+            _ => 0
+        };
+
+        /// <summary>Whether a static material samples the scene colour or depth (e.g. refracting water).</summary>
+        internal bool ReadsScreenTextures(MapMaterialDefinition material)
+        {
+            if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.StaticMesh)
+                return false;
+            CacheEntry entry = GetOrCreate(material, material.Program);
+            return entry?.Passes?.Any(pass => pass.Program?.Samplers.Any(sampler =>
+                sampler.TextureName is SceneColorTexture or SceneDepthTexture) == true) == true;
+        }
 
         /// <summary>The MapSkin grass tint bound to a grass tint sampler; the alternate falls back to the base tint.</summary>
         internal static uint GrassTintFor(string name, in TerrainFrame terrain) => name switch

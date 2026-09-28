@@ -401,8 +401,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             }
         }
 
-        [Fact]
-        public async System.Threading.Tasks.Task InstalledMap11ProgramsCompileAndLinkOnDesktopOpenGl()
+        [Theory]
+        [InlineData("Maps/MapGeometry/Map11/Base_SRX")]
+        // Bloom's base water refracts the captured scene colour and depth.
+        [InlineData("Maps/MapGeometry/Map11/Bloom")]
+        public async System.Threading.Tasks.Task InstalledMap11ProgramsCompileAndLinkOnDesktopOpenGl(string map)
         {
             string root = Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.DesktopDirectory),
@@ -413,10 +416,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             int linked = 0;
             var seen = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
             await AssetsManager.Tests.Diagnostics.Viewer.MapShaderAuditDiagnostic.Run(
-                root, "Maps/MapGeometry/Map11/Base_SRX", program =>
+                root, map, program =>
                 {
                     string vertex = ToDesktopGlsl(program.Vertex.Glsl);
-                    string fragment = ToDesktopGlsl(program.Pixel.Glsl);
+                    string fragment = ToDesktopGlsl(GameParticleShaderPrelude.WithScreenCopy(program.Pixel.Glsl));
                     if (!seen.Add(vertex + fragment))
                         return;
                     using var context = new HiddenWglContext();
@@ -427,6 +430,43 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                     linked++;
                 });
             Assert.True(linked > 0, "Map11 must supply translated programs for the GPU check.");
+        }
+
+        [Fact]
+        public void ScreenTexturesFlipUvReadsAndKeepFragCoordFetches()
+        {
+            const string source =
+                "uniform highp sampler2D sDepthTexture_SharedTexture;\n" +
+                "uniform highp sampler2D SAMPLER_BACK_BUFFER_COPY_SharedTexture;\n" +
+                "void main(){ float d = texture(sDepthTexture_SharedTexture, uv).x;" +
+                " vec4 c = texture(SAMPLER_BACK_BUFFER_COPY_SharedTexture, uv);" +
+                " float f = texelFetch(sDepthTexture_SharedTexture, ivec2(gl_FragCoord.xy), 0).x; }";
+
+            string patched = GameParticleShaderPrelude.WithScreenCopy(source);
+
+            Assert.Contains("particleScreenDepth(uv)", patched);
+            Assert.Contains("particleScreenCopy(uv)", patched);
+            Assert.Contains("vec4 particleScreenDepth(vec2 at){ return texture(sDepthTexture_SharedTexture, vec2(at.x, 1.0-at.y)); }", patched);
+            Assert.Contains("texelFetch(sDepthTexture_SharedTexture, ivec2(gl_FragCoord.xy), 0)", patched);
+            Assert.Equal("void main(){}", GameParticleShaderPrelude.WithScreenCopy("void main(){}"));
+        }
+
+        [Fact]
+        public void ScreenSamplersBindTheFrameCaptures()
+        {
+            var frame = new GameShaderRuntime.Frame(
+                System.Numerics.Matrix4x4.Identity,
+                System.Numerics.Matrix4x4.Identity,
+                System.Numerics.Vector3.Zero,
+                0f,
+                null,
+                SceneColor: 5,
+                SceneDepth: 6);
+
+            Assert.Equal(5u, GameShaderRuntime.ScreenTextureFor(GameShaderRuntime.SceneColorTexture, frame));
+            Assert.Equal(6u, GameShaderRuntime.ScreenTextureFor(GameShaderRuntime.SceneDepthTexture, frame));
+            Assert.Equal(0u, GameShaderRuntime.ScreenTextureFor("TERRAIN_BLEND_SharedTexture", frame));
+            Assert.Equal(0u, GameShaderRuntime.ScreenTextureFor(GameShaderRuntime.SceneColorTexture, frame with { SceneColor = 0 }));
         }
 
         [Theory]

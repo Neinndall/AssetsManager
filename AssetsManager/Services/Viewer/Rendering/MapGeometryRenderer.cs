@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
@@ -131,6 +132,9 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _visibilityFlags;
         private DrawPlan _programPlan;
         private DrawPlan _programPlanSource;
+        private DrawPlan _screenPlanSource;
+        private bool _screenPlanReads;
+        private GlSceneCapture _sceneCapture;
         private uint _program;
         private uint _vao;
         private uint _positionVbo;
@@ -216,6 +220,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gameShaderRuntime = _appSettings != null
                 ? new GameShaderRuntime(_gl, _gles, _appSettings)
                 : null;
+            _sceneCapture = new GlSceneCapture(gl);
             _ready = true;
         }
 
@@ -401,7 +406,13 @@ namespace AssetsManager.Services.Viewer.Rendering
                     if (transparentPass != true)
                         DrawGroups(solidPlan.OpaqueGroups, solidMode, shadersEnabled, in gameFrame);
                     if (transparentPass != false)
-                        DrawGroups(solidPlan.TransparentGroups, solidMode, shadersEnabled, in gameFrame);
+                    {
+                        GameShaderRuntime.Frame transparentFrame = WithScreenCapture(
+                            gameFrame,
+                            solidPlan,
+                            shadersEnabled && solidMode == VfxPreviewViewMode.Lit);
+                        DrawGroups(solidPlan.TransparentGroups, solidMode, shadersEnabled, in transparentFrame);
+                    }
                 }
 
                 if (wireframe && transparentPass != false)
@@ -445,6 +456,43 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.BindVertexArray(0);
                 _gl.UseProgram(0);
             }
+        }
+
+        /// <summary>
+        /// Captures the opaque frame (colour and depth) for transparent game materials that refract or
+        /// fade against it, like LTK's water; the copy is taken only when such a material is drawn.
+        /// </summary>
+        private GameShaderRuntime.Frame WithScreenCapture(
+            in GameShaderRuntime.Frame frame,
+            DrawPlan plan,
+            bool gameShaders)
+        {
+            if (!gameShaders || _gameShaderRuntime == null || _sceneCapture == null)
+                return frame;
+
+            if (!ReferenceEquals(_screenPlanSource, plan))
+            {
+                _screenPlanReads = plan.TransparentGroups
+                    .Select(group => group.BoundMaterialIndex)
+                    .Distinct()
+                    .Where(index => index >= 0 && index < plan.Materials.Count)
+                    .Any(index => _gameShaderRuntime.ReadsScreenTextures(plan.Materials[index].Material));
+                _screenPlanSource = plan;
+            }
+            if (!_screenPlanReads)
+                return frame;
+
+            Span<int> viewport = stackalloc int[4];
+            _gl.GetInteger(GetPName.Viewport, viewport);
+            if (viewport[2] <= 0 || viewport[3] <= 0)
+                return frame;
+
+            _sceneCapture.Capture((uint)viewport[2], (uint)viewport[3], captureColor: true, captureDepth: true);
+            return frame with
+            {
+                SceneColor = _sceneCapture.ColorTexture,
+                SceneDepth = _sceneCapture.DepthTexture
+            };
         }
 
         internal static DrawPlan ResolveProgramDrawPlan(
@@ -1383,6 +1431,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 DeleteAllRetainedResources();
                 _gameShaderRuntime?.Dispose();
                 _gameShaderRuntime = null;
+                _sceneCapture?.Dispose();
+                _sceneCapture = null;
                 foreach (uint sampler in _samplers.Values)
                     if (sampler != 0)
                         _gl.DeleteSampler(sampler);

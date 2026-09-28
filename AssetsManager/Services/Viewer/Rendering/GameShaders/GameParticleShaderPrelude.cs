@@ -85,16 +85,31 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             };
         }
 
+        /// <summary>
+        /// Screen textures captured from the GL framebuffer (scene colour and depth). Shaders address them
+        /// with D3D screen UVs (origin top-left), so UV-based reads flip V; texelFetch at gl_FragCoord is
+        /// already in GL space and stays untouched.
+        /// </summary>
+        private static readonly (string Sampler, string Helper)[] ScreenTextures =
+        {
+            ("SAMPLER_BACK_BUFFER_COPY_SharedTexture", "particleScreenCopy"),
+            ("sDepthTexture_SharedTexture", "particleScreenDepth")
+        };
+
         internal static string WithScreenCopy(string source)
         {
-            const string sampler = "SAMPLER_BACK_BUFFER_COPY_SharedTexture";
-            const string declaration = "uniform highp sampler2D " + sampler + ";";
-            if (!source.Contains(declaration, StringComparison.Ordinal)) return source;
-            string helpers = "\nvec4 particleScreenCopy(vec2 at){ return texture(" + sampler + ", vec2(at.x, 1.0-at.y)); }" +
-                "\nvec4 particleScreenCopyLod(vec2 at, float lod){ return textureLod(" + sampler + ", vec2(at.x, 1.0-at.y), lod); }\n";
-            return source.Replace("textureLod(" + sampler + ", ", "particleScreenCopyLod(")
-                .Replace("texture(" + sampler + ", ", "particleScreenCopy(")
-                .Replace(declaration, declaration + helpers);
+            foreach ((string sampler, string helper) in ScreenTextures)
+            {
+                string declaration = "uniform highp sampler2D " + sampler + ";";
+                if (!source.Contains(declaration, StringComparison.Ordinal))
+                    continue;
+                string helpers = "\nvec4 " + helper + "(vec2 at){ return texture(" + sampler + ", vec2(at.x, 1.0-at.y)); }" +
+                    "\nvec4 " + helper + "Lod(vec2 at, float lod){ return textureLod(" + sampler + ", vec2(at.x, 1.0-at.y), lod); }\n";
+                source = source.Replace("textureLod(" + sampler + ", ", helper + "Lod(")
+                    .Replace("texture(" + sampler + ", ", helper + "(")
+                    .Replace(declaration, declaration + helpers);
+            }
+            return source;
         }
 
         private static string[] Identity() => new[] { "vec4(1.0,0.0,0.0,0.0)", "vec4(0.0,1.0,0.0,0.0)", "vec4(0.0,0.0,1.0,0.0)", "vec4(0.0,0.0,0.0,1.0)" };
