@@ -114,7 +114,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     Console.WriteLine($"[Submesh] {name} hidden={string.Join(", ", asset.Materials?.InitialHiddenSubmeshes ?? Array.Empty<string>())}");
                     foreach ((string submesh, ModelMaterialDefinition material) in submeshes)
                         foreach (GameMaterialDynamicParameter dynamic in material?.DynamicParameters ?? Array.Empty<GameMaterialDynamicParameter>())
-                            Console.WriteLine($"[Submesh] {name} {submesh} dynamic {dynamic}");
+                            Console.WriteLine($"[Submesh] {name} {submesh} dynamic {dynamic.Name}={dynamic.Evaluate(0)?.ToString() ?? "unresolved"}");
                     foreach (MapCharacterMeshRange range in asset.Mesh?.Ranges ?? Array.Empty<MapCharacterMeshRange>())
                     {
                         // Farthest bind-pose vertex from the model origin, which dissolve radii are measured against.

@@ -94,10 +94,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 bool vector = driver.ClassHash == Hash("LerpVec4LogicDriver");
                 fields.TryGetValue(Hash(vector ? "BoolDriver" : "mBoolDriver"), out var conditionProperty);
                 var condition = ReadCondition(conditionProperty, depth + 1);
+                // A float driver fills every component, so it can drive a colour (TintColor 0 hides a form).
                 Vector4 on = vector ? Vector(fields, "OnValue", Vector4.One) :
-                    new(Scalar(fields, "mOnValue", 1), 0, 0, 0);
+                    new(Scalar(fields, "mOnValue", 1));
                 Vector4 off = vector ? Vector(fields, "OffValue", new(0, 0, 0, 1)) :
-                    new(Scalar(fields, "mOffValue", 0), 0, 0, 0);
+                    new(Scalar(fields, "mOffValue", 0));
                 // No gameplay buff transitions occur in the preview; use the settled endpoint.
                 return gear => condition.Evaluate(gear) is bool active ? active ? on : off : null;
             }
@@ -125,7 +126,69 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     return fallback?.Invoke(gear);
                 };
             }
+            if (driver.ClassHash == Hash("MaxMaterialDriver") || driver.ClassHash == Hash("MinMaterialDriver"))
+            {
+                bool max = driver.ClassHash == Hash("MaxMaterialDriver");
+                var children = new List<Func<int, Vector4?>>();
+                if (fields.TryGetValue(Hash("mDrivers"), out var driversProperty) && driversProperty is BinTreeContainer drivers)
+                    foreach (var child in drivers.Elements)
+                        children.Add(ReadValueDriver(child, depth + 1));
+                if (children.Count == 0 || children.Contains(null))
+                    return null;
+                return gear =>
+                {
+                    Vector4? result = null;
+                    foreach (var child in children)
+                    {
+                        if (child(gear) is not Vector4 value) return null;
+                        result = result is Vector4 current ? max ? Vector4.Max(current, value) : Vector4.Min(current, value) : value;
+                    }
+                    return result;
+                };
+            }
+            if (driver.ClassHash == Hash("FloatGraphMaterialDriver"))
+            {
+                // The inner driver picks the point on the authored curve (a 0..1 progress for lerp drivers).
+                fields.TryGetValue(Hash("driver"), out var innerProperty);
+                var inner = ReadValueDriver(innerProperty, depth + 1);
+                if (inner == null ||
+                    !fields.TryGetValue(Hash("graph"), out var graphProperty) || graphProperty is not BinTreeStruct graph ||
+                    !TryReadFloats(graph.Properties, "times", out float[] times) ||
+                    !TryReadFloats(graph.Properties, "values", out float[] values) ||
+                    times.Length == 0 || times.Length != values.Length)
+                    return null;
+                return gear => inner(gear) is Vector4 at ? new Vector4(SampleCurve(times, values, at.X)) : null;
+            }
             return null;
+        }
+
+        private static bool TryReadFloats(IReadOnlyDictionary<uint, BinTreeProperty> fields, string name, out float[] result)
+        {
+            result = null;
+            if (!fields.TryGetValue(Hash(name), out var property) || property is not BinTreeContainer container)
+                return false;
+            var values = new List<float>();
+            foreach (var element in container.Elements)
+            {
+                if (element is not BinTreeF32 scalar) return false;
+                values.Add(scalar.Value);
+            }
+            result = values.ToArray();
+            return true;
+        }
+
+        /// <summary>Piecewise-linear curve through (times, values), held flat before the first and after the last key.</summary>
+        internal static float SampleCurve(IReadOnlyList<float> times, IReadOnlyList<float> values, float at)
+        {
+            if (at <= times[0]) return values[0];
+            for (int key = 1; key < times.Count; key++)
+            {
+                if (at > times[key]) continue;
+                float span = times[key] - times[key - 1];
+                float t = span > 0f ? (at - times[key - 1]) / span : 1f;
+                return values[key - 1] + (values[key] - values[key - 1]) * t;
+            }
+            return values[^1];
         }
 
         private static Vector4 Vector(IReadOnlyDictionary<uint, BinTreeProperty> fields, string name, Vector4 fallback) =>
@@ -147,6 +210,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
             if (driver.ClassHash == Hash("HasBuffDynamicMaterialBoolDriver"))
                 return new(GameMaterialBoolKind.Buff);
+            if (driver.ClassHash == Hash("IsDeadDynamicMaterialBoolDriver") ||
+                driver.ClassHash == Hash("IsAnimationPlayingDynamicMaterialBoolDriver"))
+                return new(GameMaterialBoolKind.Gameplay);
             if (driver.ClassHash == Hash("AllTrueMaterialDriver") &&
                 driver.Properties.TryGetValue(Hash("mDrivers"), out var children) && children is BinTreeContainer list)
             {

@@ -17,8 +17,12 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
 {
     internal static class BinDumpDiagnostic
     {
+        // `--all-pairs` prints every map pair and container item instead of the first few.
+        private static bool _allPairs;
+
         public static async Task Run(string[] args)
         {
+            _allPairs = args.Contains("--all-pairs", StringComparer.OrdinalIgnoreCase);
             string defaultWad = @"C:\Riot Games\League of Legends (PBE)\Game\DATA\FINAL\Champions\Tristana.wad.client";
             string wadPath = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal) && a.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase)) ?? defaultWad;
             string filter = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal) && !a.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase)) ?? "skin80";
@@ -248,7 +252,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                     int elIdx = 0;
                     foreach (var el in cnt.Elements)
                     {
-                        if (elIdx++ < 10)
+                        if (elIdx++ < 10 || _allPairs)
                         {
                             DumpProperty(el, $"[{elIdx - 1}]", indent + "    ", resolver, binPath, entryName, className, unknownLinks, knownLinks, discoveredStrings);
                         }
@@ -265,7 +269,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                     int mIdx = 0;
                     foreach (var pair in map)
                     {
-                        if (mIdx++ < 5)
+                        if (mIdx++ < 5 || _allPairs)
                         {
                             DumpProperty(pair.Key, $"Key[{mIdx - 1}]", indent + "    ", resolver, binPath, entryName, className, unknownLinks, knownLinks, discoveredStrings);
                             DumpProperty(pair.Value, $"Val[{mIdx - 1}]", indent + "    ", resolver, binPath, entryName, className, unknownLinks, knownLinks, discoveredStrings);

@@ -3,7 +3,8 @@ using System.Linq;
 
 namespace AssetsManager.Views.Models.Viewer
 {
-    internal enum GameMaterialBoolKind { Unsupported, Gear, Buff, All, Not }
+    // Buff and Gameplay (death, a named animation playing) are states the resting preview is never in.
+    internal enum GameMaterialBoolKind { Unsupported, Gear, Buff, Gameplay, All, Not }
 
     internal sealed record GameMaterialBoolCondition(
         GameMaterialBoolKind Kind, int GearIndex = 0,
@@ -12,8 +13,8 @@ namespace AssetsManager.Views.Models.Viewer
         internal bool? Evaluate(int gearIndex) => Kind switch
         {
             GameMaterialBoolKind.Gear => gearIndex == GearIndex,
-            // The model preview has no active gameplay buffs.
-            GameMaterialBoolKind.Buff => false,
+            // The model preview has no active gameplay buffs, is alive and rests outside scripted animations.
+            GameMaterialBoolKind.Buff or GameMaterialBoolKind.Gameplay => false,
             GameMaterialBoolKind.Not when Children?.Count == 1 => !Children[0].Evaluate(gearIndex),
             GameMaterialBoolKind.All => EvaluateAll(gearIndex),
             _ => null

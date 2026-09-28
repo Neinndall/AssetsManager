@@ -437,6 +437,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [InlineData("Characters/Aatrox/Skins/Skin5", "Body")]
         // LLM_BASE reflects ENV_CUBE by glossiness.
         [InlineData("Characters/Aatrox/Skins/Skin11", "Body")]
+        [InlineData("Characters/Aatrox/Skins/Skin11", "Wings")]
+        // Matcap_Iridescent_Holographic: matcap, iridescence and holographic noise over the diffuse. At rest the
+        // body's dynamic Dissolve_Bias/Gradient_Sharpness leave it whole; Shadow_Form (the R form) has TintColor 0.
+        [InlineData("Characters/Aatrox/Skins/Skin40", "Body")]
+        [InlineData("Characters/Aatrox/Skins/Skin40", "Sword")]
+        // Define sets the ShaderCache never compiled, drawn with the nearest compiled permutation.
+        [InlineData("Characters/KSante/Skins/Skin18", "LWeaponShield")]
+        [InlineData("Characters/KSante/Skins/Skin18", "LWeaponSmear")]
+        [InlineData("Characters/KSante/Skins/Skin18", "LWeaponBlade")]
+        [InlineData("Characters/KSante/Skins/Skin18", "Recall_Body")]
+        [InlineData("Characters/Kayn/Skins/Skin32", "Flipbook_Assassin")]
+        [InlineData("Characters/Sett/Skins/Skin76", "Body")]
         public async System.Threading.Tasks.Task InstalledSkinSubmeshDrawsVisiblePixelsWithItsGameProgram(string skin, string submesh)
         {
             string install = FindInstalledShaderCacheRoot();
