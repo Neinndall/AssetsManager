@@ -28,7 +28,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
         // Compiled permutations are numbered 0..31 and in hundreds (up to 12700 in current data).
         // GrepWad keeps to 0..31 for speed; Basic Suite expands every known shader with the full set.
-        private static readonly int[] ShaderPermutationIndices = Enumerable.Range(0, 32)
+        private const int ShaderBasePermutationCount = 32;
+        private static readonly int[] ShaderPermutationIndices = Enumerable.Range(0, ShaderBasePermutationCount)
             .Concat(Enumerable.Range(1, 200).Select(index => index * 100))
             .ToArray();
         private readonly LogService _logService;

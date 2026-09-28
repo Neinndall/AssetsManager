@@ -127,7 +127,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                             CheckGameIter(
                                 ShaderExtensions.SelectMany(extensionName =>
                                     ShaderVariants.SelectMany(variant =>
-                                        Enumerable.Range(0, 32).Select(index =>
+                                        Enumerable.Range(0, ShaderBasePermutationCount).Select(index =>
                                             $"{candidateBase}{extensionName}{variant}_{index}"))));
                             if (engine.RemainingUnknownCount == 0) break;
                         }
