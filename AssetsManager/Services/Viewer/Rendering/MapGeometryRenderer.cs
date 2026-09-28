@@ -287,7 +287,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             foreach ((MapTextureReference reference, VfxCubeMapData cube) in cubes ?? new Dictionary<MapTextureReference, VfxCubeMapData>())
             {
-                uint texture = GlCubeMapUploader.Upload(_gl, cube, srgb: false);
+                uint texture = GlCubeMapUploader.Upload(_gl, cube, srgb: false, mipmaps: true);
                 if (texture != 0)
                     _environmentCubes[reference] = texture;
             }

@@ -1,19 +1,23 @@
 using System;
+using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 {
     /// <summary>
-    /// The environment cube PBR shaders light from (<c>IBL_CUBEMAP</c>). The translator emulates DXBC cube
-    /// arrays with a 2D array of six layers per cube, so the preview sky is uploaded as cube 0 in that layout,
-    /// sRGB-decoded to linear radiance and mipmapped for the roughness and diffuse levels the shaders read.
+    /// The preview sky as the environment game shaders light and reflect from: <c>IBL_CUBEMAP</c> for PBR
+    /// (the translator emulates DXBC cube arrays with six 2D layers per cube, so the sky is cube 0, sRGB-decoded
+    /// to linear radiance) and <c>ENV_CUBE</c> for gamma-space reflective materials (a raw cube map). Both are
+    /// mipmapped for the glossiness levels the shaders read.
     /// </summary>
     internal sealed class GameShaderImageLight : IDisposable
     {
         private readonly GL _gl;
         private VfxCubeMapData _source;
         private uint _texture;
+        private VfxCubeMapData _cubeSource;
+        private uint _cube;
 
         internal GameShaderImageLight(GL gl) => _gl = gl;
 
@@ -66,6 +70,20 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             return _texture;
         }
 
+        /// <returns>The sky as a raw mipmapped cube map for ENV_CUBE, uploaded once per cube, or 0 without one.</returns>
+        internal uint ResolveCube(VfxCubeMapData cube)
+        {
+            if (cube?.IsValid != true)
+                return 0;
+            if (ReferenceEquals(cube, _cubeSource) && _cube != 0)
+                return _cube;
+
+            ReleaseCube();
+            _cube = GlCubeMapUploader.Upload(_gl, cube, srgb: false, mipmaps: true);
+            _cubeSource = cube;
+            return _cube;
+        }
+
         private void Release()
         {
             if (_texture != 0)
@@ -74,6 +92,18 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             _source = null;
         }
 
-        public void Dispose() => Release();
+        private void ReleaseCube()
+        {
+            if (_cube != 0)
+                _gl.DeleteTexture(_cube);
+            _cube = 0;
+            _cubeSource = null;
+        }
+
+        public void Dispose()
+        {
+            Release();
+            ReleaseCube();
+        }
     }
 }

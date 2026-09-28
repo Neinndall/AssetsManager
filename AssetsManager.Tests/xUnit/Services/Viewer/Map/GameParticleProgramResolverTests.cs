@@ -435,6 +435,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [Theory]
         [InlineData("Characters/Aatrox/Skins/Skin5", "Sword")]
         [InlineData("Characters/Aatrox/Skins/Skin5", "Body")]
+        // LLM_BASE reflects ENV_CUBE by glossiness.
+        [InlineData("Characters/Aatrox/Skins/Skin11", "Body")]
         public async System.Threading.Tasks.Task InstalledSkinSubmeshDrawsVisiblePixelsWithItsGameProgram(string skin, string submesh)
         {
             string install = FindInstalledShaderCacheRoot();
@@ -542,7 +544,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Matrix4x4 view = Matrix4x4.CreateLookAt(eye, center, Vector3.UnitY);
             Matrix4x4 projection = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, 1f, radius * 0.1f, radius * 10f);
             // The generic sky the viewport shows is also the environment PBR materials light from.
-            var sky = AssetsManager.Views.Helpers.SceneElements.LoadGenericSkyCube(settings, log);
+            var sky = Environment.GetEnvironmentVariable("AM_SKIN_GPU_NO_SKY") == "1"
+                ? null
+                : AssetsManager.Views.Helpers.SceneElements.LoadGenericSkyCube(settings, log);
             var frame = new GameShaderRuntime.Frame(view, projection, eye, 1f, null, ImageLight: sky);
             Console.WriteLine($"[SkinGpu] imageLight={(sky?.IsValid == true ? $"{sky.Width}px" : "none")}");
             var bones = Enumerable.Repeat(Matrix4x4.Identity, 256).ToArray();

@@ -14,8 +14,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         /// True for display colour (the sky); false for cubes read by translated game shaders, which
         /// decode colour themselves like LTK's NoColorSpace textures.
         /// </param>
+        /// <param name="mipmaps">
+        /// Generates the mip chain for shaders that pick a level by glossiness (<c>textureLod</c> on ENV_CUBE).
+        /// </param>
         /// <returns>The cube texture, or 0 when the data is not a complete cube.</returns>
-        internal static uint Upload(GL gl, VfxCubeMapData cube, bool srgb)
+        internal static uint Upload(GL gl, VfxCubeMapData cube, bool srgb, bool mipmaps = false)
         {
             ArgumentNullException.ThrowIfNull(gl);
             if (cube?.IsValid != true)
@@ -38,7 +41,12 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             }
 
             // LTK uploads the six DDS faces in file order, without mipmaps or a face flip.
-            gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            if (mipmaps)
+                gl.GenerateMipmap(TextureTarget.TextureCubeMap);
+            gl.TexParameter(
+                TextureTarget.TextureCubeMap,
+                TextureParameterName.TextureMinFilter,
+                (int)(mipmaps ? TextureMinFilter.LinearMipmapLinear : TextureMinFilter.Linear));
             gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
             gl.TexParameter(TextureTarget.TextureCubeMap, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);

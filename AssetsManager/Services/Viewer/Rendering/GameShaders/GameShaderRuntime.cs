@@ -1003,6 +1003,16 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     samplerObject = ResolveSampler(new GameMaterialSamplerState(
                         null, MapTextureWrap.Clamp, MapTextureWrap.Clamp, MapTextureWrap.Clamp, true, true));
                 }
+                else if (name == EnvironmentCubeTexture &&
+                         sampler.Dimension == GameShaderTranslator.TextureDimension.Cube &&
+                         (_imageLight ??= new GameShaderImageLight(_gl)).ResolveCube(frame.ImageLight) is uint reflection &&
+                         reflection != 0)
+                {
+                    texture = reflection;
+                    target = TextureTarget.TextureCubeMap;
+                    samplerObject = ResolveSampler(new GameMaterialSamplerState(
+                        null, MapTextureWrap.Clamp, MapTextureWrap.Clamp, MapTextureWrap.Clamp, true, true));
+                }
                 else if (name == LightGridTexture && sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2DArray)
                 {
                     Span<Vector3> cube = stackalloc Vector3[6];

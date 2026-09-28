@@ -448,7 +448,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
-  - VFX Studio / With shaders on, PBR champion skins are lit by the scene and reflect the sky, and materials no longer lose textures or vanish (Aatrox Mecha sword).
+  - VFX Studio / With shaders on, PBR champion skins are lit by the scene, metallic skin materials reflect the sky, and materials no longer lose textures or vanish (Aatrox Mecha sword).
   - VFX Studio / With shaders on, map brush no longer disappears and map critters keep their full textures.
   - Viewer / Map critters and skins without a material no longer show stretched, half-missing textures.
   - VFX Studio / Esports banners on Summoner's Rift now show their holders and default flag instead of solid red.
