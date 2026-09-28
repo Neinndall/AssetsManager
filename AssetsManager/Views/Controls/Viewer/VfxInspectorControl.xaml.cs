@@ -900,7 +900,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     _mapSceneRuntime.ShowParticles = _model.MapParticlesVisible;
                     OpenTkControl?.InvalidateVisual();
                 }
-                SavePreviewDisplayPreferences();
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.CharacterPositionX) ||
                      e.PropertyName == nameof(VfxInspectorModel.CharacterPositionY) ||
@@ -924,8 +923,6 @@ namespace AssetsManager.Views.Controls.Viewer
                      e.PropertyName == nameof(VfxInspectorModel.InspectorVisible) ||
                      e.PropertyName == nameof(VfxInspectorModel.IsInspectorPanelVisible))
             {
-                if (e.PropertyName == nameof(VfxInspectorModel.CharacterEffectsEnabled))
-                    SavePreviewDisplayPreferences();
                 if (e.PropertyName == nameof(VfxInspectorModel.CharacterAutoRotate))
                 {
                     ApplyCharacterPlacement();
@@ -953,11 +950,14 @@ namespace AssetsManager.Views.Controls.Viewer
                      e.PropertyName == nameof(VfxInspectorModel.ShowPreviewGround) ||
                      e.PropertyName == nameof(VfxInspectorModel.ShowPreviewStage) ||
                      e.PropertyName == nameof(VfxInspectorModel.PreviewViewMode) ||
-                     e.PropertyName == nameof(VfxInspectorModel.PreviewWireOverlay) ||
-                     e.PropertyName == nameof(VfxInspectorModel.PreviewShaders))
+                     e.PropertyName == nameof(VfxInspectorModel.PreviewWireOverlay))
             {
                 OpenTkControl?.InvalidateVisual();
                 SavePreviewDisplayPreferences();
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.PreviewShaders))
+            {
+                OpenTkControl?.InvalidateVisual();
             }
         }
 
@@ -1498,10 +1498,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (Enum.TryParse(vfxSettings.ViewMode, ignoreCase: true, out VfxPreviewViewMode viewMode))
                     _model.PreviewViewMode = viewMode;
                 _model.PreviewWireOverlay = vfxSettings.WireOverlay;
-                _model.PreviewShaders = vfxSettings.ShadersEnabled;
-                _model.CharacterEffectsEnabled = vfxSettings.ChampionVfxEnabled;
-                _model.MapParticlesVisible = vfxSettings.MapVfxEnabled;
-                _model.MapStructuresVisible = vfxSettings.MapStructuresEnabled;
             }
             finally
             {
@@ -1521,12 +1517,8 @@ namespace AssetsManager.Views.Controls.Viewer
             AppSettings.StudioParameters.GroundVisible = _model.ShowPreviewGround;
             AppSettings.VfxStudio.ViewMode = _model.PreviewViewMode.ToString();
             AppSettings.VfxStudio.WireOverlay = _model.PreviewWireOverlay;
-            AppSettings.VfxStudio.ShadersEnabled = _model.PreviewShaders;
             AppSettings.VfxStudio.StageVisible = _model.ShowPreviewStage;
             AppSettings.VfxStudio.CameraPreset = _model.PreviewCameraPreset.ToString();
-            AppSettings.VfxStudio.ChampionVfxEnabled = _model.CharacterEffectsEnabled;
-            AppSettings.VfxStudio.MapVfxEnabled = _model.MapParticlesVisible;
-            AppSettings.VfxStudio.MapStructuresEnabled = _model.MapStructuresVisible;
             _ = SavePreviewDisplayPreferencesAsync();
         }
 

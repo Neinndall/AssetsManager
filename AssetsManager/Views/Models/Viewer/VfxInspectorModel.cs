@@ -807,7 +807,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _viewportToolbarVisible;
         private bool _characterBackdropEnabled;
         private bool _mapParticlesVisible;
-        private bool _mapStructuresVisible = true;
+        private bool _mapStructuresVisible;
         private VfxCharacterBackdropOption _selectedCharacterBackdrop;
         private double _characterPositionX;
         private double _characterPositionY;

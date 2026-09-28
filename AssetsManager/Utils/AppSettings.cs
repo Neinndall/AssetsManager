@@ -272,8 +272,7 @@ namespace AssetsManager.Utils
                     {
                         CameraPreset = studioJson.Value<string>("VfxCameraPreset") ?? "Orbit",
                         ViewMode = LegacyVfxViewMode(legacyWire),
-                        WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase),
-                        ShadersEnabled = false
+                        WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase)
                     };
                     needsResave = true;
                 }
@@ -301,7 +300,7 @@ namespace AssetsManager.Utils
 
                 // A previous AssetsManager build temporarily shared these controls through
                 // StudioParameters. Carry those saved choices back into VFX Studio once, then keep
-                // both viewers independent. Shaders defaults off, like reference previewShaders.
+                // both viewers independent.
                 JObject sharedDisplayJson = jsonObject["StudioParameters"] as JObject;
                 JObject savedVfxJson = jsonObject["VfxStudio"] as JObject;
                 if (savedVfxJson?["ViewMode"] == null)
@@ -316,13 +315,6 @@ namespace AssetsManager.Utils
                     bool? sharedWireOverlay = sharedDisplayJson?.Value<bool?>("WireOverlay");
                     if (sharedWireOverlay.HasValue)
                         settings.VfxStudio.WireOverlay = sharedWireOverlay.Value;
-                    needsResave = true;
-                }
-                if (savedVfxJson?["ShadersEnabled"] == null)
-                {
-                    // Do not inherit the short-lived shared Viewer default: reference VFX previews
-                    // opt into translated game shaders explicitly.
-                    settings.VfxStudio.ShadersEnabled = false;
                     needsResave = true;
                 }
                 settings.MonitoredAssets ??= new SafeList<MonitoredAsset>();
@@ -411,11 +403,7 @@ namespace AssetsManager.Utils
                     CameraPreset = "Orbit",
                     StageVisible = false,
                     ViewMode = "Lit",
-                    WireOverlay = false,
-                    ShadersEnabled = false,
-                    ChampionVfxEnabled = false,
-                    MapVfxEnabled = false,
-                    MapStructuresEnabled = true
+                    WireOverlay = false
                 },
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
@@ -552,16 +540,16 @@ namespace AssetsManager.Utils
         }
     }
 
+    /// <summary>
+    /// Persisted VFX Studio display choices. Shaders, Champion VFX, Map VFX and Map Structures are
+    /// session-only: they start off on every launch so heavy content loads only when requested.
+    /// </summary>
     public class VfxStudioSettings
     {
         public string CameraPreset { get; set; } = "Orbit";
         public bool StageVisible { get; set; }
         public string ViewMode { get; set; } = "Lit";
         public bool WireOverlay { get; set; }
-        public bool ShadersEnabled { get; set; }
-        public bool ChampionVfxEnabled { get; set; } = false;
-        public bool MapVfxEnabled { get; set; } = false;
-        public bool MapStructuresEnabled { get; set; } = true;
     }
 
     public class ReportGenerationSettings

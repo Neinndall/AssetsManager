@@ -17,7 +17,7 @@ New Features
   - VFX Studio / Scenes can now hold several Characters: add skins with + or right-click in the browser, then pick any of them in Scene Actors or the viewport to edit it.
   - VFX Studio / Added shimmerEmitterDefinitionData parsing with constant driver graph evaluations for modern mesh particle systems.
   - VFX Studio / Added a styled form selector for compatible champion skins with authored submeshes, textures, animations, and VFX.
-  - VFX Studio / Persisted Champion VFX, Map Effects VFX, and Map Structures visibility toggles across sessions in VfxStudio settings.
+  - VFX Studio / Shaders, champion VFX, map VFX and map structures start off on every launch; turn them on when needed.
   - Viewer / Skybox cubemap now loads dynamically from League Map11.wad.client, completely removing the bundled Resources/Scene directory (-16.8 MB).
   - Viewer / Consolidated Skybox cubemap and stage ground loading into SceneElements, eliminating redundant factories and obsolete texture caches.
   - Viewer / Added Skybox toggle to Environment controls in the main 3D viewer matching VFX Studio.

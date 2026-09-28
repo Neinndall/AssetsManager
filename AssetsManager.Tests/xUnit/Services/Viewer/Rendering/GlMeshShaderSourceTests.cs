@@ -137,8 +137,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
 
             Assert.Equal("Lit", settings.VfxStudio.ViewMode);
             Assert.False(settings.VfxStudio.WireOverlay);
-            Assert.False(settings.VfxStudio.ShadersEnabled);
-            Assert.False(new VfxInspectorModel().PreviewShaders);
+        }
+
+        [Fact]
+        public void HeavyPreviewContentStartsOffEverySession()
+        {
+            var model = new VfxInspectorModel();
+
+            Assert.False(model.PreviewShaders);
+            Assert.False(model.CharacterEffectsEnabled);
+            Assert.False(model.MapParticlesVisible);
+            Assert.False(model.MapStructuresVisible);
+        }
+
+        [Fact]
+        public void HeavyPreviewTogglesAreNotPersisted()
+        {
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(AppSettings.GetDefaultSettings().VfxStudio);
+
+            Assert.DoesNotContain("ShadersEnabled", json);
+            Assert.DoesNotContain("ChampionVfxEnabled", json);
+            Assert.DoesNotContain("MapVfxEnabled", json);
+            Assert.DoesNotContain("MapStructuresEnabled", json);
         }
 
         [Fact]
