@@ -49,19 +49,24 @@ namespace AssetsManager.Services.Viewer.Loading
             Action<string, MapTextureImage> onLoaded = null) =>
             LoadWaveAsync(materials, projectRoot, FullTextureSize, cancellationToken, onLoaded);
 
+        /// <param name="sceneTextures">
+        /// Engine textures of the scene (terrain grass tints) loaded in the same wave under their own keys.
+        /// </param>
         public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadProgramPreviewAsync(
             IReadOnlyList<MapMaterialDefinition> materials,
             string projectRoot,
             CancellationToken cancellationToken = default,
-            Action<string, MapTextureImage> onLoaded = null) =>
-            LoadProgramWaveAsync(materials, projectRoot, PreviewTextureSize, cancellationToken, onLoaded);
+            Action<string, MapTextureImage> onLoaded = null,
+            IEnumerable<KeyValuePair<string, MapTextureReference>> sceneTextures = null) =>
+            LoadProgramWaveAsync(materials, projectRoot, PreviewTextureSize, cancellationToken, onLoaded, sceneTextures);
 
         public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadProgramFullAsync(
             IReadOnlyList<MapMaterialDefinition> materials,
             string projectRoot,
             CancellationToken cancellationToken = default,
-            Action<string, MapTextureImage> onLoaded = null) =>
-            LoadProgramWaveAsync(materials, projectRoot, FullTextureSize, cancellationToken, onLoaded);
+            Action<string, MapTextureImage> onLoaded = null,
+            IEnumerable<KeyValuePair<string, MapTextureReference>> sceneTextures = null) =>
+            LoadProgramWaveAsync(materials, projectRoot, FullTextureSize, cancellationToken, onLoaded, sceneTextures);
 
         public Task<IReadOnlyDictionary<string, MapTextureImage>> LoadLightmapsPreviewAsync(
             IEnumerable<string> virtualPaths,
@@ -169,7 +174,8 @@ namespace AssetsManager.Services.Viewer.Loading
             string projectRoot,
             int maxTextureSize,
             CancellationToken cancellationToken,
-            Action<string, MapTextureImage> onLoaded)
+            Action<string, MapTextureImage> onLoaded,
+            IEnumerable<KeyValuePair<string, MapTextureReference>> sceneTextures = null)
         {
             var requested = (materials ?? Array.Empty<MapMaterialDefinition>())
                 .Where(material => material?.Program?.Passes != null && !string.IsNullOrWhiteSpace(material.Name))
@@ -181,6 +187,9 @@ namespace AssetsManager.Services.Viewer.Loading
                             Key = ProgramTextureKey(material.Name, passIndex, texture.Name),
                             texture.Texture
                         })))
+                .Concat((sceneTextures ?? Array.Empty<KeyValuePair<string, MapTextureReference>>())
+                    .Where(item => item.Value?.IsEmpty == false)
+                    .Select(item => new { item.Key, Texture = item.Value }))
                 .GroupBy(item => item.Key, StringComparer.Ordinal)
                 .Select(group => group.Last())
                 .ToArray();

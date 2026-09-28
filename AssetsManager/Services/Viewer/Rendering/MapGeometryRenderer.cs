@@ -128,6 +128,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private MapSceneData _scene;
         private MapSunData _previewSun;
         private DrawPlan _plan;
+        private int _visibilityFlags;
         private DrawPlan _programPlan;
         private DrawPlan _programPlanSource;
         private uint _program;
@@ -229,6 +230,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _scene = scene;
             _previewSun = scene.Sun;
             _plan = BuildDrawPlan(scene, scene.OpeningVisibility);
+            _visibilityFlags = scene.OpeningVisibilityFlags;
             _light = ResolveLight(scene.Sun);
             AcquireGeometry(scene);
             UpdateTextures(scene.Textures);
@@ -367,7 +369,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 projection,
                 eye,
                 timeSeconds,
-                _previewSun);
+                _previewSun,
+                Terrain: ResolveTerrainFrame());
 
             DrawPlan solidPlan = _plan;
             if (shadersEnabled && solidMode == VfxPreviewViewMode.Lit && _gameShaderRuntime != null)
@@ -573,6 +576,28 @@ namespace AssetsManager.Services.Viewer.Rendering
             !string.IsNullOrWhiteSpace(key) && _programTextures.TryGetValue(key, out MaterialTexture texture)
                 ? texture.TextureId
                 : null;
+
+        /// <summary>
+        /// Terrain inputs for the current state: the base grass tint, and the tint of the active state
+        /// (e.g. Infernal) at full weight once it has loaded.
+        /// </summary>
+        private GameShaderRuntime.TerrainFrame ResolveTerrainFrame()
+        {
+            MapTerrainData terrain = _scene?.Terrain;
+            if (terrain == null)
+                return default;
+
+            uint grassTint = ResolveProgramTexture(MapTerrainData.GrassTintKey) ?? 0;
+            MapGrassTintAlternate alternate = terrain.AlternateFor(_visibilityFlags);
+            uint alternateTint = alternate == null
+                ? 0
+                : ResolveProgramTexture(MapTerrainData.AlternateGrassTintKey(alternate.Flag)) ?? 0;
+            return new GameShaderRuntime.TerrainFrame(
+                terrain.TerrainTransform,
+                grassTint,
+                alternateTint,
+                alternateTint != 0 ? 1f : 0f);
+        }
 
         private uint? ResolveLightmapTexture(string path) =>
             !string.IsNullOrWhiteSpace(path) && _lightmapTextures.TryGetValue(path, out MaterialTexture texture)
@@ -1050,6 +1075,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (!_ready || _scene == null || state == null)
                 return;
             _plan = BuildDrawPlan(_scene, state);
+            _visibilityFlags = state.Flags;
         }
 
         internal static DrawPlan BuildDrawPlan(MapSceneData scene)

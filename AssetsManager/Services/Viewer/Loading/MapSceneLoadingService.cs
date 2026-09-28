@@ -161,6 +161,11 @@ namespace AssetsManager.Services.Viewer.Loading
                 .LoadAsync(materials, source, cancellationToken);
             MapPostEffectsData postEffects = MapPostEffectsParser.Parse(materials, source.Map);
             MapSsaoData ambientOcclusion = MapSsaoParser.Parse(materials, source.Map);
+            MapTerrainData terrain = MapTerrainParser.Parse(
+                materials,
+                mapDocument,
+                source.Map,
+                _hashResolver == null ? null : _hashResolver.ResolveHash);
             IReadOnlyDictionary<string, MapTextureImage> textures = includePreviewTextures
                 ? await _textureLoadingService.LoadPreviewAsync(
                     materialDefinitions,
@@ -171,7 +176,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 ? await _textureLoadingService.LoadProgramPreviewAsync(
                     materialDefinitions,
                     source.ProjectRoot,
-                    cancellationToken)
+                    cancellationToken,
+                    sceneTextures: terrain?.TextureRequests)
                 : new Dictionary<string, MapTextureImage>(StringComparer.Ordinal);
             IReadOnlyDictionary<string, MapTextureImage> lightmaps = includePreviewTextures
                 ? await _textureLoadingService.LoadLightmapsPreviewAsync(
@@ -215,7 +221,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 shaders,
                 lightGrid,
                 visibility,
-                sharedMaterials);
+                sharedMaterials,
+                terrain);
         }
 
         /// <summary>
@@ -321,7 +328,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 scene.Materials,
                 scene.Source.ProjectRoot,
                 cancellationToken,
-                onLoaded);
+                onLoaded,
+                scene.Terrain?.TextureRequests);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadFullProgramTexturesAsync(
@@ -334,7 +342,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 scene.Materials,
                 scene.Source.ProjectRoot,
                 cancellationToken,
-                onLoaded);
+                onLoaded,
+                scene.Terrain?.TextureRequests);
         }
 
         internal Task<IReadOnlyDictionary<string, MapTextureImage>> LoadPreviewLightmapsAsync(

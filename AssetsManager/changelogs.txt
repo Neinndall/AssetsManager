@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / With shaders on, map brush takes the grass tint of each rift transformation and sways on its own phase.
   - VFX Studio / Free map navigation: zoom toward the cursor without getting stuck, move with WASD (Shift faster, Ctrl slower) and double click to fly to a spot.
   - VFX Studio / Maps now switch rift transformations, Baron pit states and decorations like in game, with their terrain, structures and VFX.
   - VFX Studio / Particle emitters now respect their authored repeating emission windows and pauses.

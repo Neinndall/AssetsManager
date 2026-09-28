@@ -89,7 +89,23 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             float TimeSeconds,
             MapSunData Sun,
             MapLightGridData LightGrid = null,
-            Vector3 CharacterPosition = default);
+            Vector3 CharacterPosition = default,
+            TerrainFrame Terrain = default);
+
+        /// <summary>
+        /// Terrain inputs of the map shaders: <c>TERRAIN_XFORM</c>, the grass tint maps it addresses and
+        /// the <c>GRASS_INTERP</c> weight from the base tint to the tint of the active map state.
+        /// Zero textures fall back to the neutral white tint.
+        /// </summary>
+        internal readonly record struct TerrainFrame(
+            Vector4 Transform,
+            uint GrassTint,
+            uint GrassTintAlternate,
+            float GrassInterp);
+
+        internal const string GrassTintTexture = "GRASS_TINT_MAP_SharedTexture";
+        internal const string GrassTintAlternateTexture = "GRASS_TINT_MAP_ALTERNATE_SharedTexture";
+        private const string MeshCenter = "MESH_CENTER";
 
         private readonly record struct CharacterDraw(
             Matrix4x4 World,
@@ -292,7 +308,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 hasColors,
                 hasPivots);
             UpdateBlocks(runtime, passEntry.Globals, mesh, frame, null);
-            BindTextures(runtime, passEntry.Pass, passEntry.PassIndex, material, mesh, programTexture, lightmapTexture);
+            BindTextures(runtime, passEntry.Pass, passEntry.PassIndex, material, mesh, frame.Terrain, programTexture, lightmapTexture);
             ApplyPassState(passEntry.Pass.State, meshDoubleSided);
             return true;
         }
@@ -705,6 +721,14 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     continue;
                 }
 
+                // Per-mesh wind phase and grass-distortion origin of VertexDeform: the bounds centre in the
+                // baked world space, so each bush sways on its own phase instead of all in step.
+                if (member.Name == MeshCenter && mesh != null)
+                {
+                    WriteVector3(data, at, (mesh.Min + mesh.Max) * 0.5f);
+                    continue;
+                }
+
                 if (member.Name == BakedLightTransform)
                 {
                     WriteLightTransform(data, at, mesh?.BakedLight);
@@ -758,6 +782,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             WriteClipRows(data, 0, clip);
             WriteVector3(data, 16, eye);
             Set(data, 20, frame.TimeSeconds);
+            WriteVector4(data, 24, 4, frame.Terrain.Transform);
             WriteClipRows(data, 28, clip);
             WriteMatrixRows(data, 96, frame.View);
             WriteMatrixRows(data, 112, cameraWorld);
@@ -781,6 +806,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
             WriteVector3(data, 0, eye);
             Set(data, 4, frame.TimeSeconds);
+            WriteVector4(data, 8, 4, frame.Terrain.Transform);
             WriteVector3(data, 12, shadow);
             Set(data, 15, 1f);
             WriteVector3(data, 16, complement);
@@ -809,6 +835,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 Set(data, 41, FogEnd);
             }
             WriteMatrixRows(data, 68, frame.View);
+            // GRASS_INTERP (float4 at 64): VertexDeform blends the two grass tints by its y component.
+            Set(data, 65, frame.Terrain.GrassInterp);
             WriteMatrixRows(data, 104, cameraWorld);
         }
 
@@ -974,6 +1002,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             int passIndex,
             MapMaterialDefinition material,
             MapGeometryMeshData mesh,
+            in TerrainFrame terrain,
             Func<string, uint?> programTexture,
             Func<string, uint?> lightmapTexture)
         {
@@ -1000,7 +1029,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 }
                 else if (IsMultiplicativeSharedTexture(name, sampler.Dimension))
                 {
-                    texture = NeutralWhite2D();
+                    uint tint = GrassTintFor(name, terrain);
+                    texture = tint != 0 ? tint : NeutralWhite2D();
                     target = TextureTarget.Texture2D;
                     samplerObject = ResolveNeutralSampler(clamp: true, sampler.Dimension);
                 }
@@ -1040,14 +1070,22 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         }
 
         /// <summary>
-        /// Engine textures the shader multiplies into the colour (the map's grass tint). The preview has
-        /// no map-skin tint to bind, and white leaves the albedo as authored where black would draw nothing.
+        /// Engine textures the shader multiplies into the colour (the map's grass tint). They bind the MapSkin
+        /// tint when the scene has one; otherwise white leaves the albedo as authored where black would draw nothing.
         /// </summary>
         internal static bool IsMultiplicativeSharedTexture(string name, GameShaderTranslator.TextureDimension dimension) =>
             dimension == GameShaderTranslator.TextureDimension.Texture2D &&
             name != null &&
             name.StartsWith("GRASS_TINT_MAP", StringComparison.Ordinal) &&
             name.EndsWith(SharedTextureSuffix, StringComparison.Ordinal);
+
+        /// <summary>The MapSkin grass tint bound to a grass tint sampler; the alternate falls back to the base tint.</summary>
+        internal static uint GrassTintFor(string name, in TerrainFrame terrain) => name switch
+        {
+            GrassTintTexture => terrain.GrassTint,
+            GrassTintAlternateTexture => terrain.GrassTintAlternate != 0 ? terrain.GrassTintAlternate : terrain.GrassTint,
+            _ => 0
+        };
 
         internal static uint? ResolveStaticProgramTexture(
             string material, int authoredPassIndex, string texture, Func<string, uint?> lookup) =>

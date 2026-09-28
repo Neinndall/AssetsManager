@@ -38,6 +38,9 @@ namespace AssetsManager.Views.Models.Viewer
         public MapPostEffectsData PostEffects { get; }
         public MapSsaoData AmbientOcclusion { get; }
 
+        /// <summary>Terrain bounds and MapSkin grass tints read by the map shaders; null when the map declares none.</summary>
+        public MapTerrainData Terrain { get; }
+
         public MapSceneData(
             MapSceneSource source,
             MapSceneAssets assets,
@@ -60,7 +63,8 @@ namespace AssetsManager.Views.Models.Viewer
             BinTree shaderDefinitions = null,
             MapLightGridData lightGrid = null,
             MapSceneVisibility visibility = null,
-            BinTree sharedMaterials = null)
+            BinTree sharedMaterials = null,
+            MapTerrainData terrain = null)
         {
             Source = source;
             Assets = assets;
@@ -84,6 +88,7 @@ namespace AssetsManager.Views.Models.Viewer
             LightGrid = lightGrid;
             PostEffects = postEffects;
             AmbientOcclusion = ambientOcclusion;
+            Terrain = terrain;
         }
     }
 }

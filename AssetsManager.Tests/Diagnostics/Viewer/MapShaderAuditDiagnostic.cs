@@ -151,6 +151,19 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             string lightGrid = (bake?.Properties.GetValueOrDefault(0x7561b09eu) as BinTreeString)?.Value;
             Console.WriteLine($"[MapShader] bakedLightMeshes={scene.Geometry.Meshes.Count(mesh => mesh.BakedLight?.IsEmpty == false)} stationaryLightMeshes={scene.Geometry.Meshes.Count(mesh => mesh.StationaryLight?.IsEmpty == false)} lightGrid={lightGrid ?? "-"} loadedGrid={(scene.LightGrid == null ? "-" : $"{scene.LightGrid.Width}x{scene.LightGrid.Height} scale={scene.LightGrid.Scale} fullBright={scene.LightGrid.FullBright}")}.");
 
+            MapTerrainData terrain = scene.Terrain;
+            Console.WriteLine(terrain == null
+                ? "[MapShader] terrain=-"
+                : $"[MapShader] terrain bounds={terrain.BoundsMin}..{terrain.BoundsMax} xform={terrain.TerrainTransform} " +
+                  $"grassTint={terrain.GrassTint?.VirtualPath ?? $"0x{terrain.GrassTint?.PathHash:x16}"} " +
+                  $"alternates={string.Join(", ", terrain.GrassTintAlternates.Select(alternate => $"0x{alternate.Flag:x2}:{alternate.Texture.VirtualPath ?? $"0x{alternate.Texture.PathHash:x16}"}"))}.");
+            if (terrain != null)
+            {
+                IReadOnlyDictionary<string, MapTextureImage> programTextures = await sceneLoader.LoadPreviewProgramTexturesAsync(scene);
+                Console.WriteLine("[MapShader] terrainTextures=" + string.Join(", ", terrain.TextureRequests.Select(request =>
+                    $"{request.Key}:{(programTextures.TryGetValue(request.Key, out MapTextureImage image) ? $"{image.BaseLevel.PixelWidth}px" : "missing")}")));
+            }
+
             // Inspect the retained shader definitions without uploading resources or creating a GL context.
             MapParticleSystemCatalog runtimeCatalog = MapSceneRuntimeFactory.ParseParticleSystems(
                 scene, scene.OpeningVisibilityFlags);
@@ -170,6 +183,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var dimensions = new Dictionary<GameShaderTranslator.TextureDimension, int>();
             var failures = new Dictionary<string, int>(StringComparer.Ordinal);
             var patches = new Dictionary<GameShaderTranslator.AppliedPatch, int>();
+            var usage = new ShaderInputUsage();
 
             foreach (MapMaterialDefinition material in scene.Materials)
             {
@@ -230,6 +244,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                         textureBindings++;
                         dimensions[texture.Dimension] = dimensions.GetValueOrDefault(texture.Dimension) + 1;
                     }
+                    usage.Track(ready, material.Name?.Split('/').LastOrDefault() ?? "?");
                     engineBlocks += ready.Vertex.Sidecar.Blocks.Count(block => block.Name != "$Globals") +
                                     ready.Pixel.Sidecar.Blocks.Count(block => block.Name != "$Globals");
                     foreach (GameShaderTranslator.AppliedPatch patch in ready.Vertex.Applied.Concat(ready.Pixel.Applied))
@@ -253,6 +268,12 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
             foreach ((string failure, int count) in failures.OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key).Take(20))
                 Console.WriteLine($"[MapShader] FAIL x{count}: {failure}");
+            usage.Print("MapShader");
+
+            // Map particles run the stock particle programs (or their custom material) through the same engine blocks.
+            var particleUsage = new ShaderInputUsage();
+            particleUsage.CollectParticles(runtimeEmitters.Where(emitter => !emitter.Disabled), "map", settings);
+            particleUsage.Print("MapParticleShader");
         }
 
         private static void AddFailure(IDictionary<string, int> failures, string failure)
