@@ -7,7 +7,7 @@ namespace AssetsManager.Tests.xUnit.Views.Helpers
 {
     /// <summary>
     /// Ground navigation math for MAP scenes: cursor rays match the OpenGL projection, zoom reaches
-    /// any point without stalling, dragging keeps the grabbed ground point under the cursor.
+    /// any point without stalling and WASD travel stays on the ground.
     /// </summary>
     public class MapCameraNavigationTests
     {
@@ -101,22 +101,6 @@ namespace AssetsManager.Tests.xUnit.Views.Helpers
 
             Assert.Equal(normal * 5.0, turbo, 6);
             Assert.Equal(normal * 0.2, precise, 6);
-        }
-
-        [Fact]
-        public void DraggingKeepsTheGrabbedGroundPointUnderTheCursor()
-        {
-            MapCameraPose pose = Looking(new Point3D(0, 2050, 2000), new Vector3D(0, -2000, -2000));
-            var grabPixel = new Point(600, 500);
-            var dropPixel = new Point(1100, 300);
-            Assert.True(MapCameraNavigation.TryGetGroundPoint(pose, Surface, grabPixel, Ground, out Point3D grabbed));
-            Assert.True(MapCameraNavigation.TryGetGroundPoint(pose, Surface, dropPixel, Ground, out Point3D current));
-
-            MapCameraPose moved = pose with { Position = pose.Position + MapCameraNavigation.DragTranslation(grabbed, current) };
-
-            Assert.True(MapCameraNavigation.TryGetGroundPoint(moved, Surface, dropPixel, Ground, out Point3D underCursor));
-            AssertPoint(grabbed, underCursor);
-            Assert.Equal(pose.Position.Y, moved.Position.Y, 9);
         }
 
         [Fact]

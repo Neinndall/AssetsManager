@@ -18,8 +18,8 @@ namespace AssetsManager.Views.Helpers
 
     /// <summary>
     /// Ground-anchored navigation for large MAP scenes: zoom toward the terrain under the cursor that
-    /// glides past its closest approach, drag that keeps the grabbed ground point under the cursor, and
-    /// WASD travel over the ground. The ground is the horizontal plane at the scene stand height.
+    /// glides past its closest approach and WASD travel over the ground. The ground is the horizontal
+    /// plane at the scene stand height.
     /// </summary>
     internal static class MapCameraNavigation
     {
@@ -27,9 +27,10 @@ namespace AssetsManager.Views.Helpers
         internal const double MinimumApproach = 80.0;
         /// <summary>Lowest camera height above the ground plane.</summary>
         internal const double MinimumHeight = 30.0;
-        internal const double ZoomFraction = 0.18;
-        /// <summary>Shortest wheel step, so gliding past the cursor point keeps a usable pace.</summary>
-        internal const double MinimumZoomStep = 60.0;
+        /// <summary>Wheel step as a share of the distance, bounded like the orbit zoom of the other viewports.</summary>
+        internal const double ZoomFraction = 0.08;
+        internal const double MinimumZoomStep = 5.0;
+        internal const double MaximumZoomStep = 120.0;
         internal const double MinimumWalkSpeed = 300.0;
         internal const double MaximumWalkSpeed = 9000.0;
 
@@ -109,7 +110,8 @@ namespace AssetsManager.Views.Helpers
             if (delta == 0 || distance < 1e-6)
                 return position;
             Vector3D direction = toFocus / distance;
-            double travel = Math.Max(distance * ZoomFraction, MinimumZoomStep) * Math.Max(0.01, speed);
+            double travel = Math.Clamp(distance * ZoomFraction, MinimumZoomStep, MaximumZoomStep) *
+                            Math.Max(0.01, speed);
 
             Point3D next;
             if (delta > 0)
@@ -133,13 +135,6 @@ namespace AssetsManager.Views.Helpers
 
             return AboveGround(next, groundY);
         }
-
-        /// <summary>
-        /// Horizontal translation that brings <paramref name="grabbed"/> back under the cursor, whose
-        /// ray currently meets the ground at <paramref name="current"/>.
-        /// </summary>
-        internal static Vector3D DragTranslation(Point3D grabbed, Point3D current) =>
-            new(grabbed.X - current.X, 0, grabbed.Z - current.Z);
 
         /// <summary>
         /// WASD travel over the ground. <paramref name="forward"/> and <paramref name="strafe"/> are

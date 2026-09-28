@@ -16,8 +16,6 @@ namespace AssetsManager.Views.Helpers
         private ProjectionCamera _subscribedCamera;
         private bool _isRotating;
         private bool _isPanning;
-        private bool _isGroundDragging;
-        private Point3D _groundGrab;
         private long _lastWalkTimestamp;
         private System.Windows.Point _lastMousePosition;
         
@@ -39,8 +37,8 @@ namespace AssetsManager.Views.Helpers
 
         /// <summary>
         /// Height of the MAP ground plane while a map scene is navigated. When set, the wheel zooms toward
-        /// the terrain under the cursor, right-drag moves over the ground, WASD travels and a double click
-        /// flies to the clicked point. Null keeps the object-orbit controls unchanged.
+        /// the terrain under the cursor, WASD travels and a double click flies to the clicked point.
+        /// Null keeps the object-orbit controls unchanged.
         /// </summary>
         public double? MapNavigationGroundHeight { get; set; }
 
@@ -214,21 +212,6 @@ namespace AssetsManager.Views.Helpers
             // Stop transitions if user starts interacting with any mouse gesture (like panning or zooming or rotation)
             _isTransitioning = false;
 
-            if (e.RightButton == MouseButtonState.Pressed && IsMapNavigation &&
-                _viewport.Camera is ProjectionCamera groundCamera &&
-                MapCameraNavigation.TryGetGroundPoint(
-                    Pose(groundCamera),
-                    SurfaceSize,
-                    e.GetPosition(_inputSurface),
-                    MapNavigationGroundHeight.Value,
-                    out _groundGrab))
-            {
-                _isGroundDragging = true;
-                _inputSurface.Cursor = System.Windows.Input.Cursors.Hand;
-                _inputSurface.CaptureMouse();
-                return;
-            }
-
             if (e.LeftButton == MouseButtonState.Pressed)
             {
                 RotationStarted?.Invoke(this, EventArgs.Empty);
@@ -260,10 +243,9 @@ namespace AssetsManager.Views.Helpers
             }
             if (e.RightButton == MouseButtonState.Released)
             {
-                if (_isPanning || _isGroundDragging)
+                if (_isPanning)
                 {
                     _isPanning = false;
-                    _isGroundDragging = false;
                     _inputSurface.Cursor = System.Windows.Input.Cursors.Arrow;
                     _inputSurface.ReleaseMouseCapture();
                 }
@@ -290,10 +272,6 @@ namespace AssetsManager.Views.Helpers
                     _targetLookDirection = camera.LookDirection;
                     _targetUpDirection = camera.UpDirection;
                 }
-            }
-            else if (_isGroundDragging && e.RightButton == MouseButtonState.Pressed)
-            {
-                DragGround(e.GetPosition(_inputSurface));
             }
             else if (_isPanning && e.RightButton == MouseButtonState.Pressed)
             {
@@ -498,22 +476,6 @@ namespace AssetsManager.Views.Helpers
             _isTransitioning = true;
         }
 
-        private void DragGround(System.Windows.Point cursor)
-        {
-            if (_viewport.Camera is not ProjectionCamera camera ||
-                !MapCameraNavigation.TryGetGroundPoint(Pose(camera), SurfaceSize, cursor, MapNavigationGroundHeight.Value, out Point3D current))
-            {
-                return;
-            }
-
-            // Near the horizon a pixel spans kilometres; ignore those rays instead of jumping away.
-            if ((current - camera.Position).Length > MapFarDragDistance)
-                return;
-
-            camera.Position += MapCameraNavigation.DragTranslation(_groundGrab, current);
-            SyncTargetsToCamera(camera);
-        }
-
         private bool TryFlyToGroundPoint(System.Windows.Point cursor)
         {
             if (_viewport?.Camera is not PerspectiveCamera camera ||
@@ -573,7 +535,6 @@ namespace AssetsManager.Views.Helpers
             _targetUpDirection = camera.UpDirection;
         }
 
-        private const double MapFarDragDistance = 60000.0;
         private const double MapFlyMinimumDistance = 400.0;
         private const double MapFlyMaximumDistance = 4000.0;
         private const double MaximumWalkStep = 0.1;
