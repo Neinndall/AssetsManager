@@ -289,6 +289,11 @@ namespace AssetsManager.Tests.Diagnostics
                 MapEnvironmentAuditDiagnostic.Run(targetPath);
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "map-state-switch-bench", StringComparison.OrdinalIgnoreCase))
+            {
+                await MapStateSwitchBenchDiagnostic.Run(args.Length > 1 ? args[1] : null, args.Length > 2 ? args[2] : null);
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "map-flow-audit", StringComparison.OrdinalIgnoreCase))
             {
                 string targetPath = args.Length > 1 ? args[1] : null;

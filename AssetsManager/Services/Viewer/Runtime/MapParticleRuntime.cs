@@ -34,6 +34,12 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal string ChunkId { get; }
         internal string ItemId { get; }
 
+        /// <summary>Identity of one placed system across map states.</summary>
+        internal (uint Chunk, uint Key, uint System) ReuseKey => ReuseKeyOf(Particle);
+
+        internal static (uint Chunk, uint Key, uint System) ReuseKeyOf(MapParticleData particle) =>
+            (particle.ChunkHash, particle.KeyHash, particle.SystemHash);
+
         internal static MapParticleRuntime Create(
             MapParticleData particle,
             VfxSystemDefinition system,
@@ -87,11 +93,27 @@ namespace AssetsManager.Services.Viewer.Runtime
             MapParticleSystemCatalog catalog,
             Func<VfxSystemDefinition, Matrix4x4, int, VfxPlaybackRuntime> runtimeFactory = null)
         {
-            if (catalog?.Groups == null || catalog.Groups.Count == 0)
-                return Array.Empty<MapParticleRuntime>();
-
             var runtimes = new List<MapParticleRuntime>();
-            foreach (MapParticleSystemGroupData group in catalog.Groups)
+            foreach ((MapParticleSystemGroupData group, MapParticleData particle) in Playable(catalog))
+            {
+                runtimes.Add(Create(
+                    particle,
+                    group.System,
+                    catalog.Systems,
+                    catalog.ResourceMap,
+                    runtimeFactory));
+            }
+            return runtimes;
+        }
+
+        /// <summary>
+        /// Placements of a catalog that get a simulation graph, in catalog order. Shared by full
+        /// creation and map-state reconciliation so both produce the same placement set.
+        /// </summary>
+        internal static IEnumerable<(MapParticleSystemGroupData Group, MapParticleData Particle)> Playable(
+            MapParticleSystemCatalog catalog)
+        {
+            foreach (MapParticleSystemGroupData group in catalog?.Groups ?? Array.Empty<MapParticleSystemGroupData>())
             {
                 if (group?.System == null ||
                     group.System.Emitters is not { Count: > 0 } ||
@@ -102,18 +124,10 @@ namespace AssetsManager.Services.Viewer.Runtime
 
                 foreach (MapParticleData particle in group.Particles)
                 {
-                    if (particle == null)
-                        continue;
-                    runtimes.Add(Create(
-                        particle,
-                        group.System,
-                        catalog.Systems,
-                        catalog.ResourceMap,
-                        runtimeFactory));
+                    if (particle != null)
+                        yield return (group, particle);
                 }
             }
-
-            return runtimes;
         }
     }
 }

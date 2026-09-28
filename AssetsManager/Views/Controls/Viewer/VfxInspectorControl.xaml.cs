@@ -4004,8 +4004,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_mapVisibilityDirty && _mapSceneRuntime != null)
             {
-                _mapCharacterRenderer?.Clear();
-                _mapParticleRenderer?.Clear();
+                // Keep GPU resources of structures and VFX the new state still draws; kept emitters hold
+                // handles into the particle caches, so those caches live until the scene is replaced.
+                _mapCharacterRenderer?.Retain(_mapSceneRuntime.CharacterGroups.Select(group => group?.Asset));
                 _mapGeometryRenderer.SetVisibility(_mapSceneRuntime.Visibility);
                 _mapVisibilityDirty = false;
             }
@@ -4248,10 +4249,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
         /// <summary>
         /// Switches the previewed map state. The latest request always owns the runtime: it cancels
-        /// any pending switch first, even when it returns to the state already applied.
+        /// any pending switch first, even when it returns to the state already applied. Structures and
+        /// placed VFX are reconciled: what the new state keeps is reused, only what it adds is loaded.
         /// </summary>
         private async Task ApplyMapVisibilityAsync(MapVisibilityState state)
         {
+            const int MaximumPlanAttempts = 3;
             MapSceneRuntime runtime = _mapSceneRuntime;
             if (runtime == null || MapViewerSceneService == null || state == null || _isCleanedUp)
                 return;
@@ -4266,10 +4269,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
             var operation = new System.Threading.CancellationTokenSource();
             _mapLayerCancellation = operation;
-            Task<IReadOnlyList<MapCharacterRuntimeGroup>> characterTask = null;
-            Task<MapParticleSceneRuntime> particleTask = null;
-            bool charactersAdopted = false;
-            bool particlesAdopted = false;
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            Task<MapCharacterPlan> characterTask = null;
+            Task<MapParticlePlan> particleTask = null;
             bool IsOwner() =>
                 !_isCleanedUp &&
                 ReferenceEquals(_mapLayerCancellation, operation) &&
@@ -4278,18 +4280,33 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 _model.StatusText = $"Switching MAP state ({state})...";
-                characterTask = MapViewerSceneService.LoadCharacterAssetsAsync(runtime, state, operation.Token);
-                particleTask = MapViewerSceneService.LoadParticleAssetsAsync(runtime, state, operation.Token);
-                await Task.WhenAll(characterTask, particleTask);
-                operation.Token.ThrowIfCancellationRequested();
-                if (!IsOwner())
-                    return;
+                for (int attempt = 1; ; attempt++)
+                {
+                    characterTask = MapViewerSceneService.PlanCharacterAssetsAsync(runtime, state, operation.Token);
+                    particleTask = MapViewerSceneService.PlanParticleAssetsAsync(runtime, state, operation.Token);
+                    await Task.WhenAll(characterTask, particleTask);
+                    operation.Token.ThrowIfCancellationRequested();
+                    if (!IsOwner())
+                        return;
 
+                    // An initial placeable load may land while planning; re-plan against what the runtime holds now.
+                    if (characterTask.Result.Generation == runtime.CharacterGeneration &&
+                        particleTask.Result.Generation == runtime.ParticleGeneration)
+                    {
+                        break;
+                    }
+                    DisposePlans(characterTask, particleTask);
+                    characterTask = null;
+                    particleTask = null;
+                    if (attempt >= MaximumPlanAttempts)
+                        throw new InvalidOperationException("MAP placeables kept changing while switching state.");
+                }
+
+                MapCharacterPlan characterPlan = characterTask.Result;
+                MapParticlePlan particlePlan = particleTask.Result;
                 ClearMapCharacterClipPreview();
-                runtime.SetCharacterGroups(await characterTask);
-                charactersAdopted = true;
-                runtime.SetParticles(await particleTask);
-                particlesAdopted = true;
+                if (!runtime.TryApplyCharacterPlan(characterPlan) || !runtime.TryApplyParticlePlan(particlePlan))
+                    throw new InvalidOperationException("MAP state plan no longer matches the scene runtime.");
                 runtime.SetVisibility(state);
                 _model.SyncMapVisibility(state);
                 if (_mapSceneIsCharacterBackdrop && _model.SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin)
@@ -4297,32 +4314,44 @@ namespace AssetsManager.Views.Controls.Viewer
                 else
                     ReplaceMapBrowserRoot(MapBrowserSemantics.Build(runtime));
                 _mapVisibilityDirty = true;
-                _model.StatusText = $"MAP state {DescribeMapVisibility(state)} · {runtime.CharacterGroups.Count} structure skins · {runtime.Particles.Runtimes.Count} VFX placements.";
+
+                stopwatch.Stop();
+                string summary =
+                    $"structures {characterPlan.ReusedCount} reused / {characterPlan.LoadedCount} loaded · " +
+                    $"VFX {particlePlan.KeptCount} kept / {particlePlan.CreatedCount} new";
+                _model.StatusText = $"MAP state {DescribeMapVisibility(state)} in {stopwatch.ElapsedMilliseconds} ms · {summary}.";
+                _model.LogMessages.Add($"[MAP] State {state} applied in {stopwatch.ElapsedMilliseconds} ms · {summary}.");
                 OpenTkControl?.InvalidateVisual();
             }
             catch (OperationCanceledException)
             {
             }
+            catch (Exception) when (!IsOwner())
+            {
+                // A superseded switch (or a closed scene) must not log or roll back the request that replaced it.
+            }
             catch (Exception ex)
             {
                 LogService?.LogError(ex, $"Failed to switch MAP visibility state ({state}).");
-                // A superseded switch must not roll back the controls of the request that replaced it.
-                if (IsOwner())
-                {
-                    _model.SyncMapVisibility(runtime.Visibility);
-                    _model.StatusText = "Unable to switch MAP state.";
-                }
+                _model.SyncMapVisibility(runtime.Visibility);
+                _model.StatusText = "Unable to switch MAP state.";
             }
             finally
             {
-                if (!charactersAdopted && characterTask?.IsCompletedSuccessfully == true)
-                    DisposeCharacterGroups(characterTask.Result);
-                if (!particlesAdopted && particleTask?.IsCompletedSuccessfully == true)
-                    particleTask.Result?.Dispose();
+                // Adopted plans ignore Dispose; unadopted ones release what they loaded or created.
+                DisposePlans(characterTask, particleTask);
                 if (ReferenceEquals(_mapLayerCancellation, operation))
                     _mapLayerCancellation = null;
                 operation.Dispose();
             }
+        }
+
+        private static void DisposePlans(Task<MapCharacterPlan> characters, Task<MapParticlePlan> particles)
+        {
+            if (characters?.IsCompletedSuccessfully == true)
+                characters.Result?.Dispose();
+            if (particles?.IsCompletedSuccessfully == true)
+                particles.Result?.Dispose();
         }
 
         private string DescribeMapVisibility(MapVisibilityState state)

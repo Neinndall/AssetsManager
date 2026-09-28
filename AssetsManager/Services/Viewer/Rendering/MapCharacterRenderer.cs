@@ -1069,6 +1069,47 @@ namespace AssetsManager.Services.Viewer.Rendering
             _passSource.Clear();
         }
 
+        /// <summary>
+        /// Releases the GPU resources of skins no longer drawn after a map-state switch while keeping
+        /// buffers and textures of the skins that remain, so kept structures are not uploaded again.
+        /// </summary>
+        internal void Retain(IEnumerable<MapCharacterAssetData> liveAssets)
+        {
+            if (!_ready) return;
+
+            var live = new HashSet<MapCharacterAssetData>(ReferenceEqualityComparer.Instance);
+            var liveBitmaps = new HashSet<BitmapSource>(ReferenceEqualityComparer.Instance);
+            foreach (MapCharacterAssetData asset in liveAssets ?? Enumerable.Empty<MapCharacterAssetData>())
+            {
+                if (asset == null || !live.Add(asset) || asset.Textures == null)
+                    continue;
+                foreach (BitmapSource bitmap in asset.Textures.Values)
+                    if (bitmap != null)
+                        liveBitmaps.Add(bitmap);
+            }
+
+            foreach (MapCharacterAssetData asset in _skins.Keys.Where(asset => !live.Contains(asset)).ToArray())
+            {
+                ReleaseResources(_skins[asset]);
+                _skins.Remove(asset);
+            }
+            ReleaseTexturesExcept(_textures, liveBitmaps);
+            ReleaseTexturesExcept(_rawProgramTextures, liveBitmaps);
+            _opaque.Clear();
+            _transparent.Clear();
+            _passSource.Clear();
+        }
+
+        private void ReleaseTexturesExcept(Dictionary<BitmapSource, uint> cache, HashSet<BitmapSource> keep)
+        {
+            foreach (BitmapSource bitmap in cache.Keys.Where(bitmap => !keep.Contains(bitmap)).ToArray())
+            {
+                uint texture = cache[bitmap];
+                if (texture != 0) _gl.DeleteTexture(texture);
+                cache.Remove(bitmap);
+            }
+        }
+
         private void ReleaseResources(SkinResources resources)
         {
             DeleteBuffer(resources.PositionVbo);

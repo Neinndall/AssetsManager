@@ -404,6 +404,24 @@ namespace AssetsManager.Services.Viewer.Animation
             }
         }
 
+        /// <summary>
+        /// True when every requested animation already has a pose state, so placements needing only
+        /// these names can reuse this runtime without mutating it while it is being drawn.
+        /// </summary>
+        internal bool IsPrepared(IEnumerable<string> requestedAnimations)
+        {
+            if (_disposed)
+                return false;
+            foreach (string requested in requestedAnimations ?? Enumerable.Empty<string>())
+            {
+                if (!_byRequested.ContainsKey(NormalizeRequested(requested)))
+                    return false;
+            }
+            return true;
+        }
+
+        internal bool IsDisposed => _disposed;
+
         private static string NormalizeRequested(string value) =>
             string.IsNullOrWhiteSpace(value) ? BindKey : value.Trim().ToLowerInvariant();
 

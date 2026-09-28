@@ -150,6 +150,36 @@ namespace AssetsManager.Services.Viewer.Loading
             return _runtimeFactory.LoadParticlesAsync(backdrop.Scene, visibility, cancellationToken);
         }
 
+        /// <summary>Plans the structures of another map state, reusing the skins the runtime already holds.</summary>
+        internal Task<MapCharacterPlan> PlanCharacterAssetsAsync(
+            MapSceneRuntime runtime,
+            MapVisibilityState visibility,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(runtime);
+            return _runtimeFactory.PlanCharactersAsync(
+                runtime.Scene,
+                visibility,
+                runtime.CharacterReuseCandidates(),
+                runtime.CharacterGeneration,
+                cancellationToken);
+        }
+
+        /// <summary>Plans the placed VFX of another map state, keeping continuing placements and resources.</summary>
+        internal Task<MapParticlePlan> PlanParticleAssetsAsync(
+            MapSceneRuntime runtime,
+            MapVisibilityState visibility,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(runtime);
+            return _runtimeFactory.PlanParticlesAsync(
+                runtime.Scene,
+                visibility,
+                runtime.Particles,
+                runtime.ParticleGeneration,
+                cancellationToken);
+        }
+
         private MapSceneRuntime AttachTextureRetention(MapSceneRuntime runtime)
         {
             runtime?.SetBackdropTextureRetainer(_textureLoadingService.HoldDecodedTexture);

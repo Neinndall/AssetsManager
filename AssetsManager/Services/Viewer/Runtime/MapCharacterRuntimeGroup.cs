@@ -30,8 +30,12 @@ namespace AssetsManager.Services.Viewer.Runtime
     internal sealed class MapCharacterRuntimeGroup : IDisposable
     {
         private readonly SemaphoreSlim _vfxResourcesGate = new(1, 1);
+        // Guards the shared owners against Rebind/Dispose racing an overlay created off the UI thread.
+        private readonly object _ownership = new();
         private VfxSceneResourceContext _vfxResources;
         private bool _disposed;
+        private bool _detached;
+
         internal MapCharacterRuntimeGroup(
             MapCharacterAssetData asset,
             MapCharacterAnimationRuntime animation,
@@ -42,6 +46,11 @@ namespace AssetsManager.Services.Viewer.Runtime
             Placements = placements ?? Array.Empty<MapCharacterData>();
             AnimationGroups = GroupByAnimation(Placements, asset?.Skin?.Scale ?? 1f);
         }
+
+        internal bool IsDisposed => _disposed;
+
+        /// <summary>Authored skin every placement of this group wears; the reuse key across map states.</summary>
+        internal string Skin => Placements.Count > 0 ? Placements[0]?.Skin : null;
 
         internal MapCharacterAssetData Asset { get; }
         internal MapCharacterAnimationRuntime Animation { get; }
@@ -81,30 +90,33 @@ namespace AssetsManager.Services.Viewer.Runtime
             Func<VfxSceneResourceContext, CancellationToken, Task> ensure,
             CancellationToken cancellationToken)
         {
-            if (_disposed)
+            if (_disposed || _detached)
                 throw new ObjectDisposedException(nameof(MapCharacterRuntimeGroup));
             ArgumentNullException.ThrowIfNull(create);
 
             await _vfxResourcesGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (_disposed)
+                if (_disposed || _detached)
                     throw new ObjectDisposedException(nameof(MapCharacterRuntimeGroup));
 
                 if (_vfxResources == null)
                 {
                     VfxSceneResourceContext created = await create(cancellationToken).ConfigureAwait(false);
-                    if (_disposed)
+                    lock (_ownership)
                     {
-                        created?.Dispose();
-                        throw new ObjectDisposedException(nameof(MapCharacterRuntimeGroup));
+                        if (_disposed || _detached)
+                        {
+                            created?.Dispose();
+                            throw new ObjectDisposedException(nameof(MapCharacterRuntimeGroup));
+                        }
+                        _vfxResources = created;
                     }
-                    _vfxResources = created;
                 }
                 else if (ensure != null)
                 {
                     await ensure(_vfxResources, cancellationToken).ConfigureAwait(false);
-                    if (_disposed)
+                    if (_disposed || _detached)
                         throw new ObjectDisposedException(nameof(MapCharacterRuntimeGroup));
                 }
 
@@ -116,13 +128,40 @@ namespace AssetsManager.Services.Viewer.Runtime
             }
         }
 
+        /// <summary>
+        /// Moves the loaded skin, its animation evaluator and VFX overlay to a group with another
+        /// placement set. This group is left detached: disposing it no longer releases the shared owners.
+        /// Must run on the thread that draws the groups, after the caller stopped drawing this instance.
+        /// </summary>
+        internal MapCharacterRuntimeGroup Rebind(IReadOnlyList<MapCharacterData> placements)
+        {
+            lock (_ownership)
+            {
+                ObjectDisposedException.ThrowIf(_disposed || _detached, this);
+                var rebound = new MapCharacterRuntimeGroup(Asset, Animation, placements)
+                {
+                    _vfxResources = _vfxResources
+                };
+                _vfxResources = null;
+                _detached = true;
+                return rebound;
+            }
+        }
+
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
+            VfxSceneResourceContext resources;
+            lock (_ownership)
+            {
+                if (_disposed) return;
+                _disposed = true;
+                if (_detached)
+                    return;
+                resources = _vfxResources;
+                _vfxResources = null;
+            }
             Animation?.Dispose();
-            _vfxResources?.Dispose();
-            _vfxResources = null;
+            resources?.Dispose();
         }
 
         internal static IReadOnlyList<MapCharacterAnimationPlacementGroup> GroupByAnimation(

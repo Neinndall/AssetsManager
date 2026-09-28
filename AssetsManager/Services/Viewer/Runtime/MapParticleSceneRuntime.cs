@@ -18,8 +18,8 @@ namespace AssetsManager.Services.Viewer.Runtime
     /// </summary>
     internal sealed class MapParticleSceneRuntime : IDisposable
     {
-        private readonly IDisposable _resourceOwner;
-        private readonly IReadOnlyList<MapParticleRuntime> _runtimes;
+        private IDisposable _resourceOwner;
+        private IReadOnlyList<MapParticleRuntime> _runtimes;
         private readonly List<MapParticleRuntime> _visible = new();
         private bool _disposed;
 
@@ -36,7 +36,10 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal IReadOnlyList<MapParticleRuntime> Runtimes => _runtimes;
 
         /// <summary>Systems and placements this runtime was built for; null until placed VFX are loaded.</summary>
-        internal MapParticleSystemCatalog Catalog { get; }
+        internal MapParticleSystemCatalog Catalog { get; private set; }
+
+        /// <summary>Scene-scoped resource overlay shared by every placement, reused across map states.</summary>
+        internal VfxSceneResourceContext Resources => _resourceOwner as VfxSceneResourceContext;
         internal IReadOnlyList<MapParticleRuntime> VisibleRuntimes => _visible;
 
         internal static Task<MapParticleSceneRuntime> CreateAsync(
@@ -86,6 +89,28 @@ namespace AssetsManager.Services.Viewer.Runtime
                 resources.Dispose();
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Switches to another placement set in place. Kept runtimes continue their simulation; the
+        /// resource overlay is kept, or adopted when this runtime had none yet.
+        /// </summary>
+        internal void Reconcile(
+            MapParticleSystemCatalog catalog,
+            IReadOnlyList<MapParticleRuntime> runtimes,
+            IDisposable adoptedResources = null)
+        {
+            ThrowIfDisposed();
+            if (adoptedResources != null && !ReferenceEquals(adoptedResources, _resourceOwner))
+            {
+                if (_resourceOwner != null)
+                    throw new InvalidOperationException("MAP particle runtime already owns a resource overlay.");
+                _resourceOwner = adoptedResources;
+            }
+
+            _runtimes = runtimes ?? Array.Empty<MapParticleRuntime>();
+            Catalog = catalog;
+            _visible.Clear();
         }
 
         internal void Restart()

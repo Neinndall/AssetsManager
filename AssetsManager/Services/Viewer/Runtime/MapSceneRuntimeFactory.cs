@@ -123,6 +123,153 @@ namespace AssetsManager.Services.Viewer.Runtime
             }
         }
 
+        /// <summary>
+        /// Plans the structures of a map state against the groups the runtime already holds: a skin
+        /// is reused when its animations are prepared, and only missing skins are loaded. Decisions are
+        /// taken before the first await so the live groups are only read on the calling (render) thread.
+        /// </summary>
+        internal async Task<MapCharacterPlan> PlanCharactersAsync(
+            MapSceneData scene,
+            MapVisibilityState visibility,
+            IReadOnlyDictionary<string, MapCharacterRuntimeGroup> candidates,
+            long generation,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(scene);
+            IReadOnlyList<MapCharacterData> stood = MapCharacterSemantics.StoodFor(
+                scene.Characters,
+                scene.Visibility,
+                visibility ?? scene.OpeningVisibility);
+            IGrouping<string, MapCharacterData>[] skins = stood
+                .Where(character => !string.IsNullOrWhiteSpace(character.Skin))
+                .GroupBy(character => character.Skin, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var reused = new MapCharacterRuntimeGroup[skins.Length];
+            var loads = new Task<MapCharacterRuntimeGroup>[skins.Length];
+            var placements = new MapCharacterData[skins.Length][];
+            for (int index = 0; index < skins.Length; index++)
+            {
+                placements[index] = skins[index].ToArray();
+                if (candidates != null &&
+                    candidates.TryGetValue(skins[index].Key, out MapCharacterRuntimeGroup candidate) &&
+                    candidate is { IsDisposed: false, Asset: not null } &&
+                    candidate.Animation?.IsPrepared(placements[index].Select(placement => placement.Animation)) == true)
+                {
+                    reused[index] = candidate;
+                    loads[index] = Task.FromResult<MapCharacterRuntimeGroup>(null);
+                }
+                else
+                {
+                    loads[index] = LoadCharacterGroupAsync(
+                        skins[index].Key,
+                        placements[index],
+                        scene.Source.ProjectRoot,
+                        cancellationToken);
+                }
+            }
+
+            MapCharacterRuntimeGroup[] loaded;
+            try
+            {
+                loaded = await Task.WhenAll(loads);
+            }
+            catch
+            {
+                DisposeCompletedCharacterLoads(loads);
+                throw;
+            }
+
+            var entries = new List<MapCharacterPlan.Entry>(skins.Length);
+            for (int index = 0; index < skins.Length; index++)
+            {
+                if (reused[index] == null && loaded[index] == null)
+                    continue;
+                entries.Add(new MapCharacterPlan.Entry(
+                    skins[index].Key,
+                    placements[index],
+                    reused[index],
+                    loaded[index]));
+            }
+            return new MapCharacterPlan(generation, entries);
+        }
+
+        /// <summary>
+        /// Plans the placed VFX of a map state against the current particle runtime: its resource
+        /// overlay is extended with the new systems only, continuing placements keep their simulation
+        /// and only new placements get a graph.
+        /// </summary>
+        internal async Task<MapParticlePlan> PlanParticlesAsync(
+            MapSceneData scene,
+            MapVisibilityState visibility,
+            MapParticleSceneRuntime current,
+            long generation,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(scene);
+            MapParticleSystemCatalog catalog = ParseParticleSystems(scene, visibility, _hashResolver);
+            VfxSceneResourceContext resources = current?.Resources;
+            VfxSceneResourceContext created = null;
+            try
+            {
+                if (catalog.Groups.Count > 0)
+                {
+                    if (resources == null)
+                    {
+                        created = await VfxSceneResourceContext.CreateAsync(
+                            catalog,
+                            scene.Source?.ProjectRoot,
+                            _assetResolver,
+                            _hashResolver,
+                            _logService,
+                            cancellationToken);
+                        resources = created;
+                    }
+                    else
+                    {
+                        await resources.EnsureMaterializedAsync(
+                            catalog.Systems,
+                            ownerSceneContext: null,
+                            scene.Source?.ProjectRoot,
+                            cancellationToken);
+                    }
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var existing = new Dictionary<(uint Chunk, uint Key, uint System), MapParticleRuntime>();
+                foreach (MapParticleRuntime runtime in current?.Runtimes ?? Array.Empty<MapParticleRuntime>())
+                {
+                    if (runtime?.Particle != null)
+                        existing.TryAdd(runtime.ReuseKey, runtime);
+                }
+
+                var runtimes = new List<MapParticleRuntime>();
+                int kept = 0;
+                foreach ((MapParticleSystemGroupData group, MapParticleData particle) in MapParticleRuntime.Playable(catalog))
+                {
+                    if (existing.Remove(MapParticleRuntime.ReuseKeyOf(particle), out MapParticleRuntime runtime))
+                    {
+                        runtimes.Add(runtime);
+                        kept++;
+                        continue;
+                    }
+                    runtimes.Add(MapParticleRuntime.Create(
+                        particle,
+                        group.System,
+                        catalog.Systems,
+                        catalog.ResourceMap,
+                        resources.PreparePlaybackAtWorldTransform));
+                }
+
+                return new MapParticlePlan(generation, catalog, runtimes, created, kept);
+            }
+            catch
+            {
+                created?.Dispose();
+                throw;
+            }
+        }
+
         internal Task<MapParticleSceneRuntime> LoadParticlesAsync(
             MapSceneData scene,
             CancellationToken cancellationToken)

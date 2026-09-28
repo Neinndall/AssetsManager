@@ -148,6 +148,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio / Switching map transformations or Baron pit states is now near instant: shared structures and effects stay loaded and keep playing.
   - VFX Studio / Show the selected character, clip or spell in the viewport header and keep randomness and animation options compact, and move background selection to the viewport menu.
   - VFX Studio / Form selector now defaults to the untransformed Base form, shows friendly variant names, and automatically isolates form-specific submesh geometry to prevent overlapping meshes.
   - VFX Studio / Particle effects now use game shaders when available, including the textures of their custom materials.
