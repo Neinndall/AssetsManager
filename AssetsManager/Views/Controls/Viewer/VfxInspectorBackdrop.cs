@@ -18,9 +18,7 @@ namespace AssetsManager.Views.Controls.Viewer
             try { _model.PreviewCameraPreset = state.Preset; }
             finally { _suppressCameraPresetFit = false; }
             _cameraController.MapNavigationGroundHeight = null;
-            var stand = VfxPreviewCamera.Stand(state.Preset);
-            _cameraController.PerspectiveMinDistance = tab.Kind == VfxWorkspaceTabKind.Map ? 10d : (stand.Nearest ?? 0d);
-            _cameraController.PerspectiveMaxDistance = tab.Kind == VfxWorkspaceTabKind.Map ? 50000d : (stand.Farthest ?? double.PositiveInfinity);
+            ApplyCameraDistanceLimits(VfxPreviewCamera.Stand(state.Preset), tab.Kind == VfxWorkspaceTabKind.Map);
             ProjectionCamera camera;
             if (state.Orthographic)
             {
@@ -55,7 +53,7 @@ namespace AssetsManager.Views.Controls.Viewer
             CaptureWorkspaceSelection(source);
 
             string mapKey = VfxInstallationMapCatalog.BackdropKey(option.Source);
-            string key = $"{source.BackdropSourceKey ?? source.Key}|backdrop:{mapKey}";
+            string key = $"{source.OriginSceneKey}|backdrop:{mapKey}";
             VfxWorkspaceTab destination = _model.WorkspaceTabs.FirstOrDefault(tab =>
                 string.Equals(tab.Key, key, StringComparison.OrdinalIgnoreCase));
             if (destination == null)

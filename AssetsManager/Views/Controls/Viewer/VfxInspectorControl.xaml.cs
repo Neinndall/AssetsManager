@@ -1108,7 +1108,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ApplyCharacterBackdropOrigin(MapSceneData scene, MapSceneSource source)
         {
             VfxSceneActor actor = FocusedActor;
-            if (actor == null || !TryGetCharacterBackdropOrigin(scene, out Vector3 origin, out double yaw))
+            if (actor == null || !TryGetCharacterBackdropOrigin(scene, out Vector3 origin, out double? spawnYaw))
                 return;
 
             string sourceKey = VfxInstallationMapCatalog.BackdropKey(source);
@@ -1127,10 +1127,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.CharacterPositionX = origin.X;
                 _model.CharacterPositionY = origin.Y;
                 _model.CharacterPositionZ = origin.Z;
-                if (!preserveFraming)
+                // A Character the map spawns always takes the game's facing; otherwise a backdrop scene keeps
+                // the facing its source scene framed.
+                if (spawnYaw.HasValue || !preserveFraming)
                 {
                     _model.CharacterRotationX = 0d;
-                    _model.CharacterRotationY = yaw;
+                    _model.CharacterRotationY = spawnYaw ?? 0d;
                     _model.CharacterRotationZ = 0d;
                 }
                 StoreFocusedPlacement(actor);
@@ -1153,20 +1155,23 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         /// <summary>
-        /// Preview-space point and yaw (degrees) where the focused Character stands on the active MAP
-        /// backdrop: where the map spawns it (its map entity or the neutral camp that brings it, see
-        /// <see cref="MapCharacterSpawnSemantics"/>), else the map origin facing forward. MAP geometry is
+        /// Preview-space point where the focused Character stands on the active MAP backdrop: where the map
+        /// spawns it (its map entity or the neutral camp that brings it, see <see cref="MapCharacterSpawnSemantics"/>)
+        /// with that spawn's yaw in degrees, else the map origin with no yaw of its own. MAP geometry is
         /// mirrored on X by the renderer, so the authored engine transform is converted to that space.
         /// </summary>
-        private bool TryGetCharacterBackdropOrigin(MapSceneData scene, out Vector3 origin, out double yaw)
+        private bool TryGetCharacterBackdropOrigin(MapSceneData scene, out Vector3 origin, out double? spawnYaw)
         {
             origin = default;
-            yaw = 0d;
+            spawnYaw = null;
             if (!_model.IsSkinWorkspace || scene?.Geometry == null)
                 return false;
 
-            if (TryGetBackdropSpawn(scene, FocusedActor?.Skin, out origin, out yaw))
+            if (TryGetBackdropSpawn(scene, FocusedActor?.Skin, out origin, out double yaw))
+            {
+                spawnYaw = yaw;
                 return true;
+            }
 
             // Like LTK, the stand point comes from the opening state: switching map state never moves the subject.
             if (StableMapOrigin(scene) is not Vector3 engineOrigin)
@@ -2459,10 +2464,7 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 _model.PreviewCameraPreset = VfxPreviewCameraPreset.Orbit;
-                VfxCameraStand orbit = VfxPreviewCamera.Stand(VfxPreviewCameraPreset.Orbit);
-                bool isStandaloneMap = TryGetStandaloneMapCenter(out _);
-                _cameraController.PerspectiveMinDistance = isStandaloneMap ? 10d : (orbit.Nearest ?? 0d);
-                _cameraController.PerspectiveMaxDistance = isStandaloneMap ? 50000d : (orbit.Farthest ?? double.PositiveInfinity);
+                ApplyCameraDistanceLimits(VfxPreviewCamera.Stand(VfxPreviewCameraPreset.Orbit), TryGetStandaloneMapCenter(out _));
             }
             finally
             {
@@ -2504,22 +2506,24 @@ namespace AssetsManager.Views.Controls.Viewer
             _cameraController.SetCamera(_previewPerspectiveCamera);
         }
 
+        /// <summary>
+        /// Zoom limits of a camera stand. A standalone MAP frees the reach to the whole map unless the stand
+        /// bounds it: the Game camera keeps its game reach there too.
+        /// </summary>
+        private void ApplyCameraDistanceLimits(VfxCameraStand stand, bool standaloneMap)
+        {
+            bool mapReach = standaloneMap && stand.Farthest == null;
+            _cameraController.PerspectiveMinDistance = mapReach ? 10d : stand.Nearest ?? (standaloneMap ? 1000d : 0d);
+            _cameraController.PerspectiveMaxDistance = mapReach ? 50000d : stand.Farthest ?? double.PositiveInfinity;
+        }
+
         private void ApplyCameraPreset(VfxPreviewCameraPreset preset, bool refit)
         {
             if (_cameraController == null) return;
 
             VfxCameraStand stand = VfxPreviewCamera.Stand(preset);
             bool isStandaloneMap = TryGetStandaloneMapCenter(out _);
-            if (isStandaloneMap)
-            {
-                _cameraController.PerspectiveMinDistance = stand.Farthest != null ? (stand.Nearest ?? 1000d) : 10d;
-                _cameraController.PerspectiveMaxDistance = stand.Farthest != null ? stand.Farthest.Value : 50000d;
-            }
-            else
-            {
-                _cameraController.PerspectiveMinDistance = stand.Nearest ?? 0d;
-                _cameraController.PerspectiveMaxDistance = stand.Farthest ?? double.PositiveInfinity;
-            }
+            ApplyCameraDistanceLimits(stand, isStandaloneMap);
 
             ProjectionCamera camera;
             if (stand.Orthographic)
@@ -2981,9 +2985,10 @@ namespace AssetsManager.Views.Controls.Viewer
             VfxSceneActor actor = FocusedActor;
             if (actor == null) return;
 
-            double stageYaw = 0d;
+            // A map-spawned Character resets to its spawn transform, facing included (Rift camps, drakes).
+            double? spawnYaw = null;
             Vector3 stageOrigin = _model.HasActiveCharacterBackdrop &&
-                TryGetCharacterBackdropOrigin(_mapSceneRuntime?.Scene, out Vector3 backdropOrigin, out stageYaw)
+                TryGetCharacterBackdropOrigin(_mapSceneRuntime?.Scene, out Vector3 backdropOrigin, out spawnYaw)
                     ? backdropOrigin
                     : Vector3.Zero;
             _isApplyingCharacterViewportState = true;
@@ -2998,7 +3003,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (rotation)
                 {
                     _model.CharacterRotationX = 0d;
-                    _model.CharacterRotationY = stageYaw;
+                    _model.CharacterRotationY = spawnYaw ?? 0d;
                     _model.CharacterRotationZ = 0d;
                 }
                 if (scale)
@@ -4998,7 +5003,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 camera = _previewPerspectiveCamera;
             }
 
-            var pose = ViewerViewportControl.CalculateMapFocusPose(enginePosition, camera.LookDirection);
+            var pose = CameraNavigation.FocusPose(enginePosition, camera.LookDirection);
             if (pose == null)
                 return;
 
@@ -7961,9 +7966,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void RunKeys_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // WASD over the MAP viewport moves the camera (polled each frame); swallow the key so a
+            // WASD over the viewport moves the camera (polled each frame); swallow the key so a
             // focused browser tree does not jump to items by letter.
-            if (_cameraController?.IsMapNavigationKey(e.Key) == true)
+            if (_cameraController?.IsNavigationKey(e.Key) == true)
             {
                 e.Handled = true;
                 return;

@@ -37,8 +37,8 @@ namespace AssetsManager.Views.Helpers
 
         /// <summary>
         /// Height of the MAP ground plane while a map scene is navigated. When set, the wheel zooms toward
-        /// the terrain under the cursor, WASD travels and a double click flies to the clicked point.
-        /// Null keeps the object-orbit controls unchanged.
+        /// the terrain under the cursor, WASD travels over it and a double click flies to the clicked point.
+        /// Null keeps the object-orbit controls, where WASD moves the camera and its orbit centre.
         /// </summary>
         public double? MapNavigationGroundHeight { get; set; }
 
@@ -163,7 +163,7 @@ namespace AssetsManager.Views.Helpers
         private void OnRendering(object sender, EventArgs e)
         {
             if (_viewport?.Camera is not ProjectionCamera camera) return;
-            WalkMap(camera);
+            Walk(camera);
             if (!_isTransitioning) return;
 
             // Interpolate Position
@@ -418,21 +418,20 @@ namespace AssetsManager.Views.Helpers
         }
 
         /// <summary>
-        /// True when a navigation key should move the map camera instead of reaching the focused
-        /// control (e.g. tree type-ahead): the cursor is over the viewport and no text input has focus.
+        /// True when a navigation key should move the camera instead of reaching the focused control
+        /// (e.g. tree type-ahead): the cursor is over the viewport and no text input has focus.
         /// </summary>
-        public bool IsMapNavigationKey(Key key) =>
+        public bool IsNavigationKey(Key key) =>
             key is (Key.W or Key.A or Key.S or Key.D) && IsWalkInputAvailable();
 
         private bool IsWalkInputAvailable() =>
-            IsMapNavigation &&
             _inputSurface?.IsMouseOver == true &&
             (Keyboard.Modifiers & (ModifierKeys.Alt | ModifierKeys.Windows)) == 0 &&
             Keyboard.FocusedElement is not (TextBoxBase or PasswordBox or System.Windows.Controls.ComboBox { IsEditable: true });
 
-        private MapCameraPose Pose(ProjectionCamera camera) => Pose(camera, camera.Position, camera.LookDirection);
+        private CameraPose Pose(ProjectionCamera camera) => Pose(camera, camera.Position, camera.LookDirection);
 
-        private static MapCameraPose Pose(ProjectionCamera camera, Point3D position, Vector3D look) => new(
+        private static CameraPose Pose(ProjectionCamera camera, Point3D position, Vector3D look) => new(
             position,
             look,
             camera.UpDirection,
@@ -452,9 +451,9 @@ namespace AssetsManager.Views.Helpers
                     orthographic.Width * Math.Pow(1.12, -delta * speed),
                     OrthographicMinWidth,
                     OrthographicMaxWidth);
-                if (MapCameraNavigation.TryGetRay(Pose(camera), SurfaceSize, cursor, out Point3D anchor, out _))
+                if (CameraNavigation.TryGetRay(Pose(camera), SurfaceSize, cursor, out Point3D anchor, out _))
                 {
-                    camera.Position = MapCameraNavigation.OrthographicZoomPosition(
+                    camera.Position = CameraNavigation.OrthographicZoomPosition(
                         camera.Position, anchor, width / orthographic.Width);
                 }
                 orthographic.Width = width;
@@ -465,21 +464,21 @@ namespace AssetsManager.Views.Helpers
             // Successive wheel notches accumulate on the pending target, like the orbit zoom.
             if (!_isTransitioning)
                 SyncTargetsToCamera(camera);
-            MapCameraPose pose = Pose(camera, _targetPosition, _targetLookDirection);
-            Point3D focus = MapCameraNavigation.TryGetGroundPoint(pose, SurfaceSize, cursor, ground, out Point3D hit)
+            CameraPose pose = Pose(camera, _targetPosition, _targetLookDirection);
+            Point3D focus = CameraNavigation.TryGetGroundPoint(pose, SurfaceSize, cursor, ground, out Point3D hit)
                 ? hit
                 : _targetPosition + _targetLookDirection;
-            Point3D next = MapCameraNavigation.Zoom(
+            Point3D next = CameraNavigation.Zoom(
                 _targetPosition, focus, delta, speed, ground, PerspectiveMaxDistance);
             _targetPosition = next;
-            _targetLookDirection = MapCameraNavigation.GroundedLook(next, _targetLookDirection, ground);
+            _targetLookDirection = CameraNavigation.GroundedLook(next, _targetLookDirection, ground);
             _isTransitioning = true;
         }
 
         private bool TryFlyToGroundPoint(System.Windows.Point cursor)
         {
             if (_viewport?.Camera is not PerspectiveCamera camera ||
-                !MapCameraNavigation.TryGetGroundPoint(Pose(camera), SurfaceSize, cursor, MapNavigationGroundHeight.Value, out Point3D hit))
+                !CameraNavigation.TryGetGroundPoint(Pose(camera), SurfaceSize, cursor, MapNavigationGroundHeight.Value, out Point3D hit))
             {
                 return false;
             }
@@ -492,7 +491,7 @@ namespace AssetsManager.Views.Helpers
             return true;
         }
 
-        private void WalkMap(ProjectionCamera camera)
+        private void Walk(ProjectionCamera camera)
         {
             long now = Stopwatch.GetTimestamp();
             double seconds = _lastWalkTimestamp == 0
@@ -516,8 +515,9 @@ namespace AssetsManager.Views.Helpers
             double speed = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift) ? 3.0
                 : Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl) ? 0.25
                 : 1.0;
-            Vector3D move = MapCameraNavigation.Walk(
-                Pose(camera), forward, strafe, seconds, speed, MapNavigationGroundHeight.Value);
+            Vector3D move = IsMapNavigation
+                ? CameraNavigation.Walk(Pose(camera), forward, strafe, seconds, speed, MapNavigationGroundHeight.Value)
+                : CameraNavigation.WalkOrbit(Pose(camera), forward, strafe, seconds, speed);
             if (move.LengthSquared < 1e-12)
                 return;
 

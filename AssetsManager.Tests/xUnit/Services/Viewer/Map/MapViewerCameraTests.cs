@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Views.Controls.Viewer;
+using AssetsManager.Views.Helpers;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
@@ -35,7 +36,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [Fact]
         public void MapFocusMirrorsXPreservesLookAndClampsDistanceToReferenceReach()
         {
-            var pose = ViewerViewportControl.CalculateMapFocusPose(
+            var pose = CameraNavigation.FocusPose(
                 new Vector3(100f, 200f, 300f),
                 new Vector3D(0d, 0d, -3000d));
 
@@ -48,7 +49,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [Fact]
         public void MapFocusKeepsCurrentDistanceWhenAlreadyInsideReferenceReach()
         {
-            var pose = ViewerViewportControl.CalculateMapFocusPose(
+            var pose = CameraNavigation.FocusPose(
                 Vector3.Zero,
                 new Vector3D(300d, -400d, 0d));
 

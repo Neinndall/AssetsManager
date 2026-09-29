@@ -118,6 +118,9 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
+        /// <summary>The scene every backdrop copy descends from: this tab, or the one it was copied from.</summary>
+        internal string OriginSceneKey => BackdropSourceKey ?? Key;
+
         internal VfxWorkspaceTab CopyForBackdrop(string key, string mapKey, string mapTitle)
         {
             var copy = new VfxWorkspaceTab
@@ -127,7 +130,7 @@ namespace AssetsManager.Views.Models.Viewer
                 BackdropTitle = mapTitle,
                 CameraState = CameraState,
                 PreserveBackdropFraming = true,
-                BackdropSourceKey = BackdropSourceKey ?? Key,
+                BackdropSourceKey = OriginSceneKey,
                 CharacterBackdropEnabled = true,
                 CharacterBackdropKey = mapKey,
                 CharacterEffectsEnabled = CharacterEffectsEnabled,

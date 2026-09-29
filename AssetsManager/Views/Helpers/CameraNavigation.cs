@@ -8,7 +8,7 @@ namespace AssetsManager.Views.Helpers
     /// Camera pose as the OpenGL preview projects it: FieldOfView is vertical (CreatePerspectiveFieldOfView)
     /// and orthographic presets use Width over the surface aspect.
     /// </summary>
-    internal readonly record struct MapCameraPose(
+    internal readonly record struct CameraPose(
         Point3D Position,
         Vector3D Look,
         Vector3D Up,
@@ -17,11 +17,12 @@ namespace AssetsManager.Views.Helpers
         bool Orthographic);
 
     /// <summary>
-    /// Ground-anchored navigation for large MAP scenes: zoom toward the terrain under the cursor that
-    /// glides past its closest approach and WASD travel over the ground. The ground is the horizontal
-    /// plane at the scene stand height.
+    /// Viewport navigation math, free of input and WPF state so it is unit tested on its own;
+    /// CustomCameraController feeds it the input. MAP scenes navigate against the ground (the horizontal
+    /// plane at the scene stand height): zoom toward the terrain under the cursor that glides past its
+    /// closest approach, WASD travel over it and focus poses. Orbit views reuse the WASD travel.
     /// </summary>
-    internal static class MapCameraNavigation
+    internal static class CameraNavigation
     {
         /// <summary>Closest the camera approaches the point under the cursor before gliding over it.</summary>
         internal const double MinimumApproach = 80.0;
@@ -36,7 +37,7 @@ namespace AssetsManager.Views.Helpers
 
         /// <summary>World ray through a surface pixel, matching the preview projection.</summary>
         internal static bool TryGetRay(
-            MapCameraPose pose,
+            CameraPose pose,
             Size surface,
             Point pixel,
             out Point3D origin,
@@ -85,7 +86,7 @@ namespace AssetsManager.Views.Helpers
             return true;
         }
 
-        internal static bool TryGetGroundPoint(MapCameraPose pose, Size surface, Point pixel, double groundY, out Point3D hit)
+        internal static bool TryGetGroundPoint(CameraPose pose, Size surface, Point pixel, double groundY, out Point3D hit)
         {
             hit = default;
             return TryGetRay(pose, surface, pixel, out Point3D origin, out Vector3D direction) &&
@@ -141,12 +142,37 @@ namespace AssetsManager.Views.Helpers
         /// -1, 0 or 1; the pace scales with the camera height so a whole map stays a few seconds away.
         /// </summary>
         internal static Vector3D Walk(
-            MapCameraPose pose,
+            CameraPose pose,
             double forward,
             double strafe,
             double seconds,
             double speed,
-            double groundY)
+            double groundY) =>
+            WalkAtPace(pose, forward, strafe, seconds, speed, pose.Orthographic
+                ? Math.Max(1.0, pose.OrthographicWidth) * 0.6
+                : Math.Max(pose.Position.Y - groundY, MinimumHeight) * 1.5);
+
+        /// <summary>
+        /// WASD travel on the horizontal plane around an orbited subject: the pace scales with the orbit
+        /// distance (or the orthographic width), so a close-up and a wide shot both move at a usable speed.
+        /// </summary>
+        internal static Vector3D WalkOrbit(
+            CameraPose pose,
+            double forward,
+            double strafe,
+            double seconds,
+            double speed) =>
+            WalkAtPace(pose, forward, strafe, seconds, speed, pose.Orthographic
+                ? Math.Max(1.0, pose.OrthographicWidth) * 0.6
+                : Math.Max(pose.Look.Length, MinimumHeight) * 1.5);
+
+        private static Vector3D WalkAtPace(
+            CameraPose pose,
+            double forward,
+            double strafe,
+            double seconds,
+            double speed,
+            double reach)
         {
             if ((forward == 0 && strafe == 0) || seconds <= 0 || !double.IsFinite(seconds))
                 return default;
@@ -165,9 +191,6 @@ namespace AssetsManager.Views.Helpers
                 return default;
             move.Normalize();
 
-            double reach = pose.Orthographic
-                ? Math.Max(1.0, pose.OrthographicWidth) * 0.6
-                : Math.Max(pose.Position.Y - groundY, MinimumHeight) * 1.5;
             double pace = Math.Clamp(reach, MinimumWalkSpeed, MaximumWalkSpeed) * Math.Max(0.01, speed);
             return move * (pace * seconds);
         }
@@ -190,6 +213,27 @@ namespace AssetsManager.Views.Helpers
         /// <summary>Orthographic zoom that keeps the world point under the cursor fixed on screen.</summary>
         internal static Point3D OrthographicZoomPosition(Point3D position, Point3D cursorOnCameraPlane, double widthFactor) =>
             cursorOnCameraPlane + (position - cursorOnCameraPlane) * widthFactor;
+
+        /// <summary>
+        /// Pose that frames an engine-space map point (mirrored on X into the preview) along the current
+        /// look direction, at most 1500 units away.
+        /// </summary>
+        internal static (Point3D Target, Point3D Position, Vector3D LookDirection)? FocusPose(
+            System.Numerics.Vector3 enginePosition,
+            Vector3D currentLookDirection)
+        {
+            double distance = currentLookDirection.Length;
+            if (!double.IsFinite(distance) || distance <= 0.001)
+                return null;
+
+            Point3D target = new(-enginePosition.X, enginePosition.Y, enginePosition.Z);
+            Vector3D direction = currentLookDirection;
+            direction.Normalize();
+            double focusDistance = Math.Min(distance, 1500d);
+            Vector3D lookDirection = direction * focusDistance;
+            Point3D position = target - lookDirection;
+            return (target, position, lookDirection);
+        }
 
         private static Point3D AboveGround(Point3D position, double groundY)
         {

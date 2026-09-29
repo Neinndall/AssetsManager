@@ -339,6 +339,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             Loaded += OnViewportLoaded;
             Unloaded += OnViewportUnloaded;
+            // WASD over the viewport moves the camera (polled each frame); keep the key from focused controls.
+            PreviewKeyDown += (_, e) => e.Handled |= _cameraController?.IsNavigationKey(e.Key) == true;
 
             UpdateToolbarVisibility();
         }
@@ -962,23 +964,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _lastModelUpdates.Clear();
 
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
-        }
-
-        internal static (Point3D Target, Point3D Position, Vector3D LookDirection)? CalculateMapFocusPose(
-            Vector3 enginePosition,
-            Vector3D currentLookDirection)
-        {
-            double distance = currentLookDirection.Length;
-            if (!double.IsFinite(distance) || distance <= 0.001)
-                return null;
-
-            Point3D target = new(-enginePosition.X, enginePosition.Y, enginePosition.Z);
-            Vector3D direction = currentLookDirection;
-            direction.Normalize();
-            double focusDistance = Math.Min(distance, 1500d);
-            Vector3D lookDirection = direction * focusDistance;
-            Point3D position = target - lookDirection;
-            return (target, position, lookDirection);
         }
 
         public void AddModel(SceneModel model) => AddModelCore(model, isAuxiliary: false);
