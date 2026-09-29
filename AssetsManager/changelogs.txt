@@ -460,6 +460,8 @@ Bug Fixes
   - VFX Studio / With shaders on, skins no longer turn into a white clone or vanish (PsyOps Vladimir, Pyke, Zeri), and skin effects painted with vertex colours show them.
   - VFX Studio / With shaders on, glowing map characters such as monsters now shine with their bloom too.
   - VFX Studio / With shaders on, bloom now spreads into the soft, wide halo of the game's own bloom filters.
+  - VFX Studio / Each character in a multi-skin scene keeps its own Game State and bind pose when you switch between them.
+  - VFX Studio / With shaders on, VFX drawn with custom particle materials no longer turn invisible.
   - VFX Studio / With shaders on, map brush no longer disappears and map critters keep their full textures.
   - Viewer / Map critters and skins without a material no longer show stretched, half-missing textures.
   - VFX Studio / Esports banners on Summoner's Rift now show their holders and default flag instead of solid red.
