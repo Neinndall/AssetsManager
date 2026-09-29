@@ -108,15 +108,28 @@ namespace AssetsManager.Tests.xUnit.Views.Helpers
         {
             CameraPose pose = Looking(new Point3D(0, 1050, 1000), new Vector3D(0, -1000, -1000));
 
-            Vector3D forward = CameraNavigation.Walk(pose, 1, 0, 0.5, 1.0, Ground);
-            Vector3D right = CameraNavigation.Walk(pose, 0, 1, 0.5, 1.0, Ground);
-            Vector3D fast = CameraNavigation.Walk(pose, 1, 0, 0.5, 3.0, Ground);
+            Vector3D forward = CameraNavigation.Walk(pose, 1, 0, 0.5, 1.0);
+            Vector3D right = CameraNavigation.Walk(pose, 0, 1, 0.5, 1.0);
+            Vector3D fast = CameraNavigation.Walk(pose, 1, 0, 0.5, 3.0);
 
             Assert.Equal(0, forward.Y, 9);
             Assert.True(forward.Z < 0 && System.Math.Abs(forward.X) < 1e-9);
             Assert.True(right.X > 0 && System.Math.Abs(right.Z) < 1e-9);
             Assert.Equal(forward.Length * 3.0, fast.Length, 6);
-            Assert.Equal(default, CameraNavigation.Walk(pose, 0, 0, 0.5, 1.0, Ground));
+            Assert.Equal(default, CameraNavigation.Walk(pose, 0, 0, 0.5, 1.0));
+        }
+
+        [Fact]
+        public void WalkPaceFollowsTheViewedDistanceInEveryViewport()
+        {
+            // The same Game camera pose, orbiting a Character or looking at the MAP terrain, walks at one pace.
+            Vector3D look = new(0, -2250 * System.Math.Sin(56 * System.Math.PI / 180), -2250 * System.Math.Cos(56 * System.Math.PI / 180));
+            CameraPose game = Looking(new Point3D(0, Ground - look.Y, 0), look);
+            CameraPose close = Looking(new Point3D(0, 200, 300), new Vector3D(0, -100, -300));
+
+            Assert.Equal(1687.5, CameraNavigation.Walk(game, 1, 0, 1.0, 1.0).Length, 6);
+            Assert.Equal(1687.5 * 3.0, CameraNavigation.Walk(game, 1, 0, 1.0, 3.0).Length, 6);
+            Assert.Equal(CameraNavigation.MinimumWalkSpeed, CameraNavigation.Walk(close, 1, 0, 1.0, 1.0).Length, 6);
         }
 
         [Fact]
@@ -130,7 +143,7 @@ namespace AssetsManager.Tests.xUnit.Views.Helpers
                 0,
                 false);
 
-            Vector3D forward = CameraNavigation.Walk(pose, 1, 0, 1.0, 1.0, Ground);
+            Vector3D forward = CameraNavigation.Walk(pose, 1, 0, 1.0, 1.0);
 
             Assert.True(forward.Z < 0);
             Assert.Equal(0, forward.Y, 9);

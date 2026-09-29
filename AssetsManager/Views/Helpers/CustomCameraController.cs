@@ -37,8 +37,8 @@ namespace AssetsManager.Views.Helpers
 
         /// <summary>
         /// Height of the MAP ground plane while a map scene is navigated. When set, the wheel zooms toward
-        /// the terrain under the cursor, WASD travels over it and a double click flies to the clicked point.
-        /// Null keeps the object-orbit controls, where WASD moves the camera and its orbit centre.
+        /// the terrain under the cursor and a double click flies to the clicked point. Null keeps the
+        /// object-orbit controls. WASD travels the same way in both.
         /// </summary>
         public double? MapNavigationGroundHeight { get; set; }
 
@@ -515,9 +515,7 @@ namespace AssetsManager.Views.Helpers
             double speed = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift) ? 3.0
                 : Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl) ? 0.25
                 : 1.0;
-            Vector3D move = IsMapNavigation
-                ? CameraNavigation.Walk(Pose(camera), forward, strafe, seconds, speed, MapNavigationGroundHeight.Value)
-                : CameraNavigation.WalkOrbit(Pose(camera), forward, strafe, seconds, speed);
+            Vector3D move = CameraNavigation.Walk(Pose(camera), forward, strafe, seconds, speed);
             if (move.LengthSquared < 1e-12)
                 return;
 

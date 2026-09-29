@@ -20,7 +20,7 @@ namespace AssetsManager.Views.Helpers
     /// Viewport navigation math, free of input and WPF state so it is unit tested on its own;
     /// CustomCameraController feeds it the input. MAP scenes navigate against the ground (the horizontal
     /// plane at the scene stand height): zoom toward the terrain under the cursor that glides past its
-    /// closest approach, WASD travel over it and focus poses. Orbit views reuse the WASD travel.
+    /// closest approach and focus poses. WASD travel is shared by every viewport.
     /// </summary>
     internal static class CameraNavigation
     {
@@ -138,41 +138,17 @@ namespace AssetsManager.Views.Helpers
         }
 
         /// <summary>
-        /// WASD travel over the ground. <paramref name="forward"/> and <paramref name="strafe"/> are
-        /// -1, 0 or 1; the pace scales with the camera height so a whole map stays a few seconds away.
+        /// WASD travel on the horizontal plane, the same in every viewport. <paramref name="forward"/> and
+        /// <paramref name="strafe"/> are -1, 0 or 1. The pace scales with the distance to the point the
+        /// camera looks at (the orbit centre, or the terrain at the screen centre on a MAP) or with the
+        /// orthographic width, so a close-up and a whole map both slide about a screen width in two seconds.
         /// </summary>
         internal static Vector3D Walk(
             CameraPose pose,
             double forward,
             double strafe,
             double seconds,
-            double speed,
-            double groundY) =>
-            WalkAtPace(pose, forward, strafe, seconds, speed, pose.Orthographic
-                ? Math.Max(1.0, pose.OrthographicWidth) * 0.6
-                : Math.Max(pose.Position.Y - groundY, MinimumHeight) * 1.5);
-
-        /// <summary>
-        /// WASD travel on the horizontal plane around an orbited subject: the pace scales with the orbit
-        /// distance (or the orthographic width), so a close-up and a wide shot both move at a usable speed.
-        /// </summary>
-        internal static Vector3D WalkOrbit(
-            CameraPose pose,
-            double forward,
-            double strafe,
-            double seconds,
-            double speed) =>
-            WalkAtPace(pose, forward, strafe, seconds, speed, pose.Orthographic
-                ? Math.Max(1.0, pose.OrthographicWidth) * 0.6
-                : Math.Max(pose.Look.Length, MinimumHeight) * 1.5);
-
-        private static Vector3D WalkAtPace(
-            CameraPose pose,
-            double forward,
-            double strafe,
-            double seconds,
-            double speed,
-            double reach)
+            double speed)
         {
             if ((forward == 0 && strafe == 0) || seconds <= 0 || !double.IsFinite(seconds))
                 return default;
@@ -191,6 +167,9 @@ namespace AssetsManager.Views.Helpers
                 return default;
             move.Normalize();
 
+            double reach = pose.Orthographic
+                ? Math.Max(1.0, pose.OrthographicWidth) * 0.5
+                : Math.Max(pose.Look.Length, MinimumHeight) * 0.75;
             double pace = Math.Clamp(reach, MinimumWalkSpeed, MaximumWalkSpeed) * Math.Max(0.01, speed);
             return move * (pace * seconds);
         }

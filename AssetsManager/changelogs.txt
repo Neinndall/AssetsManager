@@ -154,7 +154,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
-  - Viewer / WASD camera movement now works in every viewport, not only maps (Shift faster, Ctrl slower).
+  - Viewer / WASD camera movement now works in every viewport at the same pace, not only maps (Shift faster, Ctrl slower).
   - VFX Studio / New backdrop scenes keep the character facing and camera framing while the map appears, and each tab remembers its camera.
   - VFX Studio / Choosing a backdrop opens a separate map and character scene; enabling the chooser no longer loads a map, and champion and map VFX switches keep independent states per scene.
   - VFX Studio / Removed duplicate backdrop visibility buttons and distinguished champion and map VFX icons in the viewport toolbar.
