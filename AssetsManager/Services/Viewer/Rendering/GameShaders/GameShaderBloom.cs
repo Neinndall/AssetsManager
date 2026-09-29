@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Utils.Rendering;
 using Silk.NET.OpenGL;
@@ -9,11 +10,16 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
     /// The glow game skin shaders write to their second target (<c>SV_Target1</c>, <c>FEATURE_BLOOM</c>): swords,
     /// eyes and runes. A renderer redraws its game passes between <see cref="BeginPasses"/> and
     /// <see cref="EndPasses"/>, which route output 1 into a bloom texture depth-tested against the scene drawn so
-    /// far; <see cref="Compose"/> blurs it at half and quarter resolution and adds it to the frame once.
+    /// far; <see cref="Compose"/> adds it to the frame once through the game's mip chain: the glow is downsampled
+    /// level by level with <c>MipChainBloomDownsample</c>, upsampled back with <c>MipChainBloomUpsample</c> adding
+    /// each level onto the finer one, and summed onto the scene (<c>ps_copy_post</c> with <c>BLOOM ADDITIVE</c>).
+    /// The kernels are the game's; the level count and <c>BLOOM_INTENSITY_SCALE</c>, which the executable sets,
+    /// are ours: the scale keeps the energy the shaders wrote.
     /// </summary>
     internal sealed class GameShaderBloom : IDisposable
     {
-        internal const float Strength = 1f;
+        internal const int Levels = 5;
+        internal const float Strength = 1f / Levels;
 
         private const string FullscreenVertex = @"
 out vec2 vUv;
@@ -25,29 +31,46 @@ void main()
     gl_Position = vec4(corner * 2.0 - 1.0, 0.0, 1.0);
 }";
 
-        // Nine-tap Gaussian along uStride; the downsample pass uses it at a coarser level too.
-        private const string BlurFragment = @"
+        // ASSETS/Shaders/HLSL/Filters/MipChainBloomDownsample.ps: 13 taps at one and two source texels (uStep).
+        private const string DownsampleFragment = @"
 uniform sampler2D uSource;
-uniform vec2 uStride;
+uniform vec2 uStep;
 
 in vec2 vUv;
 out vec4 FragColor;
 
+vec3 tap(float x, float y) { return texture(uSource, vUv + uStep * vec2(x, y)).rgb; }
+
 void main()
 {
-    const float weights[5] = float[5](0.2270270, 0.1945946, 0.1216216, 0.0540541, 0.0162162);
-    vec3 sum = texture(uSource, vUv).rgb * weights[0];
-    for (int i = 1; i < 5; i++)
-    {
-        sum += texture(uSource, vUv + uStride * float(i)).rgb * weights[i];
-        sum += texture(uSource, vUv - uStride * float(i)).rgb * weights[i];
-    }
-    FragColor = vec4(sum, 1.0);
+    vec3 sum = tap(0.0, 0.0) * 0.5
+        + (tap(-1.0, -1.0) + tap(1.0, -1.0) + tap(-1.0, 1.0) + tap(1.0, 1.0)) * 0.5
+        + (tap(0.0, -2.0) + tap(-2.0, 0.0) + tap(2.0, 0.0) + tap(0.0, 2.0)) * 0.25
+        + (tap(-2.0, -2.0) + tap(2.0, -2.0) + tap(-2.0, 2.0) + tap(2.0, 2.0)) * 0.125;
+    FragColor = vec4(sum * 0.25, 1.0);
 }";
 
+        // ASSETS/Shaders/HLSL/Filters/MipChainBloomUpsample.ps: 3x3 tent over the coarser level.
+        private const string UpsampleFragment = @"
+uniform sampler2D uSource;
+uniform vec2 uStep;
+
+in vec2 vUv;
+out vec4 FragColor;
+
+vec3 tap(float x, float y) { return texture(uSource, vUv + uStep * vec2(x, y)).rgb; }
+
+void main()
+{
+    vec3 sum = tap(0.0, 0.0) * 4.0
+        + (tap(0.0, -1.0) + tap(-1.0, 0.0) + tap(1.0, 0.0) + tap(0.0, 1.0)) * 2.0
+        + tap(-1.0, -1.0) + tap(1.0, -1.0) + tap(-1.0, 1.0) + tap(1.0, 1.0);
+    FragColor = vec4(sum * 0.0625, 1.0);
+}";
+
+        // ASSETS/Shaders/HLSL/Gamma/ps_copy_post.ps with BLOOM ADDITIVE: scene + bloom * BLOOM_INTENSITY_SCALE.
         private const string ComposeFragment = @"
-uniform sampler2D uHalf;
-uniform sampler2D uQuarter;
+uniform sampler2D uBloom;
 uniform float uStrength;
 
 in vec2 vUv;
@@ -55,18 +78,17 @@ out vec4 FragColor;
 
 void main()
 {
-    // The two blur levels share the glow, so the halo keeps the energy the shader wrote.
-    vec3 glow = (texture(uHalf, vUv).rgb + texture(uQuarter, vUv).rgb) * 0.5;
-    FragColor = vec4(max(glow, vec3(0.0)) * uStrength, 0.0);
+    FragColor = vec4(max(texture(uBloom, vUv).rgb, vec3(0.0)) * uStrength, 0.0);
 }";
 
         private GL _gl;
         private GlSceneCapture _depth;
-        private uint _blurProgram;
+        private uint _downsampleProgram;
+        private uint _upsampleProgram;
         private uint _composeProgram;
         private uint _vao;
         private Target _glow;
-        private Target _halfA, _halfB, _quarterA, _quarterB;
+        private Target[] _levels = Array.Empty<Target>();
         private uint _width, _height;
         private bool _pending;
         private int _previousFramebuffer;
@@ -80,7 +102,8 @@ void main()
                 return;
             _gl = gl;
             bool embedded = GlShaderCompiler.UsesEmbeddedProfile(gl);
-            _blurProgram = GlShaderCompiler.CreateProgram(gl, embedded, FullscreenVertex, BlurFragment);
+            _downsampleProgram = GlShaderCompiler.CreateProgram(gl, embedded, FullscreenVertex, DownsampleFragment);
+            _upsampleProgram = GlShaderCompiler.CreateProgram(gl, embedded, FullscreenVertex, UpsampleFragment);
             _composeProgram = GlShaderCompiler.CreateProgram(gl, embedded, FullscreenVertex, ComposeFragment);
             _vao = gl.GenVertexArray();
             _depth = new GlSceneCapture(gl);
@@ -121,7 +144,7 @@ void main()
             _gl.Viewport(_previousViewport[0], _previousViewport[1], (uint)_previousViewport[2], (uint)_previousViewport[3]);
         }
 
-        /// <summary>Adds this frame's blurred glow to the bound framebuffer, when any game pass wrote some.</summary>
+        /// <summary>Adds this frame's glow, spread by the mip chain, to the bound framebuffer when any game pass wrote some.</summary>
         internal void Compose()
         {
             if (_gl == null || !_pending)
@@ -135,21 +158,29 @@ void main()
             _gl.Disable(EnableCap.CullFace);
             _gl.Disable(EnableCap.Blend);
             _gl.BindVertexArray(_vao);
-            _gl.UseProgram(_blurProgram);
 
-            Blur(_glow, _halfA, _halfB);
-            Blur(_halfA, _quarterA, _quarterB);
+            _gl.UseProgram(_downsampleProgram);
+            Target source = _glow;
+            foreach (Target level in _levels)
+            {
+                Pass(_downsampleProgram, source, level);
+                source = level;
+            }
 
-            _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)target);
-            _gl.Viewport(_previousViewport[0], _previousViewport[1], (uint)_previousViewport[2], (uint)_previousViewport[3]);
+            // Each coarser level, tent-filtered, adds onto the finer one: the finest ends with every level's glow.
+            _gl.UseProgram(_upsampleProgram);
             _gl.Enable(EnableCap.Blend);
             _gl.BlendEquation(BlendEquationModeEXT.FuncAdd);
             _gl.BlendFunc(BlendingFactor.One, BlendingFactor.One);
+            for (int at = _levels.Length - 1; at > 0; at--)
+                Pass(_upsampleProgram, _levels[at], _levels[at - 1]);
+
+            _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)target);
+            _gl.Viewport(_previousViewport[0], _previousViewport[1], (uint)_previousViewport[2], (uint)_previousViewport[3]);
             // Alpha stays as drawn, so a transparent-background capture keeps its coverage.
             _gl.ColorMask(true, true, true, false);
             _gl.UseProgram(_composeProgram);
-            Bind(0, _halfA.Texture, _composeProgram, "uHalf");
-            Bind(1, _quarterA.Texture, _composeProgram, "uQuarter");
+            Bind(0, _levels[0].Texture, _composeProgram, "uBloom");
             _gl.Uniform1(_gl.GetUniformLocation(_composeProgram, "uStrength"), Strength);
             _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
 
@@ -162,21 +193,13 @@ void main()
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
 
-        // Downsamples `source` into `into`, blurs it horizontally into `scratch` and vertically back into `into`.
-        private void Blur(Target source, Target into, Target scratch)
+        // Filters `source` into `into`; UVStep is one texel of the source, as the game sets it.
+        private void Pass(uint program, Target source, Target into)
         {
-            _gl.Viewport(0, 0, into.Width, into.Height);
-            Pass(source.Texture, into.Framebuffer, 0f, 0f);
             _gl.BindFramebuffer(FramebufferTarget.Framebuffer, into.Framebuffer);
-            Pass(into.Texture, scratch.Framebuffer, 1f / into.Width, 0f);
-            Pass(scratch.Texture, into.Framebuffer, 0f, 1f / into.Height);
-        }
-
-        private void Pass(uint source, uint framebuffer, float strideX, float strideY)
-        {
-            _gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
-            Bind(0, source, _blurProgram, "uSource");
-            _gl.Uniform2(_gl.GetUniformLocation(_blurProgram, "uStride"), strideX, strideY);
+            _gl.Viewport(0, 0, into.Width, into.Height);
+            Bind(0, source.Texture, program, "uSource");
+            _gl.Uniform2(_gl.GetUniformLocation(program, "uStep"), 1f / source.Width, 1f / source.Height);
             _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         }
 
@@ -195,12 +218,9 @@ void main()
             // The game writes SV_Target1 to an 8-bit target, so glow clamps at 1: Aatrox Skin33's body pulses
             // Bloom_Intensity up to 10, which would otherwise bloom ten times too bright.
             _glow = CreateTarget(width, height, lowDynamicRange: true);
-            uint halfWidth = Math.Max(1, width / 2), halfHeight = Math.Max(1, height / 2);
-            uint quarterWidth = Math.Max(1, width / 4), quarterHeight = Math.Max(1, height / 4);
-            _halfA = CreateTarget(halfWidth, halfHeight);
-            _halfB = CreateTarget(halfWidth, halfHeight);
-            _quarterA = CreateTarget(quarterWidth, quarterHeight);
-            _quarterB = CreateTarget(quarterWidth, quarterHeight);
+            _levels = new Target[Levels];
+            for (int at = 0; at < Levels; at++)
+                _levels[at] = CreateTarget(Math.Max(1, width >> (at + 1)), Math.Max(1, height >> (at + 1)));
             _width = width;
             _height = height;
             _pending = false;
@@ -229,14 +249,15 @@ void main()
 
         private void DeleteTargets()
         {
-            foreach (Target target in new[] { _glow, _halfA, _halfB, _quarterA, _quarterB })
+            foreach (Target target in _levels.Prepend(_glow))
             {
                 if (target == null)
                     continue;
                 _gl.DeleteFramebuffer(target.Framebuffer);
                 _gl.DeleteTexture(target.Texture);
             }
-            _glow = _halfA = _halfB = _quarterA = _quarterB = null;
+            _glow = null;
+            _levels = Array.Empty<Target>();
         }
 
         public void Dispose()
@@ -245,7 +266,8 @@ void main()
                 return;
             DeleteTargets();
             _depth?.Dispose();
-            if (_blurProgram != 0) _gl.DeleteProgram(_blurProgram);
+            if (_downsampleProgram != 0) _gl.DeleteProgram(_downsampleProgram);
+            if (_upsampleProgram != 0) _gl.DeleteProgram(_upsampleProgram);
             if (_composeProgram != 0) _gl.DeleteProgram(_composeProgram);
             if (_vao != 0) _gl.DeleteVertexArray(_vao);
             _gl = null;
