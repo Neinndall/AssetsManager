@@ -28,7 +28,7 @@ using PixelFormat = Silk.NET.OpenGL.PixelFormat;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions]`:
+    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--trace-emitter NAME]`:
     /// plays one VFX system of an installed BIN the way VFX Studio does (VfxRenderSession, game particle shaders,
     /// resources extracted from the WADs) and writes a PNG per time over a mid-grey backdrop. With --per-emitter
     /// each root emitter is also drawn alone and measured: how much of the frame it darkens or brightens.
@@ -126,6 +126,19 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 foreach (VfxEmitterDefinition emitter in emitters.Where(item => string.Equals(item.Name, dumped, StringComparison.OrdinalIgnoreCase)))
                     Console.WriteLine($"[Snapshot] parsed {emitter}");
             Console.WriteLine($"[Snapshot] {system.Name} emitters={emitters.Count} bounds={bounds.Min}..{bounds.Max} eye={frame.Position}");
+            if (Option(args, "--trace-emitter") is { } traced)
+            {
+                // Simulation state of one emitter at each time: why it does not emit, or when its particles retire.
+                foreach (double time in times)
+                {
+                    session.Seek(time);
+                    foreach (var state in session.Graphs.SelectMany(graph => graph.Runtimes).SelectMany(runtime => runtime.Emitters)
+                                 .Where(item => string.Equals(item.Def.Name, traced, StringComparison.OrdinalIgnoreCase)))
+                        Console.WriteLine($"[Snapshot] trace t={time:0.00} {state.Def.Name} age={state.Age:0.000} burstDone={state.BurstDone} " +
+                                          $"initial={state.InitialEmissionDone} finishedAt={state.FinishedAt:0.000} visible={state.IsVisible} particles={state.Particles.Count} " +
+                                          string.Join(" ", state.Particles.Take(3).Select(particle => $"[age={particle.Age:0.000} life={particle.Life:0.000}]")));
+                }
+            }
             string stem = Sanitize(system.Name);
             foreach (double time in times)
             {
