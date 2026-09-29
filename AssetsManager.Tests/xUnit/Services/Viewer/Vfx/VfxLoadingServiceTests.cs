@@ -126,6 +126,42 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void LinkedSpellDeclarationsClassifyTheSkinsEffectWithoutAHashCatalog()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxRig", Guid.NewGuid().ToString("N"));
+            string character = Path.Combine(root, "data", "characters", "hero");
+            string skins = Path.Combine(character, "skins");
+            Directory.CreateDirectory(skins);
+            try
+            {
+                const uint key = 77;
+                const string effectPath = "Effects/Return";
+                uint systemHash = Fnv1a.HashLower(effectPath);
+                string primary = Path.Combine(skins, "skin0.bin");
+                WriteBin(primary, new[]
+                {
+                    CreateSystem(effectPath, "Return"),
+                    CreateResolver("Resolvers/Skin", key, systemHash),
+                    CreateSkin("Skin", Fnv1a.HashLower("Resolvers/Skin"))
+                }, new[] { "data/characters/hero/hero.bin" });
+                WriteBin(Path.Combine(character, "hero.bin"), new[]
+                {
+                    new BinTreeObject("Spells/Return", "SpellObject", new BinTreeProperty[]
+                    {
+                        new BinTreeStruct(Fnv1a.HashLower("mSpell"), Fnv1a.HashLower("SpellDataResource"),
+                            new BinTreeProperty[] { new BinTreeHash(Fnv1a.HashLower("mMissileEffectKey"), key) })
+                    })
+                }, Array.Empty<string>());
+                using var service = new VfxLoadingService();
+                var bundle = service.Load(primary, null);
+                Assert.Single(bundle.SpellPreviews);
+                Assert.Equal(AssetsManager.Services.Viewer.Vfx.Session.VfxRigPreset.Missile,
+                    VfxSystemRigResolver.Resolve(bundle.Systems[systemHash], bundle).Preset);
+            }
+            finally { Directory.Delete(root, recursive: true); }
+        }
+
+        [Fact]
         public void LinkedBinTraversalStopsAfterTheFirstThirtyTwoFilesLikeLtk()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxLinkedCap", Guid.NewGuid().ToString("N"));

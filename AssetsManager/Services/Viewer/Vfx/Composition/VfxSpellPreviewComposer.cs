@@ -196,7 +196,7 @@ internal static class VfxSpellPreviewComposer
         return (delay, duration);
     }
 
-    private static (uint Key, VfxSystemDefinition System) ResolveEffect(
+    internal static (uint Key, VfxSystemDefinition System) ResolveEffect(
         uint key,
         string name,
         VfxLoadingService.Bundle bundle,

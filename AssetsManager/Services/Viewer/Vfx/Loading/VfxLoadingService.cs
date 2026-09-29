@@ -18,6 +18,7 @@ using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Viewer.Vfx.Loading
 {
@@ -30,6 +31,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         private const int MaximumLinkedBins = 32;
         private readonly VfxResourceResolver _resources = new();
         private const string ShaderDefinitionsPath = "data/shaders/shaders.bin";
+        private static readonly uint SpellObjectClass = Fnv1a.HashLower("SpellObject");
         private readonly HashResolverService _hashResolverService;
         private readonly MapAssetResolver _assetResolver;
         private readonly SemaphoreSlim _catalogGate = new(1, 1);
@@ -66,6 +68,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             public string PrimaryBinPath { get; internal set; }
             public Dictionary<uint, VfxSystemDefinition> Systems { get; private set; } = new();
             public Dictionary<uint, uint> ResourceMap { get; private set; } = new();
+            internal Dictionary<uint, VfxSpellPreview> SpellPreviews { get; private set; } = new();
             public Dictionary<uint, string> SystemSources { get; private set; } = new();
             public Dictionary<uint, AnimationClipDefinition> EventSequences { get; private set; } = new();
             public List<AnimationClipDefinition> Clips { get; private set; } = new();
@@ -87,6 +90,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             {
                 PrimaryBinPath = source.PrimaryBinPath;
                 Systems = source.Systems;
+                SpellPreviews = source.SpellPreviews;
                 SystemSources = source.SystemSources;
                 EventSequences = source.EventSequences;
                 Clips = source.Clips;
@@ -233,6 +237,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         if (!File.Exists(currentBinPath)) continue;
                         BinTree tree = VfxGraphParser.ParseTree(File.ReadAllBytes(currentBinPath));
                         loadedTrees.Add(tree);
+                        foreach (BinTreeObject spell in tree.Objects.Values.Where(item =>
+                                     item.ClassHash == SpellObjectClass))
+                            bundle.SpellPreviews.TryAdd(spell.PathHash, VfxSpellPreviewReader.Read(spell));
                         VfxBinDocument document = VfxGraphParser.ParseDocument(
                             tree,
                             ResolveGraphHashName,

@@ -29,6 +29,7 @@ using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
@@ -5286,12 +5287,15 @@ namespace AssetsManager.Views.Controls.Viewer
             StandaloneRunMemory remembered = RecallStandaloneRun(systemItem);
             int playbackSeed = remembered?.Seed ?? StandalonePlaybackSeed;
             float playbackSpeed = remembered?.Speed ?? 1f;
+            var inferredRig = VfxSystemRigResolver.Resolve(def, _activeBundle, VfxLoadingService == null ? null : VfxLoadingService.ResolveBinEntryPath);
             VfxRigSettings rigSettings =
-                (remembered?.RigSettings ?? VfxRigSettings.ForPreset(VfxRigPreset.Still)) with
+                (remembered?.RigSettings ?? VfxRigSettings.ForPreset(inferredRig.Preset)) with
                 {
                     IsLooping = _model.IsPreviewLoopEnabled
                 };
             VfxRigPreset rigPreset = rigSettings.Preset;
+            if (remembered == null)
+                _model.LogMessages.Add($"[RIG] Auto {rigPreset}: {inferredRig.Reason}");
             HashSet<int> muted = remembered?.Muted?.ToHashSet() ?? new HashSet<int>();
             HashSet<int> soloed = remembered?.Soloed?.ToHashSet() ?? new HashSet<int>();
 
