@@ -23,7 +23,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             {
                 ["a_POSITION"] = "vec4(particleWorld, 1.0)",
                 ["a_NORMAL"] = "vec4(particleNormal, 0.0)",
-                ["a_COLOR"] = mesh ? "vec4(1.0)" : "particleTint.bgra",
+                ["a_COLOR"] = mesh ? "vMeshColor.bgra" : "particleTint.bgra",
                 ["a_TEXCOORD"] = "vec4(particleBaseUv, 0.0, particleErosion)",
                 ["a_TEXCOORD1"] = "vec4(uHasTexMult != 0 ? particleMultUv : particleLookup, 0.0, 0.0)",
                 ["a_BLENDWEIGHT"] = "vec4(1.0, 0.0, 0.0, 0.0)",

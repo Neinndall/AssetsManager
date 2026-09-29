@@ -454,6 +454,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Particle meshes use their own vertex colours, so rings, cylinders and swipes fade at their edges instead of drawing hard dark bands (dragon pit mountain transition).
   - VFX Studio / Animations stopped before switching scenes stay stopped when returning.
   - VFX Studio / Effects with endless particles stay visible instead of vanishing after their first moment (Bloom waterfall glow, Akshan E hook).
   - VFX Studio / Map monsters keep their game spawn facing in new backdrop scenes, and map tabs keep the Game camera zoom limits when reopened.

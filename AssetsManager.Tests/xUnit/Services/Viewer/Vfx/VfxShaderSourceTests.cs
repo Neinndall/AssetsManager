@@ -120,7 +120,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.DoesNotContain("uModulationFactor", VfxShaderSource.ParticleFragment);
             Assert.DoesNotContain("uModulationFactor", VfxShaderSource.MeshFragment);
             Assert.Contains("vec4 authoredColor = vColor;", VfxShaderSource.ParticleFragment);
-            Assert.Contains("vec4 authoredColor = uColor;", VfxShaderSource.MeshFragment);
+            Assert.Contains("vec4 authoredColor = uColor * vMeshColor;", VfxShaderSource.MeshFragment);
         }
         [Fact]
         public void ArbitraryQuadUsesAuthoredLtkUvOrientationForBothLayers()
@@ -190,8 +190,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Contains("sourcePosition = (skinMatrix * vec4(aPos, 1.0)).xyz;", VfxShaderSource.MeshVertex);
             Assert.Contains("vec3 scaled = sourcePosition * uScale;", VfxShaderSource.MeshVertex);
             Assert.Contains("if (uAttachedMesh != 0)", VfxShaderSource.MeshVertex);
-            Assert.Contains("vec4 authoredColor = uColor;", VfxShaderSource.MeshFragment);
-            Assert.DoesNotContain("uColor * vMeshColor", VfxShaderSource.MeshFragment);
+            // USE_VERTEX_COLORS: the mesh's vertex colour (white for skinned and attached meshes) tints the particle.
+            Assert.Contains("vec4 authoredColor = uColor * vMeshColor;", VfxShaderSource.MeshFragment);
         }
 
         [Fact]

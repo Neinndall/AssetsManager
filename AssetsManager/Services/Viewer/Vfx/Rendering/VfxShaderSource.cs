@@ -560,9 +560,10 @@ void main(){
         float lower = clamp((uErosionDrive - erosion) / featherOut, 0.0, 1.0);
         texel.a *= clamp(upper - lower, 0.0, 1.0);
     }
-    // The reference VFX geometry buffer carries no vertex-color lane. Both particle meshes
-    // and attached meshes are tinted only by the particle/attachment material color.
-    vec4 authoredColor = uColor;
+    // Mesh particles draw with USE_VERTEX_COLORS: the mesh's own vertex colour multiplies the
+    // particle colour, alpha included (SCB rings fade to transparent through it). Meshes without
+    // a colour lane, and attached meshes, carry white.
+    vec4 authoredColor = uColor * vMeshColor;
     vec4 lit = texel * authoredColor;
 
     // The rim and reflection use the carrier alpha taken before erosion. Skinned/attached

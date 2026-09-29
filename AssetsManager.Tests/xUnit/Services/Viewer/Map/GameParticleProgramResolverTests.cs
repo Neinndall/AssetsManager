@@ -301,6 +301,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                             ? "layout(location=0) in vec3 aPos;"
                             : "layout(location=0) in vec2 aCorner;",
                         composed.Vertex.Glsl);
+                    // USE_VERTEX_COLORS mesh stages read the mesh's own vertex colour, BGRA like the quad tint.
+                    if (shaderCase.Mesh && translated.Program.Vertex.Glsl.Contains("a_COLOR", System.StringComparison.Ordinal))
+                        Assert.Contains("a_COLOR = vec4(vMeshColor.bgra);", composed.Vertex.Glsl);
 
                     string vertex = ToDesktopGlsl(composed.Vertex.Glsl);
                     string pixel = ToDesktopGlsl(composed.Pixel.Glsl);
