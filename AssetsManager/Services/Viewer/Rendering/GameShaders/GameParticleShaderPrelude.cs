@@ -167,9 +167,14 @@ void particleFeed(){
                 if (!declaration.Success) continue;
                 string instance = declaration.Groups[1].Value;
                 string accessor = "particleRead_" + block.GlslName;
+                // A block the shader also bit-casts is declared as uvec4 (or ivec4); the accessor keeps that
+                // type and stores the float values as their bits.
+                string type = Regex.Match(declaration.Value, @"\b(uvec4|ivec4|vec4)\s+m\s*\[").Groups[1].Value;
+                if (type.Length == 0) type = "vec4";
+                string bits = type == "uvec4" ? "floatBitsToUint" : type == "ivec4" ? "floatBitsToInt" : string.Empty;
                 source = Regex.Replace(source, Regex.Escape(instance) + @"\.m\[([^\]\r\n]+)\]", accessor + "(int($1))");
-                source = source.Insert(declaration.Index + declaration.Length, $"\nvec4 {accessor}(int index);\n");
-                definitions.AppendLine($"vec4 {accessor}(int index){{ vec4 value = {instance}.m[index];");
+                source = source.Insert(declaration.Index + declaration.Length, $"\n{type} {accessor}(int index);\n");
+                definitions.AppendLine($"{type} {accessor}(int index){{ {type} value = {instance}.m[index];");
                 foreach (var member in selected)
                 {
                     string[] expressions = values[member.Name];
@@ -180,7 +185,7 @@ void particleFeed(){
                         int offset = (int)member.Offset / 4 + lane;
                         string target = "xyzw"[offset % 4].ToString();
                         string component = "xyzw"[lane % 4].ToString();
-                        definitions.AppendLine($"if(index == {offset / 4}) value.{target} = ({expressions[register]}).{component};");
+                        definitions.AppendLine($"if(index == {offset / 4}) value.{target} = {bits}(({expressions[register]}).{component});");
                     }
                 }
                 definitions.AppendLine("return value; }");

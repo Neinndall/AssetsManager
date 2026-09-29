@@ -221,6 +221,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             var cases = new[]
             {
                 new ParticleShaderCase("QUAD", Emitter(), false),
+                // Its $Globals is declared uvec4 (the shader bit-casts it), so the rewritten erosion
+                // parameters must keep that type.
+                new ParticleShaderCase("QUAD ALPHA_EROSION", Emitter() with { AlphaErosion = alphaErosion }, false),
                 new ParticleShaderCase(
                     "QUAD ALPHA_EROSION MULT_PASS SOFT_PARTICLES",
                     Emitter() with
