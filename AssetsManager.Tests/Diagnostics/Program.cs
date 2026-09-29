@@ -26,6 +26,11 @@ namespace AssetsManager.Tests.Diagnostics
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && string.Equals(args[0], "vfx-mesh-color-census", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxMeshColorCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "vfx-rig-audit", StringComparison.OrdinalIgnoreCase))
             {
                 VfxRigAuditDiagnostic.Run(args.Skip(1).ToArray());

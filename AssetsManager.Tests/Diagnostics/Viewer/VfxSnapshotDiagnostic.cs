@@ -28,10 +28,11 @@ using PixelFormat = Silk.NET.OpenGL.PixelFormat;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--trace-emitter NAME]`:
+    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--trace-emitter NAME] [--no-owner]`:
     /// plays one VFX system of an installed BIN the way VFX Studio does (VfxRenderSession, game particle shaders,
     /// resources extracted from the WADs) and writes a PNG per time over a mid-grey backdrop. With --per-emitter
     /// each root emitter is also drawn alone and measured: how much of the frame it darkens or brightens.
+    /// A skin BIN also supplies its Character (SKN/SKL) to AttachedMesh emitters, drawn in bind pose.
     /// </summary>
     internal static class VfxSnapshotDiagnostic
     {
@@ -80,8 +81,11 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var resolver = new MapAssetResolver(wadProvider, settings);
             IReadOnlyDictionary<uint, VfxSystemDefinition> reachable =
                 VfxSceneResourceContext.ReachableSystems(systems, resourceMap, new[] { system });
+            VfxOwnerSceneContext owner = args.Contains("--no-owner") ? null : VfxAnimationParser.ExtractOwnerSceneContext(tree);
+            if (owner != null)
+                Console.WriteLine($"[Snapshot] owner {owner.MeshPath} skeleton={owner.SkeletonPath} scale={owner.SkinScale}");
             using VfxSceneResourceContext resources = VfxSceneResourceContext
-                .CreateAsync(reachable, null, resolver, null, log).GetAwaiter().GetResult();
+                .CreateAsync(reachable, null, resolver, null, log, ownerSceneContext: owner).GetAwaiter().GetResult();
 
             if (args.Contains("--keep-resources"))
             {
@@ -107,6 +111,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 Definition = system,
                 SystemCatalog = systems,
                 ResourceMap = resourceMap,
+                OwnerSceneContext = owner,
                 SearchDirectory = resources.SearchDirectory,
                 PlaybackSeed = VfxRenderSession.IdleEffectSeed,
                 TotalDuration = VfxDurationCalculator.SystemSpan(system),
@@ -128,14 +133,16 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             Console.WriteLine($"[Snapshot] {system.Name} emitters={emitters.Count} bounds={bounds.Min}..{bounds.Max} eye={frame.Position}");
             if (Option(args, "--trace-emitter") is { } traced)
             {
-                // Simulation state of one emitter at each time: why it does not emit, or when its particles retire.
+                // Simulation and GPU state of one emitter at each time: why it does not emit or draw, or when its
+                // particles retire. Drawing the frame first uploads its resources.
                 foreach (double time in times)
                 {
-                    session.Seek(time);
+                    Draw(gl, session, framebuffer, size, time, viewProjection, view);
                     foreach (var state in session.Graphs.SelectMany(graph => graph.Runtimes).SelectMany(runtime => runtime.Emitters)
                                  .Where(item => string.Equals(item.Def.Name, traced, StringComparison.OrdinalIgnoreCase)))
                         Console.WriteLine($"[Snapshot] trace t={time:0.00} {state.Def.Name} age={state.Age:0.000} burstDone={state.BurstDone} " +
                                           $"initial={state.InitialEmissionDone} finishedAt={state.FinishedAt:0.000} visible={state.IsVisible} particles={state.Particles.Count} " +
+                                          $"texture={state.Texture} reflection={state.ReflectionTexture} meshVao={state.MeshVao} " +
                                           string.Join(" ", state.Particles.Take(3).Select(particle => $"[age={particle.Age:0.000} life={particle.Life:0.000}]")));
                 }
             }
