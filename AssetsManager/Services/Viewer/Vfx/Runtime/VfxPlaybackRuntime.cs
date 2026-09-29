@@ -1385,6 +1385,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             float sharedRoll = _pinnedBirthChance ?? drawnChance;
 
             float life = d.ParticleLifetime.SampleBirth(emitterT, _rng, sharedRoll);
+            // A negative particleLifetime (usually -1, e.g. Akshan's E hook mesh) keeps the particle for as
+            // long as its emitter runs, and for good when the emitter never ends; retiring it at its first
+            // step hid every such particle.
+            if (life < 0f)
+                life = d.EmitterLifetime is > 0f and var span ? MathF.Max(span - s.Age, 0f) : float.PositiveInfinity;
             var birthScale = d.BirthScale.SampleBirthOver(emitterT, _rng, Vector3.One, sharedRoll);
             if (d.LegacyBirthScale is { } legacyBirthScale)
             {
