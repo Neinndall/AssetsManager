@@ -2953,8 +2953,9 @@ namespace AssetsManager.Views.Controls.Viewer
             VfxSceneActor actor = FocusedActor;
             if (actor == null) return;
 
+            double stageYaw = 0d;
             Vector3 stageOrigin = _model.HasActiveCharacterBackdrop &&
-                TryGetCharacterBackdropOrigin(_mapSceneRuntime?.Scene, out Vector3 backdropOrigin, out _)
+                TryGetCharacterBackdropOrigin(_mapSceneRuntime?.Scene, out Vector3 backdropOrigin, out stageYaw)
                     ? backdropOrigin
                     : Vector3.Zero;
             _isApplyingCharacterViewportState = true;
@@ -2969,7 +2970,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (rotation)
                 {
                     _model.CharacterRotationX = 0d;
-                    _model.CharacterRotationY = 0d;
+                    _model.CharacterRotationY = stageYaw;
                     _model.CharacterRotationZ = 0d;
                 }
                 if (scale)

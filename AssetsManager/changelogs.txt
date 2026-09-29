@@ -449,6 +449,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Resetting a map character restores its spawn facing as well as its position.
   - VFX Studio / With shaders on, PBR champion skins are lit by the scene, metallic skin materials reflect the sky, and materials no longer lose textures or vanish (Aatrox Mecha sword).
   - VFX Studio / With shaders on, skin materials whose exact shader variant the game never compiled now draw with the closest one (K'Sante, Kayn and Sett skins).
   - VFX Studio / With shaders on, skins whose materials change with the game state show their resting look: no stray dissolve streaks, and alternate forms stay hidden (Aatrox Skin40).
