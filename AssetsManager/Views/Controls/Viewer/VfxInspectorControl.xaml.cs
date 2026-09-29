@@ -1091,7 +1091,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ApplyCharacterBackdropOrigin(MapSceneData scene, MapSceneSource source)
         {
             VfxSceneActor actor = FocusedActor;
-            if (actor == null || !TryGetCharacterBackdropOrigin(scene, out Vector3 origin))
+            if (actor == null || !TryGetCharacterBackdropOrigin(scene, out Vector3 origin, out double yaw))
                 return;
 
             string sourceKey = VfxInstallationMapCatalog.BackdropKey(source);
@@ -1110,7 +1110,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.CharacterPositionY = origin.Y;
                 _model.CharacterPositionZ = origin.Z;
                 _model.CharacterRotationX = 0d;
-                _model.CharacterRotationY = 0d;
+                _model.CharacterRotationY = yaw;
                 _model.CharacterRotationZ = 0d;
                 StoreFocusedPlacement(actor);
                 actor.PlacementCustomized = false;
@@ -1125,19 +1125,39 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         /// <summary>
-        /// Preview-space point where a Character stands on the active MAP backdrop. MAP geometry is
-        /// mirrored on X by the renderer, so the authored engine origin is converted to that space.
+        /// Preview-space point and yaw (degrees) where the focused Character stands on the active MAP
+        /// backdrop: where the map spawns it (its map entity or the neutral camp that brings it, see
+        /// <see cref="MapCharacterSpawnSemantics"/>), else the map origin facing forward. MAP geometry is
+        /// mirrored on X by the renderer, so the authored engine transform is converted to that space.
         /// </summary>
-        private bool TryGetCharacterBackdropOrigin(MapSceneData scene, out Vector3 origin)
+        private bool TryGetCharacterBackdropOrigin(MapSceneData scene, out Vector3 origin, out double yaw)
         {
             origin = default;
+            yaw = 0d;
             if (!_model.IsSkinWorkspace || scene?.Geometry == null)
                 return false;
+
+            if (TryGetBackdropSpawn(scene, FocusedActor?.Skin, out origin, out yaw))
+                return true;
 
             // Like LTK, the stand point comes from the opening state: switching map state never moves the subject.
             if (StableMapOrigin(scene) is not Vector3 engineOrigin)
                 return false;
             origin = new Vector3(-engineOrigin.X, engineOrigin.Y, engineOrigin.Z);
+            return true;
+        }
+
+        /// <summary>Preview-space point and yaw (degrees) where the map spawns this skin's Character, if it does.</summary>
+        private static bool TryGetBackdropSpawn(MapSceneData scene, VfxSkinItem skin, out Vector3 origin, out double yaw)
+        {
+            origin = default;
+            yaw = 0d;
+            if (MapCharacterSpawnSemantics.SpawnTransform(
+                    scene, MapCharacterSpawnSemantics.CharacterOfSkin(skin?.BinPath)) is not Matrix4x4 spawn)
+                return false;
+            origin = new Vector3(-spawn.M41, spawn.M42, spawn.M43);
+            // The X mirror turns an authored yaw about Y into its negative.
+            yaw = -Math.Atan2(spawn.M31, spawn.M33) * (180d / Math.PI);
             return true;
         }
 
@@ -2934,7 +2954,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (actor == null) return;
 
             Vector3 stageOrigin = _model.HasActiveCharacterBackdrop &&
-                TryGetCharacterBackdropOrigin(_mapSceneRuntime?.Scene, out Vector3 backdropOrigin)
+                TryGetCharacterBackdropOrigin(_mapSceneRuntime?.Scene, out Vector3 backdropOrigin, out _)
                     ? backdropOrigin
                     : Vector3.Zero;
             _isApplyingCharacterViewportState = true;

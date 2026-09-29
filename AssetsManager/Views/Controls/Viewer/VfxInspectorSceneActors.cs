@@ -106,6 +106,15 @@ namespace AssetsManager.Views.Controls.Viewer
             actor.PositionX = tab.Actors.Max(existing => existing.PositionX) + SceneActorSpacing;
             actor.PositionY = anchor.PositionY;
             actor.PositionZ = anchor.PositionZ;
+            // On a MAP backdrop a Character the map spawns (a jungle camp, a drake) stands where the game puts it.
+            if (_model.HasActiveCharacterBackdrop &&
+                TryGetBackdropSpawn(_mapSceneRuntime?.Scene, skin, out Vector3 spawn, out double yaw))
+            {
+                actor.PositionX = spawn.X;
+                actor.PositionY = spawn.Y;
+                actor.PositionZ = spawn.Z;
+                actor.RotationY = yaw;
+            }
             // Added actors keep their offset: a MAP origin never snaps them onto the anchor actor.
             actor.PlacementCustomized = true;
             actor.PlacedOnKey = anchor.PlacedOnKey;
