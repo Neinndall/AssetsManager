@@ -35,6 +35,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal readonly Dictionary<string, BitmapSource> LoadedProgramBitmaps =
                 new(StringComparer.OrdinalIgnoreCase);
             internal uint TangentVbo;
+            /// <summary>Authored SKN vertex colours at location 4, the stream game shaders read as COLOR.</summary>
+            internal uint ColorVbo;
             internal uint BoneIndexVbo;
             internal uint BoneWeightVbo;
             internal GpuSkinningData.PartData SkinningData;
@@ -202,6 +204,16 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     BufferUsageARB.StaticDraw);
                 ConfigureVertexAttribute(3, 4, 4 * sizeof(float), IntPtr.Zero);
             }
+            if (skinningData.Colors != null && skinningData.Colors.Length == resources.VertexCount)
+            {
+                resources.ColorVbo = _gl.GenBuffer();
+                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.ColorVbo);
+                _gl.BufferData(
+                    BufferTargetARB.ArrayBuffer,
+                    new ReadOnlySpan<System.Numerics.Vector4>(skinningData.Colors),
+                    BufferUsageARB.StaticDraw);
+                ConfigureVertexAttribute(4, 4, 4 * sizeof(float), IntPtr.Zero);
+            }
 
             ushort[] boneIndices = skinningData.BoneIndices
                 .Select(value => checked((ushort)Math.Clamp((int)MathF.Round(value), 0, ushort.MaxValue)))
@@ -261,9 +273,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         private void ReleaseSkinningBuffers(PartResources resources)
         {
             DeleteHandle(resources.TangentVbo, _gl.DeleteBuffer);
+            DeleteHandle(resources.ColorVbo, _gl.DeleteBuffer);
             DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
             DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
             resources.TangentVbo = 0;
+            resources.ColorVbo = 0;
             resources.BoneIndexVbo = 0;
             resources.BoneWeightVbo = 0;
             resources.SkinningData = null;

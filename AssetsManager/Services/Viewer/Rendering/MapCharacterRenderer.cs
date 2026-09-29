@@ -39,6 +39,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             internal uint NormalVbo;
             internal uint UvVbo;
             internal uint TangentVbo;
+            internal uint ColorVbo;
             internal uint SkinIndexVbo;
             internal uint SkinWeightVbo;
             internal uint Ebo;
@@ -486,7 +487,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                             command.Resources.TangentVbo != 0,
                             in drawFrame,
                             path => ResolveProgramTexture(command.Resources, path),
-                            command.SelfIllumination))
+                            command.SelfIllumination,
+                            hasColors: command.Resources.ColorVbo != 0))
                     {
                         _gameShaderRuntime.DrawBoundPass(
                             _drawElements,
@@ -632,6 +634,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             resources.UvVbo = UploadVector2Attribute(2, uv);
             if (mesh.HasTangents)
                 resources.TangentVbo = UploadVector4Attribute(3, mesh.Tangents);
+            if (mesh.HasColors)
+                resources.ColorVbo = UploadVector4Attribute(4, mesh.Colors);
             if (mesh.HasSkin)
             {
                 resources.SkinIndexVbo = UploadByte4Attribute(5, mesh.SkinIndices);
@@ -1121,6 +1125,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             DeleteBuffer(resources.NormalVbo);
             DeleteBuffer(resources.UvVbo);
             DeleteBuffer(resources.TangentVbo);
+            DeleteBuffer(resources.ColorVbo);
             DeleteBuffer(resources.SkinIndexVbo);
             DeleteBuffer(resources.SkinWeightVbo);
             DeleteBuffer(resources.Ebo);

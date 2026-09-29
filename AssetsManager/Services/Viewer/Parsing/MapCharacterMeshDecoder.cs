@@ -61,6 +61,13 @@ namespace AssetsManager.Services.Viewer.Parsing
             if (tangents != null && tangents.Length != vertexCount)
                 throw new InvalidDataException("SKN tangent buffer does not match its vertex count.");
 
+            // B8G8R8A8 vertex colours reach the shader as RGBA, as D3D's COLOR semantic does.
+            Vector4[] colors = mesh.VerticesView.TryGetAccessor(ElementName.PrimaryColor, out VertexElementAccessor colorAccessor)
+                ? colorAccessor.AsBgraU8Array().ToArray().Select(color => new Vector4(color.r, color.g, color.b, color.a) / 255f).ToArray()
+                : null;
+            if (colors != null && colors.Length != vertexCount)
+                throw new InvalidDataException("SKN colour buffer does not match its vertex count.");
+
             byte[] skinIndices = null;
             float[] skinWeights = null;
             bool hasIndices = mesh.VerticesView.TryGetAccessor(VertexElement.BLEND_INDEX.Name, out VertexElementAccessor blendIndexAccessor);
@@ -107,7 +114,8 @@ namespace AssetsManager.Services.Viewer.Parsing
                 skinIndices,
                 skinWeights,
                 flattened,
-                ranges);
+                ranges,
+                colors);
         }
 
         internal static Vector4[] BakeTangents(

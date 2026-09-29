@@ -26,10 +26,13 @@ namespace AssetsManager.Views.Models.Viewer
         byte[] SkinIndices,
         float[] SkinWeights,
         uint[] Indices,
-        IReadOnlyList<MapCharacterMeshRange> Ranges)
+        IReadOnlyList<MapCharacterMeshRange> Ranges,
+        Vector4[] Colors = null)
     {
         public int VertexCount => Positions?.Length ?? 0;
         public bool HasTangents => Tangents != null && Tangents.Length == VertexCount;
+        /// <summary>Authored SKN vertex colours (0..1 RGBA), the COLOR stream game shaders read.</summary>
+        public bool HasColors => Colors != null && Colors.Length == VertexCount;
         public bool HasSkin =>
             SkinIndices != null &&
             SkinWeights != null &&

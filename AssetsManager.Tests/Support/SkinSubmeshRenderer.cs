@@ -143,6 +143,8 @@ namespace AssetsManager.Tests.Support
             Buffer(1, corners.SelectMany(v => new[] { asset.Mesh.Normals[v].X, asset.Mesh.Normals[v].Y, asset.Mesh.Normals[v].Z }).ToArray(), 3);
             Buffer(2, corners.SelectMany(v => new[] { asset.Mesh.Uv[v].X, asset.Mesh.Uv[v].Y }).ToArray(), 2);
             Buffer(6, corners.SelectMany(v => asset.Mesh.SkinWeights.Skip((int)v * 4).Take(4)).ToArray(), 4);
+            if (asset.Mesh.HasColors)
+                Buffer(4, corners.SelectMany(v => new[] { asset.Mesh.Colors[v].X, asset.Mesh.Colors[v].Y, asset.Mesh.Colors[v].Z, asset.Mesh.Colors[v].W }).ToArray(), 4);
             uint joints = _gl.GenBuffer();
             buffers.Add(joints);
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, joints);
@@ -153,7 +155,8 @@ namespace AssetsManager.Tests.Support
             _gl.VertexAttribIPointer(5, 4, VertexAttribIType.UnsignedByte, 0, IntPtr.Zero);
 
             var missing = new List<string>();
-            bool bound = _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, BindPose, false, in frame, path => Texture(path, missing), state: state);
+            bool bound = _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, BindPose, false, in frame, path => Texture(path, missing), state: state,
+                hasColors: asset.Mesh.HasColors);
             if (bound)
             {
                 _gl.BindVertexArray(vao);

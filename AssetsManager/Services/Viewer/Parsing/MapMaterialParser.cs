@@ -25,6 +25,8 @@ namespace AssetsManager.Services.Viewer.Parsing
         private static readonly uint ShaderMacros = Fnv1a.HashLower("shaderMacros");
         private static readonly uint Techniques = Fnv1a.HashLower("techniques");
         private static readonly uint DynamicMaterial = Fnv1a.HashLower("dynamicMaterial");
+        private static readonly uint StaticSwitch = Fnv1a.HashLower("staticSwitch");
+        private static readonly uint Driver = Fnv1a.HashLower("driver");
         private static readonly uint TextureName = Fnv1a.HashLower("TextureName");
         private static readonly uint TexturePath = Fnv1a.HashLower("texturePath");
         private static readonly uint AddressU = Fnv1a.HashLower("addressU");
@@ -431,6 +433,19 @@ namespace AssetsManager.Services.Viewer.Parsing
                 result[name] = item.Properties.TryGetValue(On, out BinTreeProperty enabled)
                     ? ReadBool(enabled, fallback: true)
                     : true;
+            }
+
+            // dynamicMaterial.staticSwitch picks the permutation from game state: Vladimir PsyOps' default
+            // material (a copy of Pyke's E clone) turns USE_EFFECT on only with PykeE, so at rest he draws plain.
+            if (properties.TryGetValue(DynamicMaterial, out BinTreeProperty dynamicProperty) &&
+                dynamicProperty is BinTreeStruct dynamicMaterial &&
+                dynamicMaterial.Properties.TryGetValue(StaticSwitch, out BinTreeProperty staticSwitchProperty) &&
+                staticSwitchProperty is BinTreeStruct staticSwitch &&
+                TryReadString(staticSwitch.Properties, Name, out string switchName) &&
+                staticSwitch.Properties.TryGetValue(Driver, out BinTreeProperty driver) &&
+                AssetsManager.Services.Viewer.Resolvers.SknDynamicMaterialParser.ReadBoolDriver(driver).Evaluate(GameMaterialState.Resting with { Gear = -1 }) is bool resting)
+            {
+                result[switchName] = resting;
             }
             return result;
         }

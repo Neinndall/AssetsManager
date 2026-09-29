@@ -162,7 +162,10 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     flags.Add(tintHidden ? "TINT_HIDDEN" : material.DynamicParameters.Count > 0 ? "DYNAMIC_HIDDEN" : "DISCARDED");
                 else if (reference.Covered > 50 && game.Covered < reference.Covered / 4)
                     flags.Add("PARTIAL");
-                if (game.Covered > 0 && reference.Luminance > 0.05f && game.Luminance < reference.Luminance * 0.2f)
+                // A blended pass whose alpha stays near zero draws nothing, whatever colour it writes.
+                if (game.Covered > 0 && game.Mean.W < 0.05f && material.Program.Passes.FirstOrDefault()?.State.BlendEnabled == true)
+                    flags.Add("TRANSPARENT");
+                else if (game.Covered > 0 && reference.Luminance > 0.05f && game.Luminance < reference.Luminance * 0.2f)
                     flags.Add("DARK");
                 // Without a base texture the shaders-off look draws nothing, so there is no brightness to compare.
                 if (reference.Covered == 0 && game.Covered > 0)
@@ -178,11 +181,12 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         private static void WriteCsv(string path, IEnumerable<Row> rows)
         {
             var culture = CultureInfo.InvariantCulture;
-            var lines = new List<string> { "skin,submesh,shader,hidden,flags,covered,refCovered,lum,refLum,max,nonFinite,missing" };
+            var lines = new List<string> { "skin,submesh,shader,hidden,flags,covered,refCovered,lum,refLum,alpha,max,nonFinite,missing" };
             lines.AddRange(rows.Select(row => string.Join(",",
                 row.Skin, row.Submesh, row.Shader, row.Hidden, string.Join("|", row.Flags),
                 row.Game.Covered, row.Reference.Covered,
                 row.Game.Luminance.ToString("0.####", culture), row.Reference.Luminance.ToString("0.####", culture),
+                row.Game.Mean.W.ToString("0.###", culture),
                 row.Game.MaxComponent.ToString("0.##", culture), row.Game.NonFinite, string.Join("|", row.Game.MissingTextures))));
             File.WriteAllLines(path, lines);
             Console.WriteLine($"[SkinGpu] csv={path}");

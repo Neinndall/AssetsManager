@@ -374,7 +374,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             in Frame frame,
             Func<string, uint?> programTexture,
             float selfIllumination = 0f,
-            GameMaterialState state = null)
+            GameMaterialState state = null,
+            bool hasColors = false)
         {
             // Time drivers read the frame's preview clock.
             state = (state ?? GameMaterialState.Resting) with { Time = frame.TimeSeconds };
@@ -391,7 +392,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 return false;
 
             _gl.UseProgram(runtime.Program);
-            ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents);
+            ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents, hasColors);
             UpdateBlocks(runtime, passEntry.Globals, null, frame, new CharacterDraw(world, bones, selfIllumination),
                 overrides: entry.DynamicParameters(material, state));
             BindSkinnedTextures(runtime, passEntry.Pass, programTexture, material, state, frame);
@@ -681,7 +682,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             foreach ((uint location, string name) in attributes)
             {
                 bool provided = kind == GameMaterialKind.SkinnedMesh
-                    ? location is 0 or 1 or 2 or 5 or 6 || (location == 3 && hasTangents)
+                    ? location is 0 or 1 or 2 or 5 or 6 || (location == 3 && hasTangents) || (location == 4 && hasColors)
                     : location <= 3 ||
                       (location == StaticColorLocation && hasColors) ||
                       (location == StaticPivotLocation && hasPivots);

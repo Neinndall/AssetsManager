@@ -18,16 +18,19 @@ namespace AssetsManager.Views.Models.Viewer
 
         internal sealed class PartData
         {
-            internal PartData(float[] boneIndices, float[] boneWeights, Vector4[] tangents)
+            internal PartData(float[] boneIndices, float[] boneWeights, Vector4[] tangents, Vector4[] colors = null)
             {
                 BoneIndices = boneIndices;
                 BoneWeights = boneWeights;
                 Tangents = tangents;
+                Colors = colors;
             }
 
             internal float[] BoneIndices { get; }
             internal float[] BoneWeights { get; }
             internal Vector4[] Tangents { get; }
+            /// <summary>The SKN's authored vertex colours (0..1 RGBA), which game shaders read as COLOR; null without them.</summary>
+            internal Vector4[] Colors { get; }
             internal int VertexCount => BoneIndices.Length / 4;
         }
 
@@ -72,10 +75,17 @@ namespace AssetsManager.Views.Models.Viewer
                         out VertexElementAccessor tangentAccessor)
                     ? tangentAccessor.AsVector4Array().ToArray()
                     : null;
+                // B8G8R8A8 vertex colours reach the shader as RGBA, as D3D's COLOR semantic does.
+                Vector4[] sourceColors = skin.VerticesView.TryGetAccessor(
+                        ElementName.PrimaryColor,
+                        out VertexElementAccessor colorAccessor)
+                    ? colorAccessor.AsBgraU8Array().ToArray().Select(color => new Vector4(color.r, color.g, color.b, color.a) / 255f).ToArray()
+                    : null;
                 int vertexCount = skin.VerticesView.VertexCount;
                 if ((blendIndices != null && blendIndices.Length != vertexCount) ||
                     (blendWeights != null && blendWeights.Length != vertexCount) ||
-                    (sourceTangents != null && sourceTangents.Length != vertexCount))
+                    (sourceTangents != null && sourceTangents.Length != vertexCount) ||
+                    (sourceColors != null && sourceColors.Length != vertexCount))
                 {
                     return Fail(out failureReason, "Blend index or weight data is mismatched.");
                 }
@@ -101,6 +111,9 @@ namespace AssetsManager.Views.Models.Viewer
                     var directBoneIndices = new float[sourceVertexIndices.Length * 4];
                     var weights = new float[sourceVertexIndices.Length * 4];
                     Vector4[] tangents = sourceTangents == null
+                        ? null
+                        : new Vector4[sourceVertexIndices.Length];
+                    Vector4[] colors = sourceColors == null
                         ? null
                         : new Vector4[sourceVertexIndices.Length];
 
@@ -133,9 +146,11 @@ namespace AssetsManager.Views.Models.Viewer
                         weights[destination + 3] = sourceWeights.W;
                         if (tangents != null)
                             tangents[localVertex] = sourceTangents[sourceVertex];
+                        if (colors != null)
+                            colors[localVertex] = sourceColors[sourceVertex];
                     }
 
-                    parts[part] = new PartData(directBoneIndices, weights, tangents);
+                    parts[part] = new PartData(directBoneIndices, weights, tangents, colors);
                 }
 
                 return new GpuSkinningData(parts);

@@ -457,6 +457,7 @@ Bug Fixes
   - VFX Studio / With shaders on, more skin materials show their game colours and states (colour curves, passive stacks such as Irelia's blades, ultimate tints).
   - VFX Studio / With shaders on, skin effects that shimmer or fade over time follow the game, and bloom no longer overshoots its in-game strength.
   - VFX Studio / Skin forms now show and hide the parts the game swaps for them (Aatrox Primordian's monster head and R sword, Sett's Dark and Gold forms).
+  - VFX Studio / With shaders on, skins no longer turn into a white clone or vanish (PsyOps Vladimir, Pyke, Zeri), and skin effects painted with vertex colours show them.
   - VFX Studio / With shaders on, map brush no longer disappears and map critters keep their full textures.
   - Viewer / Map critters and skins without a material no longer show stretched, half-missing textures.
   - VFX Studio / Esports banners on Summoner's Rift now show their holders and default flag instead of solid red.

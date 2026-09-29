@@ -57,7 +57,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var skinsUsing = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
             var unresolvedParameters = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             var values = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
-            int skins = 0, withDynamic = 0, totalParameters = 0, blockedParameters = 0, submeshSkins = 0;
+            int skins = 0, withDynamic = 0, totalParameters = 0, blockedParameters = 0, submeshSkins = 0, usedMaterials = 0, missingNormal = 0;
+            var missingNormalExamples = new List<string>();
             var submeshConditionKinds = new Dictionary<string, int>(StringComparer.Ordinal);
             var restingExamples = new List<string>();
 
@@ -83,6 +84,36 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 
                     skins++;
                     // Persistent submesh conditions: how many skins author them, and which hold at rest.
+                    // Materials a skin draws with (default and per-submesh overrides) that have no "normal" technique.
+                    foreach (BinTreeObject data in tree.Objects.Values)
+                    {
+                        if (!data.Properties.TryGetValue(Fnv1a.HashLower("skinMeshProperties"), out BinTreeProperty meshProperty) || meshProperty is not BinTreeStruct meshData)
+                            continue;
+                        var links = new List<uint>();
+                        if (meshData.Properties.TryGetValue(Fnv1a.HashLower("material"), out BinTreeProperty defaultMaterial) && defaultMaterial is BinTreeObjectLink defaultLink)
+                            links.Add(defaultLink.Value);
+                        if (meshData.Properties.TryGetValue(Fnv1a.HashLower("materialOverride"), out BinTreeProperty overrides) && overrides is BinTreeContainer overrideList)
+                            foreach (BinTreeStruct entry in overrideList.Elements.OfType<BinTreeStruct>())
+                                if (entry.Properties.TryGetValue(Fnv1a.HashLower("material"), out BinTreeProperty link) && link is BinTreeObjectLink objectLink)
+                                    links.Add(objectLink.Value);
+                        foreach (uint link in links.Distinct())
+                        {
+                            if (!tree.Objects.TryGetValue(link, out BinTreeObject material) ||
+                                !material.Properties.TryGetValue(Fnv1a.HashLower("techniques"), out BinTreeProperty techniquesProperty) ||
+                                techniquesProperty is not BinTreeContainer techniques)
+                                continue;
+                            bool normal = techniques.Elements.OfType<BinTreeStruct>().Any(technique =>
+                                technique.Properties.TryGetValue(Fnv1a.HashLower("name"), out BinTreeProperty nameProperty) &&
+                                nameProperty is BinTreeString { Value: "normal" });
+                            usedMaterials++;
+                            if (!normal)
+                            {
+                                missingNormal++;
+                                if (missingNormalExamples.Count < 25)
+                                    missingNormalExamples.Add($"{skin.Split('/')[2]}/{Path.GetFileNameWithoutExtension(skin)} {(material.Properties.TryGetValue(Fnv1a.HashLower("name"), out BinTreeProperty materialName) && materialName is BinTreeString text ? text.Value : $"{link:x8}")}");
+                            }
+                        }
+                    }
                     var context = AssetsManager.Services.Viewer.Vfx.Parsing.VfxAnimationParser.ExtractOwnerSceneContext(tree);
                     if (context?.SubmeshConditions is { Count: > 0 } submeshConditions)
                     {
@@ -140,6 +171,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
 
             Console.WriteLine($"[Census] skins={skins} withDynamicMaterials={withDynamic} parameters={totalParameters} blockedByUnsupported={blockedParameters}");
+            Console.WriteLine($"[CensusTechnique] skin materials={usedMaterials} withoutNormalTechnique={missingNormal}");
+            foreach (string example in missingNormalExamples)
+                Console.WriteLine($"[CensusTechnique]   {example}");
             Console.WriteLine($"[CensusSubmesh] skins={submeshSkins} conditions={string.Join(" ", submeshConditionKinds.Select(pair => $"{pair.Key}x{pair.Value}"))}");
             foreach (string example in restingExamples)
                 Console.WriteLine($"[CensusSubmesh] holds at rest: {example}");

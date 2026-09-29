@@ -451,6 +451,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [InlineData("Characters/KSante/Skins/Skin18", "Recall_Body")]
         [InlineData("Characters/Kayn/Skins/Skin32", "Flipbook_Assassin")]
         [InlineData("Characters/Sett/Skins/Skin76", "Body")]
+        // Zeri Skin1 and Vladimir PsyOps pick their resting permutation through dynamicMaterial.staticSwitch;
+        // Akali's kama reads its SKN vertex colours.
+        [InlineData("Characters/Zeri/Skins/Skin1", "Body")]
+        [InlineData("Characters/Vladimir/Skins/Skin49", "Body")]
+        [InlineData("Characters/Akali/Skins/Skin1", "kama_left")]
         public async System.Threading.Tasks.Task InstalledSkinSubmeshDrawsVisiblePixelsWithItsGameProgram(string skin, string submesh, string buff = null)
         {
             string install = InstalledSkins.FindInstall();
