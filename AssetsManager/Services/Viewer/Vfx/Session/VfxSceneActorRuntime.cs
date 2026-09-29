@@ -290,7 +290,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _formHiddenSubmeshes ??= VfxCharacterFormSemantics.HiddenSubmeshes(
                 Bundle.OwnerSceneContext?.InitialHiddenSubmeshHashes,
                 Form,
-                Model.Parts);
+                Model.Parts,
+                Bundle.OwnerSceneContext?.SubmeshConditions);
 
         private Matrix4x4? SampleBone(double time, string name, uint hash) =>
             Animation.TrySampleBoneTransform((float)time, name, hash, out Matrix4x4 transform)

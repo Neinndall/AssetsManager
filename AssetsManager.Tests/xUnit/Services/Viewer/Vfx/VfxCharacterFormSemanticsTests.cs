@@ -19,6 +19,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             new(1, 0, "Variant", new[] { show }, new[] { hide }, null, null, null,
                 new Dictionary<uint, uint>(), Array.Empty<VfxIdleEffectDefinition>(), false);
 
+        // Aatrox Skin33: a persistent condition on gear 1 shows Monster_Head (1) and hides Default_Head (2).
+        [Fact]
+        public void PersistentSubmeshConditionsSwapSubmeshesForTheirGear()
+        {
+            var conditions = new[]
+            {
+                new VfxSubmeshCondition(new GameMaterialBoolCondition(GameMaterialBoolKind.Gear, 1), new uint[] { 1 }, new uint[] { 2 })
+            };
+            var empowered = new VfxCharacterFormDefinition(5, 1, "Empowered", Array.Empty<uint>(), Array.Empty<uint>());
+            var sword = new VfxCharacterFormDefinition(4, 0, "Sword", Array.Empty<uint>(), Array.Empty<uint>());
+
+            Assert.True(VfxCharacterFormSemantics.HiddenSubmeshes(new uint[] { 1 }, null, null, conditions).SetEquals(new uint[] { 1 }));
+            Assert.True(VfxCharacterFormSemantics.HiddenSubmeshes(new uint[] { 1 }, sword, null, conditions).SetEquals(new uint[] { 1 }));
+            Assert.True(VfxCharacterFormSemantics.HiddenSubmeshes(new uint[] { 1 }, empowered, null, conditions).SetEquals(new uint[] { 2 }));
+        }
+
         [Fact]
         public void GearFormsChangingMeshSkeletonOrMaterialsReloadTheModel()
         {

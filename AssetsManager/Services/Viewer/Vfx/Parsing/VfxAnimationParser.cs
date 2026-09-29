@@ -147,9 +147,37 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     ReadAsset(meshProperties.Properties, F_ownerSkeleton, ".skl") ?? string.Empty,
                     Math.Max(0.01f, GetF32(meshProperties.Properties, F_skinScale) ?? 1f),
                     animationGraphPathHash,
-                    ReadSubmeshNameHashes(GetString(meshProperties.Properties, F_initialSubmeshToHide)));
+                    ReadSubmeshNameHashes(GetString(meshProperties.Properties, F_initialSubmeshToHide)))
+                {
+                    SubmeshConditions = ReadSubmeshConditions(owner.Properties)
+                };
             }
             return null;
+        }
+
+        private static IReadOnlyList<VfxSubmeshCondition> ReadSubmeshConditions(IReadOnlyDictionary<uint, BinTreeProperty> owner)
+        {
+            if (Get(owner, VfxParsingHash.Fnv1a("persistentEffectConditions")) is not BinTreeContainer conditions)
+                return Array.Empty<VfxSubmeshCondition>();
+
+            static IReadOnlyList<uint> Hashes(IReadOnlyDictionary<uint, BinTreeProperty> fields, string name) =>
+                Get(fields, VfxParsingHash.Fnv1a(name)) is BinTreeContainer list
+                    ? list.Elements.OfType<BinTreeHash>().Select(hash => hash.Value).ToArray()
+                    : Array.Empty<uint>();
+
+            var result = new List<VfxSubmeshCondition>();
+            foreach (BinTreeStruct condition in conditions.Elements.OfType<BinTreeStruct>())
+            {
+                IReadOnlyList<uint> show = Hashes(condition.Properties, "SubmeshesToShow");
+                IReadOnlyList<uint> hide = Hashes(condition.Properties, "SubmeshesToHide");
+                if (show.Count == 0 && hide.Count == 0)
+                    continue;
+                result.Add(new VfxSubmeshCondition(
+                    AssetsManager.Services.Viewer.Resolvers.SknDynamicMaterialParser.ReadBoolDriver(Get(condition.Properties, VfxParsingHash.Fnv1a("OwnerCondition"))),
+                    show,
+                    hide));
+            }
+            return result;
         }
 
         internal static IReadOnlyList<AnimationGraphDefinition> ExtractAnimationGraphs(

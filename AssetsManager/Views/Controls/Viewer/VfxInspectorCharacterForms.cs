@@ -93,7 +93,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 _activeBundle?.OwnerSceneContext?.InitialHiddenSubmeshHashes,
                 ReferenceEquals(_championBundle, _activeBundle)
                     ? _model.SelectedCharacterForm?.Definition : null,
-                _championModel?.Parts);
+                _championModel?.Parts,
+                _activeBundle?.OwnerSceneContext?.SubmeshConditions,
+                _championModel?.GameState);
 
         private void ApplySelectedCharacterForm(bool clearManualOverrides, bool restoreTextures)
         {

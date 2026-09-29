@@ -25,7 +25,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     .Concat(material.TextureSwaps.SelectMany(swap => swap.Options.SelectMany(option => option.Condition.Buffs()))))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(buff => buff, StringComparer.OrdinalIgnoreCase);
-            _model.SetCharacterGameStates(buffs, UpdateChampionGameState);
+            _model.SetCharacterGameStates(buffs, OnCharacterGameStateChanged);
             UpdateChampionGameState();
         }
 
@@ -40,6 +40,16 @@ namespace AssetsManager.Views.Controls.Viewer
                     _playingAnimationHashes.Add(child);
             }
             UpdateChampionGameState();
+        }
+
+        /// <summary>A buff toggled in the Inspector: persistent submesh conditions may read it too.</summary>
+        private void OnCharacterGameStateChanged()
+        {
+            UpdateChampionGameState();
+            if (_activeAnimationClip != null)
+                ConfigureAnimationClipCues(_activeAnimationClip);
+            else
+                ApplyOwnerSubmeshVisibility(GetCharacterFormHiddenSubmeshes());
         }
 
         private void UpdateChampionGameState()

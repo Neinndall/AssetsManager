@@ -44,7 +44,31 @@ namespace AssetsManager.Views.Models.Viewer
         internal static IReadOnlySet<uint> HiddenSubmeshes(
             IEnumerable<uint> initiallyHidden,
             VfxCharacterFormDefinition form,
-            IEnumerable<ModelPart> parts = null)
+            IEnumerable<ModelPart> parts = null,
+            IEnumerable<VfxSubmeshCondition> conditions = null,
+            GameMaterialState state = null)
+        {
+            IReadOnlySet<uint> hidden = FormHiddenSubmeshes(initiallyHidden, form, parts);
+            if (conditions == null)
+                return hidden;
+
+            // The skin's persistent conditions apply last, as authored data over any inferred form lists.
+            var result = new HashSet<uint>(hidden);
+            GameMaterialState current = (state ?? GameMaterialState.Resting) with { Gear = form?.GearIndex ?? -1 };
+            foreach (VfxSubmeshCondition condition in conditions)
+            {
+                if (condition.Condition.Evaluate(current) != true)
+                    continue;
+                result.ExceptWith(condition.Show);
+                result.UnionWith(condition.Hide);
+            }
+            return result;
+        }
+
+        private static IReadOnlySet<uint> FormHiddenSubmeshes(
+            IEnumerable<uint> initiallyHidden,
+            VfxCharacterFormDefinition form,
+            IEnumerable<ModelPart> parts)
         {
             // A reloading form's GearData initialSubmeshToHide, when authored, replaces the owner's
             // baseline; its GearData show/hide lists still apply on top.

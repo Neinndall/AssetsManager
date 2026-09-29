@@ -868,7 +868,20 @@ namespace AssetsManager.Views.Models.Viewer
         string SkeletonPath,
         float SkinScale,
         uint AnimationGraphPathHash = 0,
-        IReadOnlyList<uint> InitialHiddenSubmeshHashes = null);
+        IReadOnlyList<uint> InitialHiddenSubmeshHashes = null)
+    {
+        /// <summary>The skin's persistentEffectConditions that show or hide submeshes.</summary>
+        internal IReadOnlyList<VfxSubmeshCondition> SubmeshConditions { get; init; } = System.Array.Empty<VfxSubmeshCondition>();
+    }
+
+    /// <summary>
+    /// A persistent effect condition of a skin: while its owner condition holds, the game shows and hides these
+    /// submeshes. Aatrox Skin33's gear 1 swaps Default_Head and Sword_01 for Monster_Head and Sword_02.
+    /// </summary>
+    internal sealed record VfxSubmeshCondition(
+        GameMaterialBoolCondition Condition,
+        IReadOnlyList<uint> Show,
+        IReadOnlyList<uint> Hide);
 
     /// <summary>
     /// Authored defaults from League's VfxEmitterDefinitionData schema. BIN omits

@@ -29,6 +29,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         };
 
         private static Dictionary<uint, string> _names;
+        // "op A B" of every FloatComparisonMaterialDriver, to read what each mOperator value means from its operands.
+        private static readonly Dictionary<string, int> Comparisons = new(StringComparer.Ordinal);
 
         public static void Run(string[] args)
         {
@@ -55,7 +57,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var skinsUsing = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
             var unresolvedParameters = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             var values = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
-            int skins = 0, withDynamic = 0, totalParameters = 0, blockedParameters = 0;
+            int skins = 0, withDynamic = 0, totalParameters = 0, blockedParameters = 0, submeshSkins = 0;
+            var submeshConditionKinds = new Dictionary<string, int>(StringComparer.Ordinal);
+            var restingExamples = new List<string>();
 
             foreach (string wadPath in Directory.GetFiles(Path.Combine(install, @"Game\DATA\FINAL\Champions"), "*.wad.client")
                          .Where(path => !Path.GetFileName(path)[..^".wad.client".Length].Contains('.')))
@@ -78,6 +82,20 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     }
 
                     skins++;
+                    // Persistent submesh conditions: how many skins author them, and which hold at rest.
+                    var context = AssetsManager.Services.Viewer.Vfx.Parsing.VfxAnimationParser.ExtractOwnerSceneContext(tree);
+                    if (context?.SubmeshConditions is { Count: > 0 } submeshConditions)
+                    {
+                        submeshSkins++;
+                        foreach (var condition in submeshConditions)
+                        {
+                            bool? atRest = condition.Condition.Evaluate(AssetsManager.Views.Models.Viewer.GameMaterialState.Resting with { Gear = -1 });
+                            string key = $"{condition.Condition.Kind}:{(atRest?.ToString() ?? "unknown")}";
+                            submeshConditionKinds[key] = submeshConditionKinds.GetValueOrDefault(key) + 1;
+                            if (atRest == true && restingExamples.Count < 12)
+                                restingExamples.Add($"{skin.Split('/')[2]}/{Path.GetFileNameWithoutExtension(skin)} {condition.Condition.Kind}");
+                        }
+                    }
                     bool dynamic = false;
                     foreach (BinTreeObject material in tree.Objects.Values.Where(item => item.ClassHash == Fnv1a.HashLower("StaticMaterialDef")))
                     {
@@ -122,11 +140,16 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
 
             Console.WriteLine($"[Census] skins={skins} withDynamicMaterials={withDynamic} parameters={totalParameters} blockedByUnsupported={blockedParameters}");
+            Console.WriteLine($"[CensusSubmesh] skins={submeshSkins} conditions={string.Join(" ", submeshConditionKinds.Select(pair => $"{pair.Key}x{pair.Value}"))}");
+            foreach (string example in restingExamples)
+                Console.WriteLine($"[CensusSubmesh] holds at rest: {example}");
             foreach ((string name, int count) in parameters.OrderByDescending(pair => pair.Value))
                 Console.WriteLine($"[Census] {(Supported.Contains(name) ? "ok " : "NEW")} {name} parameters={count} skins={skinsUsing[name].Count}" +
                                   (unresolvedParameters.TryGetValue(name, out List<string> examples) ? $" e.g. {string.Join(", ", examples)}" : ""));
             foreach ((string field, Dictionary<string, int> histogram) in values.OrderBy(pair => pair.Key, StringComparer.Ordinal))
                 Console.WriteLine($"[CensusValue] {field}: {string.Join(" ", histogram.OrderByDescending(pair => pair.Value).Take(15).Select(pair => $"{pair.Key}x{pair.Value}"))}");
+            foreach ((string comparison, int count) in Comparisons.OrderByDescending(pair => pair.Value).Take(40))
+                Console.WriteLine($"[CensusCompare] x{count} {comparison}");
         }
 
         // Collects every class under a driver, and the fields that decide how time drivers evaluate.
@@ -137,6 +160,12 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 case BinTreeStruct structure:
                     string name = Name(structure.ClassHash);
                     classes.Add(name);
+                    if (name == "FloatComparisonMaterialDriver")
+                    {
+                        string op = structure.Properties.TryGetValue(Fnv1a.HashLower("mOperator"), out BinTreeProperty opProperty) && opProperty is BinTreeU32 opValue ? opValue.Value.ToString(CultureInfo.InvariantCulture) : "0";
+                        string key = $"op={op} A={Operand(structure, "mValueA")} B={Operand(structure, "mValueB")}";
+                        Comparisons[key] = Comparisons.GetValueOrDefault(key) + 1;
+                    }
                     foreach ((uint fieldHash, BinTreeProperty field) in structure.Properties)
                     {
                         string fieldName = Name(fieldHash);
@@ -166,6 +195,21 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     Walk(inner, classes, values);
                     break;
             }
+        }
+
+        private static string Operand(BinTreeStruct comparison, string field)
+        {
+            if (!comparison.Properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) || property is not BinTreeStruct operand)
+                return "none";
+            string name = Name(operand.ClassHash).Replace("MaterialDriver", "").Replace("DynamicMaterialFloatDriver", "");
+            var details = operand.Properties.Values.Select(value => value switch
+            {
+                BinTreeF32 number => number.Value.ToString("0.###", CultureInfo.InvariantCulture),
+                BinTreeString text => text.Value,
+                BinTreeStruct inner => Name(inner.ClassHash).Replace("MaterialDriver", ""),
+                _ => null
+            }).Where(value => value != null);
+            return $"{name}({string.Join(",", details)})";
         }
 
         private static string Name(uint hash) => _names.TryGetValue(hash, out string name) ? name : $"0x{hash:x8}";
