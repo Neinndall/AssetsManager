@@ -13,6 +13,7 @@ New Features
   - VFX Studio / Free map navigation: zoom toward the cursor without getting stuck, move with WASD (Shift faster, Ctrl slower) and double click to fly to a spot.
   - VFX Studio / Maps now switch rift transformations, Baron pit states and decorations like in game, with their terrain, structures and VFX.
   - VFX Studio / Particle emitters now respect their authored repeating emission windows and pauses.
+  - VFX Studio / Map monsters opened or added over a map stand where the game spawns them, facing the same way (jungle camps, Baron, Rift Herald, every drake in the dragon pit).
   - VFX Studio / Added GMESH and TMESH particle meshes with their authored normals, UVs and submeshes.
   - VFX Studio / Standalone effects wait for their initial textures and meshes before playback, with a bounded wait to preserve short bursts.
   - Viewer / Added SMAA as an alternative to FXAA in preview settings.
@@ -463,6 +464,8 @@ Bug Fixes
   - VFX Studio / Each character in a multi-skin scene keeps its own Game State and bind pose when you switch between them.
   - VFX Studio / With shaders on, VFX drawn with custom particle materials no longer turn invisible.
   - VFX Studio / VFX whose material lives in a linked skin file now draw with it instead of the generic particle look.
+  - VFX Studio / Dust, smoke and rings that dissolve over time now draw with the game's own particle shader instead of falling back to the generic look.
+  - VFX Studio / Effect parts that last as long as their emitter, such as Akshan's E grappling hook, no longer vanish the moment they appear.
   - VFX Studio / With shaders on, map brush no longer disappears and map critters keep their full textures.
   - Viewer / Map critters and skins without a material no longer show stretched, half-missing textures.
   - VFX Studio / Esports banners on Summoner's Rift now show their holders and default flag instead of solid red.
