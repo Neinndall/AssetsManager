@@ -127,8 +127,8 @@ namespace AssetsManager.Tests.xUnit.Views.Helpers
             CameraPose game = Looking(new Point3D(0, Ground - look.Y, 0), look);
             CameraPose close = Looking(new Point3D(0, 200, 300), new Vector3D(0, -100, -300));
 
-            Assert.Equal(1687.5, CameraNavigation.Walk(game, 1, 0, 1.0, 1.0).Length, 6);
-            Assert.Equal(1687.5 * 3.0, CameraNavigation.Walk(game, 1, 0, 1.0, 3.0).Length, 6);
+            Assert.Equal(843.75, CameraNavigation.Walk(game, 1, 0, 1.0, 1.0).Length, 6);
+            Assert.Equal(843.75 * 3.0, CameraNavigation.Walk(game, 1, 0, 1.0, 3.0).Length, 6);
             Assert.Equal(CameraNavigation.MinimumWalkSpeed, CameraNavigation.Walk(close, 1, 0, 1.0, 1.0).Length, 6);
         }
 

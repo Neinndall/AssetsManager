@@ -406,7 +406,7 @@ namespace AssetsManager.Views.Helpers
 
             // Panning sensitivity scales naturally with camera target distance
             double distance = lookDir.Length;
-            double sensitivity = distance * 0.0012;
+            double sensitivity = distance * 0.0006;
 
             var translation = rightDir * (-delta.X * sensitivity) + orthoUp * (delta.Y * sensitivity);
             var nextPosition = camera.Position + translation;
