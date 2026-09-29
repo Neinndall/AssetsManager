@@ -220,7 +220,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     // A state whose branch uses drivers the preview cannot evaluate keeps the resting value, never the
                     // static authoring value (Aatrox Skin33's body: Bloom_Intensity 10 static, 0 at rest).
                     foreach (var parameter in material.DynamicParameters)
-                        if ((parameter.Evaluate(state) ?? parameter.Evaluate(GameMaterialState.Resting with { Gear = state.Gear })) is Vector4 value)
+                        if ((parameter.Evaluate(state) ?? parameter.Evaluate(GameMaterialState.Resting with { Gear = state.Gear, Time = state.Time })) is Vector4 value)
                             _dynamicParameters[parameter.Name] = value;
                     _dynamicState = state;
                 }
@@ -376,6 +376,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             float selfIllumination = 0f,
             GameMaterialState state = null)
         {
+            // Time drivers read the frame's preview clock.
+            state = (state ?? GameMaterialState.Resting) with { Time = frame.TimeSeconds };
             if (_disposed || material?.Program == null || material.Program.Kind != GameMaterialKind.SkinnedMesh)
                 return false;
 
@@ -391,8 +393,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             _gl.UseProgram(runtime.Program);
             ApplyGenericAttributeDefaults(runtime.Attributes, GameMaterialKind.SkinnedMesh, hasTangents);
             UpdateBlocks(runtime, passEntry.Globals, null, frame, new CharacterDraw(world, bones, selfIllumination),
-                overrides: entry.DynamicParameters(material, state ?? GameMaterialState.Resting));
-            BindSkinnedTextures(runtime, passEntry.Pass, programTexture, material, state ?? GameMaterialState.Resting, frame);
+                overrides: entry.DynamicParameters(material, state));
+            BindSkinnedTextures(runtime, passEntry.Pass, programTexture, material, state, frame);
             ApplyPassState(passEntry.Pass.State, meshDoubleSided: false);
             return true;
         }

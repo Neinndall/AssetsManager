@@ -117,8 +117,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     new(Scalar(fields, "mOnValue", 1));
                 Vector4 off = vector ? Vector(fields, "OffValue", new(0, 0, 0, 1)) :
                     new(Scalar(fields, "mOffValue", 0));
-                // The preview switches states instantly; the authored turn-on/off times are not replayed.
-                return state => condition.Evaluate(state) is bool active ? active ? on : off : null;
+                var fade = new LerpFade(
+                    Scalar(fields, vector ? "TurnOnTimeSec" : "mTurnOnTimeSec", 1f),
+                    Scalar(fields, vector ? "TurnOffTimeSec" : "mTurnOffTimeSec", 1f));
+                return state => condition.Evaluate(state) is bool active
+                    ? Vector4.Lerp(off, on, fade.Advance(active, state.Time))
+                    : null;
             }
             // BlendingSwitch is a Switch that fades between its values; the preview switches instantly.
             if (driver.ClassHash == Hash("SwitchMaterialDriver") || driver.ClassHash == Hash("BlendingSwitchMaterialDriver"))
@@ -247,7 +251,81 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return _ => Vector4.Zero;
             if (driver.ClassHash == Hash("HealthDynamicMaterialFloatDriver"))
                 return _ => Vector4.One;
+            if (driver.ClassHash == Hash("TimeMaterialDriver"))
+            {
+                // Seconds of preview time, wrapped to LoopDuration and, by default, reported as a fraction of it.
+                float? loop = fields.TryGetValue(Hash("LoopDuration"), out var loopProperty) &&
+                              loopProperty is BinTreeOptional { Value: BinTreeF32 loopValue } && loopValue.Value > 0f
+                    ? loopValue.Value
+                    : null;
+                bool fraction = !fields.TryGetValue(Hash("LoopTimeAsFraction"), out var fractionProperty) ||
+                                fractionProperty is not BinTreeBool { Value: false };
+                return state =>
+                {
+                    if (loop is not float duration)
+                        return new Vector4(state.Time);
+                    float wrapped = state.Time % duration;
+                    return new Vector4(fraction ? wrapped / duration : wrapped);
+                };
+            }
+            if (driver.ClassHash == Hash("SineMaterialDriver"))
+            {
+                // Bias + Scale * sin(2 pi Frequency input), the frequency in cycles per unit of its input (hertz for a
+                // time driver): time drivers loop every 360 s, a whole number of cycles for every authored frequency
+                // (2, 3, 5, 0.75, 1.5, 3.4, 5.3...), so the loop is seamless only in hertz.
+                fields.TryGetValue(Hash("mDriver"), out var innerProperty);
+                var inner = ReadValueDriver(innerProperty, depth + 1, conditions);
+                if (inner == null)
+                    return null;
+                float frequency = Scalar(fields, "mFrequency", 1f), scale = Scalar(fields, "mScale", 1f), bias = Scalar(fields, "mBias", 0f);
+                return state => inner(state) is Vector4 at ? new Vector4(bias + scale * MathF.Sin(MathF.Tau * frequency * at.X)) : null;
+            }
+            // A bool driver read as a float is 1 or 0, as the game compares buffs against 1.
+            GameMaterialBoolCondition asCondition = ReadCondition(property, depth);
+            if (asCondition.Kind != GameMaterialBoolKind.Unsupported)
+            {
+                conditions.Add(asCondition);
+                return state => asCondition.Evaluate(state) is bool active ? new Vector4(active ? 1f : 0f) : null;
+            }
             return null;
+        }
+
+        /// <summary>
+        /// The 0..1 progress of a lerp driver toward its on value, easing exponentially with the authored turn-on and
+        /// turn-off times: a fast on/off condition settles at a steady level instead of flickering, as Aatrox Skin33's
+        /// combat glow (0 > sin at 5 Hz, on in 1 s, off in 0.5 s) holds a steady third of its peak in game.
+        /// Its first value, a step back or a gap over half a second settle at once, so a still preview and repeated
+        /// evaluations stay exact.
+        /// </summary>
+        private sealed class LerpFade
+        {
+            private const float MaximumStep = 0.5f;
+            private readonly float _turnOn;
+            private readonly float _turnOff;
+            private float _progress = -1f;
+            private float _time;
+
+            internal LerpFade(float turnOn, float turnOff)
+            {
+                _turnOn = turnOn;
+                _turnOff = turnOff;
+            }
+
+            internal float Advance(bool on, float time)
+            {
+                float target = on ? 1f : 0f;
+                float step = time - _time;
+                if (_progress < 0f || step < 0f || step > MaximumStep)
+                    _progress = target;
+                else if (step > 0f)
+                {
+                    float duration = on ? _turnOn : _turnOff;
+                    float weight = duration > 0f ? MathF.Min(1f, step / duration) : 1f;
+                    _progress += (target - _progress) * weight;
+                }
+                _time = time;
+                return _progress;
+            }
         }
 
         private static bool TryReadVectors(IReadOnlyDictionary<uint, BinTreeProperty> fields, string name, out Vector4[] result)
@@ -313,6 +391,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static float Scalar(IReadOnlyDictionary<uint, BinTreeProperty> fields, string name, float fallback) =>
             fields.TryGetValue(Hash(name), out var value) && value is BinTreeF32 scalar ? scalar.Value : fallback;
 
+        /// <summary>A logic bool driver outside a material, such as a persistent effect condition's owner condition.</summary>
+        internal static GameMaterialBoolCondition ReadBoolDriver(BinTreeProperty property) => ReadCondition(property, 0);
+
         private static GameMaterialBoolCondition ReadCondition(BinTreeProperty property, int depth)
         {
             if (depth >= 32 || property is not BinTreeStruct driver)
@@ -347,6 +428,19 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 driver.ClassHash == Hash("HasBuffOfTypeBoolDriver") ||
                 driver.ClassHash == Hash("FixedDurationTriggeredBoolDriver"))
                 return new(GameMaterialBoolKind.Inactive);
+            if (driver.ClassHash == Hash("FloatComparisonMaterialDriver"))
+            {
+                var operands = new List<GameMaterialBoolCondition>();
+                driver.Properties.TryGetValue(Hash("mValueA"), out var left);
+                driver.Properties.TryGetValue(Hash("mValueB"), out var right);
+                var leftValue = ReadValueDriver(left, depth + 1, operands);
+                var rightValue = ReadValueDriver(right, depth + 1, operands);
+                uint op = driver.Properties.TryGetValue(Hash("mOperator"), out var opProperty) && opProperty is BinTreeU32 opValue ? opValue.Value : 0;
+                // The operands' own conditions ride along as children so their buffs are offered as game states.
+                return leftValue == null || rightValue == null
+                    ? new(GameMaterialBoolKind.Unsupported)
+                    : new(GameMaterialBoolKind.Compare, Children: operands, Left: leftValue, Right: rightValue, Operator: op);
+            }
             if (driver.ClassHash == Hash("OneTrueMaterialDriver") &&
                 driver.Properties.TryGetValue(Hash("mDrivers"), out var anyChildren) && anyChildren is BinTreeContainer anyList)
             {

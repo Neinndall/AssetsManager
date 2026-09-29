@@ -6,13 +6,15 @@ namespace AssetsManager.Views.Models.Viewer
 {
     /// <summary>
     /// The game state dynamic materials read: the equipped gear, the buffs the preview turns on, the animation
-    /// clips playing and whether the character is dead. An int converts to the resting state with that gear.
+    /// clips playing, whether the character is dead and the preview time in seconds that time drivers read.
+    /// An int converts to the resting state with that gear.
     /// </summary>
     internal sealed record GameMaterialState(
         int Gear,
         IReadOnlySet<string> Buffs,
         IReadOnlySet<uint> Animations,
-        bool Dead = false)
+        bool Dead = false,
+        float Time = 0f)
     {
         private static readonly IReadOnlySet<string> NoBuffs = new HashSet<string>();
         private static readonly IReadOnlySet<uint> NoAnimations = new HashSet<uint>();

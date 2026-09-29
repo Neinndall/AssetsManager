@@ -46,6 +46,8 @@ namespace AssetsManager.Tests.Support
         private readonly Dictionary<string, uint> _textures = new(StringComparer.OrdinalIgnoreCase);
         private GameShaderRuntime _runtime;
         private GameShaderBloom _bloom;
+        // Each render lands a second after the last, so dynamic material fades settle on the state it draws.
+        private float _clock;
         private MapCharacterAssetData _asset;
         private Dictionary<string, BitmapSource> _bitmaps;
 
@@ -114,7 +116,7 @@ namespace AssetsManager.Tests.Support
                 Matrix4x4.CreateLookAt(eye, center, Vector3.UnitY),
                 Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, 1f, radius * 0.1f, radius * 10f),
                 eye,
-                1f,
+                _clock += 1f,
                 null,
                 ImageLight: _sky);
 

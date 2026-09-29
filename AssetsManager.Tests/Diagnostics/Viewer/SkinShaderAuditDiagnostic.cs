@@ -93,7 +93,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                             Console.WriteLine(
                                 $"[Submesh] {name} {submesh} dynamic {dynamic.Name}={dynamic.Evaluate(0)?.ToString() ?? "unresolved"}" +
                                 (dynamic.Buffs is { Count: > 0 } buffs
-                                    ? $" buffs={string.Join("+", buffs)} on={dynamic.Evaluate(GameMaterialState.From(0, buffs, null))?.ToString() ?? "unresolved"}"
+                                    ? $" buffs={string.Join("+", buffs)} on={dynamic.Evaluate(GameMaterialState.From(0, buffs, null) with { Time = 1f })?.ToString() ?? "unresolved"}"
                                     : ""));
                     foreach (MapCharacterMeshRange range in asset.Mesh?.Ranges ?? Array.Empty<MapCharacterMeshRange>())
                     {

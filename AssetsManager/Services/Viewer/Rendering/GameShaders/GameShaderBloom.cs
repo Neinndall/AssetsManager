@@ -192,7 +192,9 @@ void main()
             if (_glow != null && _width == width && _height == height)
                 return;
             DeleteTargets();
-            _glow = CreateTarget(width, height);
+            // The game writes SV_Target1 to an 8-bit target, so glow clamps at 1: Aatrox Skin33's body pulses
+            // Bloom_Intensity up to 10, which would otherwise bloom ten times too bright.
+            _glow = CreateTarget(width, height, lowDynamicRange: true);
             uint halfWidth = Math.Max(1, width / 2), halfHeight = Math.Max(1, height / 2);
             uint quarterWidth = Math.Max(1, width / 4), quarterHeight = Math.Max(1, height / 4);
             _halfA = CreateTarget(halfWidth, halfHeight);
@@ -204,11 +206,14 @@ void main()
             _pending = false;
         }
 
-        private Target CreateTarget(uint width, uint height)
+        private Target CreateTarget(uint width, uint height, bool lowDynamicRange = false)
         {
             uint texture = _gl.GenTexture();
             _gl.BindTexture(TextureTarget.Texture2D, texture);
-            _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba16f, width, height, 0, PixelFormat.Rgba, PixelType.HalfFloat, ReadOnlySpan<byte>.Empty);
+            if (lowDynamicRange)
+                _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, ReadOnlySpan<byte>.Empty);
+            else
+                _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba16f, width, height, 0, PixelFormat.Rgba, PixelType.HalfFloat, ReadOnlySpan<byte>.Empty);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);

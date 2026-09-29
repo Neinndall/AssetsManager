@@ -6,7 +6,8 @@ namespace AssetsManager.Views.Models.Viewer
     // Buff, Dead and Animation read the preview's game state; the resting preview has no buff, is alive and
     // plays no scripted animation. Inactive covers what it never does: cast, attack, move, stand in grass,
     // belong to the enemy team or carry buffs picked by type or attribute.
-    internal enum GameMaterialBoolKind { Unsupported, Gear, Buff, Dead, Animation, Inactive, All, Any, Not }
+    // Compare tests two float drivers with a FloatComparisonMaterialDriver operator.
+    internal enum GameMaterialBoolKind { Unsupported, Gear, Buff, Dead, Animation, Inactive, All, Any, Not, Compare }
 
     /// <param name="Name">The buff script a Buff condition checks.</param>
     /// <param name="Animations">The clip name hashes an Animation condition checks.</param>
@@ -14,7 +15,10 @@ namespace AssetsManager.Views.Models.Viewer
         GameMaterialBoolKind Kind, int GearIndex = 0,
         IReadOnlyList<GameMaterialBoolCondition> Children = null,
         string Name = null,
-        IReadOnlyList<uint> Animations = null)
+        IReadOnlyList<uint> Animations = null,
+        System.Func<GameMaterialState, System.Numerics.Vector4?> Left = null,
+        System.Func<GameMaterialState, System.Numerics.Vector4?> Right = null,
+        uint Operator = 0)
     {
         internal bool? Evaluate(GameMaterialState state) => Kind switch
         {
@@ -26,6 +30,7 @@ namespace AssetsManager.Views.Models.Viewer
             GameMaterialBoolKind.Any => EvaluateAny(state),
             GameMaterialBoolKind.Not when Children?.Count == 1 => !Children[0].Evaluate(state),
             GameMaterialBoolKind.All => EvaluateAll(state),
+            GameMaterialBoolKind.Compare => EvaluateCompare(state),
             _ => null
         };
 
@@ -33,6 +38,26 @@ namespace AssetsManager.Views.Models.Viewer
         internal IEnumerable<string> Buffs() =>
             (Kind == GameMaterialBoolKind.Buff && !string.IsNullOrEmpty(Name) ? new[] { Name } : Enumerable.Empty<string>())
             .Concat((Children ?? System.Array.Empty<GameMaterialBoolCondition>()).SelectMany(child => child.Buffs()));
+
+        // mOperator, read from the game's data: 0 equal (Ezreal's 1..5 passive stacks, buffs against 1), 1 greater
+        // (speed over 350), 2 at least (Irelia's 4 and Jax's 8 stacks), 3 less (health under 30%), 4 at most, 5 not equal.
+        private bool? EvaluateCompare(GameMaterialState state)
+        {
+            if (Left?.Invoke(state) is not System.Numerics.Vector4 left || Right?.Invoke(state) is not System.Numerics.Vector4 right)
+                return null;
+            float a = left.X, b = right.X;
+            const float Tolerance = 1e-4f;
+            return Operator switch
+            {
+                0 => System.MathF.Abs(a - b) <= Tolerance,
+                1 => a > b,
+                2 => a >= b - Tolerance,
+                3 => a < b,
+                4 => a <= b + Tolerance,
+                5 => System.MathF.Abs(a - b) > Tolerance,
+                _ => null
+            };
+        }
 
         private bool? EvaluateAny(GameMaterialState state)
         {

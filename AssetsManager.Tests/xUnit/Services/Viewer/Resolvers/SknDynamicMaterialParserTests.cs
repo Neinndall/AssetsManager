@@ -167,8 +167,9 @@ public sealed class SknDynamicMaterialParserTests
 
         Assert.Equal(new[] { "AatroxInCombat" }, parameter.Buffs);
         Assert.Equal(0f, parameter.Evaluate(GameMaterialState.Resting)!.Value.X);
-        Assert.Equal(1f, parameter.Evaluate(GameMaterialState.From(0, new[] { "aatroxincombat" }, null))!.Value.X);
-        Assert.Equal(1f, parameter.Evaluate(GameMaterialState.From(0, null, new[] { GameMaterialState.AnimationHash("Recall") }))!.Value.X);
+        // Each state lands a second apart, past the fade window, so it settles at its value.
+        Assert.Equal(1f, parameter.Evaluate(GameMaterialState.From(0, new[] { "aatroxincombat" }, null) with { Time = 1f })!.Value.X);
+        Assert.Equal(1f, parameter.Evaluate(GameMaterialState.From(0, null, new[] { GameMaterialState.AnimationHash("Recall") }) with { Time = 2f })!.Value.X);
     }
 
     private static GameMaterialDynamicParameter Single(BinTreeStruct driver)
@@ -207,7 +208,7 @@ public sealed class SknDynamicMaterialParserTests
         Assert.Equal(new[] { "First" }, parameter.Buffs);
         // mColorOff keeps LeagueToolkit's default, blue.
         Assert.Equal(new System.Numerics.Vector4(0, 0, 1, 1), parameter.Evaluate(GameMaterialState.Resting));
-        Assert.Equal(new System.Numerics.Vector4(1, 1, 0, 1), parameter.Evaluate(GameMaterialState.From(0, new[] { "First" }, null)));
+        Assert.Equal(new System.Numerics.Vector4(1, 1, 0, 1), parameter.Evaluate(GameMaterialState.From(0, new[] { "First" }, null) with { Time = 1f }));
     }
 
     [Fact]
@@ -225,8 +226,68 @@ public sealed class SknDynamicMaterialParserTests
 
         Assert.Equal(new[] { "Stacks" }, parameter.Buffs);
         Assert.Equal(0.25f, parameter.Evaluate(GameMaterialState.Resting)!.Value.X, 5);
-        Assert.Equal(0.75f, parameter.Evaluate(GameMaterialState.From(0, new[] { "Stacks" }, null))!.Value.X, 5);
+        Assert.Equal(0.75f, parameter.Evaluate(GameMaterialState.From(0, new[] { "Stacks" }, null) with { Time = 1f })!.Value.X, 5);
         Assert.Equal(1f, SknDynamicMaterialParser.Remap(5f, 0f, 1f, 0f, 1f));
+    }
+
+    // Aatrox Skin33's combat glow: Lerp(0 > sin(2 pi 5 t)) from 0 to 10, turning off in 0.5 s and on in the default 1 s.
+    [Fact]
+    public void TimeDrivenComparisonPulsesAndLerpFadesTowardIt()
+    {
+        var sine = new BinTreeStruct(Hash("mValueB"), Hash("SineMaterialDriver"), new BinTreeProperty[]
+        {
+            new BinTreeStruct(Hash("mDriver"), Hash("TimeMaterialDriver"), new BinTreeProperty[] { new BinTreeBool(Hash("LoopTimeAsFraction"), false) }),
+            new BinTreeF32(Hash("mFrequency"), 5f)
+        });
+        var comparison = new BinTreeStruct(Hash("mBoolDriver"), Hash("FloatComparisonMaterialDriver"), new BinTreeProperty[]
+        {
+            new BinTreeU32(Hash("mOperator"), 1),
+            new BinTreeStruct(Hash("mValueA"), Hash("FloatLiteralMaterialDriver"), Array.Empty<BinTreeProperty>()),
+            sine
+        });
+        GameMaterialDynamicParameter parameter = Single(new BinTreeStruct(Hash("driver"), Hash("LerpMaterialDriver"), new BinTreeProperty[]
+        {
+            comparison,
+            new BinTreeF32(Hash("mOnValue"), 10f),
+            new BinTreeF32(Hash("mTurnOffTimeSec"), 0.5f)
+        }));
+
+        // At 0.15 s the 5 Hz sine is at its trough, so 0 > sin holds: the first value settles on.
+        Assert.Equal(10f, parameter.Evaluate(GameMaterialState.Resting with { Time = 0.15f })!.Value.X, 3);
+        // At 0.25 s it peaks: 0.1 s at the 0.5 s turn-off rate drops a fifth of the way.
+        Assert.Equal(8f, parameter.Evaluate(GameMaterialState.Resting with { Time = 0.25f })!.Value.X, 3);
+        // At 0.35 s it is back at a trough: 0.1 s at the 1 s turn-on time closes a tenth of the gap to 10.
+        Assert.Equal(8.2f, parameter.Evaluate(GameMaterialState.Resting with { Time = 0.35f })!.Value.X, 3);
+
+        // Ten seconds at 60 fps: the fast square wave under the fades holds a steady third of the peak (the game's
+        // steady "ghost" glow), never flickering back to 0.
+        float low = float.MaxValue, high = float.MinValue;
+        for (int frame = 1; frame <= 600; frame++)
+        {
+            float value = parameter.Evaluate(GameMaterialState.Resting with { Time = 0.35f + frame / 60f })!.Value.X;
+            if (frame > 540)
+            {
+                low = MathF.Min(low, value);
+                high = MathF.Max(high, value);
+            }
+        }
+        Assert.InRange(low, 2.8f, 3.9f);
+        Assert.InRange(high, 2.8f, 3.9f);
+    }
+
+    [Theory]
+    [InlineData(0u, 4f, true)]
+    [InlineData(1u, 4f, false)]
+    [InlineData(2u, 4f, true)]
+    [InlineData(2u, 5f, false)]
+    [InlineData(3u, 5f, true)]
+    [InlineData(5u, 4f, false)]
+    public void ComparisonOperatorsFollowTheGameData(uint op, float right, bool expected)
+    {
+        Func<GameMaterialState, System.Numerics.Vector4?> four = _ => new System.Numerics.Vector4(4f);
+        Func<GameMaterialState, System.Numerics.Vector4?> other = _ => new System.Numerics.Vector4(right);
+        var condition = new GameMaterialBoolCondition(GameMaterialBoolKind.Compare, Left: four, Right: other, Operator: op);
+        Assert.Equal(expected, condition.Evaluate(GameMaterialState.Resting));
     }
 
     [Theory]
