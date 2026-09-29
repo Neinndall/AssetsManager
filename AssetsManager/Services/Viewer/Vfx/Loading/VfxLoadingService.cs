@@ -14,6 +14,7 @@ using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Core.Meta;
 
 namespace AssetsManager.Services.Viewer.Vfx.Loading
 {
@@ -154,6 +155,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 var graphKeys = new HashSet<uint>();
                 var queue = new Queue<string>();
                 var characterFormDocuments = new List<VfxCharacterFormDocumentData>();
+                var loadedTrees = new List<BinTree>();
 
                 void Enqueue(string p)
                 {
@@ -180,9 +182,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     try
                     {
                         if (!File.Exists(currentBinPath)) continue;
-                        byte[] fileBytes = File.ReadAllBytes(currentBinPath);
+                        BinTree tree = VfxGraphParser.ParseTree(File.ReadAllBytes(currentBinPath));
+                        loadedTrees.Add(tree);
                         VfxBinDocument document = VfxGraphParser.ParseDocument(
-                            fileBytes,
+                            tree,
                             ResolveGraphHashName,
                             ResolveGraphClassName,
                             _hashResolverService == null ? null : _hashResolverService.ResolveHash,
@@ -257,6 +260,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     {
                         log?.LogError(ex, $"Error scanning bin dependency file: {currentBinPath}");
                     }
+                }
+
+                // A system's custom material may be declared by any BIN it links rather than its own.
+                foreach (uint systemHash in bundle.Systems.Keys.ToArray())
+                {
+                    bundle.Systems[systemHash] = VfxGraphParser.ResolveLinkedCustomMaterials(
+                        bundle.Systems[systemHash],
+                        loadedTrees,
+                        _hashResolverService == null ? null : _hashResolverService.ResolveHash,
+                        _hashResolverService == null ? null : _hashResolverService.ResolveBinEntry);
                 }
 
                 bundle.CharacterForms = VfxCharacterFormParser.Resolve(

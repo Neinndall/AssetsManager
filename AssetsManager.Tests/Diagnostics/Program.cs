@@ -326,6 +326,11 @@ namespace AssetsManager.Tests.Diagnostics
                 ShaderSpirvInspectDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-custom-material-census", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxCustomMaterialCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "shader-glsl-dump", StringComparison.OrdinalIgnoreCase))
             {
                 ShaderGlslDumpDiagnostic.Run(args.Skip(1).ToArray());

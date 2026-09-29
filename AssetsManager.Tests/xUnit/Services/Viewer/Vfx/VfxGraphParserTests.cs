@@ -759,6 +759,69 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void CustomMaterialALinkedBinDeclaresResolvesThere()
+        {
+            const string materialPath = "Characters/Akali/Skins/Skin32/Materials/Avatar_inst";
+            const ulong textureHash = 0x0fedcba987654321UL;
+            const string texturePath = "ASSETS/Characters/Akali/Avatar_TX_CM.tex";
+            uint materialHash = Fnv1a.HashLower(materialPath);
+            var material = new BinTreeObject(
+                materialPath,
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(Fnv1a.HashLower("samplerValues"), BinPropertyType.Embedded, new BinTreeProperty[]
+                    {
+                        new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialShaderSamplerDef"), new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("textureName"), "Diffuse_Texture"),
+                            new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), textureHash)
+                        })
+                    }),
+                    new BinTreeContainer(Fnv1a.HashLower("techniques"), BinPropertyType.Embedded, new BinTreeProperty[]
+                    {
+                        new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialTechniqueDef"), new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("name"), "normal"),
+                            new BinTreeContainer(Fnv1a.HashLower("passes"), BinPropertyType.Embedded, new BinTreeProperty[]
+                            {
+                                new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialPassDef"), System.Array.Empty<BinTreeProperty>())
+                            })
+                        })
+                    })
+                });
+            var system = new BinTreeObject(
+                "Characters/Akali/Skins/Skin32/Particles/Akali_Skin32_Avatar",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeContainer(Fnv1a.HashLower("complexEmitterDefinitionData"), BinPropertyType.Struct, new BinTreeProperty[]
+                    {
+                        new BinTreeStruct(0, Fnv1a.HashLower("VfxEmitterDefinitionData"), new BinTreeProperty[]
+                        {
+                            new BinTreeStruct(Fnv1a.HashLower("CustomMaterial"), Fnv1a.HashLower("VfxMaterialDefinitionData"), new BinTreeProperty[]
+                            {
+                                new BinTreeObjectLink(Fnv1a.HashLower("Material"), materialHash)
+                            })
+                        })
+                    })
+                });
+            System.Func<ulong, string> textures = hash => hash == textureHash ? texturePath : null;
+
+            VfxSystemDefinition own = Assert.Single(VfxGraphParser.ParseDocument(
+                new BinTree(new[] { system }, System.Array.Empty<string>()), wadChunkPathResolver: textures).Systems).Value;
+            Assert.False(Assert.Single(own.Emitters).HasResolvedCustomMaterial);
+
+            VfxSystemDefinition linked = VfxGraphParser.ResolveLinkedCustomMaterials(
+                own, new[] { new BinTree(new[] { material }, System.Array.Empty<string>()) }, textures);
+
+            VfxEmitterDefinition emitter = Assert.Single(linked.Emitters);
+            Assert.True(emitter.HasResolvedCustomMaterial);
+            Assert.Equal(texturePath.ToLowerInvariant(), emitter.TexturePath);
+            Assert.Same(linked, VfxGraphParser.ResolveLinkedCustomMaterials(linked, new[] { new BinTree(new[] { material }, System.Array.Empty<string>()) }, textures));
+        }
+
+        [Fact]
         public void CustomMaterialPreviewResolvesShaderDefinedInExternalShaderTree()
         {
             const string shaderPath = "Shaders/Particles/Custom_Glow";

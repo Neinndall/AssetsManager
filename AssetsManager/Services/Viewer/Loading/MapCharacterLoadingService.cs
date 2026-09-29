@@ -237,6 +237,16 @@ namespace AssetsManager.Services.Viewer.Loading
                 ownerSceneContext ??= parsed.OwnerSceneContext;
             }
 
+            // A system's custom material may be declared by any BIN it links rather than its own.
+            foreach (uint systemHash in systems.Keys.ToArray())
+            {
+                systems[systemHash] = VfxGraphParser.ResolveLinkedCustomMaterials(
+                    systems[systemHash],
+                    documents,
+                    wadChunkPathResolver,
+                    binEntryResolver);
+            }
+
             return new MapCharacterVfxCatalog(
                 systems,
                 resourceMap,

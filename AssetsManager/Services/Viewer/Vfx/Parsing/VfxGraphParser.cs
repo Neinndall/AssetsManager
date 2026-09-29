@@ -92,28 +92,67 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 VfxEmitterDefinition emitter = system.Emitters[index];
                 if (emitter.CustomMaterialPathHash == 0) continue;
 
-                ModelMaterialDefinition material = SknMaterialTextureResolver.ResolveLinkedMaterialPreview(
-                    tree,
-                    emitter.CustomMaterialPathHash,
-                    out VfxCustomMaterialBlendFactor sourceBlendFactor,
-                    out VfxCustomMaterialBlendFactor destinationBlendFactor,
-                    wadChunkPathResolver,
-                    binEntryResolver,
-                    shaderTrees);
-                VfxEmitterDefinition resolved = emitter with
-                {
-                    CustomMaterial = material,
-                    CustomMaterialSourceBlendFactor = sourceBlendFactor,
-                    CustomMaterialDestinationBlendFactor = destinationBlendFactor
-                };
-                if (material.BindingKind != ModelMaterialBindingKind.Missing)
-                    resolved = resolved with { TexturePath = material.BaseTextureName };
-
                 emitters ??= system.Emitters.ToArray();
-                emitters[index] = resolved;
+                emitters[index] = ResolveCustomMaterial(emitter, tree, wadChunkPathResolver, binEntryResolver, shaderTrees);
             }
 
             return emitters is null ? system : system with { Emitters = emitters };
+        }
+
+        /// <summary>
+        /// Resolves the custom materials the BIN declaring <paramref name="system"/> left missing in the first of
+        /// <paramref name="linkedTrees"/> that declares them: a skin's VFX often link a material its linked BIN holds
+        /// (Akali Skin32's <c>Avatar</c> reads it from <c>Akali_Multi_Skins_*.bin</c>).
+        /// </summary>
+        internal static VfxSystemDefinition ResolveLinkedCustomMaterials(
+            VfxSystemDefinition system,
+            IReadOnlyList<BinTree> linkedTrees,
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null,
+            IEnumerable<BinTree> shaderTrees = null)
+        {
+            if (system?.Emitters == null || linkedTrees == null || linkedTrees.Count == 0)
+                return system;
+
+            VfxEmitterDefinition[] emitters = null;
+            for (int index = 0; index < system.Emitters.Count; index++)
+            {
+                VfxEmitterDefinition emitter = system.Emitters[index];
+                if (emitter.CustomMaterialPathHash == 0 || emitter.HasResolvedCustomMaterial) continue;
+                BinTree declaring = linkedTrees.FirstOrDefault(tree => tree?.Objects.ContainsKey(emitter.CustomMaterialPathHash) == true);
+                if (declaring == null) continue;
+
+                emitters ??= system.Emitters.ToArray();
+                emitters[index] = ResolveCustomMaterial(emitter, declaring, wadChunkPathResolver, binEntryResolver, shaderTrees);
+            }
+
+            return emitters is null ? system : system with { Emitters = emitters };
+        }
+
+        private static VfxEmitterDefinition ResolveCustomMaterial(
+            VfxEmitterDefinition emitter,
+            BinTree tree,
+            Func<ulong, string> wadChunkPathResolver,
+            Func<uint, string> binEntryResolver,
+            IEnumerable<BinTree> shaderTrees)
+        {
+            ModelMaterialDefinition material = SknMaterialTextureResolver.ResolveLinkedMaterialPreview(
+                tree,
+                emitter.CustomMaterialPathHash,
+                out VfxCustomMaterialBlendFactor sourceBlendFactor,
+                out VfxCustomMaterialBlendFactor destinationBlendFactor,
+                wadChunkPathResolver,
+                binEntryResolver,
+                shaderTrees);
+            VfxEmitterDefinition resolved = emitter with
+            {
+                CustomMaterial = material,
+                CustomMaterialSourceBlendFactor = sourceBlendFactor,
+                CustomMaterialDestinationBlendFactor = destinationBlendFactor
+            };
+            return material.BindingKind != ModelMaterialBindingKind.Missing
+                ? resolved with { TexturePath = material.BaseTextureName }
+                : resolved;
         }
     }
 }
