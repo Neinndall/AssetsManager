@@ -429,9 +429,17 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void CaptureWorkspaceSelection(VfxWorkspaceTab tab)
         {
-            VfxSceneActor actor = tab?.Kind == VfxWorkspaceTabKind.Skin ? tab.FocusedActor : null;
+            if (tab == null) return;
+            if (_dummyViewport.Camera is ProjectionCamera camera)
+                tab.CameraState = VfxWorkspaceCameraState.Capture(camera, _model.PreviewCameraPreset);
+            tab.CharacterEffectsEnabled = _model.CharacterEffectsEnabled;
+            tab.MapEffectsEnabled = _model.MapParticlesVisible;
+            tab.ShadersEnabled = _model.PreviewShaders;
+            tab.StructuresVisible = _model.MapStructuresVisible;
+            VfxSceneActor actor = tab.Kind == VfxWorkspaceTabKind.Skin ? tab.FocusedActor : null;
             if (actor == null)
                 return;
+            actor.IsPlaybackPaused = !_model.IsPlaying;
 
             // The tree changes SelectedSkin before PropertyChanged reaches us, while the current
             // System/Clip/Spell collections still belong to the previously focused actor. Capture
@@ -499,7 +507,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.SelectedCharacterBackdrop = _model.CharacterBackdrops.FirstOrDefault(option =>
                     !string.IsNullOrWhiteSpace(tab.CharacterBackdropKey) &&
                     string.Equals(VfxInstallationMapCatalog.BackdropKey(option.Source), tab.CharacterBackdropKey, StringComparison.OrdinalIgnoreCase));
-                _model.CharacterBackdropEnabled = tab.CharacterBackdropEnabled && _model.SelectedCharacterBackdrop != null;
+                _model.CharacterBackdropEnabled = tab.CharacterBackdropEnabled;
             }
             finally
             {
@@ -655,9 +663,14 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (tab == null) return;
             VfxWorkspaceTab previous = _model.SelectedWorkspaceTab;
-            if (!ReferenceEquals(previous, tab))
-                CaptureWorkspaceSelection(previous);
+            if (ReferenceEquals(previous, tab)) return;
+            CaptureWorkspaceSelection(previous);
             _model.SelectedWorkspaceTab = tab;
+            _model.CharacterEffectsEnabled = tab.CharacterEffectsEnabled;
+            _model.MapParticlesVisible = tab.MapEffectsEnabled;
+            _model.PreviewShaders = tab.ShadersEnabled;
+            _model.MapStructuresVisible = tab.StructuresVisible;
+            RestoreWorkspaceCamera(tab);
         }
 
         private void ActivateWorkspaceTab(VfxWorkspaceTab tab)
@@ -894,11 +907,22 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (!_isUpdatingCharacterForms)
                     ApplySelectedCharacterForm(clearManualOverrides: true, restoreTextures: true);
             }
-            else if (e.PropertyName == nameof(VfxInspectorModel.CharacterBackdropEnabled) ||
-                     e.PropertyName == nameof(VfxInspectorModel.SelectedCharacterBackdrop))
+            else if (e.PropertyName == nameof(VfxInspectorModel.CharacterBackdropEnabled))
             {
                 if (!_isApplyingCharacterViewportState)
+                {
+                    // Enabling the chooser must not load a remembered or default map.
+                    _isApplyingCharacterViewportState = true;
+                    try { _model.SelectedCharacterBackdrop = null; }
+                    finally { _isApplyingCharacterViewportState = false; }
                     RefreshCharacterBackdrop();
+                }
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedCharacterBackdrop))
+            {
+                if (!_isApplyingCharacterViewportState && _model.CharacterBackdropEnabled &&
+                    _model.SelectedCharacterBackdrop is { } backdrop)
+                    OpenCharacterBackdropScene(backdrop);
             }
             else if (e.PropertyName == nameof(VfxInspectorModel.MapStructuresVisible) ||
                      e.PropertyName == nameof(VfxInspectorModel.MapParticlesVisible))
@@ -1049,21 +1073,14 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void RefreshCharacterBackdrop()
         {
-            if (!_model.IsSkinWorkspace || !_model.CharacterBackdropEnabled)
+            if (!_model.IsSkinWorkspace || !_model.CharacterBackdropEnabled || _model.SelectedCharacterBackdrop == null)
             {
                 if (_mapSceneIsCharacterBackdrop)
                     CancelMapLoadAndClearScene();
                 return;
             }
 
-            if (_model.SelectedCharacterBackdrop == null && _model.CharacterBackdrops.Count > 0)
-            {
-                _model.SelectedCharacterBackdrop = _model.CharacterBackdrops[0];
-                return;
-            }
-
-            if (_model.SelectedCharacterBackdrop != null)
-                _ = LoadCharacterBackdropAsync(_model.SelectedCharacterBackdrop);
+            _ = LoadCharacterBackdropAsync(_model.SelectedCharacterBackdrop);
         }
 
         private Task LoadCharacterBackdropAsync(VfxCharacterBackdropOption option)
@@ -1103,15 +1120,19 @@ namespace AssetsManager.Views.Controls.Viewer
                 (float)_model.CharacterPositionX,
                 (float)_model.CharacterPositionY,
                 (float)_model.CharacterPositionZ);
+            bool preserveFraming = _model.SelectedWorkspaceTab?.PreserveBackdropFraming == true;
             _isApplyingCharacterViewportState = true;
             try
             {
                 _model.CharacterPositionX = origin.X;
                 _model.CharacterPositionY = origin.Y;
                 _model.CharacterPositionZ = origin.Z;
-                _model.CharacterRotationX = 0d;
-                _model.CharacterRotationY = yaw;
-                _model.CharacterRotationZ = 0d;
+                if (!preserveFraming)
+                {
+                    _model.CharacterRotationX = 0d;
+                    _model.CharacterRotationY = yaw;
+                    _model.CharacterRotationZ = 0d;
+                }
                 StoreFocusedPlacement(actor);
                 actor.PlacementCustomized = false;
                 actor.PlacedOnKey = sourceKey;
@@ -1121,7 +1142,14 @@ namespace AssetsManager.Views.Controls.Viewer
                 _isApplyingCharacterViewportState = false;
             }
             ApplyCharacterPlacement();
-            ShiftSceneActorsWithAnchor(origin - previous, sourceKey);
+            Vector3 displacement = origin - previous;
+            ShiftSceneActorsWithAnchor(displacement, sourceKey);
+            if (preserveFraming && _dummyViewport.Camera is ProjectionCamera camera)
+            {
+                VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+                tab.CameraState = VfxWorkspaceCameraState.Capture(camera, _model.PreviewCameraPreset).Translate(displacement);
+                RestoreWorkspaceCamera(tab);
+            }
         }
 
         /// <summary>
@@ -3580,7 +3608,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (!asCharacterBackdrop)
                 {
                     ReplaceMapBrowserRoot(MapBrowserSemantics.Build(backdrop));
-                    SnapMapCamera(scene);
+                    if (_model.SelectedWorkspaceTab?.CameraState != null)
+                        RestoreWorkspaceCamera(_model.SelectedWorkspaceTab);
+                    else
+                        SnapMapCamera(scene);
                 }
                 if (asCharacterBackdrop)
                     ApplyCharacterBackdropOrigin(scene, source);

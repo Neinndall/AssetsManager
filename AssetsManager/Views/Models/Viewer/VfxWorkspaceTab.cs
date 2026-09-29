@@ -84,6 +84,14 @@ namespace AssetsManager.Views.Models.Viewer
         // Scene-level Skin workspace state. Every Character keeps its own placement and navigation
         // memory in Actors; the single Studio viewport still owns every decoded model, MAP scene and
         // GPU resource.
+        internal VfxWorkspaceCameraState CameraState { get; set; }
+        internal bool PreserveBackdropFraming { get; set; }
+        internal bool CharacterEffectsEnabled { get; set; }
+        internal bool MapEffectsEnabled { get; set; }
+        internal bool ShadersEnabled { get; set; }
+        internal bool StructuresVisible { get; set; }
+        internal string BackdropTitle { get; set; }
+        internal string BackdropSourceKey { get; set; }
         internal bool CharacterBackdropEnabled { get; set; }
         internal string CharacterBackdropKey { get; set; }
         internal MapVisibilityState CharacterBackdropVisibility { get; set; }
@@ -103,11 +111,38 @@ namespace AssetsManager.Views.Models.Viewer
                 if (_focusedActor != null)
                 {
                     _focusedActor.IsFocused = true;
-                    Title = _focusedActor.Title;
+                    Title = BackdropTitle == null ? _focusedActor.Title : $"{BackdropTitle} · {_focusedActor.Title}";
                     Subtitle = _focusedActor.Subtitle;
                 }
                 OnPropertyChanged();
             }
+        }
+
+        internal VfxWorkspaceTab CopyForBackdrop(string key, string mapKey, string mapTitle)
+        {
+            var copy = new VfxWorkspaceTab
+            {
+                Key = key,
+                Kind = VfxWorkspaceTabKind.Skin,
+                BackdropTitle = mapTitle,
+                CameraState = CameraState,
+                PreserveBackdropFraming = true,
+                BackdropSourceKey = BackdropSourceKey ?? Key,
+                CharacterBackdropEnabled = true,
+                CharacterBackdropKey = mapKey,
+                CharacterEffectsEnabled = CharacterEffectsEnabled,
+                MapEffectsEnabled = MapEffectsEnabled,
+                ShadersEnabled = ShadersEnabled,
+                StructuresVisible = StructuresVisible
+            };
+            foreach (VfxSceneActor actor in Actors)
+            {
+                VfxSceneActor cloned = actor.CopyForBackdrop();
+                copy.Actors.Add(cloned);
+                if (ReferenceEquals(actor, FocusedActor))
+                    copy.FocusedActor = cloned;
+            }
+            return copy;
         }
 
         public int ExtraActorCount => Math.Max(0, Actors.Count - 1);

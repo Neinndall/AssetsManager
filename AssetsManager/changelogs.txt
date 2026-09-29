@@ -154,6 +154,8 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio / New backdrop scenes keep the character facing and camera framing while the map appears, and each tab remembers its camera.
+  - VFX Studio / Choosing a backdrop opens a separate map and character scene; enabling the chooser no longer loads a map, and champion and map VFX switches keep independent states per scene.
   - VFX Studio / Removed duplicate backdrop visibility buttons and distinguished champion and map VFX icons in the viewport toolbar.
   - VFX Studio / Switching map transformations or Baron pit states is now near instant: shared structures and effects stay loaded and keep playing.
   - VFX Studio / Show the selected character, clip or spell in the viewport header and keep randomness and animation options compact, and move background selection to the viewport menu.

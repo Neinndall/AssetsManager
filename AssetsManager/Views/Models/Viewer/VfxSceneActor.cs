@@ -104,6 +104,35 @@ namespace AssetsManager.Views.Models.Viewer
         internal uint? SelectedSpellPathHash { get; set; }
         internal float? AnimationParameter { get; set; }
 
+        /// <summary>Copies lightweight actor state into another scene without sharing mutable state or runtime resources.</summary>
+        internal VfxSceneActor CopyForBackdrop()
+        {
+            var copy = new VfxSceneActor(Skin)
+            {
+                IsVisible = IsVisible,
+                PositionX = PositionX,
+                PositionY = PositionY,
+                PositionZ = PositionZ,
+                RotationX = RotationX,
+                RotationY = RotationY,
+                RotationZ = RotationZ,
+                ScaleMultiplier = ScaleMultiplier,
+                IsPlaybackPaused = IsPlaybackPaused,
+                ShowsBindPose = ShowsBindPose,
+                SelectedCharacterFormPathHash = SelectedCharacterFormPathHash,
+                SelectedSystemPathHash = SelectedSystemPathHash,
+                SelectedAnimationFilePath = SelectedAnimationFilePath,
+                SelectedAnimationGraphPathHash = SelectedAnimationGraphPathHash,
+                SelectedAnimationOwnerPathHash = SelectedAnimationOwnerPathHash,
+                SelectedSpellPathHash = SelectedSpellPathHash,
+                AnimationParameter = AnimationParameter
+            };
+            foreach (var pair in SubmeshOverrides)
+                copy.SubmeshOverrides.Add(pair.Key, pair.Value);
+            copy.EnabledGameStates.UnionWith(EnabledGameStates);
+            return copy;
+        }
+
         internal bool HasSkin(VfxSkinItem skin) => IsSameSkin(Skin, skin);
 
         internal static bool IsSameSkin(VfxSkinItem left, VfxSkinItem right)

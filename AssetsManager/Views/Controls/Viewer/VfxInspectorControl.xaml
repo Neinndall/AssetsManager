@@ -2089,7 +2089,7 @@
                                     Visibility="{Binding IsChecked, ElementName=VfxMapBackdropSection, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <StackPanel>
                                     <CheckBox Content="Enable MAP backdrop" IsChecked="{Binding CharacterBackdropEnabled, Mode=TwoWay}" IsEnabled="{Binding HasCharacterBackdropOptions}" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,8"/>
-                                    <ComboBox ItemsSource="{Binding CharacterBackdrops}" SelectedItem="{Binding SelectedCharacterBackdrop, Mode=TwoWay}" DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}" Height="28" Margin="0,0,0,10"/>
+                                    <ComboBox ItemsSource="{Binding CharacterBackdrops}" SelectedItem="{Binding SelectedCharacterBackdrop, Mode=TwoWay}" DisplayMemberPath="Label" IsEnabled="{Binding CharacterBackdropEnabled}" Style="{StaticResource ModernComboBox}" Height="28" Margin="0,0,0,10"/>
                                     <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MapStateControlsTemplate}"
                                                     Visibility="{Binding HasActiveCharacterBackdrop, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                 </StackPanel>
