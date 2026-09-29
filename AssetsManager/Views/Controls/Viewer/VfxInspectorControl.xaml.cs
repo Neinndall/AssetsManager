@@ -589,6 +589,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 return false;
             }
 
+            // Arm playback only after confirming the loaded BIN still belongs to this scene.
+            // Restored Systems, Clips and Spells must retain the actor's transport state.
+            _startNextPreviewPaused = actor.IsPlaybackPaused && !actor.ShowsBindPose;
             RestoreCharacterWorkspaceState(tab);
 
             if (actor.SelectedSystemPathHash is uint systemHash)
@@ -625,6 +628,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     if (actor.AnimationParameter.HasValue &&
                         (_model.AnimationParameter != actor.AnimationParameter || animation.HasParameterValues))
                     {
+                        // A parameter change can replace an already prepared clip during adoption.
+                        if (_model.AnimationParameter != actor.AnimationParameter)
+                            _startNextPreviewPaused = actor.IsPlaybackPaused;
                         _model.AnimationParameter = actor.AnimationParameter;
                     }
                     return true;

@@ -69,7 +69,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     UpdateWorkspaceTabScrollButtons();
                 }));
             }
-            _startNextPreviewPaused = destination.FocusedActor.IsPlaybackPaused;
             ActivateWorkspaceTab(destination);
         }
     }
