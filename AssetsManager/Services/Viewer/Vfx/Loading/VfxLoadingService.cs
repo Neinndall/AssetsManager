@@ -8,11 +8,14 @@ using System.Windows.Media.Imaging;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 
@@ -26,13 +29,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         // LTK bounds every breadth-first linked BIN search to 32 files beyond the primary document.
         private const int MaximumLinkedBins = 32;
         private readonly VfxResourceResolver _resources = new();
+        private const string ShaderDefinitionsPath = "data/shaders/shaders.bin";
         private readonly HashResolverService _hashResolverService;
+        private readonly MapAssetResolver _assetResolver;
         private readonly SemaphoreSlim _catalogGate = new(1, 1);
+        private (string Root, BinTree Tree) _shaderDefinitions;
         private int _disposeState;
 
-        public VfxLoadingService(HashResolverService hashResolverService = null)
+        public VfxLoadingService(
+            HashResolverService hashResolverService = null,
+            WadContentProvider wadContentProvider = null,
+            AppSettings appSettings = null)
         {
             _hashResolverService = hashResolverService;
+            _assetResolver = wadContentProvider != null && appSettings != null
+                ? new MapAssetResolver(wadContentProvider, appSettings)
+                : null;
         }
 
         /// <summary>
@@ -104,6 +116,38 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 => form == null ? this : new Bundle(this, form);
         }
 
+        /// <summary>
+        /// The global shader definitions (data/shaders/shaders.bin) from the project or the installed game, read
+        /// once per project root; null without an installation to read them from.
+        /// </summary>
+        private BinTree LoadShaderDefinitions(string projectRoot, LogService log, CancellationToken cancellationToken)
+        {
+            if (_assetResolver == null) return null;
+            if (_shaderDefinitions.Tree != null &&
+                string.Equals(_shaderDefinitions.Root, projectRoot, StringComparison.OrdinalIgnoreCase))
+                return _shaderDefinitions.Tree;
+            try
+            {
+                MapResolvedAsset asset = _assetResolver.ResolveVirtualAsync(ShaderDefinitionsPath, projectRoot, cancellationToken)
+                    .GetAwaiter().GetResult();
+                if (asset == null) return null;
+                using Stream stream = _assetResolver.OpenReadAsync(asset, cancellationToken).GetAwaiter().GetResult();
+                if (stream == null) return null;
+                BinTree tree = new BinTree(stream);
+                _shaderDefinitions = (projectRoot, tree);
+                return tree;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                log?.LogDebug($"Could not read the shader definitions for VFX materials: {ex.Message}");
+                return null;
+            }
+        }
+
         public Bundle Load(string skinBinPath, LogService log)
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
@@ -156,6 +200,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 var queue = new Queue<string>();
                 var characterFormDocuments = new List<VfxCharacterFormDocumentData>();
                 var loadedTrees = new List<BinTree>();
+                // VFX custom materials link CustomShaderDefs the global shader BIN declares; without it a
+                // material keeps its textures but no game program, and draws with the stock particle shader.
+                BinTree[] shaderTrees = LoadShaderDefinitions(searchFolder, log, cancellationToken) is { } shaders
+                    ? new[] { shaders }
+                    : null;
 
                 void Enqueue(string p)
                 {
@@ -189,7 +238,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                             ResolveGraphHashName,
                             ResolveGraphClassName,
                             _hashResolverService == null ? null : _hashResolverService.ResolveHash,
-                            _hashResolverService == null ? null : _hashResolverService.ResolveBinEntry);
+                            _hashResolverService == null ? null : _hashResolverService.ResolveBinEntry,
+                            shaderTrees);
                         bundle.LoadedBins.Add(Path.GetFullPath(currentBinPath));
                         if (document.CharacterFormData != null)
                             characterFormDocuments.Add(document.CharacterFormData);
@@ -269,7 +319,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         bundle.Systems[systemHash],
                         loadedTrees,
                         _hashResolverService == null ? null : _hashResolverService.ResolveHash,
-                        _hashResolverService == null ? null : _hashResolverService.ResolveBinEntry);
+                        _hashResolverService == null ? null : _hashResolverService.ResolveBinEntry,
+                        shaderTrees);
                 }
 
                 bundle.CharacterForms = VfxCharacterFormParser.Resolve(

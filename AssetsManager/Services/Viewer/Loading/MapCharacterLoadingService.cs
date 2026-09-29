@@ -179,7 +179,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 graphHashNameResolver,
                 graphClassNameResolver,
                 wadChunkPathResolver,
-                binEntryResolver);
+                binEntryResolver,
+                shaders == null ? null : new[] { shaders });
 
             return new MapCharacterAssetData(
                 skin with
@@ -200,7 +201,8 @@ namespace AssetsManager.Services.Viewer.Loading
             Func<uint, string> graphHashNameResolver,
             Func<uint, string> graphClassNameResolver,
             Func<ulong, string> wadChunkPathResolver,
-            Func<uint, string> binEntryResolver)
+            Func<uint, string> binEntryResolver,
+            IEnumerable<BinTree> shaderTrees = null)
         {
             if (documents == null || documents.Count == 0)
                 return MapCharacterVfxCatalog.Empty;
@@ -220,7 +222,8 @@ namespace AssetsManager.Services.Viewer.Loading
                     graphHashNameResolver,
                     graphClassNameResolver,
                     wadChunkPathResolver,
-                    binEntryResolver);
+                    binEntryResolver,
+                    shaderTrees);
                 foreach ((uint hash, VfxSystemDefinition system) in parsed.Systems)
                     systems.TryAdd(hash, system);
 
@@ -244,7 +247,8 @@ namespace AssetsManager.Services.Viewer.Loading
                     systems[systemHash],
                     documents,
                     wadChunkPathResolver,
-                    binEntryResolver);
+                    binEntryResolver,
+                    shaderTrees);
             }
 
             return new MapCharacterVfxCatalog(
