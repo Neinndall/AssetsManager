@@ -468,6 +468,7 @@ Bug Fixes
   - VFX Studio / VFX whose material lives in a linked skin file now draw with it instead of the generic particle look.
   - VFX Studio / Dust, smoke and rings that dissolve over time now draw with the game's own particle shader instead of falling back to the generic look.
   - VFX Studio / Effect parts that last as long as their emitter, such as Akshan's E grappling hook, no longer vanish the moment they appear.
+  - VFX Studio / With shaders on, champion and map character VFX with their own material (Akali's W invisibility and more) draw with the game's shader instead of the generic particle look.
   - VFX Studio / With shaders on, map brush no longer disappears and map critters keep their full textures.
   - Viewer / Map critters and skins without a material no longer show stretched, half-missing textures.
   - VFX Studio / Esports banners on Summoner's Rift now show their holders and default flag instead of solid red.
