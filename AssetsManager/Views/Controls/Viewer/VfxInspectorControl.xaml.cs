@@ -440,6 +440,7 @@ namespace AssetsManager.Views.Controls.Viewer
             actor.SelectedAnimationFilePath = _model.SelectedAnimation?.FilePath;
             actor.SelectedAnimationGraphPathHash = _model.SelectedAnimation?.Clip?.GraphPathHash;
             actor.SelectedAnimationOwnerPathHash = _model.SelectedAnimation?.Clip?.OwnerPathHash;
+            actor.ShowsBindPose = _model.SelectedAnimation?.IsBindPose == true;
             actor.SelectedSpellPathHash = _model.SelectedSpell?.PathHash;
             actor.AnimationParameter = _model.AnimationParameter;
             CaptureCharacterWorkspaceState(tab);
@@ -591,6 +592,14 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.SelectedSystem = system;
                     return true;
                 }
+            }
+
+            if (actor.ShowsBindPose &&
+                _model.DetectedAnimations.FirstOrDefault(item => item.IsBindPose) is { } bindPose)
+            {
+                _model.IsAnimationMode = true;
+                _model.SelectedAnimation = bindPose;
+                return true;
             }
 
             if (!string.IsNullOrWhiteSpace(actor.SelectedAnimationFilePath) ||

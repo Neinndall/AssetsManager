@@ -30,6 +30,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private IReadOnlyList<VfxClipCueEvaluator.VisibilityEntry> _visibilityTimeline =
             Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
         private IReadOnlySet<uint> _formHiddenSubmeshes;
+        private IReadOnlyCollection<string> _gameStates = Array.Empty<string>();
         private Matrix4x4[] _bindSkinningMatrices;
         private Func<string, uint, Matrix4x4?> _bindBoneProvider;
         private Func<string, uint, Matrix4x4?> _poseBoneProvider;
@@ -208,6 +209,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
             cancellationToken = linked.Token;
             cancellationToken.ThrowIfCancellationRequested();
+            if (actor?.ShowsBindPose == true)
+            {
+                ShowBindPose();
+                return;
+            }
             IReadOnlyList<AnimationClipCatalogItem> clips = ClipCatalog.BuildMetadata(
                 PlaybackBundle,
                 ResolveAnimationPath,
@@ -275,8 +281,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             Session.SetSystem(null);
         }
 
+        /// <summary>The GAME STATE buffs the actor has on, read with its own clip by its materials and submesh conditions.</summary>
+        internal void SetGameStates(IEnumerable<string> buffs)
+        {
+            _gameStates = buffs?.ToArray() ?? Array.Empty<string>();
+            ConfigureClipCues(Clip);
+        }
+
         private void ConfigureClipCues(AnimationClipCatalogItem clip)
         {
+            Model.GameState = GameMaterialState.Preview(_gameStates, clip);
+            _formHiddenSubmeshes = null;
             _visibilityTimeline = clip == null
                 ? Array.Empty<VfxClipCueEvaluator.VisibilityEntry>()
                 : VfxClipCueEvaluator.BuildVisibilityTimeline(clip.TimedCues, FormHiddenSubmeshes);
@@ -291,7 +306,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 Bundle.OwnerSceneContext?.InitialHiddenSubmeshHashes,
                 Form,
                 Model.Parts,
-                Bundle.OwnerSceneContext?.SubmeshConditions);
+                Bundle.OwnerSceneContext?.SubmeshConditions,
+                Model.GameState);
 
         private Matrix4x4? SampleBone(double time, string name, uint hash) =>
             Animation.TrySampleBoneTransform((float)time, name, hash, out Matrix4x4 transform)

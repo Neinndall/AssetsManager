@@ -682,9 +682,10 @@ namespace AssetsManager.Views.Models.Viewer
         private readonly Action _changed;
         private bool _isEnabled;
 
-        internal CharacterGameStateOption(string name, Action changed)
+        internal CharacterGameStateOption(string name, bool enabled, Action changed)
         {
             Name = name;
+            _isEnabled = enabled;
             _changed = changed;
         }
 
@@ -982,12 +983,12 @@ namespace AssetsManager.Views.Models.Viewer
         public bool HasMapMutators => MapMutators.Count > 0;
         public bool HasCharacterGameStates => CharacterGameStates.Count > 0;
 
-        /// <summary>Offers <paramref name="buffs"/> as toggles, all off: the resting state.</summary>
-        internal void SetCharacterGameStates(IEnumerable<string> buffs, Action changed)
+        /// <summary>Offers <paramref name="buffs"/> as toggles, on when <paramref name="enabled"/> holds them.</summary>
+        internal void SetCharacterGameStates(IEnumerable<string> buffs, IReadOnlySet<string> enabled, Action changed)
         {
             CharacterGameStates.Clear();
             foreach (string buff in buffs ?? Array.Empty<string>())
-                CharacterGameStates.Add(new CharacterGameStateOption(buff, changed));
+                CharacterGameStates.Add(new CharacterGameStateOption(buff, enabled?.Contains(buff) == true, changed));
             OnPropertyChanged(nameof(HasCharacterGameStates));
         }
 

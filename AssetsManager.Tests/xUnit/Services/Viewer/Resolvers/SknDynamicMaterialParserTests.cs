@@ -172,6 +172,20 @@ public sealed class SknDynamicMaterialParserTests
         Assert.Equal(1f, parameter.Evaluate(GameMaterialState.From(0, null, new[] { GameMaterialState.AnimationHash("Recall") }) with { Time = 2f })!.Value.X);
     }
 
+    [Fact]
+    public void PreviewStateCombinesAnActorsBuffsWithItsOwnClip()
+    {
+        AnimationClipCatalogItem Clip(string name) => new(name, name, "", 1f, null, null, null, Array.Empty<AnimationClipTimedCue>(), 0, false, "");
+
+        Assert.Null(GameMaterialState.Preview(null, null));
+        Assert.Null(GameMaterialState.Preview(Array.Empty<string>(), AnimationClipCatalogItem.CreateBindPoseItem()));
+
+        GameMaterialState recall = GameMaterialState.Preview(new[] { "AatroxInCombat" }, Clip("Recall"));
+        Assert.True(recall.HasBuff("aatroxincombat"));
+        Assert.True(recall.IsPlaying(GameMaterialState.AnimationHash("Recall")));
+        Assert.False(GameMaterialState.Preview(new[] { "AatroxInCombat" }, null).IsPlaying(GameMaterialState.AnimationHash("Recall")));
+    }
+
     private static GameMaterialDynamicParameter Single(BinTreeStruct driver)
     {
         var dynamicMaterial = new BinTreeStruct(Hash("dynamicMaterial"), Hash("DynamicMaterialDef"), new BinTreeProperty[]

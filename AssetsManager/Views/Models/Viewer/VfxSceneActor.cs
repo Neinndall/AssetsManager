@@ -90,6 +90,10 @@ namespace AssetsManager.Views.Models.Viewer
 
         /// <summary>Each Character keeps its own transport: a paused actor stays paused off focus.</summary>
         internal bool IsPlaybackPaused { get; set; }
+        /// <summary>The actor was left in bind pose, which no remembered clip describes.</summary>
+        internal bool ShowsBindPose { get; set; }
+        /// <summary>The GAME STATE buffs turned on for this actor; they follow it in and out of focus.</summary>
+        internal HashSet<string> EnabledGameStates { get; } = new(StringComparer.OrdinalIgnoreCase);
         internal uint? SelectedCharacterFormPathHash { get; set; }
 
         // Navigation memory restored when the actor regains focus.

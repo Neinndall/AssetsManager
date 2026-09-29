@@ -323,6 +323,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void RegisterSceneActorRuntime(VfxSceneActor actor, VfxSceneActorRuntime runtime)
         {
             _sceneActorRuntimes[actor] = runtime;
+            runtime.SetGameStates(actor.EnabledGameStates);
             runtime.ApplyPlacement(actor, _model.CharacterAutoRotate ? _characterAutoRotateDegrees : 0d);
             actor.StatusText = runtime.DescribePlayback();
             RefreshCharacterInteractionTarget();
