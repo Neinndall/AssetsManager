@@ -1380,6 +1380,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _purgeGpuResourcesBeforeNextFrame = false;
         }
 
+        /// <summary>Why the emitter draws with the stock program, or null when it uses the game's.</summary>
+        internal string GameParticleFallback(VfxEmitterDefinition emitter, bool mesh) =>
+            _renderer == null ? "Renderer not initialized." : _renderer.GameParticleFallback(emitter, mesh);
+
         internal void SetSun(MapSunData sun)
         {
             if (_renderer != null) _renderer.Sun = sun;

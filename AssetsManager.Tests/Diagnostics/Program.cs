@@ -326,6 +326,36 @@ namespace AssetsManager.Tests.Diagnostics
                 ShaderSpirvInspectDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-material-override-census", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxMaterialOverrideCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "bin-object-extract", StringComparison.OrdinalIgnoreCase))
+            {
+                BinObjectExtractDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-snapshot", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxSnapshotDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-sweep", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxSweepDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "map-spawn-probe", StringComparison.OrdinalIgnoreCase))
+            {
+                MapSpawnProbeDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-field-census", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxFieldCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "vfx-custom-material-census", StringComparison.OrdinalIgnoreCase))
             {
                 VfxCustomMaterialCensusDiagnostic.Run(args.Skip(1).ToArray());

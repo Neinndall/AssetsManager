@@ -41,6 +41,19 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             return (depth, color);
         }
 
+        internal string ParticleProgramFallback(VfxEmitterDefinition emitter, bool mesh)
+        {
+            if (_disposed) return "Runtime disposed.";
+            var (cache, material) = ParticleEntry(emitter, mesh);
+            if (material.Program == null)
+                return emitter.HasResolvedCustomMaterial ? "Custom material without a program."
+                    : emitter.PaletteDefinition is { PaletteCount: <= 0 } ? "Palette with no rows."
+                    : !mesh && emitter.Reflection is not null ? "Reflective quad (stock by design)."
+                    : !mesh && emitter.UvMode is 1 or 2 ? $"UvMode {emitter.UvMode} quad (stock by design)."
+                    : "No native program for this emitter.";
+            return cache == null || cache.Passes.Count == 0 ? cache?.Failure ?? "No pass linked." : null;
+        }
+
         internal int GetParticlePassCount(VfxEmitterDefinition emitter, bool mesh) =>
             _disposed ? 0 : ParticleEntry(emitter, mesh).Cache?.Passes.Count ?? 0;
 

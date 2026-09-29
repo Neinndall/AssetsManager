@@ -24,6 +24,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return (depth || inputs.Depth, inputs.Color);
         }
 
+        /// <summary>Why the emitter draws with the stock program instead of the game's: null when the game's program is used.</summary>
+        internal string GameParticleFallback(VfxEmitterDefinition emitter, bool mesh) =>
+            _gameShaders == null ? "Game shaders are unavailable." : _gameShaders.ParticleProgramFallback(emitter, mesh);
+
         private static bool HasParticleDraw(VfxPlaybackRuntime.EmitterState emitter) =>
             emitter.InstanceCount > 0 && emitter.IsVisible && (!emitter.Def.IsMeshPrimitive || emitter.MeshVao != 0);
 
