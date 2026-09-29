@@ -154,6 +154,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / WASD camera movement now works in every viewport, not only maps (Shift faster, Ctrl slower).
   - VFX Studio / New backdrop scenes keep the character facing and camera framing while the map appears, and each tab remembers its camera.
   - VFX Studio / Choosing a backdrop opens a separate map and character scene; enabling the chooser no longer loads a map, and champion and map VFX switches keep independent states per scene.
   - VFX Studio / Removed duplicate backdrop visibility buttons and distinguished champion and map VFX icons in the viewport toolbar.
@@ -452,6 +453,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Effects with endless particles stay visible instead of vanishing after their first moment (Bloom waterfall glow, Akshan E hook).
+  - VFX Studio / Map monsters keep their game spawn facing in new backdrop scenes, and map tabs keep the Game camera zoom limits when reopened.
   - VFX Studio / Resetting a map character restores its spawn facing as well as its position.
   - VFX Studio / With shaders on, PBR champion skins are lit by the scene, metallic skin materials reflect the sky, and materials no longer lose textures or vanish (Aatrox Mecha sword).
   - VFX Studio / With shaders on, skin materials whose exact shader variant the game never compiled now draw with the closest one (K'Sante, Kayn and Sett skins).
