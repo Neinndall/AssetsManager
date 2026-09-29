@@ -732,6 +732,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         WriteVector4(block.Data, 4, 4, Vector4.One);
                         Set(block.Data, 10, particle.DepthPushPull);
                         break;
+                    case "VFXDynamicPerParticleInstanceCBPS":
+                        // PARTICLE_COLOR_FACTOR scales colour and alpha (VFX_Uber_StaticMesh_Unlit with
+                        // PARTICLE_COLOR_ACTIVE); left at zero it hides the draw. Neutral, like the vertex stage's.
+                        WriteVector4(block.Data, 0, 4, Vector4.One);
+                        break;
                     case "IBL_CUBEMAP_SCALES_BUFFER":
                         // Scale of cube 0, the only cube the preview binds (IBL_CUBEMAP_INDEX stays 0).
                         Set(block.Data, 0, 1f);
