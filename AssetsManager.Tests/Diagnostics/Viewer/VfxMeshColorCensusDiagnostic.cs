@@ -10,13 +10,15 @@ using LeagueToolkit.Core.Wad;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-mesh-color-census`: reads every installed particle SCB/SCO (paths under a Particles folder) and counts
-    /// those whose vertex colours are not opaque white, the meshes USE_VERTEX_COLORS changes.
+    /// `vfx-mesh-color-census [path-filter]`: reads every installed particle SCB/SCO (paths under a Particles folder) and counts
+    /// those whose vertex colours are not opaque white, the meshes USE_VERTEX_COLORS changes. Examples are
+    /// limited to paths containing the filter when one is given.
     /// </summary>
     internal static class VfxMeshColorCensusDiagnostic
     {
         public static void Run(string[] args)
         {
+            string filter = args.Length > 0 ? args[0].ToLowerInvariant() : null;
             string hashDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AssetsManager", "hashes");
             var meshPaths = new Dictionary<ulong, string>();
             foreach (string line in File.ReadLines(Path.Combine(hashDir, "hashes.game.txt")))
@@ -56,7 +58,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                         colored++;
                         if (faded) alphaFaded++;
                         if (tint) tinted++;
-                        if (examples.Count < 15) examples.Add($"{path} alpha={(faded ? "fades" : "opaque")} rgb={(tint ? "tinted" : "white")}");
+                        if (examples.Count < 15 && (filter == null || path.Contains(filter, StringComparison.Ordinal))) examples.Add($"{path} alpha={(faded ? "fades" : "opaque")} rgb={(tint ? "tinted" : "white")}");
                     }
                     catch
                     {
