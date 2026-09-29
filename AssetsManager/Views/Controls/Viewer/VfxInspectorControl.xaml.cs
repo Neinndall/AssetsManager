@@ -2065,7 +2065,11 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_championMeshRenderer != null)
                 _championMeshRenderer.ImageLight = imageLight;
             if (_mapCharacterRenderer != null)
+            {
                 _mapCharacterRenderer.ImageLight = imageLight;
+                // Map characters add their glow to the champion's bloom, composed once per frame.
+                _mapCharacterRenderer.Bloom = _championMeshRenderer?.Bloom;
+            }
 
             // Ground navigation belongs to the MAP workspace; a Character backdrop keeps orbiting its subject.
             if (_cameraController != null)

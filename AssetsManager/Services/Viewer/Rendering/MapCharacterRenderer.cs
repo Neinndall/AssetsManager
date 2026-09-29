@@ -189,6 +189,12 @@ namespace AssetsManager.Services.Viewer.Rendering
             _ready = true;
         }
 
+        /// <summary>
+        /// The viewport's shared glow: passes whose shaders write bloom add to it after each draw phase; the
+        /// viewport composes it once per frame. Null leaves map characters without bloom.
+        /// </summary>
+        internal GameShaderBloom Bloom { get; set; }
+
         internal void Render(
             IReadOnlyList<MapCharacterRuntimeGroup> groups,
             Matrix4x4 viewProjection,
@@ -243,10 +249,19 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (solids)
                 {
                     _gl.Uniform1(_uWireframePass, 0);
+                    bool glows = Bloom != null && shadersEnabled && solidMode == VfxPreviewViewMode.Lit;
                     if (transparentPass != true)
+                    {
                         DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
+                        if (glows)
+                            DrawBloomPasses(_opaque, in gameFrame, ref activePalette, ref activeVao);
+                    }
                     if (transparentPass != false)
+                    {
                         DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
+                        if (glows)
+                            DrawBloomPasses(_transparent, in gameFrame, ref activePalette, ref activeVao);
+                    }
                 }
 
                 if (wireframe && transparentPass != false)
@@ -478,23 +493,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
                 if (!wireframePass && command.PassIndex >= 0)
                 {
-                    ConfigureSkinIndexAttribute(command.Resources, integer: true);
-                    if (_gameShaderRuntime.TryBindSkinned(
-                            command.Range.Material,
-                            command.PassIndex,
-                            world,
-                            command.Palette,
-                            command.Resources.TangentVbo != 0,
-                            in drawFrame,
-                            path => ResolveProgramTexture(command.Resources, path),
-                            command.SelfIllumination,
-                            hasColors: command.Resources.ColorVbo != 0))
+                    if (TryDrawGamePass(command, in drawFrame))
                     {
-                        _gameShaderRuntime.DrawBoundPass(
-                            _drawElements,
-                            command.Range.IndexCount,
-                            new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
-                        _gameShaderRuntime.ResetBindings();
                         activePalette = null;
                         continue;
                     }
@@ -528,6 +528,65 @@ namespace AssetsManager.Services.Viewer.Rendering
                         (uint)DrawElementsType.UnsignedInt,
                         new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
             }
+        }
+
+        private bool TryDrawGamePass(DrawCommand command, in GameShaderRuntime.Frame drawFrame)
+        {
+            ConfigureSkinIndexAttribute(command.Resources, integer: true);
+            if (!_gameShaderRuntime.TryBindSkinned(
+                    command.Range.Material,
+                    command.PassIndex,
+                    command.World,
+                    command.Palette,
+                    command.Resources.TangentVbo != 0,
+                    in drawFrame,
+                    path => ResolveProgramTexture(command.Resources, path),
+                    command.SelfIllumination,
+                    hasColors: command.Resources.ColorVbo != 0))
+            {
+                return false;
+            }
+            _gameShaderRuntime.DrawBoundPass(
+                _drawElements,
+                command.Range.IndexCount,
+                new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
+            _gameShaderRuntime.ResetBindings();
+            return true;
+        }
+
+        /// <summary>Redraws the game passes whose shaders write glow, routing it into the shared bloom texture.</summary>
+        private void DrawBloomPasses(
+            IReadOnlyList<DrawCommand> queue,
+            in GameShaderRuntime.Frame gameFrame,
+            ref Matrix4x4[] activePalette,
+            ref uint activeVao)
+        {
+            bool begun = false;
+            foreach (DrawCommand command in queue)
+            {
+                if (command.PassIndex < 0 || !_gameShaderRuntime.WritesBloom(command.Range.Material, command.PassIndex))
+                    continue;
+                if (!begun)
+                {
+                    if (!Bloom.BeginPasses())
+                        return;
+                    begun = true;
+                }
+                if (command.Resources.Vao != activeVao)
+                {
+                    activeVao = command.Resources.Vao;
+                    _gl.BindVertexArray(activeVao);
+                }
+                _gl.FrontFace(command.World.GetDeterminant() < 0f ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
+                var drawFrame = gameFrame with
+                {
+                    CharacterPosition = Vector3.Transform(command.Resources.BoundsCenter, command.World)
+                };
+                TryDrawGamePass(command, in drawFrame);
+                activePalette = null;
+            }
+            if (begun)
+                Bloom.EndPasses();
         }
 
         private static Vector3 MeshBoundsCenter(Vector3[] positions)

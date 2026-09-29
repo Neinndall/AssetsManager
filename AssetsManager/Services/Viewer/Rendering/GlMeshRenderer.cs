@@ -468,6 +468,9 @@ namespace AssetsManager.Services.Viewer.Rendering
         /// <summary>Adds the glow the game passes of this frame wrote; the viewport calls it once, after every model.</summary>
         internal void ComposeBloom() => _bloom?.Compose();
 
+        /// <summary>The frame's glow, which other renderers of the same viewport (map characters) add to.</summary>
+        internal GameShaderBloom Bloom => _bloom;
+
         private bool TryDrawProgramPass(
             SceneModel model,
             PartDraw draw,
