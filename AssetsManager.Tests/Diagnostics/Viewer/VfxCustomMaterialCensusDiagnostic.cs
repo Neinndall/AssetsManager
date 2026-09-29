@@ -66,7 +66,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 return trees[hash] = tree;
             }
 
-            int emitters = 0, own = 0, linked = 0, nowhere = 0, fixedByLinked = 0;
+            int emitters = 0, own = 0, linked = 0, nowhere = 0, fixedByLinked = 0, noProgram = 0, recoveredByShaders = 0;
+            var recoveredExamples = new List<string>();
+            BinTree shaders = Tree(XxHash64Ext.Hash("data/shaders/shaders.bin"));
             var linkedExamples = new List<string>();
             var nowhereExamples = new List<string>();
             var linkedByKind = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -87,7 +89,22 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     {
                         if (emitter.CustomMaterialPathHash == 0) continue;
                         emitters++;
-                        if (tree.Objects.ContainsKey(emitter.CustomMaterialPathHash)) { own++; continue; }
+                        if (tree.Objects.ContainsKey(emitter.CustomMaterialPathHash))
+                        {
+                            own++;
+                            // Whether the material finds its program without, and with, the global shader BIN.
+                            VfxSystemDefinition single = system with { Emitters = new[] { emitter } };
+                            bool bare = VfxGraphParser.ResolveCustomMaterials(single, tree).Emitters[0].CustomMaterial?.Program != null;
+                            bool withShaders = bare || VfxGraphParser.ResolveCustomMaterials(single, tree, shaderTrees: shaders == null ? null : new[] { shaders })
+                                .Emitters[0].CustomMaterial?.Program != null;
+                            if (!bare) noProgram++;
+                            if (!bare && withShaders)
+                            {
+                                recoveredByShaders++;
+                                if (recoveredExamples.Count < 8) recoveredExamples.Add($"{path} {system.Name}/{emitter.Name}");
+                            }
+                            continue;
+                        }
 
                         string found = FindLinked(tree, emitter.CustomMaterialPathHash, Tree);
                         if (found != null)
@@ -111,6 +128,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
 
             Console.WriteLine($"[MaterialCensus] custom-material emitters={emitters} ownBin={own} linkedBin={linked} ({string.Join(", ", linkedByKind.Select(p => $"{p.Key}={p.Value}"))}) nowhere={nowhere} resolvedByLinkedStep={fixedByLinked}");
+            Console.WriteLine($"[MaterialCensus] own-BIN materials without a program={noProgram}, found with data/shaders/shaders.bin={recoveredByShaders} (shaders.bin loaded={shaders != null})");
+            foreach (string line in recoveredExamples) Console.WriteLine($"[MaterialCensus] recovered {line}");
             foreach (string line in linkedExamples) Console.WriteLine($"[MaterialCensus] linked {line}");
             foreach (string line in nowhereExamples) Console.WriteLine($"[MaterialCensus] nowhere {line}");
             foreach (WadFile wad in wads) wad.Dispose();

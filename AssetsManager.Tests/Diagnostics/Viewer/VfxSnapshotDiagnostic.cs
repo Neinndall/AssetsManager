@@ -28,7 +28,7 @@ using PixelFormat = Silk.NET.OpenGL.PixelFormat;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources]`:
+    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions]`:
     /// plays one VFX system of an installed BIN the way VFX Studio does (VfxRenderSession, game particle shaders,
     /// resources extracted from the WADs) and writes a PNG per time over a mid-grey backdrop. With --per-emitter
     /// each root emitter is also drawn alone and measured: how much of the frame it darkens or brightens.
@@ -62,10 +62,13 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 return;
             }
 
+            // VFX custom materials find their CustomShaderDefs in the global shader BIN, as the app loads them.
+            BinTree shaders = args.Contains("--no-shader-definitions") ? null : LoadBin(install, "data/shaders/shaders.bin");
+            BinTree[] shaderTrees = shaders == null ? null : new[] { shaders };
             IReadOnlyDictionary<uint, uint> resourceMap = VfxResourceParser.ExtractResourceMap(tree);
             var systems = VfxSystemParser.ExtractAll(tree).ToDictionary(
                 pair => pair.Key,
-                pair => VfxGraphParser.ResolveCustomMaterials(pair.Value, tree) with { ResourceMap = resourceMap });
+                pair => VfxGraphParser.ResolveCustomMaterials(pair.Value, tree, shaderTrees: shaderTrees) with { ResourceMap = resourceMap });
             VfxSystemDefinition system = FindSystem(systems, systemKey);
             if (system == null)
             {
@@ -119,6 +122,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             Matrix4x4 viewProjection = view * projection;
 
             IReadOnlyList<VfxEmitterDefinition> emitters = system.Emitters ?? Array.Empty<VfxEmitterDefinition>();
+            if (Option(args, "--dump-emitter") is { } dumped)
+                foreach (VfxEmitterDefinition emitter in emitters.Where(item => string.Equals(item.Name, dumped, StringComparison.OrdinalIgnoreCase)))
+                    Console.WriteLine($"[Snapshot] parsed {emitter}");
             Console.WriteLine($"[Snapshot] {system.Name} emitters={emitters.Count} bounds={bounds.Min}..{bounds.Max} eye={frame.Position}");
             string stem = Sanitize(system.Name);
             foreach (double time in times)
@@ -176,15 +182,20 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             return pixels;
         }
 
-        /// <summary>Share of pixels at least `threshold` luminance darker, and brighter, than the backdrop.</summary>
+        /// <summary>
+        /// Share of pixels that differ from the backdrop by at least `threshold` in some channel, split by whether
+        /// their luminance is darker or brighter; a tint of the backdrop's own brightness still counts.
+        /// </summary>
         private static (float Darker, float Brighter) Coverage(float[] pixels, float threshold = 0.08f)
         {
             int darker = 0, brighter = 0, count = pixels.Length / 4;
             for (int at = 0; at < pixels.Length; at += 4)
             {
+                float change = MathF.Max(MathF.Abs(pixels[at] - Backdrop), MathF.Max(MathF.Abs(pixels[at + 1] - Backdrop), MathF.Abs(pixels[at + 2] - Backdrop)));
+                if (change < threshold) continue;
                 float luminance = pixels[at] * 0.2126f + pixels[at + 1] * 0.7152f + pixels[at + 2] * 0.0722f;
-                if (luminance < Backdrop - threshold) darker++;
-                else if (luminance > Backdrop + threshold) brighter++;
+                if (luminance < Backdrop) darker++;
+                else brighter++;
             }
             return (darker / (float)count, brighter / (float)count);
         }

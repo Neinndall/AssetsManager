@@ -24,7 +24,7 @@ using Silk.NET.OpenGL;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-sweep [--champions] [--maps] [--filter TEXT] [--max-skins N] [--max-bins N] [--max-systems N] [--csv FILE]`:
+    /// `vfx-sweep [--champions] [--maps] [--filter TEXT] [--max-skins N] [--max-bins N] [--max-systems N] [--custom-only] [--csv FILE]`:
     /// loads VFX systems of the installed BINs the way VFX Studio does and flags, per emitter:
     /// resources it authors that the engine cannot load (split into absent from the game, not extracted and not
     /// decoded), emitters drawn with the stock program instead of the game's and why, root emitters that emit
@@ -49,6 +49,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             int maxBins = int.TryParse(Option(args, "--max-bins"), out int bins) ? bins : int.MaxValue;
             int maxSystems = int.TryParse(Option(args, "--max-systems"), out int systemsCap) ? systemsCap : 60;
             string csvPath = Option(args, "--csv");
+            bool customOnly = args.Contains("--custom-only");
 
             string install = InstalledSkins.FindInstall();
             AppSettings settings = InstalledSkins.Settings(install);
@@ -95,6 +96,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
 
+            // VFX custom materials find their CustomShaderDefs in the global shader BIN, as the app loads them.
+            BinTree shaders = LoadBin(wadOf, "data/shaders/shaders.bin");
+            BinTree[] shaderTrees = shaders == null ? null : new[] { shaders };
             var findings = new List<Finding>();
             var seenSystems = new HashSet<uint>();
             int systemCount = 0, emitterCount = 0;
@@ -109,14 +113,16 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 {
                     systems = VfxSystemParser.ExtractAll(tree).ToDictionary(
                         pair => pair.Key,
-                        pair => VfxGraphParser.ResolveCustomMaterials(pair.Value, tree) with { ResourceMap = resourceMap });
+                        pair => VfxGraphParser.ResolveCustomMaterials(pair.Value, tree, shaderTrees: shaderTrees) with { ResourceMap = resourceMap });
                 }
                 catch (Exception ex)
                 {
                     findings.Add(new Finding("PARSE_FAIL", binPath, "", "", ex.Message));
                     continue;
                 }
-                VfxSystemDefinition[] chosen = systems.Where(pair => seenSystems.Add(pair.Key)).Select(pair => pair.Value)
+                VfxSystemDefinition[] chosen = systems
+                    .Where(pair => !customOnly || pair.Value.Emitters.Any(emitter => emitter.CustomMaterialPathHash != 0))
+                    .Where(pair => seenSystems.Add(pair.Key)).Select(pair => pair.Value)
                     .OrderBy(system => system.Name, StringComparer.Ordinal).Take(maxSystems).ToArray();
                 if (chosen.Length == 0) continue;
 
@@ -264,6 +270,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 if (def.Disabled || spawned.Contains(order)) continue;
                 float start = def.TimeBeforeFirstEmission;
                 if (start >= until) continue;
+                // Lifetime and delay share the system's clock: a delay past the lifetime never emits, in game
+                // too (vfx-emission-window-census: 0.4% of emitters, copy-pasted leftovers).
+                if (def.EmitterLifetime is { } life && start > life) continue;
                 Flag("NO_PARTICLES", def, $"start={start:0.00}s window={until:0.00}s prim={def.PrimitiveKind}");
             }
         }

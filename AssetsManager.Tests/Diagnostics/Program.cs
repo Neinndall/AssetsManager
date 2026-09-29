@@ -351,6 +351,16 @@ namespace AssetsManager.Tests.Diagnostics
                 MapSpawnProbeDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-emission-window-census", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxEmissionWindowCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-bundle-materials", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxBundleMaterialsDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "vfx-field-census", StringComparison.OrdinalIgnoreCase))
             {
                 VfxFieldCensusDiagnostic.Run(args.Skip(1).ToArray());

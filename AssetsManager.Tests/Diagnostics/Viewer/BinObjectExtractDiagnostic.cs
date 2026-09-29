@@ -11,7 +11,7 @@ using LeagueToolkit.Hashing;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `bin-object-extract <outDir> <entry-hash-hex>... [--maps|--champions]`: writes every installed BIN that declares
+    /// `bin-object-extract <outDir> <entry-hash-hex>... [--maps|--champions] [--tree]`: writes every installed BIN that declares
     /// one of the given object path hashes to outDir, for bin-ritobin-file.
     /// </summary>
     internal static class BinObjectExtractDiagnostic
@@ -54,7 +54,14 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     }
                     catch { continue; }
                     if (!named.Contains(chunk) && !tree.Objects.Keys.Any(wanted.Contains)) continue;
-                    string target = Path.Combine(output, binPath.Replace('/', '_'));
+                    // --tree keeps the game folder layout, so linked BINs resolve as in an extracted project.
+                    string target = args.Contains("--tree")
+                        ? Path.Combine(output, binPath.Replace('/', Path.DirectorySeparatorChar))
+                        : Path.Combine(output, binPath.Replace('/', '_'));
+                    // Names past the file system limit are stored as <hash>.bin at the root, as extracted projects do.
+                    if (Path.GetFileName(target).Length > 200)
+                        target = Path.Combine(output, $"{chunk:x16}.bin");
+                    Directory.CreateDirectory(Path.GetDirectoryName(target));
                     File.WriteAllBytes(target, bytes);
                     Console.WriteLine($"[Extract] {binPath} -> {target} ({Path.GetFileName(wadPath)})");
                 }
