@@ -393,66 +393,73 @@
                         <RowDefinition Height="*"/>    <!-- Asset tree -->
                     </Grid.RowDefinitions>
 
-                    <!-- HERO ASSETS HEADER CARD -->
-                    <Border Grid.Row="0" Margin="0,0,0,10"
-                            Background="{StaticResource CardBackground}" 
-                            CornerRadius="10" 
-                            BorderBrush="{StaticResource BorderColor}" 
-                            BorderThickness="1"
-                            Padding="10,8">
+                    <!-- Studio controls and active project -->
+                    <Border Grid.Row="0" Margin="0,0,0,10" Background="{StaticResource CardBackground}"
+                            CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,8">
                         <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Left Icon Badge -->
-                            <Border Grid.Column="0" Background="#15FFFFFF" CornerRadius="7" Width="28" Height="28" Margin="0,0,9,0" VerticalAlignment="Center">
-                                <materialIcons:MaterialIcon Kind="LayersOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-
-                            <!-- Title & Project name -->
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" ToolTip="{Binding ProjectPath}">
-                                <TextBlock Text="ASSETS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <materialIcons:MaterialIcon Kind="FolderOutline" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding ProjectName}" FontSize="9" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" MaxWidth="140" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="LayersOutline" Width="15" Height="15"
+                                                                Foreground="{StaticResource AccentBrush}" Margin="0,0,7,0"/>
+                                    <TextBlock Text="VFX STUDIO" FontSize="10" FontWeight="Bold"
+                                               Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                 </StackPanel>
-                            </StackPanel>
-
-                            <!-- Actions Toolbar (compact buttons with AccentBrush hover) -->
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Click="ExitStudio_Click"
-                                        Style="{StaticResource TransparentIconButton}"
-                                        Width="26" Height="26" Padding="0" Margin="0,0,2,0"
-                                        ToolTip="Exit VFX Studio">
-                                    <materialIcons:MaterialIcon Kind="ExitToApp" Width="14" Height="14"/>
-                                </Button>
-                                <ToggleButton IsChecked="{Binding InspectorVisible, Mode=TwoWay}"
-                                              Style="{StaticResource TransparentIconToggleButton}"
-                                              Width="26" Height="26" Padding="0" Margin="0,0,2,0"
-                                              ToolTip="Show / Hide Inspector"
-                                              Visibility="{Binding HasContextInspector, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <materialIcons:MaterialIcon Width="14" Height="14">
-                                        <materialIcons:MaterialIcon.Style>
-                                            <Style TargetType="materialIcons:MaterialIcon">
-                                                <Setter Property="Kind" Value="EyeOutline"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding InspectorVisible}" Value="False">
-                                                        <Setter Property="Kind" Value="EyeOffOutline"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialIcons:MaterialIcon.Style>
-                                    </materialIcons:MaterialIcon>
-                                </ToggleButton>
-                                <Button Click="BrowseRoot_Click"
-                                        Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0"
-                                        ToolTip="Open another project folder / WAD">
-                                    <materialIcons:MaterialIcon Kind="FolderOpen" Width="14" Height="14"/>
-                                </Button>
-                            </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <ToggleButton IsChecked="{Binding TimelineVisible, Mode=TwoWay}"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  Width="26" Height="26" Padding="0" Margin="0,0,2,0" ToolTip="Show / Hide Timeline">
+                                        <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="14" Height="14"/>
+                                    </ToggleButton>
+                                    <ToggleButton IsChecked="{Binding InspectorVisible, Mode=TwoWay}"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  Width="26" Height="26" Padding="0" Margin="0,0,2,0" ToolTip="Show / Hide Inspector">
+                                        <materialIcons:MaterialIcon Kind="TuneVariant" Width="14" Height="14"/>
+                                    </ToggleButton>
+                                    <Button Click="ExitStudio_Click" Style="{StaticResource TransparentIconButton}"
+                                            Width="26" Height="26" Padding="0" ToolTip="Exit VFX Studio">
+                                        <materialIcons:MaterialIcon Kind="ExitToApp" Width="14" Height="14"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                            <Grid Grid.Row="1" Margin="0,7,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Background="#15FFFFFF" CornerRadius="7" Width="28" Height="28" Margin="0,0,8,0" VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="FolderOutline" Width="15" Height="15"
+                                                                Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" ToolTip="{Binding ProjectPath}">
+                                    <TextBlock Text="{Binding ProjectName}" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="PROJECT FOLDER" FontSize="8" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="5,0,0,0">
+                                    <Button Click="BrowseRoot_Click" Style="{StaticResource TransparentIconButton}"
+                                            Width="26" Height="26" Padding="0" ToolTip="Open project folder">
+                                        <materialIcons:MaterialIcon Kind="FolderOpen" Width="14" Height="14"/>
+                                    </Button>
+                                    <Button Click="ReloadRoot_Click" Style="{StaticResource TransparentIconButton}"
+                                            IsEnabled="{Binding HasProject}" Width="26" Height="26" Padding="0" ToolTip="Reload project">
+                                        <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14"/>
+                                    </Button>
+                                    <Button Click="CloseProject_Click" Style="{StaticResource TransparentIconButton}"
+                                            IsEnabled="{Binding HasProject}" Width="26" Height="26" Padding="0"
+                                            ToolTip="Close project (keeps files on disk)">
+                                        <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
                         </Grid>
                     </Border>
 
@@ -465,11 +472,43 @@
                              Margin="0,0,0,8"
                              TextChanged="SearchQuery_TextChanged"/>
 
-                    <TreeView x:Name="VfxBrowser" Grid.Row="2" ItemsSource="{Binding BrowserRoots}"
-                              Style="{StaticResource ModernTreeView}" ItemContainerStyle="{StaticResource VfxBrowserBranchStyle}"
-                              SelectedItemChanged="VfxBrowser_SelectedItemChanged" BorderThickness="0" Background="Transparent"
-                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                              VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"/>
+                    <Grid Grid.Row="2">
+                        <TreeView x:Name="VfxBrowser" ItemsSource="{Binding BrowserRoots}"
+                                  Style="{StaticResource ModernTreeView}" ItemContainerStyle="{StaticResource VfxBrowserBranchStyle}"
+                                  SelectedItemChanged="VfxBrowser_SelectedItemChanged" BorderThickness="0" Background="Transparent"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"/>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="230">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding BrowserRoots.Count}" Value="0"/>
+                                                <Condition Binding="{Binding IsProjectLoading}" Value="False"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <materialIcons:MaterialIcon Kind="FolderOpen" Width="30" Height="30" Foreground="{StaticResource TextMuted}" Margin="0,0,0,12"/>
+                            <TextBlock Text="{Binding ProjectBrowserMessage}" Foreground="{StaticResource TextMuted}" FontSize="11"
+                                       TextWrapping="Wrap" TextAlignment="Center"/>
+                        </StackPanel>
+                        <Grid Background="{StaticResource SidebarBackground}"
+                              Visibility="{Binding IsProjectLoading, Converter={StaticResource BoolToVis}}">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="230">
+                                <materialIcons:MaterialIcon Kind="FolderOpen" Width="30" Height="30" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,12"/>
+                                <TextBlock Text="Loading project..." Foreground="{StaticResource TextPrimary}" FontSize="12" FontWeight="SemiBold" TextAlignment="Center"/>
+                                <TextBlock Text="{Binding ProjectBrowserMessage}" Foreground="{StaticResource TextMuted}" FontSize="10"
+                                           TextWrapping="Wrap" TextAlignment="Center" Margin="0,5,0,14"/>
+                                <ProgressBar Width="120" Height="4" Style="{StaticResource ModernProgressBar}"
+                                             IsIndeterminate="{Binding IsProjectLoading}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
 
                 </Grid>
             </Border>
@@ -481,8 +520,8 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>               <!-- Workspace tabs -->
                     <RowDefinition Height="3*" MinHeight="220"/> <!-- 3D Viewport Card -->
-                    <RowDefinition Height="6"/>                  <!-- Resize Splitter -->
-                    <RowDefinition Height="170" MinHeight="170"/> <!-- Timeline Deck Card -->
+                    <RowDefinition x:Name="TimelineSplitterRow" Height="6"/> <!-- Resize Splitter -->
+                    <RowDefinition x:Name="TimelineDeckRow" Height="170" MinHeight="170"/> <!-- Timeline Deck Card -->
                 </Grid.RowDefinitions>
 
                 <!-- Open Skin / MAP workspaces. Mirrors Explorer tab interaction without coupling to FileSystemNodeModel. -->
@@ -1355,10 +1394,12 @@
 
                 <!-- SPLITTER (Seamless Viewport vs Timeline height adjust) -->
                 <GridSplitter Grid.Row="2" Height="8" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                              Visibility="{Binding TimelineVisible, Converter={StaticResource BoolToVis}}"
                               Background="Transparent" Cursor="SizeNS" ShowsPreview="False"/>
 
                 <!-- 2. TIMELINE & TRANSPORT DECK (Independent Card outside Viewport, LTK-Manager / DAW Studio Style) -->
                 <Border Grid.Row="3" Background="{StaticResource CardBackground}" CornerRadius="10"
+                        Visibility="{Binding TimelineVisible, Converter={StaticResource BoolToVis}}"
                         BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,8">
                     <Grid>
                         <Grid>
@@ -2059,7 +2100,7 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Grid.Column="0" Kind="AccountMultiplePlusOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock Grid.Column="1" Text="Add Characters with + on a Skin in ASSETS, or right-click it." FontSize="10"
+                                        <TextBlock Grid.Column="1" Text="Add Characters with + on a Skin in the project tree, or right-click it." FontSize="10"
                                                    Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>

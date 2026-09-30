@@ -1569,6 +1569,43 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
+        private bool _timelineVisible = true;
+        private bool _isProjectLoading;
+        private string _projectBrowserMessage = "Open a project folder to browse assets.";
+
+        public bool TimelineVisible
+        {
+            get => _timelineVisible;
+            set
+            {
+                if (_timelineVisible == value) return;
+                _timelineVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsProjectLoading
+        {
+            get => _isProjectLoading;
+            set
+            {
+                if (_isProjectLoading == value) return;
+                _isProjectLoading = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string ProjectBrowserMessage
+        {
+            get => _projectBrowserMessage;
+            set
+            {
+                if (_projectBrowserMessage == value) return;
+                _projectBrowserMessage = value;
+                OnPropertyChanged();
+            }
+        }
+
         public string ProjectName
         {
             get

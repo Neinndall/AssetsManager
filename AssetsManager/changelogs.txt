@@ -154,6 +154,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio / Clearer project controls, close and reload actions, a loading state in the asset tree and a Show / Hide Timeline toggle.
   - Viewer / Right-click panning and WASD movement are half as fast by default (Shift and Ctrl still scale them).
   - VFX Studio / Systems automatically choose projectile or trail previews from their effect references and emission data.
   - Viewer / WASD camera movement now works in every viewport at the same pace, not only maps (Shift faster, Ctrl slower).

@@ -810,7 +810,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void OnModelPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(VfxInspectorModel.SelectedSkin))
+            if (e.PropertyName == nameof(VfxInspectorModel.TimelineVisible))
+            {
+                ApplyTimelineVisibility();
+            }
+            else if (e.PropertyName == nameof(VfxInspectorModel.SelectedSkin))
             {
                 if (_model.SelectedSkin != null && !_isSwitchingWorkspaceTab)
                 {
@@ -3328,50 +3332,19 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ReleaseCurrentProject()
         {
             _scanCancellation?.Cancel();
-            _binCancellation?.Cancel();
+            _scanCancellation = null;
+            _model.IsProjectLoading = false;
+            _model.ProjectBrowserMessage = "Open a project folder to browse assets.";
+            _pendingWorkspaceRestoreTab = null;
+            _startNextPreviewPaused = false;
+            _startNextPreviewTime = 0;
             ClearWorkspaceTabs();
             CancelMapLoadAndClearScene();
             _mapClipCancellation?.Dispose();
             _mapClipCancellation = null;
-            _animationClipCancellation?.Cancel();
-            _animationClipCancellation?.Dispose();
-            _animationClipCancellation = null;
-            _championLoadGeneration++;
-            _model.IsPlaying = false;
-            _vfxRenderer?.Pause();
-            _pendingSystem = null;
-            _inspectedSystem = null;
-            _pendingSpell = null;
-            _activeSpellPlan = null;
-            ClearAnimationClipCues();
-
-            if (_championModel != null)
-            {
-                var championModel = _championModel;
-                _championModel = null;
-                _championMeshRenderer?.QueueRelease(championModel);
-                championModel.CurrentAnimation = null;
-                RunReleaseStep("Champion SceneModel", championModel.Dispose);
-            }
-
-            RunReleaseStep("Champion animation cache", () => _championAnimationService?.ClearCache());
-            var clipCatalog = _clipCatalog;
-            _clipCatalog = null;
-            RunReleaseStep(nameof(VfxClipCatalog), () => clipCatalog?.Dispose());
-            _activeBundle = null;
-            _championBundle = null;
-            ClearCharacterFormState();
-
-            _model.SelectedAnimation = null;
-            _model.SelectedSpell = null;
-            _model.SelectedSystem = null;
+            ClearLoadedSkinState();
+            _standaloneRunMemory.Clear();
             _model.SelectedSkin = null;
-            _model.DetectedAnimations.Clear();
-            _model.Systems.Clear();
-            _model.SelectedEmitter = null;
-            _model.Emitters.Clear();
-            _model.Textures.Clear();
-            _model.Meshes.Clear();
             _model.DetectedSkins.Clear();
             _model.BrowserRoots.Clear();
             _suppressMapVariantReload = true;
@@ -3384,6 +3357,18 @@ namespace AssetsManager.Views.Controls.Viewer
                 _suppressMapVariantReload = false;
             }
             _model.LogMessages.Clear();
+            _isApplyingCharacterViewportState = true;
+            try
+            {
+                _model.SelectedCharacterBackdrop = null;
+                _model.CharacterBackdropEnabled = false;
+                _model.CharacterBackdrops.Clear();
+            }
+            finally
+            {
+                _isApplyingCharacterViewportState = false;
+            }
+            _model.NotifyCharacterCollectionsChanged();
             _model.RootPath = string.Empty;
             _model.SearchQuery = string.Empty;
             _model.EmitterFilterText = string.Empty;
@@ -3403,7 +3388,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             var dialog = new OpenFolderDialog
             {
-                Title = "Select asset directory root"
+                Title = "Open VFX Studio project folder"
             };
 
             if (dialog.ShowDialog() == true)
@@ -3428,6 +3413,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
 
             string fullRoot = Path.GetFullPath(rootFolder);
+            ReleaseCurrentProject();
             _model.RootPath = fullRoot;
             // Folder selection is discovery-only. MAP geometry is loaded exclusively from the
             // unified VFX Studio browser through an explicit MapFile selection.
@@ -3440,16 +3426,9 @@ namespace AssetsManager.Views.Controls.Viewer
             _scanCancellation?.Cancel();
             _scanCancellation = new System.Threading.CancellationTokenSource();
             var operation = _scanCancellation;
-            CancelMapLoadAndClearScene();
-
-            // A folder scan is discovery-only. Drop any previously loaded workspace before
-            // populating the new catalog so the project opens in a neutral, collapsed state.
-            ClearWorkspaceTabs();
-            ClearLoadedSkinState();
-            _model.SelectedSkin = null;
-            _model.DetectedSkins.Clear();
-            _model.BrowserRoots.Clear();
-            _model.StatusText = "Reading BIN catalog...";
+            _model.IsProjectLoading = true;
+            _model.ProjectBrowserMessage = "Discovering project assets...";
+            _model.StatusText = "Loading project...";
             Func<uint, string> resolveBinEntry = VfxLoadingService == null
                 ? null
                 : VfxLoadingService.ResolveBinEntryPath;
@@ -3465,6 +3444,8 @@ namespace AssetsManager.Views.Controls.Viewer
                         resolveBinEntry,
                         LogService),
                     operation.Token);
+                if (operation.IsCancellationRequested || _isCleanedUp || !ReferenceEquals(_scanCancellation, operation)) return false;
+                _model.ProjectBrowserMessage = "Preparing scene options...";
                 IReadOnlyList<MapSceneSource> installationMaps = await System.Threading.Tasks.Task.Run(
                     () => VfxInstallationMapCatalog.Discover(
                         AppSettings,
@@ -3473,7 +3454,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         operation.Token,
                         LogService),
                     operation.Token);
-                if (operation.IsCancellationRequested || _isCleanedUp) return false;
+                if (operation.IsCancellationRequested || _isCleanedUp || !ReferenceEquals(_scanCancellation, operation)) return false;
                 _model.DetectedSkins.Clear();
                 _model.BrowserRoots.Clear();
                 _model.CharacterBackdrops.Clear();
@@ -3517,6 +3498,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     _suppressMapVariantReload = false;
                 }
 
+                _model.ProjectBrowserMessage = "No previewable assets were found in this folder.";
                 VfxBrowserFolder charactersRoot = catalog.Roots.FirstOrDefault(root =>
                     string.Equals(root.Title, "Characters", StringComparison.Ordinal));
                 int characterCount = charactersRoot?.Children.OfType<VfxBrowserFolder>().Count() ?? 0;
@@ -3532,11 +3514,20 @@ namespace AssetsManager.Views.Controls.Viewer
             catch (Exception ex)
             {
                 LogService?.LogError(ex, "Failed to scan VFX folder.");
+                if (ReferenceEquals(_scanCancellation, operation))
+                {
+                    _model.ProjectBrowserMessage = "Could not load this folder. Try reloading the project.";
+                    _model.StatusText = "Unable to load project.";
+                }
                 return false;
             }
             finally
             {
-                if (ReferenceEquals(_scanCancellation, operation)) _scanCancellation = null;
+                if (ReferenceEquals(_scanCancellation, operation))
+                {
+                    _scanCancellation = null;
+                    _model.IsProjectLoading = false;
+                }
                 operation.Dispose();
             }
         }
