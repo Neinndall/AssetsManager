@@ -24,13 +24,15 @@ using Silk.NET.OpenGL;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-sweep [--champions] [--maps] [--filter TEXT] [--max-skins N] [--max-bins N] [--max-systems N] [--max-seconds N] [--custom-only] [--csv FILE]`:
+    /// `vfx-sweep [--champions] [--maps] [--filter TEXT] [--max-skins N] [--max-bins N] [--max-systems N] [--max-seconds N] [--custom-only] [--csv FILE [--resume]]`:
     /// loads VFX systems of the installed BINs (skin BINs, the shared character BINs they link, map materials) the way
     /// VFX Studio does and flags, per emitter:
     /// resources it authors that the engine cannot load (split into absent from the game, not extracted and not
     /// decoded), emitters drawn with the stock program instead of the game's and why, root emitters that emit
     /// nothing during the sampled seconds (4 by default), child emitters alive past their first emission without a
     /// particle, particles with non-finite or runaway positions, and emitters holding more than 2000 live particles.
+    /// With --csv each BIN's findings are appended as soon as it is swept and the BIN is logged in FILE.done with the
+    /// systems it covered, so a stopped sweep continues with --resume and the summary covers the whole CSV.
     /// </summary>
     internal static class VfxSweepDiagnostic
     {
@@ -53,6 +55,27 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 ? seconds
                 : DefaultSampleSeconds;
             string csvPath = Option(args, "--csv");
+            bool resume = args.Contains("--resume");
+            string donePath = csvPath == null ? null : csvPath + ".done";
+            var doneBins = new HashSet<string>(StringComparer.Ordinal);
+            var resumedSystems = new HashSet<uint>();
+            if (csvPath != null && resume && File.Exists(donePath))
+            {
+                foreach (string line in File.ReadLines(donePath))
+                {
+                    string[] parts = line.Split('|');
+                    doneBins.Add(parts[0]);
+                    if (parts.Length > 1)
+                        foreach (string hash in parts[1].Split(',', StringSplitOptions.RemoveEmptyEntries))
+                            if (uint.TryParse(hash, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint value))
+                                resumedSystems.Add(value);
+                }
+            }
+            else if (csvPath != null)
+            {
+                File.WriteAllText(csvPath, "flag,bin,system,emitter,detail" + Environment.NewLine);
+                File.WriteAllText(donePath, string.Empty);
+            }
             bool customOnly = args.Contains("--custom-only");
 
             string install = InstalledSkins.FindInstall();
@@ -108,13 +131,34 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             BinTree shaders = LoadBin(wadOf, "data/shaders/shaders.bin");
             BinTree[] shaderTrees = shaders == null ? null : new[] { shaders };
             var findings = new List<Finding>();
-            var seenSystems = new HashSet<uint>();
+            var seenSystems = new HashSet<uint>(resumedSystems);
+            if (doneBins.Count > 0)
+                Console.WriteLine($"[VfxSweep] resuming: {doneBins.Count} BINs already swept");
             int systemCount = 0, emitterCount = 0;
             var clock = System.Diagnostics.Stopwatch.StartNew();
             foreach (string binPath in targets)
             {
+                if (doneBins.Contains(binPath)) continue;
+                int firstFinding = findings.Count;
+                var binSystems = new List<uint>();
+                try
+                {
+                    SweepBin(binPath, binSystems);
+                }
+                finally
+                {
+                    if (csvPath != null)
+                    {
+                        File.AppendAllLines(csvPath, findings.Skip(firstFinding).Select(CsvRow));
+                        File.AppendAllText(donePath, $"{binPath}|{string.Join(",", binSystems.Select(hash => hash.ToString("x8")))}{Environment.NewLine}");
+                    }
+                }
+            }
+
+            void SweepBin(string binPath, List<uint> binSystems)
+            {
                 BinTree tree = LoadBin(wadOf, binPath);
-                if (tree == null) continue;
+                if (tree == null) return;
                 IReadOnlyDictionary<uint, uint> resourceMap = VfxResourceParser.ExtractResourceMap(tree);
                 Dictionary<uint, VfxSystemDefinition> systems;
                 try
@@ -126,13 +170,14 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 catch (Exception ex)
                 {
                     findings.Add(new Finding("PARSE_FAIL", binPath, "", "", ex.Message));
-                    continue;
+                    return;
                 }
                 VfxSystemDefinition[] chosen = systems
                     .Where(pair => !customOnly || pair.Value.Emitters.Any(emitter => emitter.CustomMaterialPathHash != 0))
                     .Where(pair => seenSystems.Add(pair.Key)).Select(pair => pair.Value)
                     .OrderBy(system => system.Name, StringComparer.Ordinal).Take(maxSystems).ToArray();
-                if (chosen.Length == 0) continue;
+                binSystems.AddRange(chosen.Select(system => system.PathHash));
+                if (chosen.Length == 0) return;
 
                 VfxSceneResourceContext resources;
                 try
@@ -144,7 +189,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 catch (Exception ex)
                 {
                     findings.Add(new Finding("EXTRACT_FAIL", binPath, "", "", ex.Message));
-                    continue;
+                    return;
                 }
 
                 using (resources)
@@ -172,7 +217,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
 
             Console.WriteLine($"[VfxSweep] systems={systemCount} emitters={emitterCount} findings={findings.Count} elapsed={clock.Elapsed:hh\\:mm\\:ss}");
-            foreach (IGrouping<string, Finding> flag in findings.GroupBy(finding => finding.Flag).OrderByDescending(group => group.Count()))
+            // A CSV holds every run of a resumed sweep; summarize all of it.
+            IReadOnlyList<Finding> all = csvPath != null ? ReadCsv(csvPath) : findings;
+            foreach (IGrouping<string, Finding> flag in all.GroupBy(finding => finding.Flag).OrderByDescending(group => group.Count()))
             {
                 Console.WriteLine($"[VfxSweep] {flag.Key} x{flag.Count()} systems={flag.Select(f => f.Bin + f.System).Distinct().Count()}");
                 foreach (IGrouping<string, Finding> detail in flag.GroupBy(finding => finding.Detail).OrderByDescending(group => group.Count()).Take(8))
@@ -182,11 +229,27 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 }
             }
             if (csvPath != null)
+                Console.WriteLine($"[VfxSweep] csv={csvPath} findings={all.Count}");
+        }
+
+        private static string CsvRow(Finding finding) =>
+            $"{finding.Flag},{finding.Bin},\"{finding.System}\",\"{finding.Emitter}\",\"{finding.Detail?.Replace('"', '\'')}\"";
+
+        private static IReadOnlyList<Finding> ReadCsv(string path)
+        {
+            var rows = new List<Finding>();
+            foreach (string line in File.ReadLines(path).Skip(1))
             {
-                File.WriteAllLines(csvPath, new[] { "flag,bin,system,emitter,detail" }.Concat(findings.Select(finding =>
-                    $"{finding.Flag},{finding.Bin},\"{finding.System}\",\"{finding.Emitter}\",\"{finding.Detail?.Replace('"', '\'')}\"")));
-                Console.WriteLine($"[VfxSweep] csv={csvPath}");
+                // flag,bin,"system","emitter","detail": the quoted fields never hold a double quote.
+                int firstComma = line.IndexOf(',');
+                int secondComma = firstComma < 0 ? -1 : line.IndexOf(',', firstComma + 1);
+                if (secondComma < 0) continue;
+                string[] quoted = line[(secondComma + 1)..].Split("\",\"");
+                if (quoted.Length != 3) continue;
+                rows.Add(new Finding(line[..firstComma], line[(firstComma + 1)..secondComma],
+                    quoted[0].TrimStart('"'), quoted[1], quoted[2].TrimEnd('"')));
             }
+            return rows;
         }
 
         private static void Check(
