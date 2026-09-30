@@ -286,10 +286,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
                 VfxSystemDefinition system = Assert.Single(bundle.Systems).Value;
                 Assert.Equal("Inherited", system.Name);
-                Assert.Equal(
-                    Path.GetFullPath(sharedBin),
-                    bundle.SystemSources[system.PathHash],
-                    ignoreCase: true);
             }
             finally
             {
@@ -450,104 +446,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Assert.Null(resolved.Emitters[1].MeshPath);
                 Assert.False(resolved.Emitters[1].SuppressesBeamRibbon);
                 Assert.True(resolved.Emitters[1].DrawsAsBeam);
-            }
-            finally
-            {
-                Directory.Delete(root, recursive: true);
-            }
-        }
-
-        [Fact]
-        public void ResourceIdentityIgnoresTransformEditsButDetectsAppearanceAssets()
-        {
-            VfxEmitterDefinition emitter = CreateEmitter(VfxPrimitiveKind.CameraQuad) with
-            {
-                TexturePath = "spark.dds",
-                TextureMultPath = "detail.dds",
-                TranslationOverride = Vector3.Zero
-            };
-            var definition = new VfxSystemDefinition(1, "assets", "assets", new[] { emitter });
-
-            VfxSystemDefinition transformOnly = definition with
-            {
-                Emitters = new[] { emitter with { TranslationOverride = new Vector3(10f, 20f, 30f) } }
-            };
-            Assert.True(VfxLoadingService.UsesSameResolvedAssets(definition, transformOnly));
-
-            VfxSystemDefinition textureEdit = definition with
-            {
-                Emitters = new[] { emitter with { TexturePath = "other.dds" } }
-            };
-            Assert.False(VfxLoadingService.UsesSameResolvedAssets(definition, textureEdit));
-
-            VfxSystemDefinition meshEdit = definition with
-            {
-                Emitters = new[] { emitter with { IsMeshPrimitive = true, MeshPath = "shape.scb" } }
-            };
-            Assert.False(VfxLoadingService.UsesSameResolvedAssets(definition, meshEdit));
-        }
-
-        [Fact]
-        public void CompatibleSwapRefreshDetachesStaleGpuBindingsWithoutRebuildingThePool()
-        {
-            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxSwapResources", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(root);
-            try
-            {
-                VfxEmitterDefinition emitter = CreateEmitter(VfxPrimitiveKind.CameraQuad) with
-                {
-                    TexturePath = "old.dds"
-                };
-                var definition = new VfxSystemDefinition(1, "swap", "swap", new[] { emitter });
-                using var logger = new LoggerConfiguration().CreateLogger();
-                using var service = new VfxLoadingService();
-                VfxPlaybackGraphRuntime graph = service.PreparePlaybackGraph(
-                    definition,
-                    new Dictionary<uint, VfxSystemDefinition> { [1] = definition },
-                    new Dictionary<uint, uint>(),
-                    root,
-                    Matrix4x4.Identity,
-                    17,
-                    new LogService(logger));
-
-                VfxPlaybackRuntime.EmitterState state = Assert.Single(graph.Root.Emitters);
-                state.Texture = 101;
-                state.TextureMult = 102;
-                state.ColorGradientTexture = 103;
-                state.MeshVao = 201;
-                state.MeshVbo = 202;
-                state.MeshEbo = 203;
-                state.MeshVertexCount = 9;
-                state.MeshIndexCount = 9;
-
-                VfxSystemDefinition edited = definition with
-                {
-                    Emitters = new[]
-                    {
-                        emitter with
-                        {
-                            TexturePath = "new.dds",
-                            TextureMultPath = null,
-                            ParticleColorTexturePath = null,
-                            MeshPath = null,
-                            IsMeshPrimitive = false
-                        }
-                    }
-                };
-                Assert.True(graph.TrySwapRootDefinition(edited));
-                service.RefreshPlaybackGraphResources(graph, root, new LogService(logger), ownerSceneContext: null);
-
-                Assert.Same(state, Assert.Single(graph.Root.Emitters));
-                Assert.Equal("new.dds", state.Def.TexturePath);
-                Assert.Equal(0u, state.Texture);
-                Assert.Equal(0u, state.TextureMult);
-                Assert.Equal(0u, state.ColorGradientTexture);
-                Assert.Null(state.PendingTexture);
-                Assert.Equal(0u, state.MeshVao);
-                Assert.Equal(0u, state.MeshVbo);
-                Assert.Equal(0u, state.MeshEbo);
-                Assert.Equal(0, state.MeshVertexCount);
-                Assert.Equal(0, state.MeshIndexCount);
             }
             finally
             {

@@ -156,8 +156,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         public VfxPlaybackRuntime Root { get; }
         public IReadOnlyList<VfxPlaybackRuntime> Runtimes => _runtimes;
-        internal IReadOnlyList<VfxPlaybackRuntime> ResourceRuntimes
-            => _runtimes.Concat(_pendingChildren).Distinct().ToArray();
         internal IReadOnlyList<VfxSystemDefinition> ResourceDefinitions
         {
             get
@@ -279,132 +277,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _pinnedBirthChance = chance;
             foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
                 runtime.SetPinnedBirthChance(chance);
-        }
-
-        /// <summary>
-        /// Applies an authoring edit to the opened system without rewinding when pool indices still
-        /// address the same emitters. Child runs remain alive, matching the driver.swap repoint path.
-        /// Structural edits return false so the session can rebuild deterministically instead.
-        /// </summary>
-        internal bool TrySwapRootDefinition(VfxSystemDefinition next)
-        {
-            if (next is null || next.PathHash != Root.Definition.PathHash || !Root.TrySwapDefinition(next))
-                return false;
-
-            RepointChildrenAfterSwap(Root, next);
-            BuildRenderRanks(next);
-            foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
-            {
-                AssignRenderIdentity(runtime, _paths.GetValueOrDefault(runtime, string.Empty));
-                ApplyVisibility(runtime);
-            }
-            return true;
-        }
-
-        private void RepointChildrenAfterSwap(VfxPlaybackRuntime parent, VfxSystemDefinition freshParent)
-        {
-            if (!_childrenByParent.TryGetValue(parent, out List<VfxPlaybackRuntime> direct) || direct.Count == 0)
-                return;
-
-            // Snapshot because an incompatible edit can release a whole descendant subtree.
-            VfxPlaybackRuntime[] children = direct.ToArray();
-            foreach (VfxPlaybackRuntime child in children)
-            {
-                if (!_activeRuntimes.Contains(child) && !_pendingChildren.Contains(child)) continue;
-                if (!TryParseChildAddress(_paths.GetValueOrDefault(child, string.Empty), out int sourceOrder, out int slot) ||
-                    (uint)sourceOrder >= (uint)freshParent.Emitters.Count)
-                {
-                    ReleaseSubtree(child);
-                    continue;
-                }
-
-                VfxChildParticleSetDefinition set = freshParent.Emitters[sourceOrder].ChildParticleSet;
-                if (set is null || (uint)slot >= (uint)set.Children.Count)
-                {
-                    ReleaseSubtree(child);
-                    continue;
-                }
-
-                VfxSystemDefinition freshChild = ResolveSwapSystem(set.Children[slot], freshParent);
-                if (freshChild is null || !VfxPlaybackRuntime.AddressesSameEmitters(child.Definition, freshChild))
-                {
-                    ReleaseSubtree(child);
-                    continue;
-                }
-
-                child.TrySwapDefinition(freshChild);
-                RefreshCarriedBinding(parent, child, sourceOrder, slot, set, freshChild);
-                RepointChildrenAfterSwap(child, freshChild);
-            }
-        }
-
-        private VfxSystemDefinition ResolveSwapSystem(
-            VfxChildSystemReference reference,
-            VfxSystemDefinition freshParent)
-        {
-            if (reference is null) return null;
-            if (reference.SystemHash != 0 && reference.SystemHash == freshParent.PathHash)
-                return freshParent;
-
-            IReadOnlyDictionary<uint, uint> resourceMap = freshParent.ResourceMap ?? _resourceMap;
-            if (reference.EffectKey != 0 &&
-                resourceMap.TryGetValue(reference.EffectKey, out uint mapped) &&
-                mapped == freshParent.PathHash)
-            {
-                return freshParent;
-            }
-            return ResolveSystem(reference, _systems, resourceMap);
-        }
-
-        private void RefreshCarriedBinding(
-            VfxPlaybackRuntime parent,
-            VfxPlaybackRuntime child,
-            int sourceOrder,
-            int slot,
-            VfxChildParticleSetDefinition set,
-            VfxSystemDefinition definition)
-        {
-            foreach (KeyValuePair<(VfxPlaybackRuntime Parent, int SourceOrder, uint Serial), List<CarriedChildInfo>> pair in _carriedChildren)
-            {
-                if (!ReferenceEquals(pair.Key.Parent, parent) || pair.Key.SourceOrder != sourceOrder) continue;
-                foreach (CarriedChildInfo info in pair.Value)
-                {
-                    if (!ReferenceEquals(info.Runtime, child)) continue;
-                    info.Definition = definition;
-                    info.Set = set;
-                    IReadOnlyList<string> bones = set.Bones ?? Array.Empty<string>();
-                    info.BoneName = bones.Count > slot ? bones[slot] : null;
-                }
-            }
-        }
-
-        private void ReleaseSubtree(VfxPlaybackRuntime runtime)
-        {
-            if (_childrenByParent.TryGetValue(runtime, out List<VfxPlaybackRuntime> direct))
-            {
-                foreach (VfxPlaybackRuntime child in direct.ToArray())
-                    ReleaseSubtree(child);
-            }
-
-            runtime.ParticleLifecycle -= OnParticleLifecycle;
-            runtime.ParticleUpdated -= OnParticleUpdated;
-            runtime.Kill();
-            Forget(runtime);
-            _runtimes.Remove(runtime);
-            _pendingChildren.Remove(runtime);
-        }
-
-        private static bool TryParseChildAddress(string path, out int sourceOrder, out int slot)
-        {
-            sourceOrder = 0;
-            slot = 0;
-            if (string.IsNullOrEmpty(path)) return false;
-            int slash = path.LastIndexOf('/');
-            ReadOnlySpan<char> tail = path.AsSpan(slash + 1);
-            int dot = tail.LastIndexOf('.');
-            return dot > 0 &&
-                   int.TryParse(tail[..dot], out sourceOrder) &&
-                   int.TryParse(tail[(dot + 1)..], out slot);
         }
 
         public bool SetEmitterVisibility(int rootSourceOrder, bool isVisible)
@@ -1045,16 +917,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
                 if (emitter.MeshAnimation is IVfxMeshJointProvider meshJoints)
                     _loadedMeshJoints[emitterKey] = meshJoints;
-            }
-        }
-
-        internal void RefreshResolvedResourceBindings()
-        {
-            _loadedMeshJoints.Clear();
-            foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
-            {
-                AssignRenderIdentity(runtime, _paths.GetValueOrDefault(runtime, string.Empty));
-                ApplyVisibility(runtime);
             }
         }
 

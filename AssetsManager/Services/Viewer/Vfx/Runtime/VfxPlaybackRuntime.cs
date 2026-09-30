@@ -162,48 +162,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             internal VfxAnimatedMesh MeshBaseAnimation;
             internal VfxAnimatedMesh[] MeshAnimationVariants = Array.Empty<VfxAnimatedMesh>();
 
-            /// <summary>
-            /// Detaches resolved CPU/GPU appearance resources without touching the simulation pool.
-            /// Renderer caches keep ownership of old handles, so a live definition swap can repoint
-            /// the emitter and reuse any unchanged resource on the next deferred upload.
-            /// </summary>
-            internal void ResetResolvedResources()
-            {
-                Texture = 0;
-                TextureWidth = 0;
-                TextureHeight = 0;
-                TextureMult = 0;
-                TextureMultWidth = 0;
-                TextureMultHeight = 0;
-                DistortionTexture = 0;
-                ErosionTexture = 0;
-                ReflectionTexture = 0;
-                PaletteTexture = 0;
-                ColorGradientTexture = 0;
-                ProgramTextures.Clear();
-                PendingProgramTextures.Clear();
-                PendingTexture = null;
-                PendingTextureMult = null;
-                PendingDistortionTexture = null;
-                PendingErosionTexture = null;
-                PendingReflectionTexture = null;
-                PendingPaletteTexture = null;
-                PendingColorGradient = null;
-                PendingMesh = null;
-                MeshVao = 0;
-                MeshVbo = 0;
-                MeshEbo = 0;
-                MeshVertexCount = 0;
-                MeshIndexCount = 0;
-                MeshInterleaved = null;
-                MeshHasSkinning = false;
-                MeshOwnerScale = 1f;
-                MeshRanges = Array.Empty<VfxMeshRangeData>();
-                MeshAnimation = null;
-                MeshBaseAnimation = null;
-                MeshAnimationVariants = Array.Empty<VfxAnimatedMesh>();
-            }
-
             /// <summary>Emitter-local age in seconds; drives emitter-phase curves and mesh animation time.</summary>
             public float EmitterAge => Age;
             /// <summary>
@@ -576,49 +534,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
             Reset();
             SetTransform(worldTransform);
-        }
-
-        /// <summary>
-        /// Repoints an already-running system at an edited definition when every pool emitter index
-        /// still addresses the same authored emitter: birth values stay on the particles while
-        /// appearance/integration reads the new model.
-        /// </summary>
-        internal bool TrySwapDefinition(VfxSystemDefinition next)
-        {
-            if (!AddressesSameEmitters(_definition, next)) return false;
-
-            _definition = next;
-            _dragMotion = next.DragMotion;
-            _buildUpTime = MathF.Max(0f, next.BuildUpTime);
-            foreach (EmitterState state in _emitters)
-            {
-                if ((uint)state.SourceOrder >= (uint)next.Emitters.Count) return false;
-                state.Def = next.Emitters[state.SourceOrder];
-                state.InvalidateInstances();
-            }
-
-            // Re-read emitter placement immediately without touching the particles already alive.
-            SetTransform(_worldTransform, _orientationRootTransform);
-            return true;
-        }
-
-        internal static bool AddressesSameEmitters(VfxSystemDefinition held, VfxSystemDefinition next)
-        {
-            if (held?.Emitters is null || next?.Emitters is null || held.Emitters.Count != next.Emitters.Count)
-                return false;
-
-            for (int index = 0; index < held.Emitters.Count; index++)
-            {
-                VfxEmitterDefinition before = held.Emitters[index];
-                VfxEmitterDefinition after = next.Emitters[index];
-                if (before is null || after is null ||
-                    before.IsSimpleEmitter != after.IsSimpleEmitter ||
-                    !string.Equals(before.Name, after.Name, StringComparison.Ordinal))
-                {
-                    return false;
-                }
-            }
-            return true;
         }
 
         public bool SetEmitterVisibility(int sourceOrder, bool isVisible)

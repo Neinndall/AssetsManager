@@ -448,6 +448,7 @@ Improvements
   - Input and confirmation dialogs now support Enter/Escape keys with automatic focus.
 
 Changes
+  - VFX Studio / Removed emitter editing and BIN saving while keeping effect inspection and playback.
   - VFX Studio / Removed the Reload project button from the project toolbar.
   - Benchmark / Added a MapGeo memory diagnostic that reports WPF geometry, texture, managed and renderer CPU-copy estimates by loading phase.
   - Viewer / Separated scene mesh GPU resources and shared shader source from the main render orchestration.

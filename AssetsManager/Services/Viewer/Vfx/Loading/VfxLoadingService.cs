@@ -68,7 +68,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             public Dictionary<uint, VfxSystemDefinition> Systems { get; private set; } = new();
             public Dictionary<uint, uint> ResourceMap { get; private set; } = new();
             internal Dictionary<uint, VfxSpellPreview> SpellPreviews { get; private set; } = new();
-            public Dictionary<uint, string> SystemSources { get; private set; } = new();
             public Dictionary<uint, AnimationClipDefinition> EventSequences { get; private set; } = new();
             public List<AnimationClipDefinition> Clips { get; private set; } = new();
             public List<AnimationGraphDefinition> AnimationGraphs { get; private set; } = new();
@@ -90,7 +89,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 PrimaryBinPath = source.PrimaryBinPath;
                 Systems = source.Systems;
                 SpellPreviews = source.SpellPreviews;
-                SystemSources = source.SystemSources;
                 EventSequences = source.EventSequences;
                 Clips = source.Clips;
                 AnimationGraphs = source.AnimationGraphs;
@@ -252,10 +250,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
 
                         foreach (var kv in document.Systems)
                         {
-                            if (bundle.Systems.TryAdd(kv.Key, kv.Value))
-                            {
-                                bundle.SystemSources[kv.Key] = Path.GetFullPath(currentBinPath);
-                            }
+                            bundle.Systems.TryAdd(kv.Key, kv.Value);
                         }
                         // Skin/clip effect keys resolve through SkinCharacterDataProperties.mResourceResolver
                         // in the primary document. Linked systems keep their own document resolver scope.
@@ -394,7 +389,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 : transform;
             runtime.SetSystem(definition, resolvedTransform);
 
-            PrepareRuntimeResources(runtime, searchDirectory, log, ownerSceneContext, resetResolved: false);
+            PrepareRuntimeResources(runtime, searchDirectory, log, ownerSceneContext);
 
             IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> emissionSurfaces =
                 PrepareEmissionSurfaces(new[] { definition }, searchDirectory, log);
@@ -410,16 +405,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             VfxPlaybackRuntime runtime,
             string searchDirectory,
             LogService log,
-            VfxOwnerSceneContext ownerSceneContext,
-            bool resetResolved)
+            VfxOwnerSceneContext ownerSceneContext)
         {
             if (runtime?.Emitters is null) return;
 
             foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
             {
-                if (resetResolved)
-                    emitter.ResetResolvedResources();
-
                 if (emitter.Def.CustomMaterial?.Program?.Passes != null)
                     foreach (var pass in emitter.Def.CustomMaterial.Program.Passes)
                         foreach (var texture in pass.Textures)
@@ -521,94 +512,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 }
                 emitter.PendingMesh = mesh;
             }
-        }
-
-        internal static bool UsesSameResolvedAssets(
-            VfxSystemDefinition before,
-            VfxSystemDefinition after)
-        {
-            if (before is null || after is null || before.Emitters?.Count != after.Emitters?.Count)
-                return false;
-
-            for (int index = 0; index < (before.Emitters?.Count ?? 0); index++)
-            {
-                if (!UsesSameResolvedAssets(before.Emitters[index], after.Emitters[index]))
-                    return false;
-            }
-            return true;
-        }
-
-        private static bool UsesSameResolvedAssets(VfxEmitterDefinition before, VfxEmitterDefinition after)
-        {
-            if (before is null || after is null) return before is null && after is null;
-            return Equals(before.CustomMaterial?.Program, after.CustomMaterial?.Program) &&
-                   string.Equals(before.TexturePath, after.TexturePath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.TextureMultPath, after.TextureMultPath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.ParticleColorTexturePath, after.ParticleColorTexturePath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.AlphaErosion?.TexturePath, after.AlphaErosion?.TexturePath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.Distortion?.NormalMapTexturePath, after.Distortion?.NormalMapTexturePath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.Reflection?.TexturePath, after.Reflection?.TexturePath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.PaletteDefinition?.PaletteTexturePath, after.PaletteDefinition?.PaletteTexturePath, StringComparison.OrdinalIgnoreCase) &&
-                   before.PrimitiveKind == after.PrimitiveKind &&
-                   before.IsMeshPrimitive == after.IsMeshPrimitive &&
-                   before.MeshIsSkinned == after.MeshIsSkinned &&
-                   string.Equals(before.MeshPath, after.MeshPath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.MeshFallbackPath, after.MeshFallbackPath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.MeshSkeletonPath, after.MeshSkeletonPath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.MeshAnimationPath, after.MeshAnimationPath, StringComparison.OrdinalIgnoreCase) &&
-                   SequenceEqual(before.MeshAnimationVariants, after.MeshAnimationVariants, StringComparer.OrdinalIgnoreCase) &&
-                   SequenceEqual(before.SubmeshesToDraw, after.SubmeshesToDraw) &&
-                   SequenceEqual(before.SubmeshesToDrawAlways, after.SubmeshesToDrawAlways) &&
-                   SameEmissionSurface(before.EmissionSurface, after.EmissionSurface);
-        }
-
-        private static bool SameEmissionSurface(
-            VfxEmissionSurfaceDefinition before,
-            VfxEmissionSurfaceDefinition after)
-        {
-            if (before is null || after is null) return before is null && after is null;
-            return before.Kind == after.Kind &&
-                   string.Equals(before.MeshPath, after.MeshPath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.SkeletonPath, after.SkeletonPath, StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(before.AnimationPath, after.AnimationPath, StringComparison.OrdinalIgnoreCase) &&
-                   SequenceEqual(before.Submeshes, after.Submeshes) &&
-                   SequenceEqual(before.Joints, after.Joints) &&
-                   before.Scale.Equals(after.Scale) &&
-                   before.MaxJointWeights == after.MaxJointWeights;
-        }
-
-        private static bool SequenceEqual<T>(IReadOnlyList<T> before, IReadOnlyList<T> after)
-            => SequenceEqual(before, after, EqualityComparer<T>.Default);
-
-        private static bool SequenceEqual<T>(
-            IReadOnlyList<T> before,
-            IReadOnlyList<T> after,
-            IEqualityComparer<T> comparer)
-        {
-            before ??= Array.Empty<T>();
-            after ??= Array.Empty<T>();
-            if (before.Count != after.Count) return false;
-            for (int index = 0; index < before.Count; index++)
-            {
-                if (!comparer.Equals(before[index], after[index])) return false;
-            }
-            return true;
-        }
-
-        internal void RefreshPlaybackGraphResources(
-            VfxPlaybackGraphRuntime graph,
-            string searchDirectory,
-            LogService log,
-            VfxOwnerSceneContext ownerSceneContext)
-        {
-            ArgumentNullException.ThrowIfNull(graph);
-            foreach (VfxPlaybackRuntime runtime in graph.ResourceRuntimes)
-                PrepareRuntimeResources(runtime, searchDirectory, log, ownerSceneContext, resetResolved: true);
-
-            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> emissionSurfaces =
-                PrepareEmissionSurfaces(graph.ResourceDefinitions, searchDirectory, log);
-            graph.SetEmissionSurfaces(emissionSurfaces);
-            graph.RefreshResolvedResourceBindings();
         }
 
         /// <summary>
