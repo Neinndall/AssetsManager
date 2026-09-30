@@ -105,6 +105,67 @@ public sealed class VfxSpellPreviewTests
     }
 
     [Fact]
+    public void AcceleratingFlightRampsToItsMaxSpeedThenHolds()
+    {
+        // 1000 -> 2000 at 1000/s: 1 s covers 1500 units, the remaining 500 take 0.25 s at 2000.
+        var missile = new VfxSpellMissilePreview(VfxSpellMissileMovementKind.Accelerating, null, null, null, null, null, null, null)
+        {
+            Acceleration = 1000f,
+            InitialSpeed = 1000f,
+            MaxSpeed = 2000f
+        };
+
+        var path = VfxSpellFlightPath.Compile(missile, Vector3.Zero, new Vector3(0f, 0f, 2000f));
+
+        Assert.NotNull(path);
+        Assert.Equal(1.25d, path.Duration, 4);
+        Assert.Equal(1500f, path.Sample(1d).Position.Z, 1);
+    }
+
+    [Fact]
+    public void DeceleratingFlightThatStopsShortIsNotPlayable()
+    {
+        var missile = new VfxSpellMissilePreview(VfxSpellMissileMovementKind.Accelerating, null, null, null, null, null, null, null)
+        {
+            Acceleration = -1000f,
+            InitialSpeed = 500f
+        };
+
+        Assert.Null(VfxSpellFlightPath.Compile(missile, Vector3.Zero, new Vector3(0f, 0f, 1000f)));
+    }
+
+    [Fact]
+    public void SplineFlightBendsTowardTheCastersRightAndEndsOnTarget()
+    {
+        var missile = new VfxSpellMissilePreview(VfxSpellMissileMovementKind.FixedTimeSpline, null, 1f, null, null, null, null, null)
+        {
+            SplineStartOffset = new Vector3(100f, 0f, 0f),
+            SplineControlPoint1 = new Vector3(1f, 0f, 0f),
+            SplineControlPoint2 = new Vector3(-1f, 0f, 0f)
+        };
+        Vector3 target = new(0f, 0f, 1000f);
+
+        var path = VfxSpellFlightPath.Compile(missile, Vector3.Zero, target);
+
+        Assert.NotNull(path);
+        Assert.Equal(new Vector3(100f, 0f, 0f), path.Start);
+        Assert.True(path.Sample(0.5d).Position.X > 100f);
+        Assert.True(Vector3.Distance(path.Sample(1d).Position, target) < 0.01f);
+    }
+
+    [Fact]
+    public void FixedSpeedSplineTakesItsCurveLengthOverSpeed()
+    {
+        var missile = new VfxSpellMissilePreview(VfxSpellMissileMovementKind.FixedSpeedSpline, 1000f, null, null, null, null, null, null);
+
+        var path = VfxSpellFlightPath.Compile(missile, Vector3.Zero, new Vector3(0f, 0f, 1000f));
+
+        Assert.NotNull(path);
+        Assert.Equal(1d, path.Duration, 3);
+        Assert.Equal(500f, path.Sample(0.5d).Position.Z, 0);
+    }
+
+    [Fact]
     public void FlightRejectsDifferentAnchorHeights()
     {
         var missile = new VfxSpellMissilePreview(

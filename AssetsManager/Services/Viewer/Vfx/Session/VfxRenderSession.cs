@@ -248,6 +248,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         internal static Matrix4x4 SpellTransformAt(VfxSpellPlaybackStep step, double time)
         {
             if (step is null) return Matrix4x4.Identity;
+            if (step.Motion == VfxSpellPlaybackMotion.Path && step.Flight != null)
+            {
+                (Vector3 position, Vector3 direction) = step.Flight.Sample(time - step.StartTime);
+                return VfxRigMotion.FlightTransform(position, direction);
+            }
             return step.Motion == VfxSpellPlaybackMotion.Path
                 ? VfxRigMotion.PathTransform(step.From, step.To, time, step.StartTime, step.StopTime)
                 : Matrix4x4.CreateTranslation(step.To);

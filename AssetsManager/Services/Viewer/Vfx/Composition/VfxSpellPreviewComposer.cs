@@ -65,9 +65,9 @@ internal static class VfxSpellPreviewComposer
             preview.MissileEffectName,
             bundle,
             resolveSystemPath);
-        (double Delay, double Duration)? flight = preview.Missile == null || preview.HasInvalidIssues
+        (double Delay, VfxSpellFlightPath Path)? flight = preview.Missile == null || preview.HasInvalidIssues
             ? null
-            : CompileFlight(preview.Missile, source, target);
+            : CompileFlightPath(preview.Missile, source, target);
         bool hasProjectile = flight.HasValue && projectileSystem != null;
 
         (uint impactKey, VfxSystemDefinition impactSystem) = preview.HaveHitEffect == false || preview.HasInvalidHitEffectFields
@@ -76,7 +76,7 @@ internal static class VfxSpellPreviewComposer
 
         double launch = release + (hasProjectile ? flight.Value.Delay : 0d);
         double flightDuration = hasProjectile
-            ? (flight.Value.Duration > 0d ? flight.Value.Duration : 0.5d)
+            ? (flight.Value.Path.Duration > 0d ? flight.Value.Path.Duration : 0.5d)
             : 0d;
         double arrival = launch + flightDuration;
         var steps = new List<VfxSpellPlaybackStep>(2);
@@ -89,10 +89,11 @@ internal static class VfxSpellPreviewComposer
                 projectileKey,
                 launch,
                 arrival,
-                source,
+                flight.Value.Path.Start,
                 target,
                 VfxSpellPlaybackMotion.Path,
-                ProjectileSeed));
+                ProjectileSeed,
+                flight.Value.Path));
         }
 
         if (impactSystem != null)
@@ -171,6 +172,12 @@ internal static class VfxSpellPreviewComposer
         VfxSpellMissilePreview missile,
         Vector3 from,
         Vector3 to)
+        => CompileFlightPath(missile, from, to) is { } flight ? (flight.Delay, flight.Path.Duration) : null;
+
+    internal static (double Delay, VfxSpellFlightPath Path)? CompileFlightPath(
+        VfxSpellMissilePreview missile,
+        Vector3 from,
+        Vector3 to)
     {
         if (missile == null || !Finite(from) || !Finite(to) || from.Y != to.Y ||
             OutsidePreviewBounds(from) || OutsidePreviewBounds(to))
@@ -180,20 +187,9 @@ internal static class VfxSpellPreviewComposer
 
         double delay = missile.StartDelay ?? 0d;
         if (!double.IsFinite(delay) || delay < 0d) return null;
-        double length = Vector3.Distance(from, to);
-        double duration = missile.MovementKind switch
-        {
-            VfxSpellMissileMovementKind.FixedSpeed
-                when missile.Speed is > 0f && float.IsFinite(missile.Speed.Value)
-                => length / missile.Speed.Value,
-            VfxSpellMissileMovementKind.FixedTime
-                when missile.Duration is > 0f && float.IsFinite(missile.Duration.Value)
-                => missile.Duration.Value,
-            _ => double.NaN
-        };
-
-        if (!double.IsFinite(duration) || duration < 0d || duration + delay > 30d) return null;
-        return (delay, duration);
+        VfxSpellFlightPath path = VfxSpellFlightPath.Compile(missile, from, to);
+        if (path == null || path.Duration + delay > 30d) return null;
+        return (delay, path);
     }
 
     internal static (uint Key, VfxSystemDefinition System) ResolveEffect(

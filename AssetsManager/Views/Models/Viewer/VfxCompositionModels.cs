@@ -203,6 +203,9 @@ namespace AssetsManager.Views.Models.Viewer
         Missing,
         FixedSpeed,
         FixedTime,
+        Accelerating,
+        FixedSpeedSpline,
+        FixedTimeSpline,
         Unsupported
     }
 
@@ -214,7 +217,17 @@ namespace AssetsManager.Views.Models.Viewer
         string StartBoneName,
         string TargetBoneName,
         float? TargetHeight,
-        float? InitialTargetHeight);
+        float? InitialTargetHeight)
+    {
+        public float? Acceleration { get; init; }
+        public float? MinSpeed { get; init; }
+        public float? MaxSpeed { get; init; }
+        public float? InitialSpeed { get; init; }
+        /// <summary>HermiteSplineInfo, in the caster's frame (x right, z forward).</summary>
+        public Vector3 SplineStartOffset { get; init; }
+        public Vector3 SplineControlPoint1 { get; init; }
+        public Vector3 SplineControlPoint2 { get; init; }
+    }
 
     /// <summary>The subset of SpellDataResource consumed by the isolated ability preview.</summary>
     public sealed record VfxSpellPreview(
@@ -256,7 +269,8 @@ namespace AssetsManager.Views.Models.Viewer
         Vector3 From,
         Vector3 To,
         VfxSpellPlaybackMotion Motion,
-        int Seed);
+        int Seed,
+        AssetsManager.Services.Viewer.Vfx.Composition.VfxSpellFlightPath Flight = null);
 
     public sealed record VfxSpellPreviewPlan(
         VfxSpellAvailability Availability,

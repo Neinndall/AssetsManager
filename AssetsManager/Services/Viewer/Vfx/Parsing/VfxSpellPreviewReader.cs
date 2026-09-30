@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
+using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
@@ -18,6 +20,10 @@ internal static class VfxSpellPreviewReader
     private static readonly uint MissileSpecificationClass = Fnv1a.HashLower("MissileSpecification");
     private static readonly uint FixedSpeedMovementClass = Fnv1a.HashLower("FixedSpeedMovement");
     private static readonly uint FixedTimeMovementClass = Fnv1a.HashLower("FixedTimeMovement");
+    private static readonly uint AcceleratingMovementClass = Fnv1a.HashLower("AcceleratingMovement");
+    private static readonly uint FixedSpeedSplineMovementClass = Fnv1a.HashLower("FixedSpeedSplineMovement");
+    private static readonly uint FixedTimeSplineMovementClass = Fnv1a.HashLower("FixedTimeSplineMovement");
+    private static readonly uint HermiteSplineInfoClass = Fnv1a.HashLower("HermiteSplineInfo");
     private const uint RankValuesClass = 0x0a0eddc9;
 
     internal static VfxSpellPreview Read(BinTreeObject spellObject)
@@ -118,17 +124,8 @@ internal static class VfxSpellPreviewReader
         if (missile == null || !float.IsFinite(distance) || distance < 0f) return false;
         float delay = missile.StartDelay ?? 0f;
         if (!float.IsFinite(delay) || delay < 0f) return false;
-        float duration = missile.MovementKind switch
-        {
-            VfxSpellMissileMovementKind.FixedSpeed
-                when missile.Speed is > 0f && float.IsFinite(missile.Speed.Value)
-                => distance / missile.Speed.Value,
-            VfxSpellMissileMovementKind.FixedTime
-                when missile.Duration is > 0f && float.IsFinite(missile.Duration.Value)
-                => missile.Duration.Value,
-            _ => float.NaN
-        };
-        return float.IsFinite(duration) && duration >= 0f && duration + delay <= 30f;
+        VfxSpellFlightPath path = VfxSpellFlightPath.Compile(missile, Vector3.Zero, new Vector3(0f, 0f, distance));
+        return path != null && path.Duration + delay <= 30d;
     }
 
     private static VfxSpellMissilePreview ReadMissile(
@@ -145,6 +142,8 @@ internal static class VfxSpellPreviewReader
         string targetBone = null;
         float? targetHeight = null;
         float? initialTargetHeight = null;
+        float? acceleration = null, minSpeed = null, maxSpeed = null, initialSpeed = null;
+        Vector3 splineOffset = Vector3.Zero, splinePoint1 = Vector3.Zero, splinePoint2 = Vector3.Zero;
 
         if (TryAnyStruct(missile.Properties, "movementComponent", movementPath, issues, out BinTreeStruct movement))
         {
@@ -157,6 +156,28 @@ internal static class VfxSpellPreviewReader
             {
                 kind = VfxSpellMissileMovementKind.FixedTime;
                 duration = ReadF32(movement.Properties, "mTravelTime", movementPath, issues);
+            }
+            else if (movement.ClassHash == AcceleratingMovementClass)
+            {
+                kind = VfxSpellMissileMovementKind.Accelerating;
+                acceleration = ReadF32(movement.Properties, "mAcceleration", movementPath, issues);
+                minSpeed = ReadF32(movement.Properties, "mMinSpeed", movementPath, issues);
+                maxSpeed = ReadF32(movement.Properties, "mMaxSpeed", movementPath, issues);
+                initialSpeed = ReadF32(movement.Properties, "mInitialSpeed", movementPath, issues);
+            }
+            else if (movement.ClassHash == FixedSpeedSplineMovementClass || movement.ClassHash == FixedTimeSplineMovementClass)
+            {
+                bool fixedSpeed = movement.ClassHash == FixedSpeedSplineMovementClass;
+                kind = fixedSpeed ? VfxSpellMissileMovementKind.FixedSpeedSpline : VfxSpellMissileMovementKind.FixedTimeSpline;
+                if (fixedSpeed) speed = ReadF32(movement.Properties, "mSpeed", movementPath, issues);
+                else duration = ReadF32(movement.Properties, "mTravelTime", movementPath, issues);
+                const string splinePath = movementPath + ".mSplineInfo";
+                if (TryExpectedStruct(movement.Properties, "mSplineInfo", splinePath, HermiteSplineInfoClass, issues, out BinTreeStruct spline))
+                {
+                    splineOffset = ReadVector3(spline.Properties, "mStartPositionOffset", splinePath, issues);
+                    splinePoint1 = ReadVector3(spline.Properties, "mControlPoint1", splinePath, issues);
+                    splinePoint2 = ReadVector3(spline.Properties, "mControlPoint2", splinePath, issues);
+                }
             }
             else
             {
@@ -201,7 +222,16 @@ internal static class VfxSpellPreviewReader
             startBone,
             targetBone,
             targetHeight,
-            initialTargetHeight);
+            initialTargetHeight)
+        {
+            Acceleration = acceleration,
+            MinSpeed = minSpeed,
+            MaxSpeed = maxSpeed,
+            InitialSpeed = initialSpeed,
+            SplineStartOffset = splineOffset,
+            SplineControlPoint1 = splinePoint1,
+            SplineControlPoint2 = splinePoint2
+        };
     }
 
     private static bool TryExpectedStruct(
@@ -255,6 +285,20 @@ internal static class VfxSpellPreviewReader
         if (Unwrap(property) is BinTreeF32 value && float.IsFinite(value.Value)) return value.Value;
         Issue(issues, $"{parent}.{field}", VfxSpellIssueKind.Invalid);
         return null;
+    }
+
+    private static Vector3 ReadVector3(
+        IReadOnlyDictionary<uint, BinTreeProperty> properties,
+        string field,
+        string parent,
+        ICollection<VfxSpellIssue> issues)
+    {
+        if (!TryProperty(properties, field, out BinTreeProperty property)) return Vector3.Zero;
+        if (Unwrap(property) is BinTreeVector3 value &&
+            float.IsFinite(value.Value.X) && float.IsFinite(value.Value.Y) && float.IsFinite(value.Value.Z))
+            return value.Value;
+        Issue(issues, $"{parent}.{field}", VfxSpellIssueKind.Invalid);
+        return Vector3.Zero;
     }
 
     private static bool? ReadBool(

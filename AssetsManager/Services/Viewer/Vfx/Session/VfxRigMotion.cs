@@ -257,7 +257,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             return FlightTransform(origin, to - from);
         }
 
-        private static Matrix4x4 FlightTransform(Vector3 origin, Vector3 direction)
+        internal static Matrix4x4 FlightTransform(Vector3 origin, Vector3 direction)
         {
             // Missile systems author travel on local +Y and height on local +Z.
             Vector3 forward = new(direction.X, 0f, direction.Z);
