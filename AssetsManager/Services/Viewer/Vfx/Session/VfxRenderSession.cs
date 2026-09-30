@@ -414,13 +414,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 0,
                 ownerSceneContext);
 
+        /// <summary>
+        /// A spell cast: its cast animation's clip cues and the character's idle auras, as the Clips
+        /// preview plays them, plus the spell's own projectile and impact steps on the same clock.
+        /// </summary>
         public bool SetSpellSession(
             IReadOnlyList<VfxSpellPlaybackStep> steps,
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
             IReadOnlyDictionary<uint, uint> resourceMap,
             string searchDirectory,
             double animationDuration,
-            VfxOwnerSceneContext ownerSceneContext = null)
+            VfxOwnerSceneContext ownerSceneContext = null,
+            VfxAbilityComposition castAnimation = null,
+            IReadOnlyList<VfxIdleEffectDefinition> idleEffects = null)
         {
             ClearCheckpoints();
             steps ??= Array.Empty<VfxSpellPlaybackStep>();
@@ -448,6 +454,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             }
 
             double duration = Math.Max(0.1d, animationDuration);
+            AddIdleEffects(idleEffects, systems, resourceMap, searchDirectory, ownerSceneContext);
+            duration = AddCompositionEvents(castAnimation, systems, resourceMap, searchDirectory, ownerSceneContext, duration);
             foreach (VfxSpellPlaybackStep step in steps)
             {
                 if (step?.System is null) continue;
@@ -485,7 +493,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 Speed = 1.0
             };
             ApplySpellTransforms(0d);
-            return steps.Count > 0 || animationDuration > 0d;
+            return steps.Count > 0 || animationDuration > 0d || _graphs.Count > 0;
         }
 
         public bool SetAnimationSession(
@@ -521,73 +529,114 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 QueueGpuResourcePurge();
 
             double duration = Math.Max(0.1, animationDuration);
+            AddIdleEffects(idleEffects, systems, resourceMap, searchDirectory, ownerSceneContext);
+            duration = AddCompositionEvents(composition, systems, resourceMap, searchDirectory, ownerSceneContext, duration);
 
-            // 1. Instantiate Idle Effects (continuous character-anchored auras)
-            if (idleEffects != null)
+            string sequenceName = composition != null
+                ? (!string.IsNullOrEmpty(composition.ClipName) ? composition.ClipName : $"0x{composition.SequencePathHash:X8}")
+                : "Animation";
+
+            _activeSystem = new VfxSystemModel
             {
-                foreach (VfxIdleEffectDefinition idle in idleEffects)
+                Name = $"Session {sequenceName}",
+                SystemCatalog = systems,
+                ResourceMap = resourceMap,
+                SearchDirectory = searchDirectory,
+                OwnerSceneContext = ownerSceneContext,
+                PlaybackSeed = seed,
+                TotalDuration = Math.Max(0.1, duration),
+                Speed = 1.0
+            };
+
+            return _graphs.Count > 0;
+        }
+
+        /// <summary>Continuous character-anchored auras (CharacterIdleEffect).</summary>
+        private void AddIdleEffects(
+            IReadOnlyList<VfxIdleEffectDefinition> idleEffects,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap,
+            string searchDirectory,
+            VfxOwnerSceneContext ownerSceneContext)
+        {
+            if (idleEffects == null)
+                return;
+
+            foreach (VfxIdleEffectDefinition idle in idleEffects)
+            {
+                // CharacterIdleEffect.effectKey is a ResourceResolver key, never a direct
+                // VfxSystemDefinition object id. LTK drops an idle whose key is unmapped or
+                // maps outside the systems in reach instead of guessing by hash/name.
+                if (idle.EffectKey == 0 ||
+                    !resourceMap.TryGetValue(idle.EffectKey, out uint mappedHash) ||
+                    mappedHash == 0 ||
+                    !systems.TryGetValue(mappedHash, out VfxSystemDefinition idleDef))
                 {
-                    // CharacterIdleEffect.effectKey is a ResourceResolver key, never a direct
-                    // VfxSystemDefinition object id. LTK drops an idle whose key is unmapped or
-                    // maps outside the systems in reach instead of guessing by hash/name.
-                    if (idle.EffectKey == 0 ||
-                        !resourceMap.TryGetValue(idle.EffectKey, out uint mappedHash) ||
-                        mappedHash == 0 ||
-                        !systems.TryGetValue(mappedHash, out VfxSystemDefinition idleDef))
-                    {
-                        continue;
-                    }
-
-                    var idleGraph = _loadingService.PreparePlaybackGraph(
-                        idleDef,
-                        systems,
-                        resourceMap,
-                        searchDirectory,
-                        _worldTransform,
-                        IdleEffectSeed,
-                        _logService,
-                        ownerSceneContext);
-
-                    _graphs.Add(idleGraph);
-                    _graphPlacements[idleGraph] = Matrix4x4.Identity;
-                    _graphAttachments[idleGraph] = new GraphAttachmentInfo
-                    {
-                        BoneName = idle.BoneName,
-                        BoneHash = idle.BoneNameHash,
-                        TargetBoneName = idle.TargetBoneName,
-                        TargetBoneHash = idle.TargetBoneNameHash,
-                        EffectKey = idle.EffectKey,
-                        LocalOffset = idle.Position,
-                        BaseTransform = Matrix4x4.Identity,
-                        IsIdleEffect = true
-                    };
-                    _graph ??= idleGraph;
+                    continue;
                 }
-            }
 
-            // 2. Instantiate Animation Composition Events (cued particle events)
-            if (composition != null)
-            {
-                foreach (VfxCompositionEvent compositionEvent in composition.Events)
+                var idleGraph = _loadingService.PreparePlaybackGraph(
+                    idleDef,
+                    systems,
+                    resourceMap,
+                    searchDirectory,
+                    _worldTransform,
+                    IdleEffectSeed,
+                    _logService,
+                    ownerSceneContext);
+
+                _graphs.Add(idleGraph);
+                _graphPlacements[idleGraph] = Matrix4x4.Identity;
+                _graphAttachments[idleGraph] = new GraphAttachmentInfo
                 {
-                    var cue = compositionEvent.Event;
-                    float startSeconds = Math.Max(0f, cue.StartFrame * composition.TickDuration);
-                    uint effectKey = compositionEvent.UsesEnemyEffect ? cue.EnemyEffectKey : cue.EffectKey;
-                    if (cue.IsKillEvent)
-                    {
-                        _scheduledEffectKills.Add((startSeconds, effectKey));
-                        continue;
-                    }
-                    if (compositionEvent.System is null) continue;
+                    BoneName = idle.BoneName,
+                    BoneHash = idle.BoneNameHash,
+                    TargetBoneName = idle.TargetBoneName,
+                    TargetBoneHash = idle.TargetBoneNameHash,
+                    EffectKey = idle.EffectKey,
+                    LocalOffset = idle.Position,
+                    BaseTransform = Matrix4x4.Identity,
+                    IsIdleEffect = true
+                };
+                _graph ??= idleGraph;
+            }
+        }
 
-                    // LTK keeps ParticleEventData.scale in the parsed event metadata but its
-                    // Animation Clip viewport does not apply it to the spawned VFX system.
-                    // Keep playback tied to the cue rig only; skinScale is handled separately.
-                    var attachments = cue.Attachments is { Count: > 0 }
-                        ? cue.Attachments
-                        : new[] { new VfxParticleEventAttachment(0, 0) };
-                    foreach (var pair in attachments)
-                    {
+        /// <summary>
+        /// The particle events an animation clip cues, attached to their joints and timed on its clock.
+        /// </summary>
+        /// <returns><paramref name="duration"/> extended to the last event and effect.</returns>
+        private double AddCompositionEvents(
+            VfxAbilityComposition composition,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap,
+            string searchDirectory,
+            VfxOwnerSceneContext ownerSceneContext,
+            double duration)
+        {
+            if (composition == null)
+                return duration;
+
+            foreach (VfxCompositionEvent compositionEvent in composition.Events)
+            {
+                var cue = compositionEvent.Event;
+                float startSeconds = Math.Max(0f, cue.StartFrame * composition.TickDuration);
+                uint effectKey = compositionEvent.UsesEnemyEffect ? cue.EnemyEffectKey : cue.EffectKey;
+                if (cue.IsKillEvent)
+                {
+                    _scheduledEffectKills.Add((startSeconds, effectKey));
+                    continue;
+                }
+                if (compositionEvent.System is null) continue;
+
+                // LTK keeps ParticleEventData.scale in the parsed event metadata but its
+                // Animation Clip viewport does not apply it to the spawned VFX system.
+                // Keep playback tied to the cue rig only; skinScale is handled separately.
+                var attachments = cue.Attachments is { Count: > 0 }
+                    ? cue.Attachments
+                    : new[] { new VfxParticleEventAttachment(0, 0) };
+                foreach (var pair in attachments)
+                {
                     var eventGraph = _loadingService.PreparePlaybackGraph(
                         compositionEvent.System,
                         systems,
@@ -624,44 +673,26 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     }
 
                     _graph ??= eventGraph;
-                    }
-
-                    double effectDuration = VfxDurationCalculator.Calculate(
-                        compositionEvent.System,
-                        systems,
-                        resourceMap);
-                    if (double.IsFinite(effectDuration))
-                        duration = Math.Max(duration, startSeconds + effectDuration);
                 }
 
-                if (composition.EndFrame > composition.StartFrame)
-                    duration = Math.Max(duration, (composition.EndFrame - composition.StartFrame) * composition.TickDuration);
-                foreach (VfxCompositionEvent compositionEvent in composition.Events)
-                {
-                    if (compositionEvent.Event.EndFrame >= compositionEvent.Event.StartFrame)
-                        duration = Math.Max(
-                            duration,
-                            (compositionEvent.Event.EndFrame - composition.StartFrame) * composition.TickDuration);
-                }
+                double effectDuration = VfxDurationCalculator.Calculate(
+                    compositionEvent.System,
+                    systems,
+                    resourceMap);
+                if (double.IsFinite(effectDuration))
+                    duration = Math.Max(duration, startSeconds + effectDuration);
             }
 
-            string sequenceName = composition != null
-                ? (!string.IsNullOrEmpty(composition.ClipName) ? composition.ClipName : $"0x{composition.SequencePathHash:X8}")
-                : "Animation";
-
-            _activeSystem = new VfxSystemModel
+            if (composition.EndFrame > composition.StartFrame)
+                duration = Math.Max(duration, (composition.EndFrame - composition.StartFrame) * composition.TickDuration);
+            foreach (VfxCompositionEvent compositionEvent in composition.Events)
             {
-                Name = $"Session {sequenceName}",
-                SystemCatalog = systems,
-                ResourceMap = resourceMap,
-                SearchDirectory = searchDirectory,
-                OwnerSceneContext = ownerSceneContext,
-                PlaybackSeed = seed,
-                TotalDuration = Math.Max(0.1, duration),
-                Speed = 1.0
-            };
-
-            return _graphs.Count > 0;
+                if (compositionEvent.Event.EndFrame >= compositionEvent.Event.StartFrame)
+                    duration = Math.Max(
+                        duration,
+                        (compositionEvent.Event.EndFrame - composition.StartFrame) * composition.TickDuration);
+            }
+            return duration;
         }
 
         public void UpdateBoneTransforms(Func<string, uint, Matrix4x4?> boneTransformProvider)

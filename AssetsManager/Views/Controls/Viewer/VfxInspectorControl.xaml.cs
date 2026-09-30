@@ -6069,18 +6069,18 @@ namespace AssetsManager.Views.Controls.Viewer
                     return;
                 }
 
-                ClearAnimationClipCues();
                 ClearCompositeDiagnostics();
                 _model.CurrentTime = 0d;
 
+                // The cast animation carries its own submesh, joint and particle cues, as in the Clips preview.
                 AnimationClipCatalogItem animation = plan.Animation;
+                ConfigureAnimationClipCues(animation);
                 _championModel.CurrentAnimation = animation?.AnimationAsset;
                 _championModel.AnimationTime = 0d;
                 if (animation?.AnimationAsset != null &&
                     _championAnimationService != null &&
                     _championModel.Skeleton != null)
                 {
-                    _championAnimationService.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
                     _championAnimationService.Update(
                         0f,
                         animation.AnimationAsset,
@@ -6105,9 +6105,19 @@ namespace AssetsManager.Views.Controls.Viewer
                     bundle.ResourceMap,
                     searchDir,
                     animation?.Duration ?? 0d,
-                    playbackBundle.OwnerSceneContext) == true;
+                    playbackBundle.OwnerSceneContext,
+                    animation?.Composition,
+                    playbackBundle.IdleEffects) == true;
                 if (_vfxRenderer != null)
                 {
+                    if (animation?.AnimationAsset != null && _championAnimationService != null)
+                    {
+                        float castDuration = animation.Duration;
+                        _vfxRenderer.SetBoneTransformSampler((time, name, hash) =>
+                            _championAnimationService.TrySampleBoneTransform(
+                                SpellAnimationTime(time, castDuration), name, hash, out var transform)
+                                ? transform : null);
+                    }
                     _vfxRenderer.SetOwnerSkinningMatrices(_championModel.SkinningMatrices);
                     if (ready && !startPaused) _vfxRenderer.Play();
                 }
@@ -6235,7 +6245,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_activeAnimationClip == null || _championModel == null) return;
 
-            double folded = VfxClipCueEvaluator.FoldedTime(time, _activeAnimationClip.Duration);
+            // A spell's cast animation plays once and holds its last pose; a Clip preview loops.
+            double folded = _activeSpellPlan?.Animation != null
+                ? SpellAnimationTime(time, _activeAnimationClip.Duration)
+                : VfxClipCueEvaluator.FoldedTime(time, _activeAnimationClip.Duration);
             IReadOnlySet<uint> hidden = VfxClipCueEvaluator.HiddenSubmeshesAt(
                 _animationVisibilityTimeline,
                 folded);
