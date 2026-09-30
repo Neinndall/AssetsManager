@@ -10,6 +10,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Parsers;
 using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
@@ -144,6 +145,11 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                                           $"initial={state.InitialEmissionDone} finishedAt={state.FinishedAt:0.000} visible={state.IsVisible} particles={state.Particles.Count} " +
                                           $"texture={state.Texture} reflection={state.ReflectionTexture} meshVao={state.MeshVao} " +
                                           string.Join(" ", state.Particles.Take(3).Select(particle => $"[age={particle.Age:0.000} life={particle.Life:0.000}]")));
+                    foreach (var state in session.Graphs.SelectMany(graph => graph.Runtimes).SelectMany(runtime => runtime.Emitters)
+                                 .Where(item => string.Equals(item.Def.Name, traced, StringComparison.OrdinalIgnoreCase) && item.Def.HasResolvedCustomMaterial).Take(1))
+                        Console.WriteLine($"[Snapshot] trace material " +
+                                          $"parameters=[{string.Join(", ", state.Def.CustomMaterial.Program?.Passes.SelectMany(pass => pass.Parameters).Select(parameter => parameter.Name).Distinct() ?? Array.Empty<string>())}] " +
+                                          $"shader members=[{string.Join(", ", ShaderMembers(state.Def.CustomMaterial.Program, settings))}]");
                 }
             }
             string stem = Sanitize(system.Name);
@@ -179,6 +185,23 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             gl.DeleteFramebuffer(framebuffer);
             gl.DeleteTexture(colour);
             gl.DeleteRenderbuffer(depth);
+        }
+
+        /// <summary>Constant block members of every pass of a material program, read from the installed shader cache.</summary>
+        private static IEnumerable<string> ShaderMembers(GameMaterialProgram program, AppSettings settings)
+        {
+            var bytecodes = program == null ? null : GameShaderProgramResolver.ReadProgram(program, settings);
+            foreach (var pass in bytecodes?.Passes ?? Array.Empty<GameShaderProgramResolver.ShaderBytecodePassRead>())
+            {
+                if (!pass.Bytecode.Ready) continue;
+                var translated = AssetsManager.Shaders.GameShaderTranslator.Translate(
+                    pass.Bytecode.Program.Vertex, pass.Bytecode.Program.VertexReflection,
+                    pass.Bytecode.Program.Pixel, pass.Bytecode.Program.PixelReflection);
+                if (!translated.Ready) continue;
+                foreach (var block in translated.Program.Vertex.Sidecar.Blocks.Concat(translated.Program.Pixel.Sidecar.Blocks))
+                    foreach (var member in block.Members)
+                        yield return $"{block.Name}.{member.Name}";
+            }
         }
 
         private static float[] Draw(GL gl, VfxRenderSession session, uint framebuffer, uint size, double time,

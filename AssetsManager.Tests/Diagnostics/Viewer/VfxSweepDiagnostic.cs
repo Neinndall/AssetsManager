@@ -24,19 +24,20 @@ using Silk.NET.OpenGL;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-sweep [--champions] [--maps] [--filter TEXT] [--max-skins N] [--max-bins N] [--max-systems N] [--custom-only] [--csv FILE]`:
-    /// loads VFX systems of the installed BINs the way VFX Studio does and flags, per emitter:
+    /// `vfx-sweep [--champions] [--maps] [--filter TEXT] [--max-skins N] [--max-bins N] [--max-systems N] [--max-seconds N] [--custom-only] [--csv FILE]`:
+    /// loads VFX systems of the installed BINs (skin BINs, the shared character BINs they link, map materials) the way
+    /// VFX Studio does and flags, per emitter:
     /// resources it authors that the engine cannot load (split into absent from the game, not extracted and not
     /// decoded), emitters drawn with the stock program instead of the game's and why, root emitters that emit
-    /// nothing during the first seconds, particles with non-finite or runaway positions, and emitters holding more
-    /// than 2000 live particles.
+    /// nothing during the sampled seconds (4 by default), child emitters alive past their first emission without a
+    /// particle, particles with non-finite or runaway positions, and emitters holding more than 2000 live particles.
     /// </summary>
     internal static class VfxSweepDiagnostic
     {
         private sealed record Finding(string Flag, string Bin, string System, string Emitter, string Detail);
 
         private const float SampleStep = 1f / 30f;
-        private const float MaxSampleSeconds = 4f;
+        private const float DefaultSampleSeconds = 4f;
         private const float RunawayDistance = 50000f;
         private const int FloodCount = 2000;
 
@@ -48,6 +49,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             int maxSkins = int.TryParse(Option(args, "--max-skins"), out int skins) ? skins : 1;
             int maxBins = int.TryParse(Option(args, "--max-bins"), out int bins) ? bins : int.MaxValue;
             int maxSystems = int.TryParse(Option(args, "--max-systems"), out int systemsCap) ? systemsCap : 60;
+            float maxSeconds = float.TryParse(Option(args, "--max-seconds"), NumberStyles.Float, CultureInfo.InvariantCulture, out float seconds) && seconds > 0f
+                ? seconds
+                : DefaultSampleSeconds;
             string csvPath = Option(args, "--csv");
             bool customOnly = args.Contains("--custom-only");
 
@@ -67,6 +71,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
 
             var skinPattern = new Regex(@"^data/characters/([a-z0-9_]+)/skins/skin(\d+)\.bin$");
+            // Shared BINs beside the skins (e.g. ezreal_multi_skins_*.bin) hold the systems several skins link.
+            var sharedPattern = new Regex(@"^data/characters/[a-z0-9_]+/[^/]+\.bin$");
             var perChampion = new Dictionary<string, int>(StringComparer.Ordinal);
             var targets = new List<string>();
             foreach (string line in File.ReadLines(Path.Combine(hashDir, "hashes.game.txt")))
@@ -85,11 +91,13 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     perChampion[skin.Groups[1].Value] = count + 1;
                     targets.Add(path);
                 }
+                else if (champions && sharedPattern.IsMatch(path) && !path.StartsWith("data/characters/tft", StringComparison.Ordinal))
+                    targets.Add(path);
                 else if (maps && path.StartsWith("data/maps/", StringComparison.Ordinal) && path.EndsWith(".materials.bin", StringComparison.Ordinal))
                     targets.Add(path);
             }
             targets = targets.OrderBy(path => path, StringComparer.Ordinal).Take(maxBins).ToList();
-            Console.WriteLine($"[VfxSweep] bins={targets.Count} (champions={champions} maps={maps} maxSkins={maxSkins} maxSystems={maxSystems})");
+            Console.WriteLine($"[VfxSweep] bins={targets.Count} (champions={champions} maps={maps} maxSkins={maxSkins} maxSystems={maxSystems} maxSeconds={maxSeconds})");
 
             var wadProvider = new WadContentProvider(log, new WadNodeLoaderService(null, log), new DirectoriesCreator(), new SvgParser());
             var resolver = new MapAssetResolver(wadProvider, settings);
@@ -151,7 +159,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                         emitterCount += system.Emitters?.Count ?? 0;
                         try
                         {
-                            Check(session, system, systems, resourceMap, resources.SearchDirectory, binPath, wadOf, findings);
+                            Check(session, system, systems, resourceMap, resources.SearchDirectory, binPath, wadOf, findings, maxSeconds);
                         }
                         catch (Exception ex)
                         {
@@ -189,7 +197,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             string searchDirectory,
             string binPath,
             IReadOnlyDictionary<ulong, string> wadOf,
-            List<Finding> findings)
+            List<Finding> findings,
+            float maxSeconds)
         {
             session.SetSystem(new VfxSystemModel
             {
@@ -235,10 +244,13 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     Flag("STOCK_PROGRAM", def, $"{(def.HasResolvedCustomMaterial ? "custom" : def.PrimitiveKind.ToString())}: {fallback}");
             }
 
-            // Simulation: sample the first seconds and watch every root emitter and every particle.
+            // Simulation: sample the first seconds and watch every emitter and every particle. Child systems start
+            // when their parent spawns them, so a child emitter is judged from the first sample its runtime is alive.
             double span = VfxDurationCalculator.SystemSpan(system);
-            float until = (float)Math.Min(MaxSampleSeconds, double.IsFinite(span) && span > 0 ? span : MaxSampleSeconds);
+            float until = (float)Math.Min(maxSeconds, double.IsFinite(span) && span > 0 ? span : maxSeconds);
             var spawned = new HashSet<int>();
+            var childSpawned = new HashSet<VfxEmitterDefinition>(ReferenceEqualityComparer.Instance);
+            var childAlive = new Dictionary<VfxEmitterDefinition, (float First, float Last)>(ReferenceEqualityComparer.Instance);
             var badPositions = new HashSet<VfxEmitterDefinition>(ReferenceEqualityComparer.Instance);
             for (float time = SampleStep; time <= until + 1e-4f; time += SampleStep)
             {
@@ -249,8 +261,14 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     {
                         foreach (VfxPlaybackRuntime.EmitterState state in runtime.Emitters)
                         {
-                            if (ReferenceEquals(runtime, graph.Root) && state.Particles.Count > 0)
-                                spawned.Add(state.SourceOrder);
+                            if (ReferenceEquals(runtime, graph.Root))
+                            {
+                                if (state.Particles.Count > 0) spawned.Add(state.SourceOrder);
+                            }
+                            else if (state.Particles.Count > 0)
+                                childSpawned.Add(state.Def);
+                            else
+                                childAlive[state.Def] = childAlive.TryGetValue(state.Def, out var alive) ? (alive.First, time) : (time, time);
                             if (state.Particles.Count > FloodCount && badPositions.Add(state.Def))
                                 Flag("PARTICLE_FLOOD", state.Def, $"t={time:0.00} live={state.Particles.Count}");
                             foreach (VfxPlaybackRuntime.Particle particle in state.Particles)
@@ -274,6 +292,15 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 // too (vfx-emission-window-census: 0.4% of emitters, copy-pasted leftovers).
                 if (def.EmitterLifetime is { } life && start > life) continue;
                 Flag("NO_PARTICLES", def, $"start={start:0.00}s window={until:0.00}s prim={def.PrimitiveKind}");
+            }
+            foreach ((VfxEmitterDefinition def, (float first, float last)) in childAlive)
+            {
+                if (def.Disabled || childSpawned.Contains(def)) continue;
+                float start = def.TimeBeforeFirstEmission;
+                if (def.EmitterLifetime is { } life && start > life) continue;
+                // Alive for longer than its emission delay plus a sample, and still empty.
+                if (last - first <= start + SampleStep) continue;
+                Flag("CHILD_NO_PARTICLES", def, $"start={start:0.00}s alive={first:0.00}-{last:0.00}s prim={def.PrimitiveKind}");
             }
         }
 
