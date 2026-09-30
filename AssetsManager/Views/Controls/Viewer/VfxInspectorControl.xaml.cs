@@ -3423,12 +3423,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 LoadExtractedContainer(dialog.FolderName);
         }
 
-        private void ReloadRoot_Click(object sender, RoutedEventArgs e)
-        {
-            if (!string.IsNullOrWhiteSpace(_model.RootPath))
-                LoadExtractedContainer(_model.RootPath);
-        }
-
         private void RootPathTextBox_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter && !string.IsNullOrWhiteSpace(_model.RootPath))
@@ -3544,7 +3538,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 LogService?.LogError(ex, "Failed to scan VFX folder.");
                 if (ReferenceEquals(_scanCancellation, operation))
                 {
-                    _model.ProjectBrowserMessage = "Could not load this folder. Try reloading the project.";
+                    _model.ProjectBrowserMessage = "Could not load this folder. Select the project folder again.";
                     _model.StatusText = "Unable to load project.";
                 }
                 return false;

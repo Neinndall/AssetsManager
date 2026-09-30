@@ -427,11 +427,6 @@
                                         Width="24" Height="26" Padding="0" ToolTip="Open project folder">
                                     <materialIcons:MaterialIcon Kind="FolderOpen" Width="14" Height="14"/>
                                 </Button>
-                                <Button Click="ReloadRoot_Click" Style="{StaticResource TransparentIconButton}"
-                                        Visibility="{Binding HasProject, Converter={StaticResource BoolToVis}}"
-                                        Width="24" Height="26" Padding="0" ToolTip="Reload project">
-                                    <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14"/>
-                                </Button>
                                 <Button Click="CloseProject_Click" Style="{StaticResource TransparentIconButton}"
                                         Visibility="{Binding HasProject, Converter={StaticResource BoolToVis}}"
                                         Width="24" Height="26" Padding="0" ToolTip="Close project (keeps files on disk)">
