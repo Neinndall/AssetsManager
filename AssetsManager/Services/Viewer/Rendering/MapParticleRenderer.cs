@@ -66,6 +66,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (_renderer != null) _renderer.Sun = sun;
         }
 
+        internal void SetTerrainDepth(uint texture, uint width, uint height)
+            => _renderer?.SetTerrainDepth(texture, width, height);
+
         internal bool PrepareRenderFrame(
             IReadOnlyList<MapParticleRuntime> runtimes,
             Matrix4x4 viewProjection,

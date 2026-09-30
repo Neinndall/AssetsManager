@@ -933,6 +933,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _viewportHeight = (uint)Math.Max(0, height);
         }
 
+        /// <summary>The map-only depth planar projections land on, or 0 to keep them on the flat ground.</summary>
+        internal void SetTerrainDepth(uint texture, uint width, uint height)
+            => _renderer?.SetTerrainDepth(texture, width, height);
+
         public void Update(float deltaTime)
         {
             if (!_isPlaying || _activeSystem == null) return;

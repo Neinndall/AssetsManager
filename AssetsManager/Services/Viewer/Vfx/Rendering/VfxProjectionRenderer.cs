@@ -12,6 +12,20 @@ public sealed partial class VfxOpenGlRenderer
 {
     private uint _projectionProgram;
     private VfxShaderUniforms _projectionUniforms;
+    private uint _projectionTerrainProgram;
+    private VfxShaderUniforms _projectionTerrainUniforms;
+    private uint _terrainDepthTexture;
+    private Vector2 _terrainDepthSize;
+
+    /// <summary>
+    /// The depth of the map geometry alone, captured before structures and characters draw. Planar projections land
+    /// on it like the game's decals on map triangles; without it they lie on the flat ground.
+    /// </summary>
+    internal void SetTerrainDepth(uint texture, uint width, uint height)
+    {
+        _terrainDepthTexture = texture;
+        _terrainDepthSize = new Vector2(width, height);
+    }
     private readonly VfxProjectionGeometry _projectionGeometry = new();
 
     private void RenderProjection(VfxPlaybackRuntime.EmitterState emitter, ReadOnlySpan<float> instances,
@@ -23,10 +37,31 @@ public sealed partial class VfxOpenGlRenderer
                 VfxProjectionShaderSource.Vertex, VfxProjectionShaderSource.Fragment);
             _projectionUniforms = new VfxShaderUniforms(_gl, _projectionProgram);
         }
+        bool onTerrain = _terrainDepthTexture != 0 && !wireframe;
+        if (onTerrain && _projectionTerrainProgram == 0)
+        {
+            _projectionTerrainProgram = GlShaderCompiler.CreateProgram(_gl, _gles,
+                VfxProjectionShaderSource.Vertex, VfxProjectionShaderSource.TerrainFragment);
+            _projectionTerrainUniforms = new VfxShaderUniforms(_gl, _projectionTerrainProgram);
+        }
         var definition = emitter.Def;
         var state = definition.RenderState ?? VfxEmitterRenderState.Default;
-        var uniforms = _projectionUniforms;
-        _gl.UseProgram(_projectionProgram);
+        uint program = onTerrain ? _projectionTerrainProgram : _projectionProgram;
+        var uniforms = onTerrain ? _projectionTerrainUniforms : _projectionUniforms;
+        _gl.UseProgram(program);
+        VfxProjectionDefinition band = definition.Projection ?? new VfxProjectionDefinition();
+        _gl.Uniform1(uniforms.TerrainMode, onTerrain ? 1 : 0);
+        _gl.Uniform2(uniforms.ProjectionBand, band.YRange, band.Fading);
+        if (onTerrain)
+        {
+            Matrix4x4.Invert(viewProj, out Matrix4x4 inverseViewProj);
+            _gl.UniformMatrix4(uniforms.InverseViewProj, 1, false, in inverseViewProj.M11);
+            _gl.Uniform2(uniforms.ViewportSize, _terrainDepthSize.X, _terrainDepthSize.Y);
+            _gl.Uniform1(uniforms.TerrainDepth, 5);
+            _gl.ActiveTexture(TextureUnit.Texture5);
+            _gl.BindTexture(TextureTarget.Texture2D, _terrainDepthTexture);
+            _gl.ActiveTexture(TextureUnit.Texture0);
+        }
         _gl.UniformMatrix4(uniforms.ViewProj, 1, false, in viewProj.M11);
         _gl.Uniform1(uniforms.Tex, 0);
         _gl.Uniform1(uniforms.ColorMap, 7);

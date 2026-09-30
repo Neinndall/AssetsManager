@@ -569,6 +569,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             session.SetSun(sun);
             session.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
+            session.SetTerrainDepth(_frameTerrainDepth, _frameTerrainWidth, _frameTerrainHeight);
             if (session.PrepareRenderFrame(viewProjection, view, _model.PreviewViewMode, _model.EffectivePreviewWireOverlay))
                 _preparedParticlePasses.Add(session);
         }

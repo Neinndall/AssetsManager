@@ -1045,6 +1045,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.DeleteProgram(_program);
             if (_projectionProgram != 0) _gl.DeleteProgram(_projectionProgram);
             _projectionProgram = 0;
+            if (_projectionTerrainProgram != 0) _gl.DeleteProgram(_projectionTerrainProgram);
+            _projectionTerrainProgram = 0;
+            _terrainDepthTexture = 0;
             if (_meshBoneBuffer != 0) _gl.DeleteBuffer(_meshBoneBuffer);
             _meshBoneBuffer = 0;
             _ownerSkinningMatrices = null;

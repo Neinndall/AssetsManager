@@ -456,6 +456,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Over a map, planar projections land on the map terrain and fade by its height like in game, instead of lying buried or floating on a flat plane at height 0; characters and structures stay in front of them.
   - VFX Studio / Planar projections with alpha erosion dissolve and those with a textureMult layer draw it, like in game, and neither applies the colour ramp the game skips for them (Locke W footsteps, Camille skin32 E indicator).
   - Viewer / Submeshes with only a texture and no material blend their texture alpha like in game and draw in the skin's authored submesh order, instead of a solid background or a dark or white rim (Yunara skin10 chick eyes, Yuumi glasses, Kalista, blade smears).
   - VFX Studio / Planar particle projections now draw on the ground with their authored size, rotation and height fade.

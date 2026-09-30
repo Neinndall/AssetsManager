@@ -100,6 +100,11 @@ namespace AssetsManager.Views.Controls.Viewer
         private MapCharacterRenderer _mapCharacterRenderer;
         private MapParticleRenderer _mapParticleRenderer;
         private MapPostEffectsRenderer _mapPostEffectsRenderer;
+        // The map geometry's depth before structures and characters draw, where planar projections land.
+        private AssetsManager.Services.Viewer.Rendering.Core.GlSceneCapture _terrainDepthCapture;
+        private uint _frameTerrainDepth;
+        private uint _frameTerrainWidth;
+        private uint _frameTerrainHeight;
         private FxaaPostEffectsRenderer _fxaaRenderer;
         private CheckerboardBackgroundRenderer _checkerboardBackgroundRenderer;
         private SmaaPostEffectsRenderer _smaaRenderer;
@@ -1754,6 +1759,11 @@ namespace AssetsManager.Views.Controls.Viewer
             _mapParticleRenderer = null;
             RunReleaseStep(nameof(MapParticleRenderer), () => mapParticleRenderer?.Dispose(), gpuBound: true);
 
+            var terrainDepthCapture = _terrainDepthCapture;
+            _terrainDepthCapture = null;
+            _frameTerrainDepth = 0;
+            RunReleaseStep("TerrainDepthCapture", () => terrainDepthCapture?.Dispose(), gpuBound: true);
+
             var mapPostEffectsRenderer = _mapPostEffectsRenderer;
             _mapPostEffectsRenderer = null;
             RunReleaseStep(nameof(MapPostEffectsRenderer), () => mapPostEffectsRenderer?.Dispose(), gpuBound: true);
@@ -2154,6 +2164,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             // A MAP scene owns the world backdrop. In Character-backdrop mode the selected Skin remains
             // the subject and is composited into the same depth/particle/post-processing frame.
+            _frameTerrainDepth = 0;
             if (_mapSceneRuntime != null)
             {
                 AdvanceMapCharacterClip(dt);
@@ -2171,6 +2182,8 @@ namespace AssetsManager.Views.Controls.Viewer
                         _model.EffectivePreviewWireOverlay,
                         _model.PreviewShaders,
                         transparentPass: phase == 1);
+                    if (phase == 0)
+                        CaptureTerrainDepth();
                     if (_mapSceneRuntime.ShowStructures)
                     {
                         _mapCharacterRenderer?.Render(
@@ -2210,6 +2223,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 // frame used by distortion.
                 MapSunData sun = EffectiveMapSun();
                 _mapParticleRenderer?.SetSun(sun);
+                _mapParticleRenderer?.SetTerrainDepth(_frameTerrainDepth, _frameTerrainWidth, _frameTerrainHeight);
                 bool mapParticlesPrepared = _mapSceneRuntime.ShowParticles &&
                     _mapParticleRenderer?.PrepareRenderFrame(
                         _mapSceneRuntime.Particles.VisibleRuntimes,
@@ -2306,6 +2320,19 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             Dispatcher.InvokeAsync(UpdatePlayheadPosition);
+        }
+
+        /// <summary>Copies the depth the map geometry just wrote, before structures and characters draw over it.</summary>
+        private void CaptureTerrainDepth()
+        {
+            if (_gl == null)
+                return;
+
+            _terrainDepthCapture ??= new AssetsManager.Services.Viewer.Rendering.Core.GlSceneCapture(_gl);
+            _frameTerrainWidth = (uint)Math.Max(1d, OpenTkControl.ActualWidth);
+            _frameTerrainHeight = (uint)Math.Max(1d, OpenTkControl.ActualHeight);
+            _terrainDepthCapture.Capture(_frameTerrainWidth, _frameTerrainHeight, captureColor: false, captureDepth: true);
+            _frameTerrainDepth = _terrainDepthCapture.DepthTexture;
         }
 
         private void AdvanceCurrentVfxPlayback(float dt)

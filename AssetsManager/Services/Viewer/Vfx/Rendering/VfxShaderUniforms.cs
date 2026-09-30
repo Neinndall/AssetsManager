@@ -106,6 +106,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal readonly int UvTransformCenterMult;
         internal readonly int ViewProj;
         internal readonly int ViewportSize;
+        internal readonly int InverseViewProj;
+        internal readonly int TerrainMode;
+        internal readonly int TerrainDepth;
+        internal readonly int ProjectionBand;
         internal readonly int WireframeColor;
         internal readonly int WireframePass;
         internal readonly int WorldPos;
@@ -216,6 +220,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             UvTransformCenterMult = gl.GetUniformLocation(program, "uUvTransformCenterMult");
             ViewProj = gl.GetUniformLocation(program, "uViewProj");
             ViewportSize = gl.GetUniformLocation(program, "uViewportSize");
+            InverseViewProj = gl.GetUniformLocation(program, "uInverseViewProj");
+            TerrainMode = gl.GetUniformLocation(program, "uTerrainMode");
+            TerrainDepth = gl.GetUniformLocation(program, "uTerrainDepth");
+            ProjectionBand = gl.GetUniformLocation(program, "uProjectionBand");
             WireframeColor = gl.GetUniformLocation(program, "uWireframeColor");
             WireframePass = gl.GetUniformLocation(program, "uWireframePass");
             WorldPos = gl.GetUniformLocation(program, "uWorldPos");
