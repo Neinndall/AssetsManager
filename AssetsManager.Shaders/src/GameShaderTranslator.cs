@@ -36,6 +36,7 @@ namespace AssetsManager.Shaders
         private const uint CapabilityDemoteToHelperInvocation = 5379;
         private const uint CapabilityDrawParameters = 4427;
         private const uint BuiltInBaseVertex = 4424;
+        private const uint BuiltInBaseInstance = 4425;
         private const string DrawParametersExtension = "SPV_KHR_shader_draw_parameters";
         private const uint DecorationBuiltIn = 11;
         private const uint DecorationComponent = 31;
@@ -57,6 +58,7 @@ namespace AssetsManager.Shaders
             CubeArray,
             ShadowLevelZero,
             BaseVertexZero,
+            BaseInstanceZero,
             MipLevelsOne,
             SafeReciprocal
         }
@@ -240,8 +242,10 @@ namespace AssetsManager.Shaders
             var pointeeOf = new Dictionary<uint, uint>();
             var variables = new Dictionary<uint, (uint PointerType, uint Storage)>();
             var builtins = new HashSet<uint>();
-            // BaseVertex inputs (DX SV_VertexID = VertexIndex - BaseVertex) are not expressible in GLSL ES.
+            // BaseVertex/BaseInstance inputs (DX SV_VertexID = VertexIndex - BaseVertex, SV_InstanceID =
+            // InstanceIndex - BaseInstance) are not expressible in GLSL ES.
             var baseVertex = new HashSet<uint>();
+            var baseInstance = new HashSet<uint>();
 
             foreach (SpirvInstruction instruction in instructions)
             {
@@ -257,11 +261,16 @@ namespace AssetsManager.Shaders
                     builtins.Add(inst[1]);
                     if (instruction.Count >= 4 && inst[3] == BuiltInBaseVertex)
                         baseVertex.Add(inst[1]);
+                    else if (instruction.Count >= 4 && inst[3] == BuiltInBaseInstance)
+                    {
+                        baseVertex.Add(inst[1]);
+                        baseInstance.Add(inst[1]);
+                    }
                 }
             }
 
             // Constants replacing values GLSL ES cannot query, keyed by (result type, value):
-            // - BaseVertex reads 0: the preview never draws with a base vertex offset.
+            // - BaseVertex/BaseInstance read 0: the preview never draws with a base vertex or instance offset.
             // - textureQueryLevels reads 1: the engine textures queried this way bind 1x1 neutrals.
             uint bound = words[3];
             var constants = new Dictionary<(uint Type, uint Value), uint>();
@@ -272,7 +281,9 @@ namespace AssetsManager.Shaders
                     continue;
                 if (!constants.ContainsKey(key))
                     constants[key] = bound++;
-                applied.Add(instruction.Op == OpLoad ? AppliedPatch.BaseVertexZero : AppliedPatch.MipLevelsOne);
+                applied.Add(instruction.Op != OpLoad
+                    ? AppliedPatch.MipLevelsOne
+                    : baseInstance.Contains(words[instruction.At + 3]) ? AppliedPatch.BaseInstanceZero : AppliedPatch.BaseVertexZero);
             }
 
             var newNames = new Dictionary<uint, string>();
