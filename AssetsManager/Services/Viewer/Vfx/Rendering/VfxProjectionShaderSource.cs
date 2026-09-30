@@ -134,7 +134,9 @@ void main(){
         vec3 world = surface.xyz / surface.w;
         vec2 offset = world.xz - vCenter.xz;
         float c = cos(vTurn), s = sin(vTurn);
-        vec2 corner = vec2(offset.x*c + offset.y*s, -offset.x*s + offset.y*c) / max(2.0 * vSize, vec2(0.0001));
+        // Clamp the magnitude without losing the authored mirror on either axis.
+        vec2 sizeSign = mix(vec2(1.0), vec2(-1.0), lessThan(vSize, vec2(0.0)));
+        vec2 corner = vec2(offset.x*c + offset.y*s, -offset.x*s + offset.y*c) / (sizeSign * max(abs(2.0 * vSize), vec2(0.0001)));
         uv = vec2(corner.x + 0.5, 0.5 - corner.y);
         if(any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) discard;
         float gap = abs(world.y - vCenter.y);

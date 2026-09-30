@@ -39,6 +39,36 @@ public sealed class VfxProjectionTerrainTests
         Assert.InRange(alpha, 130, 138);
     }
 
+    [Theory]
+    [InlineData(20f, 20f, 0f)]
+    [InlineData(-20f, 20f, 0f)]
+    [InlineData(20f, -20f, 0f)]
+    [InlineData(-20f, -20f, 0f)]
+    [InlineData(20f, 20f, 1.5707963f)]
+    [InlineData(-20f, 20f, 1.5707963f)]
+    [InlineData(20f, -20f, 1.5707963f)]
+    [InlineData(-20f, -20f, 1.5707963f)]
+    public void SignedScalePreservesTheFootprintAndMirrorsItsTexture(float width, float height, float turn)
+    {
+        byte[] pixels = Draw(TerrainHeight, width, 50f, 100f, height, turn, textured: true);
+        (float X, float Z, byte[] Color)[] samples =
+        {
+            (-0.5f, 0.5f, new byte[] { 255, 0, 0, 255 }),
+            (0.5f, 0.5f, new byte[] { 0, 255, 0, 255 }),
+            (-0.5f, -0.5f, new byte[] { 0, 0, 255, 255 }),
+            (0.5f, -0.5f, new byte[] { 255, 255, 0, 255 })
+        };
+        foreach (var sample in samples)
+        {
+            float x = sample.X * width, z = sample.Z * height;
+            Vector2 pixel = Project(new Vector3(x * MathF.Cos(turn) - z * MathF.Sin(turn), TerrainHeight,
+                x * MathF.Sin(turn) + z * MathF.Cos(turn)));
+            int at = ((int)pixel.Y * Size + (int)pixel.X) * 4;
+            Assert.Equal(sample.Color, pixels[at..(at + 4)]);
+        }
+        Assert.Equal(0, Alpha(pixels, Project(new Vector3(60f, TerrainHeight, 0f))));
+    }
+
     private static Matrix4x4 ViewProjection() =>
         Matrix4x4.CreateLookAt(new Vector3(0f, 600f, 400f), new Vector3(0f, TerrainHeight, 0f), Vector3.UnitY) *
         Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 3f, 1f, 10f, 5000f);
@@ -52,8 +82,9 @@ public sealed class VfxProjectionTerrainTests
     private static int Alpha(byte[] pixels, Vector2 at) =>
         pixels[((int)at.Y * Size + (int)at.X) * 4 + 3];
 
-    /// <returns>RGBA pixels of one white decal drawn in terrain mode over a flat terrain at height 100.</returns>
-    private static byte[] Draw(float particleHeight, float halfExtent, float yRange, float fading)
+    /// <returns>RGBA pixels of one decal drawn in terrain mode over a flat terrain at height 100.</returns>
+    private static byte[] Draw(float particleHeight, float halfExtent, float yRange, float fading,
+        float? halfHeight = null, float turn = 0f, bool textured = false)
     {
         using var context = new HiddenWglContext();
         using var gl = GL.GetApi(context.GetProcAddress);
@@ -112,10 +143,28 @@ public sealed class VfxProjectionTerrainTests
         gl.BindTexture(TextureTarget.Texture2D, depth);
         gl.ActiveTexture(TextureUnit.Texture0);
 
+        uint sprite = 0;
+        if (textured)
+        {
+            sprite = gl.GenTexture();
+            gl.BindTexture(TextureTarget.Texture2D, sprite);
+            gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, 2, 2, 0, PixelFormat.Rgba,
+                PixelType.UnsignedByte, new ReadOnlySpan<byte>(new byte[]
+                {
+                    255, 0, 0, 255, 0, 255, 0, 255,
+                    0, 0, 255, 255, 255, 255, 0, 255
+                }));
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            gl.Uniform1(gl.GetUniformLocation(program, "uHasTex"), 1);
+            gl.Uniform1(gl.GetUniformLocation(program, "uTex"), 0);
+        }
+
         float[] instance = new float[VfxPlaybackRuntime.InstanceStride];
         instance[1] = particleHeight;
         instance[3] = halfExtent;
-        instance[4] = halfExtent;
+        instance[4] = halfHeight ?? halfExtent;
+        instance[9] = turn;
         instance[5] = instance[6] = instance[7] = instance[8] = 1f;
         instance[31] = instance[32] = 1f;
         uint decalVao = gl.GenVertexArray();
@@ -150,6 +199,7 @@ public sealed class VfxProjectionTerrainTests
         gl.DeleteFramebuffer(decalTarget);
         gl.DeleteTexture(depth);
         gl.DeleteTexture(colour);
+        if (sprite != 0) gl.DeleteTexture(sprite);
         gl.DeleteProgram(terrain);
         gl.DeleteProgram(program);
         return pixels;
