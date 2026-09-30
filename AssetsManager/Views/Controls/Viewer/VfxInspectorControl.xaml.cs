@@ -1237,21 +1237,29 @@ namespace AssetsManager.Views.Controls.Viewer
             _championModel.RotationZ = _model.CharacterRotationZ;
             _championModel.Scale = _championAuthoredScale * _model.CharacterScaleMultiplier;
 
-            // The owner scene already applies authored skinScale to bones/attachment offsets. Only the
-            // user placement multiplier belongs in the outer VFX transform, otherwise scale is doubled.
-            if (_model.SelectedSystem == null)
-            {
-                Matrix4x4 placement = VfxCharacterViewportSemantics.CharacterPlacementWorld(
-                    _model.CharacterRotationX,
-                    _model.CharacterRotationY + autoYaw,
-                    _model.CharacterRotationZ,
-                    _model.CharacterScaleMultiplier,
-                    _model.CharacterPositionX,
-                    _model.CharacterPositionY,
-                    _model.CharacterPositionZ);
-                _vfxRenderer?.SetWorldTransform(placement);
-            }
+            _vfxRenderer?.SetWorldTransform(CharacterVfxPlacement());
             OpenTkControl?.InvalidateVisual();
+        }
+
+        /// <summary>
+        /// Where the focused Character's effects play, an inspected System included, so a System opened over a
+        /// MAP backdrop plays beside the Character rather than at the map's origin. The owner scene already applies
+        /// the authored skinScale to bones and attachment offsets, so only the user multiplier goes here.
+        /// </summary>
+        private Matrix4x4 CharacterVfxPlacement()
+        {
+            if (!_model.IsSkinWorkspace)
+                return Matrix4x4.Identity;
+
+            double autoYaw = _model.CharacterAutoRotate ? _characterAutoRotateDegrees : 0d;
+            return VfxCharacterViewportSemantics.CharacterPlacementWorld(
+                _model.CharacterRotationX,
+                _model.CharacterRotationY + autoYaw,
+                _model.CharacterRotationZ,
+                _model.CharacterScaleMultiplier,
+                _model.CharacterPositionX,
+                _model.CharacterPositionY,
+                _model.CharacterPositionZ);
         }
 
         private void CollapseInspectorSections_Click(object sender, RoutedEventArgs e) =>
@@ -5341,7 +5349,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.CurrentTime = 0;
             _model.PlaybackSeed = playbackSeed;
             string playbackContext = "standalone system";
-            _vfxRenderer?.SetWorldTransform(Matrix4x4.Identity);
+            _vfxRenderer?.SetWorldTransform(CharacterVfxPlacement());
             _vfxRenderer?.SetVfxSystem(systemModel);
             ApplyChampionBindPose();
             if (_vfxRenderer != null)

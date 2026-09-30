@@ -69,6 +69,109 @@ public sealed class VfxProjectionTerrainTests
         Assert.Equal(0, Alpha(pixels, Project(new Vector3(60f, TerrainHeight, 0f))));
     }
 
+    [Fact]
+    public void DecalPassesTheSceneDepthTestAndStaysBehindWhatIsInFront()
+    {
+        using var context = new HiddenWglContext();
+        using var gl = GL.GetApi(context.GetProcAddress);
+        Matrix4x4 viewProj = ViewProjection();
+
+        // The viewport's own frame: colour and a packed depth-stencil buffer.
+        uint colour = gl.GenTexture();
+        gl.BindTexture(TextureTarget.Texture2D, colour);
+        gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, Size, Size, 0, PixelFormat.Rgba, PixelType.UnsignedByte,
+            ReadOnlySpan<byte>.Empty);
+        uint depthStencil = gl.GenRenderbuffer();
+        gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, depthStencil);
+        gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.Depth24Stencil8, Size, Size);
+        uint frame = gl.GenFramebuffer();
+        gl.BindFramebuffer(FramebufferTarget.Framebuffer, frame);
+        gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, colour, 0);
+        gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment,
+            RenderbufferTarget.Renderbuffer, depthStencil);
+        gl.Viewport(0, 0, Size, Size);
+        gl.ClearColor(0f, 0f, 0f, 0f);
+        gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        gl.Enable(EnableCap.DepthTest);
+        gl.DepthFunc(DepthFunction.Lequal);
+        gl.DepthMask(true);
+
+        uint solid = GlShaderCompiler.CreateProgram(gl, false,
+            "layout(location=0) in vec3 aPos; uniform mat4 uViewProj; void main(){ gl_Position = uViewProj * vec4(aPos, 1.0); }",
+            "out vec4 fragColor; void main(){ fragColor = vec4(0.0, 0.0, 0.0, 0.0); }");
+        gl.UseProgram(solid);
+        gl.UniformMatrix4(gl.GetUniformLocation(solid, "uViewProj"), 1, false, in viewProj.M11);
+        uint vao = gl.GenVertexArray();
+        gl.BindVertexArray(vao);
+        uint terrainVbo = Buffer(gl, new[] { -2000f, TerrainHeight, -2000f, 2000f, TerrainHeight, -2000f, -2000f, TerrainHeight, 2000f, 2000f, TerrainHeight, 2000f });
+        gl.EnableVertexAttribArray(0);
+        gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 0, IntPtr.Zero);
+        gl.DrawArrays(PrimitiveType.TriangleStrip, 0, 4);
+
+        // Captured right after the terrain, as the viewport does before structures and characters.
+        using var capture = new AssetsManager.Services.Viewer.Rendering.Core.GlSceneCapture(gl);
+        capture.Capture(Size, Size, captureColor: false, captureDepth: true);
+
+        // A character standing on the decal's left half, drawn after the capture.
+        uint standingVbo = Buffer(gl, new[] { -30f, TerrainHeight, 5f, -5f, TerrainHeight, 5f, -30f, TerrainHeight + 80f, 5f, -5f, TerrainHeight + 80f, 5f });
+        gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 0, IntPtr.Zero);
+        gl.DrawArrays(PrimitiveType.TriangleStrip, 0, 4);
+
+        uint program = GlShaderCompiler.CreateProgram(gl, false, VfxProjectionShaderSource.Vertex, VfxProjectionShaderSource.TerrainFragment);
+        gl.UseProgram(program);
+        Matrix4x4.Invert(viewProj, out Matrix4x4 inverse);
+        gl.UniformMatrix4(gl.GetUniformLocation(program, "uViewProj"), 1, false, in viewProj.M11);
+        gl.UniformMatrix4(gl.GetUniformLocation(program, "uInverseViewProj"), 1, false, in inverse.M11);
+        gl.Uniform1(gl.GetUniformLocation(program, "uTerrainMode"), 1);
+        gl.Uniform2(gl.GetUniformLocation(program, "uProjectionBand"), 50f, 100f);
+        gl.Uniform2(gl.GetUniformLocation(program, "uViewportSize"), (float)Size, (float)Size);
+        gl.Uniform1(gl.GetUniformLocation(program, "uTerrainDepth"), 5);
+        gl.ActiveTexture(TextureUnit.Texture5);
+        gl.BindTexture(TextureTarget.Texture2D, capture.DepthTexture);
+        gl.ActiveTexture(TextureUnit.Texture0);
+        gl.DepthMask(false);
+
+        float[] instance = new float[VfxPlaybackRuntime.InstanceStride];
+        instance[1] = TerrainHeight;
+        instance[3] = instance[4] = 20f;
+        instance[5] = instance[6] = instance[7] = instance[8] = 1f;
+        instance[31] = instance[32] = 1f;
+        uint decalVao = gl.GenVertexArray();
+        gl.BindVertexArray(decalVao);
+        uint cornerVbo = Buffer(gl, new[] { -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f });
+        gl.EnableVertexAttribArray(0);
+        gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 0, IntPtr.Zero);
+        uint instanceVbo = Buffer(gl, instance);
+        foreach ((uint location, int components, int offset) in new (uint, int, int)[]
+                 { (1, 3, 0), (2, 2, 3), (3, 4, 5), (4, 2, 9), (7, 4, 19), (8, 4, 23), (9, 2, 27), (10, 4, 29), (11, 3, 33) })
+        {
+            gl.EnableVertexAttribArray(location);
+            gl.VertexAttribPointer(location, components, VertexAttribPointerType.Float, false,
+                VfxPlaybackRuntime.InstanceStride * sizeof(float), new IntPtr(offset * sizeof(float)));
+            gl.VertexAttribDivisor(location, 1);
+        }
+        gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, 1);
+
+        byte[] pixels = new byte[Size * Size * 4];
+        gl.ReadPixels(0, 0, Size, Size, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan());
+        Assert.Equal(GLEnum.NoError, gl.GetError());
+        gl.DeleteBuffer(terrainVbo);
+        gl.DeleteBuffer(standingVbo);
+        gl.DeleteBuffer(cornerVbo);
+        gl.DeleteBuffer(instanceVbo);
+        gl.DeleteVertexArray(vao);
+        gl.DeleteVertexArray(decalVao);
+        gl.DeleteFramebuffer(frame);
+        gl.DeleteRenderbuffer(depthStencil);
+        gl.DeleteTexture(colour);
+        gl.DeleteProgram(solid);
+        gl.DeleteProgram(program);
+
+        // The terrain half shows the decal; the character in front of the other half still covers it.
+        Assert.Equal(255, Alpha(pixels, Project(new Vector3(12f, TerrainHeight, -12f))));
+        Assert.Equal(0, Alpha(pixels, Project(new Vector3(-17f, TerrainHeight + 30f, 5f))));
+    }
+
     private static Matrix4x4 ViewProjection() =>
         Matrix4x4.CreateLookAt(new Vector3(0f, 600f, 400f), new Vector3(0f, TerrainHeight, 0f), Vector3.UnitY) *
         Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 3f, 1f, 10f, 5000f);
