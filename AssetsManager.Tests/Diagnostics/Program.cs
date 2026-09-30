@@ -26,6 +26,21 @@ namespace AssetsManager.Tests.Diagnostics
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && string.Equals(args[0], "skin-part-render", StringComparison.OrdinalIgnoreCase))
+            {
+                SkinPartRenderDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-planar-projection-census", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxPlanarProjectionCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "texture-only-alpha-census", StringComparison.OrdinalIgnoreCase))
+            {
+                await TextureOnlyAlphaCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "skin-blend-material-census", StringComparison.OrdinalIgnoreCase))
             {
                 SkinBlendMaterialCensusDiagnostic.Run(args.Skip(1).ToArray());
