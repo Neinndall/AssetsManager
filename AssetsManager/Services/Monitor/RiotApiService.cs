@@ -454,7 +454,7 @@ namespace AssetsManager.Services.Monitor
 
         public async Task<(string Json, HttpStatusCode? StatusCode)> GetPassRewardsProgressionAsync(string eventId, string overrideName = null)
         {
-            var response = await MakeRemoteRequestAsync("progression", eventId: eventId);
+            using var response = await MakeRemoteRequestAsync("progression", eventId: eventId);
             if (response != null && response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
@@ -518,7 +518,7 @@ namespace AssetsManager.Services.Monitor
 
         public async Task<string> GetPassRewardsRewardsAsync()
         {
-            var response = await MakeRemoteRequestAsync("rewards");
+            using var response = await MakeRemoteRequestAsync("rewards");
             if (response != null && response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
@@ -553,27 +553,33 @@ namespace AssetsManager.Services.Monitor
                 if (data == null) return (null, null);
 
                 using var doc = JsonDocument.Parse(data);
-                var bestEvent = doc.RootElement.EnumerateArray()
-                    .Select(e => e.TryGetProperty("event", out var ev) ? ev : (JsonElement?)null)
-                    .Where(ev => ev != null && ev.Value.TryGetProperty("eventHubType", out var t) && t.GetString() == "kSeasonPass")
-                    .Select(ev => new {
-                        Id = ev.Value.GetProperty("rewardTrack").GetProperty("trackConfig").GetProperty("id").GetString(),
-                        Name = ev.Value.TryGetProperty("localizedName", out var n) ? n.GetString() : "Unknown Event",
-                        Start = ev.Value.TryGetProperty("startDate", out var s) && DateTime.TryParse(s.GetString(), out var sd) ? sd : DateTime.MinValue,
-                        End = ev.Value.TryGetProperty("endDate", out var ed) && DateTime.TryParse(ed.GetString(), out var edd) ? edd : DateTime.MaxValue
-                    })
-                    .Where(e => DateTime.UtcNow <= e.End)
-                    .OrderByDescending(e => e.Start)
-                    .FirstOrDefault();
-
-                if (bestEvent != null)
+                var bestEvent = FindActivePass(doc.RootElement, DateTimeOffset.UtcNow);
+                if (bestEvent.Id != null)
                 {
                     _logService.LogSuccess($"Active Pass found: {bestEvent.Name}");
-                    return (bestEvent.Id, bestEvent.Name);
+                    return bestEvent;
                 }
             }
             catch (Exception ex) { _logService.LogError(ex, $"Error parsing event-hub from {node.SourceWadPath}"); }
             return (null, null);
+        }
+
+        internal static (string Id, string Name) FindActivePass(JsonElement hub, DateTimeOffset utcNow)
+        {
+            var bestEvent = hub.EnumerateArray()
+                .Select(e => e.TryGetProperty("event", out var ev) ? ev : (JsonElement?)null)
+                .Where(ev => ev != null && ev.Value.TryGetProperty("eventHubType", out var t) && t.GetString() == "kSeasonPass")
+                .Select(ev => new {
+                    Id = ev.Value.GetProperty("rewardTrack").GetProperty("trackConfig").GetProperty("id").GetString(),
+                    Name = ev.Value.TryGetProperty("localizedName", out var n) ? n.GetString() : "Unknown Event",
+                    Start = ev.Value.TryGetProperty("startDate", out var s) && DateTimeOffset.TryParse(s.GetString(), out var sd) ? sd : DateTimeOffset.MinValue,
+                    End = ev.Value.TryGetProperty("endDate", out var ed) && DateTimeOffset.TryParse(ed.GetString(), out var edd) ? edd : DateTimeOffset.MaxValue
+                })
+                .Where(e => e.Start <= utcNow && utcNow <= e.End)
+                .OrderByDescending(e => e.Start)
+                .FirstOrDefault();
+
+            return bestEvent == null ? (null, null) : (bestEvent.Id, bestEvent.Name);
         }
 
         public async Task<string> GetPassNameFromHubAsync(string trackConfigId)
@@ -684,6 +690,28 @@ namespace AssetsManager.Services.Monitor
             return await _httpClient.SendAsync(request);
         }
 
+        internal async Task<string> ResolveRemoteBaseUrlAsync(string endpointKey, string region)
+        {
+            if (endpointKey == "progression")
+            {
+                try
+                {
+                    using var response = await MakeLocalRequestAsync(_localEndpoints["playerPlatformUrl"]);
+                    if (response?.IsSuccessStatusCode == true)
+                    {
+                        using var config = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                        if (config.RootElement.ValueKind == JsonValueKind.String)
+                            return Endpoints.GetRemoteBaseUrl(endpointKey, region, config.RootElement.GetString());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogWarning($"Could not read the Player Platform host from the League client: {ex.Message}");
+                }
+            }
+            return Endpoints.GetRemoteBaseUrl(endpointKey, region);
+        }
+
         private async Task<HttpResponseMessage> MakeRemoteRequestAsync(string endpointKey, int retryCount = 1, string eventId = null)
         {
             if (!_remoteEndpoints.TryGetValue(endpointKey, out var endpointPath))
@@ -716,7 +744,7 @@ namespace AssetsManager.Services.Monitor
             }
 
             var regionKey = Regex.Replace(currentRegion, @"\d+$", "");
-            var baseUrl = Endpoints.BaseUrlLive.Replace("{region}", regionKey);
+            var baseUrl = await ResolveRemoteBaseUrlAsync(endpointKey, regionKey);
             var requestUri = $"{baseUrl}{tempPath}";
 
             var request = CreateRemoteRequest(requestUri, jwt);
