@@ -16,6 +16,13 @@ namespace AssetsManager.Services.Viewer.Loading
     /// </summary>
     internal sealed class BinDocumentClosureLoader
     {
+        /// <summary>
+        /// Linked files one walk opens beyond the primary document. The reference viewport stops at 32, but shipped
+        /// skins reach up to 40 (Evelynn, Thresh, Akali base skins) and hold VFX systems past 32; 64 covers them
+        /// all while still bounding a cyclic or runaway link graph.
+        /// </summary>
+        internal const int MaximumLinkedBins = 64;
+
         private readonly MapAssetResolver _assetResolver;
 
         internal BinDocumentClosureLoader(MapAssetResolver assetResolver)

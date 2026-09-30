@@ -30,7 +30,6 @@ namespace AssetsManager.Services.Viewer.Loading
 {
     public class SknLoadingService
     {
-        private const int MaximumLinkedMaterialBins = 32;
         private const string ShaderDefinitionsPath = "data/shaders/shaders.bin";
         private readonly LogService _logService;
         private readonly HashResolverService _hashResolverService;
@@ -576,7 +575,7 @@ namespace AssetsManager.Services.Viewer.Loading
             return await _binClosureLoader.LoadAsync(
                 primary,
                 projectRoot,
-                MaximumLinkedMaterialBins,
+                BinDocumentClosureLoader.MaximumLinkedBins,
                 cancellationToken,
                 (asset, ex) => _logService.LogDebug(
                     $"Could not read skin material BIN dependency '{asset?.VirtualPath}': {ex.Message}"));
@@ -596,7 +595,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 string fullPath = Path.GetFullPath(binPath);
                 if (!visitedPaths.Add(fullPath))
                     continue;
-                if (isLinked && openedLinkedBins >= MaximumLinkedMaterialBins)
+                if (isLinked && openedLinkedBins >= BinDocumentClosureLoader.MaximumLinkedBins)
                     break;
                 if (isLinked)
                     openedLinkedBins++;

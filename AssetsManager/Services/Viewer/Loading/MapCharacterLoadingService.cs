@@ -27,8 +27,6 @@ namespace AssetsManager.Services.Viewer.Loading
     internal sealed class MapCharacterLoadingService
     {
         private const string ShadersPath = "data/shaders/shaders.bin";
-        // LTK bounds breadth-first linked BIN walks to 32 files beyond the primary skin document.
-        private const int MaximumLinkedBins = 32;
         private const int MaxConcurrentTextureLoads = 4;
 
         private readonly MapAssetResolver _assetResolver;
@@ -77,7 +75,7 @@ namespace AssetsManager.Services.Viewer.Loading
             List<BinTree> documents = await _binClosureLoader.LoadAsync(
                 skinAsset,
                 projectRoot,
-                MaximumLinkedBins,
+                BinDocumentClosureLoader.MaximumLinkedBins,
                 cancellationToken,
                 (asset, ex) => _logService?.LogWarning(
                     $"MAP character BIN unavailable '{asset?.VirtualPath}': {ex.Message}"));

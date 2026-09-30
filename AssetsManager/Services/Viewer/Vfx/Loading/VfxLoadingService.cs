@@ -14,6 +14,7 @@ using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
@@ -27,8 +28,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
     /// </summary>
     public sealed class VfxLoadingService : IDisposable
     {
-        // LTK bounds every breadth-first linked BIN search to 32 files beyond the primary document.
-        private const int MaximumLinkedBins = 32;
         private readonly VfxResourceResolver _resources = new();
         private const string ShaderDefinitionsPath = "data/shaders/shaders.bin";
         private static readonly uint SpellObjectClass = Fnv1a.HashLower("SpellObject");
@@ -229,7 +228,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         StringComparison.OrdinalIgnoreCase);
                     if (!isPrimary)
                     {
-                        if (openedLinkedBins >= MaximumLinkedBins) break;
+                        if (openedLinkedBins >= BinDocumentClosureLoader.MaximumLinkedBins) break;
                         openedLinkedBins++;
                     }
                     try

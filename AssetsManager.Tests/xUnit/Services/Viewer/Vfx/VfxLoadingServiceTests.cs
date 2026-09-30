@@ -162,7 +162,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void LinkedBinTraversalStopsAfterTheFirstThirtyTwoFilesLikeLtk()
+        public void LinkedBinTraversalStopsAtTheSharedCapPastTheShippedMaximum()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxLinkedCap", Guid.NewGuid().ToString("N"));
             string championDirectory = Path.Combine(root, "data", "characters", "hero");
@@ -172,7 +172,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             {
                 string skin = Path.Combine(skinsDirectory, "skin0.bin");
                 var dependencies = new List<string>();
-                for (int index = 0; index < 33; index++)
+                // Shipped skins reach up to 40 linked files (Evelynn, Thresh); the cap stops one past it.
+                int cap = AssetsManager.Services.Viewer.Loading.BinDocumentClosureLoader.MaximumLinkedBins;
+                Assert.True(cap >= 40);
+                for (int index = 0; index <= cap; index++)
                 {
                     string dependency = $"data/characters/hero/linked{index:D2}.bin";
                     dependencies.Add(dependency);
@@ -186,10 +189,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 using var service = new VfxLoadingService();
                 VfxLoadingService.Bundle bundle = service.Load(skin, null);
 
-                Assert.Equal(33, bundle.LoadedBins.Count); // primary + 32 linked documents
-                Assert.Equal(32, bundle.Systems.Count);
-                Assert.True(bundle.Systems.ContainsKey(Fnv1a.HashLower("Effects/Linked31")));
-                Assert.False(bundle.Systems.ContainsKey(Fnv1a.HashLower("Effects/Linked32")));
+                Assert.Equal(cap + 1, bundle.LoadedBins.Count); // primary + cap linked documents
+                Assert.Equal(cap, bundle.Systems.Count);
+                Assert.True(bundle.Systems.ContainsKey(Fnv1a.HashLower($"Effects/Linked{cap - 1:D2}")));
+                Assert.False(bundle.Systems.ContainsKey(Fnv1a.HashLower($"Effects/Linked{cap:D2}")));
             }
             finally
             {
