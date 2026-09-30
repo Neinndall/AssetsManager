@@ -3149,7 +3149,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            VfxRigSettings settings = VfxRigSettings.ForPreset(preset) with
+            VfxRigSettings current = _vfxRenderer?.RigSettings ?? VfxRigSettings.ForPreset(_model.RigPreset);
+            VfxRigSettings settings = current.WithPreset(preset) with
             {
                 IsLooping = _model.IsPreviewLoopEnabled
             };

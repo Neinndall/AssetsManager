@@ -3404,11 +3404,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(terrain));
             Assert.True(VfxOpenGlRenderer.ShouldProjectToGround(ground));
             Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(projection));
-            Assert.False(projection.IsVisual);
+            Assert.True(projection.IsVisual);
         }
 
         [Fact]
-        public void SoftParticleMaterialContractDoesNotSpecialCasePlanarProjection()
+        public void PlanarProjectionUsesItsOwnHeightFadeInsteadOfSoftParticles()
         {
             var soft = new VfxSoftParticleDefinition(0f, 80f, 0f, 0f);
             VfxEmitterDefinition regular = CreateEmitter(
@@ -3424,8 +3424,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: true));
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(ground, hasSceneDepth: true));
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(terrain, hasSceneDepth: true));
-            Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(projection, hasSceneDepth: true));
-            Assert.False(projection.IsVisual);
+            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(projection, hasSceneDepth: true));
+            Assert.True(projection.IsVisual);
             Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: false));
 
             VfxEmitterDefinition groundRotation = regular with

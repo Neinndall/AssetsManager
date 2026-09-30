@@ -309,6 +309,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static readonly uint PrimRay = VfxParsingHash.Fnv1a("VfxPrimitiveRay");
         internal static readonly uint PrimBeam = VfxParsingHash.Fnv1a("VfxPrimitiveBeam");
         internal static readonly uint PrimCameraSegmentBeam = VfxParsingHash.Fnv1a("VfxPrimitiveCameraSegmentBeam");
+        internal static readonly uint F_projection = VfxParsingHash.Fnv1a("mProjection");
+        internal static readonly uint F_projectionYRange = VfxParsingHash.Fnv1a("mYRange");
+        internal static readonly uint F_projectionFading = VfxParsingHash.Fnv1a("mFading");
         internal static readonly uint PrimPlanarProjection = VfxParsingHash.Fnv1a("VfxPrimitivePlanarProjection");
         internal static readonly uint ShapeLegacy = VfxParsingHash.Fnv1a("VfxShapeLegacy");
         internal static readonly uint ShapeOld = VfxParsingHash.Fnv1a("VfxShape");

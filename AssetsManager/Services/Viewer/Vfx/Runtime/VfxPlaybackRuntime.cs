@@ -1540,11 +1540,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector4 col = lingering && d.Linger?.Color is { } lingerColor
                     ? p.BirthColor * lingerColor.SampleOver(particleLingerT, Vector4.One)
                     : VfxColorSemantics.ResolveParticle(p.BirthColor, d.ColorOverLife, t);
-                col = VfxColorSemantics.PremultiplyForAddOrSubtract(
-                    col,
-                    d.BlendMode,
-                    d.DrawsAsDistortion,
-                    d.HasResolvedCustomMaterial);
+                // UNLIT_DECAL consumes MODULATE_COLOR directly, without billboard preprocessing.
+                if (!d.DrawsAsProjection)
+                    col = VfxColorSemantics.PremultiplyForAddOrSubtract(
+                        col,
+                        d.BlendMode,
+                        d.DrawsAsDistortion,
+                        d.HasResolvedCustomMaterial);
 
                 // League keeps one logical flipbook counter for both texture layers. Each
                 // sampler wraps that counter against its own texDiv grid at draw time, so do

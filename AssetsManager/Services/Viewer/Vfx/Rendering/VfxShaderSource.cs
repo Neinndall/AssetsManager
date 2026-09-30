@@ -383,7 +383,7 @@ void main(){
 }";
 
 
-        private const string TextureSampling = @"
+        internal const string TextureSampling = @"
 uniform int uClampUv;
 uniform int uClampUvMult;
 uniform vec2 uTexDiv;

@@ -176,7 +176,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public VfxRigPreset RigPreset
         {
             get => _rigSettings.Preset;
-            set => RigSettings = VfxRigSettings.ForPreset(value);
+            set => RigSettings = _rigSettings.WithPreset(value);
         }
 
         public VfxRigSettings RigSettings

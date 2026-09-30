@@ -512,6 +512,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                         wireOpacity, passIndex);
                     continue;
                 }
+                if (es.Def.DrawsAsProjection)
+                {
+                    RenderProjection(es, instancesSpan, renderInstanceCount, viewProj, useWireframe, wireOpacity);
+                    continue;
+                }
                 RenderQuadEmitter(es, instancesSpan, renderInstanceCount, sharedPalettePhase, useWireframe, wireOpacity, camPos, camRight, camUp, passIndex);
             }
 
@@ -1038,6 +1043,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.DeleteBuffer(_instVbo);
             _gl.DeleteVertexArray(_vao);
             _gl.DeleteProgram(_program);
+            if (_projectionProgram != 0) _gl.DeleteProgram(_projectionProgram);
+            _projectionProgram = 0;
             if (_meshBoneBuffer != 0) _gl.DeleteBuffer(_meshBoneBuffer);
             _meshBoneBuffer = 0;
             _ownerSkinningMatrices = null;
@@ -1526,7 +1533,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     ? MeshesPerEmitter
                     : definition.DrawsAsBeam
                         ? BeamsPerEmitter
-                        : definition.DrawsAsQuad
+                        : definition.DrawsAsQuad || definition.DrawsAsProjection
                             ? QuadsPerEmitter
                             : int.MaxValue;
 

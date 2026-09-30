@@ -33,13 +33,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public static VfxRigSettings ForPreset(VfxRigPreset preset)
             => new(
                 preset,
-                VfxRigMotion.StandHeight,
+                preset is VfxRigPreset.Missile or VfxRigPreset.Trail ? VfxRigMotion.FlightHeight : 0f,
                 VfxRigMotion.FlightRange,
                 VfxRigMotion.FlightSpeed,
                 VfxRigMotion.OrbitRadius,
                 VfxRigMotion.OrbitPeriod,
                 preset is VfxRigPreset.Burst or VfxRigPreset.Missile,
                 null);
+
+        public VfxRigSettings WithPreset(VfxRigPreset preset)
+        {
+            VfxRigSettings next = ForPreset(preset);
+            return next with
+            {
+                Height = Height != ForPreset(Preset).Height ? Height : next.Height,
+                StopAt = StopAt
+            };
+        }
 
         public VfxRigMotionKind MotionKind => Preset switch
         {
@@ -69,7 +79,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public const float ChampionHeight = 200f;
         public const float FlightRange = ChampionHeight * 6f;  // 1200 engine units
         public const float FlightSpeed = ChampionHeight * 8f;  // 1600 engine units/second
-        public const float StandHeight = ChampionHeight * 0.5f; // 100 engine units
+        public const float FlightHeight = ChampionHeight * 0.5f; // 100 engine units
         public const float OrbitRadius = ChampionHeight * 1.5f; // 300 engine units
         public const float OrbitPeriod = 3.0f;                  // 3 seconds per revolution
         public const float TargetReach = ChampionHeight * 3f;   // 600 engine units
@@ -119,13 +129,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             Vector3? lastOrigin = null,
             float flightRange = FlightRange,
             float flightSpeed = FlightSpeed,
-            float standHeight = StandHeight,
+            float? standHeight = null,
             float orbitRadius = OrbitRadius,
             float orbitPeriod = OrbitPeriod)
         {
             VfxRigSettings settings = VfxRigSettings.ForPreset(preset) with
             {
-                Height = standHeight,
+                Height = standHeight ?? VfxRigSettings.ForPreset(preset).Height,
                 FlightRange = flightRange,
                 FlightSpeed = flightSpeed,
                 OrbitRadius = orbitRadius,

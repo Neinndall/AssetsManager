@@ -17,7 +17,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void MissileRig_TravelsAlongFlightPathAndStopsOnArrival()
         {
-            // Range = 1200, Speed = 1600, FlightTime = 0.75s, StandHeight = 100
+            // Range = 1200, Speed = 1600, FlightTime = 0.75s, FlightHeight = 100
             var atStart = VfxRigMotion.Evaluate(VfxRigPreset.Missile, 0.0, 5.0);
             Assert.Equal(-600f, atStart.Origin.X, tolerance: 0.1f);
             Assert.Equal(100f, atStart.Origin.Y, tolerance: 0.1f);
@@ -123,7 +123,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 5.0,
                 new Vector3(
                     MathF.Cos((VfxRigMotion.OrbitPeriod - 0.01f) / VfxRigMotion.OrbitPeriod * MathF.PI * 2f) * VfxRigMotion.OrbitRadius,
-                    VfxRigMotion.StandHeight,
+                    VfxRigMotion.FlightHeight,
                     MathF.Sin((VfxRigMotion.OrbitPeriod - 0.01f) / VfxRigMotion.OrbitPeriod * MathF.PI * 2f) * VfxRigMotion.OrbitRadius));
 
             Assert.Equal(VfxRigMotion.OrbitPeriod + 0.25f, afterOneOrbit.Phase, precision: 4);
@@ -131,17 +131,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void BurstAndStillRigs_PositionAtOriginHeight()
+        public void BurstAndStillRigs_StandOnGround()
         {
             var burst = VfxRigMotion.Evaluate(VfxRigPreset.Burst, 1.2, 5.0);
             Assert.Equal(0f, burst.Origin.X);
-            Assert.Equal(100f, burst.Origin.Y);
+            Assert.Equal(0f, burst.Origin.Y);
             Assert.Equal(0f, burst.Origin.Z);
             Assert.False(burst.IsStopped);
 
             var still = VfxRigMotion.Evaluate(VfxRigPreset.Still, 0.0, 5.0);
             Assert.Equal(0f, still.Origin.X);
-            Assert.Equal(100f, still.Origin.Y);
+            Assert.Equal(0f, still.Origin.Y);
             Assert.Equal(0f, still.Origin.Z);
         }
 
@@ -196,7 +196,44 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.False(trail.IsLooping);
             Assert.Equal(VfxRigMotion.OrbitRadius, trail.OrbitRadius);
             Assert.Equal(VfxRigMotion.OrbitPeriod, trail.OrbitPeriod);
-            Assert.Equal(VfxRigMotion.StandHeight, trail.Height);
+            Assert.Equal(VfxRigMotion.FlightHeight, trail.Height);
+        }
+
+        [Theory]
+        [InlineData(VfxRigPreset.Still, VfxRigPreset.Missile, 100f)]
+        [InlineData(VfxRigPreset.Burst, VfxRigPreset.Trail, 100f)]
+        [InlineData(VfxRigPreset.Missile, VfxRigPreset.Still, 0f)]
+        [InlineData(VfxRigPreset.Trail, VfxRigPreset.Burst, 0f)]
+        public void PresetSwitchUsesNewDefaultHeight(VfxRigPreset from, VfxRigPreset to, float height)
+        {
+            VfxRigSettings next = VfxRigSettings.ForPreset(from).WithPreset(to);
+            Assert.Equal(height, next.Height);
+            Assert.Equal(to, next.Preset);
+            Assert.Null(next.StopAt);
+            Assert.Equal(height, VfxRigMotion.Evaluate(next, 0d, 5d).Origin.Y);
+        }
+
+        [Theory]
+        [InlineData(VfxRigPreset.Still, VfxRigPreset.Trail, 40f)]
+        [InlineData(VfxRigPreset.Missile, VfxRigPreset.Burst, 0f)]
+        public void PresetSwitchKeepsTunedHeightAndStop(VfxRigPreset from, VfxRigPreset to, float height)
+        {
+            VfxRigSettings current = VfxRigSettings.ForPreset(from) with { Height = height, StopAt = 0f };
+            VfxRigSettings next = current.WithPreset(to);
+            Assert.Equal(height, next.Height);
+            Assert.Equal(0f, next.StopAt);
+            Assert.Equal(VfxRigSettings.ForPreset(to).IsLooping, next.IsLooping);
+        }
+
+        [Fact]
+        public void PresetSwitchCarriesTuningThroughLiveSession()
+        {
+            using var session = new VfxRenderSession();
+            session.RigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Still) with { Height = 40f, StopAt = 3f };
+            session.RigPreset = VfxRigPreset.Missile;
+            Assert.Equal(40f, session.RigSettings.Height);
+            Assert.Equal(3f, session.RigSettings.StopAt);
+            Assert.Equal(VfxRigMotionKind.Path, session.RigSettings.MotionKind);
         }
 
         [Fact]
@@ -290,7 +327,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             using var session = new VfxRenderSession();
             session.SetSystem(model);
             VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
-            Assert.Equal(VfxRigMotion.StandHeight, root.WorldTransform.Translation.Y, precision: 4);
+            Assert.Equal(0f, root.WorldTransform.Translation.Y, precision: 4);
             session.Play();
             session.Update(0.2f);
             double time = session.ActiveSystem.CurrentTime;
@@ -468,8 +505,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             session.SetSystem(model);
 
             VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
-            Assert.Equal(new Vector3(0f, 200f, 0f), root.WorldTransform.Translation);
-            Assert.Equal(new Vector3(1200f, 200f, 0f), Assert.Single(root.Emitters).SystemTarget);
+            Assert.Equal(Vector3.Zero, root.WorldTransform.Translation);
+            Assert.Equal(new Vector3(1200f, 0f, 0f), Assert.Single(root.Emitters).SystemTarget);
         }
 
         [Fact]

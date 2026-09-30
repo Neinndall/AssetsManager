@@ -144,6 +144,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 : 0u;
             uint primitiveClass = authoredPrimitiveClass != 0 ? authoredPrimitiveClass : PrimCameraQuad;
             VfxPrimitiveKind primitiveKind = GetPrimitiveKind(primitiveClass);
+            VfxProjectionDefinition projection = null;
+            if (primitiveKind == VfxPrimitiveKind.PlanarProjection)
+            {
+                BinTreeStruct data = prim is BinTreeStruct projectionPrimitive
+                    ? Get(projectionPrimitive.Properties, F_projection) as BinTreeStruct : null;
+                projection = data is null ? new VfxProjectionDefinition() : new VfxProjectionDefinition(
+                    GetF32(data.Properties, F_projectionYRange) ?? 5f,
+                    GetF32(data.Properties, F_projectionFading) ?? 200f);
+            }
             bool isMesh = primitiveKind is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
             bool isArbitraryQuad = prim is BinTreeStruct aq && aq.ClassHash == PrimArbitraryQuad;
             string meshPath = null, meshSkl = null, meshAnm = null, meshFallbackPath = null;
@@ -442,6 +451,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 DepthBiasFactors: GetVec2(p, F_depthBiasFactors),
                 IsRotationEnabled: GetBool(p, F_isRotationEnabled),
                 PrimitiveKind: primitiveKind,
+                Projection: projection,
                 VelocityOverLife: ReadCurve3(p, F_velocity),
                 RotationOverLife: ReadCurve3(p, F_rotation),
                 BirthUvOffset: ReadCurve2(p, F_birthUvOffset),

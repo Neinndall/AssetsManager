@@ -18,6 +18,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal (bool Depth, bool Color) SceneInputsFor(VfxEmitterDefinition emitter)
         {
+            if (emitter.DrawsAsProjection) return (false, false);
             bool depth = ShouldUseSoftParticles(emitter, true);
             if (!emitter.HasResolvedCustomMaterial || _gameShaders == null) return (depth, false);
             var inputs = _gameShaders.ParticleSceneInputs(emitter, emitter.IsMeshPrimitive);
@@ -32,10 +33,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             emitter.InstanceCount > 0 && emitter.IsVisible && (!emitter.Def.IsMeshPrimitive || emitter.MeshVao != 0);
 
         private int ParticlePassCount(VfxPlaybackRuntime.EmitterState emitter, bool mesh, bool wireframe) =>
-            wireframe || !HasParticleDraw(emitter) ? 0 : _gameShaders?.GetParticlePassCount(emitter.Def, mesh) ?? 0;
+            wireframe || emitter.Def.DrawsAsProjection || !HasParticleDraw(emitter) ? 0 : _gameShaders?.GetParticlePassCount(emitter.Def, mesh) ?? 0;
 
         private bool ParticlePassTransparent(VfxPlaybackRuntime.EmitterState emitter, int pass, bool wireframe) =>
-            HasParticleDraw(emitter) && IsParticlePassTransparent(emitter.Def, wireframe, emitter.Def.HasResolvedCustomMaterial
+            HasParticleDraw(emitter) && IsParticlePassTransparent(emitter.Def, wireframe, !emitter.Def.DrawsAsProjection && emitter.Def.HasResolvedCustomMaterial
                 ? _gameShaders?.GetParticlePassState(emitter.Def, emitter.Def.IsMeshPrimitive, pass)?.BlendEnabled
                 : null);
 
@@ -43,6 +44,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             if (emitter.IsGroundLayer) return false;
             if (wireframe) return true;
+            if (emitter.DrawsAsProjection) return VfxBlendModes.GetDrawDescriptor(emitter.BlendMode, false).Kind != VfxBlendModeKind.Opaque;
             if (customBlend.HasValue) return customBlend.Value;
             return emitter.HasResolvedCustomMaterial ||
                 VfxBlendModes.GetDrawDescriptor(emitter.BlendMode, emitter.DrawsAsDistortion).Kind != VfxBlendModeKind.Opaque;

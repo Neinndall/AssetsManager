@@ -14,8 +14,8 @@ public sealed class VfxSystemBoundsTests
     {
         VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(System(), VfxRigPreset.Still);
 
-        Assert.Equal(new Vector3(-100f, 0f, -100f), bounds.Min);
-        Assert.Equal(new Vector3(100f, 200f, 100f), bounds.Max);
+        Assert.Equal(new Vector3(-100f, -100f, -100f), bounds.Min);
+        Assert.Equal(new Vector3(100f, 100f, 100f), bounds.Max);
     }
 
     [Fact]
@@ -66,8 +66,8 @@ public sealed class VfxSystemBoundsTests
 
         VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(System(disabled), VfxRigPreset.Still);
 
-        Assert.Equal(new Vector3(-100f, 0f, -100f), bounds.Min);
-        Assert.Equal(new Vector3(100f, 200f, 100f), bounds.Max);
+        Assert.Equal(new Vector3(-100f, -100f, -100f), bounds.Min);
+        Assert.Equal(new Vector3(100f, 100f, 100f), bounds.Max);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class VfxSystemBoundsTests
 
         VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(System(emitter), VfxRigPreset.Still);
 
-        Assert.Equal(408f, bounds.Max.Y, precision: 4);
+        Assert.Equal(308f, bounds.Max.Y, precision: 4);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class VfxSystemBoundsTests
 
         VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(System(emitter), VfxRigPreset.Still);
 
-        Assert.Equal(450f, bounds.Max.Y, precision: 4);
+        Assert.Equal(350f, bounds.Max.Y, precision: 4);
         Assert.Equal(-100f, bounds.Min.X, precision: 4);
         Assert.Equal(100f, bounds.Max.X, precision: 4);
     }
@@ -195,8 +195,8 @@ public sealed class VfxSystemBoundsTests
 
         VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(System(root), VfxRigPreset.Still);
 
-        Assert.Equal(new Vector3(-100f, 0f, -100f), bounds.Min);
-        Assert.Equal(new Vector3(100f, 200f, 100f), bounds.Max);
+        Assert.Equal(new Vector3(-100f, -100f, -100f), bounds.Min);
+        Assert.Equal(new Vector3(100f, 100f, 100f), bounds.Max);
     }
 
     [Fact]

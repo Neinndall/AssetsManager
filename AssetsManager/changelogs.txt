@@ -456,6 +456,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Planar particle projections now draw on the ground with their authored size, rotation and height fade.
+  - VFX Studio / Still and Burst effects start on the ground; switching motion presets preserves a custom height and emission stop time.
   - VFX Studio / Emitters that name no texture no longer draw a white square; like in game they only carry their child effects (Evelynn W mark).
   - VFX Studio / Skins that link more than 32 shared files (Thresh, Evelynn and Akali base skins) load all their effects and materials instead of dropping the last ones.
   - VFX Studio / Particle meshes, animated ones included, use their own vertex colours, so rings, cylinders and swipes fade at their edges instead of drawing hard dark bands (dragon pit mountain transition).

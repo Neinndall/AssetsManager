@@ -68,7 +68,7 @@ namespace AssetsManager.Utils.Rendering
         public static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
         {
             if (!hasSceneDepth || definition?.SoftParticle is null) return false;
-            if (definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh) return false;
+            if (definition.PrimitiveKind is VfxPrimitiveKind.AttachedMesh or VfxPrimitiveKind.PlanarProjection) return false;
 
             bool fixedAlphaUv = definition.UvMode == 2 &&
                 definition.PrimitiveKind != VfxPrimitiveKind.Mesh &&

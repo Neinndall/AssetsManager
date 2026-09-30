@@ -214,9 +214,12 @@ namespace AssetsManager.Views.Models.Viewer
         ModelMaterialDefinition CustomMaterial = null,
         VfxCustomMaterialBlendFactor CustomMaterialSourceBlendFactor = VfxCustomMaterialBlendFactor.One,
         VfxCustomMaterialBlendFactor CustomMaterialDestinationBlendFactor = VfxCustomMaterialBlendFactor.Zero,
-        VfxEmissionPeriod EmissionPeriod = null)
+        VfxEmissionPeriod EmissionPeriod = null,
+        VfxProjectionDefinition Projection = null)
     {
         /// <summary>LTK drawKind.ts: this emitter reaches the quad renderer.</summary>
+        public bool DrawsAsProjection => PrimitiveKind == VfxPrimitiveKind.PlanarProjection;
+
         public bool DrawsAsQuad => PrimitiveKind is
             VfxPrimitiveKind.CameraQuad or
             VfxPrimitiveKind.CameraUnitQuad or
@@ -236,7 +239,7 @@ namespace AssetsManager.Views.Models.Viewer
         /// LTK drawKind.ts: a resolved CustomMaterial owns the shading path and suppresses the
         /// legacy distortion pass. A missing linked material falls back to the authored emitter.
         /// </summary>
-        public bool DrawsAsDistortion => Distortion is not null && !HasResolvedCustomMaterial;
+        public bool DrawsAsDistortion => Distortion is not null && !DrawsAsProjection && !HasResolvedCustomMaterial;
 
         /// <summary>
         /// Riot suppresses a beam's ribbon when its primitive also names a mesh. Because a beam
@@ -251,8 +254,10 @@ namespace AssetsManager.Views.Models.Viewer
         /// </summary>
         public bool IsVisual => !Disabled &&
             !SuppressesBeamRibbon &&
-            (DrawsAsQuad || DrawsAsTrail || DrawsAsBeam);
+            (DrawsAsQuad || DrawsAsTrail || DrawsAsBeam || DrawsAsProjection);
     }
+
+    public sealed record VfxProjectionDefinition(float YRange = 5f, float Fading = 200f);
 
     public sealed record VfxSystemAuthoredFeatures(
         bool HasMaterialOverrides = false,
