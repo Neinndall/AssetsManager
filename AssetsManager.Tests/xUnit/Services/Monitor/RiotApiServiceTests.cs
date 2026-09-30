@@ -15,13 +15,11 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor;
 public sealed class RiotApiServiceTests
 {
     [Theory]
-    [InlineData("progression", "pbe", "https://pbe.pp.sgp.pvp.net")]
-    [InlineData("progression", "euw", "https://euw-red.lol.sgp.pvp.net")]
     [InlineData("rewards", "pbe", "https://pbe-red.lol.sgp.pvp.net")]
     [InlineData("rewards", "euw", "https://euw-red.lol.sgp.pvp.net")]
     [InlineData("sales", "euw", "https://euw-red.lol.sgp.pvp.net")]
     [InlineData("mythic_shop", "pbe", "https://pbe-red.lol.sgp.pvp.net")]
-    public void UsesKnownRegionalFallbackHosts(string endpoint, string region, string expected)
+    public void UsesDynamicLeagueRegionForCatalogHosts(string endpoint, string region, string expected)
     {
         Assert.Equal(expected, Endpoints.GetRemoteBaseUrl(endpoint, region));
     }
@@ -42,12 +40,24 @@ public sealed class RiotApiServiceTests
     [InlineData("unavailable")]
     [InlineData("\"https://untrusted.example\"")]
     [InlineData("\"http://euc1-red.pp.sgp.pvp.net\"")]
-    public async Task PreservesWorkingLiveRouteWhenClientConfigurationIsUnavailableOrInvalid(string body)
+    public async Task DoesNotGuessProgressionHostWhenClientConfigurationIsUnavailableOrInvalid(string body)
     {
         using var bridge = new AssetsManagerTestBridge();
         using var client = new HttpClient(new ConfigHandler(body));
         var service = CreateService(client, bridge);
-        Assert.Equal("https://euw-red.lol.sgp.pvp.net", await service.ResolveRemoteBaseUrlAsync("progression", "euw"));
+        Assert.Null(await service.ResolveRemoteBaseUrlAsync("progression", "euw"));
+        Assert.Null(await service.ResolveRemoteBaseUrlAsync("progression", "pbe"));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task DoesNotGuessProgressionHostWhenConfigurationRequestFails(HttpStatusCode status)
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        using var client = new HttpClient(new ConfigHandler("null", status: status));
+        var service = CreateService(client, bridge);
+        Assert.Null(await service.ResolveRemoteBaseUrlAsync("progression", "euw"));
     }
 
     [Fact]
@@ -84,7 +94,7 @@ public sealed class RiotApiServiceTests
         return new RiotApiService(settings, client, bridge.LogService, bridge.Directories, null);
     }
 
-    private sealed class ConfigHandler(string body, bool allowRequest = true) : HttpMessageHandler
+    private sealed class ConfigHandler(string body, bool allowRequest = true, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -92,7 +102,7 @@ public sealed class RiotApiServiceTests
             Assert.Equal("127.0.0.1", request.RequestUri!.Host);
             Assert.Equal("/client-config/v2/config/lol.client_settings.player_platform_edge.url", request.RequestUri.AbsolutePath);
             Assert.Equal("Basic", request.Headers.Authorization!.Scheme);
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+            return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body) });
         }
     }
 }

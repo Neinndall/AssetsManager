@@ -5,27 +5,25 @@ namespace AssetsManager.Views.Models.Monitor
 {
     public static class Endpoints
     {
-        public static string BaseUrlPBE => "https://pbe-red.lol.sgp.pvp.net";
-        public static string BaseUrlLive => "https://{region}-red.lol.sgp.pvp.net";
-
-        public static string BaseUrlPlayerPlatformPBE => "https://pbe.pp.sgp.pvp.net";
+        public static string LeagueEdgeUrlTemplate => "https://{region}-red.lol.sgp.pvp.net";
+        public static string PlayerPlatformUrlTemplate => "https://{region}.pp.sgp.pvp.net";
 
         public static string GetRemoteBaseUrl(string endpointKey, string region, string playerPlatformUrl = null)
         {
-            if (endpointKey == "progression")
-            {
-                // Player Platform clusters do not follow League region names.
-                if (Uri.TryCreate(playerPlatformUrl, UriKind.Absolute, out var uri)
-                    && uri.Scheme == Uri.UriSchemeHttps
-                    && uri.Host.EndsWith(".pp.sgp.pvp.net", StringComparison.OrdinalIgnoreCase)
-                    && uri.IsDefaultPort && string.IsNullOrEmpty(uri.UserInfo)
-                    && uri.AbsolutePath == "/" && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment))
-                    return uri.GetLeftPart(UriPartial.Authority);
+            if (endpointKey != "progression")
+                return LeagueEdgeUrlTemplate.Replace("{region}", region);
 
-                // The previous League Edge route still serves progression on LIVE.
-                if (region == "pbe") return BaseUrlPlayerPlatformPBE;
-            }
-            return BaseUrlLive.Replace("{region}", region);
+            const string playerPlatformSuffix = ".pp.sgp.pvp.net";
+            if (!Uri.TryCreate(playerPlatformUrl, UriKind.Absolute, out var uri)
+                || uri.Scheme != Uri.UriSchemeHttps
+                || !uri.Host.EndsWith(playerPlatformSuffix, StringComparison.OrdinalIgnoreCase)
+                || !uri.IsDefaultPort || !string.IsNullOrEmpty(uri.UserInfo)
+                || uri.AbsolutePath != "/" || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+                return null;
+
+            // Player Platform uses the cluster advertised by the selected client, not its League region.
+            string playerPlatformRegion = uri.Host[..^playerPlatformSuffix.Length];
+            return PlayerPlatformUrlTemplate.Replace("{region}", playerPlatformRegion);
         }
 
         public static Dictionary<string, string> GetLocalEndpoints() => new Dictionary<string, string>

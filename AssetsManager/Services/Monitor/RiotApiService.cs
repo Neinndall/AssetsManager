@@ -692,24 +692,30 @@ namespace AssetsManager.Services.Monitor
 
         internal async Task<string> ResolveRemoteBaseUrlAsync(string endpointKey, string region)
         {
-            if (endpointKey == "progression")
+            if (endpointKey != "progression")
+                return Endpoints.GetRemoteBaseUrl(endpointKey, region);
+
+            try
             {
-                try
+                using var response = await MakeLocalRequestAsync(_localEndpoints["playerPlatformUrl"]);
+                if (response?.IsSuccessStatusCode == true)
                 {
-                    using var response = await MakeLocalRequestAsync(_localEndpoints["playerPlatformUrl"]);
-                    if (response?.IsSuccessStatusCode == true)
+                    using var config = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                    if (config.RootElement.ValueKind == JsonValueKind.String)
                     {
-                        using var config = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-                        if (config.RootElement.ValueKind == JsonValueKind.String)
-                            return Endpoints.GetRemoteBaseUrl(endpointKey, region, config.RootElement.GetString());
+                        string baseUrl = Endpoints.GetRemoteBaseUrl(endpointKey, region, config.RootElement.GetString());
+                        if (!string.IsNullOrEmpty(baseUrl)) return baseUrl;
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logService.LogWarning($"Could not read the Player Platform host from the League client: {ex.Message}");
-                }
             }
-            return Endpoints.GetRemoteBaseUrl(endpointKey, region);
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Could not read the Player Platform host from the League client.");
+                return null;
+            }
+
+            _logService.LogWarning("Player Platform host is unavailable in the League client configuration. Progression request cancelled.");
+            return null;
         }
 
         private async Task<HttpResponseMessage> MakeRemoteRequestAsync(string endpointKey, int retryCount = 1, string eventId = null)
@@ -745,6 +751,7 @@ namespace AssetsManager.Services.Monitor
 
             var regionKey = Regex.Replace(currentRegion, @"\d+$", "");
             var baseUrl = await ResolveRemoteBaseUrlAsync(endpointKey, regionKey);
+            if (string.IsNullOrEmpty(baseUrl)) return null;
             var requestUri = $"{baseUrl}{tempPath}";
 
             var request = CreateRemoteRequest(requestUri, jwt);
