@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
@@ -361,7 +362,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _opaqueDraws.Clear();
             _transparentDraws.Clear();
             int order = 0;
-            foreach (ModelPart part in model.Parts)
+            foreach (ModelPart part in model.Parts.OrderBy(part => part.DrawRank))
             {
                 if (!part.IsVisible)
                     continue;
@@ -390,7 +391,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
                 for (int passIndex = 0; passIndex < passCount; passIndex++)
                 {
-                    bool blended = _gameShaderRuntime.GetSkinnedPassState(material, passIndex)?.BlendEnabled == true;
+                    bool blended = _gameShaderRuntime.GetSkinnedPassState(material, passIndex)?.BlendEnabled == true &&
+                                   !material.BlendsInDrawOrder;
                     float distance = blended ? GetRenderDistanceSquared(part, cameraPosition, world) : 0f;
                     (blended ? _transparentDraws : _opaqueDraws)
                         .Add(new PartDraw(part, resources, passIndex, distance, order++));

@@ -456,6 +456,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Submeshes with only a texture and no material blend their texture alpha like in game and draw in the skin's authored submesh order, instead of a solid background or a dark or white rim (Yunara skin10 chick eyes, Yuumi glasses, Kalista, blade smears).
   - VFX Studio / Planar particle projections now draw on the ground with their authored size, rotation and height fade.
   - VFX Studio / Still and Burst effects start on the ground; switching motion presets preserves a custom height and emission stop time.
   - VFX Studio / Emitters that name no texture no longer draw a white square; like in game they only carry their child effects (Evelynn W mark).

@@ -403,7 +403,15 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 RuntimeSwitches: Array.Empty<KeyValuePair<string, bool>>(),
                 Textures: textures,
                 Parameters: Array.Empty<GameMaterialParameter>(),
-                State: GameMaterialPassState.Default);
+                // LIT_UBER writes the diffuse alpha, which the engine blends, as ModelMaterialRenderState.TextureOnly.
+                State: GameMaterialPassState.Default with
+                {
+                    BlendEnabled = true,
+                    SourceColor = MapBlendFactor.SourceAlpha,
+                    DestinationColor = MapBlendFactor.OneMinusSourceAlpha,
+                    SourceAlpha = MapBlendFactor.One,
+                    DestinationAlpha = MapBlendFactor.OneMinusSourceAlpha
+                });
 
             return new GameMaterialProgram(
                 GameMaterialKind.SkinnedMesh,

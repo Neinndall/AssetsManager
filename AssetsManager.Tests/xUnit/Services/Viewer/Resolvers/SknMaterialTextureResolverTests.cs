@@ -920,6 +920,35 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void DrawRanks_ReorderOnlyTheSubmeshesTheRenderOrderNames()
+        {
+            var resolution = new SknMaterialTextureResolution(null, new Dictionary<string, ModelMaterialDefinition>())
+            {
+                SubmeshRenderOrder = new[] { "Body", "Bead_1", "EyesA" }
+            };
+
+            // Yunara skin10's mesh lists the eyes before the bead they sit on, and Hair is not named.
+            int[] ranks = resolution.DrawRanks(new[] { "EyesA", "Hair", "Bead_1", "Body" });
+
+            Assert.Equal(new[] { 3, 1, 2, 0 }, ranks);
+            Assert.Equal(new[] { 0, 1, 2 }, (resolution with { SubmeshRenderOrder = Array.Empty<string>() }).DrawRanks(new[] { "a", "b", "c" }));
+        }
+
+        [Fact]
+        public void Resolve_ReadsTheAuthoredSubmeshRenderOrder()
+        {
+            BinTree tree = CreateSkinTree("ASSETS/Characters/Test/Skins/Skin1/Test_TX_CM.tex");
+            BinTreeObject skin = tree.Objects.Values.First();
+            var meshProperties = (BinTreeStruct)skin.Properties[Fnv1a.HashLower("skinMeshProperties")];
+            meshProperties.Properties[Fnv1a.HashLower("submeshRenderOrder")] =
+                new BinTreeString(Fnv1a.HashLower("submeshRenderOrder"), "Body Bead_1 EyesA");
+
+            SknMaterialTextureResolution resolution = SknResolver.Resolve(tree, new[] { "test_tx_cm" });
+
+            Assert.Equal(new[] { "Body", "Bead_1", "EyesA" }, resolution.SubmeshRenderOrder);
+        }
+
+        [Fact]
         public void Resolve_BuildsDirectTextureOverrideWithoutInheritingSkinDefault()
         {
             BinTree tree = CreateSkinTree(
@@ -936,7 +965,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             ModelMaterialDefinition definition = resolution.ResolveMaterialDefinition("accessory");
             Assert.Equal("test_accessory_tx_cm", definition.BaseTextureName);
-            Assert.Equal(ModelMaterialBlendMode.Opaque, definition.RenderState.Blending);
+            // Drawn by LIT_UBER, which blends the texture alpha.
+            Assert.Equal(ModelMaterialBlendMode.Normal, definition.RenderState.Blending);
             Assert.Equal("test_tx_cm", resolution.ResolveMaterialDefinition("body").BaseTextureName);
         }
 

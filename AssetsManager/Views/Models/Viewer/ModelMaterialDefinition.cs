@@ -46,10 +46,21 @@ namespace AssetsManager.Views.Models.Viewer
             RenderState.Blending != ModelMaterialBlendMode.Opaque ||
             AlphaCutoff > 0f;
 
+        // A material-less submesh blends in the character's own draw order rather than the sorted transparent queue.
+        internal bool BlendsInDrawOrder => BindingKind == ModelMaterialBindingKind.TextureOnly;
+
+        internal bool DrawsInTransparentQueue =>
+            RenderState.Blending != ModelMaterialBlendMode.Opaque &&
+            !RenderState.Cutout &&
+            !BlendsInDrawOrder;
+
         public static ModelMaterialDefinition Default { get; } = TextureOnly(null);
 
         public static ModelMaterialDefinition TextureOnly(string baseTextureName) =>
             TextureOnly(baseTextureName, null);
+
+        // SkinnedMesh/LIT_UBER, which draws a submesh without a material, discards only texels whose alpha is 0.
+        private const float TextureOnlyAlphaCutoff = 0.5f / 255f;
 
         // Skins without a material (map critters) author UVs past 0..1 and rely on repeat, as LTK samples them.
         internal static ModelMaterialDefinition TextureOnly(string baseTextureName, GameMaterialProgram program) =>
@@ -57,7 +68,7 @@ namespace AssetsManager.Views.Models.Viewer
                 baseTextureName,
                 ModelMaterialBaseRule.None,
                 Vector4.One,
-                0f,
+                TextureOnlyAlphaCutoff,
                 Vector2.One,
                 Vector2.Zero,
                 ModelMaterialWrapMode.Repeat,
@@ -79,7 +90,7 @@ namespace AssetsManager.Views.Models.Viewer
             Vector2.Zero,
             ModelMaterialWrapMode.Clamp,
             ModelMaterialWrapMode.Clamp,
-            ModelMaterialRenderState.TextureOnly,
+            ModelMaterialRenderState.TextureOnly with { Blending = ModelMaterialBlendMode.Opaque },
             ModelMaterialBindingKind.Missing,
             false,
             null);
@@ -103,9 +114,11 @@ namespace AssetsManager.Views.Models.Viewer
             true,
             true);
 
-        // A skin with no StaticMaterialDef is drawn from its texture alone and keeps both faces.
+        // A skin with no StaticMaterialDef is drawn from its texture alone and keeps both faces. LIT_UBER writes
+        // the texture alpha and the engine blends it (brushAlphaOverride fades a character through it), so eye
+        // decals and glass blend over the submeshes drawn before them while depth is still written.
         public static ModelMaterialRenderState TextureOnly { get; } = new(
-            ModelMaterialBlendMode.Opaque,
+            ModelMaterialBlendMode.Normal,
             false,
             false,
             true,

@@ -3286,7 +3286,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.False(VfxOpenGlRenderer.ShouldSortInstances(mesh, 4));
             Assert.True(VfxOpenGlRenderer.ShouldSortInstances(quad, 4));
 
-            ModelMaterialDefinition opaqueCustom = ModelMaterialDefinition.TextureOnly("custom.tex");
+            ModelMaterialDefinition opaqueCustom = ModelMaterialDefinition.TextureOnly("custom.tex") with
+            {
+                RenderState = ModelMaterialRenderState.Default
+            };
             ModelMaterialDefinition transparentCustom = opaqueCustom with
             {
                 RenderState = ModelMaterialRenderState.Default with { Blending = ModelMaterialBlendMode.Normal }

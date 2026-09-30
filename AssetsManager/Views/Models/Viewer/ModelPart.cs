@@ -66,9 +66,7 @@ namespace AssetsManager.Views.Models.Viewer
         // Runtime tint/opacity used by Viewer and Diff controls; authored SKN color lives in MaterialDefinition.
         public System.Numerics.Vector4 ColorTint { get; set; } = System.Numerics.Vector4.One;
         internal bool IsAlphaBlended => ColorTint.W < 0.999f ||
-            (MaterialDefinition != null &&
-             MaterialDefinition.RenderState.Blending != ModelMaterialBlendMode.Opaque &&
-             !MaterialDefinition.RenderState.Cutout);
+            MaterialDefinition?.DrawsInTransparentQueue == true;
         internal float AlphaCutoff { get; set; } = 0.1f;
         internal bool ForceUnlit { get; set; }
         internal bool TreatBaseTextureAsSrgb { get; set; }
@@ -78,6 +76,8 @@ namespace AssetsManager.Views.Models.Viewer
 
         // SKN loaders attach the authored material here; other mesh pipelines keep their own material semantics.
         public ModelMaterialDefinition MaterialDefinition { get; set; }
+        // Where the part draws among its model's parts: SknMaterialTextureResolution.DrawRanks, or 0 for list order.
+        internal int DrawRank { get; set; }
         internal int EquippedGearIndex { get; set; } = -1;
 
         public Dictionary<string, BitmapSource> AllTextures

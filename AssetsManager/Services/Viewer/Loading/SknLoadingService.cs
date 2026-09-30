@@ -394,6 +394,13 @@ namespace AssetsManager.Services.Viewer.Loading
                     parts.Add(modelPart);
                 }
 
+                if (materialTextures != null)
+                {
+                    int[] drawRanks = materialTextures.DrawRanks(parts.Select(part => part.Name).ToArray());
+                    for (int at = 0; at < parts.Count; at++)
+                        parts[at].DrawRank = drawRanks[at];
+                }
+
                 sceneModel.AddParts(parts);
                 _logService.LogDebug("--- Finished displaying model ---");
                 return sceneModel;

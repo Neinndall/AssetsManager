@@ -19,9 +19,32 @@ namespace AssetsManager.Services.Viewer.Resolvers
         IReadOnlyDictionary<string, ModelMaterialDefinition> MaterialDefinitions)
     {
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
+        internal IReadOnlyList<string> SubmeshRenderOrder { get; init; } = Array.Empty<string>();
         internal float SkinScale { get; init; } = 1f;
         internal float SelfIllumination { get; init; } = 0f;
         internal string EmissiveTexturePath { get; init; }
+
+        /// <summary>
+        /// The draw rank of each submesh, in mesh order. The submeshes skinMeshProperties.submeshRenderOrder names
+        /// take the slots they hold in the mesh in the authored order (Yunara skin10 draws its chick eyes over the
+        /// beads they sit on), and every other submesh keeps its own slot.
+        /// </summary>
+        internal int[] DrawRanks(IReadOnlyList<string> submeshNames)
+        {
+            int[] ranks = Enumerable.Range(0, submeshNames.Count).ToArray();
+            if (SubmeshRenderOrder == null || SubmeshRenderOrder.Count == 0)
+                return ranks;
+
+            var authored = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (int at = 0; at < SubmeshRenderOrder.Count; at++)
+                authored.TryAdd(SubmeshRenderOrder[at], at);
+
+            int[] listed = ranks.Where(at => authored.ContainsKey(submeshNames[at] ?? string.Empty)).ToArray();
+            int[] byAuthoredOrder = listed.OrderBy(at => authored[submeshNames[at]]).ToArray();
+            for (int slot = 0; slot < listed.Length; slot++)
+                ranks[byAuthoredOrder[slot]] = listed[slot];
+            return ranks;
+        }
 
         internal ModelMaterialDefinition ResolveMaterialDefinition(string submeshName)
         {
@@ -118,6 +141,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         IReadOnlyDictionary<string, SknMaterialDefinition> OverrideMaterials)
     {
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
+        internal IReadOnlyList<string> SubmeshRenderOrder { get; init; } = Array.Empty<string>();
         internal float SkinScale { get; init; } = 1f;
         internal float SelfIllumination { get; init; } = 0f;
         internal string EmissiveTexturePath { get; init; }
@@ -188,6 +212,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint SelfIllumination = Fnv1a.HashLower("selfIllumination");
         private static readonly uint EmissiveTexture = Fnv1a.HashLower("emissiveTexture");
         private static readonly uint InitialSubmeshToHide = Fnv1a.HashLower("initialSubmeshToHide");
+        private static readonly uint SubmeshRenderOrderField = Fnv1a.HashLower("submeshRenderOrder");
         private static readonly uint MaterialOverride = Fnv1a.HashLower("materialOverride");
         private static readonly uint Texture = Fnv1a.HashLower("texture");
         private static readonly uint Submesh = Fnv1a.HashLower("submesh");
@@ -283,6 +308,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
             var seenOverrideSubmeshes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             IReadOnlyList<string> initialHiddenSubmeshes = Array.Empty<string>();
             bool readInitialHiddenSubmeshes = false;
+            IReadOnlyList<string> submeshRenderOrder = Array.Empty<string>();
+            bool readSubmeshRenderOrder = false;
             float skinScale = 1f;
             bool readSkinScale = false;
             float selfIllumination = 0f;
@@ -350,6 +377,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     readInitialHiddenSubmeshes = true;
                     if (TryGetString(meshProperties, InitialSubmeshToHide, out string hiddenSubmeshes))
                         initialHiddenSubmeshes = SplitSubmeshNames(hiddenSubmeshes);
+                }
+                if (!readSubmeshRenderOrder)
+                {
+                    readSubmeshRenderOrder = true;
+                    if (TryGetString(meshProperties, SubmeshRenderOrderField, out string renderOrder))
+                        submeshRenderOrder = SplitSubmeshNames(renderOrder);
                 }
                 if (!readSkinScale)
                 {
@@ -480,6 +513,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 overrideMaterials)
             {
                 InitialHiddenSubmeshes = initialHiddenSubmeshes,
+                SubmeshRenderOrder = submeshRenderOrder,
                 SkinScale = skinScale,
                 SelfIllumination = selfIllumination,
                 EmissiveTexturePath = emissiveTexturePath,
@@ -633,6 +667,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 materialDefinitions)
             {
                 InitialHiddenSubmeshes = metadata.InitialHiddenSubmeshes ?? Array.Empty<string>(),
+                SubmeshRenderOrder = metadata.SubmeshRenderOrder ?? Array.Empty<string>(),
                 SkinScale = metadata.SkinScale,
                 SelfIllumination = metadata.SelfIllumination,
                 EmissiveTexturePath = metadata.EmissiveTexturePath

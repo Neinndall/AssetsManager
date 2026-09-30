@@ -438,7 +438,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 {
                     GameMaterialPassState state = _gameShaderRuntime.GetSkinnedPassState(command.Range.Material, pass);
                     DrawCommand layered = command with { PassIndex = pass, Order = order++ };
-                    (state.BlendEnabled ? _transparent : _opaque).Add(layered);
+                    (state.BlendEnabled && !command.Range.Material.BlendsInDrawOrder ? _transparent : _opaque).Add(layered);
                 }
             }
             _opaque.Sort((left, right) => ComparePassOrder(
@@ -742,8 +742,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     asset.Textures?.TryGetValue(material.BaseTextureName, out texture);
                 }
 
-                bool transparent = material.RenderState.Blending != ModelMaterialBlendMode.Opaque &&
-                                   !material.RenderState.Cutout;
+                bool transparent = material.DrawsInTransparentQueue;
                 bool forceRepeat = material.UvRepeat != Vector2.One;
                 result.Add(new BoundRange(
                     range.StartIndex,
@@ -759,7 +758,15 @@ namespace AssetsManager.Services.Viewer.Rendering
                     forceRepeat ? ModelMaterialWrapMode.Repeat : material.WrapV));
             }
 
-            return result;
+            if (asset.Materials == null)
+                return result;
+
+            int[] drawRanks = asset.Materials.DrawRanks(result.Select(range => range.Name).ToArray());
+            return result
+                .Select((range, at) => (range, rank: drawRanks[at]))
+                .OrderBy(entry => entry.rank)
+                .Select(entry => entry.range)
+                .ToList();
         }
 
         private void ApplyMaterial(
@@ -797,7 +804,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             ModelMaterialRenderState renderState = forceUntextured
                 ? ModelMaterialRenderState.Default with { DoubleSided = material.RenderState.DoubleSided }
                 : material.RenderState;
-            bool transparent = !forceUntextured && range.Transparent;
+            bool transparent = !forceUntextured &&
+                renderState.Blending != ModelMaterialBlendMode.Opaque &&
+                !renderState.Cutout;
 
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, textureId);
