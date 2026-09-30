@@ -57,13 +57,21 @@ namespace AssetsManager.Views.Models.Viewer
         public int DeclarationCount { get; init; } = 1;
         public VfxSpellPreview Preview { get; init; }
         public VfxSpellAvailability Availability { get; init; }
+        public VfxSpellUnplayableReason UnplayableReason { get; init; }
         public bool IsPlayable => Availability == VfxSpellAvailability.Supported;
         public string AvailabilityText => Availability switch
         {
             VfxSpellAvailability.Supported => "Play",
             VfxSpellAvailability.Ambiguous => "Ambiguous",
             VfxSpellAvailability.Unavailable => "Unavailable",
-            _ => "Unsupported"
+            _ => UnplayableReason switch
+            {
+                VfxSpellUnplayableReason.Buff => "Buff",
+                VfxSpellUnplayableReason.ScriptOnly => "Script",
+                VfxSpellUnplayableReason.NoVisuals => "No visuals",
+                VfxSpellUnplayableReason.UnsupportedMissile => "Missile",
+                _ => "Unsupported"
+            }
         };
         public string SourceName => System.IO.Path.GetFileName(BinPath);
     }

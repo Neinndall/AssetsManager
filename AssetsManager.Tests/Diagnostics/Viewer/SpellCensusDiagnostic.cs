@@ -49,7 +49,6 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var movements = new Dictionary<string, int>();
             var unsupportedMovements = new Dictionary<string, int>();
             var reasons = new Dictionary<string, int>();
-            uint buffField = Fnv1a.HashLower("mBuff");
             string final = Path.Combine(InstalledSkins.FindInstall(), @"Game\DATA\FINAL\Champions");
             foreach (string wadPath in Directory.GetFiles(final, "*.wad.client")
                          .Where(path => !Path.GetFileName(path)[..^".wad.client".Length].Contains('.')))
@@ -89,8 +88,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                         if (state != VfxSpellAvailability.Supported)
                         {
                             Tally(unsupportedMovements, movementClass);
-                            bool hasSpell = spell.Properties.ContainsKey(spellField), hasBuff = spell.Properties.ContainsKey(buffField);
-                            Tally(reasons, hasSpell ? (movementClass != "none" ? "spellWithUnplayableMissile" : "spellWithoutVisualData") : hasBuff ? "buffOnly" : "scriptOnly");
+                            Tally(reasons, VfxSpellPreviewReader.UnplayableReasonOf(preview).ToString());
                         }
                     }
                 }

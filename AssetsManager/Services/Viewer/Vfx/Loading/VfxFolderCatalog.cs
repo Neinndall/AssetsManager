@@ -383,7 +383,8 @@ internal static class VfxFolderCatalog
                         BinPath = spell.BinPath,
                         DeclarationCount = found.Count,
                         Preview = spell.Preview,
-                        Availability = found.Availability
+                        Availability = found.Availability,
+                        UnplayableReason = VfxSpellPreviewReader.UnplayableReasonOf(spell.Preview)
                     });
                 }
 

@@ -27,7 +27,11 @@ internal static class VfxSpellPreviewReader
         if (!TryExpectedStruct(spellObject.Properties, "mSpell", "mSpell", SpellDataResourceClass, issues, out BinTreeStruct spell))
         {
             return new VfxSpellPreview(
-                null, null, null, 0u, null, null, null, null, 0u, null, issues);
+                null, null, null, 0u, null, null, null, null, 0u, null, issues)
+            {
+                HasSpellData = false,
+                HasBuffData = TryProperty(spellObject.Properties, "mBuff", out _)
+            };
         }
 
         float? spellCastTime = ReadF32(spell.Properties, "spellCastTime", "mSpell", issues);
@@ -97,6 +101,16 @@ internal static class VfxSpellPreviewReader
         return impact || animation || missile
             ? VfxSpellAvailability.Supported
             : VfxSpellAvailability.Unsupported;
+    }
+
+    /// <summary>Why <see cref="AvailabilityOf"/> finds nothing to play, from what the SpellObject authors.</summary>
+    internal static VfxSpellUnplayableReason UnplayableReasonOf(VfxSpellPreview preview)
+    {
+        if (preview == null || AvailabilityOf(preview) == VfxSpellAvailability.Supported)
+            return VfxSpellUnplayableReason.None;
+        if (!preview.HasSpellData)
+            return preview.HasBuffData ? VfxSpellUnplayableReason.Buff : VfxSpellUnplayableReason.ScriptOnly;
+        return preview.Missile != null ? VfxSpellUnplayableReason.UnsupportedMissile : VfxSpellUnplayableReason.NoVisuals;
     }
 
     internal static bool CanCompileFlight(VfxSpellMissilePreview missile, float distance)

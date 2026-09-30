@@ -176,6 +176,20 @@ namespace AssetsManager.Views.Models.Viewer
         Unavailable
     }
 
+    /// <summary>Why a SpellObject has nothing the preview can play.</summary>
+    public enum VfxSpellUnplayableReason
+    {
+        None,
+        /// <summary>A BuffData state: its visuals are spawned by the server script.</summary>
+        Buff,
+        /// <summary>Only a script name, without spell or buff data.</summary>
+        ScriptOnly,
+        /// <summary>Spell data without animation, hit effect or missile.</summary>
+        NoVisuals,
+        /// <summary>A missile whose movement the preview cannot fly.</summary>
+        UnsupportedMissile
+    }
+
     public enum VfxSpellIssueKind
     {
         Invalid,
@@ -216,6 +230,8 @@ namespace AssetsManager.Views.Models.Viewer
         string MissileEffectName,
         IReadOnlyList<VfxSpellIssue> Issues)
     {
+        public bool HasSpellData { get; init; } = true;
+        public bool HasBuffData { get; init; }
         public bool HasInvalidIssues => Issues?.Any(issue => issue.Kind == VfxSpellIssueKind.Invalid) == true;
         public bool HasInvalidHitEffectFields => Issues?.Any(issue =>
             issue.Kind == VfxSpellIssueKind.Invalid &&
