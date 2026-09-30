@@ -119,16 +119,31 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             var positions = new float[sourcePositions.Count * 3];
             var uvs = new float[sourceUvs.Count * 2];
             var colors = new float[sourcePositions.Count * 4];
+            // A particle SKN of the Color vertex type carries B8G8R8A8 colours the USE_VERTEX_COLORS
+            // stage multiplies in, alpha included, like an SCB's; other vertex types stay white.
+            var sourceColors = mesh.VerticesView.TryGetAccessor(
+                    LeagueToolkit.Core.Memory.ElementName.PrimaryColor,
+                    out LeagueToolkit.Core.Memory.VertexElementAccessor colorAccessor)
+                ? colorAccessor.AsBgraU8Array().ToArray()
+                : null;
             for (int index = 0; index < sourcePositions.Count; index++)
             {
                 var position = sourcePositions[index];
                 positions[index * 3] = position.X;
                 positions[index * 3 + 1] = position.Y;
                 positions[index * 3 + 2] = position.Z;
-                colors[index * 4] = 1f;
-                colors[index * 4 + 1] = 1f;
-                colors[index * 4 + 2] = 1f;
-                colors[index * 4 + 3] = 1f;
+                if (sourceColors != null && index < sourceColors.Length)
+                {
+                    var color = sourceColors[index];
+                    colors[index * 4] = color.r / 255f;
+                    colors[index * 4 + 1] = color.g / 255f;
+                    colors[index * 4 + 2] = color.b / 255f;
+                    colors[index * 4 + 3] = color.a / 255f;
+                }
+                else
+                {
+                    colors[index * 4] = colors[index * 4 + 1] = colors[index * 4 + 2] = colors[index * 4 + 3] = 1f;
+                }
             }
             for (int index = 0; index < sourceUvs.Count; index++)
             {
