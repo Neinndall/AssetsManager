@@ -26,6 +26,16 @@ namespace AssetsManager.Tests.Diagnostics
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && string.Equals(args[0], "submesh-render-order-census", StringComparison.OrdinalIgnoreCase))
+            {
+                SubmeshRenderOrderCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "mapgeo-heights", StringComparison.OrdinalIgnoreCase))
+            {
+                MapGeoHeightsDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "skin-part-render", StringComparison.OrdinalIgnoreCase))
             {
                 SkinPartRenderDiagnostic.Run(args.Skip(1).ToArray());

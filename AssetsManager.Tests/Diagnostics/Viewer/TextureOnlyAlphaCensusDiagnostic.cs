@@ -18,7 +18,7 @@ using LeagueToolkit.Core.Wad;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `texture-only-alpha-census <out.csv> [--champions] [--maps] [--max-skins N] [skin-path...]`: every submesh drawn
+    /// `texture-only-alpha-census <out.csv> [--champions] [--maps] [--max-skins N] [--shard i/n] [skin-path...]`: every submesh drawn
     /// from a texture alone (the game's LIT_UBER, which discards alpha 0 and blends the rest) with the share of its
     /// surface at alpha 0, below one half, below 0.9 and opaque. Each triangle is sampled at its centroid and corners.
     /// `--maps` loads every character whose skin BIN ships in a map or Common WAD.
@@ -44,9 +44,18 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 skins.AddRange(InstalledSkins.FromArguments(install, new[] { "--all" }.Concat(args).ToArray()).Select(skin => (skin, "champion")));
             if (args.Contains("--maps"))
                 skins.AddRange(MapCharacterSkins(install).Select(skin => (skin, "map")));
+            // --shard i/n keeps every n-th skin from i, so several processes split one census.
+            int shardAt = Array.IndexOf(args, "--shard");
+            if (shardAt >= 0 && shardAt + 1 < args.Length && args[shardAt + 1].Split('/') is [var index, var count])
+            {
+                int shard = int.Parse(index, CultureInfo.InvariantCulture), shards = int.Parse(count, CultureInfo.InvariantCulture);
+                skins = skins.Where((_, at) => at % shards == shard).ToList();
+            }
             Console.WriteLine($"[TextureOnlyAlpha] skins={skins.Count}");
 
-            var rows = new List<string> { "source,skin,submesh,hidden,triangles,zero,low,mid,opaque,texture" };
+            // Rows are appended as each skin is measured, so a stopped census keeps what it read.
+            using var csv = new StreamWriter(args[0], append: false) { AutoFlush = true };
+            csv.WriteLine("source,skin,submesh,hidden,triangles,zero,low,mid,opaque,texture");
             int loaded = 0, failed = 0, textureOnly = 0;
             foreach ((string skin, string source) in skins)
             {
@@ -80,13 +89,12 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 
                     textureOnly++;
                     int[] bands = Sample(asset.Mesh, range, texture);
-                    rows.Add(string.Join(",",
+                    csv.WriteLine(string.Join(",",
                         source, skin, Quote(range.Name), hidden.Contains(range.Name), range.IndexCount / 3,
                         bands[0], bands[1], bands[2], bands[3], material.BaseTextureName));
                 }
             }
 
-            File.WriteAllLines(args[0], rows);
             Console.WriteLine($"[TextureOnlyAlpha] loaded={loaded} failed={failed} textureOnlySubmeshes={textureOnly} csv={args[0]}");
         }
 
