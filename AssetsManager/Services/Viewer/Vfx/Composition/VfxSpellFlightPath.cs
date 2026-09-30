@@ -20,6 +20,9 @@ public sealed class VfxSpellFlightPath
     private readonly Vector3 _tangent1;
     private readonly bool _spline;
     private readonly float[] _arcLengths;
+    private float _gravity;
+    private float _sineAmplitude;
+    private float _sinePeriods;
 
     private VfxSpellFlightPath(
         Vector3 from,
@@ -47,16 +50,34 @@ public sealed class VfxSpellFlightPath
     /// <summary>The flight's start, which a spline's start offset moves away from the launch bone.</summary>
     public Vector3 Start => _from;
 
+    /// <summary>Where the flight lands, which a height solver may move down to the target's height.</summary>
+    public Vector3 End => _to;
+
     /// <summary>Position and travel direction <paramref name="elapsed"/> seconds after launch.</summary>
     public (Vector3 Position, Vector3 Direction) Sample(double elapsed)
     {
         double time = Math.Clamp(elapsed, 0d, Duration);
         float progress = Duration > 0d ? _progressAt(time) : 1f;
+        Vector3 lift = Vector3.UnitY * HeightAt(time);
         if (!_spline)
-            return (Vector3.Lerp(_from, _to, progress), _to - _from);
+            return (Vector3.Lerp(_from, _to, progress) + lift, _to - _from);
 
         float u = _arcLengths != null ? ParameterAtArcFraction(progress) : progress;
-        return (Hermite(u), HermiteDerivative(u));
+        return (Hermite(u) + lift, HermiteDerivative(u));
+    }
+
+    /// <summary>
+    /// Height the missile's height solver adds over its straight track: a ballistic arc under the authored gravity
+    /// that leaves and lands on the track's ends, or sine waves of the authored amplitude.
+    /// </summary>
+    private float HeightAt(double time)
+    {
+        if (!(Duration > 0d)) return 0f;
+        if (_gravity > 0f)
+            return (float)(0.5d * _gravity * time * (Duration - time));
+        if (_sineAmplitude != 0f && _sinePeriods != 0f)
+            return (float)(_sineAmplitude * Math.Sin(2d * Math.PI * _sinePeriods * time / Duration));
+        return 0f;
     }
 
     /// <summary>
@@ -66,6 +87,9 @@ public sealed class VfxSpellFlightPath
     internal static VfxSpellFlightPath Compile(VfxSpellMissilePreview missile, Vector3 from, Vector3 to)
     {
         if (missile == null) return null;
+        // The preview's ground is the character's feet plane, y = 0.
+        if (missile.LandsOnTargetHeight)
+            to = new Vector3(to.X, missile.TargetHeight is { } augment && float.IsFinite(augment) ? augment : 0f, to.Z);
         Vector3 forward = new(to.X - from.X, 0f, to.Z - from.Z);
         if (forward.LengthSquared() <= 1e-8f) forward = Vector3.UnitZ;
         else forward = Vector3.Normalize(forward);
@@ -73,7 +97,7 @@ public sealed class VfxSpellFlightPath
         Vector3 right = Vector3.Cross(Vector3.UnitY, forward);
         Vector3 Local(Vector3 value) => right * value.X + Vector3.UnitY * value.Y + forward * value.Z;
 
-        return missile.MovementKind switch
+        VfxSpellFlightPath path = missile.MovementKind switch
         {
             VfxSpellMissileMovementKind.FixedSpeed when Positive(missile.Speed) =>
                 Linear(from, to, Vector3.Distance(from, to) / missile.Speed.Value),
@@ -86,6 +110,13 @@ public sealed class VfxSpellFlightPath
                 Spline(missile, from + Local(missile.SplineStartOffset), to, Local, null, missile.Duration.Value),
             _ => null
         };
+        if (path != null)
+        {
+            path._gravity = float.IsFinite(missile.Gravity) ? missile.Gravity : 0f;
+            path._sineAmplitude = float.IsFinite(missile.SineAmplitude) ? missile.SineAmplitude : 0f;
+            path._sinePeriods = float.IsFinite(missile.SinePeriods) ? missile.SinePeriods : 0f;
+        }
+        return path;
     }
 
     private static VfxSpellFlightPath Linear(Vector3 from, Vector3 to, double duration)

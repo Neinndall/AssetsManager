@@ -24,6 +24,9 @@ internal static class VfxSpellPreviewReader
     private static readonly uint FixedSpeedSplineMovementClass = Fnv1a.HashLower("FixedSpeedSplineMovement");
     private static readonly uint FixedTimeSplineMovementClass = Fnv1a.HashLower("FixedTimeSplineMovement");
     private static readonly uint HermiteSplineInfoClass = Fnv1a.HashLower("HermiteSplineInfo");
+    private static readonly uint GravityHeightSolverClass = Fnv1a.HashLower("GravityHeightSolver");
+    private static readonly uint SinusoidalHeightSolverClass = Fnv1a.HashLower("SinusoidalHeightSolver");
+    private static readonly uint BlendedLinearHeightSolverClass = Fnv1a.HashLower("BlendedLinearHeightSolver");
     private const uint RankValuesClass = 0x0a0eddc9;
 
     internal static VfxSpellPreview Read(BinTreeObject spellObject)
@@ -203,11 +206,35 @@ internal static class VfxSpellPreviewReader
                 "mUseGroundHeightAtTarget");
         }
 
+        float gravity = 0f, sineAmplitude = 0f, sinePeriods = 0f;
+        bool landsOnTargetHeight = false;
+        const string heightPath = root + ".heightSolver";
+        if (TryAnyStruct(missile.Properties, "heightSolver", heightPath, issues, out BinTreeStruct height))
+        {
+            if (height.ClassHash == GravityHeightSolverClass)
+            {
+                landsOnTargetHeight = true;
+                gravity = ReadF32(height.Properties, "mGravity", heightPath, issues) ?? 0f;
+            }
+            else if (height.ClassHash == BlendedLinearHeightSolverClass)
+            {
+                landsOnTargetHeight = true;
+            }
+            else if (height.ClassHash == SinusoidalHeightSolverClass)
+            {
+                sineAmplitude = ReadF32(height.Properties, "mAmplitude", heightPath, issues) ?? 0f;
+                sinePeriods = ReadF32(height.Properties, "mNumberOfPeriods", heightPath, issues) ?? 0f;
+            }
+            else
+            {
+                Issue(issues, heightPath, VfxSpellIssueKind.Unsupported);
+            }
+        }
+
         MarkUnsupported(
             missile.Properties,
             root,
             issues,
-            "heightSolver",
             "verticalFacing",
             "behaviors",
             "missileGroupSpawners",
@@ -230,7 +257,11 @@ internal static class VfxSpellPreviewReader
             InitialSpeed = initialSpeed,
             SplineStartOffset = splineOffset,
             SplineControlPoint1 = splinePoint1,
-            SplineControlPoint2 = splinePoint2
+            SplineControlPoint2 = splinePoint2,
+            LandsOnTargetHeight = landsOnTargetHeight,
+            Gravity = gravity,
+            SineAmplitude = sineAmplitude,
+            SinePeriods = sinePeriods
         };
     }
 

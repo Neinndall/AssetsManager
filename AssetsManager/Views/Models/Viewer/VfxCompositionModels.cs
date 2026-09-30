@@ -227,6 +227,16 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector3 SplineStartOffset { get; init; }
         public Vector3 SplineControlPoint1 { get; init; }
         public Vector3 SplineControlPoint2 { get; init; }
+        /// <summary>
+        /// Gravity and BlendedLinear height solvers carry the missile from its launch height down to the target's,
+        /// the ground plus mTargetHeightAugment; without one the missile keeps its launch height.
+        /// </summary>
+        public bool LandsOnTargetHeight { get; init; }
+        /// <summary>GravityHeightSolver: a ballistic arc over the flight's straight height change.</summary>
+        public float Gravity { get; init; }
+        /// <summary>SinusoidalHeightSolver: height waves of this amplitude over the flight.</summary>
+        public float SineAmplitude { get; init; }
+        public float SinePeriods { get; init; }
     }
 
     /// <summary>The subset of SpellDataResource consumed by the isolated ability preview.</summary>

@@ -166,6 +166,52 @@ public sealed class VfxSpellPreviewTests
     }
 
     [Fact]
+    public void GravityFlightArcsAndLandsAtItsTrackHeight()
+    {
+        // 1 s flight under gravity 8000 peaks at g*T^2/8 = 1000 halfway.
+        var missile = new VfxSpellMissilePreview(VfxSpellMissileMovementKind.FixedTime, null, 1f, null, null, null, null, null)
+        {
+            Gravity = 8000f
+        };
+
+        var path = VfxSpellFlightPath.Compile(missile, new Vector3(0f, 100f, 0f), new Vector3(0f, 100f, 1000f));
+
+        Assert.Equal(100f, path.Sample(0d).Position.Y, 3);
+        Assert.Equal(1100f, path.Sample(0.5d).Position.Y, 3);
+        Assert.Equal(100f, path.Sample(1d).Position.Y, 3);
+    }
+
+    [Fact]
+    public void HeightSolverFlightLandsAtTheTargetHeightAugment()
+    {
+        var missile = new VfxSpellMissilePreview(VfxSpellMissileMovementKind.FixedTime, null, 0.5f, null, "head", null, 30f, null)
+        {
+            LandsOnTargetHeight = true,
+            Gravity = 7000f
+        };
+
+        var path = VfxSpellFlightPath.Compile(missile, new Vector3(0f, 250f, 0f), new Vector3(0f, 250f, 1000f));
+
+        Assert.Equal(new Vector3(0f, 30f, 1000f), path.End);
+        Assert.Equal(30f, path.Sample(0.5d).Position.Y, 3);
+        Assert.True(path.Sample(0.25d).Position.Y > 250f);
+    }
+
+    [Fact]
+    public void SinusoidalFlightWavesByItsAmplitude()
+    {
+        var missile = new VfxSpellMissilePreview(VfxSpellMissileMovementKind.FixedTime, null, 1f, null, null, null, null, null)
+        {
+            SineAmplitude = -60f,
+            SinePeriods = 0.25f
+        };
+
+        var path = VfxSpellFlightPath.Compile(missile, Vector3.Zero, new Vector3(0f, 0f, 1000f));
+
+        Assert.Equal(-60f, path.Sample(1d).Position.Y, 3);
+    }
+
+    [Fact]
     public void FlightRejectsDifferentAnchorHeights()
     {
         var missile = new VfxSpellMissilePreview(

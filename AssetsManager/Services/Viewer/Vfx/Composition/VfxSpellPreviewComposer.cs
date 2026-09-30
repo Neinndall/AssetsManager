@@ -79,6 +79,7 @@ internal static class VfxSpellPreviewComposer
             ? (flight.Value.Path.Duration > 0d ? flight.Value.Path.Duration : 0.5d)
             : 0d;
         double arrival = launch + flightDuration;
+        Vector3 landing = hasProjectile ? flight.Value.Path.End : target;
         var steps = new List<VfxSpellPlaybackStep>(2);
 
         if (hasProjectile)
@@ -90,7 +91,7 @@ internal static class VfxSpellPreviewComposer
                 launch,
                 arrival,
                 flight.Value.Path.Start,
-                target,
+                landing,
                 VfxSpellPlaybackMotion.Path,
                 ProjectileSeed,
                 flight.Value.Path));
@@ -104,8 +105,8 @@ internal static class VfxSpellPreviewComposer
                 impactKey,
                 arrival,
                 arrival + ImpactDuration,
-                target,
-                target,
+                landing,
+                landing,
                 VfxSpellPlaybackMotion.Static,
                 ImpactSeed));
         }
@@ -119,7 +120,7 @@ internal static class VfxSpellPreviewComposer
             arrival,
             startBone,
             source,
-            target,
+            landing,
             status);
     }
 
