@@ -52,7 +52,7 @@ internal static class VfxSpellPreviewComposer
         {
             if (!string.IsNullOrEmpty(startBone))
                 return Empty(VfxSpellAvailability.Unavailable, $"Missing launch bone: {startBone}.");
-            sampledLaunch = (Vector3.Zero, Vector3.UnitX);
+            sampledLaunch = (Vector3.Zero, Vector3.UnitZ);
         }
         Vector3 source = sampledLaunch.Value.Origin;
         float range = preview.CastRange is > 0f and <= 100000f && float.IsFinite(preview.CastRange.Value)
@@ -149,7 +149,7 @@ internal static class VfxSpellPreviewComposer
     internal static Vector3 ResolveTarget(Vector3 source, float range, Vector3 forward)
     {
         Vector3 flat = new(forward.X, 0f, forward.Z);
-        if (!Finite(flat) || flat.LengthSquared() <= 1e-8f) flat = Vector3.UnitX;
+        if (!Finite(flat) || flat.LengthSquared() <= 1e-8f) flat = Vector3.UnitZ;
         else flat = Vector3.Normalize(flat);
         return new Vector3(flat.X * range, source.Y, flat.Z * range);
     }

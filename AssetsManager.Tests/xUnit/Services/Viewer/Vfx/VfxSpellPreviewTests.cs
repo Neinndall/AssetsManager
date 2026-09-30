@@ -198,7 +198,7 @@ public sealed class VfxSpellPreviewTests
     }
 
     [Fact]
-    public void SpellTargetFallsBackToPositiveXForADegenerateFacing()
+    public void SpellTargetFallsBackToPositiveZForADegenerateFacing()
     {
         Vector3 source = new(25f, 80f, -40f);
 
@@ -207,7 +207,7 @@ public sealed class VfxSpellPreviewTests
             500f,
             Vector3.Zero);
 
-        Assert.Equal(new Vector3(500f, 80f, 0f), target);
+        Assert.Equal(new Vector3(0f, 80f, 500f), target);
     }
 
     private static VfxSpellPreview Preview(float? spellCastTime = null, float? castTime = null)

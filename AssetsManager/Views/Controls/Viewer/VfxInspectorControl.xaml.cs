@@ -6209,9 +6209,15 @@ namespace AssetsManager.Views.Controls.Viewer
                     Vector3.Zero,
                     skinScale).Translation
                 : Vector3.Zero;
-            Vector3 forward = hasRootTransform
-                ? Vector3.TransformNormal(Vector3.UnitX, rootTransform)
-                : Vector3.UnitX;
+            // The model faces +Z in its bind pose; the root joint carries its own authored rotation,
+            // so only the turn the animation adds on top of that bind rotation changes the facing.
+            Vector3 forward = Vector3.UnitZ;
+            if (hasRootTransform &&
+                AnimationService.TryGetBindRootTransform(_championModel.Skeleton, out Matrix4x4 bindRoot) &&
+                Matrix4x4.Invert(bindRoot, out Matrix4x4 inverseBindRoot))
+            {
+                forward = Vector3.TransformNormal(Vector3.UnitZ, inverseBindRoot * rootTransform);
+            }
             return (origin, forward);
         }
 
