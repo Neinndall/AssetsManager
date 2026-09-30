@@ -12,7 +12,7 @@ using LeagueToolkit.Hashing;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-planar-projection-census`: every emitter of the installed champion, map and common BINs whose primitive is a
+    /// `vfx-planar-projection-census [out.csv]`: every emitter of the installed champion, map and common BINs whose primitive is a
     /// VfxPrimitivePlanarProjection, with where it lives, the emitter fields and nested classes it authors, its blend
     /// mode and its projection band.
     /// </summary>
@@ -49,6 +49,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var seenSystems = new HashSet<uint>();
             int champion = 0, map = 0, systems = 0;
             var examples = new List<string>();
+            var rows = new List<string> { "side,bin,system,emitter,blend,band,erosion,mult,palette,disabled" };
+            uint particleNameField = Fnv1a.HashLower("particleName");
 
             string final = Path.Combine(InstalledSkins.FindInstall(), @"Game\DATA\FINAL");
             foreach (string wadPath in Directory.GetFiles(final, "*.wad.client", SearchOption.AllDirectories)
@@ -102,12 +104,21 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                                 ? $"yRange={(bandStruct.Properties.TryGetValue(yRangeField, out var y) ? Scalar(y) : "default")} fading={(bandStruct.Properties.TryGetValue(fadingField, out var f) ? Scalar(f) : "default")}"
                                 : "noProjectionBlock";
                             Tally(values, band);
+
+                            string systemName = system.Properties.TryGetValue(particleNameField, out var systemNameProperty) && systemNameProperty is BinTreeString systemText
+                                ? systemText.Value : $"0x{system.PathHash:x8}";
+                            bool Has(string field) => emitter.Properties.ContainsKey(Fnv1a.HashLower(field));
+                            rows.Add(string.Join(",", isChampion ? "champion" : "map", binPath, systemName, name, blend, band.Replace(' ', ';'),
+                                Has("alphaErosionDefinition"), Has("textureMult"), Has("paletteDefinition"),
+                                emitter.Properties.TryGetValue(Fnv1a.HashLower("disabled"), out var disabledProperty) && disabledProperty is BinTreeBool { Value: true }));
                         }
                         if (systemHasProjection) systems++;
                     }
                 }
             }
 
+            string csv = args.FirstOrDefault(arg => arg.EndsWith(".csv", StringComparison.OrdinalIgnoreCase));
+            if (csv != null) File.WriteAllLines(csv, rows);
             Console.WriteLine($"[PlanarProjection] emitters={champion + map} champion={champion} mapOrCommon={map} systems={systems}");
             foreach (var pair in fields.OrderByDescending(pair => pair.Value.Count))
                 Console.WriteLine($"[PlanarProjection] field {pair.Key} = {pair.Value.Count} e.g. {pair.Value.Example}");

@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
@@ -30,7 +31,26 @@ public sealed partial class VfxOpenGlRenderer
         _gl.Uniform1(uniforms.Tex, 0);
         _gl.Uniform1(uniforms.ColorMap, 7);
         _gl.Uniform1(uniforms.HasTex, emitter.Texture != 0 ? 1 : 0);
-        _gl.Uniform1(uniforms.HasColor, emitter.ColorGradientTexture != 0 ? 1 : 0);
+        _gl.Uniform1(uniforms.HasColor, UsesProjectionColorRamp(definition, emitter.ColorGradientTexture != 0) ? 1 : 0);
+        _gl.Uniform1(uniforms.TexMult, 1);
+        _gl.Uniform1(uniforms.HasTexMult, emitter.TextureMult != 0 ? 1 : 0);
+        _gl.Uniform1(uniforms.AddressModeMult, definition.TextureMultAddressMode);
+        _gl.Uniform2(uniforms.UvTransformCenterMult, definition.TextureMultTransformCenter.X, definition.TextureMultTransformCenter.Y);
+        Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
+            definition.TextureMultEmitterUvScrollRate * emitter.RenderTime, definition.TextureMultAddressMode);
+        _gl.Uniform2(uniforms.UvScrollRateMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
+        _gl.Uniform1(uniforms.FlipUMult, definition.TextureMultFlipU ? 1 : 0);
+        _gl.Uniform1(uniforms.FlipVMult, definition.TextureMultFlipV ? 1 : 0);
+        VfxAlphaErosionDefinition erosion = definition.AlphaErosion;
+        Vector4 erosionDefault = erosion is not null && string.IsNullOrWhiteSpace(erosion.TexturePath) ? Vector4.One : Vector4.Zero;
+        _gl.Uniform1(uniforms.ErosionTex, 4);
+        _gl.Uniform1(uniforms.HasErosion, erosion is not null ? 1 : 0);
+        _gl.Uniform1(uniforms.HasErosionMap, erosion is not null && emitter.ErosionTexture != 0 ? 1 : 0);
+        _gl.Uniform1(uniforms.ErosionAddressMode, erosion?.AddressMode ?? 0);
+        _gl.Uniform4(uniforms.ErosionDefault, erosionDefault.X, erosionDefault.Y, erosionDefault.Z, erosionDefault.W);
+        _gl.Uniform1(uniforms.ErosionFeatherIn, erosion?.FeatherIn ?? 0f);
+        _gl.Uniform1(uniforms.ErosionFeatherOut, erosion?.FeatherOut ?? 0f);
+        _gl.Uniform1(uniforms.ErosionSliceWidth, erosion?.SliceWidth ?? 1.5f);
         _gl.Uniform1(uniforms.AlphaCutoff,
             VfxBlendModes.ShouldAlphaTest(definition.BlendMode, state.AlphaReference) ? state.AlphaCutoff : 0f);
         _gl.Uniform1(uniforms.WireframePass, wireframe ? 1 : 0);
@@ -56,6 +76,18 @@ public sealed partial class VfxOpenGlRenderer
             ? emitter.ColorGradientTexture : _textures.FallbackTransparentTexture);
         ApplyAddressMode(2);
         ApplyTextureSampling();
+        if (emitter.TextureMult != 0)
+        {
+            _gl.ActiveTexture(TextureUnit.Texture1);
+            _gl.BindTexture(TextureTarget.Texture2D, emitter.TextureMult);
+            ApplyAddressMode(2);
+        }
+        if (emitter.ErosionTexture != 0)
+        {
+            _gl.ActiveTexture(TextureUnit.Texture4);
+            _gl.BindTexture(TextureTarget.Texture2D, emitter.ErosionTexture);
+            ApplyAddressMode(2);
+        }
         _gl.ActiveTexture(TextureUnit.Texture0);
         ReadOnlySpan<float> decals = _projectionGeometry.Prepare(definition, instances);
         _gl.BindVertexArray(_vao);
@@ -69,4 +101,11 @@ public sealed partial class VfxOpenGlRenderer
         _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)count);
         _gl.UseProgram(_program);
     }
+
+    /// <summary>
+    /// UNLIT_DECAL reads PARTICLE_COLOR_TEXTURE only in its permutations without ALPHA_EROSION and MULT_PASS, which an
+    /// emitter authoring alphaErosionDefinition or textureMult selects.
+    /// </summary>
+    internal static bool UsesProjectionColorRamp(VfxEmitterDefinition definition, bool hasRamp) =>
+        hasRamp && definition.AlphaErosion is null && !HasTextureMultLayer(definition);
 }

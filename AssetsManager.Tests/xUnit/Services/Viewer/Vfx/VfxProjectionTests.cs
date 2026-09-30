@@ -117,6 +117,18 @@ public sealed class VfxProjectionTests
     }
 
     [Fact]
+    public void ColorRampOnlyDrawsWithoutErosionOrTextureMult()
+    {
+        VfxEmitterDefinition plain = ReadEmitter(true);
+        Assert.True(VfxOpenGlRenderer.UsesProjectionColorRamp(plain, hasRamp: true));
+        Assert.False(VfxOpenGlRenderer.UsesProjectionColorRamp(plain, hasRamp: false));
+        Assert.False(VfxOpenGlRenderer.UsesProjectionColorRamp(
+            plain with { AlphaErosion = new VfxAlphaErosionDefinition("erosion.tex", VfxCurveF.Const(1f), 0.1f, 0.1f, 0) }, hasRamp: true));
+        Assert.False(VfxOpenGlRenderer.UsesProjectionColorRamp(
+            plain with { TextureMultPath = "mult.tex" }, hasRamp: true));
+    }
+
+    [Fact]
     public void ProjectionShaderCompilesAndLinksOnDesktopOpenGl()
     {
         using var context = new AssetsManager.Tests.Support.HiddenWglContext();
