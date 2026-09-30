@@ -6,6 +6,10 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Spells now play their cast animation's effects together with the projectile and impact.
+  - VFX Studio / Spells that cannot be previewed now say why: Buff, Script, No visuals or Missile.
+  - VFX Studio / Accelerating and curved spell missiles now fly, like Galio Q, Mel Q or Fizz R.
+  - VFX Studio / Spell missiles follow their authored height: lobbed ones arc down to the ground and wavy ones weave.
   - VFX Studio / With shaders on, map brush takes the grass tint of each rift transformation and sways on its own phase.
   - VFX Studio / With shaders on, map water refracts the scene behind it instead of drawing black.
   - VFX Studio / With shaders on, elemental map decorations rise into place when their rift transformation is selected, like in game.
@@ -458,6 +462,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Spell missiles now launch where the champion faces instead of to its side.
+  - Viewer / Game shaders work again for champions whose shaders changed in the latest PBE patch (Sett, Aatrox, Kayn, Zeri, K'Sante...).
   - API Center / Pass requests now follow the selected client's server configuration without fixed PBE hosts.
   - API Center / Unavailable passes now show a log warning without opening a dialog.
   - API Center / Restored pass rewards loading and prevented upcoming passes from being selected as active.
