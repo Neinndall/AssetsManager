@@ -457,6 +457,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - API Center / Unavailable passes now show a log warning without opening a dialog.
+  - API Center / Restored pass rewards loading and prevented upcoming passes from being selected as active.
   - VFX Studio / A System opened from the browser plays where the Character stands, with its rotation and size, so over a MAP backdrop it shows beside the Character instead of at the map's corner.
   - VFX Studio / Mirrored planar effects keep their full footprint and texture orientation over map terrain (Braum R indicators).
   - VFX Studio / Over a map, planar projections land on the map terrain and fade by its height like in game, instead of lying buried or floating on a flat plane at height 0; characters and structures stay in front of them.

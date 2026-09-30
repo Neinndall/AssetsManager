@@ -755,14 +755,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 ViewModel.StatusText = "Status: LCU Connected";
                 UpdateAuthenticationStatus();
 
-                if (statusCode == HttpStatusCode.NotFound)
-                {
-                    CustomMessageBoxService.ShowWarning(
-                        "Pass Unavailable",
-                        "The pass was not found on Riot servers.\n\nIt may be inactive or temporarily removed, or the ID is no longer active.",
-                        Window.GetWindow(this));
-                }
-                else
+                if (statusCode != HttpStatusCode.NotFound)
                 {
                     string errorDetail = statusCode.HasValue ? $"Server returned status: {statusCode.Value}" : "The server response was empty or unreachable.";
                     CustomMessageBoxService.ShowError(
