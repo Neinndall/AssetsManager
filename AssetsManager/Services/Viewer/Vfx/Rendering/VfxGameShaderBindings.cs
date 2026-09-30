@@ -94,7 +94,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private uint? ParticleTexture(VfxPlaybackRuntime.EmitterState emitter, string name) => name switch
         {
-            "TEXTURE" => emitter.Texture != 0 ? emitter.Texture : string.IsNullOrWhiteSpace(emitter.Def.TexturePath) ? null : _textures.FallbackTransparentTexture,
+            // An emitter naming no texture binds the engine's 1x1 transparent black, as does one whose texture failed to
+            // load: it draws nothing itself and only carries its children (Evelynn W mark's Start_flash). A custom
+            // material keeps its own sampler neutrals.
+            "TEXTURE" => emitter.Texture != 0 ? emitter.Texture : emitter.Def.HasResolvedCustomMaterial ? null : _textures.FallbackTransparentTexture,
             "TEXTUREMULT" => emitter.TextureMult != 0 ? emitter.TextureMult : null,
             "PARTICLE_COLOR_TEXTURE" => emitter.ColorGradientTexture != 0 ? emitter.ColorGradientTexture : null,
             "sPalettesTexture" => emitter.PaletteTexture != 0 ? emitter.PaletteTexture : null,

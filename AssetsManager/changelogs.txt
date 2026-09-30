@@ -456,6 +456,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Emitters that name no texture no longer draw a white square; like in game they only carry their child effects (Evelynn W mark).
   - VFX Studio / Skins that link more than 32 shared files (Thresh, Evelynn and Akali base skins) load all their effects and materials instead of dropping the last ones.
   - VFX Studio / Particle meshes, animated ones included, use their own vertex colours, so rings, cylinders and swipes fade at their edges instead of drawing hard dark bands (dragon pit mountain transition).
   - VFX Studio / Animations stopped before switching scenes stay stopped when returning.
