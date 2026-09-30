@@ -393,73 +393,53 @@
                         <RowDefinition Height="*"/>    <!-- Asset tree -->
                     </Grid.RowDefinitions>
 
-                    <!-- Studio controls and active project -->
+                    <!-- Active project and contextual tools -->
                     <Border Grid.Row="0" Margin="0,0,0,10" Background="{StaticResource CardBackground}"
                             CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="10,8">
                         <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <materialIcons:MaterialIcon Kind="LayersOutline" Width="15" Height="15"
-                                                                Foreground="{StaticResource AccentBrush}" Margin="0,0,7,0"/>
-                                    <TextBlock Text="VFX STUDIO" FontSize="10" FontWeight="Bold"
-                                               Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                    <ToggleButton IsChecked="{Binding TimelineVisible, Mode=TwoWay}"
-                                                  Style="{StaticResource TransparentIconToggleButton}"
-                                                  Width="26" Height="26" Padding="0" Margin="0,0,2,0" ToolTip="Show / Hide Timeline">
-                                        <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="14" Height="14"/>
-                                    </ToggleButton>
-                                    <ToggleButton IsChecked="{Binding InspectorVisible, Mode=TwoWay}"
-                                                  Style="{StaticResource TransparentIconToggleButton}"
-                                                  Width="26" Height="26" Padding="0" Margin="0,0,2,0" ToolTip="Show / Hide Inspector">
-                                        <materialIcons:MaterialIcon Kind="TuneVariant" Width="14" Height="14"/>
-                                    </ToggleButton>
-                                    <Button Click="ExitStudio_Click" Style="{StaticResource TransparentIconButton}"
-                                            Width="26" Height="26" Padding="0" ToolTip="Exit VFX Studio">
-                                        <materialIcons:MaterialIcon Kind="ExitToApp" Width="14" Height="14"/>
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
-                            <Grid Grid.Row="1" Margin="0,7,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Background="#15FFFFFF" CornerRadius="7" Width="28" Height="28" Margin="0,0,8,0" VerticalAlignment="Center">
-                                    <materialIcons:MaterialIcon Kind="FolderOutline" Width="15" Height="15"
-                                                                Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" ToolTip="{Binding ProjectPath}">
-                                    <TextBlock Text="{Binding ProjectName}" FontSize="11" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="PROJECT FOLDER" FontSize="8" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="5,0,0,0">
-                                    <Button Click="BrowseRoot_Click" Style="{StaticResource TransparentIconButton}"
-                                            Width="26" Height="26" Padding="0" ToolTip="Open project folder">
-                                        <materialIcons:MaterialIcon Kind="FolderOpen" Width="14" Height="14"/>
-                                    </Button>
-                                    <Button Click="ReloadRoot_Click" Style="{StaticResource TransparentIconButton}"
-                                            IsEnabled="{Binding HasProject}" Width="26" Height="26" Padding="0" ToolTip="Reload project">
-                                        <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14"/>
-                                    </Button>
-                                    <Button Click="CloseProject_Click" Style="{StaticResource TransparentIconButton}"
-                                            IsEnabled="{Binding HasProject}" Width="26" Height="26" Padding="0"
-                                            ToolTip="Close project (keeps files on disk)">
-                                        <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14"/>
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Background="#15FFFFFF" CornerRadius="7" Width="26" Height="26" Margin="0,0,7,0" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="FolderOutline" Width="14" Height="14"
+                                                            Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding ProjectName}" ToolTip="{Binding ProjectPath}"
+                                       FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ToggleButton IsChecked="{Binding TimelineVisible, Mode=TwoWay}"
+                                              Style="{StaticResource TransparentIconToggleButton}"
+                                              Width="24" Height="26" Padding="0" ToolTip="Show / Hide Timeline">
+                                    <materialIcons:MaterialIcon Kind="MotionPlayOutline" Width="14" Height="14"/>
+                                </ToggleButton>
+                                <ToggleButton IsChecked="{Binding InspectorVisible, Mode=TwoWay}"
+                                              Visibility="{Binding HasContextInspector, Converter={StaticResource BoolToVis}}"
+                                              Style="{StaticResource TransparentIconToggleButton}"
+                                              Width="24" Height="26" Padding="0" ToolTip="Show / Hide Inspector">
+                                    <materialIcons:MaterialIcon Kind="TuneVariant" Width="14" Height="14"/>
+                                </ToggleButton>
+                                <Button Click="BrowseRoot_Click" Style="{StaticResource TransparentIconButton}"
+                                        Width="24" Height="26" Padding="0" ToolTip="Open project folder">
+                                    <materialIcons:MaterialIcon Kind="FolderOpen" Width="14" Height="14"/>
+                                </Button>
+                                <Button Click="ReloadRoot_Click" Style="{StaticResource TransparentIconButton}"
+                                        Visibility="{Binding HasProject, Converter={StaticResource BoolToVis}}"
+                                        Width="24" Height="26" Padding="0" ToolTip="Reload project">
+                                    <materialIcons:MaterialIcon Kind="Refresh" Width="14" Height="14"/>
+                                </Button>
+                                <Button Click="CloseProject_Click" Style="{StaticResource TransparentIconButton}"
+                                        Visibility="{Binding HasProject, Converter={StaticResource BoolToVis}}"
+                                        Width="24" Height="26" Padding="0" ToolTip="Close project (keeps files on disk)">
+                                    <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14"/>
+                                </Button>
+                                <Button Click="ExitStudio_Click" Style="{StaticResource TransparentIconButton}"
+                                        Width="24" Height="26" Padding="0" ToolTip="Exit VFX Studio">
+                                    <materialIcons:MaterialIcon Kind="ExitToApp" Width="14" Height="14"/>
+                                </Button>
+                            </StackPanel>
                         </Grid>
                     </Border>
 
