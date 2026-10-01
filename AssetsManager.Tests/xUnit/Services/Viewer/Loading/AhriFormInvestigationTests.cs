@@ -11,6 +11,7 @@ using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 using Xunit;
 using Xunit.Abstractions;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Loading;
 

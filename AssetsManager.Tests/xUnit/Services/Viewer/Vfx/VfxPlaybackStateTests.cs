@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 {

@@ -10,6 +10,7 @@ using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 using Xunit;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 {
@@ -162,7 +163,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [InlineData("ASSETS/Characters/Lux/Skins/Skin07/lux_skin07_fire_tx_cm.tex", "Fire")]
         public void ExtractFormTokenFromTexturePath_ReturnsExpectedFormName(string path, string expected)
         {
-            string actual = VfxCharacterFormOption.ExtractFormTokenFromTexturePath(path);
+            string actual = VfxCharacterFormSemantics.ExtractFormTokenFromTexturePath(path);
             Assert.Equal(expected, actual);
         }
 
@@ -174,8 +175,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(-1, baseDef.GearIndex);
             Assert.Equal("Base", baseDef.Name);
 
-            var option = new VfxCharacterFormOption(baseDef, null);
-            Assert.Equal("Base", option.Label);
+            Assert.Equal("Base", VfxCharacterFormSemantics.FormLabel(baseDef, null));
         }
 
         [Fact]

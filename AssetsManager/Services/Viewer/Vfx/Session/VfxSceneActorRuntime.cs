@@ -13,6 +13,7 @@ using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Hashing;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Services.Viewer.Vfx.Session
 {
