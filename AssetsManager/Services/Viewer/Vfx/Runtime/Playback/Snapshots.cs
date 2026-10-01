@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
@@ -120,13 +121,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _startDelay = snapshot.StartDelay;
 
             int live = 0;
+            Matrix4x4 systemOrientation = VectorMathUtils.OrientationOnly(_worldTransform);
             for (int index = 0; index < _emitters.Count; index++)
             {
                 EmitterState state = _emitters[index];
                 EmitterSnapshot saved = snapshot.Emitters[index];
                 state.BasePos = saved.BasePos;
+                state.StepStartBasePos = saved.BasePos;
                 state.FieldBasePos = saved.FieldBasePos;
                 state.SystemOrigin = saved.SystemOrigin;
+                state.SystemOrientation = systemOrientation;
                 state.SystemTarget = saved.SystemTarget;
                 state.PlacementRight = saved.PlacementRight;
                 state.PlacementUp = saved.PlacementUp;

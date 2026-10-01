@@ -79,6 +79,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _orientationRootTransform = orientationRootTransform;
             if (!Matrix4x4.Invert(worldTransform, out _inverseWorldTransform))
                 _inverseWorldTransform = Matrix4x4.Identity;
+            Matrix4x4 systemOrientation = VectorMathUtils.OrientationOnly(worldTransform);
 
             foreach (var es in _emitters)
             {
@@ -89,6 +90,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 es.BasePos = nextBasePos;
                 es.FieldBasePos = EmitterFieldPosition(es.Def, emitterT);
                 es.SystemOrigin = nextOrigin;
+                es.SystemOrientation = systemOrientation;
                 es.SystemTarget = Vector3.Transform(new Vector3(600f, 0f, 0f), worldTransform);
                 es.PlacementRight = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitX, placement), Vector3.UnitX);
                 es.PlacementUp = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitY, placement), Vector3.UnitY);
@@ -260,6 +262,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 s.NoiseLast = Array.Empty<float>();
                 s.NoiseFired = Array.Empty<int>();
                 s.BasePos = Vector3.Transform(s.Def.EmitterPosition.Sample(0f), EmitterPlacement(s.Def));
+                s.StepStartBasePos = null;
                 s.FieldBasePos = EmitterFieldPosition(s.Def, 0f);
                 s.EmittedThrough = s.Def.TimeBeforeFirstEmission;
                 s.Age = 0;

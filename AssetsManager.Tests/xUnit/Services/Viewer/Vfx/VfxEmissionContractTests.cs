@@ -472,6 +472,63 @@ public sealed class VfxEmissionContractTests
         Assert.InRange(particle.BirthRotation.X, 0.075f, 0.082f);
     }
 
+    [Theory]
+    [InlineData(0.02f)]
+    [InlineData(0f)]
+    public void EmitterShorterThanOneFrameStillEmitsAtThirtyFps(float lifetime)
+    {
+        var runtime = Create(Emitter() with
+        {
+            Rate = VfxCurveF.Const(3),
+            EmitterLifetime = lifetime,
+            ParticleLifetime = VfxCurveF.Const(1f)
+        });
+
+        runtime.Update(1f / 30f);
+
+        Assert.Equal(3, runtime.LiveParticleCount);
+    }
+
+    [Fact]
+    public void AngularAccelerationTurnsTheSameWhateverTheFrameRate()
+    {
+        float TurnAfterOneSecond(int steps)
+        {
+            var runtime = Create(Emitter() with
+            {
+                ParticleLifetime = VfxCurveF.Const(5f),
+                BirthRotationalAcceleration = VfxCurve3.Const(new Vector3(360f, 0f, 0f))
+            });
+            runtime.Update(0.001f);
+            for (int step = 0; step < steps; step++)
+                runtime.Update(1f / steps);
+            return Assert.Single(Assert.Single(runtime.Emitters).Particles).BirthRotation.X;
+        }
+
+        // The closed form a * t^2 / 2 at a = 2 pi rad/s^2 over one second.
+        Assert.Equal(MathF.PI, TurnAfterOneSecond(1), precision: 4);
+        Assert.Equal(MathF.PI, TurnAfterOneSecond(60), precision: 4);
+    }
+
+    [Fact]
+    public void MovingEmitterSpreadsAStepsBirthsAlongItsTravel()
+    {
+        var runtime = Create(Emitter() with
+        {
+            IsSingleParticle = false,
+            Rate = VfxCurveF.Const(100f),
+            ParticleLifetime = VfxCurveF.Const(5f)
+        });
+        runtime.Update(0.01f);
+        runtime.SetTransform(Matrix4x4.CreateTranslation(100f, 0f, 0f));
+
+        runtime.Update(0.1f);
+
+        var newborns = Assert.Single(runtime.Emitters).Particles.GetRange(1, 10);
+        for (int born = 0; born < newborns.Count; born++)
+            Assert.Equal(10f * (born + 1), newborns[born].Pos.X, precision: 3);
+    }
+
     private static VfxPlaybackRuntime Create(VfxEmitterDefinition emitter)
     {
         var runtime = new VfxPlaybackRuntime(7);

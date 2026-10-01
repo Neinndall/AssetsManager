@@ -5048,7 +5048,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             runtime.Update(0.10f);
 
-            Assert.Equal(2, state.Particles.Count);
+            // The step crossing the 0.03 s lifetime still owes the 0.01 s left of it: one more birth at rate 100.
+            Assert.Equal(3, state.Particles.Count);
             Assert.NotEqual(firstBefore, state.Particles[0].Vel);
             Assert.NotEqual(secondBefore, state.Particles[1].Vel);
         }
@@ -5460,6 +5461,42 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(geometry.Vertices[2], geometry.Vertices[stride + 2]);
             Assert.Equal(geometry.Vertices[3], geometry.Vertices[stride + 3]);
             Assert.Equal(geometry.Vertices[4], geometry.Vertices[stride + 4]);
+        }
+
+        [Fact]
+        public void BeamEndOffsetsTurnWithTheSystemOrientation()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.Beam,
+                Beam = new VfxBeamDefinition(
+                    0,
+                    0,
+                    0,
+                    VfxCurve3.Const(Vector3.One),
+                    VfxCurve4.Const(Vector4.One),
+                    false,
+                    new Vector3(10f, 0f, 0f),
+                    new Vector3(0f, 0f, 5f))
+            };
+            var state = BeamState(emitter, Vector3.Zero, new Vector3(0f, 0f, 40f), Vector3.Zero);
+            // A system turned a quarter about +Y carries local +X to world -Z and local +Z to world +X.
+            state.SystemOrientation = Matrix4x4.CreateRotationY(MathF.PI * 0.5f);
+
+            var geometry = new VfxBeamGeometry();
+            Assert.Equal(6, geometry.Build(state, new Vector3(0f, 50f, 20f)));
+
+            int stride = VfxBeamGeometry.VertexStride;
+            var corners = Enumerable.Range(0, 6)
+                .Select(vertex => new Vector3(
+                    geometry.Vertices[vertex * stride + 2],
+                    geometry.Vertices[vertex * stride + 3],
+                    geometry.Vertices[vertex * stride + 4]))
+                .ToArray();
+            Assert.Contains(corners, corner => Vector3.Distance(corner, new Vector3(0f, 0f, -10f)) <= 1.001f);
+            Assert.Contains(corners, corner => Vector3.Distance(corner, new Vector3(5f, 0f, 40f)) <= 1.001f);
+            Assert.DoesNotContain(corners, corner => Vector3.Distance(corner, new Vector3(10f, 0f, 0f)) <= 1.001f);
         }
 
         [Fact]

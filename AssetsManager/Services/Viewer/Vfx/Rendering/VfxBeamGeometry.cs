@@ -28,8 +28,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (Vertices.Length < needed)
                 Vertices = new float[VfxBufferGrowth.NextLength(Vertices.Length, needed, VertexStride * 6)];
 
-            Vector3 source = state.SystemOrigin + beam.SourceOffset;
-            Vector3 target = state.SystemTarget + beam.TargetOffset;
+            // The engine turns both local-space end offsets by the system's orientation before adding them.
+            Vector3 source = state.SystemOrigin + Vector3.TransformNormal(beam.SourceOffset, state.SystemOrientation);
+            Vector3 target = state.SystemTarget + Vector3.TransformNormal(beam.TargetOffset, state.SystemOrientation);
             Vector3 delta = target - source;
             float length = delta.Length();
             float colorDistance = (state.SystemTarget - state.SystemOrigin).Length();

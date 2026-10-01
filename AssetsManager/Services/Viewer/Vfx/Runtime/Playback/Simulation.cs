@@ -60,6 +60,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         _stepContexts[index].FieldOrigin,
                         _newbornStarts[index]);
                 }
+                state.StepStartBasePos = state.BasePos;
                 state.RenderTime = CurrentTime;
                 state.InvalidateInstances();
                 live += state.Particles.Count;
@@ -188,7 +189,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 // Birth angular velocity and acceleration always integrate. rotation0 is
                 // a separate integrated value authored per 1/60 second and is gated only
                 // by isRotationEnabled.
-                p.BirthRotation += (p.RotationalVelocity + p.RotationalAcceleration * p.Age) * dt;
+                // The engine's closed form (w + a * age / 2) * age: sampling the acceleration at the step's
+                // mid age sums to exactly that, whatever the frame rate.
+                p.BirthRotation += (p.RotationalVelocity + p.RotationalAcceleration * (p.Age - 0.5f * dt)) * dt;
                 if (d.IsRotationEnabled && d.RotationOverLife is { } rotationCurve)
                 {
                     Vector3 rotationRate = rotationCurve.Sample(particleT);
@@ -217,7 +220,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     ParticleUpdated?.Invoke(this, d, LifecycleInfo(s, p, died: false));
             }
 
-            return new EmitterStepContext(emitterT, preparedNoise, fieldOrigin);
+            return new EmitterStepContext(emitterT, preparedNoise, fieldOrigin, dt);
         }
 
         private int EmitEmitter(
@@ -227,10 +230,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             VfxEmitterDefinition d = s.Def;
             float emitterT = context.EmitterT;
+            // The step that crosses the emitter's lifetime still emits, counted only up to the lifetime,
+            // so an emitter shorter than one frame emits at any frame rate. Its window opens at the later
+            // of the step's start and the first emission, so a lifetime over before that never emits.
             bool emitting = !d.Disabled
                             && !IsStopped
                             && s.Age >= d.TimeBeforeFirstEmission
-                            && (d.EmitterLifetime is not { } life || s.Age <= life);
+                            && (d.EmitterLifetime is not { } life ||
+                                MathF.Max(s.Age - context.Dt, d.TimeBeforeFirstEmission) <= life);
             if (!emitting || (d.IsSingleParticle && s.BurstDone)) return -1;
             if (d.EmissionPeriod is { } period && !period.IsActive(s.Age - d.TimeBeforeFirstEmission))
             {
@@ -243,8 +250,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 // for inspection but does not reinterpret the simulation rate.
                 float rate = MathF.Max(0f, d.Rate.Sample(emitterT));
                 if (!float.IsFinite(rate)) rate = 0f;
+                float emittingUntil = d.EmitterLifetime is { } lifetime ? MathF.Min(s.Age, lifetime) : s.Age;
                 float owed = MathF.Min(
-                    MathF.Truncate(MathF.Max(0f, s.Age - s.EmittedThrough) * rate),
+                    MathF.Truncate(MathF.Max(0f, emittingUntil - s.EmittedThrough) * rate),
                     MathF.Truncate(rate * 0.33f) + 1f);
                 int requestedCount = owed >= int.MaxValue ? int.MaxValue : (int)MathF.Max(0f, owed);
                 if (!s.InitialEmissionDone)
@@ -281,7 +289,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 int actualCount = Math.Min(requestedCount, availableParticleSlots);
                 availableParticleSlots -= actualCount;
                 int firstNewborn = s.Particles.Count;
-                for (int born = 0; born < actualCount; born++) Spawn(s, emitterT);
+                // The engine spreads a step's births along the emitter's travel during the step, the last
+                // one at its current origin, rather than stacking them all on that origin.
+                Vector3 travelled = s.StepStartBasePos is { } stepStart ? s.BasePos - stepStart : Vector3.Zero;
+                for (int born = 0; born < actualCount; born++)
+                    Spawn(s, emitterT, s.BasePos - travelled * (1f - (born + 1f) / requestedCount));
 
                 if (actualCount < requestedCount)
                 {
@@ -301,7 +313,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private readonly record struct EmitterStepContext(
             float EmitterT,
             PreparedNoiseField[] PreparedNoise,
-            Vector3 FieldOrigin);
+            Vector3 FieldOrigin,
+            float Dt);
 
         private static void ApplyAnalyticDrag(ref Particle particle, ref Vector3 moving, Vector3 drag, float dt)
         {

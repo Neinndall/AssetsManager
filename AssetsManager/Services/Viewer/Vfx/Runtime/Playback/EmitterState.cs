@@ -25,8 +25,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             internal int RenderRank { get; set; }
             public bool IsVisible { get; set; } = true;
             public Vector3 BasePos;                 // world spawn origin (placement + emitterPosition)
+            /// <summary>The spawn origin where the previous step ended, which a step's births spread from.</summary>
+            internal Vector3? StepStartBasePos;
             internal Vector3 FieldBasePos;          // emitterPosition under the frame basis, excluding translationOverride
             public Vector3 SystemOrigin, SystemTarget;
+            /// <summary>The system's world turn without scale, which turns a beam's local-space end offsets.</summary>
+            internal Matrix4x4 SystemOrientation = Matrix4x4.Identity;
             public Vector3 PlacementRight, PlacementUp, PlacementForward;
             internal Matrix4x4 PlacementTransform;
             public uint Texture;                    // GL handle for this emitter's sprite (0 = not uploaded/skip)

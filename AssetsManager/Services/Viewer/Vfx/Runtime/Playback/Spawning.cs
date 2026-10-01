@@ -7,7 +7,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
     public sealed partial class VfxPlaybackRuntime
     {
-        private void Spawn(EmitterState s, float emitterT)
+        private void Spawn(EmitterState s, float emitterT, Vector3 basePos)
         {
             var d = s.Def;
             if (d.ParticlesShareRandomValue && !s.SharedRandomRolled)
@@ -89,7 +89,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
             s.Particles.Add(new Particle
             {
-                Pos = s.BasePos + worldOffset,
+                Pos = basePos + worldOffset,
                 Vel = vel,
                 BirthOrbitalVelocity = birthOrbitalVelocity,
                 BirthDrag = birthDrag,
