@@ -426,6 +426,16 @@ namespace AssetsManager.Tests.Diagnostics
                 VfxFieldCensusDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-field-values", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxFieldValuesDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-reflection-census", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxReflectionCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "vfx-custom-material-census", StringComparison.OrdinalIgnoreCase))
             {
                 VfxCustomMaterialCensusDiagnostic.Run(args.Skip(1).ToArray());
