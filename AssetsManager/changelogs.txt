@@ -462,6 +462,12 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Beam ends stay on their joints when the effect turns, like Sylas chains, Akshan's rope or Blitzcrank cables.
+  - VFX Studio / Scrolling flipbook particles show the neighbouring frames of their atlas like in game, instead of repeating one frame.
+  - VFX Studio / Effects that emit for less than one frame now appear at any frame rate.
+  - VFX Studio / Spinning particles with angular acceleration turn the same at any frame rate.
+  - VFX Studio / Fast moving emitters leave a continuous trail of particles instead of separate clumps.
+  - VFX Studio / The fallback heat-haze distortion now matches the game shader, without coloured sheets at zero strength.
   - VFX Studio / Spell missiles now launch where the champion faces instead of to its side.
   - Viewer / Game shaders work again for champions whose shaders changed in the latest PBE patch (Sett, Aatrox, Kayn, Zeri, K'Sante...).
   - API Center / Pass requests now follow the selected client's server configuration without fixed PBE hosts.
