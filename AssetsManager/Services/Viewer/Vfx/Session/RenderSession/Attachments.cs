@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Vfx.Session
 {
@@ -153,13 +154,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             Vector3 localOffset,
             float skinScale)
         {
-            static Vector3 Normal(Vector3 value, Vector3 fallback)
-                => value.LengthSquared() > 1e-8f ? Vector3.Normalize(value) : fallback;
-
             float scale = skinScale > 0f && float.IsFinite(skinScale) ? skinScale : 1f;
-            Vector3 right = Normal(Vector3.TransformNormal(Vector3.UnitX, transform), Vector3.UnitX);
-            Vector3 up = Normal(Vector3.TransformNormal(Vector3.UnitY, transform), Vector3.UnitY);
-            Vector3 forward = Normal(Vector3.TransformNormal(Vector3.UnitZ, transform), Vector3.UnitZ);
+            Vector3 right = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitX, transform), Vector3.UnitX);
+            Vector3 up = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitY, transform), Vector3.UnitY);
+            Vector3 forward = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitZ, transform), Vector3.UnitZ);
             // LTK's jointAnchor transforms the authored offset by the joint's complete
             // posed frame, then applies the character skin scale to the resulting origin.
             Vector3 translation = Vector3.Transform(localOffset, transform) * scale;

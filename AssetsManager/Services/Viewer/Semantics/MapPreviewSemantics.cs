@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Semantics
 {
@@ -59,7 +60,7 @@ namespace AssetsManager.Services.Viewer.Semantics
             float total = direct + ambient;
             float strength = total > 0f ? direct / total : 0.5f;
             float ambientShare = total > 0f ? ambient / total : 0.5f;
-            Vector3 direction = IsFinite(own.Direction) && own.Direction.LengthSquared() > 1e-12f
+            Vector3 direction = VectorMathUtils.IsFinite(own.Direction) && own.Direction.LengthSquared() > 1e-12f
                 ? Vector3.Normalize(own.Direction)
                 : DefaultSun.Direction;
             return new MapSunPreviewOverride(
@@ -131,12 +132,9 @@ namespace AssetsManager.Services.Viewer.Semantics
         }
 
         private static Vector3 NormalizeOrDefault(Vector3 direction) =>
-            IsFinite(direction) && direction.LengthSquared() > 1e-12f
+            VectorMathUtils.IsFinite(direction) && direction.LengthSquared() > 1e-12f
                 ? Vector3.Normalize(direction)
                 : DefaultSun.Direction;
-
-        private static bool IsFinite(Vector3 value) =>
-            float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 
         private static float DegreesToRadians(float degrees) => degrees * (MathF.PI / 180f);
         private static float RadiansToDegrees(float radians) => radians * (180f / MathF.PI);

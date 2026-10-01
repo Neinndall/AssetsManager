@@ -104,9 +104,6 @@ namespace AssetsManager.Services.Viewer.Semantics
             "ALPHABLEND_MAIN", "ALPHABLEND_BLENDMAT", "USE_MAINTEXALPHA", "ALPHACLIP_ON"
         };
 
-        private static readonly Regex PlaceholderTexture = new(
-            @"(?i)shared[\\/]materials[\\/](black|white|grey|gray|flat_normal|default|transparent|blank)|[\\/]blank\.tex$|alpha-mask\.tex$",
-            RegexOptions.Compiled);
         private static readonly Regex BaseLikeName = new(
             @"(?i)(^|_)(diffuse|albedo|main|base|basecolor|diff|color)(_|$|tex|texture)",
             RegexOptions.Compiled);
@@ -313,9 +310,9 @@ namespace AssetsManager.Services.Viewer.Semantics
 
             bool IsUsable(MapMaterialSamplerData sampler) =>
                 sampler?.Texture?.IsEmpty == false &&
-                !IsPlaceholder(sampler.Texture.VirtualPath);
+                !MaterialSwitchSemantics.IsPlaceholder(sampler.Texture.VirtualPath);
 
-            if (switchedShader && IsEnabled(switches, "MAINTEX_ON"))
+            if (switchedShader && MaterialSwitchSemantics.IsEnabled(switches, "MAINTEX_ON"))
             {
                 MapMaterialSamplerData main = FindSampler(samplers, "Main_Texture");
                 if (IsUsable(main))
@@ -401,7 +398,7 @@ namespace AssetsManager.Services.Viewer.Semantics
             string shaderPath)
         {
             bool masked = !string.IsNullOrWhiteSpace(shaderPath) && MaskedShader.IsMatch(shaderPath) ||
-                          IsMacroEnabled(macros, "FEATURE_MASKED");
+                          MaterialSwitchSemantics.IsMacroEnabled(macros, "FEATURE_MASKED");
             return masked ? MaskedAlphaCutoff : null;
         }
 
@@ -432,13 +429,13 @@ namespace AssetsManager.Services.Viewer.Semantics
             float? authoredAlphaTest)
         {
             bool blendEnabled = pass?.BlendEnabled ?? false;
-            MapBlendFactor source = BlendFactorOf(pass?.SourceBlendFactor, MapBlendFactor.One);
-            MapBlendFactor destination = BlendFactorOf(pass?.DestinationBlendFactor, MapBlendFactor.Zero);
+            MapBlendFactor source = MaterialSwitchSemantics.BlendFactorOf(pass?.SourceBlendFactor, MapBlendFactor.One);
+            MapBlendFactor destination = MaterialSwitchSemantics.BlendFactorOf(pass?.DestinationBlendFactor, MapBlendFactor.Zero);
             MapMaterialBlendMode blending = blendEnabled
                 ? BlendModeOf(source, destination)
                 : MapMaterialBlendMode.Opaque;
 
-            if (IsMacroEnabled(macros, "SKINNED_MATERIAL_ADDITIVE") ||
+            if (MaterialSwitchSemantics.IsMacroEnabled(macros, "SKINNED_MATERIAL_ADDITIVE") ||
                 blendEnabled && !switchedShader &&
                 !string.IsNullOrWhiteSpace(shaderPath) && AdditiveShader.IsMatch(shaderPath))
             {
@@ -446,14 +443,14 @@ namespace AssetsManager.Services.Viewer.Semantics
             }
 
             if (switchedShader && blending == MapMaterialBlendMode.Normal &&
-                IsEnabled(switches, "ADDITIVEALPHA_ON"))
+                MaterialSwitchSemantics.IsEnabled(switches, "ADDITIVEALPHA_ON"))
             {
                 blending = MapMaterialBlendMode.Additive;
             }
 
             bool readsAlpha = opacity.HasValue ||
                               alphaTest.HasValue ||
-                              switchedShader && SwitchedAlphaNames.Any(name => IsEnabled(switches, name));
+                              switchedShader && SwitchedAlphaNames.Any(name => MaterialSwitchSemantics.IsEnabled(switches, name));
             if (blending == MapMaterialBlendMode.Normal && !readsAlpha)
                 blending = MapMaterialBlendMode.Opaque;
 
@@ -466,7 +463,7 @@ namespace AssetsManager.Services.Viewer.Semantics
 
             bool premultiplied = blendEnabled
                 ? source == MapBlendFactor.One && destination == MapBlendFactor.OneMinusSourceAlpha
-                : IsMacroEnabled(macros, "PREMULTIPLIED_ALPHA");
+                : MaterialSwitchSemantics.IsMacroEnabled(macros, "PREMULTIPLIED_ALPHA");
             bool cullEnabled = pass?.CullEnabled ?? true;
             uint winding = pass?.WindingToCull ?? DefaultCullWinding;
 
@@ -493,20 +490,6 @@ namespace AssetsManager.Services.Viewer.Semantics
                 _ => MapMaterialBlendMode.Normal
             };
 
-        private static MapBlendFactor BlendFactorOf(uint? value, MapBlendFactor fallback) =>
-            value switch
-            {
-                0 => MapBlendFactor.Zero,
-                1 => MapBlendFactor.One,
-                2 => MapBlendFactor.SourceColor,
-                3 => MapBlendFactor.OneMinusSourceColor,
-                4 => MapBlendFactor.DestinationColor,
-                5 => MapBlendFactor.OneMinusDestinationColor,
-                6 => MapBlendFactor.SourceAlpha,
-                7 => MapBlendFactor.OneMinusSourceAlpha,
-                _ => fallback
-            };
-
         private static bool TryFirst(
             IReadOnlyDictionary<string, Vector4> values,
             IEnumerable<string> names,
@@ -519,12 +502,6 @@ namespace AssetsManager.Services.Viewer.Semantics
             return false;
         }
 
-        private static bool IsEnabled(IReadOnlyDictionary<string, bool> switches, string name) =>
-            switches != null && switches.TryGetValue(name, out bool enabled) && enabled;
-
-        private static bool IsMacroEnabled(IReadOnlyDictionary<string, string> macros, string name) =>
-            macros != null && macros.TryGetValue(name, out string value) && value == "1";
-
         private static bool IsSwitchedShader(string shaderPath) =>
             !string.IsNullOrWhiteSpace(shaderPath) &&
             shaderPath.EndsWith(SwitchedShader, StringComparison.OrdinalIgnoreCase);
@@ -533,9 +510,6 @@ namespace AssetsManager.Services.Viewer.Semantics
             IEnumerable<MapMaterialSamplerData> samplers,
             string name) =>
             samplers.FirstOrDefault(sampler => string.Equals(sampler.Name, name, StringComparison.Ordinal));
-
-        private static bool IsPlaceholder(string texturePath) =>
-            !string.IsNullOrWhiteSpace(texturePath) && PlaceholderTexture.IsMatch(texturePath);
 
         private static bool IsColorMapPath(string texturePath)
         {

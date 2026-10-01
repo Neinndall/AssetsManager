@@ -5,6 +5,7 @@ using System.Numerics;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
+using AssetsManager.Services.Viewer.Rendering.Core;
 
 namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 {
@@ -272,8 +273,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     ? (int)TextureMinFilter.Linear
                     : min ? (int)TextureMinFilter.LinearMipmapLinear : (int)TextureMinFilter.NearestMipmapNearest);
             _gl.SamplerParameter(sampler, SamplerParameterI.MagFilter, mag ? (int)TextureMagFilter.Linear : (int)TextureMagFilter.Nearest);
-            _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)ToWrap(u));
-            _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)ToWrap(v));
+            _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)GlTextureWrap.Of(u));
+            _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)GlTextureWrap.Of(v));
             _samplers[key] = sampler;
             return sampler;
         }

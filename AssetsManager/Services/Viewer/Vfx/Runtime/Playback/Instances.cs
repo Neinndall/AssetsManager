@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
@@ -194,9 +195,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 buf[k++] = 0f;
 
                 Matrix4x4 basis = ParticleBasis(p, s, direction, orbitalTurn, legacyRoll);
-                Vector3 basisX = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, basis), Vector3.UnitX);
-                Vector3 basisY = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, basis), Vector3.UnitY);
-                Vector3 basisZ = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, basis), Vector3.UnitZ);
+                Vector3 basisX = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitX, basis), Vector3.UnitX);
+                Vector3 basisY = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitY, basis), Vector3.UnitY);
+                Vector3 basisZ = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitZ, basis), Vector3.UnitZ);
                 buf[k++] = basisX.X; buf[k++] = basisX.Y; buf[k++] = basisX.Z;
                 buf[k++] = basisY.X; buf[k++] = basisY.Y; buf[k++] = basisY.Z;
                 buf[k++] = basisZ.X; buf[k++] = basisZ.Y; buf[k++] = basisZ.Z;

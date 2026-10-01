@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
@@ -32,9 +33,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     state.PlacementUp.X, state.PlacementUp.Y, state.PlacementUp.Z, 0f,
                     state.PlacementForward.X, state.PlacementForward.Y, state.PlacementForward.Z, 0f,
                     0f, 0f, 0f, 1f)
-                : OrientationOnly(particle.BirthFrame);
+                : VectorMathUtils.OrientationOnly(particle.BirthFrame);
             if (orbitalTurn != Matrix4x4.Identity)
-                frame = OrientationOnly(frame * orbitalTurn);
+                frame = VectorMathUtils.OrientationOnly(frame * orbitalTurn);
 
             float particleTime = died && float.IsFinite(particle.Life) ? particle.Life : particle.Age;
             return new ParticleLifecycleInfo(
@@ -94,7 +95,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             if (!Matrix4x4.Invert(_orientationRootTransform, out Matrix4x4 inverseRoot))
                 return Matrix4x4.Identity;
-            return OrientationOnly(_worldTransform * inverseRoot);
+            return VectorMathUtils.OrientationOnly(_worldTransform * inverseRoot);
         }
 
         private static Matrix4x4 EmitterTransform(VfxEmitterDefinition definition, Matrix4x4 world)

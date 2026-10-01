@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Hashing;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
@@ -257,7 +258,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             foreach (VfxEmitterDefinition emitter in system.Emitters)
             {
                 if (emitter.Disabled) continue;
-                double rate = Peak(emitter.Rate);
+                double rate = VfxDurationCalculator.Peak(emitter.Rate);
                 if (emitter.IsSingleParticle)
                 {
                     int burst = (int)(Math.Truncate(rate) % (ushort.MaxValue + 1d));
@@ -265,7 +266,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 }
                 else
                 {
-                    double lifetime = Peak(emitter.ParticleLifetime);
+                    double lifetime = VfxDurationCalculator.Peak(emitter.ParticleLifetime);
                     wanted += Math.Ceiling(rate * (lifetime + VfxPlaybackRuntime.LingerSeconds(emitter))) +
                               Math.Ceiling(rate) + 1d;
                 }
@@ -275,15 +276,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             while (capacity < wanted && capacity < MaximumChildParticleCapacity)
                 capacity *= 2;
             return capacity;
-        }
-
-        private static double Peak(VfxCurveF curve)
-        {
-            double most = Math.Max(curve.Constant, 0f);
-            if (curve.Values is not { Length: > 0 }) return most;
-            foreach (float value in curve.Values)
-                most = Math.Max(most, value);
-            return most;
         }
 
         private static Matrix4x4 ChildBearing(
@@ -330,8 +322,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         private static Matrix4x4 ReRootOnJoint(Matrix4x4 bearing, Matrix4x4 joint)
         {
-            Matrix4x4 bearingTurn = OrientationOnly(bearing);
-            Matrix4x4 jointTurn = OrientationOnly(joint);
+            Matrix4x4 bearingTurn = VectorMathUtils.OrientationOnly(bearing);
+            Matrix4x4 jointTurn = VectorMathUtils.OrientationOnly(joint);
             Vector3 jointOffset = Vector3.TransformNormal(joint.Translation, bearingTurn);
             Vector3 position = bearing.Translation + jointOffset;
 
@@ -376,20 +368,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return result;
         }
 
-        private static Matrix4x4 OrientationOnly(Matrix4x4 transform)
-        {
-            static Vector3 Safe(Vector3 value, Vector3 fallback)
-                => value.LengthSquared() > 1e-8f ? Vector3.Normalize(value) : fallback;
-
-            Vector3 right = Safe(Vector3.TransformNormal(Vector3.UnitX, transform), Vector3.UnitX);
-            Vector3 up = Safe(Vector3.TransformNormal(Vector3.UnitY, transform), Vector3.UnitY);
-            Vector3 forward = Safe(Vector3.TransformNormal(Vector3.UnitZ, transform), Vector3.UnitZ);
-            return new Matrix4x4(
-                right.X, right.Y, right.Z, 0f,
-                up.X, up.Y, up.Z, 0f,
-                forward.X, forward.Y, forward.Z, 0f,
-                0f, 0f, 0f, 1f);
-        }
 
         private static int ChildSeed(int seed, string path, uint serial)
         {

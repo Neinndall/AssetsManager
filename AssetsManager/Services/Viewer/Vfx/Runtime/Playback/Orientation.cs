@@ -1,13 +1,12 @@
 using System;
 using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
     public sealed partial class VfxPlaybackRuntime
     {
-        private static Vector3 SafeNormal(Vector3 value, Vector3 fallback)
-            => value.LengthSquared() > 1e-8f ? Vector3.Normalize(value) : fallback;
 
         private static Vector3 ExtractScale(Matrix4x4 transform)
             => new(
@@ -15,17 +14,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 MathF.Max(1e-6f, Vector3.TransformNormal(Vector3.UnitY, transform).Length()),
                 MathF.Max(1e-6f, Vector3.TransformNormal(Vector3.UnitZ, transform).Length()));
 
-        private static Matrix4x4 OrientationOnly(Matrix4x4 transform)
-        {
-            Vector3 right = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, transform), Vector3.UnitX);
-            Vector3 up = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, transform), Vector3.UnitY);
-            Vector3 forward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, transform), Vector3.UnitZ);
-            return new Matrix4x4(
-                right.X, right.Y, right.Z, 0f,
-                up.X, up.Y, up.Z, 0f,
-                forward.X, forward.Y, forward.Z, 0f,
-                0f, 0f, 0f, 1f);
-        }
 
         private static Matrix4x4 OrbitalTurn(Vector3 radians)
         {
@@ -50,8 +38,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             {
                 Vector3 up = Vector3.Normalize(direction);
                 Vector3 axis = MathF.Abs(up.Y) < 0.99999f ? Vector3.UnitY : Vector3.UnitX;
-                Vector3 right = SafeNormal(Vector3.Cross(axis, up), Vector3.UnitX);
-                Vector3 forward = SafeNormal(Vector3.Cross(right, up), Vector3.UnitZ);
+                Vector3 right = VectorMathUtils.NormalizeOr(Vector3.Cross(axis, up), Vector3.UnitX);
+                Vector3 forward = VectorMathUtils.NormalizeOr(Vector3.Cross(right, up), Vector3.UnitZ);
                 return new Matrix4x4(
                     right.X, right.Y, right.Z, 0f,
                     up.X, up.Y, up.Z, 0f,
@@ -99,13 +87,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
             else
             {
-                frame = OrientationOnly(particle.BirthFrame);
+                frame = VectorMathUtils.OrientationOnly(particle.BirthFrame);
             }
 
             Matrix4x4 basis = standing * frame;
             if (orbitalTurn != Matrix4x4.Identity)
                 basis *= orbitalTurn;
-            return OrientationOnly(basis);
+            return VectorMathUtils.OrientationOnly(basis);
         }
     }
 }

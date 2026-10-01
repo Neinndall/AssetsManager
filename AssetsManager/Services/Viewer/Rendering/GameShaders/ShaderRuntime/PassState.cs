@@ -98,13 +98,5 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 _ => DepthFunction.Lequal
             };
 
-        private static TextureWrapMode ToWrap(MapTextureWrap wrap) =>
-            wrap switch
-            {
-                MapTextureWrap.Clamp => TextureWrapMode.ClampToEdge,
-                MapTextureWrap.Mirror => TextureWrapMode.MirroredRepeat,
-                MapTextureWrap.Border => TextureWrapMode.ClampToEdge,
-                _ => TextureWrapMode.Repeat
-            };
     }
 }

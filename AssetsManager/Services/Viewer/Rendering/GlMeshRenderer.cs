@@ -890,21 +890,12 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.TexParameter(
                 TextureTarget.Texture2D,
                 TextureParameterName.TextureWrapS,
-                (int)ToTextureWrapMode(wrapU));
+                (int)GlTextureWrap.Of(wrapU));
             _gl.TexParameter(
                 TextureTarget.Texture2D,
                 TextureParameterName.TextureWrapT,
-                (int)ToTextureWrapMode(wrapV));
+                (int)GlTextureWrap.Of(wrapV));
         }
-
-        private static TextureWrapMode ToTextureWrapMode(ModelMaterialWrapMode wrap) =>
-            wrap switch
-            {
-                ModelMaterialWrapMode.Clamp => TextureWrapMode.ClampToEdge,
-                ModelMaterialWrapMode.Mirror => TextureWrapMode.MirroredRepeat,
-                ModelMaterialWrapMode.Border => TextureWrapMode.ClampToEdge,
-                _ => TextureWrapMode.Repeat
-            };
 
         private void UnbindSceneTextures()
         {

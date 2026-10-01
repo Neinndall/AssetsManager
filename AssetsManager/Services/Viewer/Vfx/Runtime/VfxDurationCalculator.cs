@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
-using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
-using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
@@ -91,7 +88,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return tail;
         }
 
-        private static double Peak(VfxCurveF curve)
+        /// <summary>The largest value a curve reaches: zero, its constant and every key.</summary>
+        internal static double Peak(VfxCurveF curve)
         {
             double peak = Math.Max(curve.Constant, 0f);
             if (curve.Values is not { Length: > 0 }) return peak;

@@ -5,7 +5,6 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Semantics;
@@ -794,7 +793,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             else if (!hasTexture && material.BindingKind == ModelMaterialBindingKind.TextureOnly)
                 color = untextured;
             else
-                color = SrgbToLinear(new Vector3(material.Color.X, material.Color.Y, material.Color.Z));
+                color = VectorMathUtils.SrgbToLinear(new Vector3(material.Color.X, material.Color.Y, material.Color.Z));
 
             Vector2 scroll = forceUntextured
                 ? Vector2.Zero
@@ -1085,8 +1084,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             sampler = _gl.GenSampler();
             _gl.SamplerParameter(sampler, SamplerParameterI.MinFilter, (int)TextureMinFilter.LinearMipmapLinear);
             _gl.SamplerParameter(sampler, SamplerParameterI.MagFilter, (int)TextureMagFilter.Linear);
-            _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)ToWrap(u));
-            _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)ToWrap(v));
+            _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)GlTextureWrap.Of(u));
+            _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)GlTextureWrap.Of(v));
             _samplers[key] = sampler;
             return sampler;
         }
@@ -1111,22 +1110,6 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.BindTexture(TextureTarget.Texture2D, 0);
             return texture;
         }
-
-        private static TextureWrapMode ToWrap(ModelMaterialWrapMode wrap) => wrap switch
-        {
-            ModelMaterialWrapMode.Clamp => TextureWrapMode.ClampToEdge,
-            ModelMaterialWrapMode.Mirror => TextureWrapMode.MirroredRepeat,
-            ModelMaterialWrapMode.Border => TextureWrapMode.ClampToEdge,
-            _ => TextureWrapMode.Repeat
-        };
-
-        private static Vector3 SrgbToLinear(Vector3 value) => new(
-            SrgbChannelToLinear(value.X),
-            SrgbChannelToLinear(value.Y),
-            SrgbChannelToLinear(value.Z));
-
-        private static float SrgbChannelToLinear(float value) =>
-            value <= 0.04045f ? value / 12.92f : MathF.Pow((value + 0.055f) / 1.055f, 2.4f);
 
         internal void Clear()
         {

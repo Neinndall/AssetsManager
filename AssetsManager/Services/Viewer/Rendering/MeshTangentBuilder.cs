@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Rendering
 {
@@ -40,7 +41,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 float reciprocal = 1f / determinant;
                 Vector3 tangent = (edge1 * duv2.Y - edge2 * duv1.Y) * reciprocal;
                 Vector3 bitangent = (edge2 * duv1.X - edge1 * duv2.X) * reciprocal;
-                if (!IsFinite(tangent) || !IsFinite(bitangent))
+                if (!VectorMathUtils.IsFinite(tangent) || !VectorMathUtils.IsFinite(bitangent))
                     continue;
 
                 tangentSum[a] += tangent;
@@ -55,13 +56,13 @@ namespace AssetsManager.Services.Viewer.Rendering
             for (int vertex = 0; vertex < vertexCount; vertex++)
             {
                 Vector3 normal = basisNormals[vertex];
-                if (!IsFinite(normal) || normal.LengthSquared() <= 1e-12f)
+                if (!VectorMathUtils.IsFinite(normal) || normal.LengthSquared() <= 1e-12f)
                     normal = Vector3.UnitY;
                 else
                     normal = Vector3.Normalize(normal);
 
                 Vector3 tangent = tangentSum[vertex] - normal * Vector3.Dot(normal, tangentSum[vertex]);
-                if (!IsFinite(tangent) || tangent.LengthSquared() <= 1e-12f)
+                if (!VectorMathUtils.IsFinite(tangent) || tangent.LengthSquared() <= 1e-12f)
                 {
                     Vector3 axis = MathF.Abs(normal.Y) < 0.999f ? Vector3.UnitY : Vector3.UnitX;
                     tangent = Vector3.Cross(axis, normal);
@@ -85,7 +86,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     continue;
 
                 Vector3 normal = Vector3.Cross(positions[b] - positions[a], positions[c] - positions[a]);
-                if (!IsFinite(normal) || normal.LengthSquared() <= 1e-12f)
+                if (!VectorMathUtils.IsFinite(normal) || normal.LengthSquared() <= 1e-12f)
                     continue;
                 normals[a] += normal;
                 normals[b] += normal;
@@ -94,7 +95,5 @@ namespace AssetsManager.Services.Viewer.Rendering
             return normals;
         }
 
-        private static bool IsFinite(Vector3 value) =>
-            float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
     }
 }

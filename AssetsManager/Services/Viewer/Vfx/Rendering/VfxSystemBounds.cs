@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
@@ -63,7 +64,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 GrowEmitter(ref min, ref max, emitter, worldBasis, rootOrigin);
             }
 
-            if (!IsFinite(min) || !IsFinite(max))
+            if (!VectorMathUtils.IsFinite(min) || !VectorMathUtils.IsFinite(max))
             {
                 min = new Vector3(-StandingReach, 0f, -StandingReach);
                 max = new Vector3(StandingReach, VfxRigMotion.ChampionHeight, StandingReach);
@@ -82,7 +83,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 ? verticalFovDegrees
                 : 45f;
             float safeAspect = float.IsFinite(aspect) && aspect > 0f ? aspect : 1f;
-            Vector3 safeDirection = direction.LengthSquared() > 1e-8f && IsFinite(direction)
+            Vector3 safeDirection = direction.LengthSquared() > 1e-8f && VectorMathUtils.IsFinite(direction)
                 ? Vector3.Normalize(direction)
                 : Vector3.UnitZ;
 
@@ -111,7 +112,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             float viewportHeight,
             Vector3 direction)
         {
-            Vector3 safeDirection = direction.LengthSquared() > 1e-8f && IsFinite(direction)
+            Vector3 safeDirection = direction.LengthSquared() > 1e-8f && VectorMathUtils.IsFinite(direction)
                 ? Vector3.Normalize(direction)
                 : Vector3.UnitZ;
             float radius = bounds.Radius;
@@ -279,7 +280,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private static void Grow(ref Vector3 min, ref Vector3 max, Vector3 point)
         {
-            if (!IsFinite(point)) return;
+            if (!VectorMathUtils.IsFinite(point)) return;
             min = Vector3.Min(min, point);
             max = Vector3.Max(max, point);
         }
@@ -294,7 +295,5 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             else value.Z = component;
         }
 
-        private static bool IsFinite(Vector3 value)
-            => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
     }
 }

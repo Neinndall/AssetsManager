@@ -431,7 +431,7 @@ namespace AssetsManager.Services.Viewer.Parsing
                 if (shader?.IsDeclared == true && !shader.DefaultSwitches.ContainsKey(name))
                     warnings.Add($"UndeclaredSwitch:{name}");
                 result[name] = item.Properties.TryGetValue(On, out BinTreeProperty enabled)
-                    ? ReadBool(enabled, fallback: true)
+                    ? BinPropertyReader.ReadBool(enabled, fallback: true)
                     : true;
             }
 
@@ -501,9 +501,9 @@ namespace AssetsManager.Services.Viewer.Parsing
                 if (!TryReadString(item.Properties, Name, out string name))
                     continue;
                 bool onByDefault = item.Properties.TryGetValue(OnByDefault, out BinTreeProperty enabled) &&
-                                   ReadBool(enabled, fallback: false);
+                                   BinPropertyReader.ReadBool(enabled, fallback: false);
                 bool runtime = item.Properties.TryGetValue(RuntimeSwitch, out BinTreeProperty runtimeValue) &&
-                               ReadBool(runtimeValue, fallback: false);
+                               BinPropertyReader.ReadBool(runtimeValue, fallback: false);
                 result[name] = new MapShaderSwitchData(onByDefault, runtime);
             }
             return result;
@@ -800,10 +800,10 @@ namespace AssetsManager.Services.Viewer.Parsing
         private static GameMaterialPassState ResolveProgramState(MapMaterialPassData pass) =>
             new(
                 pass?.BlendEnabled ?? false,
-                ToBlendFactor(pass?.SourceBlendFactor, MapBlendFactor.One),
-                ToBlendFactor(pass?.DestinationBlendFactor, MapBlendFactor.Zero),
-                ToBlendFactor(pass?.SourceAlphaBlendFactor, MapBlendFactor.One),
-                ToBlendFactor(pass?.DestinationAlphaBlendFactor, MapBlendFactor.Zero),
+                MaterialSwitchSemantics.BlendFactorOf(pass?.SourceBlendFactor, MapBlendFactor.One),
+                MaterialSwitchSemantics.BlendFactorOf(pass?.DestinationBlendFactor, MapBlendFactor.Zero),
+                MaterialSwitchSemantics.BlendFactorOf(pass?.SourceAlphaBlendFactor, MapBlendFactor.One),
+                MaterialSwitchSemantics.BlendFactorOf(pass?.DestinationAlphaBlendFactor, MapBlendFactor.Zero),
                 pass?.CullEnabled ?? true,
                 (pass?.WindingToCull ?? 1) == 0
                     ? GameMaterialWinding.Clockwise
@@ -811,20 +811,6 @@ namespace AssetsManager.Services.Viewer.Parsing
                 pass?.DepthEnabled ?? true,
                 pass?.DepthCompareFunc ?? 3,
                 pass?.WriteMask ?? 31);
-
-        private static MapBlendFactor ToBlendFactor(uint? value, MapBlendFactor fallback) =>
-            value switch
-            {
-                0 => MapBlendFactor.Zero,
-                1 => MapBlendFactor.One,
-                2 => MapBlendFactor.SourceColor,
-                3 => MapBlendFactor.OneMinusSourceColor,
-                4 => MapBlendFactor.DestinationColor,
-                5 => MapBlendFactor.OneMinusDestinationColor,
-                6 => MapBlendFactor.SourceAlpha,
-                7 => MapBlendFactor.OneMinusSourceAlpha,
-                _ => fallback
-            };
 
         private static GameMaterialKind ResolveMaterialKind(uint? value) =>
             value switch
@@ -925,16 +911,8 @@ namespace AssetsManager.Services.Viewer.Parsing
             IReadOnlyDictionary<uint, BinTreeProperty> properties,
             uint hash) =>
             properties.TryGetValue(hash, out BinTreeProperty property)
-                ? ReadBool(property, fallback: false)
+                ? BinPropertyReader.ReadBool(property, fallback: false)
                 : null;
-
-        private static bool ReadBool(BinTreeProperty property, bool fallback) =>
-            property switch
-            {
-                BinTreeBool value => value.Value,
-                BinTreeBitBool value => value.Value,
-                _ => fallback
-            };
 
         private static uint? ReadOptionalUInt(
             IReadOnlyDictionary<uint, BinTreeProperty> properties,

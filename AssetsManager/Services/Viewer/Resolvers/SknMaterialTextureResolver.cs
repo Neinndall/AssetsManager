@@ -1310,7 +1310,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         continue;
 
                     defaultSwitches[name] = switchDefinition.Properties.TryGetValue(OnByDefault, out BinTreeProperty onByDefault)
-                        ? ReadBool(onByDefault, false)
+                        ? BinPropertyReader.ReadBool(onByDefault, false)
                         : false;
                 }
             }
@@ -1537,7 +1537,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
                 // An authored switch with no `on` field is enabled by the BIN class default.
                 result[name] = !switchDefinition.Properties.TryGetValue(SwitchOn, out BinTreeProperty enabled) ||
-                               ReadBool(enabled, true);
+                               BinPropertyReader.ReadBool(enabled, true);
             }
 
             return result;
@@ -1625,16 +1625,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IReadOnlyDictionary<uint, BinTreeProperty> properties,
             uint propertyHash) =>
             properties.TryGetValue(propertyHash, out BinTreeProperty value)
-                ? ReadBool(value, false)
+                ? BinPropertyReader.ReadBool(value, false)
                 : null;
-
-        private static bool ReadBool(BinTreeProperty property, bool fallback) =>
-            property switch
-            {
-                BinTreeBool value => value.Value,
-                BinTreeBitBool value => value.Value,
-                _ => fallback
-            };
 
         private static uint? ReadOptionalUInt(
             IReadOnlyDictionary<uint, BinTreeProperty> properties,

@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text.RegularExpressions;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Utils.Rendering;
 using LeagueToolkit.Hashing;
+using AssetsManager.Services.Viewer.Semantics;
 
 namespace AssetsManager.Services.Viewer.Resolvers
 {
@@ -95,10 +95,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
             "Diffuse_Scroll_Speed",
             "Diffuse_ScrollSpeed"
         };
-
-        private static readonly Regex PlaceholderTexture = new(
-            @"(?i)shared[\\/]materials[\\/](black|white|grey|gray|flat_normal|default|transparent|blank)|[\\/]blank\.tex$|alpha-mask\.tex$",
-            RegexOptions.Compiled);
 
         private static readonly Regex BaseLikeName = new(
             @"(?i)(^|_)(diffuse|albedo|main|base|basecolor|diff|color)(_|$|tex|texture)",
@@ -349,9 +345,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             bool IsUsable(SknMaterialSampler sampler) =>
                 sampler != null &&
                 !string.IsNullOrWhiteSpace(sampler.TexturePath) &&
-                !IsPlaceholder(sampler.TexturePath);
+                !MaterialSwitchSemantics.IsPlaceholder(sampler.TexturePath);
 
-            if (switchedShader && IsEnabled(switches, "MAINTEX_ON"))
+            if (switchedShader && MaterialSwitchSemantics.IsEnabled(switches, "MAINTEX_ON"))
             {
                 SknMaterialSampler main = FindSampler(samplers, "Main_Texture");
                 if (IsUsable(main))
@@ -444,7 +440,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return value.X;
 
             bool masked = (!string.IsNullOrWhiteSpace(shaderPath) && MaskedShader.IsMatch(shaderPath)) ||
-                IsMacroEnabled(macros, "FEATURE_MASKED");
+                MaterialSwitchSemantics.IsMacroEnabled(macros, "FEATURE_MASKED");
             return masked ? MaskedAlphaCutoff : 0f;
         }
 
@@ -511,7 +507,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             bool additive =
                 (blendEnabled && destinationBlendFactor == BlendFactorOne) ||
-                IsMacroEnabled(macros, "SKINNED_MATERIAL_ADDITIVE") ||
+                MaterialSwitchSemantics.IsMacroEnabled(macros, "SKINNED_MATERIAL_ADDITIVE") ||
                 (blendEnabled && !switchedShader &&
                  !string.IsNullOrWhiteSpace(shaderPath) &&
                  AdditiveShader.IsMatch(shaderPath));
@@ -528,7 +524,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                             : ModelMaterialBlendMode.Normal;
 
             if (switchedShader && blending == ModelMaterialBlendMode.Normal &&
-                IsEnabled(switches, "ADDITIVEALPHA_ON"))
+                MaterialSwitchSemantics.IsEnabled(switches, "ADDITIVEALPHA_ON"))
             {
                 blending = ModelMaterialBlendMode.Additive;
             }
@@ -547,7 +543,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 (!hasOpacity || opacity >= 1f);
             bool premultiplied = blendEnabled
                 ? sourceBlendFactor == BlendFactorOne && destinationBlendFactor == BlendFactorOneMinusSrcAlpha
-                : IsMacroEnabled(macros, "PREMULTIPLIED_ALPHA");
+                : MaterialSwitchSemantics.IsMacroEnabled(macros, "PREMULTIPLIED_ALPHA");
 
             return new ModelMaterialRenderState(
                 blending,
@@ -573,20 +569,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return false;
         }
 
-        private static bool IsEnabled(IReadOnlyDictionary<string, bool> switches, string name) =>
-            switches != null && switches.TryGetValue(name, out bool enabled) && enabled;
-
-        private static bool IsMacroEnabled(IReadOnlyDictionary<string, string> macros, string name) =>
-            macros != null && macros.TryGetValue(name, out string value) && value == "1";
-
         private static SknMaterialSampler FindSampler(
             IEnumerable<SknMaterialSampler> samplers,
             string name) =>
             samplers.FirstOrDefault(sampler =>
                 string.Equals(sampler.TextureName, name, StringComparison.Ordinal));
-
-        private static bool IsPlaceholder(string texturePath) =>
-            !string.IsNullOrWhiteSpace(texturePath) && PlaceholderTexture.IsMatch(texturePath);
 
         private static bool IsColorMapPath(string texturePath)
         {

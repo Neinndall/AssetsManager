@@ -4,7 +4,6 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Semantics;
@@ -29,7 +28,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private const long RetainedResourceSweepIntervalMs = 1_000;
 
         private static readonly Vector3 StoneSrgb = new(154f / 255f, 149f / 255f, 140f / 255f);
-        private static readonly Vector3 StoneLinear = SrgbToLinear(StoneSrgb);
+        private static readonly Vector3 StoneLinear = VectorMathUtils.SrgbToLinear(StoneSrgb);
         private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
         private static readonly Vector3 DefaultSunDirection = Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
         private static readonly Regex IndicatorShader = new(IndicatorPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -1156,8 +1155,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             sampler = _gl.GenSampler();
             _gl.SamplerParameter(sampler, SamplerParameterI.MinFilter, (int)TextureMinFilter.LinearMipmapLinear);
             _gl.SamplerParameter(sampler, SamplerParameterI.MagFilter, (int)TextureMagFilter.Linear);
-            _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)ToTextureWrapMode(wrapU));
-            _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)ToTextureWrapMode(wrapV));
+            _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)GlTextureWrap.Of(wrapU));
+            _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)GlTextureWrap.Of(wrapV));
             _samplers[key] = sampler;
             return sampler;
         }
@@ -1351,7 +1350,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
 
             Vector3 direction = sun.Direction;
-            if (!IsFinite(direction) || direction.LengthSquared() <= 1e-12f)
+            if (!VectorMathUtils.IsFinite(direction) || direction.LengthSquared() <= 1e-12f)
                 direction = new Vector3(-0.25f, 0.75f, -0.05f);
             direction = Vector3.Normalize(direction);
             direction.X = -direction.X;
@@ -1372,11 +1371,11 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             return new LightState(
                 direction,
-                SrgbToLinear(new Vector3(sun.Color.X, sun.Color.Y, sun.Color.Z)),
+                VectorMathUtils.SrgbToLinear(new Vector3(sun.Color.X, sun.Color.Y, sun.Color.Z)),
                 sunStrength,
-                SrgbToLinear(new Vector3(sun.SkyColor.X, sun.SkyColor.Y, sun.SkyColor.Z)),
-                SrgbToLinear(new Vector3(sun.GroundColor.X, sun.GroundColor.Y, sun.GroundColor.Z)),
-                SrgbToLinear(new Vector3(sun.HorizonColor.X, sun.HorizonColor.Y, sun.HorizonColor.Z)),
+                VectorMathUtils.SrgbToLinear(new Vector3(sun.SkyColor.X, sun.SkyColor.Y, sun.SkyColor.Z)),
+                VectorMathUtils.SrgbToLinear(new Vector3(sun.GroundColor.X, sun.GroundColor.Y, sun.GroundColor.Z)),
+                VectorMathUtils.SrgbToLinear(new Vector3(sun.HorizonColor.X, sun.HorizonColor.Y, sun.HorizonColor.Z)),
                 ambientStrength,
                 MathF.Max(sun.LightMapColorScale, 0f));
         }
@@ -1385,7 +1384,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             LightState own = ResolveLight(sun);
             Vector3 direction = previewOverride.Direction;
-            if (!IsFinite(direction) || direction.LengthSquared() <= 1e-12f)
+            if (!VectorMathUtils.IsFinite(direction) || direction.LengthSquared() <= 1e-12f)
                 direction = MapPreviewSemantics.DefaultSun.Direction;
             direction = Vector3.Normalize(direction);
             direction.X = -direction.X;
@@ -1393,42 +1392,20 @@ namespace AssetsManager.Services.Viewer.Rendering
             return own with
             {
                 Direction = direction,
-                SunColor = SrgbToLinear(new Vector3(previewOverride.Color.X, previewOverride.Color.Y, previewOverride.Color.Z)),
+                SunColor = VectorMathUtils.SrgbToLinear(new Vector3(previewOverride.Color.X, previewOverride.Color.Y, previewOverride.Color.Z)),
                 SunStrength = MathF.Max(previewOverride.Strength, 0f),
-                SkyColor = SrgbToLinear(new Vector3(previewOverride.SkyColor.X, previewOverride.SkyColor.Y, previewOverride.SkyColor.Z)),
-                GroundColor = SrgbToLinear(new Vector3(previewOverride.GroundColor.X, previewOverride.GroundColor.Y, previewOverride.GroundColor.Z)),
+                SkyColor = VectorMathUtils.SrgbToLinear(new Vector3(previewOverride.SkyColor.X, previewOverride.SkyColor.Y, previewOverride.SkyColor.Z)),
+                GroundColor = VectorMathUtils.SrgbToLinear(new Vector3(previewOverride.GroundColor.X, previewOverride.GroundColor.Y, previewOverride.GroundColor.Z)),
                 AmbientStrength = MathF.Max(previewOverride.Ambient, 0f)
             };
         }
 
-        internal static Vector3 SrgbToLinear(Vector3 value) => new(
-            SrgbChannelToLinear(value.X),
-            SrgbChannelToLinear(value.Y),
-            SrgbChannelToLinear(value.Z));
-
-        private static bool IsFinite(Vector3 value) =>
-            float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
-
         private static Vector3 ResolveColor(MapMaterialDefinition material, bool hasTexture)
         {
             if (material?.Missing == false && material.Tint.HasValue)
-                return SrgbToLinear(material.Tint.Value);
+                return VectorMathUtils.SrgbToLinear(material.Tint.Value);
             return hasTexture ? Vector3.One : StoneLinear;
         }
-
-        private static float SrgbChannelToLinear(float value) =>
-            value <= 0.04045f
-                ? value / 12.92f
-                : MathF.Pow((value + 0.055f) / 1.055f, 2.4f);
-
-        private static TextureWrapMode ToTextureWrapMode(MapTextureWrap wrap) =>
-            wrap switch
-            {
-                MapTextureWrap.Clamp => TextureWrapMode.ClampToEdge,
-                MapTextureWrap.Mirror => TextureWrapMode.MirroredRepeat,
-                MapTextureWrap.Border => TextureWrapMode.ClampToEdge,
-                _ => TextureWrapMode.Repeat
-            };
 
         internal void ClearScene()
         {

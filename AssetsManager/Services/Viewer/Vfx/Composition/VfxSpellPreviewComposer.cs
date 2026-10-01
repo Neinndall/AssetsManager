@@ -6,6 +6,7 @@ using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Hashing;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Vfx.Composition;
 
@@ -150,7 +151,7 @@ internal static class VfxSpellPreviewComposer
     internal static Vector3 ResolveTarget(Vector3 source, float range, Vector3 forward)
     {
         Vector3 flat = new(forward.X, 0f, forward.Z);
-        if (!Finite(flat) || flat.LengthSquared() <= 1e-8f) flat = Vector3.UnitZ;
+        if (!VectorMathUtils.IsFinite(flat) || flat.LengthSquared() <= 1e-8f) flat = Vector3.UnitZ;
         else flat = Vector3.Normalize(flat);
         return new Vector3(flat.X * range, source.Y, flat.Z * range);
     }
@@ -180,7 +181,7 @@ internal static class VfxSpellPreviewComposer
         Vector3 from,
         Vector3 to)
     {
-        if (missile == null || !Finite(from) || !Finite(to) || from.Y != to.Y ||
+        if (missile == null || !VectorMathUtils.IsFinite(from) || !VectorMathUtils.IsFinite(to) || from.Y != to.Y ||
             OutsidePreviewBounds(from) || OutsidePreviewBounds(to))
         {
             return null;
@@ -245,9 +246,6 @@ internal static class VfxSpellPreviewComposer
             Vector3.Zero,
             Vector3.Zero,
             status);
-
-    private static bool Finite(Vector3 value)
-        => float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 
     private static bool OutsidePreviewBounds(Vector3 value)
         => Math.Abs(value.X) > 100000f || Math.Abs(value.Y) > 100000f || Math.Abs(value.Z) > 100000f;

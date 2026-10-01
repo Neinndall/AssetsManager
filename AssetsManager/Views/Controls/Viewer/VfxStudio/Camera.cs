@@ -8,6 +8,7 @@ using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
@@ -200,9 +201,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private static bool IsFiniteBounds(VfxDefinitionBounds bounds)
         {
-            static bool Finite(Vector3 value) =>
-                float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
-            return Finite(bounds.Min) && Finite(bounds.Max) &&
+            return VectorMathUtils.IsFinite(bounds.Min) && VectorMathUtils.IsFinite(bounds.Max) &&
                    bounds.Max.X >= bounds.Min.X &&
                    bounds.Max.Y >= bounds.Min.Y &&
                    bounds.Max.Z >= bounds.Min.Z &&

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
@@ -89,9 +90,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 es.FieldBasePos = EmitterFieldPosition(es.Def, emitterT);
                 es.SystemOrigin = nextOrigin;
                 es.SystemTarget = Vector3.Transform(new Vector3(600f, 0f, 0f), worldTransform);
-                es.PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, placement), Vector3.UnitX);
-                es.PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, placement), Vector3.UnitY);
-                es.PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, placement), Vector3.UnitZ);
+                es.PlacementRight = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitX, placement), Vector3.UnitX);
+                es.PlacementUp = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitY, placement), Vector3.UnitY);
+                es.PlacementForward = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitZ, placement), Vector3.UnitZ);
                 es.InvalidateInstances();
             }
         }
@@ -140,7 +141,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             bool replayCurrentTime = true)
         {
             surfaces ??= EmptyEmissionSurfaces;
-            if (SurfacesEquals(_emissionSurfaces, surfaces)) return;
+            if (SameReferences(_emissionSurfaces, surfaces)) return;
             _emissionSurfaces = surfaces;
 
             if (!replayCurrentTime || _definition is null || CurrentTime <= 0f) return;
@@ -149,9 +150,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             Seek(targetTime);
         }
 
-        private static bool SurfacesEquals(
-            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> a,
-            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> b)
+        /// <summary>Whether both maps hold the same keys bound to the very same instances.</summary>
+        internal static bool SameReferences<TKey, TValue>(
+            IReadOnlyDictionary<TKey, TValue> a,
+            IReadOnlyDictionary<TKey, TValue> b)
+            where TValue : class
         {
             if (ReferenceEquals(a, b)) return true;
             if (a.Count != b.Count) return false;
@@ -195,9 +198,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     SourceOrder = emitterIndex,
                     BasePos = Vector3.Transform(e.EmitterPosition.Sample(0f), EmitterTransform(e, worldTransform)),
                     FieldBasePos = Vector3.Transform(e.EmitterPosition.Sample(0f), EmitterFieldTransform(e, worldTransform)),
-                    PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX),
-                    PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY),
-                    PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ),
+                    PlacementRight = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX),
+                    PlacementUp = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY),
+                    PlacementForward = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ),
                 };
                 emitterState.BindOwner(this);
                 _emitters.Add(emitterState);

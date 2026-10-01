@@ -221,7 +221,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> surfaces)
         {
             surfaces ??= EmptyEmissionSurfaces;
-            if (SurfacesEquals(_emissionSurfaces, surfaces)) return false;
+            if (VfxPlaybackRuntime.SameReferences(_emissionSurfaces, surfaces)) return false;
             _emissionSurfaces = surfaces;
             foreach (VfxPlaybackRuntime runtime in _runtimes.Concat(_pendingChildren))
                 runtime.SetEmissionSurfaces(surfaces, replayCurrentTime: false);
@@ -235,38 +235,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         internal bool SetMeshJointProviders(IReadOnlyDictionary<string, IVfxMeshJointProvider> joints)
         {
             joints ??= EmptyMeshJoints;
-            if (JointsEquals(_meshJoints, joints)) return false;
+            if (VfxPlaybackRuntime.SameReferences(_meshJoints, joints)) return false;
             _meshJoints = joints;
             return true;
         }
 
-        private static bool SurfacesEquals(
-            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> a,
-            IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> b)
-        {
-            if (ReferenceEquals(a, b)) return true;
-            if (a.Count != b.Count) return false;
-            foreach (var (k, v) in a)
-            {
-                if (!b.TryGetValue(k, out var other) || !ReferenceEquals(v, other))
-                    return false;
-            }
-            return true;
-        }
-
-        private static bool JointsEquals(
-            IReadOnlyDictionary<string, IVfxMeshJointProvider> a,
-            IReadOnlyDictionary<string, IVfxMeshJointProvider> b)
-        {
-            if (ReferenceEquals(a, b)) return true;
-            if (a.Count != b.Count) return false;
-            foreach (var (k, v) in a)
-            {
-                if (!b.TryGetValue(k, out var other) || !ReferenceEquals(v, other))
-                    return false;
-            }
-            return true;
-        }
 
         public void SetStartDelay(float seconds) => Root.SetStartDelay(seconds);
 
