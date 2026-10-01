@@ -406,8 +406,10 @@ vec2 atlasUvRaw(vec2 local, vec2 cell, vec2 divisions){
     vec2 div = max(divisions, vec2(1.0));
     return (cell + local) / div;
 }
+// The engine places the cell over the whole atlas unfolded, and the sampler's authored address mode
+// covers the whole texture, so a moving uv reaches the neighbouring frames.
 vec2 atlasUv(vec2 local, vec2 cell, vec2 divisions, vec2 size, int mode){
-    return atlasUvRaw(addressedUv(local, mode), cell, divisions);
+    return atlasUvRaw(local, cell, divisions);
 }
 ";
 
@@ -507,6 +509,7 @@ vec4 applyParticleColor(vec4 texel){
         colorUv = atlasUvRaw(vLocalUvMult, vCellMult, uTexDivMult);
     return texel * texture(uColorMap, colorUv);
 }
+" + DistortedScene + @"
 
 void main(){
     if (uWireframePass != 0) {
@@ -526,8 +529,12 @@ void main(){
     }
     vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uAddressMode);
     vec2 vUvMult = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uAddressModeMult);
+    if (uIsDistortion != 0) {
+        fragColor = distortedScene(vUv, atlasUvRaw(vLocalUv, vCell, uTexDiv), uColor * vMeshColor);
+        return;
+    }
     vec4 texel = (uHasTex != 0)
-        ? texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode)
+        ? texture(uTex, vUv)
         : vec4(1.0);
     if (uHasTex != 0 && uUvMode == 2)
         texel.a = sampleAddressed(uTex, vCornerUv, uAddressMode).a;
@@ -541,7 +548,7 @@ void main(){
     }
     texel = applyParticleColor(texel);
     if (uHasTexMult != 0) {
-        vec4 mult = texture(uTexMult, vUvMult) * addressMask(vLocalUvMult, uAddressModeMult);
+        vec4 mult = texture(uTexMult, vUvMult);
         texel.rgb *= mult.rgb;
         texel.a *= mult.a;
     }
@@ -597,19 +604,27 @@ void main(){
     }
     lit.rgb = clamp(lit.rgb, vec3(0.0), vec3(1.0));
     if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;
-    if (uIsDistortion != 0 && uDistortionStrength != 0.0) {
-        vec4 normalSample = texture(uDistortionTex, vLocalUv);
-        float mask = normalSample.a * lit.a;
-        vec2 normalOffset = normalSample.rg * 2.0 - vec2(1.0);
-        vec2 sceneUv = gl_FragCoord.xy / max(uViewportSize, vec2(1.0));
-        sceneUv = clamp(sceneUv + normalOffset * uDistortionStrength * mask * vec2(uViewportSize.y / max(uViewportSize.x, 1.0), 1.0), vec2(0.0), vec2(1.0));
-        vec4 refracted = texture(uSceneTex, sceneUv);
-        fragColor = vec4(refracted.rgb, mask);
-        return;
-    }
     fragColor = lit;
     fragColor.rgb *= uEmissiveStrength;
 }";
+
+        /// <summary>
+        /// DISTORTION_PS and DISTORTION_MESH_PS: the scene behind, pushed by the normal map and tinted by the
+        /// texture, the colour and the ramp. The alpha is the normal map's under the ramp's, never the particle's.
+        /// </summary>
+        internal const string DistortedScene = @"
+vec4 distortedScene(vec2 uv, vec2 normalUv, vec4 color){
+    vec4 ramp = applyParticleColor(vec4(1.0));
+    vec4 normalSample = texture(uDistortionTex, normalUv);
+    float alpha = normalSample.a * ramp.a;
+    if (uAlphaTest != 0 && alpha < uAlphaCutoff) discard;
+    vec2 push = (normalSample.xy * 2.0 - vec2(1.0)) * uDistortionStrength * ramp.a;
+    // The engine's screen uv runs down the screen, the captured scene up it.
+    vec2 sceneUv = clamp(gl_FragCoord.xy / max(uViewportSize, vec2(1.0)) + vec2(push.x, -push.y), vec2(0.0), vec2(1.0));
+    vec3 tint = (uHasTex != 0 ? texture(uTex, uv).rgb : vec3(1.0)) * color.rgb * ramp.rgb;
+    return vec4(texture(uSceneTex, sceneUv).rgb * tint, alpha);
+}
+";
 
         internal const string ParticleFragment = TextureSampling + @"
 in vec2 vCell;
@@ -706,6 +721,7 @@ vec4 applyParticleColor(vec4 tex){
         colorUv = atlasUvRaw(vLocalUvMult, vCellMult, uTexDivMult);
     return tex * texture(uColorMap, colorUv);
 }
+" + DistortedScene + @"
 
 void main(){
     if (uWireframePass != 0) {
@@ -725,9 +741,13 @@ void main(){
     }
     vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uAddressMode);
     vec2 vUvMult = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uAddressModeMult);
+    if (uIsDistortion != 0) {
+        fragColor = distortedScene(vUv, atlasUvRaw(vLocalUv, vCell, uTexDiv), vColor);
+        return;
+    }
     vec4 t;
     if (uHasTex != 0) {
-        t = texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode);
+        t = texture(uTex, vUv);
     } else {
         t = vec4(1.0);
         bool ribbonPrimitive = uPrimitiveKind == 5 || uPrimitiveKind == 6 || uPrimitiveKind == 8 || uPrimitiveKind == 10;
@@ -746,7 +766,7 @@ void main(){
     }
     t = applyParticleColor(t);
     if (uHasTexMult != 0) {
-        vec4 mult = texture(uTexMult, vUvMult) * addressMask(vLocalUvMult, uAddressModeMult);
+        vec4 mult = texture(uTexMult, vUvMult);
         t.rgb *= mult.rgb;
         t.a *= mult.a;
     }
@@ -784,16 +804,6 @@ void main(){
     }
     lit.rgb = clamp(lit.rgb, vec3(0.0), vec3(1.0));
     if (uAlphaTest != 0 && lit.a < uAlphaCutoff) discard;
-    if (uIsDistortion != 0 && uDistortionStrength != 0.0) {
-        vec4 normalSample = texture(uDistortionTex, vLocalUv);
-        float mask = normalSample.a * lit.a;
-        vec2 normalOffset = normalSample.rg * 2.0 - vec2(1.0);
-        vec2 sceneUv = gl_FragCoord.xy / max(uViewportSize, vec2(1.0));
-        sceneUv = clamp(sceneUv + normalOffset * uDistortionStrength * mask * vec2(uViewportSize.y / max(uViewportSize.x, 1.0), 1.0), vec2(0.0), vec2(1.0));
-        vec4 refracted = texture(uSceneTex, sceneUv);
-        fragColor = vec4(refracted.rgb, mask);
-        return;
-    }
     fragColor = lit;
     fragColor.rgb *= uEmissiveStrength;
 }        ";

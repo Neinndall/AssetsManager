@@ -245,27 +245,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void DistortionShadersUseTheLtkCoverageAndAspectCorrectedWarp()
+        public void DistortionShadersFollowDistortionPsWithoutAspectOrParticleAlpha()
         {
-            const string coverage = "float mask = normalSample.a * lit.a;";
-            const string direction = "vec2 normalOffset = normalSample.rg * 2.0 - vec2(1.0);";
-            const string aspect = "vec2(uViewportSize.y / max(uViewportSize.x, 1.0), 1.0)";
-            const string output = "fragColor = vec4(refracted.rgb, mask);";
-
             foreach (string shader in new[] { VfxShaderSource.MeshFragment, VfxShaderSource.ParticleFragment })
             {
-                Assert.Contains(coverage, shader);
-                Assert.Contains(direction, shader);
-                Assert.Contains(aspect, shader);
-                Assert.Contains(output, shader);
+                Assert.Contains("fragColor = distortedScene(", shader);
+                Assert.Contains("vec2(push.x, -push.y)", shader);
+                Assert.DoesNotContain("uViewportSize.y / max(uViewportSize.x, 1.0)", shader);
+                Assert.DoesNotContain("normalSample.a * lit.a", shader);
             }
         }
 
         [Fact]
-        public void ZeroStrengthDistortionKeepsTheLitParticlePath()
+        public void DistortionFollowsTheGameShaderAtAnyStrength()
         {
-            Assert.Contains("uIsDistortion != 0 && uDistortionStrength != 0.0", VfxShaderSource.MeshFragment);
-            Assert.Contains("uIsDistortion != 0 && uDistortionStrength != 0.0", VfxShaderSource.ParticleFragment);
+            foreach (string shader in new[] { VfxShaderSource.MeshFragment, VfxShaderSource.ParticleFragment })
+            {
+                Assert.DoesNotContain("uDistortionStrength != 0.0", shader);
+                Assert.Contains("float alpha = normalSample.a * ramp.a;", shader);
+                Assert.Contains("vec2 push = (normalSample.xy * 2.0 - vec2(1.0)) * uDistortionStrength * ramp.a;", shader);
+                Assert.Contains("texture(uSceneTex, sceneUv).rgb * tint", shader);
+            }
         }
 
         [Fact]

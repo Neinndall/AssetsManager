@@ -99,7 +99,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
             bool isDistortion = es.Def.DrawsAsDistortion && !wireframePass;
-            bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
+            // The game draws the scene behind a distorting emitter at any strength, so it always needs the frame.
+            bool warpsFrame = isDistortion;
             if (warpsFrame && _capture.ColorTexture == 0) return;
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
             EnsureMeshProgram();
@@ -189,7 +190,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _meshUniforms.MaterialAddressU,
                 _meshUniforms.MaterialAddressV,
                 _meshUniforms.MaterialPremultiplied);
-            ApplyAddressMode(2);
+            ApplyAddressMode(renderState.TextureAddressMode);
             float alphaCutoff = customMaterial?.AlphaCutoff ?? renderState.AlphaCutoff;
             _gl.Uniform1(_meshUniforms.AlphaCutoff, alphaCutoff);
             _gl.Uniform1(
@@ -248,7 +249,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             {
                 _gl.ActiveTexture(TextureUnit.Texture1);
                 _gl.BindTexture(TextureTarget.Texture2D, es.TextureMult);
-                ApplyAddressMode(2);
+                ApplyAddressMode(es.Def.TextureMultAddressMode);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
             if (es.ErosionTexture != 0)

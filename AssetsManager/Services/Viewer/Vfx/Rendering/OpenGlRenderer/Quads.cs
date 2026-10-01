@@ -16,7 +16,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             bool native = UseGameParticle(es, false, passIndex, useWireframe);
             int floats = renderInstanceCount * Stride;
             bool isDistortion = es.Def.DrawsAsDistortion && !useWireframe;
-            bool warpsFrame = isDistortion && es.Def.Distortion.Strength != 0f;
+            // The game draws the scene behind a distorting emitter at any strength, so it always needs the frame.
+            bool warpsFrame = isDistortion;
             if (warpsFrame && _capture.ColorTexture == 0) return;
 
             var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
@@ -145,13 +146,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
             _gl.Uniform1(_particleUniforms.HasTex, ShouldSampleBaseTexture(es.Def, es.Texture) ? 1 : 0);
-            ApplyAddressMode(2);
+            ApplyAddressMode(renderState.TextureAddressMode);
             ApplyTextureSampling();
             if (es.TextureMult != 0)
             {
                 _gl.ActiveTexture(TextureUnit.Texture1);
                 _gl.BindTexture(TextureTarget.Texture2D, es.TextureMult);
-                ApplyAddressMode(2);
+                ApplyAddressMode(es.Def.TextureMultAddressMode);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
             if (_capture.ColorTexture != 0)
