@@ -19,7 +19,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed partial class GameHashGuesser
     {
-        private const int DefaultExtendedCandidateBudget = 15_000_000;
+        private const int DefaultExtendedCandidateBudget = 50_000_000;
 
         private static IEnumerable<IReadOnlyList<T>> GetCombinations<T>(IReadOnlyList<T> values, int length)
         {

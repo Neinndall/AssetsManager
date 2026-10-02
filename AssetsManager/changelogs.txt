@@ -159,6 +159,7 @@ New Features
 
 Improvements
   - Hash Lab / GAME learns matching skin and companion theme layouts to expand guessing coverage.
+  - Hash Lab / GAME Extended increases capped searches from 15 to 50 million candidates per method.
   - VFX Studio / Compact project toolbar with folder subtitle, contextual actions, an inset asset tree, loading feedback and a Show / Hide Timeline toggle.
   - Viewer / Right-click panning and WASD movement are half as fast by default (Shift and Ctrl still scale them).
   - VFX Studio / Systems automatically choose projectile or trail previews from their effect references and emission data.
