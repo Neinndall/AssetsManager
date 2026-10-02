@@ -78,24 +78,6 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 
 
         [Fact]
-        public void AnimationDecorationsAreLearnedWithinTheSameCharacter()
-        {
-            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/example/skins/skin1/animations/idle.anm",
-                "assets/characters/example/skins/skin2/animations/run.pie_c_11_15.anm",
-                "assets/characters/example/skins/skin3/animations/attack.echo_12_2.anm",
-                "assets/characters/other/skins/skin1/animations/run.unrelated_14_1.anm"
-            }));
-            string[] paths = guesser.GenerateAnimationDecorationCandidates().Select(value => value.Path).ToArray();
-            Assert.Contains("assets/characters/example/skins/skin1/animations/idle.pie_c_11_15.anm", paths);
-            Assert.Contains("assets/characters/example/skins/skin2/animations/run.echo_12_2.anm", paths);
-            Assert.DoesNotContain(paths, path => path.Contains("example/") && path.Contains("unrelated"));
-            Assert.Equal(paths.Length, paths.Distinct().Count());
-        }
-
-
-        [Fact]
         public async System.Threading.Tasks.Task ExtendedSelectionAddsCorrelationWithoutRemovingLegacyCombinations()
         {
             var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]

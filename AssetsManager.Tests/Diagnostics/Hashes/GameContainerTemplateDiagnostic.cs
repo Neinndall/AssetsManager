@@ -28,7 +28,6 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             var engine = new HashGuessEngine(HashGuessDomain.Game, unknown);
             Console.WriteLine($"Input: {input}; {unknown.Count} unknowns; persistence disabled");
             Run("Correlated containers", guesser.GenerateContainerTemplateCandidates());
-            Run("Animation decorations", guesser.GenerateAnimationDecorationCandidates());
             var proposed = engine.Matches.Values.ToList();
             foreach (var match in proposed.OrderBy(value => value.Hash))
                 Console.WriteLine($"PROPOSED {match.Hash:x16} {match.Path}");

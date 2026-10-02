@@ -181,15 +181,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             int checkedCandidates = 0;
             bool ShouldRun(string subId) => selectedSubMethods == null || selectedSubMethods.Contains(subId);
 
-            if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-suffixes"))
-                checkedCandidates += CheckCandidates(
-                    engine,
-                    GenerateAnimationDecorationCandidates(cancellationToken),
-                    "GAME learned animation decorations",
-                    cancellationToken,
-                    progress,
-                    checkedCandidates);
-
             // Keep the legacy combinations and their budget intact; learned correlated layouts are additive.
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-skinnumbers"))
                 checkedCandidates += CheckCandidates(
