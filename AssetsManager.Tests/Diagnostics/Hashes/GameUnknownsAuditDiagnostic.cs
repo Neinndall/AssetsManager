@@ -186,7 +186,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             if (asciiMagic.StartsWith("r3d2", StringComparison.Ordinal))
             {
                 if (asciiMagic.Length >= 8 && asciiMagic.StartsWith("r3d2anmd")) return "ANIMATION_ANMD";
-                if (asciiMagic.Length >= 8 && asciiMagic.StartsWith("r3d2canmd")) return "ANIMATION_CANMD";
+                if (asciiMagic.Length >= 8 && asciiMagic.StartsWith("r3d2canm")) return "ANIMATION_CANM";
                 if (asciiMagic.StartsWith("r3d2sklt")) return "SKELETON_SKLT";
                 if (asciiMagic.StartsWith("r3d2cskt")) return "SKELETON_CSKT";
                 if (asciiMagic.StartsWith("r3d2smpl")) return "MESH_SAMPLER";
@@ -198,7 +198,14 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             if (asciiMagic.StartsWith("OggS", StringComparison.Ordinal)) return "OGG";
             if (data.Length >= 4 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47) return "PNG";
             if (data.Length >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF) return "JPG";
-            if (data[0] == 0x1B && data[1] == 0x4C && data[2] == 0x75 && data[3] == 0x61) return "LUA_BYTECODE";
+            if (data.Length >= 4 && data[0] == 0x1B && data[1] == 0x4C && data[2] == 0x75 && data[3] == 0x61) return "LUA_BYTECODE";
+
+            if (asciiMagic.StartsWith("TEX\0", StringComparison.Ordinal)) return "TEX";
+            if (asciiMagic.StartsWith("PROP", StringComparison.Ordinal) ||
+                asciiMagic.StartsWith("PTCH", StringComparison.Ordinal)) return "PROPERTY_BIN";
+            if (asciiMagic.StartsWith("DDS ", StringComparison.Ordinal)) return "DDS";
+            if (data.Length >= 8 && Encoding.ASCII.GetString(data, 4, 4) == "TOC3") return "SHADER_TOC";
+            if (data.Length >= 8 && Encoding.ASCII.GetString(data, 4, 4) == "DXBC") return "SHADER_DXBC";
 
             if (IsLikelyRiotTex(data))
             {
