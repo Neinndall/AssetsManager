@@ -2074,7 +2074,7 @@
                                         </StackPanel>
                                         <ComboBox ItemsSource="{Binding CharacterForms}" DisplayMemberPath="Label"
                                                   SelectedItem="{Binding SelectedCharacterForm, Mode=TwoWay}"
-                                                  Style="{StaticResource ModernComboBox}" Height="28" FontSize="11"
+                                                  Style="{StaticResource ModernComboBox}" Height="28"
                                                   ToolTip="Select character form"/>
                                     </StackPanel>
                                 </Border>
@@ -2151,7 +2151,7 @@
                                                                   ItemsSource="{Binding AvailableTextureNames}"
                                                                   SelectedItem="{Binding SelectedTextureName, Mode=TwoWay}"
                                                                   Style="{StaticResource ModernComboBox}"
-                                                                  Height="28" FontSize="10.5"
+                                                                  Height="28"
                                                                   ToolTip="Select submesh texture"/>
                                                     </Grid>
                                                 </StackPanel>
