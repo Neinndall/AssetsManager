@@ -15,6 +15,8 @@ namespace AssetsManager.Views.Helpers
         private FrameworkElement _inputSurface;
         private ProjectionCamera _subscribedCamera;
         private bool _isRotating;
+        private bool _isOrbiting;
+        private Vector3D _pendingRotation;
         private bool _isPanning;
         private long _lastWalkTimestamp;
         private System.Windows.Point _lastMousePosition;
@@ -38,7 +40,8 @@ namespace AssetsManager.Views.Helpers
         /// <summary>
         /// Height of the MAP ground plane while a map scene is navigated. When set, the wheel zooms toward
         /// the terrain under the cursor and a double click flies to the clicked point. Null keeps the
-        /// object-orbit controls. WASD travels the same way in both.
+        /// object zoom controls. Left drag looks around, Alt + left drag orbits, and WASD travels
+        /// the same way in both. Orthographic presets retain orbiting on left drag.
         /// </summary>
         public double? MapNavigationGroundHeight { get; set; }
 
@@ -54,6 +57,7 @@ namespace AssetsManager.Views.Helpers
             _inputSurface.MouseUp += OnMouseUp;
             _inputSurface.MouseMove += OnMouseMove;
             _inputSurface.MouseWheel += OnMouseWheel;
+            _inputSurface.LostMouseCapture += OnLostMouseCapture;
             
             // Start the smooth update loop
             CompositionTarget.Rendering += OnRendering;
@@ -86,6 +90,7 @@ namespace AssetsManager.Views.Helpers
             _targetLookDirection = camera.LookDirection;
             _targetUpDirection = camera.UpDirection;
             _isTransitioning = false;
+            _pendingRotation = default;
         }
 
         public void Dispose()
@@ -102,6 +107,7 @@ namespace AssetsManager.Views.Helpers
                 _inputSurface.MouseUp -= OnMouseUp;
                 _inputSurface.MouseMove -= OnMouseMove;
                 _inputSurface.MouseWheel -= OnMouseWheel;
+                _inputSurface.LostMouseCapture -= OnLostMouseCapture;
                 _inputSurface = null;
                 _viewport = null;
             }
@@ -133,6 +139,7 @@ namespace AssetsManager.Views.Helpers
             _targetLookDirection = lookDirection;
             _targetUpDirection = upDirection;
             _isTransitioning = true;
+            _pendingRotation = default;
         }
 
         public void SnapTo(Point3D position, Vector3D lookDirection, Vector3D upDirection)
@@ -144,6 +151,7 @@ namespace AssetsManager.Views.Helpers
             _targetLookDirection = lookDirection;
             _targetUpDirection = upDirection;
             _isTransitioning = false; // Instant
+            _pendingRotation = default;
 
             camera.Position = position;
             camera.LookDirection = lookDirection;
@@ -163,6 +171,7 @@ namespace AssetsManager.Views.Helpers
         private void OnRendering(object sender, EventArgs e)
         {
             if (_viewport?.Camera is not ProjectionCamera camera) return;
+            ApplyPendingRotation();
             Walk(camera);
             if (!_isTransitioning) return;
 
@@ -216,6 +225,9 @@ namespace AssetsManager.Views.Helpers
             {
                 RotationStarted?.Invoke(this, EventArgs.Empty);
                 _isRotating = true;
+                _isOrbiting = (Keyboard.Modifiers & ModifierKeys.Alt) != 0 ||
+                    _viewport.Camera is OrthographicCamera;
+                _pendingRotation = default;
                 _lastMousePosition = e.GetPosition(_inputSurface);
                 _inputSurface.Cursor = System.Windows.Input.Cursors.SizeAll;
                 _inputSurface.CaptureMouse();
@@ -235,6 +247,7 @@ namespace AssetsManager.Views.Helpers
             {
                 if (_isRotating)
                 {
+                    ApplyPendingRotation();
                     _isRotating = false;
                     _inputSurface.Cursor = System.Windows.Input.Cursors.Arrow;
                     _inputSurface.ReleaseMouseCapture();
@@ -252,6 +265,17 @@ namespace AssetsManager.Views.Helpers
             }
         }
 
+        private void OnLostMouseCapture(object sender, MouseEventArgs e)
+        {
+            bool wasRotating = _isRotating;
+            _isRotating = false;
+            _isPanning = false;
+            _pendingRotation = default;
+            _inputSurface.Cursor = Cursors.Arrow;
+            if (wasRotating)
+                RotationEnded?.Invoke(this, EventArgs.Empty);
+        }
+
         private void OnMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
         {
             if (_isRotating && e.LeftButton == MouseButtonState.Pressed)
@@ -260,18 +284,10 @@ namespace AssetsManager.Views.Helpers
                 var delta = new System.Windows.Point(currentMousePosition.X - _lastMousePosition.X, currentMousePosition.Y - _lastMousePosition.Y);
 
                 double sensitivity = 0.25;
-                var delta3D = new Vector3D(-delta.X * sensitivity, delta.Y * sensitivity, 0);
-                Rotate(delta3D);
+                // Consume every mouse delta once per frame without an additional smoothing delay.
+                _pendingRotation += new Vector3D(-delta.X * sensitivity, -delta.Y * sensitivity, 0);
 
                 _lastMousePosition = currentMousePosition;
-                
-                // Update target position/dirs after rotation to sync
-                if (_viewport.Camera is ProjectionCamera camera)
-                {
-                    _targetPosition = camera.Position;
-                    _targetLookDirection = camera.LookDirection;
-                    _targetUpDirection = camera.UpDirection;
-                }
             }
             else if (_isPanning && e.RightButton == MouseButtonState.Pressed)
             {
@@ -294,6 +310,7 @@ namespace AssetsManager.Views.Helpers
 
         private void OnMouseWheel(object sender, MouseWheelEventArgs e)
         {
+            ApplyPendingRotation();
             var camera = _viewport.Camera as ProjectionCamera;
             if (camera == null) return;
 
@@ -367,27 +384,19 @@ namespace AssetsManager.Views.Helpers
                 _targetPosition + lookDir * (delta * step));
         }
 
-        private void Rotate(Vector3D delta)
+        private void ApplyPendingRotation()
         {
-            var camera = _viewport.Camera as ProjectionCamera;
-            if (camera == null) return;
+            if (_pendingRotation.LengthSquared == 0 || _viewport?.Camera is not ProjectionCamera camera)
+                return;
 
-            var target = camera.Position + camera.LookDirection;
-            var up = camera.UpDirection;
-
-            var transform = new Transform3DGroup();
-            transform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), delta.X)));
-            transform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(Vector3D.CrossProduct(up, -camera.LookDirection), -delta.Y)));
-
-
-            var newPosition = ConstrainMapPosition(
-                transform.Transform(camera.Position - target) + target);
-            var newLookDirection = target - newPosition;
-            var newUpDirection = transform.Transform(up);
-
-            camera.Position = newPosition;
-            camera.LookDirection = newLookDirection;
-            camera.UpDirection = newUpDirection;
+            Vector3D delta = _pendingRotation;
+            _pendingRotation = default;
+            CameraPose pose = CameraNavigation.Rotate(Pose(camera), delta.X, delta.Y, _isOrbiting);
+            Point3D position = ConstrainMapPosition(pose.Position);
+            camera.Position = position;
+            camera.LookDirection = _isOrbiting ? pose.Position + pose.Look - position : pose.Look;
+            camera.UpDirection = pose.Up;
+            SyncTargetsToCamera(camera);
         }
 
         private void Pan(System.Windows.Point delta)

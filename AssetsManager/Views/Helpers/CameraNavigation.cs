@@ -32,7 +32,48 @@ namespace AssetsManager.Views.Helpers
         internal const double ZoomFraction = 0.08;
         internal const double MinimumZoomStep = 5.0;
         internal const double MaximumZoomStep = 120.0;
-        internal const double WalkSpeed = 150.0;
+        internal const double WalkSpeed = 300.0;
+
+        /// <summary>Yaw and pitch with a level horizon; orbiting retains the current focus point.</summary>
+        internal static CameraPose Rotate(CameraPose pose, double yawDegrees, double pitchDegrees, bool orbit)
+        {
+            double distance = pose.Look.Length;
+            if (!double.IsFinite(distance) || distance < 1e-6 ||
+                !double.IsFinite(yawDegrees) || !double.IsFinite(pitchDegrees) ||
+                (yawDegrees == 0 && pitchDegrees == 0))
+                return pose;
+
+            Vector3D forward = pose.Look / distance;
+            Vector3D heading = new(forward.X, 0, forward.Z);
+            double horizontalLength = heading.Length;
+            // A vertical preset has no forward heading; its screen-up direction supplies it.
+            if (horizontalLength < 1e-6)
+                heading = forward.Y < 0
+                    ? new Vector3D(pose.Up.X, 0, pose.Up.Z)
+                    : new Vector3D(-pose.Up.X, 0, -pose.Up.Z);
+            if (heading.LengthSquared < 1e-12)
+                heading = new Vector3D(0, 0, -1);
+            heading.Normalize();
+
+            double yaw = (yawDegrees % 360) * Math.PI / 180;
+            heading = new Vector3D(
+                heading.X * Math.Cos(yaw) + heading.Z * Math.Sin(yaw),
+                0,
+                -heading.X * Math.Sin(yaw) + heading.Z * Math.Cos(yaw));
+            double pitch = Math.Atan2(forward.Y, horizontalLength);
+            // Preserve exact top/bottom presets on yaw, but prevent pitching through a pole.
+            if (pitchDegrees != 0)
+                pitch = Math.Clamp(pitch + pitchDegrees * Math.PI / 180, -89 * Math.PI / 180, 89 * Math.PI / 180);
+
+            Vector3D look = (heading * Math.Cos(pitch) + new Vector3D(0, Math.Sin(pitch), 0)) * distance;
+            Vector3D up = -heading * Math.Sin(pitch) + new Vector3D(0, Math.Cos(pitch), 0);
+            return pose with
+            {
+                Position = orbit ? pose.Position + pose.Look - look : pose.Position,
+                Look = look,
+                Up = up
+            };
+        }
 
         /// <summary>World ray through a surface pixel, matching the preview projection.</summary>
         internal static bool TryGetRay(

@@ -158,6 +158,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / Left drag now looks around with a stable horizon; Alt + left drag orbits, and WASD moves at 300 units/s.
   - Settings / Anti-aliasing now uses a single Off, FXAA or SMAA selector.
   - Interface / Unified dropdown text sizing with the Geometry selectors through the shared theme.
   - VFX Studio / Moved motion settings below Scene Actors in the Inspector with a matching section header, keeping the quick preset selector in the toolbar.

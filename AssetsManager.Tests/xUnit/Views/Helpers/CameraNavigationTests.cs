@@ -133,7 +133,7 @@ namespace AssetsManager.Tests.xUnit.Views.Helpers
             foreach (CameraPose pose in new[] { model, map, backdrop, orthographic, closeOrthographic })
             {
                 double forward = CameraNavigation.Walk(pose, 1, 0, 1.0, speed).Length;
-                Assert.Equal(150.0 * speed, forward, 6);
+                Assert.Equal(300.0 * speed, forward, 6);
                 Assert.Equal(forward, CameraNavigation.Walk(pose, 1, 1, 1.0, speed).Length, 6);
                 Assert.Equal(forward, CameraNavigation.Walk(pose, -1, 0, 1.0, speed).Length, 6);
                 Assert.Equal(forward, CameraNavigation.Walk(pose, 0, 1, 1.0, speed).Length, 6);
@@ -150,7 +150,7 @@ namespace AssetsManager.Tests.xUnit.Views.Helpers
             Vector3D total = default;
             for (int frame = 0; frame < frames; frame++)
                 total += CameraNavigation.Walk(pose, 1, 1, 1.0 / frames, 1.0);
-            Assert.Equal(150.0, total.Length, 6);
+            Assert.Equal(300.0, total.Length, 6);
         }
 
         [Fact]
@@ -200,6 +200,90 @@ namespace AssetsManager.Tests.xUnit.Views.Helpers
 
             Assert.True(CameraNavigation.TryGetGroundPoint(zoomed, Surface, cursor, Ground, out Point3D after));
             AssertPoint(before, after);
+        }
+
+        [Fact]
+        public void LookingAroundKeepsCameraPositionAndTurnsInMouseDirection()
+        {
+            CameraPose pose = Looking(new Point3D(120, 300, 900), new Vector3D(0, 0, -500));
+
+            CameraPose next = CameraNavigation.Rotate(pose, -30, -20, orbit: false);
+
+            Assert.Equal(pose.Position, next.Position);
+            Assert.True(next.Look.X > 0 && next.Look.Y < 0 && next.Look.Z < 0);
+            Assert.Equal(pose.Look.Length, next.Look.Length, 6);
+            Assert.Equal(0, Vector3D.DotProduct(next.Look, next.Up), 6);
+            Assert.Equal(1, next.Up.Length, 6);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void OrbitKeepsItsFocusAndDistanceInBothProjections(bool orthographic)
+        {
+            CameraPose pose = Looking(new Point3D(120, 300, 900), new Vector3D(-120, -300, -900)) with
+            {
+                Orthographic = orthographic,
+                OrthographicWidth = 800
+            };
+
+            CameraPose next = CameraNavigation.Rotate(pose, -35, 10, orbit: true);
+
+            AssertPoint(pose.Position + pose.Look, next.Position + next.Look);
+            Assert.Equal(pose.Look.Length, next.Look.Length, 6);
+            Assert.Equal(pose.OrthographicWidth, next.OrthographicWidth);
+            Assert.NotEqual(pose.Position, next.Position);
+        }
+
+        [Theory]
+        [InlineData(-1000)]
+        [InlineData(1000)]
+        public void PitchStopsBeforeInvertingTheHorizon(double pitch)
+        {
+            CameraPose pose = Looking(new Point3D(0, 300, 900), new Vector3D(0, 0, -500));
+            for (int step = 0; step < 20; step++)
+                pose = CameraNavigation.Rotate(pose, -15, pitch, orbit: false);
+
+            Assert.InRange(System.Math.Asin(pose.Look.Y / pose.Look.Length) * 180 / System.Math.PI, -89.000001, 89.000001);
+            Assert.True(pose.Up.Y > 0);
+            Assert.Equal(0, Vector3D.DotProduct(pose.Look, pose.Up), 6);
+            Assert.Equal(500, pose.Look.Length, 6);
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(1)]
+        public void VerticalPresetsSupplyAStableHeadingWithoutChangingFocus(double vertical)
+        {
+            CameraPose pose = Looking(new Point3D(0, -vertical * 500, 0), new Vector3D(0, vertical * 500, 0)) with
+            {
+                Up = new Vector3D(0, 0, vertical),
+                Orthographic = true
+            };
+
+            CameraPose yawed = CameraNavigation.Rotate(pose, 30, 0, orbit: true);
+            CameraPose pitched = CameraNavigation.Rotate(yawed, 10, -vertical * 20, orbit: true);
+
+            AssertPoint(pose.Position + pose.Look, yawed.Position + yawed.Look);
+            Assert.Equal(pose.Look.Y, yawed.Look.Y, 6);
+            Assert.Equal(1, yawed.Up.Length, 6);
+            Assert.True(double.IsFinite(pitched.Look.X) && double.IsFinite(pitched.Look.Z));
+            Assert.Equal(0, Vector3D.DotProduct(pitched.Look, pitched.Up), 6);
+            Assert.True(pitched.Up.Y > 0);
+        }
+
+        [Fact]
+        public void RotationDoesNotDependOnHowMouseEventsAreSplitBeforeReachingThePitchLimit()
+        {
+            CameraPose pose = Looking(new Point3D(100, 200, 300), new Vector3D(0, -100, -500));
+            CameraPose combined = CameraNavigation.Rotate(pose, -30, 15, orbit: false);
+            CameraPose split = pose;
+            for (int step = 0; step < 30; step++)
+                split = CameraNavigation.Rotate(split, -1, 0.5, orbit: false);
+
+            AssertPoint(new Point3D(combined.Look.X, combined.Look.Y, combined.Look.Z),
+                new Point3D(split.Look.X, split.Look.Y, split.Look.Z));
+            Assert.Equal(combined.Position, split.Position);
         }
 
         private static CameraPose Looking(Point3D position, Vector3D look) =>
