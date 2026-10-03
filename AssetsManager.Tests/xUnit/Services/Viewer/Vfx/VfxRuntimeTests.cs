@@ -5137,7 +5137,43 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void NoiseFieldFirstImpulseMatchesLtkHashDirection()
+        public void NoiseFieldUsesSystemSeedAndReplaysAfterReset()
+        {
+            var noise = new VfxNoiseField(
+                VfxCurveF.Zero, VfxCurveF.Const(1f), VfxCurve3.Const(Vector3.Zero),
+                VfxCurveF.Const(1000f), Vector3.One);
+            var fields = new VfxFieldCollectionDefinition(
+                Array.Empty<VfxAccelerationField>(), Array.Empty<VfxAttractionField>(),
+                Array.Empty<VfxDragField>(), Array.Empty<VfxOrbitalField>(), new[] { noise });
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                ParticleLifetime = VfxCurveF.Const(10f),
+                Fields = fields
+            };
+            var definition = new VfxSystemDefinition(1, "seeded-noise", "seeded-noise", new[] { emitter });
+            var first = new VfxPlaybackRuntime(7);
+            var second = new VfxPlaybackRuntime(11);
+            first.SetSystem(definition, Vector3.Zero);
+            second.SetSystem(definition, Vector3.Zero);
+            first.Update(0.02f);
+            second.Update(0.02f);
+            Vector3 original = Assert.Single(Assert.Single(first.Emitters).Particles).Vel;
+            Vector3 other = Assert.Single(Assert.Single(second.Emitters).Particles).Vel;
+
+            Assert.NotEqual(original, other);
+            var withoutNoise = new VfxPlaybackRuntime(7);
+            withoutNoise.SetSystem(definition with { Emitters = new[] { emitter with { Fields = null } } }, Vector3.Zero);
+            withoutNoise.Update(0.02f);
+            Assert.Equal(withoutNoise.RandomState, first.RandomState);
+            first.Reset();
+            first.Update(0.02f);
+            Assert.Equal(original, Assert.Single(Assert.Single(first.Emitters).Particles).Vel);
+        }
+
+        [Fact]
+        public void ZeroSeedNoiseFieldPreservesTheLtkHashDirection()
         {
             var noise = new VfxNoiseField(
                 VfxCurveF.Zero,
@@ -5158,7 +5194,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 ParticleLifetime = VfxCurveF.Const(10f),
                 Fields = fields
             };
-            var runtime = new VfxPlaybackRuntime(7);
+            var runtime = new VfxPlaybackRuntime(0);
             runtime.SetSystem(new VfxSystemDefinition(1, "noise-golden", "noise-golden", new[] { emitter }), Vector3.Zero);
 
             runtime.Update(0.02f);

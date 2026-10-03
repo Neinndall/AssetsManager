@@ -231,9 +231,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return true;
         }
 
-        private static Vector3 NoiseDirection(uint serial, int slot, int impulse)
+        private Vector3 NoiseDirection(uint serial, int slot, int impulse)
         {
-            uint first = Mix32(Mix32(serial + 1u) ^ Mix32(unchecked((uint)((slot + 1) * (int)0x9e3779b1 + impulse))));
+            // The lineage seed separates otherwise identical sibling systems without advancing birth RNG.
+            uint first = Mix32(Mix32(unchecked((uint)_seed)) ^ Mix32(serial + 1u) ^
+                Mix32(unchecked((uint)((slot + 1) * (int)0x9e3779b1 + impulse))));
             uint second = Mix32(first ^ 0x68e31da4u);
             uint third = Mix32(second ^ 0x1b56c4e9u);
             const double span = 4294967296.0;
