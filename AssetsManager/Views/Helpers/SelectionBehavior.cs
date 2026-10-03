@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -285,6 +286,39 @@ namespace AssetsManager.Views.Helpers
         }
 
         #region Helpers
+
+        internal static T SelectItems<T>(
+            IList<T> items, T anchor, T target, ModifierKeys modifiers,
+            Func<T, bool> isSelected, Action<T, bool> setSelected) where T : class
+        {
+            bool control = modifiers.HasFlag(ModifierKeys.Control);
+            bool shift = modifiers.HasFlag(ModifierKeys.Shift);
+            if (target != null && !items.Contains(target)) return anchor;
+            if (target == null)
+            {
+                if (!control && !shift)
+                    foreach (T item in items) setSelected(item, false);
+                return control || shift ? anchor : null;
+            }
+
+            if (shift)
+            {
+                int from = items.IndexOf(anchor);
+                int to = items.IndexOf(target);
+                if (from < 0) { from = to; anchor = target; }
+                int first = Math.Min(from, to);
+                int last = Math.Max(from, to);
+                for (int i = 0; i < items.Count; i++)
+                    setSelected(items[i], (control && isSelected(items[i])) || (i >= first && i <= last));
+                return anchor;
+            }
+
+            if (control)
+                setSelected(target, !isSelected(target));
+            else
+                foreach (T item in items) setSelected(item, ReferenceEquals(item, target));
+            return target;
+        }
 
         public static bool IsMultiSelectIntent()
         {

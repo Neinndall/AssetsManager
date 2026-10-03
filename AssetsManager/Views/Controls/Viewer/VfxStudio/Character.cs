@@ -21,7 +21,8 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         private void RefreshCharacterInteractionTarget()
         {
-            // Every visible Character can be picked to take the focus; only the focused one is moved.
+            SynchronizeSceneActorsListSelection();
+            // Picking sees every visible Character; the gizmo translates only the selected group.
             _characterInteractionModels.Clear();
             SceneModel focused = _championModel != null && _model.IsSkinWorkspace && IsFocusedActorVisible
                 ? _championModel
@@ -42,16 +43,20 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _characterInteractionController.IsEnabled =
                 _model.IsSkinWorkspace && _model.CharacterTransformGizmoEnabled;
-            _characterInteractionController.SetSelection(
-                focused == null ? Array.Empty<SceneModel>() : new[] { focused },
-                focused);
+            var selected = new List<SceneModel>();
+            if (focused != null && FocusedActor?.IsSelected == true)
+                selected.Add(focused);
+            foreach ((VfxSceneActor actor, VfxSceneActorRuntime runtime) in _sceneActorRuntimes)
+                if (_model.IsSkinWorkspace && actor.IsSelected && actor.IsVisible)
+                    selected.Add(runtime.Model);
+            _characterInteractionController.SetSelection(selected,
+                selected.Contains(focused) ? focused : selected.LastOrDefault());
         }
 
         private void CharacterInteraction_TransformChanged(SceneModel model)
         {
             if (_isApplyingCharacterViewportState ||
                 model == null ||
-                !ReferenceEquals(model, _championModel) ||
                 !_model.IsSkinWorkspace)
             {
                 return;
@@ -60,10 +65,23 @@ namespace AssetsManager.Views.Controls.Viewer
             _isApplyingCharacterViewportState = true;
             try
             {
-                _model.CharacterPositionX = model.PositionX;
-                _model.CharacterPositionY = model.PositionY;
-                _model.CharacterPositionZ = model.PositionZ;
-                PinFocusedPlacement();
+                if (FocusedActor?.IsSelected == true && IsFocusedActorVisible && _championModel != null)
+                {
+                    _model.CharacterPositionX = _championModel.PositionX;
+                    _model.CharacterPositionY = _championModel.PositionY;
+                    _model.CharacterPositionZ = _championModel.PositionZ;
+                    PinFocusedPlacement();
+                    StoreFocusedPlacement(FocusedActor);
+                }
+                foreach ((VfxSceneActor actor, VfxSceneActorRuntime runtime) in _sceneActorRuntimes)
+                {
+                    if (!actor.IsSelected || !actor.IsVisible) continue;
+                    actor.PositionX = runtime.Model.PositionX;
+                    actor.PositionY = runtime.Model.PositionY;
+                    actor.PositionZ = runtime.Model.PositionZ;
+                    actor.PlacementCustomized = true;
+                    actor.PlacedOnKey = ActiveCharacterBackdropKey();
+                }
             }
             finally
             {
@@ -73,6 +91,7 @@ namespace AssetsManager.Views.Controls.Viewer
             // The shared gizmo owns the SceneModel translation. Re-applying through the Studio placement
             // path keeps attached clip/idle VFX and the actor placement in the same world frame.
             ApplyCharacterPlacement();
+            ApplySceneActorPlacements();
         }
 
         private void AdvanceCharacterAutoRotate(float deltaSeconds)

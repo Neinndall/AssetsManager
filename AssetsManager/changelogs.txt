@@ -158,6 +158,8 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio / Select Scene Actors with Ctrl-click or Shift-click and move the selected group with the viewport gizmo.
+  - VFX Studio / Timeline playback controls sit on the left with Loop enabled by default; T-Pose is now a viewport toggle.
   - Viewer / Reduced repeated VFX draw setup and applied recent mouse movement before drawing each frame.
   - Viewer / Left drag now looks around with a stable horizon; Alt + left drag orbits, and WASD moves at 300 units/s.
   - VFX Studio / Reduced map rendering overhead and prioritized camera input while preserving VFX and shader quality and behavior.

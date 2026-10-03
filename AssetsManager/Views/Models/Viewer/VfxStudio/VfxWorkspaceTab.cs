@@ -98,6 +98,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         /// <summary>Characters composed into this Skin scene, in insertion order.</summary>
         public ObservableCollection<VfxSceneActor> Actors { get; } = new();
+        internal VfxSceneActor SelectionAnchor { get; set; }
 
         /// <summary>The actor driven by the Inspector, browser, timeline and gizmo.</summary>
         public VfxSceneActor FocusedActor
@@ -111,6 +112,11 @@ namespace AssetsManager.Views.Models.Viewer
                 if (_focusedActor != null)
                 {
                     _focusedActor.IsFocused = true;
+                    if (SelectionAnchor == null)
+                    {
+                        SelectionAnchor = _focusedActor;
+                        _focusedActor.IsSelected = true;
+                    }
                     Title = BackdropTitle == null ? _focusedActor.Title : $"{BackdropTitle} · {_focusedActor.Title}";
                     Subtitle = _focusedActor.Subtitle;
                 }

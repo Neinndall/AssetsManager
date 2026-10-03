@@ -8,10 +8,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Views.Controls.Viewer
@@ -33,6 +35,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly List<IDisposable> _preparedParticleBatches = new();
         private VfxSceneActorRuntime _pendingActorAdoption;
         private bool _isSceneFocusHandover;
+        private bool _isSynchronizingSceneActorSelection;
         private bool _openSkinInOwnTab;
         private bool _startNextPreviewPaused;
         private double _startNextPreviewTime;
@@ -142,14 +145,27 @@ namespace AssetsManager.Views.Controls.Viewer
         /// Moves Inspector/timeline ownership to another actor of the active scene. Loaded runtimes are
         /// swapped with the focused pipeline instead of being disposed and decoded again.
         /// </summary>
-        private void FocusSceneActor(VfxSceneActor actor)
+        private void FocusSceneActor(VfxSceneActor actor, bool preserveSelection = false)
         {
             VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
             if (actor == null || tab?.Kind != VfxWorkspaceTabKind.Skin || !tab.Actors.Contains(actor))
                 return;
+            if (!preserveSelection)
+            {
+                _isSynchronizingSceneActorSelection = true;
+                try
+                {
+                    tab.SelectionAnchor = SelectionBehavior.SelectItems(tab.Actors, tab.SelectionAnchor,
+                        actor, ModifierKeys.None, item => item.IsSelected, (item, selected) => item.IsSelected = selected);
+                }
+                finally { _isSynchronizingSceneActorSelection = false; }
+            }
             VfxSceneActor previous = tab.FocusedActor;
             if (ReferenceEquals(previous, actor))
+            {
+                RefreshCharacterInteractionTarget();
                 return;
+            }
 
             CaptureWorkspaceSelection(tab);
             if (previous != null)
@@ -653,9 +669,20 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void CharacterInteraction_SelectionRequested(SceneModel model, ModifierKeys modifiers)
         {
-            VfxSceneActor actor = SceneActorForModel(model);
-            if (actor != null && !ReferenceEquals(actor, FocusedActor))
-                FocusSceneActor(actor);
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            if (tab?.Kind != VfxWorkspaceTabKind.Skin) return;
+            VfxSceneActor target = SceneActorForModel(model);
+            _isSynchronizingSceneActorSelection = true;
+            try
+            {
+                tab.SelectionAnchor = SelectionBehavior.SelectItems(tab.Actors, tab.SelectionAnchor,
+                    target, modifiers, actor => actor.IsSelected, (actor, selected) => actor.IsSelected = selected);
+            }
+            finally { _isSynchronizingSceneActorSelection = false; }
+            VfxSceneActor active = target?.IsSelected == true
+                ? target : tab.Actors.LastOrDefault(actor => actor.IsSelected);
+            if (active != null) FocusSceneActor(active, preserveSelection: true);
+            RefreshCharacterInteractionTarget();
         }
 
         /// <summary>World bounds of every visible Character in the Skin scene for camera framing.</summary>
@@ -700,11 +727,53 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void SceneActorsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if ((sender as ListBox)?.SelectedItem is VfxSceneActor actor &&
-                !ReferenceEquals(actor, FocusedActor))
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            if (_isSynchronizingSceneActorSelection || _isSwitchingWorkspaceTab ||
+                sender is not ListBox list || tab?.Kind != VfxWorkspaceTabKind.Skin ||
+                !ReferenceEquals(list.ItemsSource, tab.Actors) ||
+                e.RemovedItems.OfType<VfxSceneActor>().Any(actor => !tab.Actors.Contains(actor))) return;
+
+            _isSynchronizingSceneActorSelection = true;
+            try
             {
-                FocusSceneActor(actor);
+                foreach (VfxSceneActor actor in tab.Actors)
+                    actor.IsSelected = list.SelectedItems.Contains(actor);
             }
+            finally { _isSynchronizingSceneActorSelection = false; }
+
+            VfxSceneActor added = e.AddedItems.OfType<VfxSceneActor>().LastOrDefault();
+            if (added != null && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+                tab.SelectionAnchor = added;
+            VfxSceneActor active = added ?? (list.SelectedItems.Contains(FocusedActor)
+                ? FocusedActor : list.SelectedItems.OfType<VfxSceneActor>().LastOrDefault());
+            if (active != null) FocusSceneActor(active, preserveSelection: true);
+            RefreshCharacterInteractionTarget();
+        }
+
+        private void SceneActorsList_TargetUpdated(object sender, DataTransferEventArgs e)
+        {
+            if (e.Property == ItemsControl.ItemsSourceProperty)
+                SynchronizeSceneActorsListSelection();
+        }
+
+        private void SynchronizeSceneActorsListSelection()
+        {
+            VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            if (_isSynchronizingSceneActorSelection || SceneActorsList == null ||
+                tab?.Kind != VfxWorkspaceTabKind.Skin ||
+                !ReferenceEquals(SceneActorsList.ItemsSource, tab.Actors)) return;
+
+            _isSynchronizingSceneActorSelection = true;
+            try
+            {
+                foreach (VfxSceneActor actor in tab.Actors)
+                {
+                    bool selected = SceneActorsList.SelectedItems.Contains(actor);
+                    if (actor.IsSelected && !selected) SceneActorsList.SelectedItems.Add(actor);
+                    else if (!actor.IsSelected && selected) SceneActorsList.SelectedItems.Remove(actor);
+                }
+            }
+            finally { _isSynchronizingSceneActorSelection = false; }
         }
 
         private void RemoveSceneActor_Click(object sender, RoutedEventArgs e)

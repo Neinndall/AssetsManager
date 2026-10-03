@@ -16,6 +16,51 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Interaction
     public sealed class ViewportModelInteractionControllerTests
     {
         [Fact]
+        public void NativeExtendedActorListKeepsGroupSelectionAcrossFocusChanges()
+        {
+            Exception failure = null;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    var first = new VfxSceneActor(new VfxSkinItem { BinPath = @"C:\p\first.bin" });
+                    var second = new VfxSceneActor(new VfxSkinItem { BinPath = @"C:\p\second.bin" });
+                    var tab = new VfxWorkspaceTab { Kind = VfxWorkspaceTabKind.Skin };
+                    tab.Actors.Add(first); tab.Actors.Add(second); tab.FocusedActor = first;
+                    var list = new ListBox
+                    {
+                        ItemsSource = tab.Actors, SelectionMode = SelectionMode.Extended
+                    };
+                    list.SelectionChanged += (_, _) =>
+                    {
+                        foreach (VfxSceneActor actor in tab.Actors)
+                            actor.IsSelected = list.SelectedItems.Contains(actor);
+                    };
+                    list.Measure(new Size(300, 200)); list.Arrange(new Rect(0, 0, 300, 200)); list.UpdateLayout();
+                    list.SelectedItems.Add(first);
+                    list.SelectedItems.Add(second);
+                    Assert.True(first.IsSelected);
+                    Assert.True(second.IsSelected);
+
+                    tab.FocusedActor = second;
+                    Assert.Equal(2, list.SelectedItems.Count);
+                    list.SelectedItems.Remove(first);
+                    Assert.False(first.IsSelected);
+                    Assert.True(second.IsSelected);
+
+                    list.SelectedItems.Add(first);
+                    Assert.True(list.SelectedItems.Contains(first));
+                    Assert.Equal(2, list.SelectedItems.Count);
+                }
+                catch (Exception ex) { failure = ex; }
+            }) { IsBackground = true };
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "Actor selection test timed out.");
+            if (failure != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        }
+
+        [Fact]
         public void SwitchingActorsKeepsAxesRenderedAtTheirNewOrigin()
         {
             Exception failure = null;

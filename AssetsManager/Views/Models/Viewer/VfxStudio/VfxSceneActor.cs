@@ -14,6 +14,7 @@ namespace AssetsManager.Views.Models.Viewer
     public sealed class VfxSceneActor : INotifyPropertyChanged
     {
         private bool _isFocused;
+        private bool _isSelected;
         private bool _isVisible = true;
         private bool _isLoading;
         private string _statusText;
@@ -49,6 +50,17 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 if (_isVisible == value) return;
                 _isVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value) return;
+                _isSelected = value;
                 OnPropertyChanged();
             }
         }
@@ -109,6 +121,7 @@ namespace AssetsManager.Views.Models.Viewer
         {
             var copy = new VfxSceneActor(Skin)
             {
+                IsSelected = IsSelected,
                 IsVisible = IsVisible,
                 PositionX = PositionX,
                 PositionY = PositionY,

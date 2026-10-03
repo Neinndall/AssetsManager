@@ -188,6 +188,29 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void GroupSelectionSurvivesFocusChangesAndBackdropCopies()
+        {
+            var first = new VfxSceneActor(new VfxSkinItem { BinPath = @"C:\p\first.bin" });
+            var second = new VfxSceneActor(new VfxSkinItem { BinPath = @"C:\p\second.bin" });
+            var tab = new VfxWorkspaceTab { Key = "scene", Kind = VfxWorkspaceTabKind.Skin };
+            tab.Actors.Add(first);
+            tab.Actors.Add(second);
+            tab.FocusedActor = first;
+            second.IsSelected = true;
+
+            tab.FocusedActor = second;
+            Assert.True(first.IsSelected);
+            Assert.True(second.IsSelected);
+            Assert.False(first.IsFocused);
+            Assert.True(second.IsFocused);
+
+            VfxWorkspaceTab copy = tab.CopyForBackdrop("backdrop", "map", "Map");
+            Assert.All(copy.Actors, actor => Assert.True(actor.IsSelected));
+            copy.Actors[0].IsSelected = false;
+            Assert.True(first.IsSelected);
+        }
+
+        [Fact]
         public void CompatibleFormsExcludeOwnerMeshMismatchesUnlessTheyReloadTheModel()
         {
             var owner = new VfxOwnerSceneContext("ASSETS/Kayn/Skin0/Kayn.skn", "ASSETS/Kayn/Skin0/Kayn.skl", 1f);

@@ -115,6 +115,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ClearLoadedSkinState()
         {
+            _bindPoseReturnAnimation = null;
             _binCancellation?.Cancel();
             _animationClipCancellation?.Cancel();
             _animationClipCancellation?.Dispose();

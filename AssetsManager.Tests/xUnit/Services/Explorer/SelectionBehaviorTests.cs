@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -16,6 +17,43 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer
 {
     public class SelectionBehaviorTests
     {
+        [Theory]
+        [InlineData(ModifierKeys.None, 1, 3, "3", 3)]
+        [InlineData(ModifierKeys.Control, 1, 3, "0,3", 3)]
+        [InlineData(ModifierKeys.Control, 1, 0, "", 0)]
+        [InlineData(ModifierKeys.Shift, 1, 3, "1,2,3", 1)]
+        [InlineData(ModifierKeys.Shift, 3, 1, "1,2,3", 3)]
+        [InlineData(ModifierKeys.Control | ModifierKeys.Shift, 2, 3, "0,2,3", 2)]
+        [InlineData(ModifierKeys.Shift, -1, 2, "2", 2)]
+        public void ViewportSelectionSharesToggleRangeAndAnchorRules(
+            ModifierKeys modifiers, int anchorIndex, int targetIndex, string expected, int expectedAnchor)
+        {
+            var items = new[] { new object(), new object(), new object(), new object() };
+            var selected = new HashSet<object> { items[0] };
+            object anchor = SelectionBehavior.SelectItems(items,
+                anchorIndex < 0 ? null : items[anchorIndex], items[targetIndex], modifiers,
+                selected.Contains, (item, value) => { if (value) selected.Add(item); else selected.Remove(item); });
+
+            var indexes = new List<int>();
+            for (int i = 0; i < items.Length; i++) if (selected.Contains(items[i])) indexes.Add(i);
+            Assert.Equal(expected, string.Join(",", indexes));
+            Assert.Same(items[expectedAnchor], anchor);
+        }
+
+        [Theory]
+        [InlineData(ModifierKeys.None, false)]
+        [InlineData(ModifierKeys.Control, true)]
+        [InlineData(ModifierKeys.Shift, true)]
+        public void EmptyViewportClickClearsOnlyWithoutModifiers(ModifierKeys modifiers, bool remainsSelected)
+        {
+            var item = new object();
+            var selected = new HashSet<object> { item };
+            object anchor = SelectionBehavior.SelectItems(new[] { item }, item, null, modifiers,
+                selected.Contains, (value, state) => { if (state) selected.Add(value); else selected.Remove(value); });
+            Assert.Equal(remainsSelected, selected.Contains(item));
+            Assert.Equal(remainsSelected ? item : null, anchor);
+        }
+
         [Fact]
         public void PrimaryAction_SelectsLeafTreeItem()
         {

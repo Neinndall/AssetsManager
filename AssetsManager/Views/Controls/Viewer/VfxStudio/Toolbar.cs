@@ -3,11 +3,41 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Services.Viewer.Vfx.Composition;
+using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class VfxInspectorControl
     {
+        private AnimationClipCatalogItem _bindPoseReturnAnimation;
+
+        private void PreviewBindPoseToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not ToggleButton toggle) return;
+
+            if (toggle.IsChecked == true)
+            {
+                _bindPoseReturnAnimation = _model.SelectedAnimation;
+                _model.IsAnimationMode = true;
+                StopToBindPose_Click(sender, e);
+            }
+            else
+            {
+                AnimationClipCatalogItem animation = _bindPoseReturnAnimation != null &&
+                    _model.DetectedAnimations.Contains(_bindPoseReturnAnimation)
+                    ? _bindPoseReturnAnimation : VfxClipCatalog.OpeningClip(_model.DetectedAnimations);
+                if (animation is { IsBindPose: false })
+                {
+                    _model.IsAnimationMode = true;
+                    _model.SelectedAnimation = animation;
+                    _bindPoseReturnAnimation = null;
+                }
+            }
+
+            toggle.GetBindingExpression(ToggleButton.IsCheckedProperty)?.UpdateTarget();
+        }
+
         private void CloseAllToolbarPopups(Popup exceptPopup = null)
         {
             if (PreviewShowPopup != null && PreviewShowPopup != exceptPopup && PreviewShowPopup.IsOpen)

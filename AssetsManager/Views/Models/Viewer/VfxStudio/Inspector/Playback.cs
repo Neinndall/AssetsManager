@@ -11,7 +11,7 @@ namespace AssetsManager.Views.Models.Viewer
         private double _totalDuration = 5.0;
         private double _activeLoopStart;
         private double _activeLoopDuration = 0.0;
-        private bool _isPreviewLoopEnabled;
+        private bool _isPreviewLoopEnabled = true;
         private float _speed = 1.0f;
         private int _liveParticleCount;
         private int _playbackSeed = 1337;

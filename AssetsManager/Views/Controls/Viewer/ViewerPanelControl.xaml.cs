@@ -310,61 +310,17 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ApplyViewportSelection(SceneModel model, ModifierKeys modifiers)
         {
-            bool control = modifiers.HasFlag(ModifierKeys.Control);
-            bool shift = modifiers.HasFlag(ModifierKeys.Shift);
-
-            if (model == null)
-            {
-                if (!control && !shift)
+            _modelSelectionAnchor = SelectionBehavior.SelectItems(
+                _viewModel.LoadedModels, _modelSelectionAnchor ?? _viewModel.SelectedModel, model, modifiers,
+                item => ModelsListBox.SelectedItems.Contains(item),
+                (item, selected) =>
                 {
-                    ModelsListBox.SelectedItems.Clear();
-                    _modelSelectionAnchor = null;
-                }
-                return;
-            }
-
-            if (shift)
-            {
-                SelectModelRange(_modelSelectionAnchor ?? _viewModel.SelectedModel, model, control);
-            }
-            else if (control)
-            {
-                if (ModelsListBox.SelectedItems.Contains(model))
-                    ModelsListBox.SelectedItems.Remove(model);
-                else
-                    ModelsListBox.SelectedItems.Add(model);
-                _modelSelectionAnchor = model;
-            }
-            else
-            {
-                ModelsListBox.SelectedItems.Clear();
-                ModelsListBox.SelectedItems.Add(model);
-                _modelSelectionAnchor = model;
-            }
-
-            ModelsListBox.ScrollIntoView(model);
-        }
-
-        private void SelectModelRange(SceneModel anchor, SceneModel target, bool additive)
-        {
-            int anchorIndex = _viewModel.LoadedModels.IndexOf(anchor);
-            int targetIndex = _viewModel.LoadedModels.IndexOf(target);
-            if (targetIndex < 0) return;
-            if (!additive) ModelsListBox.SelectedItems.Clear();
-            if (anchorIndex < 0)
-            {
-                anchorIndex = targetIndex;
-                _modelSelectionAnchor = target;
-            }
-
-            int start = Math.Min(anchorIndex, targetIndex);
-            int end = Math.Max(anchorIndex, targetIndex);
-            for (int index = start; index <= end; index++)
-            {
-                SceneModel model = _viewModel.LoadedModels[index];
-                if (!ModelsListBox.SelectedItems.Contains(model))
-                    ModelsListBox.SelectedItems.Add(model);
-            }
+                    if (selected && !ModelsListBox.SelectedItems.Contains(item))
+                        ModelsListBox.SelectedItems.Add(item);
+                    else if (!selected && ModelsListBox.SelectedItems.Contains(item))
+                        ModelsListBox.SelectedItems.Remove(item);
+                });
+            if (model != null) ModelsListBox.ScrollIntoView(model);
         }
 
         private List<SceneModel> GetSelectedModels()
