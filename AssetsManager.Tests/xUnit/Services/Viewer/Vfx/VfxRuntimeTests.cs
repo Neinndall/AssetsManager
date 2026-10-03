@@ -1915,7 +1915,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
                 EmitterLifetime = 10f,
-                ParticleLifetime = VfxCurveF.Const(1f)
+                ParticleLifetime = VfxCurveF.Const(1f),
+                Fields = new VfxFieldCollectionDefinition(
+                    Array.Empty<VfxAccelerationField>(), Array.Empty<VfxAttractionField>(),
+                    Array.Empty<VfxDragField>(), Array.Empty<VfxOrbitalField>(),
+                    new[] { new VfxNoiseField(VfxCurveF.Const(40f), VfxCurveF.Const(10f),
+                        VfxCurve3.Const(Vector3.Zero), VfxCurveF.Const(1000f), Vector3.One) })
             };
             var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
             VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -1954,6 +1959,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             bool expectedStopped = expectedChild.IsStopped;
             Vector3 expectedPosition = expectedChild.Emitters[0].BasePos;
             int expectedLive = expectedChild.LiveParticleCount;
+            int expectedSeed = expectedChild.Seed;
+            var expectedParticle = Assert.Single(Assert.Single(expectedChild.Emitters).Particles);
+            Assert.NotEqual(Vector3.Zero, expectedParticle.Vel);
 
             graph.RestoreSnapshot(checkpoint);
             Assert.Equal(2, graph.Runtimes.Count);
@@ -1966,6 +1974,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(expectedStopped, restoredChild.IsStopped);
             Assert.Equal(expectedPosition, restoredChild.Emitters[0].BasePos);
             Assert.Equal(expectedLive, restoredChild.LiveParticleCount);
+            Assert.Equal(expectedSeed, restoredChild.Seed);
+            var restoredParticle = Assert.Single(Assert.Single(restoredChild.Emitters).Particles);
+            Assert.Equal(expectedParticle.Pos, restoredParticle.Pos);
+            Assert.Equal(expectedParticle.Vel, restoredParticle.Vel);
+            Assert.Equal(expectedChild.RandomState, restoredChild.RandomState);
         }
 
         [Fact]
