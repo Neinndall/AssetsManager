@@ -523,13 +523,42 @@ namespace AssetsManager.Utils
         public string AntiAliasingMode
         {
             get => _antiAliasingMode;
-            set => SetProperty(ref _antiAliasingMode, string.Equals(value, "Smaa", StringComparison.OrdinalIgnoreCase) ? "Smaa" : "Fxaa");
+            set
+            {
+                string mode = string.Equals(value, "Smaa", StringComparison.OrdinalIgnoreCase) ? "Smaa" : "Fxaa";
+                if (_antiAliasingMode == mode) return;
+                SetProperty(ref _antiAliasingMode, mode);
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AntiAliasingSelection)));
+            }
         }
 
         public bool EnableFxaa
         {
             get => _enableFxaa;
-            set => SetProperty(ref _enableFxaa, value);
+            set
+            {
+                if (_enableFxaa == value) return;
+                SetProperty(ref _enableFxaa, value);
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AntiAliasingSelection)));
+            }
+        }
+
+        // The selector combines the existing persisted fields without changing saved settings.
+        [JsonIgnore]
+        public string AntiAliasingSelection
+        {
+            get => EnableFxaa ? AntiAliasingMode : "Off";
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value)) return;
+                if (string.Equals(value, "Off", StringComparison.OrdinalIgnoreCase))
+                    EnableFxaa = false;
+                else
+                {
+                    AntiAliasingMode = value;
+                    EnableFxaa = true;
+                }
+            }
         }
 
         private void SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)

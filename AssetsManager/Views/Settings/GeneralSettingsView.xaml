@@ -297,14 +297,12 @@
                         <TextBlock Text="Anti-Aliasing" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
                         <TextBlock Text="Smooth preview edges with FXAA or SMAA" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <ComboBox Width="100" Height="30" Margin="0,0,12,0" Style="{StaticResource ModernComboBox}"
-                                  SelectedValuePath="Tag" SelectedValue="{Binding Settings.StudioParameters.AntiAliasingMode, Mode=TwoWay}">
-                            <ComboBoxItem Content="FXAA" Tag="Fxaa"/>
-                            <ComboBoxItem Content="SMAA" Tag="Smaa"/>
-                        </ComboBox>
-                        <CheckBox IsChecked="{Binding Settings.StudioParameters.EnableFxaa, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
-                    </StackPanel>
+                    <ComboBox Grid.Column="1" Width="100" Height="30" VerticalAlignment="Center" Style="{StaticResource ModernComboBox}"
+                              SelectedValuePath="Tag" SelectedValue="{Binding Settings.StudioParameters.AntiAliasingSelection, Mode=TwoWay}">
+                        <ComboBoxItem Content="Off" Tag="Off"/>
+                        <ComboBoxItem Content="FXAA" Tag="Fxaa"/>
+                        <ComboBoxItem Content="SMAA" Tag="Smaa"/>
+                    </ComboBox>
                 </Grid>
 
                 <Grid>

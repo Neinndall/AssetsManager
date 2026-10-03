@@ -2,6 +2,7 @@ using System.Numerics;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Utils;
 using Xunit;
+using Newtonsoft.Json;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
 {
@@ -49,6 +50,41 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         {
             Assert.Contains("float lumaM = rgbyM.g;", FxaaPostEffectsRenderer.FragmentShader);
             Assert.Contains("dot(rgba.rgb, vec3(0.299, 0.587, 0.114))", FxaaPostEffectsRenderer.FragmentShader);
+        }
+
+        [Theory]
+        [InlineData("Off", false)]
+        [InlineData("Fxaa", true)]
+        [InlineData("Smaa", true)]
+        public void AntiAliasingSelectionEnablesTheSelectedModeAndSurvivesReload(string choice, bool enabled)
+        {
+            var settings = new StudioParametersSettings { EnableFxaa = false, AntiAliasingMode = "Smaa" };
+            settings.AntiAliasingSelection = choice;
+            Assert.Equal(enabled, settings.EnableFxaa);
+            Assert.Equal(choice, settings.AntiAliasingSelection);
+            if (enabled) Assert.Equal(choice, settings.AntiAliasingMode);
+
+            string json = JsonConvert.SerializeObject(settings);
+            Assert.DoesNotContain("AntiAliasingSelection", json);
+            var restored = JsonConvert.DeserializeObject<StudioParametersSettings>(json);
+            Assert.Equal(choice, restored.AntiAliasingSelection);
+            Assert.Equal(enabled, restored.EnableFxaa);
+        }
+
+        [Fact]
+        public void LegacyDisabledAntiAliasingShowsOffAndNotifiesWhenReenabled()
+        {
+            var settings = JsonConvert.DeserializeObject<StudioParametersSettings>(
+                "{\"EnableFxaa\":false,\"AntiAliasingMode\":\"Smaa\"}");
+            Assert.Equal("Off", settings.AntiAliasingSelection);
+            var changed = new System.Collections.Generic.List<string>();
+            settings.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+            settings.AntiAliasingSelection = "Smaa";
+            Assert.True(settings.EnableFxaa);
+            Assert.Equal("Smaa", settings.AntiAliasingSelection);
+            Assert.Contains(nameof(StudioParametersSettings.AntiAliasingSelection), changed);
+            settings.AntiAliasingSelection = "Off";
+            Assert.False(settings.EnableFxaa);
         }
 
         [Fact]
