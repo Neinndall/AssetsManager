@@ -4364,6 +4364,94 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(expectedInstances, restoredRoot.Emitters[0].Instances);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void SessionSeekRestoresSeededChildrenAcrossRigLoops(bool spawnOnDeath)
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                TexturePath = null,
+                EmitterLifetime = 1f,
+                ParticleLifetime = VfxCurveF.Const(1f),
+                Fields = new VfxFieldCollectionDefinition(
+                    Array.Empty<VfxAccelerationField>(), Array.Empty<VfxAttractionField>(),
+                    Array.Empty<VfxDragField>(), Array.Empty<VfxOrbitalField>(),
+                    new[] { new VfxNoiseField(VfxCurveF.Const(40f), VfxCurveF.Const(10f),
+                        VfxCurve3.Const(Vector3.Zero), VfxCurveF.Const(1000f), Vector3.One) })
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                TexturePath = null,
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(20f),
+                EmitterLifetime = 2f,
+                ParticleLifetime = VfxCurveF.Const(0.15f),
+                BirthVelocity = VfxCurve3.Const(new Vector3(2f, 3f, 4f)),
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) }, spawnOnDeath,
+                    VfxCurveF.Zero, VfxCurve3.Const(Vector3.Zero), 0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { emitter });
+            VfxSystemModel Model() => new()
+            {
+                Name = parent.Name,
+                Definition = parent,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [1] = parent, [2] = child },
+                ResourceMap = new Dictionary<uint, uint>(),
+                PlaybackSeed = 17
+            };
+            using var straight = new VfxRenderSession();
+            using var restored = new VfxRenderSession();
+            straight.SetSystem(Model());
+            restored.SetSystem(Model());
+            straight.RigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Burst);
+            restored.RigSettings = straight.RigSettings;
+            double target = 2d * straight.RigDuration + 0.62d;
+            straight.Seek(target);
+            VfxPlaybackGraphRuntime expected = Assert.Single(straight.Graphs);
+            Assert.Contains(expected.Runtimes, runtime => ReferenceEquals(runtime.Definition, child));
+            Assert.Contains(expected.Runtimes.Skip(1).SelectMany(runtime => runtime.Emitters)
+                .SelectMany(state => state.Particles), particle => particle.Vel != Vector3.Zero);
+
+            restored.Seek(target + 0.8d);
+            restored.Seek(target);
+            Assert.InRange(restored.LastSeekRestoreTime, target - 0.3d, target);
+            AssertStateMatches();
+            restored.Seek(0d);
+            restored.Seek(target);
+            AssertStateMatches();
+
+            void AssertStateMatches()
+            {
+                VfxPlaybackGraphRuntime actual = Assert.Single(restored.Graphs);
+                Assert.Equal(straight.ActiveSystem.CurrentTime, restored.ActiveSystem.CurrentTime);
+                Assert.Equal(expected.HeldChildParticleCapacity, actual.HeldChildParticleCapacity);
+                Assert.Equal(expected.Runtimes.Count, actual.Runtimes.Count);
+                foreach (var (before, after) in expected.Runtimes.Zip(actual.Runtimes))
+                {
+                    Assert.Same(before.Definition, after.Definition);
+                    Assert.Equal(before.Seed, after.Seed);
+                    Assert.Equal(before.RandomState, after.RandomState);
+                    Assert.Equal(before.CurrentTime, after.CurrentTime);
+                    Assert.Equal(before.WorldTransform, after.WorldTransform);
+                    Assert.Equal(before.IsStopped, after.IsStopped);
+                    foreach (var (beforeEmitter, afterEmitter) in before.Emitters.Zip(after.Emitters))
+                    {
+                        Assert.Equal(beforeEmitter.Instances, afterEmitter.Instances);
+                        Assert.Equal(beforeEmitter.Particles.Count, afterEmitter.Particles.Count);
+                        foreach (var (beforeParticle, afterParticle) in beforeEmitter.Particles.Zip(afterEmitter.Particles))
+                        {
+                            Assert.Equal(beforeParticle.Serial, afterParticle.Serial);
+                            Assert.Equal(beforeParticle.Pos, afterParticle.Pos);
+                            Assert.Equal(beforeParticle.Vel, afterParticle.Vel);
+                        }
+                    }
+                }
+            }
+        }
+
         [Fact]
         public void ChangingPinnedChanceKeepsLiveStateButInvalidatesSeekCheckpoints()
         {
