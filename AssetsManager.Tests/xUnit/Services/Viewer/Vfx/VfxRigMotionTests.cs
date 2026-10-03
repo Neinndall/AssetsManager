@@ -412,6 +412,45 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.True(session.ActiveSystem.CurrentTime > before);
         }
 
+        [Theory]
+        [InlineData(0.0625f, 1d)]
+        [InlineData(0.0625f, 2d)]
+        [InlineData(0.07f, 2d)]
+        public void MissileLoopDetectsCyclesEvenWhenTheEndPhaseDoesNotDecrease(float frameTime, double speed)
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
+            {
+                TexturePath = null,
+                IsSingleParticle = true,
+                EmitterLifetime = 0.01f,
+                ParticleLifetime = VfxCurveF.Const(0.01f)
+            };
+            var definition = new VfxSystemDefinition(7, "short-flight", "short-flight", new[] { emitter });
+            var model = new VfxSystemModel
+            {
+                Name = definition.Name,
+                Definition = definition,
+                SystemCatalog = new Dictionary<uint, VfxSystemDefinition> { [7] = definition },
+                ResourceMap = new Dictionary<uint, uint>(),
+                Speed = 1d
+            };
+            using var session = new VfxRenderSession();
+            session.SetSystem(model);
+            session.RigSettings = VfxRigSettings.ForPreset(VfxRigPreset.Missile) with
+            {
+                FlightRange = 0.0625f,
+                FlightSpeed = 1f
+            };
+            Assert.Equal(0.0625d, session.RigDuration, precision: 6);
+            session.Play();
+            session.Update(0.03125f);
+            model.Speed = speed;
+            session.Update(frameTime);
+
+            VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
+            Assert.Equal(frameTime * (float)speed, root.CurrentTime, precision: 6);
+        }
+
         [Fact]
         public void LoopWrapReplaysTheWholeVariableFrameLikeLtk()
         {

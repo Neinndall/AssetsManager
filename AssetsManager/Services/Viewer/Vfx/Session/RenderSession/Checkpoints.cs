@@ -28,9 +28,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
                 KillGraphsAt(previous);
 
-                // LTK does not split a variable frame at the rig boundary. It detects a wrap
-                // from the end phase, resets to phase zero, then runs this frame's whole dt on
-                // the new pass. This also applies during the fixed 1/60 seek replay.
+                // Keep LTK's whole-frame replay policy at a crossed rig boundary.
+                // Check cycle numbers because a complete cycle can leave the same end phase.
                 bool rigWrapped = DidRigWrap(previous, next);
                 if (rigWrapped)
                     ReplayRigLoopAtStart();
@@ -58,9 +57,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 return false;
             }
 
-            float previousPhase = VfxRigMotion.Evaluate(_rigSettings, previous, RigDuration).Phase;
-            float nextPhase = VfxRigMotion.Evaluate(_rigSettings, next, RigDuration).Phase;
-            return nextPhase < previousPhase;
+            double span = VfxRigMotion.Evaluate(_rigSettings, previous, RigDuration).TotalSpan;
+            return span > 0d && double.IsFinite(span) &&
+                Math.Floor(next / span) > Math.Floor(previous / span);
         }
 
         private void ReplayRigLoopAtStart()
