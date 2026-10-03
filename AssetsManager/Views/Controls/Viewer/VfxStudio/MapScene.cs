@@ -910,7 +910,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
             switch (node.Kind)
             {
-                case MapBrowserNodeKind.Map:
                 case MapBrowserNodeKind.Geometry:
                     _mapGpuSceneDirty = true;
                     SnapMapCamera(_mapSceneRuntime.Scene);
