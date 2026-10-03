@@ -173,6 +173,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                     .Where(pair =>
                     {
                         string indexedDirectory = Normalize(Path.GetDirectoryName(pair.Key) ?? string.Empty);
+                        if (!Path.GetExtension(pair.Key).Equals(extension, StringComparison.OrdinalIgnoreCase))
+                            return false;
                         string indexedFileName = Path.GetFileName(pair.Key);
                         string indexedStem = StripCollisionSuffix(Path.GetFileNameWithoutExtension(indexedFileName));
                         return (indexedFileName.Length >= ExtractedFileNameLimit ||

@@ -49,6 +49,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             }
         }
 
+        [Theory]
+        [InlineData(".tex", false)]
+        [InlineData(".skn", false)]
+        [InlineData(".anm", false)]
+        [InlineData(".tex", true)]
+        [InlineData(".skn", true)]
+        public void TruncatedBinDependencyDoesNotResolveOtherResourceTypes(string extension, bool collisionName)
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxDependencyTypes", Guid.NewGuid().ToString("N"));
+            string directory = Path.Combine(root, "data", "characters", "hero");
+            Directory.CreateDirectory(directory);
+            try
+            {
+                string stem = collisionName ? "shared" : new string('c', 236);
+                string extractedName = stem + (collisionName ? " (1)" : string.Empty) + extension;
+                File.WriteAllBytes(Path.Combine(directory, extractedName), Array.Empty<byte>());
+                var index = VfxResourceIndex.Build(root);
+                string dependency = $"data/characters/hero/{stem}_skins_skin28.bin";
+
+                Assert.Empty(index.ResolveLinkedAll(dependency, new[] { ".bin" }));
+                Assert.Null(index.Resolve(dependency, new[] { ".bin" }));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
         [Fact]
         public void NamedAssetDoesNotBorrowSameBasenameFromAnotherDirectory()
         {

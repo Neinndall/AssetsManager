@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -29,7 +29,7 @@ using PixelFormat = Silk.NET.OpenGL.PixelFormat;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--trace-emitter NAME] [--no-owner] [--rig Still|Trail|Missile] [--trace-layout] [--frame-scale 1]`:
+    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--trace-emitter NAME] [--no-owner] [--rig Still|Trail|Missile] [--trace-layout] [--frame-scale 1] [--preview-stage] [--single-burst-emitter NAME,NAME]`:
     /// plays one VFX system of an installed BIN the way VFX Studio does (VfxRenderSession, game particle shaders,
     /// resources extracted from the WADs) and writes a PNG per time over a mid-grey backdrop. With --per-emitter
     /// each root emitter is also drawn alone and measured: how much of the frame it darkens or brightens.
@@ -79,6 +79,23 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 return;
             }
 
+            if (Option(args, "--single-burst-emitter") is { } burstNames)
+            {
+                // A diagnostic data override, not a runtime policy for permanent particles.
+                var names = burstNames.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                foreach (string name in names)
+                    if (!system.Emitters.Any(emitter => string.Equals(emitter.Name, name, StringComparison.OrdinalIgnoreCase)))
+                        throw new ArgumentException($"Unknown emitter '{name}'.");
+                system = system with
+                {
+                    Emitters = system.Emitters.Select(emitter => names.Contains(emitter.Name)
+                        ? emitter with { IsSingleParticle = true } : emitter).ToArray()
+                };
+                systems = new Dictionary<uint, VfxSystemDefinition>(systems) { [system.PathHash] = system };
+                Console.WriteLine($"[Snapshot] Diagnostic single-burst override: {string.Join(",", names)}");
+            }
+
             var wadProvider = new WadContentProvider(log, new WadNodeLoaderService(null, log), new DirectoriesCreator(), new SvgParser());
             var resolver = new MapAssetResolver(wadProvider, settings);
             IReadOnlyDictionary<uint, VfxSystemDefinition> reachable =
@@ -120,6 +137,10 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 Speed = 1
             });
 
+            using var surface = args.Contains("--preview-stage") ? new VfxPreviewSurfaceRenderer() : null;
+            surface?.Initialize(gl, groundTexture: null);
+            if (surface != null)
+                Console.WriteLine("[Snapshot] Coverage includes the preview surface; compare particle placement visually.");
             session.RigPreset = rig;
 
             // The League camera looks down at about 56 degrees; frame the system's authored bounds from there.
@@ -152,7 +173,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 // particles retire. Drawing the frame first uploads its resources.
                 foreach (double time in times)
                 {
-                    Draw(gl, session, framebuffer, size, time, viewProjection, view);
+                    Draw(gl, session, framebuffer, size, time, viewProjection, view, surface);
                     foreach (var state in session.Graphs.SelectMany(graph => graph.Runtimes).SelectMany(runtime => runtime.Emitters)
                                  .Where(item => string.Equals(item.Def.Name, traced, StringComparison.OrdinalIgnoreCase)))
                         Console.WriteLine($"[Snapshot] trace t={time:0.00} {state.Def.Name} age={state.Age:0.000} burstDone={state.BurstDone} " +
@@ -169,7 +190,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             if (args.Contains("--trace-layout"))
                 foreach (double time in times)
                 {
-                    Draw(gl, session, framebuffer, size, time, viewProjection, view);
+                    Draw(gl, session, framebuffer, size, time, viewProjection, view, surface);
                     foreach (var runtime in session.Graphs.SelectMany(graph => graph.Runtimes))
                     {
                         Console.WriteLine($"[Layout] t={time:0.00} system={runtime.Definition.Name} origin={runtime.WorldTransform.Translation} up={Vector3.TransformNormal(Vector3.UnitY, runtime.WorldTransform)}");
@@ -188,7 +209,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             foreach (double time in times)
             {
                 session.SetAllEmittersVisibility(true);
-                float[] pixels = Draw(gl, session, framebuffer, size, time, viewProjection, view);
+                float[] pixels = Draw(gl, session, framebuffer, size, time, viewProjection, view, surface);
                 string file = Path.Combine(output, $"{stem}_t{time.ToString("0.00", CultureInfo.InvariantCulture)}.png");
                 SavePng(pixels, size, file);
                 (float darker, float brighter) = Coverage(pixels);
@@ -199,7 +220,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 {
                     session.SetAllEmittersVisibility(false);
                     if (!session.SetEmitterVisibility(order, true)) continue;
-                    float[] alone = Draw(gl, session, framebuffer, size, time, viewProjection, view);
+                    float[] alone = Draw(gl, session, framebuffer, size, time, viewProjection, view, surface);
                     (float emitterDarker, float emitterBrighter) = Coverage(alone);
                     int live = session.GetEmitterLiveCount(order);
                     if (live == 0 && emitterDarker + emitterBrighter < 0.001f) continue;
@@ -237,7 +258,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         }
 
         private static float[] Draw(GL gl, VfxRenderSession session, uint framebuffer, uint size, double time,
-            Matrix4x4 viewProjection, Matrix4x4 view)
+            Matrix4x4 viewProjection, Matrix4x4 view, VfxPreviewSurfaceRenderer surface)
         {
             session.Seek(time);
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
@@ -249,6 +270,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             gl.Viewport(0, 0, size, size);
             gl.ClearColor(Backdrop, Backdrop, Backdrop, 1f);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
+            surface?.Render(viewProjection, showGrid: false, showGround: false, showStage: true);
             session.Render(viewProjection, view);
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
             var pixels = new float[size * size * 4];
@@ -294,13 +316,24 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         private static BinTree LoadBin(string install, string binPath)
         {
             ulong hash = XxHash64Ext.Hash(binPath);
-            foreach (string wadPath in Directory.GetFiles(Path.Combine(install, @"Game\DATA\FINAL"), "*.wad.client", SearchOption.AllDirectories))
+            // BIN definitions live in the core WADs; localized audio WADs are irrelevant here.
+            foreach (string wadPath in Directory.GetFiles(Path.Combine(install, @"Game\DATA\FINAL"), "*.wad.client", SearchOption.AllDirectories)
+                         .Where(path => !Path.GetFileName(path)[..^".wad.client".Length].Contains('.')))
             {
-                using var wad = new WadFile(wadPath);
-                if (!wad.Chunks.ContainsKey(hash)) continue;
-                using var data = wad.LoadChunkDecompressed(hash);
-                using var stream = new MemoryStream(data.Span.ToArray(), writable: false);
-                return new BinTree(stream);
+                WadFile wad;
+                try { wad = new WadFile(wadPath); }
+                catch (Exception error) when (error is InvalidDataException or ZstdSharp.ZstdException)
+                {
+                    Console.WriteLine($"[Snapshot] Cannot index WAD {Path.GetFileName(wadPath)}: {error.Message}");
+                    continue;
+                }
+                using (wad)
+                {
+                    if (!wad.Chunks.ContainsKey(hash)) continue;
+                    using var data = wad.LoadChunkDecompressed(hash);
+                    using var stream = new MemoryStream(data.Span.ToArray(), writable: false);
+                    return new BinTree(stream);
+                }
             }
             return null;
         }
