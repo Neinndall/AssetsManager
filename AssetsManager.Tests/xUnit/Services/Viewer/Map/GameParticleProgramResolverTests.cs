@@ -14,6 +14,58 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 {
     public sealed class GameParticleProgramResolverTests
     {
+        [Theory]
+        [InlineData(VfxPrimitiveKind.CameraQuad, null)]
+        [InlineData(VfxPrimitiveKind.CameraQuad, "")]
+        [InlineData(VfxPrimitiveKind.CameraQuad, " ")]
+        [InlineData(VfxPrimitiveKind.Mesh, null)]
+        [InlineData(VfxPrimitiveKind.AttachedMesh, null)]
+        public void PaletteWithoutTextureFallsBackInsteadOfSamplingNativeWhite(
+            VfxPrimitiveKind primitive, string texturePath)
+        {
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var runtime = new GameShaderRuntime(gl, false, new AssetsManager.Utils.AppSettings());
+            bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
+            var emitter = Emitter() with
+            {
+                PrimitiveKind = primitive,
+                IsMeshPrimitive = mesh,
+                PaletteDefinition = new VfxPaletteDefinition(
+                    32, VfxCurve3.Const(new Vector3(6f, 0f, 0f)), texturePath)
+            };
+
+            Assert.Equal("Palette without a texture.", runtime.ParticleProgramFallback(emitter, mesh));
+            Assert.Equal(0, runtime.GetParticlePassCount(emitter, mesh));
+            Assert.Equal(0u, runtime.UseParticleProgram(emitter, mesh, 0));
+            Assert.Equal((false, false), runtime.ParticleSceneInputs(emitter, mesh));
+        }
+
+        [Theory]
+        [InlineData(VfxPrimitiveKind.CameraQuad)]
+        [InlineData(VfxPrimitiveKind.Mesh)]
+        [InlineData(VfxPrimitiveKind.AttachedMesh)]
+        public void PaletteWithTextureStillUsesNativeParticleProgram(VfxPrimitiveKind primitive)
+        {
+            string root = FindInstalledShaderCacheRoot();
+            if (root == null) return;
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var runtime = new GameShaderRuntime(gl, false, InstalledSkins.Settings(root));
+            bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
+            var emitter = Emitter() with
+            {
+                PrimitiveKind = primitive,
+                IsMeshPrimitive = mesh,
+                PaletteDefinition = new VfxPaletteDefinition(
+                    32, VfxCurve3.Const(new Vector3(6f, 0f, 0f)), "palette.tex")
+            };
+
+            Assert.Null(runtime.ParticleProgramFallback(emitter, mesh));
+            Assert.Equal(1, runtime.GetParticlePassCount(emitter, mesh));
+            Assert.NotEqual(0u, runtime.UseParticleProgram(emitter, mesh, 0));
+        }
+
         [Fact]
         public void DefaultQuadUsesTheAuthoredHlslStageTocsAndTranslatesWhenTheCacheIsInstalled()
         {

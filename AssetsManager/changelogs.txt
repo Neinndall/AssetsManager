@@ -474,6 +474,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Fixed solid rectangles in effects such as Aurora's R travel end when an emitter declares a palette without a texture.
   - VFX Studio / Selecting the loaded map in the project tree preserves the current camera view.
   - Viewer / WASD now moves at the same speed in maps, models and map backdrops, regardless of camera zoom.
   - VFX Studio / Short preview loops now restart correctly when one frame crosses a complete cycle.
