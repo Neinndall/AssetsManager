@@ -2108,7 +2108,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
         [Theory]
         [InlineData(0)]
+        [InlineData(1)]
         [InlineData(2)]
+        [InlineData(3)]
+        [InlineData(12)]
+        [InlineData(18)]
         public void BoneChildFollowsTheDrawnParentScaleThroughoutItsLife(int inheritanceMode)
         {
             VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
@@ -2116,7 +2120,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxEmitterDefinition parentEmitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
             {
                 PrimitiveKind = VfxPrimitiveKind.Mesh,
-                BirthRotation = VfxCurve3.Const(new Vector3(0f, 0f, MathF.PI / 2f)),
+                BirthRotation = VfxCurve3.Const(new Vector3(0f, 90f, 0f)),
+                BirthRotationalVelocity = VfxCurve3.Const(new Vector3(0f, 90f, 0f)),
                 ScaleOverLife = new VfxCurve3(Vector3.One, new[] { 0f, 1f }, new[] { Vector3.One, new Vector3(2f) }, null),
                 ChildParticleSet = new VfxChildParticleSetDefinition(
                     new[] { new VfxChildSystemReference("child", 2, 0) }, false,
@@ -2127,7 +2132,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Vector3 joint = new(5f, 7f, 11f);
             graph.SetMeshJointProviders(new Dictionary<string, IVfxMeshJointProvider>
             {
-                ["0"] = new DelegateMeshJointProvider((_, _) => Matrix4x4.CreateTranslation(joint))
+                ["0"] = new DelegateMeshJointProvider((_, time) => Matrix4x4.CreateTranslation(joint + Vector3.UnitY * (20f * time)))
             });
             VfxPlaybackRuntime.ParticleLifecycleInfo latest = default;
             graph.Runtimes[0].ParticleLifecycle += (_, _, info) => latest = info;
@@ -2138,15 +2143,31 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 VfxPlaybackRuntime parentRuntime = graph.Runtimes[0];
                 var instances = parentRuntime.Emitters[0].PrepareInstances(1);
                 Vector3 drawnScale = new(instances[3], instances[4], instances[18]);
-                Matrix4x4 turn = inheritanceMode == 2 ? latest.Frame : latest.Basis;
-                Vector3 expected = latest.Position + Vector3.TransformNormal(joint * drawnScale, turn);
+                // A socket must coincide with the rendered parent even when the child ignores its turn.
+                Matrix4x4 turn = new(
+                    instances[36], instances[37], instances[38], 0f,
+                    instances[39], instances[40], instances[41], 0f,
+                    instances[42], instances[43], instances[44], 0f,
+                    0f, 0f, 0f, 1f);
+                Vector3 liveJoint = joint + Vector3.UnitY * (20f * latest.ParticleTime);
+                Vector3 expected = latest.Position + Vector3.TransformNormal(liveJoint * drawnScale, turn);
                 VfxPlaybackRuntime childRuntime = Assert.Single(graph.Runtimes.Skip(1));
                 Assert.True(Vector3.Distance(expected, childRuntime.Emitters[0].BasePos) < 0.001f);
                 Assert.Equal(Vector3.One, latest.DrawnScale / drawnScale);
+                Matrix4x4 inheritedTurn = (inheritanceMode & 2) != 0 ? latest.Frame : latest.Basis;
+                Vector3 expectedForward = Vector3.TransformNormal(Vector3.UnitZ, inheritedTurn);
+                Assert.True(Vector3.Distance(expectedForward,
+                    Vector3.TransformNormal(Vector3.UnitZ, childRuntime.WorldTransform)) < 0.001f);
                 Assert.Equal(1f, Vector3.TransformNormal(Vector3.UnitX, childRuntime.WorldTransform).Length(), precision: 4);
                 Assert.Equal(1f, Vector3.TransformNormal(Vector3.UnitY, childRuntime.WorldTransform).Length(), precision: 4);
                 Assert.Equal(1f, Vector3.TransformNormal(Vector3.UnitZ, childRuntime.WorldTransform).Length(), precision: 4);
             }
+            var checkpoint = graph.CaptureSnapshot();
+            graph.Update(0.12f);
+            Matrix4x4 expectedAfterSeek = Assert.Single(graph.Runtimes.Skip(1)).WorldTransform;
+            graph.RestoreSnapshot(checkpoint);
+            graph.Update(0.12f);
+            Assert.Equal(expectedAfterSeek, Assert.Single(graph.Runtimes.Skip(1)).WorldTransform);
         }
 
         [Fact]
@@ -5408,6 +5429,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(2f, state.Instances[3], precision: 4);
             Assert.Equal(3f, state.Instances[4], precision: 4);
             Assert.Equal(80f, state.Instances[18], precision: 4);
+        }
+
+        [Theory]
+        [InlineData(0f, false, 4f)]
+        [InlineData(0.00001f, false, 8f)]
+        [InlineData(10f, false, 80f)]
+        [InlineData(10f, true, 4f)]
+        public void MeshLifecycleScaleMatchesDrawnDimensionsForDirectionStretch(float speed, bool legacy, float expectedZ)
+        {
+            var emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = true, PrimitiveKind = VfxPrimitiveKind.Mesh,
+                BirthVelocity = VfxCurve3.Const(new Vector3(speed, 0f, 0f)),
+                IsDirectionOriented = true, DirectionVelocityScale = 2f, DirectionVelocityMinScale = 2f,
+                AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasLegacySimple: legacy),
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) }, false,
+                    VfxCurveF.Zero, VfxCurve3.Const(Vector3.Zero), 0, new[] { "socket" })
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            Vector3 lifecycleScale = Vector3.Zero;
+            runtime.ParticleUpdated += (_, _, particle) => lifecycleScale = particle.DrawnScale;
+            runtime.SetSystem(new VfxSystemDefinition(1, "mesh", "mesh", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.02f);
+            runtime.Update(0.02f);
+            var instances = Assert.Single(runtime.Emitters).PrepareInstances(1);
+            Assert.Equal(new Vector3(2f, 3f, expectedZ), lifecycleScale);
+            Assert.Equal(lifecycleScale, new Vector3(instances[3], instances[4], instances[18]));
         }
 
         [Fact]

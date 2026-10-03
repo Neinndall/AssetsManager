@@ -29,7 +29,7 @@ using PixelFormat = Silk.NET.OpenGL.PixelFormat;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--trace-emitter NAME] [--no-owner] [--rig Still|Trail|Missile]`:
+    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--trace-emitter NAME] [--no-owner] [--rig Still|Trail|Missile] [--trace-layout] [--frame-scale 1]`:
     /// plays one VFX system of an installed BIN the way VFX Studio does (VfxRenderSession, game particle shaders,
     /// resources extracted from the WADs) and writes a PNG per time over a mid-grey backdrop. With --per-emitter
     /// each root emitter is also drawn alone and measured: how much of the frame it darkens or brightens.
@@ -126,14 +126,25 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             float pitch = 56f * MathF.PI / 180f;
             VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(system, rig);
             VfxCameraFrame frame = VfxSystemBounds.FramePerspective(bounds, 40f, 1f, new Vector3(0f, MathF.Sin(pitch), MathF.Cos(pitch)));
+            if (float.TryParse(Option(args, "--frame-scale"), NumberStyles.Float, CultureInfo.InvariantCulture, out float frameScale) &&
+                float.IsFinite(frameScale) && frameScale > 0f)
+                frame = frame with { Position = frame.Target + (frame.Position - frame.Target) * frameScale };
             Matrix4x4 view = Matrix4x4.CreateLookAt(frame.Position, frame.Target, Vector3.UnitY);
             Matrix4x4 projection = Matrix4x4.CreatePerspectiveFieldOfView(40f * MathF.PI / 180f, 1f, VfxPreviewCamera.NearPlane, VfxPreviewCamera.FarPlane);
             Matrix4x4 viewProjection = view * projection;
 
             IReadOnlyList<VfxEmitterDefinition> emitters = system.Emitters ?? Array.Empty<VfxEmitterDefinition>();
             if (Option(args, "--dump-emitter") is { } dumped)
-                foreach (VfxEmitterDefinition emitter in emitters.Where(item => string.Equals(item.Name, dumped, StringComparison.OrdinalIgnoreCase)))
+                foreach (VfxEmitterDefinition emitter in emitters.Where(item => dumped == "*" || string.Equals(item.Name, dumped, StringComparison.OrdinalIgnoreCase)))
+                {
                     Console.WriteLine($"[Snapshot] parsed {emitter}");
+                    if (emitter.ChildParticleSet is { } childSet)
+                        foreach (VfxChildSystemReference child in childSet.Children)
+                        {
+                            VfxSystemDefinition target = VfxPlaybackGraphRuntime.ResolveSystem(child, systems, system.ResourceMap ?? resourceMap);
+                            Console.WriteLine($"[Snapshot] child parent={emitter.Name} target={target?.Name ?? "unresolved"} reference={child} bones=[{string.Join(",", childSet.Bones ?? Array.Empty<string>())}]");
+                        }
+                }
             Console.WriteLine($"[Snapshot] {system.Name} emitters={emitters.Count} bounds={bounds.Min}..{bounds.Max} eye={frame.Position}");
             if (Option(args, "--trace-emitter") is { } traced)
             {
@@ -155,6 +166,24 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                                           $"shader members=[{string.Join(", ", ShaderMembers(state.Def.CustomMaterial.Program, settings))}]");
                 }
             }
+            if (args.Contains("--trace-layout"))
+                foreach (double time in times)
+                {
+                    Draw(gl, session, framebuffer, size, time, viewProjection, view);
+                    foreach (var runtime in session.Graphs.SelectMany(graph => graph.Runtimes))
+                    {
+                        Console.WriteLine($"[Layout] t={time:0.00} system={runtime.Definition.Name} origin={runtime.WorldTransform.Translation} up={Vector3.TransformNormal(Vector3.UnitY, runtime.WorldTransform)}");
+                        foreach (var state in runtime.Emitters)
+                        {
+                            var instances = state.Instances;
+                            if (state.Particles.Count == 0) continue;
+                            var particle = state.Particles[0];
+                            Console.WriteLine($"[Layout] emitter={state.Def.Name} root={state.RenderRootSourceOrder} path={state.RenderPath} base={state.BasePos} position={particle.Pos} age={particle.Age:0.000} drawn=<{instances[0]}, {instances[1]}, {instances[2]}> scale=<{instances[3]}, {instances[4]}, {instances[18]}> rotation={particle.BirthRotation} right=<{instances[36]}, {instances[37]}, {instances[38]}> up=<{instances[39]}, {instances[40]}, {instances[41]}> forward=<{instances[42]}, {instances[43]}, {instances[44]}>");
+                            if (state.MeshAnimation?.TryGetJointTransform("Chest", particle.Age, out var joint) == true)
+                                Console.WriteLine($"[Layout] Chest local={joint.Translation} up={Vector3.TransformNormal(Vector3.UnitY, joint)}");
+                        }
+                    }
+                }
             string stem = Sanitize(system.Name);
             foreach (double time in times)
             {

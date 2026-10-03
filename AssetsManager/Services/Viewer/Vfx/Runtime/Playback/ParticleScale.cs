@@ -25,13 +25,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return definition.IsUniformScale ? new Vector3(multiplier.X) : multiplier;
         }
 
+        private static float ResolveDirectionStretch(VfxEmitterDefinition definition, Vector3 travel)
+        {
+            // Ordinary meshes stretch local Z; quads stretch their long axis. Legacy
+            // particles, rays and attachment meshes retain their authored dimensions.
+            if (!definition.IsDirectionOriented || definition.PrimitiveKind == VfxPrimitiveKind.Ray ||
+                definition.AuthoredFeatures?.HasLegacySimple == true ||
+                (!definition.DrawsAsQuad && definition.PrimitiveKind != VfxPrimitiveKind.Mesh) ||
+                !(travel.LengthSquared() > 0f))
+                return 1f;
+            return MathF.Max(definition.DirectionVelocityMinScale, travel.Length() * definition.DirectionVelocityScale);
+        }
+
         private static Vector3 ResolveMeshScale(EmitterState state, in Particle particle)
         {
             VfxEmitterDefinition definition = state.Def;
             Vector3 scale = particle.BirthSize * ResolveScaleMultiplier(state, particle);
-            if (definition.PrimitiveKind == VfxPrimitiveKind.Mesh && definition.IsDirectionOriented &&
-                definition.AuthoredFeatures?.HasLegacySimple != true && particle.Travel.LengthSquared() > 0f)
-                scale.Z *= MathF.Max(definition.DirectionVelocityMinScale, particle.Travel.Length() * definition.DirectionVelocityScale);
+            if (definition.PrimitiveKind == VfxPrimitiveKind.Mesh)
+                scale.Z *= ResolveDirectionStretch(definition, particle.Travel);
             // Bone positions follow the drawn mesh; children retain their own authored dimensions.
             scale = new Vector3(float.IsFinite(scale.X) ? scale.X : 1f,
                 float.IsFinite(scale.Y) ? scale.Y : 1f, float.IsFinite(scale.Z) ? scale.Z : 1f);

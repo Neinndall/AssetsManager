@@ -4,6 +4,7 @@ using System.Linq;
 using AssetsManager.Shaders;
 using System.Text.RegularExpressions;
 using AssetsManager.Utils.Rendering;
+using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
 
@@ -127,6 +128,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             try
             {
                 var blocks = new List<BlockRuntime>();
+                uint boneBlock = particle ? _gl.GetUniformBlockIndex(program, "VfxBoneTransforms") : uint.MaxValue;
+                bool hasParticleBones = boneBlock != uint.MaxValue;
+                // The geometry prelude's palette is uploaded by the VFX renderer, outside
+                // the translated shader sidecar. Reserve its slot across every native pass.
+                if (hasParticleBones)
+                    _gl.UniformBlockBinding(program, boneBlock, VfxShaderSource.BoneTransformsBinding);
                 uint binding = 0;
                 foreach (GameShaderTranslator.UniformBlock block in translated.Vertex.Sidecar.Blocks
                              .Concat(translated.Pixel.Sidecar.Blocks))
@@ -135,6 +142,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     if (index == uint.MaxValue)
                         continue;
 
+                    if (hasParticleBones && binding == VfxShaderSource.BoneTransformsBinding) binding++;
                     _gl.UniformBlockBinding(program, index, binding);
                     uint buffer = _gl.GenBuffer();
                     float[] data = new float[checked((int)(block.Size / sizeof(float)))];

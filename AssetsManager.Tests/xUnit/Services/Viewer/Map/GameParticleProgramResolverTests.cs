@@ -49,6 +49,39 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.True(translated.Ready, translated.Failure);
         }
 
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public void NativeParticleBonePaletteDoesNotAliasTranslatedShaderBlocks(bool attached, bool distortion)
+        {
+            string root = FindInstalledShaderCacheRoot();
+            if (root == null) return;
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var runtime = new GameShaderRuntime(gl, false, InstalledSkins.Settings(root));
+            var emitter = Emitter() with
+            {
+                IsMeshPrimitive = true, MeshIsSkinned = true,
+                PrimitiveKind = attached ? VfxPrimitiveKind.AttachedMesh : VfxPrimitiveKind.Mesh,
+                Distortion = distortion ? new VfxDistortionDefinition(1f, 1, "normal.tex") : null
+            };
+            uint program = runtime.UseParticleProgram(emitter, true, 0);
+            Assert.NotEqual(0u, program);
+            uint boneBlock = gl.GetUniformBlockIndex(program, "VfxBoneTransforms");
+            Assert.NotEqual(uint.MaxValue, boneBlock);
+            gl.GetActiveUniformBlock(program, boneBlock, GLEnum.UniformBlockBinding, out int paletteBinding);
+            Assert.Equal((int)AssetsManager.Services.Viewer.Vfx.Rendering.VfxShaderSource.BoneTransformsBinding, paletteBinding);
+            gl.GetProgram(program, GLEnum.ActiveUniformBlocks, out int count);
+            for (uint block = 0; block < count; block++)
+            {
+                if (block == boneBlock) continue;
+                gl.GetActiveUniformBlock(program, block, GLEnum.UniformBlockBinding, out int binding);
+                Assert.NotEqual(paletteBinding, binding);
+            }
+        }
+
         [Fact]
         public void PairSelectionUsesSeparateScreenFixedMeshAttachedAndDistortionHlslFiles()
         {

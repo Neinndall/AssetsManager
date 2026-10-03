@@ -578,7 +578,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _ready = false;
         }
 
-        private const uint OwnerBoneBinding = 1;
+        private const uint OwnerBoneBinding = VfxShaderSource.BoneTransformsBinding;
         private uint _meshProgram;
         private uint _meshBoneBuffer;
         private Matrix4x4[] _ownerSkinningMatrices;

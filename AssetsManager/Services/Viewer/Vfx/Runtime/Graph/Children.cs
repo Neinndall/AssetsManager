@@ -98,7 +98,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         child.BoneName,
                         particle.ParticleTime);
                     if (!joint.HasValue) continue;
-                    placement = ReRootOnJoint(bearing, joint.Value, particle.DrawnScale);
+                    placement = ReRootOnJoint(bearing, joint.Value, particle.Basis, particle.DrawnScale);
                 }
                 UpdateChildPlacement(child.Runtime, child.Definition, placement);
             }
@@ -141,7 +141,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         bone,
                         particle.ParticleTime);
                     if (!joint.HasValue) continue;
-                    Matrix4x4 placement = ReRootOnJoint(bearing, joint.Value, particle.DrawnScale);
+                    Matrix4x4 placement = ReRootOnJoint(bearing, joint.Value, particle.Basis, particle.DrawnScale);
                     int childSeed = ChildSeed(_initialSeed, $"{emitterPath}.{slot}", particle.Serial);
                     SpawnChild(parentRuntime, childSet, particle, parentDepth, emitterPath, slot,
                         placement, childSeed, unchecked((uint)childSeed), carried, bone);
@@ -322,11 +322,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return _jointTransformProvider?.Invoke(boneName);
         }
 
-        private static Matrix4x4 ReRootOnJoint(Matrix4x4 bearing, Matrix4x4 joint, Vector3 drawnScale)
+        private static Matrix4x4 ReRootOnJoint(
+            Matrix4x4 bearing, Matrix4x4 joint, Matrix4x4 particleBasis, Vector3 drawnScale)
         {
             Matrix4x4 bearingTurn = VectorMathUtils.OrientationOnly(bearing);
             Matrix4x4 jointTurn = VectorMathUtils.OrientationOnly(joint);
-            Vector3 jointOffset = Vector3.TransformNormal(joint.Translation * drawnScale, bearingTurn);
+            // Inheritance may drop the particle's turn from the child's orientation, but
+            // the socket position still follows the parent's rendered scale and whole turn.
+            Vector3 jointOffset = Vector3.TransformNormal(
+                joint.Translation * drawnScale, VectorMathUtils.OrientationOnly(particleBasis));
             Vector3 position = bearing.Translation + jointOffset;
 
             // System.Numerics uses row vectors: local joint turn followed by the particle

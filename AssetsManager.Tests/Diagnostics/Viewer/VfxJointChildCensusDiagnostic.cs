@@ -41,6 +41,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
 
             var counts = new Dictionary<string, int>();
+            var modes = new Dictionary<string, int>();
             var owners = new HashSet<uint>();
             var examples = new List<string>();
             foreach ((ulong hash, string path) in paths.Where(pair => where.ContainsKey(pair.Key) &&
@@ -67,6 +68,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                         if (emitter.Disabled || emitter.ChildParticleSet?.Bones is not { Count: > 0 }) continue;
                         string kind = emitter.PrimitiveKind.ToString();
                         counts[kind] = counts.GetValueOrDefault(kind) + 1;
+                        string mode = $"{kind}:0x{emitter.ChildParticleSet.InheritanceMode:X}";
+                        modes[mode] = modes.GetValueOrDefault(mode) + 1;
                         owners.Add(system.PathHash);
                         if (examples.Count < 30)
                             examples.Add($"{path} {system.Name}/{emitter.Name} kind={kind} birthScale={emitter.BirthScale.Constant} scaleOverLife={emitter.ScaleOverLife?.Constant} mesh={emitter.MeshPath}");
@@ -76,6 +79,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             Console.WriteLine($"[JointChildCensus] systems={owners.Count} emitters={counts.Values.Sum()}");
             foreach (var pair in counts.OrderByDescending(pair => pair.Value))
                 Console.WriteLine($"[JointChildCensus] {pair.Key}={pair.Value}");
+            foreach (var pair in modes.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+                Console.WriteLine($"[JointChildCensus] inheritance {pair.Key}={pair.Value}");
             foreach (string example in examples) Console.WriteLine($"[JointChildCensus] {example}");
             foreach (WadFile wad in wads) wad.Dispose();
         }

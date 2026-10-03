@@ -464,6 +464,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Fixed animated particle meshes losing their shape when using game shaders.
+  - VFX Studio / Fixed effects attached to particle bones appearing away from rotated meshes.
   - VFX Studio / Effects anchored to particle mesh bones now follow the mesh's changing size.
   - VFX Studio / Corrected effect layering across parent, child and overlapping systems.
   - VFX Studio / Corrected locked alpha masks on particle ribbons and beams.

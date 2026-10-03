@@ -95,18 +95,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 }
                 Vector3 direction = p.Travel;
 
-                // LTK stretchOf() reaches only direction-oriented quads and ordinary meshes.
-                // LegacySimple and rays explicitly keep a factor of one; meshes stretch local +Z,
-                // while quads stretch their authored long/local Y axis.
-                bool canDirectionStretch =
-                    d.IsDirectionOriented &&
-                    d.PrimitiveKind != VfxPrimitiveKind.Ray &&
-                    d.AuthoredFeatures?.HasLegacySimple != true &&
-                    (d.DrawsAsQuad || d.PrimitiveKind == VfxPrimitiveKind.Mesh) &&
-                    direction.LengthSquared() > 0f;
-                if (canDirectionStretch)
+                float stretch = ResolveDirectionStretch(d, direction);
+                if (stretch != 1f)
                 {
-                    float stretch = MathF.Max(d.DirectionVelocityMinScale, direction.Length() * d.DirectionVelocityScale);
                     if (d.PrimitiveKind == VfxPrimitiveKind.Mesh) sizeZ *= stretch;
                     else sizeY *= stretch;
                 }
