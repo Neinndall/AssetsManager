@@ -206,6 +206,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             Loaded += OnControlLoaded;
             Unloaded += OnControlUnloaded;
+            IsVisibleChanged += OnControlVisibilityChanged;
             PreviewKeyDown += RunKeys_PreviewKeyDown;
         }
 

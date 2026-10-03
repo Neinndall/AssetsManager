@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
 
@@ -12,6 +13,19 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class VfxInspectorControl
     {
+        private DispatcherOperation _playheadRefreshOperation;
+
+        private void QueuePlayheadRefresh()
+        {
+            if (_model?.TimelineVisible != true || _playheadRefreshOperation?.Status == DispatcherOperationStatus.Pending)
+                return;
+            _playheadRefreshOperation = Dispatcher.InvokeAsync(() =>
+            {
+                _playheadRefreshOperation = null;
+                if (_isActive && !_isCleanedUp) UpdatePlayheadPosition();
+            }, DispatcherPriority.Background);
+        }
+
         private void TracksCanvasContainer_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             UpdateTimelineTrackMetrics();

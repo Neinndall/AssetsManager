@@ -283,9 +283,7 @@ namespace AssetsManager.Views.Helpers
                 var currentMousePosition = e.GetPosition(_inputSurface);
                 var delta = new System.Windows.Point(currentMousePosition.X - _lastMousePosition.X, currentMousePosition.Y - _lastMousePosition.Y);
 
-                double sensitivity = 0.25;
-                // Consume every mouse delta once per frame without an additional smoothing delay.
-                _pendingRotation += new Vector3D(-delta.X * sensitivity, -delta.Y * sensitivity, 0);
+                QueueRotation(new Vector(delta.X, delta.Y));
 
                 _lastMousePosition = currentMousePosition;
             }
@@ -384,7 +382,15 @@ namespace AssetsManager.Views.Helpers
                 _targetPosition + lookDir * (delta * step));
         }
 
-        private void ApplyPendingRotation()
+        internal void QueueRotation(Vector mouseDelta)
+        {
+            const double sensitivity = 0.25;
+            _pendingRotation += new Vector3D(-mouseDelta.X * sensitivity, -mouseDelta.Y * sensitivity, 0);
+        }
+
+        // Render hosts consume input again immediately before reading their camera matrices;
+        // mouse events arriving after CompositionTarget.Rendering belong to this frame too.
+        internal void ApplyPendingRotation()
         {
             if (_pendingRotation.LengthSquared == 0 || _viewport?.Camera is not ProjectionCamera camera)
                 return;

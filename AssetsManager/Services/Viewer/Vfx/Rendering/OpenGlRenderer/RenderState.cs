@@ -144,22 +144,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private void ApplyCustomMaterialUniforms(
             ModelMaterialDefinition material,
-            int useLocation,
-            int tintLocation,
-            int repeatLocation,
-            int addressULocation,
-            int addressVLocation,
-            int premultipliedLocation)
+            VfxShaderUniforms uniforms)
         {
             bool enabled = material is not null;
-            _gl.Uniform1(useLocation, enabled ? 1 : 0);
+            uniforms.Uniform1(uniforms.UseCustomMaterial, enabled ? 1 : 0);
             Vector4 tint = material?.Color ?? Vector4.One;
             Vector2 repeat = material?.UvRepeat ?? Vector2.One;
-            _gl.Uniform4(tintLocation, tint.X, tint.Y, tint.Z, tint.W);
-            _gl.Uniform2(repeatLocation, repeat.X, repeat.Y);
-            _gl.Uniform1(addressULocation, enabled ? (int)material.WrapU : 0);
-            _gl.Uniform1(addressVLocation, enabled ? (int)material.WrapV : 0);
-            _gl.Uniform1(premultipliedLocation, enabled && material.RenderState.PremultipliedAlpha ? 1 : 0);
+            uniforms.Uniform4(uniforms.MaterialTint, tint.X, tint.Y, tint.Z, tint.W);
+            uniforms.Uniform2(uniforms.MaterialRepeat, repeat.X, repeat.Y);
+            uniforms.Uniform1(uniforms.MaterialAddressU, enabled ? (int)material.WrapU : 0);
+            uniforms.Uniform1(uniforms.MaterialAddressV, enabled ? (int)material.WrapV : 0);
+            uniforms.Uniform1(uniforms.MaterialPremultiplied, enabled && material.RenderState.PremultipliedAlpha ? 1 : 0);
         }
 
         internal static BlendingFactor ToOpenGl(VfxCustomMaterialBlendFactor factor) => factor switch

@@ -10,6 +10,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 {
     internal sealed partial class GameShaderRuntime
     {
+        internal AssetsManager.Services.Viewer.Rendering.Core.GlDrawBindings ParticleDrawBindings { get; set; }
         private sealed record ParticleMaterial(GameMaterialProgram Program);
         private readonly Dictionary<VfxEmitterDefinition, ParticleMaterial[]> _particleMaterials =
             new(ReferenceEqualityComparer.Instance);
@@ -68,7 +69,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             var cache = ParticleEntry(emitter, mesh).Cache;
             if (cache == null || index < 0 || index >= cache.Passes.Count) return 0;
             uint handle = cache.Passes[index].Program.Program;
-            _gl.UseProgram(handle);
+            if (ParticleDrawBindings != null)
+                ParticleDrawBindings.UseProgram(handle);
+            else
+                _gl.UseProgram(handle);
             return handle;
         }
 
@@ -81,9 +85,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             {
                 // A texture resolved on demand may upload, which binds on the active unit: activate this one first.
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + sampler.Unit));
-                string own = sampler.TextureName.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
-                    ? sampler.TextureName[..^MaterialTextureSuffix.Length] : sampler.TextureName;
-                var declared = entry.Pass.Textures?.FirstOrDefault(texture => string.Equals(texture.Name, own, StringComparison.Ordinal));
+                string own = sampler.MaterialName;
+                var declared = FindDeclaredTexture(entry.Pass.Textures, own);
                 uint? texture = ResolveParticleTexture(emitter.HasResolvedCustomMaterial, sampler.TextureName, declared, textures);
                 TextureTarget target = sampler.Dimension switch
                 {
@@ -116,11 +119,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 if (sampler.Dimension == GameShaderTranslator.TextureDimension.Buffer)
                     samplerObject = ResolveNeutralSampler(true, sampler.Dimension);
                 else if (emitter.HasResolvedCustomMaterial && declared?.Sampler != null)
-                    samplerObject = ResolveSampler(declared.Sampler with { SharedSampler = "No_Mip" });
+                    samplerObject = ResolveParticleSampler(declared.Sampler);
                 else
                 {
-                    var wrap = mode == 0 ? MapTextureWrap.Repeat : mode == 1 ? MapTextureWrap.Mirror : MapTextureWrap.Clamp;
-                    samplerObject = ResolveSampler(new GameMaterialSamplerState("No_Mip", wrap, wrap, wrap, true, true));
+                    samplerObject = ResolveSampler(ParticleSamplers[mode == 0 ? 0 : mode == 1 ? 1 : 2]);
                 }
                 _gl.BindSampler(sampler.Unit, samplerObject);
             }
@@ -130,6 +132,22 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             else
                 _doubleSidedTransparent = false;
             if (emitter.IsGroundLayer) _doubleSidedTransparent = false;
+        }
+
+        private static readonly GameMaterialSamplerState[] ParticleSamplers =
+        {
+            new("No_Mip", MapTextureWrap.Repeat, MapTextureWrap.Repeat, MapTextureWrap.Repeat, true, true),
+            new("No_Mip", MapTextureWrap.Mirror, MapTextureWrap.Mirror, MapTextureWrap.Mirror, true, true),
+            new("No_Mip", MapTextureWrap.Clamp, MapTextureWrap.Clamp, MapTextureWrap.Clamp, true, true)
+        };
+
+        private readonly Dictionary<GameMaterialSamplerState, GameMaterialSamplerState> _particleSamplerStates = new();
+
+        private uint ResolveParticleSampler(GameMaterialSamplerState state)
+        {
+            if (!_particleSamplerStates.TryGetValue(state, out GameMaterialSamplerState singleLevel))
+                _particleSamplerStates.Add(state, singleLevel = state with { SharedSampler = "No_Mip" });
+            return ResolveSampler(singleLevel);
         }
 
         internal static uint? ResolveParticleTexture(bool custom, string samplerName,

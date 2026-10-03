@@ -24,6 +24,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private readonly Dictionary<VfxCubeMapData, uint> _cubeMaps =
             new(ReferenceEqualityComparer.Instance);
 
+        private readonly List<string> _pendingProgramKeys = new();
+
         internal void UploadPendingResources(
             IEnumerable<VfxPlaybackGraphRuntime> graphs,
             VfxOpenGlRenderer renderer,
@@ -120,7 +122,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 renderer,
                 ref budget);
 
-            foreach (string path in new List<string>(emitter.PendingProgramTextures.Keys))
+            _pendingProgramKeys.Clear();
+            foreach (string path in emitter.PendingProgramTextures.Keys)
+                _pendingProgramKeys.Add(path);
+            foreach (string path in _pendingProgramKeys)
             {
                 object pending = emitter.PendingProgramTextures[path];
                 uint handle = pending is VfxCubeMapData

@@ -17,6 +17,8 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class VfxInspectorControl
     {
+        private ViewportFrameScheduler _viewportFrameScheduler;
+
         private void OnControlLoaded(object sender, RoutedEventArgs e)
         {
             LoadPreviewDisplayPreferences();
@@ -136,14 +138,25 @@ namespace AssetsManager.Views.Controls.Viewer
             // LTK stops the viewport frameloop while hidden. Keep the GL resources alive but stop
             // scheduling empty render callbacks until the Studio becomes visible again.
             SetRenderLoopRunning(false);
+            _playheadRefreshOperation?.Abort();
+            _playheadRefreshOperation = null;
+        }
+
+        private void OnControlVisibilityChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (_isCleanedUp) return;
+            if (IsVisible) _discardNextSimulationDelta = true;
+            SetRenderLoopRunning(_isActive && IsVisible);
         }
 
         private void SetRenderLoopRunning(bool running)
         {
             if (!_isGlStarted || OpenTkControl == null) return;
-            OpenTkControl.RenderContinuously = running;
-            if (running)
-                OpenTkControl.InvalidateVisual();
+            _viewportFrameScheduler ??= new ViewportFrameScheduler(Dispatcher, OpenTkControl.InvalidateVisual);
+            if (running && IsVisible)
+                _viewportFrameScheduler.Start();
+            else
+                _viewportFrameScheduler.Stop();
         }
 
         private void EnsureOpenGlStarted()
@@ -156,10 +169,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     MajorVersion = 3,
                     MinorVersion = 3,
-                    RenderContinuously = true
+                    RenderContinuously = false
                 };
                 OpenTkControl.Start(settings);
                 _isGlStarted = true;
+                SetRenderLoopRunning(_isActive);
             }
             catch (Exception ex)
             {
@@ -184,6 +198,9 @@ namespace AssetsManager.Views.Controls.Viewer
             _isExitPending = false;
             Deactivate();
             _isCleanedUp = true;
+            IsVisibleChanged -= OnControlVisibilityChanged;
+            _viewportFrameScheduler?.Dispose();
+            _viewportFrameScheduler = null;
             _model.PropertyChanged -= OnModelPropertyChanged;
             _model.MapVisibilityRequested -= OnMapVisibilityRequested;
             _championLoadGeneration++;

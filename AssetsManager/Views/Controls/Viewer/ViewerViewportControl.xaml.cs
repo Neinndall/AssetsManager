@@ -136,6 +136,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _gl.Clear((uint)(Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit | Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit));
 
             // 1. Get perspective camera from viewport to build View/Projection matrices
+            _cameraController?.ApplyPendingRotation();
             var camera = Viewport3D.Camera as PerspectiveCamera;
             if (camera == null) return;
 

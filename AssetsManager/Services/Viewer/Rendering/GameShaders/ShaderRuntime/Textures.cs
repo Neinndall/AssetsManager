@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using AssetsManager.Shaders;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Loading;
@@ -19,6 +20,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             GameMaterialState state,
             in Frame frame)
         {
+            Span<Vector3> cube = stackalloc Vector3[6];
             foreach (SamplerRuntime sampler in runtime.Samplers)
             {
                 // Resolving a texture may upload it, and an upload binds on the active unit. Activating this
@@ -51,7 +53,6 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 }
                 else if (name == LightGridTexture && sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2DArray)
                 {
-                    Span<Vector3> cube = stackalloc Vector3[6];
                     ResolveAmbientCube(frame, cube);
                     texture = (_lightGridTexture ??= new GameShaderLightGridTexture(_gl)).Update(cube);
                     target = TextureTarget.Texture2DArray;
@@ -64,11 +65,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 }
                 else
                 {
-                    string own = name.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
-                        ? name[..^MaterialTextureSuffix.Length]
-                        : name;
-                    GameMaterialTexture declared = pass.Textures?
-                        .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
+                    string own = sampler.MaterialName;
+                    GameMaterialTexture declared = FindDeclaredTexture(pass.Textures, own);
                     string authoredPath = material.ResolveTextureSwap(own, state) ?? declared?.Texture?.VirtualPath;
                     if (string.IsNullOrWhiteSpace(authoredPath) && declared?.Texture?.PathHash > 0)
                         authoredPath = declared.Texture.PathHash.ToString("x16");
@@ -171,13 +169,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 }
                 else
                 {
-                    string own = name.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
-                        ? name[..^MaterialTextureSuffix.Length]
-                        : name;
-                    GameMaterialTexture declared = pass.Textures?
-                        .FirstOrDefault(item => string.Equals(item.Name, own, StringComparison.Ordinal));
+                    string own = sampler.MaterialName;
+                    GameMaterialTexture declared = FindDeclaredTexture(pass.Textures, own);
                     uint? loaded = sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D
-                        ? ResolveStaticProgramTexture(material.Name, passIndex, own, programTexture)
+                        ? ResolveCachedStaticProgramTexture(material.Name, passIndex, own, programTexture)
                         : null;
                     if (loaded.HasValue && loaded.Value != 0)
                     {
@@ -238,6 +233,22 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal static uint? ResolveStaticProgramTexture(
             string material, int authoredPassIndex, string texture, Func<string, uint?> lookup) =>
             lookup?.Invoke(MapTextureLoadingService.ProgramTextureKey(material, authoredPassIndex, texture));
+
+        private uint? ResolveCachedStaticProgramTexture(string material, int pass, string texture, Func<string, uint?> lookup)
+        {
+            var identity = (material, pass, texture);
+            if (!_staticTextureKeys.TryGetValue(identity, out string key))
+                _staticTextureKeys.Add(identity, key = MapTextureLoadingService.ProgramTextureKey(material, pass, texture));
+            return lookup?.Invoke(key);
+        }
+
+        private static GameMaterialTexture FindDeclaredTexture(IReadOnlyList<GameMaterialTexture> textures, string name)
+        {
+            for (int index = 0; index < (textures?.Count ?? 0); index++)
+                if (string.Equals(textures[index]?.Name, name, StringComparison.Ordinal))
+                    return textures[index];
+            return null;
+        }
 
         private static uint? ResolveLightmap(
             MapGeometryLightChannelData channel,

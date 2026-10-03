@@ -130,6 +130,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             internal uint Buffer;
             internal uint Binding;
             internal float[] Data;
+            internal float[] UploadedData;
+            internal bool HasUploadedData;
         }
 
         private sealed record SamplerRuntime(
@@ -137,7 +139,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             GameShaderTranslator.TextureDimension Dimension,
             string LogicalSampler,
             int Location,
-            uint Unit);
+            uint Unit)
+        {
+            internal string MaterialName { get; } = TextureName.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
+                ? TextureName[..^MaterialTextureSuffix.Length] : TextureName;
+        }
 
         private sealed class ProgramRuntime : IDisposable
         {
@@ -234,6 +240,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         private readonly Dictionary<string, ProgramRuntime> _sharedPrograms =
             new(StringComparer.Ordinal);
         private readonly Dictionary<(MapTextureWrap U, MapTextureWrap V, bool Min, bool Mag, string Shared), uint> _samplers = new();
+        private readonly Dictionary<(string Material, int Pass, string Texture), string> _staticTextureKeys = new();
         private uint _neutralGrey2D;
         private uint _neutralBlack2D;
         private uint _neutralWhite2D;
@@ -412,9 +419,13 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 return;
             _disposed = true;
             _programs.Clear();
+            _staticTextureKeys.Clear();
+            _particleSamplerStates.Clear();
             foreach (ProgramRuntime program in _sharedPrograms.Values)
                 program?.Dispose();
             _sharedPrograms.Clear();
+            _bytecodeReads.Clear();
+            _cachedBytecodeBytes = 0;
             _shaderCache?.Dispose();
             _lightGridTexture?.Dispose();
             _lightGridTexture = null;

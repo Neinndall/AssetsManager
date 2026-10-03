@@ -1,9 +1,66 @@
+using System;
 using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
     internal sealed class VfxShaderUniforms
     {
+        private readonly GL _gl;
+        private UniformValue[] _values = Array.Empty<UniformValue>();
+        internal int UploadCount { get; private set; }
+
+        private struct UniformValue
+        {
+            internal int Kind, X, Y, Z, W;
+        }
+
+        private bool Changed(int location, int kind, int x, int y = 0, int z = 0, int w = 0)
+        {
+            if (location < 0) return false;
+            if (location >= _values.Length)
+                Array.Resize(ref _values, Math.Max(location + 1, Math.Max(32, _values.Length * 2)));
+            ref UniformValue previous = ref _values[location];
+            if (previous.Kind == kind && previous.X == x && previous.Y == y && previous.Z == z && previous.W == w)
+                return false;
+            previous.Kind = kind;
+            previous.X = x;
+            previous.Y = y;
+            previous.Z = z;
+            previous.W = w;
+            UploadCount++;
+            return true;
+        }
+
+        // Uniform state belongs to the linked program, so it survives draws of other programs.
+        // Keep float bits: signed zero and NaN payloads can carry authored shader semantics.
+        internal void Uniform1(int location, int value)
+        {
+            if (location >= 0 && Changed(location, 1, value)) _gl.Uniform1(location, value);
+        }
+
+        internal void Uniform1(int location, float value)
+        {
+            if (location >= 0 && Changed(location, 2, BitConverter.SingleToInt32Bits(value))) _gl.Uniform1(location, value);
+        }
+
+        internal void Uniform2(int location, float x, float y)
+        {
+            if (location >= 0 && Changed(location, 3, BitConverter.SingleToInt32Bits(x), BitConverter.SingleToInt32Bits(y)))
+                _gl.Uniform2(location, x, y);
+        }
+
+        internal void Uniform3(int location, float x, float y, float z)
+        {
+            if (location >= 0 && Changed(location, 4, BitConverter.SingleToInt32Bits(x), BitConverter.SingleToInt32Bits(y), BitConverter.SingleToInt32Bits(z)))
+                _gl.Uniform3(location, x, y, z);
+        }
+
+        internal void Uniform4(int location, float x, float y, float z, float w)
+        {
+            if (location >= 0 && Changed(location, 5, BitConverter.SingleToInt32Bits(x), BitConverter.SingleToInt32Bits(y), BitConverter.SingleToInt32Bits(z), BitConverter.SingleToInt32Bits(w)))
+                _gl.Uniform4(location, x, y, z, w);
+        }
+
         internal readonly int AddressMode;
         internal readonly int AddressModeMult;
         internal readonly int AlignPitchToCamera;
@@ -118,6 +175,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal VfxShaderUniforms(GL gl, uint program)
         {
+            _gl = gl;
             AddressMode = gl.GetUniformLocation(program, "uAddressMode");
             AddressModeMult = gl.GetUniformLocation(program, "uAddressModeMult");
             AlignPitchToCamera = gl.GetUniformLocation(program, "uAlignPitchToCamera");

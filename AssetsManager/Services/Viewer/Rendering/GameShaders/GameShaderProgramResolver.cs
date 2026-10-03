@@ -178,7 +178,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             return !string.IsNullOrWhiteSpace(stagePath) ? stagePath : pass.ShaderPath;
         }
 
-        private static ShaderBytecodeRead ReadFromWad(
+        internal static ShaderBytecodeRead ReadFromWad(
             GameMaterialPass pass,
             GameMaterialKind kind,
             WadFile wad,

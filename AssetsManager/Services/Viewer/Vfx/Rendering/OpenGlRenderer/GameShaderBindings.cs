@@ -13,6 +13,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     {
         private GameShaderRuntime _gameShaders;
         private GameShaderRuntime.Frame _gameFrame;
+        private Matrix4x4 _gameViewProjection;
+        private Vector3 _gameCameraRight;
+        private Vector3 _gameCameraUp;
+        private readonly HashSet<uint> _cameraPrograms = new();
         private readonly Dictionary<uint, VfxShaderUniforms> _gameUniforms = new();
         private readonly Dictionary<string, Vector4> _particleParameters = new(StringComparer.Ordinal);
 
@@ -58,7 +62,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 for (uint unit = 0; unit < 16; unit++) _gl.BindSampler(unit, 0);
                 if (mesh) _meshUniforms = _stockMeshUniforms;
                 else _particleUniforms = _stockParticleUniforms;
-                _gl.UseProgram(mesh ? _meshProgram : _program);
+                _drawBindings.UseProgram(mesh ? _meshProgram : _program);
                 return false;
             }
             if (!_gameUniforms.TryGetValue(program, out var uniforms))
@@ -67,23 +71,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             else
             {
                 _particleUniforms = uniforms;
-                Matrix4x4.Invert(_gameFrame.View, out var inverse);
-                Vector3 right = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX, inverse));
-                Vector3 up = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitY, inverse));
-                Matrix4x4 projection = _gameFrame.View * _gameFrame.Projection;
-                _gl.UniformMatrix4(uniforms.ViewProj, 1, false, in projection.M11);
-                _gl.Uniform3(uniforms.CamRight, right.X, right.Y, right.Z);
-                _gl.Uniform3(uniforms.CamUp, up.X, up.Y, up.Z);
-                _gl.Uniform3(uniforms.CamPos, _gameFrame.Eye.X, _gameFrame.Eye.Y, _gameFrame.Eye.Z);
+                // Each linked program keeps its camera uniforms while other emitters draw.
+                if (_cameraPrograms.Add(program))
+                {
+                    _gl.UniformMatrix4(uniforms.ViewProj, 1, false, in _gameViewProjection.M11);
+                    uniforms.Uniform3(uniforms.CamRight, _gameCameraRight.X, _gameCameraRight.Y, _gameCameraRight.Z);
+                    uniforms.Uniform3(uniforms.CamUp, _gameCameraUp.X, _gameCameraUp.Y, _gameCameraUp.Z);
+                    uniforms.Uniform3(uniforms.CamPos, _gameFrame.Eye.X, _gameFrame.Eye.Y, _gameFrame.Eye.Z);
+                }
             }
-            _gl.Uniform1(uniforms.GamePremultiplied, !emitter.Def.HasResolvedCustomMaterial && !emitter.Def.DrawsAsDistortion && emitter.Def.BlendMode is 0 or 5 ? 1 : 0);
+            uniforms.Uniform1(uniforms.GamePremultiplied, !emitter.Def.HasResolvedCustomMaterial && !emitter.Def.DrawsAsDistortion && emitter.Def.BlendMode is 0 or 5 ? 1 : 0);
             return true;
         }
 
         private void BindGameParticle(VfxPlaybackRuntime.EmitterState emitter, bool mesh, int pass, float phase)
         {
             var uniforms = mesh ? _meshUniforms : _particleUniforms;
-            _gl.Uniform1(uniforms.HasTexMult, HasTextureMultLayer(emitter.Def) ? 1 : 0);
+            uniforms.Uniform1(uniforms.HasTexMult, HasTextureMultLayer(emitter.Def) ? 1 : 0);
             _particleParameters.Clear();
             VfxShaderParameterUtils.PopulateNativeParameters(_particleParameters, emitter.Def, phase);
             var frame = _gameFrame with { TimeSeconds = emitter.RenderTime };

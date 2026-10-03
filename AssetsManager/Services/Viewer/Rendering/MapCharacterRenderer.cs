@@ -32,6 +32,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private sealed class SkinResources
         {
             internal MapCharacterAssetData Asset;
+            internal Func<string, uint?> ProgramTextureLookup;
             internal Vector3 BoundsCenter;
             internal uint Vao;
             internal uint PositionVbo;
@@ -62,6 +63,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             bool Transparent,
             ModelMaterialWrapMode WrapU,
             ModelMaterialWrapMode WrapV);
+
+        private bool _gameBindingsActive;
 
         private readonly record struct DrawCommand(
             SkinResources Resources,
@@ -267,6 +270,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 {
                     activePalette = null;
                     activeVao = 0;
+                    ResetGameBindings();
+                    UseStockProgram(viewProjection, gameFrame.Sun);
                     _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
                     _gl.Uniform1(_uWireframePass, 1);
                     _gl.Uniform4(
@@ -276,7 +281,6 @@ namespace AssetsManager.Services.Viewer.Rendering
                         PreviewWireColor.Z,
                         wireOpacity);
                     ApplyWireframeState(wireOpacity);
-                    UseStockProgram(viewProjection, gameFrame.Sun);
                     DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
                     DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
                 }
@@ -285,6 +289,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             {
                 if (!_gles)
                     _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
+                ResetGameBindings();
+                _gl.UseProgram(_program);
                 _gl.Uniform1(_uWireframePass, 0);
                 _gl.FrontFace(FrontFaceDirection.Ccw);
                 _gl.Disable(EnableCap.Blend);
@@ -502,6 +508,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         continue;
                 }
 
+                ResetGameBindings();
                 if (command.Resources.HasSkin)
                     ConfigureSkinIndexAttribute(command.Resources, integer: false);
                 UseStockProgram(viewProjection, gameFrame.Sun);
@@ -529,8 +536,20 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
         }
 
+        private Func<string, uint?> CreateProgramTextureLookup(SkinResources resources) =>
+            path => ResolveProgramTexture(resources, path);
+
+        private void ResetGameBindings()
+        {
+            if (!_gameBindingsActive) return;
+            _gameShaderRuntime.ResetBindings();
+            _gameBindingsActive = false;
+        }
+
         private bool TryDrawGamePass(DrawCommand command, in GameShaderRuntime.Frame drawFrame)
         {
+            bool previousBindings = _gameBindingsActive;
+            _gameBindingsActive = true;
             ConfigureSkinIndexAttribute(command.Resources, integer: true);
             if (!_gameShaderRuntime.TryBindSkinned(
                     command.Range.Material,
@@ -539,17 +558,17 @@ namespace AssetsManager.Services.Viewer.Rendering
                     command.Palette,
                     command.Resources.TangentVbo != 0,
                     in drawFrame,
-                    path => ResolveProgramTexture(command.Resources, path),
+                    command.Resources.ProgramTextureLookup ??= CreateProgramTextureLookup(command.Resources),
                     command.SelfIllumination,
                     hasColors: command.Resources.ColorVbo != 0))
             {
+                _gameBindingsActive = previousBindings;
                 return false;
             }
             _gameShaderRuntime.DrawBoundPass(
                 _drawElements,
                 command.Range.IndexCount,
                 new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
-            _gameShaderRuntime.ResetBindings();
             return true;
         }
 

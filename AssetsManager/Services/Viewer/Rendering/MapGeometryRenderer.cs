@@ -124,6 +124,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<(MapTextureWrap U, MapTextureWrap V), uint> _samplers = new();
 
+        private readonly Func<string, uint?> _programTextureLookup;
+        private readonly Func<string, uint?> _lightmapTextureLookup;
         private GL _gl;
         private GameShaderRuntime.DrawElementsDelegate _drawElements;
         private MapSceneData _scene;
@@ -183,6 +185,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         internal MapGeometryRenderer(AppSettings appSettings = null)
         {
             _appSettings = appSettings;
+            _programTextureLookup = ResolveProgramTexture;
+            _lightmapTextureLookup = ResolveLightmapTexture;
         }
 
         internal void Initialize(GL gl)
@@ -631,8 +635,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                                 mesh,
                                 bound.MeshDoubleSided,
                                 in gameFrame,
-                                ResolveProgramTexture,
-                                ResolveLightmapTexture,
+                                _programTextureLookup,
+                                _lightmapTextureLookup,
                                 _scene.Geometry.HasColors,
                                 _scene.Geometry.HasPivots))
                         {
@@ -641,7 +645,6 @@ namespace AssetsManager.Services.Viewer.Rendering
                                 _drawElements,
                                 group.IndexCount,
                                 new IntPtr(checked(group.StartIndex * sizeof(uint))));
-                            _gameShaderRuntime.ResetBindings();
                         }
                     }
 
@@ -655,6 +658,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
                 if (!stockActive)
                 {
+                    _gameShaderRuntime?.ResetBindings();
                     _gl.UseProgram(_program);
                     stockActive = true;
                 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using AssetsManager.Shaders;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
 
@@ -61,12 +62,24 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         break;
                 }
 
-                _gl.BindBuffer(BufferTargetARB.UniformBuffer, block.Buffer);
-                _gl.BufferSubData(BufferTargetARB.UniformBuffer, 0, new ReadOnlySpan<float>(block.Data));
-                _gl.BindBufferBase(BufferTargetARB.UniformBuffer, block.Binding, block.Buffer);
+                if (!block.HasUploadedData || !BlockDataMatches(block.Data, block.UploadedData))
+                {
+                    _gl.BindBuffer(BufferTargetARB.UniformBuffer, block.Buffer);
+                    // Replacing the store lets in-flight draws retain their data without a GPU wait.
+                    _gl.BufferData(BufferTargetARB.UniformBuffer, new ReadOnlySpan<float>(block.Data), BufferUsageARB.StreamDraw);
+                    block.Data.CopyTo(block.UploadedData, 0);
+                    block.HasUploadedData = true;
+                }
+                if (ParticleDrawBindings != null)
+                    ParticleDrawBindings.BindUniformBuffer(block.Binding, block.Buffer);
+                else
+                    _gl.BindBufferBase(BufferTargetARB.UniformBuffer, block.Binding, block.Buffer);
             }
             _gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
         }
+
+        internal static bool BlockDataMatches(ReadOnlySpan<float> current, ReadOnlySpan<float> uploaded) =>
+            MemoryMarshal.AsBytes(current).SequenceEqual(MemoryMarshal.AsBytes(uploaded));
 
         private static void WriteGlobals(
             float[] data,

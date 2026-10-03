@@ -48,49 +48,49 @@ public sealed partial class VfxOpenGlRenderer
         var state = definition.RenderState ?? VfxEmitterRenderState.Default;
         uint program = onTerrain ? _projectionTerrainProgram : _projectionProgram;
         var uniforms = onTerrain ? _projectionTerrainUniforms : _projectionUniforms;
-        _gl.UseProgram(program);
+        _drawBindings.UseProgram(program);
         VfxProjectionDefinition band = definition.Projection ?? new VfxProjectionDefinition();
-        _gl.Uniform1(uniforms.TerrainMode, onTerrain ? 1 : 0);
-        _gl.Uniform2(uniforms.ProjectionBand, band.YRange, band.Fading);
+        uniforms.Uniform1(uniforms.TerrainMode, onTerrain ? 1 : 0);
+        uniforms.Uniform2(uniforms.ProjectionBand, band.YRange, band.Fading);
         if (onTerrain)
         {
             Matrix4x4.Invert(viewProj, out Matrix4x4 inverseViewProj);
             _gl.UniformMatrix4(uniforms.InverseViewProj, 1, false, in inverseViewProj.M11);
-            _gl.Uniform2(uniforms.ViewportSize, _terrainDepthSize.X, _terrainDepthSize.Y);
-            _gl.Uniform1(uniforms.TerrainDepth, 5);
+            uniforms.Uniform2(uniforms.ViewportSize, _terrainDepthSize.X, _terrainDepthSize.Y);
+            uniforms.Uniform1(uniforms.TerrainDepth, 5);
             _gl.ActiveTexture(TextureUnit.Texture5);
             _gl.BindTexture(TextureTarget.Texture2D, _terrainDepthTexture);
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
         _gl.UniformMatrix4(uniforms.ViewProj, 1, false, in viewProj.M11);
-        _gl.Uniform1(uniforms.Tex, 0);
-        _gl.Uniform1(uniforms.ColorMap, 7);
-        _gl.Uniform1(uniforms.HasTex, emitter.Texture != 0 ? 1 : 0);
-        _gl.Uniform1(uniforms.HasColor, UsesProjectionColorRamp(definition, emitter.ColorGradientTexture != 0) ? 1 : 0);
-        _gl.Uniform1(uniforms.TexMult, 1);
-        _gl.Uniform1(uniforms.HasTexMult, emitter.TextureMult != 0 ? 1 : 0);
-        _gl.Uniform1(uniforms.AddressModeMult, definition.TextureMultAddressMode);
-        _gl.Uniform2(uniforms.UvTransformCenterMult, definition.TextureMultTransformCenter.X, definition.TextureMultTransformCenter.Y);
+        uniforms.Uniform1(uniforms.Tex, 0);
+        uniforms.Uniform1(uniforms.ColorMap, 7);
+        uniforms.Uniform1(uniforms.HasTex, emitter.Texture != 0 ? 1 : 0);
+        uniforms.Uniform1(uniforms.HasColor, UsesProjectionColorRamp(definition, emitter.ColorGradientTexture != 0) ? 1 : 0);
+        uniforms.Uniform1(uniforms.TexMult, 1);
+        uniforms.Uniform1(uniforms.HasTexMult, emitter.TextureMult != 0 ? 1 : 0);
+        uniforms.Uniform1(uniforms.AddressModeMult, definition.TextureMultAddressMode);
+        uniforms.Uniform2(uniforms.UvTransformCenterMult, definition.TextureMultTransformCenter.X, definition.TextureMultTransformCenter.Y);
         Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
             definition.TextureMultEmitterUvScrollRate * emitter.RenderTime, definition.TextureMultAddressMode);
-        _gl.Uniform2(uniforms.UvScrollRateMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
-        _gl.Uniform1(uniforms.FlipUMult, definition.TextureMultFlipU ? 1 : 0);
-        _gl.Uniform1(uniforms.FlipVMult, definition.TextureMultFlipV ? 1 : 0);
+        uniforms.Uniform2(uniforms.UvScrollRateMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
+        uniforms.Uniform1(uniforms.FlipUMult, definition.TextureMultFlipU ? 1 : 0);
+        uniforms.Uniform1(uniforms.FlipVMult, definition.TextureMultFlipV ? 1 : 0);
         VfxAlphaErosionDefinition erosion = definition.AlphaErosion;
         Vector4 erosionDefault = erosion is not null && string.IsNullOrWhiteSpace(erosion.TexturePath) ? Vector4.One : Vector4.Zero;
-        _gl.Uniform1(uniforms.ErosionTex, 4);
-        _gl.Uniform1(uniforms.HasErosion, erosion is not null ? 1 : 0);
-        _gl.Uniform1(uniforms.HasErosionMap, erosion is not null && emitter.ErosionTexture != 0 ? 1 : 0);
-        _gl.Uniform1(uniforms.ErosionAddressMode, erosion?.AddressMode ?? 0);
-        _gl.Uniform4(uniforms.ErosionDefault, erosionDefault.X, erosionDefault.Y, erosionDefault.Z, erosionDefault.W);
-        _gl.Uniform1(uniforms.ErosionFeatherIn, erosion?.FeatherIn ?? 0f);
-        _gl.Uniform1(uniforms.ErosionFeatherOut, erosion?.FeatherOut ?? 0f);
-        _gl.Uniform1(uniforms.ErosionSliceWidth, erosion?.SliceWidth ?? 1.5f);
-        _gl.Uniform1(uniforms.AlphaCutoff,
+        uniforms.Uniform1(uniforms.ErosionTex, 4);
+        uniforms.Uniform1(uniforms.HasErosion, erosion is not null ? 1 : 0);
+        uniforms.Uniform1(uniforms.HasErosionMap, erosion is not null && emitter.ErosionTexture != 0 ? 1 : 0);
+        uniforms.Uniform1(uniforms.ErosionAddressMode, erosion?.AddressMode ?? 0);
+        uniforms.Uniform4(uniforms.ErosionDefault, erosionDefault.X, erosionDefault.Y, erosionDefault.Z, erosionDefault.W);
+        uniforms.Uniform1(uniforms.ErosionFeatherIn, erosion?.FeatherIn ?? 0f);
+        uniforms.Uniform1(uniforms.ErosionFeatherOut, erosion?.FeatherOut ?? 0f);
+        uniforms.Uniform1(uniforms.ErosionSliceWidth, erosion?.SliceWidth ?? 1.5f);
+        uniforms.Uniform1(uniforms.AlphaCutoff,
             VfxBlendModes.ShouldAlphaTest(definition.BlendMode, state.AlphaReference) ? state.AlphaCutoff : 0f);
-        _gl.Uniform1(uniforms.WireframePass, wireframe ? 1 : 0);
-        _gl.Uniform4(uniforms.WireframeColor, PreviewWireColor.X, PreviewWireColor.Y, PreviewWireColor.Z, wireOpacity);
-        _gl.Uniform1(uniforms.AddressMode, state.TextureAddressMode);
+        uniforms.Uniform1(uniforms.WireframePass, wireframe ? 1 : 0);
+        uniforms.Uniform4(uniforms.WireframeColor, PreviewWireColor.X, PreviewWireColor.Y, PreviewWireColor.Z, wireOpacity);
+        uniforms.Uniform1(uniforms.AddressMode, state.TextureAddressMode);
         _gl.Disable(EnableCap.CullFace);
         if (VfxBlendModes.ShouldTestDepth(definition.MiscRenderFlags)) _gl.Enable(EnableCap.DepthTest);
         else _gl.Disable(EnableCap.DepthTest);
@@ -127,14 +127,8 @@ public sealed partial class VfxOpenGlRenderer
         ReadOnlySpan<float> decals = _projectionGeometry.Prepare(definition, instances);
         _gl.BindVertexArray(_vao);
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _instVbo);
-        if (decals.Length > _instCapFloats)
-        {
-            _gl.BufferData(BufferTargetARB.ArrayBuffer, decals, BufferUsageARB.DynamicDraw);
-            _instCapFloats = decals.Length;
-        }
-        else _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, decals);
+        _gl.BufferData(BufferTargetARB.ArrayBuffer, decals, BufferUsageARB.StreamDraw);
         _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)count);
-        _gl.UseProgram(_program);
     }
 
     /// <summary>

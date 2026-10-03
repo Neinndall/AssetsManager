@@ -16,12 +16,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     public sealed partial class VfxOpenGlRenderer : IDisposable
     {
         private GL _gl = null!;
+        private GlDrawBindings _drawBindings;
+        internal bool CacheDrawBindings { get; set; } = true;
+        internal (int Programs, int UniformBuffers) LastDrawBindingCounts =>
+            (_drawBindings.ProgramBindCount, _drawBindings.UniformBufferBindCount);
         private VfxShaderUniforms _particleUniforms, _stockParticleUniforms, _meshUniforms, _stockMeshUniforms;
         private uint _program, _vao, _quadVbo, _instVbo, _trailVao, _trailVbo;
         private readonly VfxTrailGeometry _trailGeometry = new();
         private readonly VfxBeamGeometry _beamGeometry = new();
-        private int _instCapFloats;
-        private int _trailCapFloats;
         private bool _ready;
         private VfxTextureResourceCache _textures = null!;
         private GlSceneCapture _capture = null!;
@@ -114,6 +116,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         public void Initialize(GL gl, AppSettings settings = null)
         {
             _gl = gl;
+            _drawBindings = new GlDrawBindings(gl);
             var proc = gl.Context.GetProcAddress("glDrawElements");
             if (proc == IntPtr.Zero)
                 throw new NotSupportedException("The active OpenGL context does not expose glDrawElements.");
@@ -363,26 +366,28 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             ResetEmitterDrawScratch();
             try
             {
+            _drawBindings.Begin(CacheDrawBindings);
+            _gameShaders.ParticleDrawBindings = _drawBindings;
             if (useWireframe)
                 _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
 
-            _gl.UseProgram(_program);
+            _drawBindings.UseProgram(_program);
             _gl.UniformMatrix4(_particleUniforms.ViewProj, 1, false, in viewProj.M11);
-            _gl.Uniform3(_particleUniforms.CamRight, camRight.X, camRight.Y, camRight.Z);
-            _gl.Uniform3(_particleUniforms.CamUp, camUp.X, camUp.Y, camUp.Z);
-            _gl.Uniform3(_particleUniforms.CamPos, camPos.X, camPos.Y, camPos.Z);
-            _gl.Uniform1(_particleUniforms.Tex, 0);
-            _gl.Uniform1(_particleUniforms.TexMult, 1);
-            _gl.Uniform1(_particleUniforms.ColorMap, 7);
-            _gl.Uniform1(_particleUniforms.PaletteMap, 8);
-            _gl.Uniform1(_particleUniforms.SceneTex, 2);
-            _gl.Uniform1(_particleUniforms.DistortionTex, 3);
-            _gl.Uniform1(_particleUniforms.ErosionTex, 4);
-            _gl.Uniform1(_particleUniforms.SceneDepthTex, 6);
-            _gl.Uniform2(_particleUniforms.ViewportSize, (float)_capture.Width, (float)_capture.Height);
-            _gl.Uniform2(_particleUniforms.DepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y);
-            _gl.Uniform1(_particleUniforms.WireframePass, useWireframe ? 1 : 0);
-            _gl.Uniform4(
+            _particleUniforms.Uniform3(_particleUniforms.CamRight, camRight.X, camRight.Y, camRight.Z);
+            _particleUniforms.Uniform3(_particleUniforms.CamUp, camUp.X, camUp.Y, camUp.Z);
+            _particleUniforms.Uniform3(_particleUniforms.CamPos, camPos.X, camPos.Y, camPos.Z);
+            _particleUniforms.Uniform1(_particleUniforms.Tex, 0);
+            _particleUniforms.Uniform1(_particleUniforms.TexMult, 1);
+            _particleUniforms.Uniform1(_particleUniforms.ColorMap, 7);
+            _particleUniforms.Uniform1(_particleUniforms.PaletteMap, 8);
+            _particleUniforms.Uniform1(_particleUniforms.SceneTex, 2);
+            _particleUniforms.Uniform1(_particleUniforms.DistortionTex, 3);
+            _particleUniforms.Uniform1(_particleUniforms.ErosionTex, 4);
+            _particleUniforms.Uniform1(_particleUniforms.SceneDepthTex, 6);
+            _particleUniforms.Uniform2(_particleUniforms.ViewportSize, (float)_capture.Width, (float)_capture.Height);
+            _particleUniforms.Uniform2(_particleUniforms.DepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y);
+            _particleUniforms.Uniform1(_particleUniforms.WireframePass, useWireframe ? 1 : 0);
+            _particleUniforms.Uniform4(
                 _particleUniforms.WireframeColor,
                 PreviewWireColor.X,
                 PreviewWireColor.Y,
@@ -401,9 +406,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Enable(EnableCap.Blend);
             _gl.BlendEquation(GLEnum.FuncAdd);
 
-            Matrix4x4.Invert(view, out var invView);
-            Matrix4x4 particleProjection = invView * viewProj;
-            _gameFrame = new AssetsManager.Services.Viewer.Rendering.GameShaders.GameShaderRuntime.Frame(view, particleProjection, camPos, 0f, Sun);
+            _gameFrame = new AssetsManager.Services.Viewer.Rendering.GameShaders.GameShaderRuntime.Frame(view, projection, camPos, 0f, Sun);
+            _gameViewProjection = view * projection;
+            _gameCameraRight = camRight;
+            _gameCameraUp = camUp;
+            _cameraPrograms.Clear();
 
             Dictionary<(object Graph, string Path, int SourceOrder, int Pass), int> emitterUsed = _emitterUsed;
             Dictionary<(object Graph, string Path, int SourceOrder), VfxPlaybackRuntime.EmitterState> firstSourceByEmitter = _firstSourceByEmitter;
@@ -521,7 +528,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             }
             finally
             {
+                _gameShaders.ParticleDrawBindings = null;
+                _drawBindings.End();
                 ResetEmitterDrawScratch();
+                // Each emitter establishes its draw state. Restore the caller at the batch boundary,
+                // avoiding a driver query and an unnecessary stock-program switch after each draw.
+                _particleUniforms = _stockParticleUniforms;
+                _meshUniforms = _stockMeshUniforms;
                 if (useWireframe)
                     _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
 
@@ -573,8 +586,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _instanceDepths = Array.Empty<float>();
             _instanceOrder = Array.Empty<int>();
             _ownerHiddenSubmeshes.Clear();
-            _instCapFloats = 0;
-            _trailCapFloats = 0;
             _ready = false;
         }
 

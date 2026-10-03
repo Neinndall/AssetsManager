@@ -33,6 +33,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         private bool _preparedWireframe;
         private float _preparedWireOpacity;
         private bool _ready;
+        internal bool CacheDrawBindings { set => _renderer.CacheDrawBindings = value; }
+        internal (int Programs, int UniformBuffers) LastDrawBindingCounts => _renderer.LastDrawBindingCounts;
 
         internal void Initialize(GL gl, AssetsManager.Utils.AppSettings settings = null)
         {

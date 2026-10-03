@@ -241,6 +241,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             // Build view/projection matrices from the active preview camera. Orthographic presets
             // use the same camera controller but require their own projection matrix.
+            _cameraController?.ApplyPendingRotation();
             if (_dummyViewport.Camera is not ProjectionCamera camera) return;
 
             var eye = new Vector3((float)camera.Position.X, (float)camera.Position.Y, (float)camera.Position.Z);
@@ -471,7 +472,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     emitter.ActiveParticleCount = _vfxRenderer.GetEmitterLiveCount(emitter.SourceOrder);
             }
 
-            Dispatcher.InvokeAsync(UpdatePlayheadPosition);
+            QueuePlayheadRefresh();
         }
 
         /// <summary>Copies the depth the map geometry just wrote, before structures and characters draw over it.</summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using AssetsManager.Shaders;
 using System.Text.RegularExpressions;
@@ -12,6 +13,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 {
     internal sealed partial class GameShaderRuntime
     {
+        [ThreadStatic]
+        internal static Action<string, double> PreparationMeasured;
+
         private CacheEntry GetOrCreate(object owner, GameMaterialProgram program, bool? particleMesh = null)
         {
             if (owner != null && _programs.TryGetValue(owner, out CacheEntry cached))
@@ -30,11 +34,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 }
                 else
                 {
+                    var measure = PreparationMeasured;
+                    long started = measure != null ? Stopwatch.GetTimestamp() : 0;
                     GameShaderProgramResolver.ShaderBytecodeMaterialProgram bytecodes =
-                        GameShaderProgramResolver.ReadProgram(
-                            program,
-                            _shaderCache,
-                            _shaderCachePath);
+                        ReadCachedProgram(program);
+                    measure?.Invoke("bytecode/" + program?.Kind, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
                     if (bytecodes == null)
                     {
                         created = new CacheEntry(Array.Empty<PassRuntimeEntry>(), "Material has no resolved game program.");
@@ -56,12 +60,14 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                             string key = program.Kind + "|" + particleMesh + "|" + ProgramKey(passRead.Pass, passRead.Bytecode.Program);
                             if (!_sharedPrograms.TryGetValue(key, out ProgramRuntime ready))
                             {
+                                started = measure != null ? Stopwatch.GetTimestamp() : 0;
                                 GameShaderTranslator.TranslationRead translated =
                                     GameShaderTranslator.Translate(
                                         passRead.Bytecode.Program.Vertex,
                                         passRead.Bytecode.Program.VertexReflection,
                                         passRead.Bytecode.Program.Pixel,
                                         passRead.Bytecode.Program.PixelReflection);
+                                measure?.Invoke("translate/" + program.Kind, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
                                 if (!translated.Ready)
                                 {
                                     if (!string.IsNullOrWhiteSpace(translated.Failure))
@@ -71,11 +77,13 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
                                 try
                                 {
+                                    started = measure != null ? Stopwatch.GetTimestamp() : 0;
                                     ready = CreateProgram(particleMesh.HasValue
                                         ? GameParticleShaderPrelude.Compose(translated.Program, particleMesh.Value)
                                         : translated.Program, program.Kind, particleMesh.HasValue);
                                     ready.WritesBloom = WritesSecondTarget(translated.Program.Pixel.Glsl);
                                     _sharedPrograms[key] = ready;
+                                    measure?.Invoke("link/" + program.Kind, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
                                 }
                                 catch (Exception ex)
                                 {
@@ -115,6 +123,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             GameShaderTranslator.TranslatedProgram translated,
             GameMaterialKind kind, bool particle = false)
         {
+            // Linking initializes bindings directly; the next draw must establish them again.
+            ParticleDrawBindings?.Invalidate();
             IReadOnlyDictionary<uint, string> attributes = particle ? new Dictionary<uint, string>() :
                 AttributeLocations(translated.Vertex.Sidecar.Attributes, kind);
             string vertex = SourceForProfile(translated.Vertex.Glsl, vertexStage: true, preserveInputs: particle);
@@ -157,7 +167,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         Block = block,
                         Buffer = buffer,
                         Binding = binding,
-                        Data = data
+                        Data = data,
+                        UploadedData = new float[data.Length]
                     });
                     binding++;
                 }
