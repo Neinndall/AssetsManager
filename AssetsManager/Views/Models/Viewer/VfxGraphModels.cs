@@ -215,7 +215,10 @@ namespace AssetsManager.Views.Models.Viewer
         VfxCustomMaterialBlendFactor CustomMaterialSourceBlendFactor = VfxCustomMaterialBlendFactor.One,
         VfxCustomMaterialBlendFactor CustomMaterialDestinationBlendFactor = VfxCustomMaterialBlendFactor.Zero,
         VfxEmissionPeriod EmissionPeriod = null,
-        VfxProjectionDefinition Projection = null)
+        VfxProjectionDefinition Projection = null,
+        VfxCurve2? RateByVelocityFunction = null,
+        float? MaximumRateByVelocity = null,
+        bool HasVariableStartTime = false)
     {
         /// <summary>LTK drawKind.ts: this emitter reaches the quad renderer.</summary>
         public bool DrawsAsProjection => PrimitiveKind == VfxPrimitiveKind.PlanarProjection;

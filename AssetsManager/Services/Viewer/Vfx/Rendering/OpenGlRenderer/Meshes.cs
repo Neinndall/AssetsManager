@@ -215,7 +215,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.BindTexture(TextureTarget.Texture2D, _capture.ColorTexture);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
-            _gl.Uniform1(_meshUniforms.HasColor, 0);
+            _gl.Uniform1(_meshUniforms.HasColor, es.ColorGradientTexture != 0 ? 1 : 0);
             _gl.Uniform1(_meshUniforms.RampAtMult, 0);
             _gl.Uniform1(_meshUniforms.UvMode, es.Def.UvMode);
             _gl.Uniform1(

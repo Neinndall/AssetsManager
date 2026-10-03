@@ -464,6 +464,12 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Effects anchored to particle mesh bones now follow the mesh's changing size.
+  - VFX Studio / Corrected effect layering across parent, child and overlapping systems.
+  - VFX Studio / Corrected locked alpha masks on particle ribbons and beams.
+  - VFX Studio / Restored particle mesh color ramps when using the preview shader.
+  - VFX Studio / Moving trails now respect velocity-based emission and authored variable starts.
+  - VFX Studio / Playback duration and child particle limits now account for randomized lifetimes.
   - VFX Studio / Beam ends stay on their joints when the effect turns, like Sylas chains, Akshan's rope or Blitzcrank cables.
   - VFX Studio / Scrolling flipbook particles show the neighbouring frames of their atlas like in game, instead of repeating one frame.
   - VFX Studio / Effects that emit for less than one frame now appear at any frame rate.

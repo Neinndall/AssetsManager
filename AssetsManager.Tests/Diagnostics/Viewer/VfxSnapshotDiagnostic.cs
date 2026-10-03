@@ -29,7 +29,7 @@ using PixelFormat = Silk.NET.OpenGL.PixelFormat;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--trace-emitter NAME] [--no-owner]`:
+    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--trace-emitter NAME] [--no-owner] [--rig Still|Trail|Missile]`:
     /// plays one VFX system of an installed BIN the way VFX Studio does (VfxRenderSession, game particle shaders,
     /// resources extracted from the WADs) and writes a PNG per time over a mid-grey backdrop. With --per-emitter
     /// each root emitter is also drawn alone and measured: how much of the frame it darkens or brightens.
@@ -53,6 +53,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                              ?? new[] { 0.25, 0.5, 1.0 };
             uint size = uint.TryParse(Option(args, "--size"), out uint parsedSize) ? parsedSize : 512u;
             bool perEmitter = args.Contains("--per-emitter");
+            VfxRigPreset rig = Enum.TryParse(Option(args, "--rig"), ignoreCase: true, out VfxRigPreset parsedRig)
+                ? parsedRig : VfxRigPreset.Still;
 
             string install = InstalledSkins.FindInstall();
             AppSettings settings = InstalledSkins.Settings(install);
@@ -67,10 +69,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             // VFX custom materials find their CustomShaderDefs in the global shader BIN, as the app loads them.
             BinTree shaders = args.Contains("--no-shader-definitions") ? null : LoadBin(install, "data/shaders/shaders.bin");
             BinTree[] shaderTrees = shaders == null ? null : new[] { shaders };
-            IReadOnlyDictionary<uint, uint> resourceMap = VfxResourceParser.ExtractResourceMap(tree);
-            var systems = VfxSystemParser.ExtractAll(tree).ToDictionary(
-                pair => pair.Key,
-                pair => VfxGraphParser.ResolveCustomMaterials(pair.Value, tree, shaderTrees: shaderTrees) with { ResourceMap = resourceMap });
+            VfxDiagnosticCatalog catalog = VfxDiagnosticCatalog.Load(binPath, tree, path => LoadBin(install, path), shaderTrees);
+            IReadOnlyDictionary<uint, uint> resourceMap = catalog.ResourceMap;
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems = catalog.Systems;
             VfxSystemDefinition system = FindSystem(systems, systemKey);
             if (system == null)
             {
@@ -82,7 +83,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var resolver = new MapAssetResolver(wadProvider, settings);
             IReadOnlyDictionary<uint, VfxSystemDefinition> reachable =
                 VfxSceneResourceContext.ReachableSystems(systems, resourceMap, new[] { system });
-            VfxOwnerSceneContext owner = args.Contains("--no-owner") ? null : VfxAnimationParser.ExtractOwnerSceneContext(tree);
+            VfxOwnerSceneContext owner = args.Contains("--no-owner") ? null : catalog.Owner;
             if (owner != null)
                 Console.WriteLine($"[Snapshot] owner {owner.MeshPath} skeleton={owner.SkeletonPath} scale={owner.SkinScale}");
             using VfxSceneResourceContext resources = VfxSceneResourceContext
@@ -119,9 +120,11 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 Speed = 1
             });
 
+            session.RigPreset = rig;
+
             // The League camera looks down at about 56 degrees; frame the system's authored bounds from there.
             float pitch = 56f * MathF.PI / 180f;
-            VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(system, VfxRigPreset.Still);
+            VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(system, rig);
             VfxCameraFrame frame = VfxSystemBounds.FramePerspective(bounds, 40f, 1f, new Vector3(0f, MathF.Sin(pitch), MathF.Cos(pitch)));
             Matrix4x4 view = Matrix4x4.CreateLookAt(frame.Position, frame.Target, Vector3.UnitY);
             Matrix4x4 projection = Matrix4x4.CreatePerspectiveFieldOfView(40f * MathF.PI / 180f, 1f, VfxPreviewCamera.NearPlane, VfxPreviewCamera.FarPlane);

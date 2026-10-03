@@ -8,6 +8,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
     {
         internal sealed record EmitterSnapshot(
             Vector3 BasePos,
+            Vector3? StepStartBasePos,
             Vector3 FieldBasePos,
             Vector3 SystemOrigin,
             Vector3 SystemTarget,
@@ -57,6 +58,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 int[] noiseFired = (int[])state.NoiseFired.Clone();
                 emitters[index] = new EmitterSnapshot(
                     state.BasePos,
+                    state.StepStartBasePos,
                     state.FieldBasePos,
                     state.SystemOrigin,
                     state.SystemTarget,
@@ -127,7 +129,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 EmitterState state = _emitters[index];
                 EmitterSnapshot saved = snapshot.Emitters[index];
                 state.BasePos = saved.BasePos;
-                state.StepStartBasePos = saved.BasePos;
+                state.StepStartBasePos = saved.StepStartBasePos;
                 state.FieldBasePos = saved.FieldBasePos;
                 state.SystemOrigin = saved.SystemOrigin;
                 state.SystemOrientation = systemOrientation;

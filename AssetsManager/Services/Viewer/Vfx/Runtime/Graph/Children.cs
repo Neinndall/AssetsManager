@@ -98,7 +98,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         child.BoneName,
                         particle.ParticleTime);
                     if (!joint.HasValue) continue;
-                    placement = ReRootOnJoint(bearing, joint.Value);
+                    placement = ReRootOnJoint(bearing, joint.Value, particle.DrawnScale);
                 }
                 UpdateChildPlacement(child.Runtime, child.Definition, placement);
             }
@@ -141,7 +141,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         bone,
                         particle.ParticleTime);
                     if (!joint.HasValue) continue;
-                    Matrix4x4 placement = ReRootOnJoint(bearing, joint.Value);
+                    Matrix4x4 placement = ReRootOnJoint(bearing, joint.Value, particle.DrawnScale);
                     int childSeed = ChildSeed(_initialSeed, $"{emitterPath}.{slot}", particle.Serial);
                     SpawnChild(parentRuntime, childSet, particle, parentDepth, emitterPath, slot,
                         placement, childSeed, unchecked((uint)childSeed), carried, bone);
@@ -258,7 +258,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             foreach (VfxEmitterDefinition emitter in system.Emitters)
             {
                 if (emitter.Disabled) continue;
-                double rate = VfxDurationCalculator.Peak(emitter.Rate);
+                double rate = emitter.RateByVelocityFunction.HasValue
+                    ? Math.Max(0f, emitter.MaximumRateByVelocity ?? 300f)
+                    : VfxDurationCalculator.Peak(emitter.Rate);
                 if (emitter.IsSingleParticle)
                 {
                     int burst = (int)(Math.Truncate(rate) % (ushort.MaxValue + 1d));
@@ -266,7 +268,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 }
                 else
                 {
-                    double lifetime = VfxDurationCalculator.Peak(emitter.ParticleLifetime);
+                    double lifetime = VfxDurationCalculator.GetMaximumParticleLifetime(emitter);
                     wanted += Math.Ceiling(rate * (lifetime + VfxPlaybackRuntime.LingerSeconds(emitter))) +
                               Math.Ceiling(rate) + 1d;
                 }
@@ -320,11 +322,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return _jointTransformProvider?.Invoke(boneName);
         }
 
-        private static Matrix4x4 ReRootOnJoint(Matrix4x4 bearing, Matrix4x4 joint)
+        private static Matrix4x4 ReRootOnJoint(Matrix4x4 bearing, Matrix4x4 joint, Vector3 drawnScale)
         {
             Matrix4x4 bearingTurn = VectorMathUtils.OrientationOnly(bearing);
             Matrix4x4 jointTurn = VectorMathUtils.OrientationOnly(joint);
-            Vector3 jointOffset = Vector3.TransformNormal(joint.Translation, bearingTurn);
+            Vector3 jointOffset = Vector3.TransformNormal(joint.Translation * drawnScale, bearingTurn);
             Vector3 position = bearing.Translation + jointOffset;
 
             // System.Numerics uses row vectors: local joint turn followed by the particle

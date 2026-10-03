@@ -300,6 +300,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return new VfxEmitterDefinition(
                 Name: GetString(p, F_emitterName) ?? string.Empty,
                 Rate: ReadCurveF(p, F_rate) ?? VfxCurveF.Zero,
+                RateByVelocityFunction: ReadCurve2(p, F_rateByVelocityFunction),
+                MaximumRateByVelocity: GetOptionalF32(p, F_maximumRateByVelocity),
+                HasVariableStartTime: GetBool(p, F_hasVariableStartTime),
                 ParticleLifetime: ReadCurveF(p, F_particleLife, 3f) ?? VfxCurveF.Const(3f),
                 EmitterLifetime: GetOptionalF32(p, F_lifetime),
                 ParticleLinger: GetOptionalF32(p, F_particleLinger) ?? 0f,

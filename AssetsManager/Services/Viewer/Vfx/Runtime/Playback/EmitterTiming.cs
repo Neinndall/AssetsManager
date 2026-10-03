@@ -47,7 +47,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 particleTime,
                 particle.Life,
                 emitterT,
-                died);
+                died)
+            {
+                DrawnScale = state.Def.IsMeshPrimitive ? ResolveMeshScale(state, particle) : Vector3.One
+            };
         }
 
         internal static float EmitterTime(EmitterState state)

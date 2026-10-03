@@ -64,12 +64,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 // The engine transforms (along, across) first and only then transposes the
                 // resulting coordinate pair for beam sampling. Supplying (across, along)
                 // here is not equivalent once a layer has non-uniform scale or rotation.
-                Write(state, instances, instance, ref written, end - half, 0f, 0f, distanceColor);
-                Write(state, instances, instance, ref written, end + half, 0f, across, distanceColor);
-                Write(state, instances, instance, ref written, start + half, along, across, distanceColor);
-                Write(state, instances, instance, ref written, end - half, 0f, 0f, distanceColor);
-                Write(state, instances, instance, ref written, start + half, along, across, distanceColor);
-                Write(state, instances, instance, ref written, start - half, along, 0f, distanceColor);
+                Write(state, instances, instance, ref written, end - half, 0f, 0f, distanceColor, 0);
+                Write(state, instances, instance, ref written, end + half, 0f, across, distanceColor, 1);
+                Write(state, instances, instance, ref written, start + half, along, across, distanceColor, 2);
+                Write(state, instances, instance, ref written, end - half, 0f, 0f, distanceColor, 0);
+                Write(state, instances, instance, ref written, start + half, along, across, distanceColor, 2);
+                Write(state, instances, instance, ref written, start - half, along, 0f, distanceColor, 3);
             }
 
             return written;
@@ -118,7 +118,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector3 position,
             float u,
             float v,
-            Vector4 distanceColor)
+            Vector4 distanceColor,
+            int alphaVertexIndex)
         {
             int target = vertex * VertexStride;
             instances.Slice(instance, VfxPlaybackRuntime.InstanceStride)
@@ -126,7 +127,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vertices[target + 2] = position.X;
             Vertices[target + 3] = position.Y;
             Vertices[target + 4] = position.Z;
-            VfxRibbonVertexSemantics.Pack(state, instances, instance, Vertices, target, u, v, transpose: true);
+            VfxRibbonVertexSemantics.Pack(state, instances, instance, Vertices, target, u, v, transpose: true, alphaVertexIndex: alphaVertexIndex);
             Vertices[target + 7] *= distanceColor.X;
             Vertices[target + 8] *= distanceColor.Y;
             Vertices[target + 9] *= distanceColor.Z;

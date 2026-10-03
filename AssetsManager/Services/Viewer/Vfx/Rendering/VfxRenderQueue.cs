@@ -97,6 +97,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (order != 0) return order;
             order = left.Entry.Emitter.Def.IsGroundLayer.CompareTo(right.Entry.Emitter.Def.IsGroundLayer);
             if (order != 0) return -order;
+            order = VfxDrawOrderSemantics.Compare(left.Entry.Emitter.Def, 0, right.Entry.Emitter.Def, 0);
+            if (order != 0) return order;
             order = left.Entry.GraphOrder.CompareTo(right.Entry.GraphOrder);
             if (order != 0) return order;
             // passTwin raises the emitter rank, rather than drawing its passes consecutively.
@@ -116,9 +118,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (leftGround != rightGround)
                 return leftGround ? -1 : 1;
 
-            // Separate top-level graph instances keep their authored insertion order. Inside a
-            // graph, LTK ranks definitions from the static definition tree, not from child birth time.
-            int order = left.GraphOrder.CompareTo(right.GraphOrder);
+            // Authored display-list keys apply across every system. Graph insertion and
+            // definition ranks only break ties, so child birth order cannot override a pass.
+            int order = VfxDrawOrderSemantics.Compare(left.Emitter.Def, 0, right.Emitter.Def, 0);
+            if (order != 0) return order;
+            order = left.GraphOrder.CompareTo(right.GraphOrder);
             if (order != 0) return order;
 
             order = left.Emitter.RenderRank.CompareTo(right.Emitter.RenderRank);

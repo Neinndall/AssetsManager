@@ -48,7 +48,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             float ParticleTime,
             float ParticleLifetime,
             float EmitterPhase,
-            bool Died);
+            bool Died)
+        {
+            public Vector3 DrawnScale { get; init; } = Vector3.One;
+        }
 
         public event Action<VfxPlaybackRuntime, VfxEmitterDefinition, ParticleLifecycleInfo> ParticleLifecycle;
         // Carried child systems need the parent's current drawn bearing every step, not only

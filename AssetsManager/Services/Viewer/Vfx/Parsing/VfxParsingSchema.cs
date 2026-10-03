@@ -160,6 +160,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static readonly uint F_translationOverride = VfxParsingHash.Fnv1a("translationOverride");
         internal static readonly uint F_rotationOverride = VfxParsingHash.Fnv1a("rotationOverride");
         internal static readonly uint F_scaleOverride = VfxParsingHash.Fnv1a("scaleOverride");
+        internal static readonly uint F_rateByVelocityFunction = VfxParsingHash.Fnv1a("rateByVelocityFunction");
+        internal static readonly uint F_maximumRateByVelocity = VfxParsingHash.Fnv1a("MaximumRateByVelocity");
+        internal static readonly uint F_hasVariableStartTime = VfxParsingHash.Fnv1a("HasVariableStartTime");
         internal static readonly uint F_period = VfxParsingHash.Fnv1a("period");
         internal static readonly uint F_timeActiveDuringPeriod = VfxParsingHash.Fnv1a("timeActiveDuringPeriod");
         internal const uint F_spawnShape              = 0x3bf0b4ed; // SpawnShape

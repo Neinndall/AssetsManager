@@ -68,7 +68,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 double emitting = emitter.EmitterLifetime ?? EndlessSpan;
                 span = Math.Max(
                     span,
-                    emitter.TimeBeforeFirstEmission + emitting + Peak(emitter.ParticleLifetime));
+                    emitter.TimeBeforeFirstEmission + emitting + GetMaximumParticleLifetime(emitter));
             }
             return Math.Min(span, MaximumSpan);
         }

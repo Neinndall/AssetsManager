@@ -14,6 +14,26 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
     public sealed class VfxGraphParserTests
     {
         [Fact]
+        public void ParsesVelocityEmissionFunctionAndVariableStartFromAuthoredBinFields()
+        {
+            var function = new BinTreeStruct(Fnv1a.HashLower("rateByVelocityFunction"), Fnv1a.HashLower("ValueVector2"),
+                new BinTreeProperty[] { new BinTreeVector2(Fnv1a.HashLower("constantValue"), new Vector2(0.25f, 4f)) });
+            var emitter = new BinTreeStruct(0, Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[] { function, new BinTreeF32(Fnv1a.HashLower("MaximumRateByVelocity"), 20f),
+                    new BinTreeBitBool(Fnv1a.HashLower("HasVariableStartTime"), true) });
+            var system = new BinTreeObject("Effects/Velocity", "VfxSystemDefinitionData", new BinTreeProperty[]
+            {
+                new BinTreeContainer(Fnv1a.HashLower("complexEmitterDefinitionData"), BinPropertyType.Struct, new BinTreeProperty[] { emitter })
+            });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+            var parsed = Assert.Single(Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+            Assert.Equal(new Vector2(0.25f, 4f), parsed.RateByVelocityFunction.Value.Sample(0f));
+            Assert.Equal(20f, parsed.MaximumRateByVelocity);
+            Assert.True(parsed.HasVariableStartTime);
+        }
+
+        [Fact]
         public void ParsesEveryVfxProjectionFromOneBinDocument()
         {
             var effectObject = new BinTreeObject(

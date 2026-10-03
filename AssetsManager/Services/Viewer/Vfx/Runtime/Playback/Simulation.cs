@@ -249,13 +249,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 // LTK samples rate directly. Legacy rateIsPeriod is retained in the model
                 // for inspection but does not reinterpret the simulation rate.
                 float rate = MathF.Max(0f, d.Rate.Sample(emitterT));
+                if (d.RateByVelocityFunction is { } velocityRate)
+                {
+                    Vector2 function = velocityRate.Sample(emitterT);
+                    float speed = s.StepStartBasePos is { } start && context.Dt > 0f
+                        ? Vector3.Distance(s.BasePos, start) / context.Dt : 0f;
+                    rate = Math.Clamp(speed * function.X + function.Y, 0f, MathF.Max(0f, d.MaximumRateByVelocity ?? 300f));
+                    if (rate <= 0f && s.InitialEmissionDone) s.EmittedThrough = s.Age;
+                }
                 if (!float.IsFinite(rate)) rate = 0f;
                 float emittingUntil = d.EmitterLifetime is { } lifetime ? MathF.Min(s.Age, lifetime) : s.Age;
                 float owed = MathF.Min(
                     MathF.Truncate(MathF.Max(0f, emittingUntil - s.EmittedThrough) * rate),
                     MathF.Truncate(rate * 0.33f) + 1f);
                 int requestedCount = owed >= int.MaxValue ? int.MaxValue : (int)MathF.Max(0f, owed);
-                if (!s.InitialEmissionDone)
+                if (!s.InitialEmissionDone && !d.HasVariableStartTime)
                 {
                     if (d.IsSingleParticle)
                     {

@@ -39,7 +39,6 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var wads = new List<WadFile>();
             var where = new Dictionary<ulong, WadFile>();
             foreach (string wadPath in Directory.GetFiles(final, "*.wad.client", SearchOption.AllDirectories)
-                         .Where(path => path.Contains(@"\Champions\") || path.Contains(@"\Maps\") || Path.GetFileName(path).StartsWith("Common", StringComparison.OrdinalIgnoreCase))
                          .Where(path => !Path.GetFileName(path)[..^".wad.client".Length].Contains('.')))
             {
                 var wad = new WadFile(wadPath);

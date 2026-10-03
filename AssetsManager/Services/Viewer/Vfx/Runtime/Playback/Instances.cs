@@ -51,11 +51,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         ? Math.Clamp((p.Age - p.LingerFrom) / window, 0f, 1f)
                         : 1f;
                 }
-                var scaleMul = lingering && d.Linger?.Scale is { } lingerScale
-                    ? lingerScale.SampleOver(particleLingerT, Vector3.One)
-                    : d.ScaleOverLife?.SampleOver(t, Vector3.One) ?? Vector3.One;
-                if (d.IsUniformScale)
-                    scaleMul = new Vector3(scaleMul.X);
+                Vector3 scaleMul = ResolveScaleMultiplier(s, p);
                 Vector4 col = lingering && d.Linger?.Color is { } lingerColor
                     ? p.BirthColor * lingerColor.SampleOver(particleLingerT, Vector4.One)
                     : VfxColorSemantics.ResolveParticle(p.BirthColor, d.ColorOverLife, t);

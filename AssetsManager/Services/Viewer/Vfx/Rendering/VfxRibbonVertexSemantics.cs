@@ -29,7 +29,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             int vertexOffset,
             float u,
             float v,
-            bool transpose)
+            bool transpose,
+            int alphaVertexIndex = -1)
             => Pack(
                 state,
                 state.PrepareInstances(state.InstanceCount),
@@ -38,7 +39,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 vertexOffset,
                 u,
                 v,
-                transpose);
+                transpose,
+                alphaVertexIndex);
 
         internal static void Pack(
             VfxPlaybackRuntime.EmitterState state,
@@ -48,7 +50,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             int vertexOffset,
             float u,
             float v,
-            bool transpose)
+            bool transpose,
+            int alphaVertexIndex = -1)
         {
             ArgumentNullException.ThrowIfNull(state);
             ArgumentNullException.ThrowIfNull(vertex);
@@ -108,6 +111,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 baseUv = Swap(baseUv);
                 alphaUv = Swap(alphaUv);
                 multUv = Swap(multUv);
+            }
+
+            if (definition.UvMode == 2)
+            {
+                // QUAD_VS_FixedAlphaUV addresses the logical indexed vertex, before
+                // triangle expansion; alpha ignores the colour layer's UV transform.
+                int corner = (alphaVertexIndex >= 0 ? alphaVertexIndex : vertexOffset / VfxTrailGeometry.VertexStride) & 3;
+                alphaUv = new Vector2(corner is 1 or 2 ? 1f : 0f, corner >= 2 ? 1f : 0f);
             }
 
             vertex[vertexOffset] = baseUv.X;

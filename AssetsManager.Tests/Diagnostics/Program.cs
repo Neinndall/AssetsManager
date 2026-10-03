@@ -437,6 +437,11 @@ namespace AssetsManager.Tests.Diagnostics
                 VfxFieldValuesDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "vfx-joint-child-census", StringComparison.OrdinalIgnoreCase))
+            {
+                VfxJointChildCensusDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "vfx-reflection-census", StringComparison.OrdinalIgnoreCase))
             {
                 VfxReflectionCensusDiagnostic.Run(args.Skip(1).ToArray());

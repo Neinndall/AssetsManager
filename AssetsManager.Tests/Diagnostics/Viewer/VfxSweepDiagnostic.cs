@@ -24,7 +24,7 @@ using Silk.NET.OpenGL;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-sweep [--champions] [--maps] [--filter TEXT] [--max-skins N] [--max-bins N] [--max-systems N] [--max-seconds N] [--custom-only] [--csv FILE [--resume]]`:
+    /// `vfx-sweep [--champions] [--maps] [--filter TEXT] [--max-skins N] [--max-bins N] [--max-systems N] [--max-seconds N] [--custom-only] [--no-owner] [--csv FILE [--resume]]`:
     /// loads VFX systems of the installed BINs (skin BINs, the shared character BINs they link, map materials) the way
     /// VFX Studio does and flags, per emitter:
     /// resources it authors that the engine cannot load (split into absent from the game, not extracted and not
@@ -159,31 +159,32 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             {
                 BinTree tree = LoadBin(wadOf, binPath);
                 if (tree == null) return;
-                IReadOnlyDictionary<uint, uint> resourceMap = VfxResourceParser.ExtractResourceMap(tree);
-                Dictionary<uint, VfxSystemDefinition> systems;
+                VfxDiagnosticCatalog catalog;
                 try
                 {
-                    systems = VfxSystemParser.ExtractAll(tree).ToDictionary(
-                        pair => pair.Key,
-                        pair => VfxGraphParser.ResolveCustomMaterials(pair.Value, tree, shaderTrees: shaderTrees) with { ResourceMap = resourceMap });
+                    catalog = VfxDiagnosticCatalog.Load(binPath, tree, path => LoadBin(wadOf, path), shaderTrees);
                 }
                 catch (Exception ex)
                 {
                     findings.Add(new Finding("PARSE_FAIL", binPath, "", "", ex.Message));
                     return;
                 }
+                IReadOnlyDictionary<uint, uint> resourceMap = catalog.ResourceMap;
+                IReadOnlyDictionary<uint, VfxSystemDefinition> systems = catalog.Systems;
                 VfxSystemDefinition[] chosen = systems
+                    .Where(pair => catalog.PrimarySystemHashes.Contains(pair.Key))
                     .Where(pair => !customOnly || pair.Value.Emitters.Any(emitter => emitter.CustomMaterialPathHash != 0))
                     .Where(pair => seenSystems.Add(pair.Key)).Select(pair => pair.Value)
                     .OrderBy(system => system.Name, StringComparer.Ordinal).Take(maxSystems).ToArray();
                 binSystems.AddRange(chosen.Select(system => system.PathHash));
                 if (chosen.Length == 0) return;
 
+                VfxOwnerSceneContext owner = args.Contains("--no-owner") ? null : catalog.Owner;
                 VfxSceneResourceContext resources;
                 try
                 {
                     resources = VfxSceneResourceContext.CreateAsync(
-                        VfxSceneResourceContext.ReachableSystems(systems, resourceMap, chosen), null, resolver, null, log)
+                        VfxSceneResourceContext.ReachableSystems(systems, resourceMap, chosen), null, resolver, null, log, ownerSceneContext: owner)
                         .GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
@@ -204,7 +205,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                         emitterCount += system.Emitters?.Count ?? 0;
                         try
                         {
-                            Check(session, system, systems, resourceMap, resources.SearchDirectory, binPath, wadOf, findings, maxSeconds);
+                            Check(session, system, systems, resourceMap, resources.SearchDirectory, binPath, wadOf, findings, maxSeconds, owner);
                         }
                         catch (Exception ex)
                         {
@@ -261,7 +262,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             string binPath,
             IReadOnlyDictionary<ulong, string> wadOf,
             List<Finding> findings,
-            float maxSeconds)
+            float maxSeconds,
+            VfxOwnerSceneContext owner)
         {
             session.SetSystem(new VfxSystemModel
             {
@@ -270,6 +272,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 SystemCatalog = catalog,
                 ResourceMap = resourceMap,
                 SearchDirectory = searchDirectory,
+                OwnerSceneContext = owner,
                 PlaybackSeed = VfxRenderSession.IdleEffectSeed,
                 TotalDuration = VfxDurationCalculator.SystemSpan(system),
                 Speed = 1
