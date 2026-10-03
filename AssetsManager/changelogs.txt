@@ -158,6 +158,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio / Moved motion settings to the Inspector while keeping the quick preset selector in the toolbar.
   - Hash Lab / GAME learns matching skin and companion theme layouts to expand guessing coverage.
   - Hash Lab / GAME Extended increases capped searches from 15 to 50 million candidates per method.
   - VFX Studio / Compact project toolbar with folder subtitle, contextual actions, an inset asset tree, loading feedback and a Show / Hide Timeline toggle.

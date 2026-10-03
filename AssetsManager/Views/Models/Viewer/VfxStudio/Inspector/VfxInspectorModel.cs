@@ -184,7 +184,7 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public bool IsSkinWorkspace => SelectedWorkspaceTab?.Kind == VfxWorkspaceTabKind.Skin;
-        public bool HasContextInspector => IsSkinWorkspace || IsMapWorkspace;
+        public bool HasContextInspector => IsSkinWorkspace || IsMapWorkspace || HasStandaloneSystem;
         public bool IsInspectorPanelVisible => HasContextInspector && InspectorVisible;
 
         public void NotifyWorkspaceTabsChanged()

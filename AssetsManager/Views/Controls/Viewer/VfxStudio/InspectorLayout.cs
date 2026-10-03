@@ -9,6 +9,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void CollapseInspectorSections()
         {
+            VfxMotionSection.IsChecked = false;
             VfxSceneActorsSection.IsChecked = false;
             VfxMapBackdropSection.IsChecked = false;
             VfxCharacterTransformSection.IsChecked = false;

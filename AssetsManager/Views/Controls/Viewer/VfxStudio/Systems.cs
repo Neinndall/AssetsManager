@@ -109,6 +109,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _model.RigPreset = rigPreset;
             }
+            UpdateRigControlValues();
             SetPlaybackSpeed(playbackSpeed);
 
             double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(_model.RigPreset, def);

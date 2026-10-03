@@ -26,10 +26,16 @@ namespace AssetsManager.Views.Models.Viewer
             get => _isAnimationMode;
             set
             {
+                bool hadContextInspector = HasContextInspector;
                 _isAnimationMode = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsRawSystemsMode));
                 OnPropertyChanged(nameof(HasStandaloneSystem));
+                if (hadContextInspector != HasContextInspector)
+                {
+                    OnPropertyChanged(nameof(HasContextInspector));
+                    OnPropertyChanged(nameof(IsInspectorPanelVisible));
+                }
             }
         }
 
@@ -120,9 +126,15 @@ namespace AssetsManager.Views.Models.Viewer
             get => _selectedSystem;
             set
             {
+                bool hadContextInspector = HasContextInspector;
                 _selectedSystem = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(HasStandaloneSystem));
+                if (hadContextInspector != HasContextInspector)
+                {
+                    OnPropertyChanged(nameof(HasContextInspector));
+                    OnPropertyChanged(nameof(IsInspectorPanelVisible));
+                }
                 OnPropertyChanged(nameof(ViewportSelectionTitle));
                 OnPropertyChanged(nameof(ViewportSelectionDetail));
             }
