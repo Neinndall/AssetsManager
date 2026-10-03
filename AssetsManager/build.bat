@@ -1,5 +1,4 @@
-dotnet build AssetsManager.csproj
-
+dotnet build
 
 >null
 
