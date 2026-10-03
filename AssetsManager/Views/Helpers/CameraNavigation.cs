@@ -32,8 +32,7 @@ namespace AssetsManager.Views.Helpers
         internal const double ZoomFraction = 0.08;
         internal const double MinimumZoomStep = 5.0;
         internal const double MaximumZoomStep = 120.0;
-        internal const double MinimumWalkSpeed = 150.0;
-        internal const double MaximumWalkSpeed = 9000.0;
+        internal const double WalkSpeed = 150.0;
 
         /// <summary>World ray through a surface pixel, matching the preview projection.</summary>
         internal static bool TryGetRay(
@@ -138,10 +137,8 @@ namespace AssetsManager.Views.Helpers
         }
 
         /// <summary>
-        /// WASD travel on the horizontal plane, the same in every viewport. <paramref name="forward"/> and
-        /// <paramref name="strafe"/> are -1, 0 or 1. The pace scales with the distance to the point the
-        /// camera looks at (the orbit centre, or the terrain at the screen centre on a MAP) or with the
-        /// orthographic width, so a close-up and a whole map both slide about a screen width in four seconds.
+        /// WASD travel on the horizontal plane at a fixed world-space pace in every viewport.
+        /// Camera distance and projection must not make MAPs travel faster than models.
         /// </summary>
         internal static Vector3D Walk(
             CameraPose pose,
@@ -167,10 +164,7 @@ namespace AssetsManager.Views.Helpers
                 return default;
             move.Normalize();
 
-            double reach = pose.Orthographic
-                ? Math.Max(1.0, pose.OrthographicWidth) * 0.25
-                : Math.Max(pose.Look.Length, MinimumHeight) * 0.375;
-            double pace = Math.Clamp(reach, MinimumWalkSpeed, MaximumWalkSpeed) * Math.Max(0.01, speed);
+            double pace = WalkSpeed * Math.Max(0.01, speed);
             return move * (pace * seconds);
         }
 

@@ -464,6 +464,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / WASD now moves at the same speed in maps, models and map backdrops, regardless of camera zoom.
   - VFX Studio / Short preview loops now restart correctly when one frame crosses a complete cycle.
   - VFX Studio / Particle noise now varies with the effect seed instead of repeating identical motion across effect instances.
   - VFX Studio / Prevented textures and meshes from being mistaken for missing effect dependency files in extracted projects.

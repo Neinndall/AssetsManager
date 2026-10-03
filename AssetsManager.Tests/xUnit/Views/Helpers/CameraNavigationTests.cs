@@ -119,17 +119,38 @@ namespace AssetsManager.Tests.xUnit.Views.Helpers
             Assert.Equal(default, CameraNavigation.Walk(pose, 0, 0, 0.5, 1.0));
         }
 
-        [Fact]
-        public void WalkPaceFollowsTheViewedDistanceInEveryViewport()
+        [Theory]
+        [InlineData(1.0)]
+        [InlineData(3.0)]
+        [InlineData(0.25)]
+        public void WalkPaceIsIndependentOfCameraDistanceAndProjection(double speed)
         {
-            // The same Game camera pose, orbiting a Character or looking at the MAP terrain, walks at one pace.
-            Vector3D look = new(0, -2250 * System.Math.Sin(56 * System.Math.PI / 180), -2250 * System.Math.Cos(56 * System.Math.PI / 180));
-            CameraPose game = Looking(new Point3D(0, Ground - look.Y, 0), look);
-            CameraPose close = Looking(new Point3D(0, 200, 300), new Vector3D(0, -100, -300));
+            CameraPose model = Looking(new Point3D(0, 200, 300), new Vector3D(0, -100, -300));
+            CameraPose map = Looking(new Point3D(0, 10000, 30000), new Vector3D(0, -10000, -30000));
+            CameraPose backdrop = model with { Position = new Point3D(7000, 200, 7000) };
+            CameraPose orthographic = map with { Orthographic = true, OrthographicWidth = 20000 };
+            CameraPose closeOrthographic = model with { Orthographic = true, OrthographicWidth = 50 };
+            foreach (CameraPose pose in new[] { model, map, backdrop, orthographic, closeOrthographic })
+            {
+                double forward = CameraNavigation.Walk(pose, 1, 0, 1.0, speed).Length;
+                Assert.Equal(150.0 * speed, forward, 6);
+                Assert.Equal(forward, CameraNavigation.Walk(pose, 1, 1, 1.0, speed).Length, 6);
+                Assert.Equal(forward, CameraNavigation.Walk(pose, -1, 0, 1.0, speed).Length, 6);
+                Assert.Equal(forward, CameraNavigation.Walk(pose, 0, 1, 1.0, speed).Length, 6);
+            }
+        }
 
-            Assert.Equal(843.75, CameraNavigation.Walk(game, 1, 0, 1.0, 1.0).Length, 6);
-            Assert.Equal(843.75 * 3.0, CameraNavigation.Walk(game, 1, 0, 1.0, 3.0).Length, 6);
-            Assert.Equal(CameraNavigation.MinimumWalkSpeed, CameraNavigation.Walk(close, 1, 0, 1.0, 1.0).Length, 6);
+        [Theory]
+        [InlineData(30)]
+        [InlineData(60)]
+        [InlineData(144)]
+        public void WalkTravelsTheSameDistanceOverOneSecondAtDifferentFrameRates(int frames)
+        {
+            CameraPose pose = Looking(new Point3D(0, 1050, 1000), new Vector3D(0, -1000, -1000));
+            Vector3D total = default;
+            for (int frame = 0; frame < frames; frame++)
+                total += CameraNavigation.Walk(pose, 1, 1, 1.0 / frames, 1.0);
+            Assert.Equal(150.0, total.Length, 6);
         }
 
         [Fact]
