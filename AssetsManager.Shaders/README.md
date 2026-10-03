@@ -4,7 +4,7 @@
 
 Responsibilities:
 - Parse and reflect DXBC shader containers.
-- Convert League DXBC shader bytecode to SPIR-V through the `vkd3d-shader` native distributed by the `ShadowDusk.HLSL` NuGet package.
+- Convert League DXBC shader bytecode to SPIR-V through the `dxbc-spirv` native (`dxbc_spv_lol.dll`).
 - Normalize DXBC register semantics into stable shader interfaces.
 - Patch SPIR-V/GLSL for the preview renderer contract.
 - Cross-compile SPIR-V to GLSL through SPIRV-Cross.
@@ -14,6 +14,6 @@ The library is intentionally independent from MAP, VFX Studio, WAD resolution an
 
 ## Native dependency
 
-There is no project-owned shader DLL or native source tree. `ShadowDusk.HLSL` supplies `libvkd3d-shader-1.dll` through NuGet runtime assets, and normal `dotnet build` copies that dependency transitively to the consuming `win-x64` application output.
+There is no NuGet-owned shader compiler. `runtimes/win-x64/native/dxbc_spv_lol.dll` is the project-owned SM5 shim built from the pinned `dxbc-spirv` + `SPIRV-Headers` revisions under `native/dxbc-spv/` (see its README), and normal `dotnet build` copies it via `Content/PreserveNewest` to the consuming `win-x64` application output. SPIRV-Cross arrives via the `Vortice.SpirvCross` NuGet package.
 
 The shader pipeline is documented and validated independently from the Viewer implementation.
