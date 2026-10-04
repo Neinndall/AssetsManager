@@ -33,9 +33,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             }
         }
 
+        public static IEnumerable<object[]> LookupAxesCases()
+        {
+            foreach (object[] test in LookupCases())
+                foreach (bool vertical in new[] { false, true })
+                    yield return test.Concat(new object[] { vertical }).ToArray();
+        }
+
         [Theory]
-        [MemberData(nameof(LookupCases))]
-        public void RampSamplesTheAuthoredParticleDriver(VfxPrimitiveKind primitive, int driver, bool mult, bool fallback)
+        [MemberData(nameof(LookupAxesCases))]
+        public void RampSamplesTheAuthoredParticleDriver(VfxPrimitiveKind primitive, int driver, bool mult, bool fallback, bool vertical)
         {
             string install = InstalledSkins.FindInstall();
             if (install == null) return;
@@ -51,7 +58,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 TextureTarget.Texture2D, target, 0);
             Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
             uint white = Texture(gl, 1, 1, new byte[] { 255, 255, 255, 255 });
-            uint ramp = Texture(gl, 2, 1, new byte[] { 255, 0, 0, 255, 0, 0, 255, 255 });
+            uint ramp = Texture(gl, vertical ? 1u : 2u, vertical ? 2u : 1u, new byte[] { 255, 0, 0, 255, 0, 0, 255, 255 });
             try
             {
                 bool mesh = primitive is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
@@ -63,8 +70,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true },
                     TextureMultPath: mult ? "mult.tex" : null,
                     PaletteDefinition: fallback ? new VfxPaletteDefinition(0, VfxCurve3.Const(Vector3.Zero)) : null,
-                    ParticleColorTexturePath: "ramp.tex", ColorLookUpTypeX: driver, ColorLookUpTypeY: 0,
-                    ColorLookUpScales: new Vector2(1, 0.5f), ColorLookUpOffsets: new Vector2(0.15f, 0.35f),
+                    ParticleColorTexturePath: "ramp.tex", ColorLookUpTypeX: vertical ? 0 : driver,
+                    ColorLookUpTypeY: vertical ? driver : 0,
+                    ColorLookUpScales: vertical ? new Vector2(0.5f, 1) : new Vector2(1, 0.5f),
+                    ColorLookUpOffsets: vertical ? new Vector2(0.35f, 0.15f) : new Vector2(0.15f, 0.35f),
                     Beam: new VfxBeamDefinition(0, 0, 1, VfxCurve3.Const(Vector3.One),
                         VfxCurve4.Const(Vector4.One), false, Vector3.Zero, Vector3.Zero),
                     Trail: new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 0, 0, 0));
@@ -93,7 +102,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     emitter.Particles.Add(new VfxPlaybackRuntime.Particle
                     {
                         Serial = (uint)index, Life = 1, BirthFrame = Matrix4x4.Identity,
-                        TrailTiling = trail ? new Vector3(2, 1, 0) : Vector3.Zero,
+                        TrailTiling = trail ? new Vector3(2, vertical && mult ? 0 : 1, 0) : Vector3.Zero,
                         BirthRotation = primitive == VfxPrimitiveKind.ArbitraryTrail
                             ? new Vector3(0, 0, MathF.PI / 2) : Vector3.Zero
                     });

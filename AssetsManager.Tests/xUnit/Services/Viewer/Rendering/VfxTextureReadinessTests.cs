@@ -220,6 +220,106 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             }
         }
 
+        public static IEnumerable<object[]> CustomSamplerCases()
+        {
+            foreach (VfxPrimitiveKind primitive in new[]
+                     { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh, VfxPrimitiveKind.AttachedMesh })
+            {
+                yield return new object[] { primitive, "Clamp_No_Mip", (int)MapTextureWrap.Repeat, true };
+                yield return new object[] { primitive, "Clamp_Linear_Mip", (int)MapTextureWrap.Repeat, true };
+                yield return new object[] { primitive, "CharacterClamp", (int)MapTextureWrap.Repeat, true };
+                yield return new object[] { primitive, "Wrap_No_Mip", (int)MapTextureWrap.Clamp, false };
+                yield return new object[] { primitive, "CharacterWrap", (int)MapTextureWrap.Clamp, false };
+                yield return new object[] { primitive, null, (int)MapTextureWrap.Clamp, true };
+                yield return new object[] { primitive, null, (int)MapTextureWrap.Repeat, false };
+                yield return new object[] { primitive, null, (int)MapTextureWrap.Mirror, true };
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(CustomSamplerCases))]
+        public void CustomMaterialPreservesSamplerAddressingWithSingleLevelTextures(
+            VfxPrimitiveKind primitive, string sharedSampler, int addressMode, bool blue)
+        {
+            string install = InstalledSkins.FindInstall();
+            if (install == null) return;
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var renderer = new VfxOpenGlRenderer();
+            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            uint target = CreateTexture(gl, 64, 64, new byte[64 * 64 * 4]);
+            uint framebuffer = gl.GenFramebuffer();
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                TextureTarget.Texture2D, target, 0);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+            uint texture = CreateTexture(gl, 2, 1, new byte[] { 255, 0, 0, 255, 0, 0, 255, 255 });
+            try
+            {
+                bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
+                var definition = new VfxEmitterDefinition("custom sampler", VfxCurveF.Const(1), VfxCurveF.Const(1),
+                    null, 0, 0, false, false, 4, VfxCurve3.Const(Vector3.One), null,
+                    VfxCurve4.Const(Vector4.One), null, null, null, null, VfxCurve3.Const(Vector3.Zero),
+                    "emitter.tex", Vector2.One, 1, false, mesh, PrimitiveKind: primitive,
+                    RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true });
+                var parameters = new Dictionary<string, Vector4>();
+                VfxShaderParameterUtils.PopulateNativeParameters(parameters, definition, 0);
+                var wrap = (MapTextureWrap)addressMode;
+                var sampler = new GameMaterialSamplerState(sharedSampler, wrap, wrap, wrap, true, true);
+                GameMaterialProgram program = GameParticleProgramResolver.Create(definition, mesh);
+                program = program with
+                {
+                    Passes = program.Passes.Select(pass => pass with
+                    {
+                        State = pass.State with { CullEnabled = false },
+                        Parameters = parameters.Select(pair => new GameMaterialParameter(
+                            pair.Key, pair.Value, GameMaterialParamSource.Material)).ToArray(),
+                        Textures = new[] { new GameMaterialTexture("TEXTURE", new MapTextureReference("custom.tex", 0),
+                            GameMaterialTextureSource.ShaderDefault, sampler) }
+                    }).ToArray()
+                };
+                definition = definition with
+                {
+                    CustomMaterial = ModelMaterialDefinition.TextureOnly("custom.tex") with { Program = program }
+                };
+                float[] instance = new float[VfxPlaybackRuntime.InstanceStride];
+                instance[3] = instance[4] = instance[18] = 0.75f;
+                instance[5] = instance[6] = instance[7] = instance[8] = 1;
+                // Vertices sample near U=1.25: repeat reads red, clamp/mirror read blue.
+                instance[19] = 1.25f;
+                instance[20] = 0.5f;
+                instance[21] = instance[22] = 0.001f;
+                instance[31] = instance[32] = 1;
+                instance[36] = instance[40] = instance[44] = 1;
+                var emitter = new VfxPlaybackRuntime.EmitterState
+                {
+                    Def = definition, Texture = texture, TextureWidth = 2, TextureHeight = 1,
+                    Instances = instance, InstanceCount = 1
+                };
+                emitter.ProgramTextures["custom.tex"] = texture;
+                if (mesh)
+                    renderer.UploadEmitterMesh(emitter,
+                        new float[] { -1, -1, 0, 1, -1, 0, 0, 1, 0 },
+                        new float[] { 0, 0, 1, 0, 0, 1, 0, 0, 1 },
+                        new float[] { 0, 0, 1, 0, 0.5f, 1 }, null);
+
+                byte[] pixels = Draw(gl, renderer, emitter, framebuffer);
+                Assert.Null(renderer.GameParticleFallback(emitter, mesh));
+                int channel = blue ? 2 : 0;
+                Assert.Contains(Enumerable.Range(0, 64 * 64), at => pixels[at * 4 + channel] > 64);
+                Assert.DoesNotContain(Enumerable.Range(0, 64 * 64), at => pixels[at * 4 + 2 - channel] > 16);
+                Assert.Equal(pixels, Draw(gl, renderer, emitter, framebuffer));
+                Assert.Equal(GLEnum.NoError, gl.GetError());
+            }
+            finally
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                gl.DeleteFramebuffer(framebuffer);
+                gl.DeleteTexture(target);
+                gl.DeleteTexture(texture);
+            }
+        }
+
         private static byte[] Draw(GL gl, VfxOpenGlRenderer renderer,
             VfxPlaybackRuntime.EmitterState emitter, uint framebuffer)
         {

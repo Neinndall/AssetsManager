@@ -149,7 +149,14 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         private uint ResolveParticleSampler(GameMaterialSamplerState state)
         {
             if (!_particleSamplerStates.TryGetValue(state, out GameMaterialSamplerState singleLevel))
-                _particleSamplerStates.Add(state, singleLevel = state with { SharedSampler = "No_Mip" });
+            {
+                // Keep shared addressing overrides when disabling mipmaps for decoded VFX textures.
+                string shared = state.SharedSampler ?? string.Empty;
+                _particleSamplerStates.Add(state, singleLevel = state with
+                {
+                    SharedSampler = shared.Contains("No_Mip", StringComparison.Ordinal) ? shared : shared + " No_Mip"
+                });
+            }
             return ResolveSampler(singleLevel);
         }
 
