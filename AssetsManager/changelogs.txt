@@ -469,6 +469,7 @@ Improvements
   - Input and confirmation dialogs now support Enter/Escape keys with automatic focus.
 
 Changes
+  - VFX Studio / Renamed the champion visibility tooltip to Show/Hide Champion.
   - VFX Studio / Unified toolbar actions for camera fitting, snapshots and playback, removing redundant actions.
   - VFX Studio / Removed emitter editing and BIN saving while keeping effect inspection and playback.
   - VFX Studio / Removed the Reload project button from the project toolbar.

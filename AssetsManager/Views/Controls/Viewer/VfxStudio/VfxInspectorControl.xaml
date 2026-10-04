@@ -893,7 +893,7 @@
                                             <ToggleButton IsChecked="{Binding ShowChampionMesh, Mode=TwoWay}"
                                                           Style="{StaticResource TransparentIconToggleButton}"
                                                           Width="30" Height="30"
-                                                          ToolTip="Toggle Champion 3D Model Mesh (when available)">
+                                                          ToolTip="Show/Hide Champion">
                                                 <materialIcons:MaterialIcon Kind="AccountBoxOutline" Width="14" Height="14"/>
                                             </ToggleButton>
                                             <ToggleButton Click="PreviewBindPoseToggle_Click"
