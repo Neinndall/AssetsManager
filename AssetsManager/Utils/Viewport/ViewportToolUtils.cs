@@ -1,10 +1,10 @@
 using System;
 
-namespace AssetsManager.Services.Viewer.Semantics
+namespace AssetsManager.Utils.Viewport
 {
-    internal static class ViewerAutoRotation
+    internal static class ViewportToolUtils
     {
-        internal static double Advance(double degrees, double deltaSeconds)
+        internal static double AdvanceAutoRotation(double degrees, double deltaSeconds)
         {
             if (!double.IsFinite(degrees)) degrees = 0d;
             if (double.IsFinite(deltaSeconds) && deltaSeconds > 0d)

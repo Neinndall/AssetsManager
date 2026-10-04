@@ -4,7 +4,7 @@ using System.Numerics;
 using System.Windows.Input;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Rendering;
-using AssetsManager.Services.Viewer.Semantics;
+using AssetsManager.Utils.Viewport;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Helpers;
@@ -76,13 +76,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void SharedAutoRotationKeepsItsAngleWhenStoppedAndResumesAtViewerSpeed()
         {
-            double yaw = ViewerAutoRotation.Advance(350d, 1d);
+            double yaw = ViewportToolUtils.AdvanceAutoRotation(350d, 1d);
             Assert.Equal(20d, yaw, 8);
-            Assert.Equal(yaw, ViewerAutoRotation.Advance(yaw, 0d));
-            Assert.Equal(50d, ViewerAutoRotation.Advance(yaw, 1d), 8);
-            Assert.Equal(345d, ViewerAutoRotation.Advance(-45d, 1d), 8);
+            Assert.Equal(yaw, ViewportToolUtils.AdvanceAutoRotation(yaw, 0d));
+            Assert.Equal(50d, ViewportToolUtils.AdvanceAutoRotation(yaw, 1d), 8);
+            Assert.Equal(345d, ViewportToolUtils.AdvanceAutoRotation(-45d, 1d), 8);
             double stepped = 350d;
-            for (int i = 0; i < 4; i++) stepped = ViewerAutoRotation.Advance(stepped, .25d);
+            for (int i = 0; i < 4; i++) stepped = ViewportToolUtils.AdvanceAutoRotation(stepped, .25d);
             Assert.Equal(yaw, stepped, 8);
         }
 

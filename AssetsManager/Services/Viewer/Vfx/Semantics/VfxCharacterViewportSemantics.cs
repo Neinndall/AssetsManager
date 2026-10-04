@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using AssetsManager.Services.Viewer.Semantics;
+using AssetsManager.Utils.Viewport;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Semantics
@@ -25,7 +25,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
             foreach (VfxSceneActor actor in actors)
             {
                 if (!actor.IsSelected) continue;
-                actor.RotationY = ViewerAutoRotation.Advance(actor.RotationY, deltaSeconds);
+                actor.RotationY = ViewportToolUtils.AdvanceAutoRotation(actor.RotationY, deltaSeconds);
                 actor.PlacementCustomized = true;
                 actor.PlacedOnKey = backdropKey;
             }

@@ -19,6 +19,7 @@ using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Viewport;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Helpers;
 using Microsoft.Win32;
@@ -984,13 +985,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (IsDiffMode)
                 {
                     foreach (SceneModel model in _loadedModels)
-                        model.RotationY = ViewerAutoRotation.Advance(model.RotationY, deltaTime);
+                        model.RotationY = ViewportToolUtils.AdvanceAutoRotation(model.RotationY, deltaTime);
                     foreach (SceneModel model in _auxiliaryModels)
-                        model.RotationY = ViewerAutoRotation.Advance(model.RotationY, deltaTime);
+                        model.RotationY = ViewportToolUtils.AdvanceAutoRotation(model.RotationY, deltaTime);
                 }
                 else if (_activeSceneModel != null)
                 {
-                    _activeSceneModel.RotationY = ViewerAutoRotation.Advance(_activeSceneModel.RotationY, deltaTime);
+                    _activeSceneModel.RotationY = ViewportToolUtils.AdvanceAutoRotation(_activeSceneModel.RotationY, deltaTime);
                 }
             }
 
