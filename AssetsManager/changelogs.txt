@@ -477,6 +477,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Auto Rotate Character now rotates only the selected scene actors and their effects.
   - VFX Studio / Removed the duplicate Base option on skins that already define their base form, preserving other skins' form choices.
   - Viewer / Skin textures stored by hash remain correctly assigned after updating hashes.
   - Comparator / Refreshing a selected backup now updates Base Version, its directory and Quick Select when returning to the view.

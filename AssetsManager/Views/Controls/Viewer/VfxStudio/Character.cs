@@ -22,6 +22,11 @@ namespace AssetsManager.Views.Controls.Viewer
         private void RefreshCharacterInteractionTarget()
         {
             SynchronizeSceneActorsListSelection();
+            if (_model.CharacterAutoRotate)
+            {
+                ApplyCharacterPlacement();
+                ApplySceneActorPlacements();
+            }
             // Picking sees every visible Character; the gizmo translates only the selected group.
             _characterInteractionModels.Clear();
             SceneModel focused = _championModel != null && _model.IsSkinWorkspace && IsFocusedActorVisible
@@ -109,6 +114,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 deltaSeconds);
             ApplyCharacterPlacement();
         }
+
+        private double CharacterAutoRotation(VfxSceneActor actor) =>
+            VfxCharacterViewportSemantics.ActorAutoRotation(actor, _model.CharacterAutoRotate, _characterAutoRotateDegrees);
 
         private void ClearCharacterArmatureOverlay()
         {

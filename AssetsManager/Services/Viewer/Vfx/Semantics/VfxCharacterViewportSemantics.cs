@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Semantics
 {
@@ -24,6 +25,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
             if (!double.IsFinite(speedDegreesPerSecond)) speedDegreesPerSecond = 30d;
             return NormalizeDegrees(degrees + deltaSeconds * speedDegreesPerSecond);
         }
+
+        internal static double ActorAutoRotation(VfxSceneActor actor, bool enabled, double degrees) =>
+            enabled && actor?.IsSelected == true ? degrees : 0d;
 
         private static double NormalizeDegrees(double degrees)
         {

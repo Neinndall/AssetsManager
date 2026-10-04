@@ -349,7 +349,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _sceneActorRuntimes[actor] = runtime;
             runtime.SetGameStates(actor.EnabledGameStates);
-            runtime.ApplyPlacement(actor, _model.CharacterAutoRotate ? _characterAutoRotateDegrees : 0d);
+            runtime.ApplyPlacement(actor, CharacterAutoRotation(actor));
             actor.StatusText = runtime.DescribePlayback();
             RefreshCharacterInteractionTarget();
             OpenTkControl?.InvalidateVisual();
@@ -550,20 +550,18 @@ namespace AssetsManager.Views.Controls.Viewer
         private void AdvanceSceneActors(float deltaSeconds)
         {
             if (_sceneActorRuntimes.Count == 0 || !_model.IsSkinWorkspace) return;
-            double autoYaw = _model.CharacterAutoRotate ? _characterAutoRotateDegrees : 0d;
             foreach ((VfxSceneActor actor, VfxSceneActorRuntime runtime) in _sceneActorRuntimes)
             {
                 if (_model.CharacterAutoRotate)
-                    runtime.ApplyPlacement(actor, autoYaw);
+                    runtime.ApplyPlacement(actor, CharacterAutoRotation(actor));
                 runtime.Advance(deltaSeconds, !actor.IsPlaybackPaused, _model.Speed, actor);
             }
         }
 
         private void ApplySceneActorPlacements()
         {
-            double autoYaw = _model.CharacterAutoRotate ? _characterAutoRotateDegrees : 0d;
             foreach ((VfxSceneActor actor, VfxSceneActorRuntime runtime) in _sceneActorRuntimes)
-                runtime.ApplyPlacement(actor, autoYaw);
+                runtime.ApplyPlacement(actor, CharacterAutoRotation(actor));
             OpenTkControl?.InvalidateVisual();
         }
 
@@ -638,7 +636,6 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             VfxWorkspaceTab tab = _model.SelectedWorkspaceTab;
             if (tab?.Kind != VfxWorkspaceTabKind.Skin || delta == Vector3.Zero) return;
-            double autoYaw = _model.CharacterAutoRotate ? _characterAutoRotateDegrees : 0d;
             foreach (VfxSceneActor actor in tab.Actors)
             {
                 if (ReferenceEquals(actor, tab.FocusedActor) ||
@@ -652,7 +649,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 actor.PositionZ += delta.Z;
                 actor.PlacedOnKey = sourceKey;
                 if (_sceneActorRuntimes.TryGetValue(actor, out VfxSceneActorRuntime runtime))
-                    runtime.ApplyPlacement(actor, autoYaw);
+                    runtime.ApplyPlacement(actor, CharacterAutoRotation(actor));
             }
         }
 

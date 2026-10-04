@@ -1,8 +1,12 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using System.Windows.Input;
+using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Loading;
+using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
@@ -77,6 +81,64 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             double manualYaw = 35d;
             Assert.Equal(55d, manualYaw + phase, 8);
             Assert.Equal(35d, manualYaw, 8);
+        }
+
+        [Fact]
+        public void AutoRotateFollowsSingleAndGroupSelectionAndRestoresManualActorPlacement()
+        {
+            using var loading = new VfxLoadingService();
+            var first = new VfxSceneActor(new VfxSkinItem { OwnerName = "Aatrox", SkinIndex = 0 })
+            {
+                RotationY = 35d, PositionX = -100d
+            };
+            var second = new VfxSceneActor(new VfxSkinItem { OwnerName = "Aatrox", SkinIndex = 1 })
+            {
+                RotationY = 90d, PositionX = 100d
+            };
+            var tab = new VfxWorkspaceTab { Kind = VfxWorkspaceTabKind.Skin };
+            tab.Actors.Add(first);
+            tab.Actors.Add(second);
+            tab.FocusedActor = first;
+            VfxSceneActorRuntime CreateRuntime() => new(loading, new VfxLoadingService.Bundle(), null,
+                new SceneModel(), null, new AnimationService(null), new VfxRenderSession(loadingService: loading), null, null);
+            var runtimes = new[] { CreateRuntime(), CreateRuntime() };
+            void Select(VfxSceneActor actor, ModifierKeys modifiers = ModifierKeys.None)
+            {
+                tab.SelectionAnchor = SelectionBehavior.SelectItems(tab.Actors, tab.SelectionAnchor, actor,
+                    modifiers, item => item.IsSelected, (item, selected) => item.IsSelected = selected);
+                if (actor?.IsSelected == true) tab.FocusedActor = actor;
+            }
+            void Verify(double phase, double firstYaw, double secondYaw, bool enabled = true)
+            {
+                for (int i = 0; i < runtimes.Length; i++)
+                    runtimes[i].ApplyPlacement(tab.Actors[i],
+                        VfxCharacterViewportSemantics.ActorAutoRotation(tab.Actors[i], enabled, phase));
+                Assert.Equal(firstYaw, runtimes[0].Model.RotationY);
+                Assert.Equal(secondYaw, runtimes[1].Model.RotationY);
+                Assert.Equal(-100d, runtimes[0].Model.PositionX);
+                Assert.Equal(100d, runtimes[1].Model.PositionX);
+                Assert.Equal(35d, first.RotationY);
+                Assert.Equal(90d, second.RotationY);
+            }
+            try
+            {
+                Verify(30d, 65d, 90d);
+                Select(second);
+                Verify(60d, 35d, 150d);
+                Select(first, ModifierKeys.Control);
+                Verify(90d, 125d, 180d);
+                Verify(90d, 35d, 90d, enabled: false);
+                Select(null);
+                Verify(120d, 35d, 90d);
+            }
+            finally
+            {
+                foreach (var runtime in runtimes)
+                {
+                    runtime.ReleaseCpuState();
+                    runtime.Session.Dispose();
+                }
+            }
         }
 
         [Theory]
