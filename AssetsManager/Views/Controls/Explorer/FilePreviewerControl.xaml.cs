@@ -39,6 +39,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private ObservableRangeCollection<FileGridViewModel> _gridItems;
         private CancellationTokenSource _gridPreviewCancellation;
         private string _currentSearchFilter = string.Empty;
+        private bool _isDisposed;
 
         public FilePreviewerControl()
         {
@@ -202,6 +203,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void FilePreviewerControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (_isDisposed) return;
             try
             {
                 ExplorerPreviewService.Initialize(
@@ -232,25 +234,15 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async void FilePreviewerControl_Unloaded(object sender, RoutedEventArgs e)
+        private void FilePreviewerControl_Unloaded(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                CancelGridPreviewLoading();
-                await ExplorerPreviewService.ResetPreviewAsync();
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, "Error cleaning FilePreviewerControl on unload");
-            }
-            finally
-            {
-                CleanupResources();
-            }
+            CleanupResources();
         }
 
         public void CleanupResources()
         {
+            if (_isDisposed) return;
+            _isDisposed = true;
             try
             {
                 CancelGridPreviewLoading();
@@ -271,7 +263,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
 
                 // Clear sub-controls peer connection
-                if (FileGridControl != null) FileGridControl.ParentPreviewer = null;
+                if (FileGridControl != null)
+                {
+                    FileGridControl.ItemsSource = null;
+                    FileGridControl.ParentPreviewer = null;
+                }
 
                 _currentNode = null;
                 _currentFolderNode = null;
@@ -285,7 +281,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
-            if (node == null) return;
+            if (_isDisposed || node == null) return;
 
             _currentNode = node;
 
@@ -401,6 +397,7 @@ namespace AssetsManager.Views.Controls.Explorer
             // Defer execution to avoid issues with current mouse events in the ListBox
             Dispatcher.InvokeAsync(() =>
             {
+                if (_isDisposed) return;
                 CancelGridPreviewLoading();
                 _gridPreviewCancellation = new CancellationTokenSource();
                 var cancellationToken = _gridPreviewCancellation.Token;

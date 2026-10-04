@@ -711,6 +711,11 @@ namespace AssetsManager.Services.Explorer
             }
             finally
             {
+                _currentContentNode = null;
+                _currentImageNode = null;
+                _activeContentPreviewer = Previewer.None;
+                _activeImagePreviewer = Previewer.None;
+                _isGridActive = false;
                 _imagePreview = null;
                 _textEditorPreview = null;
                 _viewModel = null;

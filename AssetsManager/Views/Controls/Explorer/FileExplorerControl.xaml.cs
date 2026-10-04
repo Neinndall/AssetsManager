@@ -98,7 +98,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private readonly FileExplorerModel _viewModel;
         
         private readonly DispatcherTimer _searchTimer;
-        private CancellationTokenSource _treeBuildCts;
+        private readonly ExplorerTreeLoadService _treeLoader;
         private string _currentRootPath;
         private string _backupJsonPath;
         private bool _isExternalInitRequested = false;
@@ -115,6 +115,13 @@ namespace AssetsManager.Views.Controls.Explorer
             
             _viewModel = new FileExplorerModel();
             DataContext = _viewModel;
+            _treeLoader = new ExplorerTreeLoadService(_viewModel.RootNodes,
+                () =>
+                {
+                    WadSearchBoxService?.InvalidateIndex(_viewModel.RootNodes);
+                    _viewModel.SelectedItem = null;
+                    _viewModel.SelectedNodes.Clear();
+                });
             
             this.Loaded += FileExplorerControl_Loaded;
             this.Unloaded += FileExplorerControl_Unloaded;
@@ -146,6 +153,7 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
             }
+            CleanupResources();
         }
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
@@ -172,47 +180,45 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void CleanupResources()
         {
-            // 1. Cancel active local tree build without affecting global background tasks
-            _treeBuildCts?.Cancel();
-            _treeBuildCts?.Dispose();
-            _treeBuildCts = null;
+            if (_treeLoader.IsDisposed) return;
+            CancelTreeLoad();
 
-            // 2. Stop search timer
+            // Stop search before detaching the tree.
             _searchTimer?.Stop();
 
-            // 3. Clear search box index BEFORE clearing RootNodes
-            if (WadSearchBoxService != null && _viewModel.RootNodes != null)
-            {
-                WadSearchBoxService.InvalidateIndex(_viewModel.RootNodes);
-            }
-
-            // 4. Clear the TreeView binding and events
+            // Detach controls before disposing their nodes.
             if (FileTreeView != null)
             {
                 FileTreeView.SelectedItemChanged -= FileTreeView_SelectedItemChanged;
                 FileTreeView.ItemsSource = null; 
             }
 
-            // 5. DEEP CLEANUP: Dispose all nodes recursively without allocating temporary lists
-            if (_viewModel.RootNodes != null)
-            {
-                for (int i = 0; i < _viewModel.RootNodes.Count; i++)
-                {
-                    _viewModel.RootNodes[i]?.Dispose(); 
-                }
-                _viewModel.RootNodes.Clear();
-            }
+            _viewModel.SelectedItem = null;
+            _viewModel.SelectedNodes.Clear();
+            _treeLoader.Dispose();
+            _viewModel.IsBusy = false;
+            _viewModel.IsTreeReady = false;
 
-            // 6. Break peer connections
+            // Break peer connections.
             FilePreviewer = null; 
 
-            // 7. Reset internal state
+            // Reset navigation state.
             _currentRootPath = null;
+            _backupJsonPath = null;
+            NewLolPath = null;
+            OldLolPath = null;
             _isExternalInitRequested = false;
+        }
+
+        private void CancelTreeLoad()
+        {
+            if (_treeLoader.Cancel() && ProgressUIManager != null)
+                _ = ProgressUIManager.ShowCancellationAsync();
         }
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (_treeLoader.IsDisposed) return;
             if (AppSettings != null)
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
@@ -279,10 +285,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 // If we are not going to load, show the correct placeholder immediately.
                 _viewModel.UpdateEmptyState(_viewModel.IsWadMode);
             }
-
-            // Now, perform the async hash loading.
-            if (shouldLoadHashes)
-                await HashResolverService.LoadAllHashesAsync();
 
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
@@ -386,6 +388,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ReloadTreeAsync()
         {
+            if (_treeLoader.IsDisposed) return;
             if (_viewModel.IsWadMode)
             {
                 string path = _currentRootPath;
@@ -458,23 +461,30 @@ namespace AssetsManager.Views.Controls.Explorer
             bool isBackupMode,
             Action<ObservableRangeCollection<FileSystemNodeModel>> onSuccess = null)
         {
+            if (_treeLoader.IsDisposed) return;
             _viewModel.IsBackupMode = isBackupMode;
-            _treeBuildCts?.Cancel();
-            _treeBuildCts?.Dispose();
-            _treeBuildCts = new CancellationTokenSource();
-            var cancellationToken = _treeBuildCts.Token;
-
             _viewModel.SetLoadingState(loadingState);
+            long version = 0;
 
             try
             {
-                var newNodes = await buildFunc(cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                _viewModel.RootNodes.ReplaceRange(newNodes);
+                var load = _treeLoader.LoadAsync(async ct =>
+                {
+                    if (HashResolverService?.HasLocalHashCatalogs == true)
+                    {
+                        _viewModel.SetLoadingState(ExplorerLoadingState.LoadingHashes);
+                        // The shared hash catalog continues loading; only this view's wait is cancelled.
+                        await HashResolverService.LoadAllHashesAsync().WaitAsync(ct);
+                    }
+                    ct.ThrowIfCancellationRequested();
+                    _viewModel.SetLoadingState(loadingState);
+                    return await buildFunc(ct);
+                });
+                version = _treeLoader.Version;
+                if (!await load || _treeLoader.IsDisposed || version != _treeLoader.Version) return;
                 WadSearchBoxService.RebuildIndex(_viewModel.RootNodes);
 
-                onSuccess?.Invoke(newNodes);
+                onSuccess?.Invoke(_viewModel.RootNodes);
 
                 if (_viewModel.RootNodes.Count == 0 && !isBackupMode)
                 {
@@ -489,15 +499,16 @@ namespace AssetsManager.Views.Controls.Explorer
             catch (Exception ex)
             {
                 LogService.LogError(ex, errorMsg);
+                if (_treeLoader.IsDisposed || version != _treeLoader.Version) return;
                 CustomMessageBoxService.ShowError("Error", $"{errorMsg} Please check the logs.", Window.GetWindow(this));
                 _viewModel.IsEmptyState = true;
             }
             finally
             {
-                _viewModel.IsBusy = false;
-                if (!_viewModel.IsEmptyState)
+                if (!_treeLoader.IsDisposed && version == _treeLoader.Version)
                 {
-                    _viewModel.IsTreeReady = true;
+                    _viewModel.IsBusy = false;
+                    _viewModel.IsTreeReady = !_viewModel.IsEmptyState;
                 }
             }
         }
@@ -519,8 +530,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             await ExecuteTreeBuildInternalAsync(
                 async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct, AppSettings.PreferredDirectory, 
-                    (file) => Dispatcher.Invoke(() => _viewModel.UpdateScanningProgress(file)),
-                    (dir) => Dispatcher.Invoke(() => _viewModel.UpdateMountingProgress(dir))),
+                    (file) => Dispatcher.Invoke(() => { if (!ct.IsCancellationRequested && !_treeLoader.IsDisposed) _viewModel.UpdateScanningProgress(file); }),
+                    (dir) => Dispatcher.Invoke(() => { if (!ct.IsCancellationRequested && !_treeLoader.IsDisposed) _viewModel.UpdateMountingProgress(dir); })),
                 ExplorerLoadingState.LoadingWads,
                 "Failed to build WAD tree.",
                 false);
@@ -537,8 +548,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             await ExecuteTreeBuildInternalAsync(
                 async ct => await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct, 
-                    (file) => Dispatcher.Invoke(() => _viewModel.UpdateScanningProgress(file)),
-                    (dir) => Dispatcher.Invoke(() => _viewModel.UpdateMountingProgress(dir))),
+                    (file) => Dispatcher.Invoke(() => { if (!ct.IsCancellationRequested && !_treeLoader.IsDisposed) _viewModel.UpdateScanningProgress(file); }),
+                    (dir) => Dispatcher.Invoke(() => { if (!ct.IsCancellationRequested && !_treeLoader.IsDisposed) _viewModel.UpdateMountingProgress(dir); })),
                 ExplorerLoadingState.ExploringDirectory,
                 "Failed to build directory tree.",
                 false);
@@ -555,8 +566,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 async ct => 
                 {
                     var (nodes, newPath, oldPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _viewModel.IsSortingEnabled, ct);
-                    NewLolPath = newPath;
-                    OldLolPath = oldPath;
+                    if (!ct.IsCancellationRequested && !_treeLoader.IsDisposed)
+                    {
+                        NewLolPath = newPath;
+                        OldLolPath = oldPath;
+                    }
                     return nodes;
                 },
                 ExplorerLoadingState.LoadingResults,
@@ -1051,6 +1065,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
             var selectedNode = FileTreeView.SelectedItem as FileSystemNodeModel;
             var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, selectedNode);
+            if (_treeLoader.IsDisposed) return;
 
             // Update No Results found UI after search completes
             if (!string.IsNullOrEmpty(searchText))

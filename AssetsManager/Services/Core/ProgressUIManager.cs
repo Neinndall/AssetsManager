@@ -25,6 +25,7 @@ namespace AssetsManager.Services.Core
         private Window _owner;
         private ProgressDetailsWindow _progressDetailsWindow;
         private int _totalFiles;
+        private readonly CancellationStatusState _cancellationStatus = new();
 
         public ProgressUIManager(
             LogService logService,
@@ -123,7 +124,7 @@ namespace AssetsManager.Services.Core
             {
                 // Set the status bar text to the cancellation message to ensure it is displayed
                 UpdateStatusBar(_taskCancellationManager.CancellationMessage);
-                await Task.Delay(1500);
+                await Task.Delay(CancellationStatusState.HoldMilliseconds);
             }
             else
             {
@@ -157,9 +158,10 @@ namespace AssetsManager.Services.Core
 
         private void UpdateStatusBar(string message, int completed = -1, int total = -1, string customProgressText = null)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _owner?.Dispatcher.Invoke(() =>
             {
                 if (_statusBarViewModel == null) return;
+                if (!_cancellationStatus.Allows(message)) return;
 
                 // PROTECT CANCELLATION STATE: If we are cancelling, don't let other progress messages 
                 // overwrite the "Cancelling Task..." message, except for the "Ready" reset.
@@ -192,11 +194,11 @@ namespace AssetsManager.Services.Core
         {
             if (_taskCancellationManager.IsCancelling)
             {
-                UpdateStatusBar(_taskCancellationManager.CancellationMessage);
+                _ = ShowCancellationAsync();
             }
             else
             {
-                _owner.Dispatcher.InvokeAsync(() =>
+                _owner?.Dispatcher.InvokeAsync(() =>
                 {
                     if (_statusBarViewModel != null && _statusBarViewModel.StatusText == _taskCancellationManager.CancellationMessage)
                     {
@@ -211,6 +213,23 @@ namespace AssetsManager.Services.Core
         #region Public Interface (Event Handlers)
 
         public void ClearStatusText() => UpdateStatusBar("");
+
+        /// <summary>Reports cancellation of view-owned work without cancelling a shared background operation.</summary>
+        public async Task ShowCancellationAsync()
+        {
+            string message = _taskCancellationManager.IsCancelling
+                ? _taskCancellationManager.CancellationMessage : CancellationStatusState.Message;
+            _cancellationStatus.Begin(message);
+            UpdateStatusBar(message);
+            // Timers may wake slightly early; repeated cancellations also extend the shared deadline.
+            while (_cancellationStatus.IsActive)
+                await Task.Delay(Math.Max(1, _cancellationStatus.RemainingMilliseconds));
+            if (!_cancellationStatus.IsActive && !_taskCancellationManager.IsCancelling &&
+                _statusBarViewModel?.StatusText == message)
+            {
+                UpdateStatusBar("Ready");
+            }
+        }
 
         public void ShowDetails()
         {

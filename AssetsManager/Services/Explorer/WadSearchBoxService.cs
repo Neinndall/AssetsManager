@@ -23,6 +23,7 @@ namespace AssetsManager.Services.Explorer
         private readonly NarrativeMetadataService _metadataService;
         private readonly LogService _logService;
         private CancellationTokenSource _searchCts;
+        private ObservableRangeCollection<FileSystemNodeModel> _activeSearchRoots;
         private readonly object _searchLock = new object();
         private readonly object _indexLock = new object();
         private readonly ConditionalWeakTable<ObservableRangeCollection<FileSystemNodeModel>, List<FileSystemNodeModel>> _treeIndexes = new();
@@ -50,6 +51,15 @@ namespace AssetsManager.Services.Explorer
         {
             if (rootNodes == null) return;
 
+            lock (_searchLock)
+            {
+                if (ReferenceEquals(_activeSearchRoots, rootNodes))
+                {
+                    _searchCts?.Cancel();
+                    _activeSearchRoots = null;
+                }
+            }
+
             lock (_indexLock)
             {
                 _treeIndexes.Remove(rootNodes);
@@ -66,7 +76,7 @@ namespace AssetsManager.Services.Explorer
             ObservableRangeCollection<FileSystemNodeModel> rootNodes,
             FileSystemNodeModel activeNode = null)
         {
-            var token = PrepareCancellationToken();
+            var token = PrepareCancellationToken(rootNodes);
 
             try
             {
@@ -102,7 +112,7 @@ namespace AssetsManager.Services.Explorer
         {
             if (string.IsNullOrEmpty(path)) return null;
 
-            var token = PrepareCancellationToken();
+            var token = PrepareCancellationToken(rootNodes);
             await FilterTreeAsync(rootNodes, string.Empty, token);
 
             return await ExpandToPathAsync(path, rootNodes);
@@ -546,13 +556,14 @@ namespace AssetsManager.Services.Explorer
             return null;
         }
 
-        private CancellationToken PrepareCancellationToken()
+        private CancellationToken PrepareCancellationToken(ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
             lock (_searchLock)
             {
                 _searchCts?.Cancel();
                 _searchCts?.Dispose();
                 _searchCts = new CancellationTokenSource();
+                _activeSearchRoots = rootNodes;
                 return _searchCts.Token;
             }
         }
