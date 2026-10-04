@@ -56,6 +56,17 @@ namespace AssetsManager.Views.Models.Viewer
         ulong PathHash)
     {
         public bool IsEmpty => string.IsNullOrWhiteSpace(VirtualPath) && PathHash == 0;
+
+        internal static MapAssetReference FromAuthoredPath(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            string trimmed = value.Trim();
+            if (trimmed.Length == 16 && ulong.TryParse(trimmed,
+                System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture, out ulong hash))
+                return new MapAssetReference(null, hash);
+            return new MapAssetReference(trimmed, 0);
+        }
     }
 
     internal sealed record MapResolvedAsset(

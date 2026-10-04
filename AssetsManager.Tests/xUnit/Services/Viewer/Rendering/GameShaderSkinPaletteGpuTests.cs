@@ -48,7 +48,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     Matrix4x4[] pose = Enumerable.Range(0, asset.Skeleton.Joints.Count)
                         .Select(joint => joint > 255 ? Matrix4x4.CreateTranslation(8f, -2f, 0f) : Matrix4x4.Identity).ToArray();
                     foreach (bool posed in new[] { false, true })
-                    foreach (string submesh in new[] { "Body", "Cloths", "Hair", "Weapon" })
+                    foreach (string submesh in new[] { "Body", "Cloths", "Hair", "Weapon", "Wing", "Cloak01", "Cloak02", "Skirt", "WingsHair" })
                     {
                         int reference = SkinPartRenderDiagnostic.Render(asset, submesh, "front", null, 256, 3.2f,
                             settings, skin, shaders: false, isolateFocus: true, pose: posed ? pose : null);

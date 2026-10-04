@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Tests.Support;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Settings;
@@ -80,6 +81,18 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AM_SHADER_PARAMS")))
                 {
                     Console.WriteLine($"[Skeleton] {name} joints={asset.Skeleton?.Joints.Count} influences={asset.Skeleton?.Influences.Count} maxInfluenceJoint={asset.Skeleton?.Influences.Max()}");
+                    var textures = asset.Textures.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+                    string[] textureKeys = textures.Keys.ToArray();
+                    foreach (GameMaterialTexture texture in materials.SelectMany(material => material.Program.Passes)
+                        .SelectMany(pass => pass.Textures).Distinct())
+                    {
+                        string path = texture.Texture?.VirtualPath;
+                        if (string.IsNullOrWhiteSpace(path) && texture.Texture?.PathHash > 0)
+                            path = texture.Texture.PathHash.ToString("x16");
+                        string key = SknMaterialTextureResolver.MatchTextureKey(path, textureKeys);
+                        bool textureLoaded = !string.IsNullOrWhiteSpace(key) && TextureUtils.ResolveTexture(textures, key) != null;
+                        Console.WriteLine($"[Texture] {name} {texture.Name}: path={path} key={key} loaded={textureLoaded}");
+                    }
                     var submeshes = (asset.Materials?.MaterialDefinitions ?? new Dictionary<string, ModelMaterialDefinition>())
                         .Select(pair => (Submesh: pair.Key, Material: pair.Value))
                         .Prepend(("<default>", asset.Materials?.DefaultMaterialDefinition));

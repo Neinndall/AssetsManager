@@ -301,7 +301,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 return new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
 
             var keyedReferences = keys
-                .Select(key => (Key: key, Reference: ReferenceFromAuthoredTexture(key)))
+                .Select(key => (Key: key, Reference: MapAssetReference.FromAuthoredPath(key)))
                 .Where(item => item.Reference?.IsEmpty == false)
                 .ToArray();
             IReadOnlyDictionary<MapAssetReference, MapResolvedAsset> resolved =
@@ -358,24 +358,6 @@ namespace AssetsManager.Services.Viewer.Loading
             await Task.WhenAll(tasks);
             cancellationToken.ThrowIfCancellationRequested();
             return new Dictionary<string, BitmapSource>(loaded, StringComparer.OrdinalIgnoreCase);
-        }
-
-        internal static MapAssetReference ReferenceFromAuthoredTexture(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-                return null;
-
-            string trimmed = value.Trim();
-            if (trimmed.Length == 16 && ulong.TryParse(
-                    trimmed,
-                    System.Globalization.NumberStyles.HexNumber,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out ulong hash))
-            {
-                return new MapAssetReference(null, hash);
-            }
-
-            return new MapAssetReference(trimmed, 0);
         }
 
     }

@@ -14,7 +14,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [Fact]
         public void BareSixteenDigitTextureKeyRemainsAHashOnlyAsset()
         {
-            MapAssetReference reference = MapCharacterLoadingService.ReferenceFromAuthoredTexture("1234567890abcdef");
+            MapAssetReference reference = MapAssetReference.FromAuthoredPath("1234567890abcdef");
 
             Assert.NotNull(reference);
             Assert.Null(reference.VirtualPath);
@@ -81,7 +81,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [InlineData("data/characters/test/skins/skin0.bin")]
         public void AuthoredPathRemainsAPathAsset(string path)
         {
-            MapAssetReference reference = MapCharacterLoadingService.ReferenceFromAuthoredTexture(path);
+            MapAssetReference reference = MapAssetReference.FromAuthoredPath(path);
 
             Assert.NotNull(reference);
             Assert.Equal(path, reference.VirtualPath);

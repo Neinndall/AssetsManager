@@ -469,6 +469,7 @@ Improvements
   - Input and confirmation dialogs now support Enter/Escape keys with automatic focus.
 
 Changes
+  - VFX Studio / Unified toolbar actions for camera fitting, snapshots and playback, removing redundant actions.
   - VFX Studio / Removed emitter editing and BIN saving while keeping effect inspection and playback.
   - VFX Studio / Removed the Reload project button from the project toolbar.
   - Benchmark / Added a MapGeo memory diagnostic that reports WPF geometry, texture, managed and renderer CPU-copy estimates by loading phase.
@@ -479,6 +480,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Shaders now load unnamed material textures from WAD files, restoring dark wings and fabrics on Janna Skin67.
   - VFX Studio / Fixed missing body parts with Shaders enabled on skins with large skeletons, including Janna Skin67.
   - Viewer / Auto Rotate keeps the current angle when stopped and shares its behavior between normal Viewer and VFX Studio.
   - VFX Studio / Auto Rotate Character now rotates only the selected scene actors and their effects.

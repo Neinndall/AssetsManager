@@ -408,7 +408,7 @@ namespace AssetsManager.Services.Viewer.Loading
             });
         }
 
-        private async Task<SknMaterialTextureResolution> LoadMaterialTexturesAsync(
+        internal async Task<SknMaterialTextureResolution> LoadMaterialTexturesAsync(
             string assetPath,
             Dictionary<string, BitmapSource> loadedTextures,
             bool loadReferencedTextures,
@@ -525,8 +525,8 @@ namespace AssetsManager.Services.Viewer.Loading
                             continue;
                         try
                         {
-                            MapResolvedAsset textureAsset = await _assetResolver.ResolveVirtualAsync(
-                                texturePath,
+                            MapResolvedAsset textureAsset = await _assetResolver.ResolveReferenceAsync(
+                                MapAssetReference.FromAuthoredPath(texturePath),
                                 Path.GetDirectoryName(assetPath),
                                 cancellationToken);
                             if (textureAsset == null)
