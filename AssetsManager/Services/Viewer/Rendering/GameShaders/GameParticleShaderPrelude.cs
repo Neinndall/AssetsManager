@@ -114,7 +114,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
         private static string[] Identity() => new[] { "vec4(1.0,0.0,0.0,0.0)", "vec4(0.0,1.0,0.0,0.0)", "vec4(0.0,0.0,1.0,0.0)", "vec4(0.0,0.0,0.0,1.0)" };
 
-        private static string Helpers(bool mesh) => (mesh ? "uniform vec4 uColor;\nuniform float uErosionDrive;\nuniform vec3 uGameLookupDrivers;\n" : string.Empty) + @"
+        private static string Helpers(bool mesh) => (mesh ? "uniform vec4 uColor;\nuniform float uErosionDrive;\n" : string.Empty) + @"
 uniform int uGamePremultiplied;
 uniform int uHasTexMult;
 uniform int uColorLookUpTypeX;

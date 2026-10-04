@@ -27,6 +27,7 @@ uniform int uAttachedMesh;
 uniform int uUseSkinning;
 uniform int uIsGroundLayer;
 uniform vec3 uOrbitRotation;
+uniform vec3 uGameLookupDrivers;
 const int MAX_BONES = 512;
 layout(std140) uniform VfxBoneTransforms {
     mat4 uBoneTransforms[MAX_BONES];
@@ -199,7 +200,7 @@ void main(){
     vec2 multCell = vec2(mod(multFrame, multCols), floor(multFrame / multCols));
     vCellMult = multCell;
     vMeshColor = aColor;
-    vColorDynamics = vec3(1.0, 0.0, 0.0);
+    vColorDynamics = uGameLookupDrivers;
 }";
 
         internal const string ParticleVertex = @"

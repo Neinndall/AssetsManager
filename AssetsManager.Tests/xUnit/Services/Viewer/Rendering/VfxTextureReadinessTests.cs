@@ -138,6 +138,88 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             }
         }
 
+        [Theory]
+        [InlineData(VfxPrimitiveKind.CameraQuad, true)]
+        [InlineData(VfxPrimitiveKind.Mesh, true)]
+        [InlineData(VfxPrimitiveKind.AttachedMesh, true)]
+        [InlineData(VfxPrimitiveKind.CameraQuad, false)]
+        [InlineData(VfxPrimitiveKind.Mesh, false)]
+        [InlineData(VfxPrimitiveKind.AttachedMesh, false)]
+        public void NativeErosionChannelSelectionMatchesParticleStateAcrossEmitterAge(
+            VfxPrimitiveKind primitive, bool curvedMixer)
+        {
+            string install = InstalledSkins.FindInstall();
+            if (install == null) return;
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var renderer = new VfxOpenGlRenderer();
+            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            uint target = CreateTexture(gl, 64, 64, new byte[64 * 64 * 4]);
+            uint framebuffer = gl.GenFramebuffer();
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                TextureTarget.Texture2D, target, 0);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+            uint texture = CreateTexture(gl, 1, 1, new byte[] { 255, 255, 255, 255 });
+            uint erosion = CreateTexture(gl, 1, 1, new byte[] { 255, 0, 0, 0 });
+            try
+            {
+                bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
+                VfxCurve4 mixer = curvedMixer
+                    ? new VfxCurve4(Vector4.UnitW, new[] { 0f, 1f }, new[] { Vector4.UnitW, Vector4.UnitX })
+                    : VfxCurve4.Const(Vector4.UnitW);
+                var definition = new VfxEmitterDefinition("erosion", VfxCurveF.Const(1), VfxCurveF.Const(1),
+                    1, 0, 0, false, false, 4, VfxCurve3.Const(Vector3.One), null,
+                    VfxCurve4.Const(Vector4.One), null, null, null, null, VfxCurve3.Const(Vector3.Zero),
+                    "base.tex", Vector2.One, 1, false, mesh, PrimitiveKind: primitive,
+                    RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true },
+                    AlphaErosion: new VfxAlphaErosionDefinition("erosion.tex", VfxCurveF.Const(-0.2f),
+                        0.1f, 0.1f, 2, mixer, SliceWidth: 0.4f));
+                float[] instance = new float[VfxPlaybackRuntime.InstanceStride];
+                instance[3] = instance[4] = instance[18] = 0.75f;
+                instance[5] = instance[6] = instance[7] = instance[8] = 1;
+                instance[21] = instance[22] = instance[31] = instance[32] = 1;
+                instance[24] = -0.2f;
+                instance[28] = 1;
+                instance[36] = instance[40] = instance[44] = 1;
+                var emitter = new VfxPlaybackRuntime.EmitterState
+                {
+                    Def = definition, Texture = texture, ErosionTexture = erosion,
+                    Instances = instance, InstanceCount = 1
+                };
+                if (mesh)
+                    renderer.UploadEmitterMesh(emitter,
+                        new float[] { -1, -1, 0, 1, -1, 0, 0, 1, 0 },
+                        new float[] { 0, 0, 1, 0, 0, 1, 0, 0, 1 },
+                        new float[] { 0, 0, 1, 0, 0.5f, 1 }, null);
+                byte[] initial = Draw(gl, renderer, emitter, framebuffer);
+                Assert.Contains(Enumerable.Range(0, 64 * 64), at => initial[at * 4] > 32);
+                foreach (float age in new[] { 0.5f, 1f })
+                {
+                    // Instances sample the mixer at zero; changing only the emitter's clock must preserve that channel.
+                    emitter.Age = age;
+                    byte[] later = Draw(gl, renderer, emitter, framebuffer);
+                    Assert.Null(renderer.GameParticleFallback(emitter, mesh));
+                    Assert.True(initial.SequenceEqual(later),
+                        $"{primitive} changed erosion channel at emitter age {age} with unchanged particle state.");
+                }
+                instance[24] = 1f;
+                byte[] eroded = Draw(gl, renderer, emitter, framebuffer);
+                Assert.DoesNotContain(Enumerable.Range(0, 64 * 64), at => eroded[at * 4] > 32);
+                instance[24] = -0.2f;
+                Assert.True(initial.SequenceEqual(Draw(gl, renderer, emitter, framebuffer)));
+                Assert.Equal(GLEnum.NoError, gl.GetError());
+            }
+            finally
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                gl.DeleteFramebuffer(framebuffer);
+                gl.DeleteTexture(target);
+                gl.DeleteTexture(texture);
+                gl.DeleteTexture(erosion);
+            }
+        }
+
         private static byte[] Draw(GL gl, VfxOpenGlRenderer renderer,
             VfxPlaybackRuntime.EmitterState emitter, uint framebuffer)
         {

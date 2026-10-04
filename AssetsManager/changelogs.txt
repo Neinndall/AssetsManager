@@ -474,6 +474,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Preserved particle-driven mesh colors while effects use fallback shaders.
+  - VFX Studio / Kept erosion texture channels consistent as effects advance, preventing unintended fading with game shaders.
   - VFX Studio / Fixed color gradients driven by particle age, speed and birth variation in trails, beams and mesh effects.
   - VFX Studio / Preserved effect textures while a declared palette is unavailable, restoring game shaders when it loads.
   - VFX Studio / Fixed solid rectangles in effects such as Aurora's R travel end when an emitter declares a palette without a texture.

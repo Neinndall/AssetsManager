@@ -24,15 +24,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                      })
             {
                 for (int driver = 0; driver <= 3; driver++)
-                    yield return new object[] { primitive, driver, false };
+                    yield return new object[] { primitive, driver, false, false };
                 if (primitive is not (VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh))
-                    yield return new object[] { primitive, 1, true };
+                    yield return new object[] { primitive, 1, true, false };
+                else
+                    for (int driver = 0; driver <= 3; driver++)
+                        yield return new object[] { primitive, driver, false, true };
             }
         }
 
         [Theory]
         [MemberData(nameof(LookupCases))]
-        public void NativeRampSamplesTheAuthoredParticleDriver(VfxPrimitiveKind primitive, int driver, bool mult)
+        public void RampSamplesTheAuthoredParticleDriver(VfxPrimitiveKind primitive, int driver, bool mult, bool fallback)
         {
             string install = InstalledSkins.FindInstall();
             if (install == null) return;
@@ -59,6 +62,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     "base.tex", Vector2.One, 1, false, mesh, PrimitiveKind: primitive,
                     RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true },
                     TextureMultPath: mult ? "mult.tex" : null,
+                    PaletteDefinition: fallback ? new VfxPaletteDefinition(0, VfxCurve3.Const(Vector3.Zero)) : null,
                     ParticleColorTexturePath: "ramp.tex", ColorLookUpTypeX: driver, ColorLookUpTypeY: 0,
                     ColorLookUpScales: new Vector2(1, 0.5f), ColorLookUpOffsets: new Vector2(0.15f, 0.35f),
                     Beam: new VfxBeamDefinition(0, 0, 1, VfxCurve3.Const(Vector3.One),
@@ -81,7 +85,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     instances[at + 4] = mesh || primitive == VfxPrimitiveKind.CameraQuad ? 0.5f : 0;
                     instances[at + 18] = mesh || primitive == VfxPrimitiveKind.CameraQuad ? 0.5f : 0;
                     instances[at + 5] = instances[at + 6] = instances[at + 7] = instances[at + 8] = 1;
-                    instances[at + 11] = 1;
+                    instances[at + 11] = fallback ? 0 : 1;
+                    instances[at + 12] = fallback ? 1 : 0;
                     instances[at + 21] = instances[at + 22] = instances[at + 31] = instances[at + 32] = 1;
                     instances[at + 34] = 1;
                     instances[at + 36] = instances[at + 40] = instances[at + 44] = 1;
@@ -104,7 +109,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.ClearColor(0, 0, 0, 1);
                 gl.Clear(ClearBufferMask.ColorBufferBit);
                 renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, Matrix4x4.Identity, Matrix4x4.Identity);
-                Assert.Null(renderer.GameParticleFallback(emitter, mesh));
+                Assert.Equal(fallback ? "Palette with no rows." : null, renderer.GameParticleFallback(emitter, mesh));
                 var pixels = new byte[64 * 64 * 4];
                 gl.ReadPixels(0, 0, 64, 64, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan());
                 int[] lit = Enumerable.Range(0, 64 * 64)
@@ -118,8 +123,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 }
                 else
                 {
-                    // Age and birth random are one; speed is zero. A constant lookup ignores offsets.
-                    int channel = driver == 2 ? 0 : 2;
+                    // Fallback controls reverse age/speed to exercise non-default drivers; random is one in both paths.
+                    int channel = (driver == 2 && !fallback) || (driver == 1 && fallback) ? 0 : 2;
                     int wrong = lit.Count(at => pixels[at * 4 + channel] < 240 || pixels[at * 4 + (2 - channel)] > 8);
                     int first = lit[0] * 4;
                     Assert.True(wrong == 0,

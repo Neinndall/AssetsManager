@@ -121,7 +121,8 @@ namespace AssetsManager.Utils.Rendering
             {
                 parameters["AlphaTestReferenceValue"] = ResolveAlphaTestReference(definition);
                 parameters["cAlphaErosionParams"] = ResolveErosionParams(definition.AlphaErosion);
-                parameters["cAlphaErosionTextureMixer"] = ResolveErosionTextureMixer(definition.AlphaErosion, phase);
+                // Particle state selects erosion channels at zero; the emitter clock only drives palette scroll here.
+                parameters["cAlphaErosionTextureMixer"] = ResolveErosionTextureMixer(definition.AlphaErosion, 0f);
                 parameters["cPaletteSelectMain"] = ResolvePaletteSelectMain(definition.PaletteDefinition, phase);
                 parameters["cPaletteSrcMixerMain"] = ResolvePaletteSourceMixColor(definition.PaletteDefinition);
                 parameters["kColorFactor"] = Vector4.One;
