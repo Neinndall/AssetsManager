@@ -475,6 +475,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Comparator / Refreshing a selected backup now updates Base Version, its directory and Quick Select when returning to the view.
   - Explorer / Leaving the view cancels loading with status bar feedback and releases the tree so returning starts a fresh load.
   - Viewer / Fixed attached effects drifting from moving models with path-following poses.
   - VFX Studio / Additive animation clips retain the model's base pose instead of collapsing it, including Earth Dragon Attack1.
