@@ -162,28 +162,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void ChancePinButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_model?.HasStandaloneSystem != true || ChancePinPopup == null ||
-                Environment.TickCount64 - _chancePinClosedTicks < 250) return;
-            SyncChancePinControls();
-            CloseAllToolbarPopups(ChancePinPopup);
-            ChancePinPopup.IsOpen = !ChancePinPopup.IsOpen;
-        }
-
-        private void ChancePinPopup_Closed(object sender, EventArgs e)
-            => _chancePinClosedTicks = Environment.TickCount64;
-
-        private void TimelineOptionsButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (TimelineOptionsPopup == null || Environment.TickCount64 - _timelineOptionsClosedTicks < 250) return;
-            CloseAllToolbarPopups(TimelineOptionsPopup);
-            TimelineOptionsPopup.IsOpen = !TimelineOptionsPopup.IsOpen;
-        }
-
-        private void TimelineOptionsPopup_Closed(object sender, EventArgs e)
-            => _timelineOptionsClosedTicks = Environment.TickCount64;
-
         private void SyncChancePinControls()
         {
             if (ChancePinToggle == null || ChancePinSlider == null) return;
@@ -270,70 +248,5 @@ namespace AssetsManager.Views.Controls.Viewer
             return PlaybackSpeedDetents[0];
         }
 
-        private void BgMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_model == null) return;
-            if (BgComboBox?.SelectedItem is ComboBoxItem item)
-            {
-                _model.BgMode = item.Tag?.ToString() ?? item.Content?.ToString() ?? "Dark";
-            }
-        }
-
-        private void CopyDebugReport_Click(object sender, RoutedEventArgs e)
-        {
-            if (_model.SelectedSystem == null)
-            {
-                MessageBox.Show("Selecciona primero un sistema VFX de la lista para generar el reporte de depuración.", "VFX Inspector", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"# INFORME COMPLETO DE DIAGNÓSTICO DE VISUALIZACIÓN VFX");
-            sb.AppendLine($"Fecha/Hora: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine($"Sistema VFX: {_model.SelectedSystem.Name}");
-            sb.AppendLine($"Ruta Partícula: {_model.SelectedSystem.Definition?.ParticlePath ?? "N/A"}");
-            sb.AppendLine($"Hash de Ruta: 0x{_model.SelectedSystem.Definition?.PathHash ?? 0:X8}");
-            sb.AppendLine($"Duración Calculada: {_model.TotalDuration:F2} s");
-            sb.AppendLine($"Emisores Totales: {_model.Emitters.Count}");
-            sb.AppendLine($"Texturas Cargadas: {_model.Textures.Count}");
-            sb.AppendLine();
-
-            sb.AppendLine("## EMISORES Y PROPIEDADES DE RENDERIZADO");
-            int idx = 1;
-            foreach (var emitter in _model.Emitters)
-            {
-                var d = emitter.EmitterDef;
-                sb.AppendLine($"### Emisor {idx++}: {emitter.Name}");
-                sb.AppendLine($"  - Estado: {(emitter.IsEnabled ? "ACTIVO" : "DESACTIVADO")}");
-                sb.AppendLine($"  - Modo Mezcla (BlendMode): {emitter.BlendMode} (Valor Original BIN: {d?.BlendMode})");
-                sb.AppendLine($"  - Tipo Primitiva: {(d?.IsMeshPrimitive == true ? "MALLA 3D (.scb/.sco)" : (d?.IsGroundLayer == true ? "CAPA SUELO 3D" : "QUAD BILLBOARD 2D"))}");
-                sb.AppendLine($"  - Malla 3D Ruta: {emitter.MeshPath} (Estado GPU: {emitter.MeshStatus})");
-                sb.AppendLine($"  - Textura Principal: {emitter.TexturePath} (Estado GPU: {emitter.TextureStatus})");
-                sb.AppendLine($"  - Textura Multiplicadora: {d?.TextureMultPath ?? "N/A"}");
-                sb.AppendLine($"  - Textura Color Lookup: {d?.ParticleColorTexturePath ?? "N/A"}");
-                sb.AppendLine($"  - Textura Paleta: {d?.PaletteDefinition?.PaletteTexturePath ?? "N/A"}");
-                sb.AppendLine($"  - Rejilla Atlas (TexDiv): {emitter.TexDiv}");
-                if (d != null)
-                {
-                    var bs = d.BirthScale.Constant;
-                    sb.AppendLine($"  - Escala Inicial (BirthScale): X={bs.X:F1}, Y={bs.Y:F1}, Z={bs.Z:F1}");
-                    sb.AppendLine($"  - Bucle Infinito (IsLoop): {d.IsLoop}");
-                    sb.AppendLine($"  - Emisor Único (IsSingleParticle): {d.IsSingleParticle}");
-                    sb.AppendLine($"  - Flags Orientación: OrientadoDirección={d.IsDirectionOriented}, CuadriláteroArbitrario={d.IsArbitraryQuad}, Terreno={d.IsFollowingTerrain}, Suelo={d.IsGroundLayer}");
-                }
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("## TEXTURAS EN MEMORIA GPU");
-            foreach (var tex in _model.Textures)
-            {
-                sb.AppendLine($"  - {tex.AuthoredPath} => [{tex.Width}x{tex.Height}] ({tex.Status})");
-            }
-
-            string reportText = sb.ToString();
-            Clipboard.SetText(reportText);
-            _model.LogMessages.Add("[DEBUG EXPORT] Reporte completo de depuración copiado al Portapapeles.");
-            MessageBox.Show("¡Reporte de Depuración Completo copiado al Portapapeles de Windows!\n\nPuedes pegarlo directamente en la conversación para que analicemos cualquier anomalía visual.", "VFX Inspector", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
     }
 }

@@ -106,8 +106,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.IsAllMuted = _model.Emitters.Count > 0 && _model.Emitters.All(em => em.IsMuted);
         }
 
-        private void Replay_Click(object sender, RoutedEventArgs e) => Play_Click(sender, e);
-
         private void EmitterFilter_TextChanged(object sender, TextChangedEventArgs e)
         {
             ApplyEmitterFilter();

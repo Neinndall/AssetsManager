@@ -22,6 +22,37 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_pendingSnapshot != null) OpenTkControl.InvalidateVisual();
         }
 
+        private void ChancePinButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model?.HasStandaloneSystem != true || ChancePinPopup == null ||
+                Environment.TickCount64 - _chancePinClosedTicks < 250) return;
+            SyncChancePinControls();
+            CloseAllToolbarPopups(ChancePinPopup);
+            ChancePinPopup.IsOpen = !ChancePinPopup.IsOpen;
+        }
+
+        private void ChancePinPopup_Closed(object sender, EventArgs e)
+            => _chancePinClosedTicks = Environment.TickCount64;
+
+        private void TimelineOptionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (TimelineOptionsPopup == null || Environment.TickCount64 - _timelineOptionsClosedTicks < 250) return;
+            CloseAllToolbarPopups(TimelineOptionsPopup);
+            TimelineOptionsPopup.IsOpen = !TimelineOptionsPopup.IsOpen;
+        }
+
+        private void TimelineOptionsPopup_Closed(object sender, EventArgs e)
+            => _timelineOptionsClosedTicks = Environment.TickCount64;
+
+        private void BgMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_model == null) return;
+            if (BgComboBox?.SelectedItem is ComboBoxItem item)
+            {
+                _model.BgMode = item.Tag?.ToString() ?? item.Content?.ToString() ?? "Dark";
+            }
+        }
+
         private void PreviewBindPoseToggle_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not ToggleButton toggle) return;
