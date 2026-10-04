@@ -479,6 +479,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Fixed missing body parts with Shaders enabled on skins with large skeletons, including Janna Skin67.
   - Viewer / Auto Rotate keeps the current angle when stopped and shares its behavior between normal Viewer and VFX Studio.
   - VFX Studio / Auto Rotate Character now rotates only the selected scene actors and their effects.
   - VFX Studio / Removed the duplicate Base option on skins that already define their base form, preserving other skins' form choices.

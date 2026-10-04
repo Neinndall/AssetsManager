@@ -7,6 +7,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Parsers;
+using AssetsManager.Services.Viewer.Resolvers;
+using LeagueToolkit.Core.Mesh;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Tests.Support;
 using AssetsManager.Utils;
@@ -18,7 +22,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
     /// `skin-part-render <skin-path> <focus-submesh> <toward-submesh> <out.png> [size]`: draws the skin's visible
-    /// submeshes in bind pose through the viewer's GlMeshRenderer with the Studio reference lighting and shaders off,
+    /// submeshes in bind pose through the viewer's GlMeshRenderer with the Studio reference lighting,
+    /// optionally with game programs enabled by `--shaders`,
     /// framed on the focus submesh and seen from the side the toward submesh sits on.
     /// </summary>
     internal static class SkinPartRenderDiagnostic
@@ -33,15 +38,22 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 
             string install = InstalledSkins.FindInstall();
             AppSettings settings = InstalledSkins.Settings(install);
-            var loader = InstalledSkins.CreateLoader(settings, new LogService(new Serilog.LoggerConfiguration().CreateLogger()));
+            using var logger = new Serilog.LoggerConfiguration().CreateLogger();
+            var log = new LogService(logger);
+            var loader = InstalledSkins.CreateLoader(settings, log);
             string projectRoot = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "am-skin-part-render")).FullName;
             MapCharacterAssetData asset = loader.LoadAsync(args[0], projectRoot, CancellationToken.None).GetAwaiter().GetResult();
+            var provider = new WadContentProvider(log, new WadNodeLoaderService(null, log), new AssetsManager.Utils.DirectoriesCreator(), new SvgParser());
+            var resolver = new MapAssetResolver(provider, settings);
+            var source = resolver.ResolveReferenceAsync(asset.Skin.Mesh, projectRoot).GetAwaiter().GetResult();
+            using Stream stream = resolver.OpenReadAsync(source).GetAwaiter().GetResult();
+            using SkinnedMesh skin = SkinnedMesh.ReadFromSimpleSkin(stream);
             int size = args.Length > 4 ? int.Parse(args[4]) : 512;
 
             Exception failure = null;
             var thread = new Thread(() =>
             {
-                try { Render(asset, args[1], args[2], args[3], size, args.Length > 5 ? float.Parse(args[5], System.Globalization.CultureInfo.InvariantCulture) : 3.2f); }
+                try { Render(asset, args[1], args[2], args[3], size, args.Length > 5 ? float.Parse(args[5], System.Globalization.CultureInfo.InvariantCulture) : 3.2f, settings, skin, args.Contains("--shaders")); }
                 catch (Exception ex) { failure = ex; }
             });
             thread.SetApartmentState(ApartmentState.STA);
@@ -50,19 +62,22 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             if (failure != null) Console.WriteLine($"[PartRender] failed: {failure}");
         }
 
-        private static void Render(MapCharacterAssetData asset, string focusName, string towardName, string output, int size, float distance)
+        internal static int Render(MapCharacterAssetData asset, string focusName, string towardName, string output, int size, float distance, AppSettings settings, SkinnedMesh skin, bool shaders, bool isolateFocus = false, Matrix4x4[] pose = null)
         {
             MapCharacterMeshData mesh = asset.Mesh;
             var hidden = asset.Materials.InitialHiddenSubmeshes?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new();
-            var model = new SceneModel { Name = "render" };
+            var model = new SceneModel { Name = "render", Skeleton = asset.Skeleton, SkinnedMesh = skin, SkinningMatrices = pose };
             var parts = mesh.Ranges
                 .Where(range => !hidden.Contains(range.Name))
+                .Where(range => !isolateFocus || range.Name == focusName)
                 .Select(range => Part(mesh, range, asset))
                 .ToList();
             int[] ranks = asset.Materials.DrawRanks(parts.Select(part => part.Name).ToArray());
             for (int at = 0; at < parts.Count; at++)
                 parts[at].DrawRank = ranks[at];
             model.AddParts(parts);
+            model.GpuSkinningData = GpuSkinningData.TryCreate(asset.Skeleton, skin, parts, out string failure);
+            if (model.GpuSkinningData == null) throw new InvalidOperationException(failure);
 
             MapCharacterMeshRange focus = mesh.Ranges.FirstOrDefault(range => string.Equals(range.Name, focusName, StringComparison.OrdinalIgnoreCase))
                 ?? new MapCharacterMeshRange("*", 0, mesh.Indices.Length);
@@ -93,18 +108,23 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, colour, 0);
             gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, RenderbufferTarget.Renderbuffer, depth);
 
-            var renderer = new GlMeshRenderer();
+            using var renderer = new GlMeshRenderer(settings);
             renderer.Initialize(gl);
             gl.Viewport(0, 0, (uint)size, (uint)size);
             gl.ClearColor(0.07f, 0.08f, 0.12f, 1f);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
             var lighting = GlMeshRenderer.ReferenceCharacterLighting();
             renderer.Render(model, view * projection, view, projection, eye,
-                lighting.LightDirection, lighting.LightColor, lighting.FillDirection, lighting.FillColor, lighting.AmbientColor);
+                lighting.LightDirection, lighting.LightColor, lighting.FillDirection, lighting.FillColor, lighting.AmbientColor, shadersEnabled: shaders);
 
             byte[] rgba = new byte[size * size * 4];
             gl.ReadPixels(0, 0, (uint)size, (uint)size, Silk.NET.OpenGL.PixelFormat.Rgba, PixelType.UnsignedByte, rgba.AsSpan());
             Console.WriteLine($"[PartRender] glError={gl.GetError()} parts={parts.Count} eye={eye} centre={centre}");
+
+            int covered = 0;
+            for (int at = 0; at < rgba.Length; at += 4)
+                if (rgba[at] != 18 || rgba[at + 1] != 20 || rgba[at + 2] != 31) covered++;
+            if (output == null) return covered;
 
             byte[] bgra = new byte[rgba.Length];
             for (int y = 0; y < size; y++)
@@ -119,7 +139,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             encoder.Frames.Add(BitmapFrame.Create(BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, bgra, size * 4)));
             using FileStream file = File.Create(output);
             encoder.Save(file);
-            Console.WriteLine($"[PartRender] wrote {output}");
+            Console.WriteLine($"[PartRender] wrote {output} covered={covered}");
+            return covered;
         }
 
         private static ModelPart Part(MapCharacterMeshData mesh, MapCharacterMeshRange range, MapCharacterAssetData asset)
@@ -139,6 +160,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             {
                 AllTextures = asset.Textures.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
                 SelectedTextureName = material.BaseTextureName,
+                SourceVertexIndices = Enumerable.Range(0, mesh.Positions.Length).ToArray(),
                 MaterialDefinition = material
             };
         }

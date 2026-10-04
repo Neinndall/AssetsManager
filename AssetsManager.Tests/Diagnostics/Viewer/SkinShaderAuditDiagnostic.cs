@@ -79,6 +79,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     skinUsage.Collect(material.Program, name, settings);
                 if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AM_SHADER_PARAMS")))
                 {
+                    Console.WriteLine($"[Skeleton] {name} joints={asset.Skeleton?.Joints.Count} influences={asset.Skeleton?.Influences.Count} maxInfluenceJoint={asset.Skeleton?.Influences.Max()}");
                     var submeshes = (asset.Materials?.MaterialDefinitions ?? new Dictionary<string, ModelMaterialDefinition>())
                         .Select(pair => (Submesh: pair.Key, Material: pair.Value))
                         .Prepend(("<default>", asset.Materials?.DefaultMaterialDefinition));

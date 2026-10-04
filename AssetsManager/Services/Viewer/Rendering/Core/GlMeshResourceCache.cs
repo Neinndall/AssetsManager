@@ -38,6 +38,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             /// <summary>Authored SKN vertex colours at location 4, the stream game shaders read as COLOR.</summary>
             internal uint ColorVbo;
             internal uint BoneIndexVbo;
+            internal uint InfluenceIndexVbo;
             internal uint BoneWeightVbo;
             internal GpuSkinningData.PartData SkinningData;
             internal bool IsGpuSkinned;
@@ -190,6 +191,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 return;
 
             resources.BoneIndexVbo = _gl.GenBuffer();
+            resources.InfluenceIndexVbo = _gl.GenBuffer();
             resources.BoneWeightVbo = _gl.GenBuffer();
 
             _gl.BindVertexArray(resources.Vao);
@@ -231,6 +233,12 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 false,
                 4 * sizeof(ushort),
                 IntPtr.Zero);
+
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.InfluenceIndexVbo);
+            _gl.BufferData(
+                BufferTargetARB.ArrayBuffer,
+                new ReadOnlySpan<byte>(skinningData.InfluenceIndices),
+                BufferUsageARB.StaticDraw);
 
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.BoneWeightVbo);
             _gl.BufferData(
@@ -275,10 +283,12 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             DeleteHandle(resources.TangentVbo, _gl.DeleteBuffer);
             DeleteHandle(resources.ColorVbo, _gl.DeleteBuffer);
             DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
+            DeleteHandle(resources.InfluenceIndexVbo, _gl.DeleteBuffer);
             DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
             resources.TangentVbo = 0;
             resources.ColorVbo = 0;
             resources.BoneIndexVbo = 0;
+            resources.InfluenceIndexVbo = 0;
             resources.BoneWeightVbo = 0;
             resources.SkinningData = null;
             resources.IsGpuSkinned = false;
@@ -350,8 +360,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
             DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
             DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
-            DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
-            DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
+            ReleaseSkinningBuffers(resources);
             _liveResources.Remove(resources);
             _partResources.Remove(part);
         }
@@ -495,8 +504,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
                     DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
                     DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
-                    DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
-                    DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
+                    ReleaseSkinningBuffers(resources);
                 }
                 _liveResources.Clear();
                 _pendingReleases.Clear();

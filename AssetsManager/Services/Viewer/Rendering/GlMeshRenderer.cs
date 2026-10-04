@@ -42,6 +42,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly List<PartDraw> _transparentDraws = new();
         private readonly Dictionary<SceneModel, long> _materialTimeOrigins = new();
         private readonly Dictionary<SceneModel, Matrix4x4[]> _bindSkinningPalettes = new();
+        private readonly Dictionary<SceneModel, Matrix4x4[]> _influenceSkinningPalettes = new();
         private int _uViewProj;
         private int _uWorld;
         private int _uUseSkinning;
@@ -146,6 +147,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             {
                 gameSkinningMatrices = GetBindSkinningPalette(model);
             }
+            if (UsesGameShaders(viewMode, shadersEnabled) && gameSkinningMatrices is { Count: > 0 })
+                gameSkinningMatrices = GetInfluenceSkinningPalette(model, gameSkinningMatrices);
             long now = Stopwatch.GetTimestamp();
             if (!_materialTimeOrigins.TryGetValue(model, out long materialTimeOrigin))
             {
@@ -282,15 +285,15 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             if (resources?.BoneIndexVbo == 0)
                 return;
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.BoneIndexVbo);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, integer ? resources.InfluenceIndexVbo : resources.BoneIndexVbo);
             _gl.EnableVertexAttribArray(5);
             if (integer)
             {
                 _gl.VertexAttribIPointer(
                     5,
                     4,
-                    VertexAttribIType.UnsignedShort,
-                    4 * sizeof(ushort),
+                    VertexAttribIType.UnsignedByte,
+                    4 * sizeof(byte),
                     IntPtr.Zero);
             }
             else
@@ -935,6 +938,31 @@ namespace AssetsManager.Services.Viewer.Rendering
             return palette;
         }
 
+        private Matrix4x4[] GetInfluenceSkinningPalette(SceneModel model, IReadOnlyList<Matrix4x4> joints)
+        {
+            var influences = model.Skeleton?.Influences;
+            if (influences == null) return Array.Empty<Matrix4x4>();
+            int count = Math.Min(256, influences.Count);
+            if (!_influenceSkinningPalettes.TryGetValue(model, out Matrix4x4[] palette) || palette.Length != count)
+            {
+                palette = new Matrix4x4[count];
+                _influenceSkinningPalettes[model] = palette;
+            }
+            WriteInfluenceSkinningPalette(joints, influences, palette);
+            return palette;
+        }
+
+        internal static void WriteInfluenceSkinningPalette(
+            IReadOnlyList<Matrix4x4> joints, IReadOnlyList<short> influences, Span<Matrix4x4> palette)
+        {
+            // The game's byte indices address the SKN influence table, not the full rig's joint order.
+            for (int index = 0; index < palette.Length; index++)
+            {
+                int joint = index < influences.Count ? influences[index] : -1;
+                palette[index] = joint >= 0 && joint < joints.Count ? joints[joint] : Matrix4x4.Identity;
+            }
+        }
+
         internal static Matrix4x4 CreateWorldMatrix(SceneModel model, bool mirrorCharacterX = false)
         {
             float pitch = (float)(model.RotationX * (Math.PI / 180.0));
@@ -976,6 +1004,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             {
                 _materialTimeOrigins.Remove(model);
                 _bindSkinningPalettes.Remove(model);
+                _influenceSkinningPalettes.Remove(model);
             }
             _resources?.QueueRelease(model);
         }
@@ -999,6 +1028,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _resources?.Dispose();
                 _materialTimeOrigins.Clear();
                 _bindSkinningPalettes.Clear();
+                _influenceSkinningPalettes.Clear();
                 if (_boneBuffer != 0)
                     _gl?.DeleteBuffer(_boneBuffer);
                 _boneBuffer = 0;

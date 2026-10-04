@@ -18,15 +18,17 @@ namespace AssetsManager.Views.Models.Viewer
 
         internal sealed class PartData
         {
-            internal PartData(float[] boneIndices, float[] boneWeights, Vector4[] tangents, Vector4[] colors = null)
+            internal PartData(float[] boneIndices, byte[] influenceIndices, float[] boneWeights, Vector4[] tangents, Vector4[] colors = null)
             {
                 BoneIndices = boneIndices;
+                InfluenceIndices = influenceIndices;
                 BoneWeights = boneWeights;
                 Tangents = tangents;
                 Colors = colors;
             }
 
             internal float[] BoneIndices { get; }
+            internal byte[] InfluenceIndices { get; }
             internal float[] BoneWeights { get; }
             internal Vector4[] Tangents { get; }
             /// <summary>The SKN's authored vertex colours (0..1 RGBA), which game shaders read as COLOR; null without them.</summary>
@@ -109,6 +111,7 @@ namespace AssetsManager.Views.Models.Viewer
                     }
 
                     var directBoneIndices = new float[sourceVertexIndices.Length * 4];
+                    var influenceIndices = new byte[sourceVertexIndices.Length * 4];
                     var weights = new float[sourceVertexIndices.Length * 4];
                     Vector4[] tangents = sourceTangents == null
                         ? null
@@ -132,6 +135,11 @@ namespace AssetsManager.Views.Models.Viewer
 
                         int destination = localVertex * 4;
 
+                        influenceIndices[destination] = sourceIndices.x < skeleton.Influences.Count ? sourceIndices.x : (byte)0;
+                        influenceIndices[destination + 1] = sourceIndices.y < skeleton.Influences.Count ? sourceIndices.y : (byte)0;
+                        influenceIndices[destination + 2] = sourceIndices.z < skeleton.Influences.Count ? sourceIndices.z : (byte)0;
+                        influenceIndices[destination + 3] = sourceIndices.w < skeleton.Influences.Count ? sourceIndices.w : (byte)0;
+
                         if (!TryResolveJoint(sourceIndices.x, sourceWeights.X, skeleton, out directBoneIndices[destination]) ||
                             !TryResolveJoint(sourceIndices.y, sourceWeights.Y, skeleton, out directBoneIndices[destination + 1]) ||
                             !TryResolveJoint(sourceIndices.z, sourceWeights.Z, skeleton, out directBoneIndices[destination + 2]) ||
@@ -150,7 +158,7 @@ namespace AssetsManager.Views.Models.Viewer
                             colors[localVertex] = sourceColors[sourceVertex];
                     }
 
-                    parts[part] = new PartData(directBoneIndices, weights, tangents, colors);
+                    parts[part] = new PartData(directBoneIndices, influenceIndices, weights, tangents, colors);
                 }
 
                 return new GpuSkinningData(parts);

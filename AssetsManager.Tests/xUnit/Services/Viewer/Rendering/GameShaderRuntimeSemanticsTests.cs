@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Numerics;
 using AssetsManager.Shaders;
 using AssetsManager.Services.Viewer.Rendering;
@@ -9,6 +10,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
 {
     public sealed class GameShaderRuntimeSemanticsTests
     {
+        [Fact]
+        public void CompactSkinPaletteIncludesAnimatedRigJointsAbove255()
+        {
+            Matrix4x4[] joints = Enumerable.Repeat(Matrix4x4.Identity, 361).ToArray();
+            joints[346] = Matrix4x4.CreateTranslation(8f, -2f, 0f);
+            var palette = new Matrix4x4[2];
+            GlMeshRenderer.WriteInfluenceSkinningPalette(joints, new short[] { 346, 0 }, palette);
+            Assert.Equal(joints[346], palette[0]);
+            Assert.Equal(Matrix4x4.Identity, palette[1]);
+            joints[346] = Matrix4x4.CreateRotationY(0.5f);
+            GlMeshRenderer.WriteInfluenceSkinningPalette(joints, new short[] { 346, 0 }, palette);
+            Assert.Equal(joints[346], palette[0]);
+        }
+
         [Theory]
         [InlineData(0.1f, 1000f, 0.2f)]
         [InlineData(1f, 10000f, 50f)]
