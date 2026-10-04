@@ -90,7 +90,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     uniforms.Uniform3(uniforms.CamPos, _gameFrame.Eye.X, _gameFrame.Eye.Y, _gameFrame.Eye.Z);
                 }
             }
-            uniforms.Uniform1(uniforms.GamePremultiplied, !emitter.Def.HasResolvedCustomMaterial && !emitter.Def.DrawsAsDistortion && emitter.Def.BlendMode is 0 or 5 ? 1 : 0);
+            uniforms.Uniform1(uniforms.GamePremultiplied, !emitter.Def.HasResolvedCustomMaterial && !emitter.Def.DrawsAsDistortion && emitter.Def.BlendMode is 0 or 2 ? 1 : 0);
             return true;
         }
 
