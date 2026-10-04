@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text.RegularExpressions;
 using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Utils;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Views.Models.Viewer;
@@ -18,6 +19,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         ModelMaterialDefinition DefaultMaterialDefinition,
         IReadOnlyDictionary<string, ModelMaterialDefinition> MaterialDefinitions)
     {
+        internal SkinPoseDefinition PoseDefinition { get; init; } = SkinPoseDefinition.Empty;
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
         internal IReadOnlyList<string> SubmeshRenderOrder { get; init; } = Array.Empty<string>();
         internal float SkinScale { get; init; } = 1f;
@@ -140,6 +142,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         SknMaterialDefinition DefaultMaterial,
         IReadOnlyDictionary<string, SknMaterialDefinition> OverrideMaterials)
     {
+        internal SkinPoseDefinition PoseDefinition { get; init; } = SkinPoseDefinition.Empty;
         internal IReadOnlyList<string> InitialHiddenSubmeshes { get; init; } = Array.Empty<string>();
         internal IReadOnlyList<string> SubmeshRenderOrder { get; init; } = Array.Empty<string>();
         internal float SkinScale { get; init; } = 1f;
@@ -367,7 +370,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     .ToList();
             }
 
-            foreach (BinTreeStruct meshProperties in meshPropertySets)
+            var effectiveMeshProperties = meshPropertySets.Where(mesh => mesh != null).ToArray();
+            SkinPoseDefinition poseDefinition = effectiveMeshProperties.Length == 1
+                ? SkinPoseReader.Read(effectiveMeshProperties[0]) : SkinPoseDefinition.Empty;
+
+            foreach (BinTreeStruct meshProperties in effectiveMeshProperties)
             {
                 if (meshProperties == null)
                     continue;
@@ -513,6 +520,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 overrideMaterials)
             {
                 InitialHiddenSubmeshes = initialHiddenSubmeshes,
+                PoseDefinition = poseDefinition,
                 SubmeshRenderOrder = submeshRenderOrder,
                 SkinScale = skinScale,
                 SelfIllumination = selfIllumination,
@@ -667,6 +675,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 materialDefinitions)
             {
                 InitialHiddenSubmeshes = metadata.InitialHiddenSubmeshes ?? Array.Empty<string>(),
+                PoseDefinition = metadata.PoseDefinition,
                 SubmeshRenderOrder = metadata.SubmeshRenderOrder ?? Array.Empty<string>(),
                 SkinScale = metadata.SkinScale,
                 SelfIllumination = metadata.SelfIllumination,

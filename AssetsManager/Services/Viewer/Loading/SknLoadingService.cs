@@ -347,6 +347,7 @@ namespace AssetsManager.Services.Viewer.Loading
                     SkinnedMesh = skinnedMesh,
                     FilePath = filePath,
                     Skeleton = skeleton,
+                    PoseDefinition = materialTextures?.PoseDefinition ?? SkinPoseDefinition.Empty,
                     Scale = materialTextures?.SkinScale ?? 1f,
                     SelfIllumination = materialTextures?.SelfIllumination ?? 0f,
                     EmissiveTexturePath = materialTextures?.EmissiveTexturePath

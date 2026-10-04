@@ -179,7 +179,18 @@ namespace AssetsManager.Services.Viewer.Animation
         internal static IAnimationAsset CreatePlaylist(IReadOnlyList<IAnimationAsset> steps) =>
             new AnimationPlaylistAsset(steps ?? Array.Empty<IAnimationAsset>());
 
-        private sealed class RetimedAnimationAsset : IAnimationAsset
+        internal static void Evaluate(IAnimationAsset animation, float time,
+            IDictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> pose, RigResource skeleton)
+        {
+            // Cached compressed ANMs own a mutable seek cursor. Background preparation also samples the idle base.
+            lock (animation)
+            {
+                if (animation is IGraphPoseAnimationAsset graph) graph.Evaluate(time, pose, skeleton);
+                else animation.Evaluate(time, pose);
+            }
+        }
+
+        private sealed class RetimedAnimationAsset : IGraphPoseAnimationAsset
         {
             private readonly IAnimationAsset _source;
             private readonly float _sourceDuration;
@@ -207,15 +218,19 @@ namespace AssetsManager.Services.Viewer.Animation
             public void Evaluate(
                 float time,
                 IDictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> pose)
+                => Evaluate(time, pose, null);
+
+            public void Evaluate(float time,
+                IDictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> pose, RigResource skeleton)
             {
                 float sourceTime = Duration > 0f && _sourceDuration > 0f
                     ? Math.Clamp(time, 0f, Duration) * (_sourceDuration / Duration)
                     : 0f;
-                _source.Evaluate(sourceTime, pose);
+                AnimationGraphPlayback.Evaluate(_source, sourceTime, pose, skeleton);
             }
         }
 
-        private sealed class AnimationPlaylistAsset : IAnimationAsset
+        private sealed class AnimationPlaylistAsset : IGraphPoseAnimationAsset
         {
             private readonly IReadOnlyList<IAnimationAsset> _steps;
 
@@ -234,6 +249,10 @@ namespace AssetsManager.Services.Viewer.Animation
             public void Evaluate(
                 float time,
                 IDictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> pose)
+                => Evaluate(time, pose, null);
+
+            public void Evaluate(float time,
+                IDictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> pose, RigResource skeleton)
             {
                 if (IsDisposed) return;
                 float remaining = Math.Clamp(time, 0f, Duration);
@@ -242,7 +261,7 @@ namespace AssetsManager.Services.Viewer.Animation
                     IAnimationAsset step = _steps[index];
                     if (remaining < step.Duration || index == _steps.Count - 1)
                     {
-                        step.Evaluate(Math.Min(remaining, step.Duration), pose);
+                        AnimationGraphPlayback.Evaluate(step, Math.Min(remaining, step.Duration), pose, skeleton);
                         return;
                     }
                     remaining -= step.Duration;

@@ -26,6 +26,11 @@ namespace AssetsManager.Tests.Diagnostics
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "skin-pose-audit")
+            {
+                await SkinPoseAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "map-frame-bench", StringComparison.OrdinalIgnoreCase))
             {
                 await MapFrameBenchDiagnostic.Run(args.Skip(1).ToArray());

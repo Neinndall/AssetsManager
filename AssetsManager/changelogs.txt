@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Viewer / Skin springs, path-following poses and sockets now guide animated models and attached effects.
   - VFX Studio / Spells now play their cast animation's effects together with the projectile and impact.
   - VFX Studio / Spells that cannot be previewed now say why: Buff, Script, No visuals or Missile.
   - VFX Studio / Accelerating and curved spell missiles now fly, like Galio Q, Mel Q or Fizz R.
@@ -474,6 +475,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Additive animation clips retain the model's base pose instead of collapsing it, including Earth Dragon Attack1.
+  - Viewer / Sampling animation attachments no longer changes the model's displayed pose.
   - VFX Studio / Fixed effects disappearing near surfaces when fallback shaders use an orthographic camera.
   - VFX Studio / Fixed incorrect mesh colors and fading when erosion or a second texture is used with fallback shaders.
   - VFX Studio / Fixed effects losing transparency and fading when game shaders are enabled.

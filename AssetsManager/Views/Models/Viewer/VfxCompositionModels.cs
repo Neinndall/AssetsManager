@@ -35,6 +35,15 @@ namespace AssetsManager.Views.Models.Viewer
         float BlendOutSeconds)
         : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
 
+    public sealed record AnimationSpringEventDefinition(uint EventHash, float StartFrame, float EndFrame,
+        uint SpringHash, float BlendOutSeconds) : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
+    public sealed record AnimationLockOrientationEventDefinition(uint EventHash, float StartFrame, float EndFrame,
+        uint JointHash, float BlendOutSeconds) : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
+    public sealed record AnimationOrientationEventDefinition(uint EventHash, float StartFrame, float EndFrame,
+        float? BlendFromSeconds, float BlendToSeconds) : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
     /// <summary>Preserves unsupported authored events so event counts remain truthful.</summary>
     public sealed record AnimationOtherClipEventDefinition(
         uint EventHash,
@@ -68,6 +77,15 @@ namespace AssetsManager.Views.Models.Viewer
         float BlendInSeconds,
         float BlendOutSeconds)
         : AnimationClipTimedCue(AtSeconds, UntilSeconds);
+
+    public sealed record AnimationSpringCue(double AtSeconds, double? UntilSeconds, uint SpringHash,
+        float BlendOutSeconds) : AnimationClipTimedCue(AtSeconds, UntilSeconds);
+
+    public sealed record AnimationLockOrientationCue(double AtSeconds, double? UntilSeconds, uint JointHash,
+        float BlendOutSeconds) : AnimationClipTimedCue(AtSeconds, UntilSeconds);
+
+    public sealed record AnimationOrientationCue(double AtSeconds, double? UntilSeconds,
+        float? BlendFromSeconds, float BlendToSeconds) : AnimationClipTimedCue(AtSeconds, UntilSeconds);
 
     public sealed record VfxParticleEventAttachment(uint SourceBoneHash, uint TargetBoneHash);
 

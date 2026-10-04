@@ -1159,7 +1159,7 @@ namespace AssetsManager.Views.Controls.Viewer
                                    lastKey.IsVisible != currentKey.IsVisible;
 
                 AnimationService animationService = GetAnimationServiceForModel(model);
-                if (needsUpdate)
+                if (needsUpdate || model.PoseDefinition.HasDynamics)
                 {
                     _lastModelUpdates[model] = currentKey;
                     animationService.Update(
@@ -1168,7 +1168,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         model.Skeleton,
                         model.SkinnedMesh,
                         model.Parts,
-                        model.Name);
+                        model.Name, model, (float)deltaTime);
                     model.GpuSkinningData = animationService.SkinningData;
                     model.SkinningMatrices = animationService.FinalBoneTransforms;
                 }

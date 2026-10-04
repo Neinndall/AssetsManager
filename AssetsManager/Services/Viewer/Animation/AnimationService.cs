@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Diagnostics;
+using AssetsManager.Services.Viewer.Rendering;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Hashing;
@@ -40,6 +42,14 @@ namespace AssetsManager.Services.Viewer.Animation
         private IList<ModelPart> _lastModelParts;
 
         private bool _isDisposed;
+        private SkinPoseDefinition _poseDefinition = SkinPoseDefinition.Empty;
+        private SkinPoseRuntime _poseDynamics;
+        private SkinSocketResolver _sockets;
+        private IReadOnlyList<AnimationClipTimedCue> _poseCues = Array.Empty<AnimationClipTimedCue>();
+        private IReadOnlyList<AnimationMaskDefinition> _poseMasks = Array.Empty<AnimationMaskDefinition>();
+        private Matrix4x4 _unitTransform = Matrix4x4.Identity;
+        private long _lastDynamicsTick;
+        private IAnimationAsset _dynamicsAnimation;
 
         public AnimationService(LogService logService = null)
         {
@@ -69,6 +79,13 @@ namespace AssetsManager.Services.Viewer.Animation
             _hierarchyOrder = null;
             _hierarchyParents = null;
             _jointSnapCues = Array.Empty<AnimationJointSnapCue>();
+            _poseDefinition = SkinPoseDefinition.Empty;
+            _poseDynamics = null;
+            _sockets = null;
+            _poseCues = Array.Empty<AnimationClipTimedCue>();
+            _poseMasks = Array.Empty<AnimationMaskDefinition>();
+            _dynamicsAnimation = null;
+            _lastDynamicsTick = 0;
             _currentPose.Clear();
         }
 
@@ -134,6 +151,7 @@ namespace AssetsManager.Services.Viewer.Animation
 
             (_hierarchyOrder, _hierarchyParents) = BuildHierarchy(
                 skeleton.Joints.Select(static joint => (int)joint.ParentId).ToArray());
+            RebuildPoseDynamics(skeleton);
             _evaluatedAnimation = null;
             _evaluatedSkeleton = null;
             _evaluatedTime = float.NaN;
@@ -162,13 +180,45 @@ namespace AssetsManager.Services.Viewer.Animation
             _evaluatedTime = float.NaN;
         }
 
+        internal void SetPoseCues(IReadOnlyList<AnimationClipTimedCue> cues,
+            IReadOnlyList<AnimationMaskDefinition> masks = null)
+        {
+            _poseCues = cues ?? Array.Empty<AnimationClipTimedCue>();
+            _poseMasks = masks ?? Array.Empty<AnimationMaskDefinition>();
+            SetJointSnapCues(_poseCues.OfType<AnimationJointSnapCue>().ToArray());
+            _poseDynamics?.SetCues(_poseCues, _poseMasks);
+        }
+
+        internal void ConfigurePose(SkinPoseDefinition definition, Matrix4x4 unitTransform)
+        {
+            definition ??= SkinPoseDefinition.Empty;
+            bool changed = !ReferenceEquals(definition, _poseDefinition);
+            _poseDefinition = definition;
+            if (_unitTransform != unitTransform || changed) _evaluatedTime = float.NaN;
+            _unitTransform = unitTransform;
+            if (changed && _poseSkeleton != null) RebuildPoseDynamics(_poseSkeleton);
+        }
+
+        private void RebuildPoseDynamics(RigResource skeleton)
+        {
+            _poseDynamics = new SkinPoseRuntime(_poseDefinition, _hierarchyParents, _hierarchyOrder,
+                hash => FindJointIndex(skeleton, hash));
+            _poseDynamics.SetCues(_poseCues, _poseMasks);
+            _sockets = new SkinSocketResolver(_poseDefinition, CreateBindWorldTransforms(skeleton),
+                hash => FindJointIndex(skeleton, hash));
+            _lastDynamicsTick = 0;
+            _dynamicsAnimation = null;
+        }
+
         public void Update(
             float totalSeconds,
             IAnimationAsset animation,
             RigResource skeleton,
             SkinnedMesh skin,
             IList<ModelPart> modelParts,
-            string modelName)
+            string modelName,
+            SceneModel scene = null,
+            float deltaSeconds = 0f)
         {
             if (_isDisposed) return;
             if (animation == null || skeleton == null || skin == null)
@@ -179,6 +229,20 @@ namespace AssetsManager.Services.Viewer.Animation
             // 1. Ensure buffers are ready (only allocates when model data changes)
             EnsureBuffers(skeleton, skin, modelParts, modelName);
             _lastAnimation = animation;
+
+            if (scene != null) ConfigurePose(scene.PoseDefinition, GlMeshRenderer.CreateWorldMatrix(scene));
+            if (!ReferenceEquals(_dynamicsAnimation, animation))
+            {
+                _poseDynamics?.ResetLive();
+                _dynamicsAnimation = animation;
+            }
+            long now = Stopwatch.GetTimestamp();
+            float elapsed = deltaSeconds > 0f ? deltaSeconds : _lastDynamicsTick == 0 ? 1f / 60f
+                : (float)Stopwatch.GetElapsedTime(_lastDynamicsTick, now).TotalSeconds;
+            _lastDynamicsTick = now;
+            _poseDynamics?.Advance(FoldAnimationTime(totalSeconds, animation.Duration), _unitTransform, elapsed);
+            if (_poseDefinition.HasDynamics || _poseCues.OfType<AnimationLockOrientationCue>().Any())
+                _evaluatedTime = float.NaN;
 
             EvaluatePose(totalSeconds, animation, skeleton);
 
@@ -204,8 +268,11 @@ namespace AssetsManager.Services.Viewer.Animation
             if (_isDisposed || _lastAnimation == null || _lastSkeleton == null || _boneTransforms == null)
                 return false;
 
+            float visibleTime = _evaluatedTime;
             EvaluatePose(totalSeconds, _lastAnimation, _lastSkeleton);
-            return TryGetBoneTransform(boneName, boneHash, out transform);
+            bool found = TryGetBoneTransform(boneName, boneHash, out transform);
+            if (float.IsFinite(visibleTime)) EvaluatePose(visibleTime, _lastAnimation, _lastSkeleton);
+            return found;
         }
 
         public bool TrySampleRootTransform(float totalSeconds, out Matrix4x4 transform)
@@ -214,10 +281,12 @@ namespace AssetsManager.Services.Viewer.Animation
             if (_isDisposed || _lastAnimation == null || _lastSkeleton == null || _boneTransforms == null)
                 return false;
 
+            float visibleTime = _evaluatedTime;
             EvaluatePose(totalSeconds, _lastAnimation, _lastSkeleton);
             int rootIndex = FindRootIndex(_lastSkeleton);
             if (rootIndex < 0 || rootIndex >= _boneTransforms.Length) return false;
             transform = _boneTransforms[rootIndex];
+            if (float.IsFinite(visibleTime)) EvaluatePose(visibleTime, _lastAnimation, _lastSkeleton);
             return true;
         }
 
@@ -237,7 +306,7 @@ namespace AssetsManager.Services.Viewer.Animation
             // LTK samples a clip as a looping pose. Fold the scene clock into one pass
             // before handing it to LeagueToolkit, whose animation evaluator itself clamps.
             float currentTime = FoldAnimationTime(totalSeconds, animation.Duration);
-            animation.Evaluate(currentTime, _currentPose);
+            AnimationGraphPlayback.Evaluate(animation, currentTime, _currentPose, skeleton);
 
             // Build the base local/world pose first. LTK resolves joint-snap targets and
             // parents against this unmodified pose, then rewrites the snapped local joint.
@@ -260,6 +329,13 @@ namespace AssetsManager.Services.Viewer.Animation
                     : localTransform;
             }
 
+            _poseDynamics?.ApplyLocks(currentTime, _localTransforms);
+            _poseDynamics?.ApplyConforms(currentTime, animation.Duration, animation, _localTransforms,
+                (time, into) => SampleBaseLocals(time, animation, skeleton, into));
+            foreach (int slot in _hierarchyOrder)
+                _baseBoneTransforms[slot] = _localTransforms[slot] *
+                    (_hierarchyParents[slot] < 0 ? Matrix4x4.Identity : _baseBoneTransforms[_hierarchyParents[slot]]);
+
             if (_jointSnapCues.Count > 0)
             {
                 double folded = animation.Duration > 0f
@@ -276,11 +352,15 @@ namespace AssetsManager.Services.Viewer.Animation
 
                     int jointIndex = FindJointIndex(skeleton, snap.JointHash);
                     int targetIndex = FindJointIndex(skeleton, snap.SnapToHash);
-                    if (!CanApplyJointSnap(jointIndex, targetIndex))
+                    Matrix4x4 target;
+                    if (targetIndex >= 0) target = _baseBoneTransforms[targetIndex];
+                    else if (_sockets?.TryResolve(null, snap.SnapToHash, _baseBoneTransforms, out target) != true)
+                        continue;
+                    if (jointIndex < 0)
                         continue;
 
                     Matrix4x4 snappedLocal =
-                        Matrix4x4.CreateTranslation(snap.Offset) * _baseBoneTransforms[targetIndex];
+                        Matrix4x4.CreateTranslation(snap.Offset) * target;
                     int parentIndex = _hierarchyParents[jointIndex];
                     if (parentIndex >= 0 &&
                         Matrix4x4.Invert(_baseBoneTransforms[parentIndex], out Matrix4x4 inverseParent))
@@ -314,6 +394,36 @@ namespace AssetsManager.Services.Viewer.Animation
                     ? _localTransforms[i] * _boneTransforms[parentIndex]
                     : _localTransforms[i];
             }
+            _poseDynamics?.ApplyPost(currentTime, _localTransforms, _boneTransforms);
+        }
+
+        internal bool TrySampleBoneTransformFnv(float totalSeconds, string boneName, uint boneHash, out Matrix4x4 transform)
+        {
+            transform = Matrix4x4.Identity;
+            if (_isDisposed || _lastAnimation == null || _lastSkeleton == null || _boneTransforms == null) return false;
+            float visibleTime = _evaluatedTime;
+            try
+            {
+                EvaluatePose(totalSeconds, _lastAnimation, _lastSkeleton);
+                if (!string.IsNullOrWhiteSpace(boneName) && TryGetBoneTransformExactName(boneName, out transform)) return true;
+                return boneHash != 0 && TryGetBoneTransformFnv(boneHash, out transform);
+            }
+            finally
+            {
+                if (float.IsFinite(visibleTime)) EvaluatePose(visibleTime, _lastAnimation, _lastSkeleton);
+            }
+        }
+
+        private void SampleBaseLocals(float time, IAnimationAsset animation, RigResource skeleton, Matrix4x4[] into)
+        {
+            _currentPose.Clear();
+            AnimationGraphPlayback.Evaluate(animation, FoldAnimationTime(time, animation.Duration), _currentPose, skeleton);
+            for (int i = 0; i < into.Length; i++)
+            {
+                into[i] = _currentPose.TryGetValue(_jointHashes[i], out var pose)
+                    ? Matrix4x4.CreateScale(pose.Scale) * Matrix4x4.CreateFromQuaternion(pose.Rotation) * Matrix4x4.CreateTranslation(pose.Translation)
+                    : skeleton.Joints[i].LocalTransform;
+            }
         }
 
         private int FindJointIndex(RigResource skeleton, uint hash)
@@ -340,7 +450,8 @@ namespace AssetsManager.Services.Viewer.Animation
         internal static bool CanApplyJointSnap(int jointIndex, int targetIndex)
             => jointIndex >= 0 && targetIndex >= 0;
 
-        internal static Func<string, uint, Matrix4x4?> CreateBindBoneTransformProvider(RigResource skeleton)
+        internal static Func<string, uint, Matrix4x4?> CreateBindBoneTransformProvider(RigResource skeleton,
+            SkinPoseDefinition definition = null)
         {
             if (skeleton?.Joints == null || skeleton.Joints.Count == 0)
                 return null;
@@ -359,13 +470,19 @@ namespace AssetsManager.Services.Viewer.Animation
                 byHash.TryAdd(Elf.HashLower(name), transform);
             }
 
+            var sockets = new SkinSocketResolver(definition ?? SkinPoseDefinition.Empty, world,
+                hash =>
+                {
+                    for (int i = 0; i < skeleton.Joints.Count; i++)
+                        if (Fnv1a.HashLower(skeleton.Joints[i].Name) == hash || Elf.HashLower(skeleton.Joints[i].Name) == hash) return i;
+                    return -1;
+                });
             return (name, hash) =>
             {
                 if (!string.IsNullOrWhiteSpace(name) && byName.TryGetValue(name, out Matrix4x4 named))
                     return named;
-                return hash != 0 && byHash.TryGetValue(hash, out Matrix4x4 hashed)
-                    ? hashed
-                    : null;
+                if (hash != 0 && byHash.TryGetValue(hash, out Matrix4x4 hashed)) return hashed;
+                return sockets.TryResolve(name, hash, world, out Matrix4x4 socket) ? socket : null;
             };
         }
 
@@ -532,7 +649,7 @@ namespace AssetsManager.Services.Viewer.Animation
                 return true;
             }
 
-            return false;
+            return _sockets?.TryResolve(boneName, 0u, _boneTransforms, out transform) == true;
         }
 
         public bool TryGetBoneTransform(uint boneHash, out Matrix4x4 transform)
@@ -562,7 +679,7 @@ namespace AssetsManager.Services.Viewer.Animation
                 }
             }
 
-            return false;
+            return _sockets?.TryResolve(null, boneHash, _boneTransforms, out transform) == true;
         }
 
         public bool TryGetBoneTransformFnv(uint boneHash, out Matrix4x4 transform)
@@ -579,7 +696,7 @@ namespace AssetsManager.Services.Viewer.Animation
                 return true;
             }
 
-            return false;
+            return _sockets?.TryResolve(null, boneHash, _boneTransforms, out transform) == true;
         }
 
         public void Dispose()

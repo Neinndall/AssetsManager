@@ -209,7 +209,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _championBindWorldTransforms.Length != skeleton.Joints.Count)
             {
                 _championBindSkeleton = skeleton;
-                _championBindBoneTransformProvider = AnimationService.CreateBindBoneTransformProvider(skeleton);
+                _championBindBoneTransformProvider = AnimationService.CreateBindBoneTransformProvider(skeleton, _championModel.PoseDefinition);
                 _championBindSkinningMatrices = AnimationService.CreateBindSkinningMatrices(skeleton);
                 _championBindWorldTransforms = AnimationService.CreateBindWorldTransforms(skeleton);
             }
@@ -611,7 +611,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (!ReferenceEquals(_championBindSkeleton, skeleton) || _championBindBoneTransformProvider == null)
             {
                 _championBindSkeleton = skeleton;
-                _championBindBoneTransformProvider = AnimationService.CreateBindBoneTransformProvider(skeleton);
+                _championBindBoneTransformProvider = AnimationService.CreateBindBoneTransformProvider(skeleton, _championModel.PoseDefinition);
                 _championBindSkinningMatrices = AnimationService.CreateBindSkinningMatrices(skeleton);
                 _championBindWorldTransforms = AnimationService.CreateBindWorldTransforms(skeleton);
             }

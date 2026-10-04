@@ -206,7 +206,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_vfxRenderer != null)
                 {
                     _championAnimationService?.Update(0, animItem.AnimationAsset, _championModel.Skeleton,
-                        _championModel.SkinnedMesh, _championModel.Parts, _championModel.Name);
+                        _championModel.SkinnedMesh, _championModel.Parts, _championModel.Name, _championModel);
                     _vfxRenderer.SetBoneTransformSampler((time, name, hash) =>
                         _championAnimationService != null &&
                         _championAnimationService.TrySampleBoneTransform((float)time, name, hash, out var transform)
@@ -352,8 +352,8 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationVisibilityTimeline = VfxClipCueEvaluator.BuildVisibilityTimeline(
                 clip.TimedCues,
                 _animationBaseHiddenSubmeshes);
-            _championAnimationService?.SetJointSnapCues(
-                clip.TimedCues.OfType<AnimationJointSnapCue>().ToArray());
+            _championAnimationService?.SetPoseCues(clip.TimedCues,
+                _activeBundle?.AnimationGraphs.FirstOrDefault(graph => graph.PathHash == clip.Clip.GraphPathHash)?.Masks);
             ApplyAnimationClipCues(0d);
         }
 
@@ -387,7 +387,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationBasePartVisibility.Clear();
             _animationBaseHiddenSubmeshes.Clear();
             _animationVisibilityTimeline = Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();
-            _championAnimationService?.SetJointSnapCues(Array.Empty<AnimationJointSnapCue>());
+            _championAnimationService?.SetPoseCues(Array.Empty<AnimationClipTimedCue>());
             ApplyOwnerSubmeshVisibility(GetCharacterFormHiddenSubmeshes());
         }
     }

@@ -175,8 +175,11 @@ internal sealed class VfxClipCatalog : IDisposable
             resolved[index] = (atomic, path);
         }
 
+        AnimationGraphDefinition graph = bundle.AnimationGraphs.FirstOrDefault(candidate => candidate.PathHash == item.Clip.GraphPathHash);
+        string basisPath = playlist.Any(atomic => GraphPoseAnimationAsset.AdditiveTrack(atomic, graph) != null) &&
+            GraphPoseAnimationAsset.BasisClip(graph) is { } basisClip ? resolve(basisClip.AnimationFilePath) : null;
         return await Task.Run(
-            () => PrepareResolved(item, bundle, resolved, cancellationToken),
+            () => PrepareResolved(item, bundle, resolved, graph, basisPath, cancellationToken),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -184,6 +187,8 @@ internal sealed class VfxClipCatalog : IDisposable
         AnimationClipCatalogItem item,
         VfxLoadingService.Bundle bundle,
         IReadOnlyList<(AnimationClipDefinition Clip, string Path)> playlist,
+        AnimationGraphDefinition graph,
+        string basisPath,
         CancellationToken cancellationToken)
     {
         var steps = new List<IAnimationAsset>(playlist.Count);
@@ -196,7 +201,8 @@ internal sealed class VfxClipCatalog : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             IAnimationAsset asset = GetOrLoadAsset(path, cancellationToken);
-            IAnimationAsset timedAsset = RetimeForGraph(asset, atomic.TickDuration);
+            IAnimationAsset timedAsset = GraphPoseAnimationAsset.Wrap(RetimeForGraph(asset, atomic.TickDuration),
+                atomic, graph, basisPath == null ? null : GetOrLoadAsset(basisPath, cancellationToken));
             steps.Add(timedAsset);
             float tick = 1f / timedAsset.Fps;
 
@@ -255,6 +261,10 @@ internal sealed class VfxClipCatalog : IDisposable
                             conform.MaskHash,
                             conform.BlendInSeconds,
                             conform.BlendOutSeconds));
+                        break;
+                    default:
+                        if (AnimationPoseCues.Timed(authoredEvent, at, until) is { } poseCue)
+                            timedCues.Add(poseCue);
                         break;
                 }
             }

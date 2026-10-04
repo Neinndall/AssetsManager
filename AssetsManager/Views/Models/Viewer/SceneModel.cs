@@ -108,6 +108,7 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableRangeCollection<AnimationData> Animations { get; set; }
 
         public RigResource Skeleton { get; set; }
+        internal SkinPoseDefinition PoseDefinition { get; set; } = SkinPoseDefinition.Empty;
         public IAnimationAsset CurrentAnimation { get; set; }
         public bool IsAnimationPaused { get; set; } = true;
         public double AnimationTime { get; set; }
@@ -375,6 +376,7 @@ namespace AssetsManager.Views.Models.Viewer
             CurrentAnimation = null;
             SkinnedMesh = null;
             Skeleton = null;
+            PoseDefinition = SkinPoseDefinition.Empty;
             GpuSkinningData = null;
             SkinningMatrices = null;
             RootVisual = null;

@@ -91,6 +91,7 @@ namespace AssetsManager.Services.Viewer.Animation
                 IReadOnlyList<AnimationClipDefinition> playlist =
                     AnimationGraphPlayback.ResolvePlaylist(clip, clips);
                 var steps = new List<IAnimationAsset>(playlist.Count);
+                var preparedClips = new List<AnimationClipDefinition>(playlist.Count);
                 foreach (AnimationClipDefinition step in playlist)
                 {
                     IAnimationAsset source = await LoadSourceAsync(
@@ -99,7 +100,12 @@ namespace AssetsManager.Services.Viewer.Animation
                         cancellationToken);
                     if (source == null)
                         continue;
-                    steps.Add(AnimationGraphPlayback.RetimeForGraph(source, step.TickDuration));
+                    IAnimationAsset basis = GraphPoseAnimationAsset.AdditiveTrack(step, asset.AnimationGraph) != null &&
+                        GraphPoseAnimationAsset.BasisClip(asset.AnimationGraph) is { } basisClip
+                        ? await LoadSourceAsync(basisClip.AnimationFilePath, projectRoot, cancellationToken) : null;
+                    steps.Add(GraphPoseAnimationAsset.Wrap(AnimationGraphPlayback.RetimeForGraph(source, step.TickDuration),
+                        step, asset.AnimationGraph, basis));
+                    preparedClips.Add(step);
                 }
 
                 if (steps.Count == 0)
@@ -109,11 +115,14 @@ namespace AssetsManager.Services.Viewer.Animation
                 }
 
                 IAnimationAsset animation = AnimationGraphPlayback.CreatePlaylist(steps);
+                IReadOnlyList<AnimationClipTimedCue> timedCues = BuildTimedCues(preparedClips, steps);
                 var state = new PoseState(
                     animation,
                     new AnimationService(_logService),
-                    Array.Empty<AnimationClipTimedCue>(),
+                    timedCues,
                     Array.Empty<PreparedStep>());
+                state.Evaluator.ConfigurePose(asset.Materials?.PoseDefinition, Matrix4x4.Identity);
+                state.Evaluator.SetPoseCues(timedCues, asset.AnimationGraph?.Masks);
                 _states[clip.OwnerPathHash] = state;
                 _byRequested[key] = state;
             }
@@ -154,8 +163,12 @@ namespace AssetsManager.Services.Viewer.Animation
                     _projectRoot,
                     cancellationToken);
                 if (source == null)
-                    continue;
-                IAnimationAsset timed = AnimationGraphPlayback.RetimeForGraph(source, step.TickDuration);
+                    return false;
+                IAnimationAsset basis = GraphPoseAnimationAsset.AdditiveTrack(step, asset.AnimationGraph) != null &&
+                    GraphPoseAnimationAsset.BasisClip(asset.AnimationGraph) is { } basisClip
+                    ? await LoadSourceAsync(basisClip.AnimationFilePath, _projectRoot, cancellationToken) : null;
+                IAnimationAsset timed = GraphPoseAnimationAsset.Wrap(AnimationGraphPlayback.RetimeForGraph(source, step.TickDuration),
+                    step, asset.AnimationGraph, basis);
                 steps.Add(timed);
                 preparedSteps.Add(new PreparedStep(
                     step,
@@ -167,9 +180,10 @@ namespace AssetsManager.Services.Viewer.Animation
                 return false;
 
             IAnimationAsset animation = AnimationGraphPlayback.CreatePlaylist(steps);
-            IReadOnlyList<AnimationClipTimedCue> timedCues = BuildTimedCues(playlist, steps);
+            IReadOnlyList<AnimationClipTimedCue> timedCues = BuildTimedCues(preparedSteps.Select(step => step.Clip).ToArray(), steps);
             var evaluator = new AnimationService(_logService);
-            evaluator.SetJointSnapCues(timedCues.OfType<AnimationJointSnapCue>().ToArray());
+            evaluator.SetPoseCues(timedCues, asset.AnimationGraph?.Masks);
+            evaluator.ConfigurePose(asset.Materials?.PoseDefinition, Matrix4x4.Identity);
             if (_previewStates.Remove(clip.OwnerPathHash, out PoseState previous))
             {
                 previous.Animation.Dispose();
@@ -241,10 +255,9 @@ namespace AssetsManager.Services.Viewer.Animation
             float sampleTime = double.IsFinite(timeSeconds)
                 ? (float)Math.Max(0d, timeSeconds)
                 : 0f;
-            state.Evaluator.EvaluateSkinningTransforms(sampleTime, state.Animation, asset.Skeleton);
-            if (!string.IsNullOrWhiteSpace(boneName) && state.Evaluator.TryGetBoneTransformExactName(boneName, out transform))
-                return true;
-            return boneHash != 0 && state.Evaluator.TryGetBoneTransformFnv(boneHash, out transform);
+            if (state.Evaluator.FinalBoneTransforms == null)
+                state.Evaluator.EvaluateSkinningTransforms(0f, state.Animation, asset.Skeleton);
+            return state.Evaluator.TrySampleBoneTransformFnv(sampleTime, boneName, boneHash, out transform);
         }
 
         internal Matrix4x4[] PreparedClipSkinningMatrices(AnimationClipDefinition clip) =>
@@ -335,6 +348,10 @@ namespace AssetsManager.Services.Viewer.Animation
                                 conform.MaskHash,
                                 conform.BlendInSeconds,
                                 conform.BlendOutSeconds));
+                            break;
+                        default:
+                            if (AnimationPoseCues.Timed(authoredEvent, at, until) is { } poseCue)
+                                cues.Add(poseCue);
                             break;
                     }
                 }

@@ -94,7 +94,8 @@ namespace AssetsManager.Tests.Support
             ModelMaterialDefinition material,
             bool keepPixels = false,
             bool glowOnly = false,
-            GameMaterialState state = null)
+            GameMaterialState state = null,
+            Matrix4x4[] bones = null)
         {
             if (!ReferenceEquals(asset, _asset))
             {
@@ -155,7 +156,7 @@ namespace AssetsManager.Tests.Support
             _gl.VertexAttribIPointer(5, 4, VertexAttribIType.UnsignedByte, 0, IntPtr.Zero);
 
             var missing = new List<string>();
-            bool bound = _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, BindPose, false, in frame, path => Texture(path, missing), state: state,
+            bool bound = _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, bones ?? BindPose, false, in frame, path => Texture(path, missing), state: state,
                 hasColors: asset.Mesh.HasColors);
             if (bound)
             {
@@ -172,7 +173,7 @@ namespace AssetsManager.Tests.Support
                         _bloom.Initialize(_gl);
                     }
                     _bloom.BeginPasses();
-                    _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, BindPose, false, in frame, path => Texture(path, missing), state: state);
+                    _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, bones ?? BindPose, false, in frame, path => Texture(path, missing), state: state);
                     _gl.BindVertexArray(vao);
                     _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)corners.Length);
                     _bloom.EndPasses();

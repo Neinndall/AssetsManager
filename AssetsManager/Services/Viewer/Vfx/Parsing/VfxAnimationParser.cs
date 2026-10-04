@@ -1,4 +1,5 @@
 using System;
+using AssetsManager.Services.Viewer.Animation;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -309,7 +310,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     name,
                     (byte)(GetU8(track.Properties, F_trackPriority) ?? 0),
                     (byte)(GetU8(track.Properties, F_trackBlendMode) ?? 0),
-                    GetF32(track.Properties, F_trackBlendWeight) ?? 0f));
+                    GetF32(track.Properties, F_trackBlendWeight) ?? 1f));
             }
             return result;
         }
@@ -618,6 +619,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     AsU32(Get(properties, F_eventMaskDataName)) ?? 0u,
                     GetF32(properties, F_eventBlendIn) ?? 0f,
                     GetF32(properties, F_eventBlendOut) ?? 0f);
+            }
+
+            if (eventData.ClassHash == VfxParsingHash.Fnv1a("SpringPhysicsEventData"))
+                return new AnimationSpringEventDefinition(eventHash, startFrame, endFrame,
+                    SkinPoseReader.Reference(Get(properties, VfxParsingHash.Fnv1a("SpringToAffect"))),
+                    GetF32(properties, VfxParsingHash.Fnv1a("BlendOutTime")) ?? 0f);
+
+            if (eventData.ClassHash == VfxParsingHash.Fnv1a("LockRootOrientationEventData"))
+                return new AnimationLockOrientationEventDefinition(eventHash, startFrame, endFrame,
+                    SkinPoseReader.Reference(Get(properties, VfxParsingHash.Fnv1a("JointName"))),
+                    GetF32(properties, VfxParsingHash.Fnv1a("BlendOutTime")) ?? 0.2f);
+
+            if (eventData.ClassHash == VfxParsingHash.Fnv1a("JointOrientationEventData"))
+            {
+                var blend = Get(properties, VfxParsingHash.Fnv1a("BlendData")) as BinTreeStruct;
+                return new AnimationOrientationEventDefinition(eventHash, startFrame, endFrame,
+                    blend == null ? null : GetF32(blend.Properties, VfxParsingHash.Fnv1a("BlendFromDefaultDuration")) ?? 0f,
+                    blend == null ? 0f : GetF32(blend.Properties, VfxParsingHash.Fnv1a("BlendToDefaultDuration")) ?? 0f);
             }
 
             return new AnimationOtherClipEventDefinition(

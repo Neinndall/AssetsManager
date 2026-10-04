@@ -537,7 +537,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     _championModel.Skeleton,
                     _championModel.SkinnedMesh,
                     _championModel.Parts,
-                    _championModel.Name);
+                    _championModel.Name, _championModel);
                 _championModel.SkinningMatrices = _championAnimationService.FinalBoneTransforms;
                 _championModel.GpuSkinningData = _championAnimationService.SkinningData;
                 _vfxRenderer?.SetOwnerSkinningMatrices(_championAnimationService.FinalBoneTransforms);

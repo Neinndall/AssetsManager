@@ -296,8 +296,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _visibilityTimeline = clip == null
                 ? Array.Empty<VfxClipCueEvaluator.VisibilityEntry>()
                 : VfxClipCueEvaluator.BuildVisibilityTimeline(clip.TimedCues, FormHiddenSubmeshes);
-            Animation.SetJointSnapCues(
-                clip?.TimedCues.OfType<AnimationJointSnapCue>().ToArray() ?? Array.Empty<AnimationJointSnapCue>());
+            Animation.SetPoseCues(clip?.TimedCues,
+                Bundle.AnimationGraphs.FirstOrDefault(graph => graph.PathHash == clip?.Clip?.GraphPathHash)?.Masks);
             _hiddenDirty = true;
         }
 
@@ -348,7 +348,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             }
 
             double time = Session.PlaybackTime;
-            Animation.Update((float)time, Clip.AnimationAsset, Model.Skeleton, Model.SkinnedMesh, Model.Parts, Model.Name);
+            Animation.Update((float)time, Clip.AnimationAsset, Model.Skeleton, Model.SkinnedMesh, Model.Parts, Model.Name, Model, deltaSeconds);
             Model.SkinningMatrices = Animation.FinalBoneTransforms;
             Model.GpuSkinningData = Animation.SkinningData;
             Session.SetOwnerSkinningMatrices(Animation.FinalBoneTransforms);
@@ -377,7 +377,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             }
 
             _bindSkinningMatrices ??= AnimationService.CreateBindSkinningMatrices(skeleton);
-            _bindBoneProvider ??= AnimationService.CreateBindBoneTransformProvider(skeleton);
+            _bindBoneProvider ??= AnimationService.CreateBindBoneTransformProvider(skeleton, Model.PoseDefinition);
             Model.SkinningMatrices = _bindSkinningMatrices;
             Session.SetOwnerSkinningMatrices(_bindSkinningMatrices);
             Session.UpdateBoneTransforms(_bindBoneProvider);

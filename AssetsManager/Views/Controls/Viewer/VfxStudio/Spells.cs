@@ -153,7 +153,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         _championModel.Skeleton,
                         _championModel.SkinnedMesh,
                         _championModel.Parts,
-                        _championModel.Name);
+                        _championModel.Name, _championModel);
                     _championModel.SkinningMatrices = _championAnimationService.FinalBoneTransforms;
                     _championModel.GpuSkinningData = _championAnimationService.SkinningData;
                 }
@@ -234,7 +234,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     _championModel.Skeleton,
                     _championModel.SkinnedMesh,
                     _championModel.Parts,
-                    _championModel.Name);
+                    _championModel.Name, _championModel);
                 float sampleTime = SpellAnimationTime(time, animation.Duration);
                 if (hasLaunchBone &&
                     !_championAnimationService.TrySampleBoneTransform(
