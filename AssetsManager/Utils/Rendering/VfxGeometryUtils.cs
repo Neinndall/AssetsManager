@@ -54,12 +54,12 @@ namespace AssetsManager.Utils.Rendering
         {
             if (!hasColorRampTexture || definition is null) return false;
 
-            bool fixedAlphaUv = definition.UvMode == 2 &&
-                definition.PrimitiveKind != VfxPrimitiveKind.Mesh &&
-                definition.PrimitiveKind != VfxPrimitiveKind.AttachedMesh;
+            bool mesh = definition.PrimitiveKind is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
+            bool fixedAlphaUv = definition.UvMode == 2 && !mesh;
             bool erosionEnabled = definition.AlphaErosion is not null && !fixedAlphaUv;
             bool hasMultLayer = HasTextureMultLayer(definition);
-            return !erosionEnabled && !(hasMultLayer && definition.UvMode == 2);
+            // Original mesh MULT_PASS shaders omit the ramp; quad/ribbon MULT_PASS samples it except in LOCK_ALPHA.
+            return !erosionEnabled && !(hasMultLayer && (mesh || definition.UvMode == 2));
         }
 
         public static bool ShouldProjectToGround(VfxEmitterDefinition definition)
