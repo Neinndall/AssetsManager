@@ -227,6 +227,8 @@ internal sealed class SkinPoseRuntime
 
     internal void ApplyPost(float time, Matrix4x4[] locals, Matrix4x4[] worlds)
     {
+        // Sampling must reuse this frame's conform result even without post modifiers.
+        _pendingStep = 0f;
         if (_springs.Length == 0 && _definition.Orientations.Count == 0) return;
         var world = _world;
         Action compose = () => Compose(locals, world, _root);
@@ -265,7 +267,6 @@ internal sealed class SkinPoseRuntime
             }
         }
         Compose(locals, worlds, Matrix4x4.Identity);
-        _pendingStep = 0f;
     }
 
     private float OrientationWeight(float time, bool defaultOn)

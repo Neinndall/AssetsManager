@@ -475,6 +475,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Fixed attached effects drifting from moving models with path-following poses.
   - VFX Studio / Additive animation clips retain the model's base pose instead of collapsing it, including Earth Dragon Attack1.
   - Viewer / Sampling animation attachments no longer changes the model's displayed pose.
   - VFX Studio / Fixed effects disappearing near surfaces when fallback shaders use an orthographic camera.
