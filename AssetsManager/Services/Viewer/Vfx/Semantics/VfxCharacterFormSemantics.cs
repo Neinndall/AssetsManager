@@ -42,6 +42,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
             !string.IsNullOrWhiteSpace(right) && string.Equals(
                 left.Replace('\\', '/'), right.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
 
+        internal static IReadOnlyList<VfxCharacterFormOption> FormOptions(
+            IEnumerable<VfxCharacterFormDefinition> forms,
+            VfxOwnerSceneContext owner,
+            SceneModel model)
+        {
+            var options = CompatibleForms(forms, owner)
+                .Select(form => new VfxCharacterFormOption(form, FormLabel(form, model))).ToList();
+            // Some skins author their own Base gear; others only author the alternate forms.
+            if (options.Count > 0 && !options.Any(option =>
+                string.Equals(option.Label, "Base", StringComparison.OrdinalIgnoreCase)))
+                options.Insert(0, new VfxCharacterFormOption(VfxCharacterFormDefinition.CreateBase(), "Base"));
+            return options;
+        }
+
         internal static IReadOnlySet<uint> HiddenSubmeshes(
             IEnumerable<uint> initiallyHidden,
             VfxCharacterFormDefinition form,

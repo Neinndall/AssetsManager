@@ -5,6 +5,13 @@ using System.IO;
 using System.Linq;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Viewer.Vfx.Loading;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 
@@ -14,6 +21,12 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
     {
         internal static void Run(string[] args)
         {
+            if (args.Contains("--preview"))
+            {
+                foreach (string path in args.Where(arg => !arg.StartsWith("--", StringComparison.Ordinal)))
+                    PrintPreview(path);
+                return;
+            }
             var names = new Dictionary<uint, string>();
             string hashes = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "AssetsManager", "hashes");
@@ -66,6 +79,42 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     foreach (var entry in metadata.OverrideMaterials.OrderBy(entry => entry.Key))
                         Console.WriteLine($"  resolved material {entry.Key}={string.Join(",", entry.Value.Samplers.Select(sampler => sampler.TexturePath))}");
                 }
+            }
+        }
+
+        private static void PrintPreview(string path)
+        {
+            var log = new LogService(new Serilog.LoggerConfiguration().CreateLogger());
+            using var hashes = new HashResolverService(new DirectoriesCreator(), log);
+            hashes.LoadAllHashesAsync().GetAwaiter().GetResult();
+            using var loading = new VfxLoadingService(hashes);
+            var bundle = loading.Load(path, log);
+            string sknPath = loading.ResolveAssetPath(bundle.OwnerSceneContext.MeshPath, Path.GetDirectoryName(path), ".skn");
+            var trees = bundle.LoadedBins.Select(bin =>
+            {
+                using var stream = File.OpenRead(bin);
+                return new BinTree(stream);
+            }).ToArray();
+            var metadata = SknMaterialTextureResolver.ReadMetadata(trees, hashes.ResolveHash, hashes.ResolveBinEntry, sknPath);
+            var resolution = SknMaterialTextureResolver.Resolve(metadata,
+                metadata.ReferencedTexturePaths.Select(Path.GetFileNameWithoutExtension).ToArray());
+            using var mesh = SkinnedMesh.ReadFromSimpleSkin(sknPath);
+            using var model = new SceneModel();
+            foreach (var range in mesh.Ranges)
+            {
+                string name = range.Material.TrimEnd('\0');
+                model.AddPart(new ModelPart(name, new System.Windows.Media.Media3D.GeometryModel3D())
+                {
+                    MaterialDefinition = resolution.ResolveMaterialDefinition(SknMaterialTextureResolver.NormalizeMaterialKey(name))
+                });
+            }
+            Console.WriteLine($"[Preview Forms] {path} authored={bundle.CharacterForms.Count}");
+            foreach (var option in VfxCharacterFormSemantics.FormOptions(bundle.CharacterForms, bundle.OwnerSceneContext, model))
+            {
+                var hidden = VfxCharacterFormSemantics.HiddenSubmeshes(bundle.OwnerSceneContext.InitialHiddenSubmeshHashes,
+                    option.Definition, model.Parts, bundle.OwnerSceneContext.SubmeshConditions);
+                Console.WriteLine($"label={option.Label} gear={option.Definition.GearIndex} path={option.Definition.PathHash:x8} " +
+                    $"visible=[{string.Join(",", model.Parts.Where(part => !hidden.Contains(LeagueToolkit.Hashing.Fnv1a.HashLower(part.Name))).Select(part => part.Name))}]");
             }
         }
         private static void PrintMesh(string label, BinTreeStruct mesh, Func<uint, string> name)

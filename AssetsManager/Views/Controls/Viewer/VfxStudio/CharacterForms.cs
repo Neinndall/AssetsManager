@@ -64,19 +64,11 @@ namespace AssetsManager.Views.Controls.Viewer
                     return;
                 }
 
-                IReadOnlyList<VfxCharacterFormDefinition> compatibleForms = VfxCharacterFormSemantics.CompatibleForms(
+                foreach (var option in VfxCharacterFormSemantics.FormOptions(
                     _activeBundle.CharacterForms,
-                    _activeBundle.OwnerSceneContext);
-
-                if (compatibleForms.Count > 0)
-                {
-                    var baseDef = VfxCharacterFormDefinition.CreateBase("Base");
-                    _model.CharacterForms.Add(new VfxCharacterFormOption(baseDef, VfxCharacterFormSemantics.FormLabel(baseDef, _championModel)));
-                    foreach (var form in compatibleForms)
-                    {
-                        _model.CharacterForms.Add(new VfxCharacterFormOption(form, VfxCharacterFormSemantics.FormLabel(form, _championModel)));
-                    }
-                }
+                    _activeBundle.OwnerSceneContext,
+                    _championModel))
+                    _model.CharacterForms.Add(option);
                 uint? selectedHash = FocusedActor?.SelectedCharacterFormPathHash;
                 _model.SelectedCharacterForm = _model.CharacterForms.FirstOrDefault(option =>
                     option.Definition.PathHash == selectedHash) ?? _model.CharacterForms.FirstOrDefault();

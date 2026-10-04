@@ -238,5 +238,78 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             var baseHidden = VfxCharacterFormSemantics.HiddenSubmeshes(initialHidden, baseForm, parts);
             Assert.True(baseHidden.SetEquals(initialHidden));
         }
+
+        [Theory]
+        [InlineData("Base")]
+        [InlineData("Form 1")]
+        public void KaynFormOptionsKeepAuthoredBaseGearWithoutAddingAnotherBase(string baseName)
+        {
+            using var model = new SceneModel();
+            string[] names = { "Base", "Assassin", "Slayer" };
+            foreach (string name in names)
+                model.AddPart(new ModelPart("Body_" + name, new GeometryModel3D()));
+            uint[] hashes = names.Select(name => Fnv1a.HashLower("Body_" + name)).ToArray();
+            var forms = names.Select((name, index) => new VfxCharacterFormDefinition(
+                (uint)(10 + index), index, index == 0 ? baseName : $"Form {index + 1}",
+                new[] { hashes[index] }, hashes.Where(hash => hash != hashes[index]).ToArray(),
+                ResourceMap: new Dictionary<uint, uint> { [1] = (uint)(20 + index) })).ToArray();
+
+            var options = VfxCharacterFormSemantics.FormOptions(forms, null, model);
+
+            Assert.Equal(names, options.Select(option => option.Label));
+            Assert.Equal(forms, options.Select(option => option.Definition));
+            Assert.Same(forms[0], options[0].Definition);
+            Assert.False(options[0].Definition.IsBase);
+            Assert.True(VfxCharacterFormSemantics.HiddenSubmeshes(hashes, options[0].Definition)
+                .SetEquals(hashes.Skip(1)));
+            var playback = new VfxLoadingService.Bundle().CreateCharacterPlaybackView(options[0].Definition);
+            Assert.Equal(0, playback.CharacterGearIndex);
+            Assert.Equal(20u, playback.ResourceMap[1]);
+        }
+
+        [Fact]
+        public void SettFormOptionsAddBaseBeforeDarkAndGoldWithoutRenumberingGear()
+        {
+            using var model = new SceneModel();
+            var forms = new[]
+            {
+                new VfxCharacterFormDefinition(10, 0, "Form 1", Array.Empty<uint>(), Array.Empty<uint>()),
+                new VfxCharacterFormDefinition(20, 1, "Form 2", Array.Empty<uint>(), Array.Empty<uint>())
+            };
+            model.AddPart(new ModelPart("Base", new GeometryModel3D())
+            {
+                MaterialDefinition = ModelMaterialDefinition.TextureOnly("sett_skin66_base_tx_cm") with
+                {
+                    TextureSwaps = new[]
+                    {
+                        new GameMaterialTextureSwap("Diffuse_Texture", new[]
+                        {
+                            new GameMaterialTextureSwapOption("ASSETS/Characters/Sett/Skins/Skin66/sett_skin66_dark_tx_cm.tex",
+                                new GameMaterialBoolCondition(GameMaterialBoolKind.Gear, 0)),
+                            new GameMaterialTextureSwapOption("ASSETS/Characters/Sett/Skins/Skin66/sett_skin66_gold_tx_cm.tex",
+                                new GameMaterialBoolCondition(GameMaterialBoolKind.Gear, 1))
+                        })
+                    }
+                }
+            });
+
+            var options = VfxCharacterFormSemantics.FormOptions(forms, null, model);
+
+            Assert.Equal(new[] { "Base", "Dark", "Gold" }, options.Select(option => option.Label));
+            Assert.True(options[0].Definition.IsBase);
+            Assert.Equal(new[] { -1, 0, 1 }, options.Select(option => option.Definition.GearIndex));
+            Assert.Equal(forms, options.Skip(1).Select(option => option.Definition));
+        }
+
+        [Fact]
+        public void IncompatibleFormsDoNotCreateAnEmptyBaseSelector()
+        {
+            var owner = new VfxOwnerSceneContext("ASSETS/Base.skn", "ASSETS/Base.skl", 1f);
+            var incompatible = new VfxCharacterFormDefinition(1, 0, "Base", Array.Empty<uint>(),
+                Array.Empty<uint>(), MeshPath: "ASSETS/Other.skn");
+
+            Assert.Empty(VfxCharacterFormSemantics.FormOptions(new[] { incompatible }, owner, null));
+            Assert.Empty(VfxCharacterFormSemantics.FormOptions(null, owner, null));
+        }
     }
 }
