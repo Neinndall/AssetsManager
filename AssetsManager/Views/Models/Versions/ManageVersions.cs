@@ -5,6 +5,8 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using System.Windows.Input;
+using AssetsManager.Views.Helpers;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 
@@ -34,6 +36,8 @@ namespace AssetsManager.Views.Models.Versions
     {
         private readonly VersionService _versionService;
         private readonly LogService _logService;
+        private VersionFileInfo _leagueClientSelectionAnchor;
+        private VersionFileInfo _gameClientSelectionAnchor;
 
         public List<VersionFileInfo> AllLeagueClientVersions { get; private set; }
         public List<VersionFileInfo> AllLoLGameClientVersions { get; private set; }
@@ -121,6 +125,27 @@ namespace AssetsManager.Views.Models.Versions
         public void SetActiveTab(bool isGame)
         {
             Paginator = isGame ? (IPaginationModel)LoLGameClientPaginator : (IPaginationModel)LeagueClientPaginator;
+        }
+
+        internal void SelectVersion(IList<VersionFileInfo> visibleVersions, VersionFileInfo version,
+            bool isGame, ModifierKeys modifiers)
+        {
+            if (version == null || !visibleVersions.Contains(version)) return;
+            bool wasSelected = version.IsSelected;
+            if (!modifiers.HasFlag(ModifierKeys.Control))
+            {
+                foreach (VersionFileInfo file in AllLeagueClientVersions.Concat(AllLoLGameClientVersions))
+                    file.IsSelected = false;
+            }
+
+            VersionFileInfo anchor = isGame ? _gameClientSelectionAnchor : _leagueClientSelectionAnchor;
+            // A plain second click keeps the existing radio-style deselection.
+            VersionFileInfo target = SelectionBehavior.IsPrimaryActionIntent(modifiers) && wasSelected
+                ? null : version;
+            anchor = SelectionBehavior.SelectItems(visibleVersions, anchor, target, modifiers,
+                file => file.IsSelected, (file, selected) => file.IsSelected = selected);
+            if (isGame) _gameClientSelectionAnchor = anchor;
+            else _leagueClientSelectionAnchor = anchor;
         }
 
         public async Task LoadVersionFilesAsync()

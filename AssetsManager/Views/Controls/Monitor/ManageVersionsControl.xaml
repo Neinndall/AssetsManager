@@ -246,7 +246,8 @@
 
         <!-- 4. CONTENT AREA -->
         <Grid Grid.Row="3">
-            <ListView x:Name="LeagueClientVersionsListView" 
+            <ListView x:Name="LeagueClientVersionsListView"
+                      SelectionMode="Extended"
                       ItemsSource="{Binding LeagueClientPaginator.PagedItems}" 
                       Background="Transparent" BorderThickness="0">
                 <ListView.Style>
@@ -313,6 +314,7 @@
             </ListView>
 
             <ListView x:Name="LoLGameClientVersionsListView" 
+                      SelectionMode="Extended"
                       ItemsSource="{Binding LoLGameClientPaginator.PagedItems}" 
                       Background="Transparent" BorderThickness="0">
                 <ListView.Style>

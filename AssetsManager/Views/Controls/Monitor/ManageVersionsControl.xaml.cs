@@ -206,32 +206,9 @@ namespace AssetsManager.Views.Controls.Monitor
             // Handle left-click for selection logic
             if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
             {
-                // If Ctrl is pressed, toggle selection (for multi-select delete)
-                if (System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
-                {
-                    clickedVersion.IsSelected = !clickedVersion.IsSelected;
-                }
-                else // If Ctrl is not pressed, behave like a radio button (toggle)
-                {
-                    bool wasSelected = clickedVersion.IsSelected;
-
-                    // 1. Deselect all items in both lists
-                    foreach (var version in _viewModel.AllLeagueClientVersions)
-                    {
-                        version.IsSelected = false;
-                    }
-                    foreach (var version in _viewModel.AllLoLGameClientVersions)
-                    {
-                        version.IsSelected = false;
-                    }
-
-                    // 2. If the item was not already selected, select it.
-                    //    If it was selected, the loop above has already deselected it.
-                    if (!wasSelected)
-                    {
-                        clickedVersion.IsSelected = true;
-                    }
-                }
+                if (_viewModel == null || ItemsControl.ItemsControlFromItemContainer(item) is not ListView list) return;
+                _viewModel.SelectVersion(list.Items.Cast<VersionFileInfo>().ToList(), clickedVersion,
+                    ReferenceEquals(list, LoLGameClientVersionsListView), System.Windows.Input.Keyboard.Modifiers);
                 e.Handled = true;
             }
         }
