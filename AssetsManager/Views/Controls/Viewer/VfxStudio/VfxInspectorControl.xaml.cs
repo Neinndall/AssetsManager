@@ -124,7 +124,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private MapSceneRuntime _pendingMapTextureRuntime;
         private bool _mapTexturePublishQueued;
         private bool _suppressMapVariantReload;
-        private VfxPreviewSurfaceRenderer _previewSurfaceRenderer;
+        private PreviewSurfaceRenderer _previewSurfaceRenderer;
         private PerspectiveCamera _previewPerspectiveCamera;
         private OrthographicCamera _previewOrthographicCamera;
         private bool _isLoadingPreviewPreferences;

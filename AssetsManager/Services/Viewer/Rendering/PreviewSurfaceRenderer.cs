@@ -3,18 +3,16 @@ using System.Numerics;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using AssetsManager.Services.Viewer.Rendering;
-using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils.Rendering;
 using Silk.NET.OpenGL;
 
-namespace AssetsManager.Services.Viewer.Vfx.Rendering
+namespace AssetsManager.Services.Viewer.Rendering
 {
-    /// <summary>Owns the VFX preview Grid, Ground and Stage rendering paths behind one GPU lifecycle.</summary>
-    internal sealed class VfxPreviewSurfaceRenderer : IDisposable
+    /// <summary>Shared preview Ground, Grid and Stage with resources owned by each viewport's GL context.</summary>
+    internal sealed class PreviewSurfaceRenderer : IDisposable
     {
         internal const float GroundDrop = -0.5f;
-        internal const float GroundSize = VfxRigMotion.ChampionHeight * 16f;
+        internal const float GroundSize = 3200f;
         internal const float StageSize = GroundSize;
         internal const float GridCellSize = 100f;
         internal const float GridSectionSize = 500f;
@@ -29,6 +27,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private uint _groundVao;
         private uint _groundVbo;
         private uint _groundTexture;
+        private BitmapSource _groundTextureSource;
         private int _groundViewProjection;
         private int _groundTextureUniform;
         private int _groundTextured;
@@ -57,9 +56,15 @@ in vec2 vUv;
 out vec4 fragColor;
 uniform sampler2D uTexture;
 uniform int uTextured;
+vec3 linearToSrgb(vec3 value) {
+    vec3 low = value * 12.92;
+    vec3 high = 1.055 * pow(max(value, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055;
+    return mix(high, low, lessThanEqual(value, vec3(0.0031308)));
+}
 void main() {
+    vec4 color = uTextured != 0 ? texture(uTexture, vUv) : vec4(0.0);
     fragColor = uTextured != 0
-        ? texture(uTexture, vUv)
+        ? vec4(linearToSrgb(color.rgb), color.a)
         : vec4(0.137, 0.165, 0.196, 1.0);
 }";
 
@@ -111,7 +116,8 @@ void main() {
     fragColor = vec4(lineColor, line * fade);
 }";
 
-        internal void Initialize(GL gl, BitmapSource groundTexture)
+        internal void Initialize(GL gl, BitmapSource groundTexture,
+            float groundSize = GroundSize, float groundHeight = GroundDrop, float gridHeight = 0f)
         {
             ArgumentNullException.ThrowIfNull(gl);
             if (_ready) return;
@@ -122,8 +128,8 @@ void main() {
             try
             {
                 _gridRenderer = new GridRenderer();
-                _gridRenderer.Initialize(_gl, gles);
-                InitializeGround(gles, groundTexture);
+                _gridRenderer.Initialize(_gl, gles, gridHeight);
+                InitializeGround(gles, groundTexture, groundSize, groundHeight);
                 InitializeStage(gles);
                 _ready = true;
             }
@@ -152,20 +158,20 @@ void main() {
                 _gridRenderer?.Render(viewProjection);
         }
 
-        private void InitializeGround(bool gles, BitmapSource groundTexture)
+        private void InitializeGround(bool gles, BitmapSource groundTexture, float size, float height)
         {
             _groundProgram = GlShaderCompiler.CreateProgram(_gl, gles, GroundVertexShader, GroundFragmentShader);
             _groundViewProjection = _gl.GetUniformLocation(_groundProgram, "uViewProjection");
             _groundTextureUniform = _gl.GetUniformLocation(_groundProgram, "uTexture");
             _groundTextured = _gl.GetUniformLocation(_groundProgram, "uTextured");
 
-            float half = GroundSize * 0.5f;
+            float half = size * 0.5f;
             float[] vertices =
             {
-                -half, GroundDrop, -half, 0f, 1f,
-                 half, GroundDrop, -half, 1f, 1f,
-                 half, GroundDrop,  half, 1f, 0f,
-                -half, GroundDrop,  half, 0f, 0f
+                -half, height, -half, 0f, 1f,
+                 half, height, -half, 1f, 1f,
+                 half, height,  half, 1f, 0f,
+                -half, height,  half, 0f, 0f
             };
 
             _groundVao = _gl.GenVertexArray();
@@ -180,8 +186,17 @@ void main() {
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
             _gl.BindVertexArray(0);
 
-            if (groundTexture != null)
-                _groundTexture = UploadTexture(groundTexture);
+            SetGroundTexture(groundTexture);
+        }
+
+        internal void SetGroundTexture(BitmapSource source)
+        {
+            if (_gl == null || ReferenceEquals(_groundTextureSource, source)) return;
+
+            uint replacement = source == null ? 0 : UploadTexture(source);
+            if (_groundTexture != 0) _gl.DeleteTexture(_groundTexture);
+            _groundTexture = replacement;
+            _groundTextureSource = source;
         }
 
         private void RenderGround(Matrix4x4 viewProjection)
@@ -193,6 +208,7 @@ void main() {
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.GetInteger(GLEnum.TextureBinding2D, out int previousTexture0);
             _gl.GetInteger(GLEnum.DepthWritemask, out int previousDepthWrite);
+            _gl.GetInteger(GLEnum.DepthFunc, out int previousDepthFunction);
             bool depthTest = _gl.IsEnabled(EnableCap.DepthTest);
             bool blend = _gl.IsEnabled(EnableCap.Blend);
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
@@ -200,6 +216,7 @@ void main() {
             try
             {
                 _gl.Enable(EnableCap.DepthTest);
+                _gl.DepthFunc(DepthFunction.Lequal);
                 _gl.DepthMask(true);
                 _gl.Disable(EnableCap.Blend);
                 _gl.Disable(EnableCap.CullFace);
@@ -216,6 +233,7 @@ void main() {
             {
                 if (depthTest) _gl.Enable(EnableCap.DepthTest); else _gl.Disable(EnableCap.DepthTest);
                 _gl.DepthMask(previousDepthWrite != 0);
+                _gl.DepthFunc((DepthFunction)previousDepthFunction);
                 if (blend) _gl.Enable(EnableCap.Blend); else _gl.Disable(EnableCap.Blend);
                 if (cullFace) _gl.Enable(EnableCap.CullFace); else _gl.Disable(EnableCap.CullFace);
                 _gl.ActiveTexture(TextureUnit.Texture0);
@@ -333,23 +351,35 @@ void main() {
             bitmap.CopyPixels(new Int32Rect(0, 0, width, height), pixels, stride, 0);
 
             uint texture = _gl.GenTexture();
-            _gl.BindTexture(TextureTarget.Texture2D, texture);
-            _gl.TexImage2D(
-                TextureTarget.Texture2D,
-                0,
-                InternalFormat.Rgba8,
-                (uint)width,
-                (uint)height,
-                0,
-                Silk.NET.OpenGL.PixelFormat.Bgra,
-                PixelType.UnsignedByte,
-                new ReadOnlySpan<byte>(pixels));
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
-            return texture;
+            _gl.GetInteger(GLEnum.TextureBinding2D, out int previousTexture);
+            try
+            {
+                _gl.BindTexture(TextureTarget.Texture2D, texture);
+                _gl.TexImage2D(
+                    TextureTarget.Texture2D,
+                    0,
+                    InternalFormat.Srgb8Alpha8,
+                    (uint)width,
+                    (uint)height,
+                    0,
+                    Silk.NET.OpenGL.PixelFormat.Bgra,
+                    PixelType.UnsignedByte,
+                    new ReadOnlySpan<byte>(pixels));
+                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+                return texture;
+            }
+            catch
+            {
+                _gl.DeleteTexture(texture);
+                throw;
+            }
+            finally
+            {
+                _gl.BindTexture(TextureTarget.Texture2D, (uint)previousTexture);
+            }
         }
 
         public void Dispose()
@@ -379,6 +409,7 @@ void main() {
             {
                 _gridRenderer = null;
                 _groundTexture = 0;
+                _groundTextureSource = null;
                 _groundVbo = 0;
                 _groundVao = 0;
                 _groundProgram = 0;

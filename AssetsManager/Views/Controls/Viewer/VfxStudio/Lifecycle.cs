@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -18,9 +19,18 @@ namespace AssetsManager.Views.Controls.Viewer
     public partial class VfxInspectorControl
     {
         private ViewportFrameScheduler _viewportFrameScheduler;
+        private bool _groundTextureDirty = true;
 
         private void OnControlLoaded(object sender, RoutedEventArgs e)
         {
+            if (AppSettings != null)
+            {
+                AppSettings.PropertyChanged -= OnGroundLogoSettingsChanged;
+                AppSettings.PropertyChanged += OnGroundLogoSettingsChanged;
+                AppSettings.ConfigurationSaved -= OnGroundLogoSettingsSaved;
+                AppSettings.ConfigurationSaved += OnGroundLogoSettingsSaved;
+            }
+            _groundTextureDirty = true;
             LoadPreviewDisplayPreferences();
             UpdateViewportClip();
             UpdateInspectorColumnVisibility();
@@ -28,6 +38,30 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 EnsureOpenGlStarted();
             }
+        }
+
+        private void OnGroundLogoSettingsChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (SceneElements.IsGroundLogoSetting(e.PropertyName)) RequestGroundTextureRefresh();
+        }
+
+        private void OnGroundLogoSettingsSaved(object sender, EventArgs e) => RequestGroundTextureRefresh();
+
+        private void RequestGroundTextureRefresh()
+        {
+            _ = Dispatcher.InvokeAsync(() =>
+            {
+                if (_isCleanedUp) return;
+                _groundTextureDirty = true;
+                OpenTkControl.InvalidateVisual();
+            });
+        }
+
+        private void UnsubscribeGroundLogoSettings()
+        {
+            if (AppSettings == null) return;
+            AppSettings.PropertyChanged -= OnGroundLogoSettingsChanged;
+            AppSettings.ConfigurationSaved -= OnGroundLogoSettingsSaved;
         }
 
         private void LoadPreviewDisplayPreferences()
@@ -184,6 +218,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void OnControlUnloaded(object sender, RoutedEventArgs e)
         {
+            UnsubscribeGroundLogoSettings();
             Deactivate();
         }
 
@@ -198,6 +233,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _isExitPending = false;
             Deactivate();
             _isCleanedUp = true;
+            UnsubscribeGroundLogoSettings();
             IsVisibleChanged -= OnControlVisibilityChanged;
             _viewportFrameScheduler?.Dispose();
             _viewportFrameScheduler = null;
@@ -228,7 +264,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             var previewSurfaceRenderer = _previewSurfaceRenderer;
             _previewSurfaceRenderer = null;
-            RunReleaseStep(nameof(VfxPreviewSurfaceRenderer), () => previewSurfaceRenderer?.Dispose(), gpuBound: true);
+            RunReleaseStep(nameof(PreviewSurfaceRenderer), () => previewSurfaceRenderer?.Dispose(), gpuBound: true);
 
             var mapGeometryRenderer = _mapGeometryRenderer;
             _mapGeometryRenderer = null;

@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Ground now uses the same custom logo, size and opacity settings as Load Project and Chroma Library, with live updates.
   - VFX Studio / The character browser now labels each skin entry as Skin or Chroma using its extracted model and textures.
   - Viewer / Skin springs, path-following poses and sockets now guide animated models and attached effects.
   - VFX Studio / Spells now play their cast animation's effects together with the projectile and impact.

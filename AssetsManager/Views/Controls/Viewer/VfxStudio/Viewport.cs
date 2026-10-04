@@ -103,9 +103,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
                 if (_previewSurfaceRenderer == null)
                 {
-                    BitmapSource groundTexture = SceneElements.LoadStageGroundTexture(AppSettings, LogService);
-                    _previewSurfaceRenderer = new VfxPreviewSurfaceRenderer();
+                    BitmapSource groundTexture = SceneElements.LoadGroundTexture(AppSettings, LogService);
+                    _previewSurfaceRenderer = new PreviewSurfaceRenderer();
                     _previewSurfaceRenderer.Initialize(_gl, groundTexture);
+                    _groundTextureDirty = false;
                 }
 
                 if (_championMeshRenderer == null)
@@ -199,6 +200,19 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             if (!_isActive || !IsVisible) return;
+
+            if (_groundTextureDirty)
+            {
+                _groundTextureDirty = false;
+                try
+                {
+                    _previewSurfaceRenderer?.SetGroundTexture(SceneElements.LoadGroundTexture(AppSettings, LogService));
+                }
+                catch (Exception ex)
+                {
+                    LogService?.LogError(ex, "Failed to refresh the VFX Studio ground texture.");
+                }
+            }
 
             // The first-pose wait ends once a pose landed or nothing is being prepared any more.
             if (_championAwaitingFirstPose &&

@@ -19,7 +19,6 @@ using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Utils;
-using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Helpers;
 using Microsoft.Win32;
@@ -34,7 +33,7 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         private Silk.NET.OpenGL.GL _gl;
         private GlMeshRenderer _meshRenderer;
-        private GridRenderer _gridRenderer;
+        private PreviewSurfaceRenderer _previewSurfaceRenderer;
         private SkyRenderer _skyRenderer;
         private VfxCubeMapData _genericSkyCube;
         private bool _skyCubeDirty;
@@ -200,18 +199,9 @@ namespace AssetsManager.Views.Controls.Viewer
             Vector3 lightColor2 = lighting.FillColor;
             Vector3 ambientColor = lighting.AmbientColor;
 
-            // Render ground before the editor grid so the grid remains a world-space guide.
-            if (_groundModel != null && _viewModel.IsGroundVisible && !_viewModel.IsTransparentBg)
-            {
-                _meshRenderer.Render(_groundModel, viewProj, view, proj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
-            }
-
-            // Render the grid before transparent model passes. Transparent parts do not write
-            // depth, so drawing the grid afterward makes it appear over the model.
-            if (_gridRenderer != null && _viewModel.IsGridVisible)
-            {
-                _gridRenderer.Render(viewProj);
-            }
+            // Draw preview surfaces before transparent models, which do not write depth.
+            _previewSurfaceRenderer?.Render(viewProj, _viewModel.IsGridVisible,
+                _viewModel.IsGroundVisible && !_viewModel.IsTransparentBg, showStage: false);
 
             // Render primary models, then auxiliary diff geometry.
             foreach (var model in _loadedModels)
@@ -272,10 +262,26 @@ namespace AssetsManager.Views.Controls.Viewer
                 _meshRenderer.Initialize(_gl);
             }
 
-            if (hasClassicScene && _gridRenderer == null && _viewModel.IsGridVisible)
+            if (_previewSurfaceRenderer == null)
             {
-                _gridRenderer = new GridRenderer();
-                _gridRenderer.Initialize(_gl, GlShaderCompiler.UsesEmbeddedProfile(_gl), 1000f);
+                var surfaces = new PreviewSurfaceRenderer();
+                surfaces.Initialize(_gl, SceneElements.LoadGroundTexture(AppSettings, LogService),
+                    groundSize: SceneElements.GroundSize, groundHeight: (float)SceneElements.GroundLevel,
+                    gridHeight: (float)SceneElements.GroundLevel);
+                _previewSurfaceRenderer = surfaces;
+                _groundTextureDirty = false;
+            }
+            else if (_groundTextureDirty)
+            {
+                _groundTextureDirty = false;
+                try
+                {
+                    _previewSurfaceRenderer.SetGroundTexture(SceneElements.LoadGroundTexture(AppSettings, LogService));
+                }
+                catch (Exception ex)
+                {
+                    LogService?.LogError(ex, "Failed to refresh preview ground texture.");
+                }
             }
 
             if (hasClassicScene && _skyRenderer == null)
@@ -324,8 +330,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private readonly Dictionary<SceneModel, ModelUpdateKey> _lastModelUpdates = new();
         // Environment references
-        private ModelVisual3D _groundVisual;
-        private SceneModel _groundModel;
+        private bool _groundTextureDirty = true;
         private DispatcherOperation _groundRefreshOperation;
 
         public ViewerViewportControl()
@@ -375,8 +380,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     break;
                 case nameof(ViewerViewportModel.IsTransparentBg):
                 case nameof(ViewerViewportModel.IsGroundVisible):
-                    SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
-                    break;
                 case nameof(ViewerViewportModel.IsGridVisible):
                 case nameof(ViewerViewportModel.IsSkyVisible):
                 case nameof(ViewerViewportModel.IsFxaaEnabled):
@@ -485,7 +488,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void OnAppSettingsPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             ApplyStudioParameters();
-            RequestGroundPlaneRefresh();
+            if (SceneElements.IsGroundLogoSetting(e.PropertyName)) RequestGroundTextureRefresh();
         }
 
         private void OnAppSettingsSaved(object sender, EventArgs e)
@@ -494,11 +497,11 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (_isCleanedUp) return;
                 ApplyStudioParameters();
-                RequestGroundPlaneRefresh();
+                RequestGroundTextureRefresh();
             });
         }
 
-        private void RequestGroundPlaneRefresh()
+        private void RequestGroundTextureRefresh()
         {
             if (_isCleanedUp ||
                 _groundRefreshOperation?.Status == DispatcherOperationStatus.Pending)
@@ -506,22 +509,14 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            _groundRefreshOperation = Dispatcher.InvokeAsync(RefreshGroundPlane, DispatcherPriority.Render);
+            _groundRefreshOperation = Dispatcher.InvokeAsync(RefreshGroundTexture, DispatcherPriority.Render);
         }
 
-        private void RefreshGroundPlane()
+        private void RefreshGroundTexture()
         {
             if (_isCleanedUp) return;
-
-            SceneElements.ClearSceneCache();
-            if (_groundVisual != null && Viewport.Children.Contains(_groundVisual))
-                Viewport.Children.Remove(_groundVisual);
-
-            _meshRenderer?.QueueRelease(_groundModel);
-            _groundModel?.Dispose();
-            _groundVisual = null;
-            _groundModel = null;
-            SetupScene();
+            _groundTextureDirty = true;
+            OpenTkControl.InvalidateVisual();
         }
 
         private void OnViewportUnloaded(object sender, RoutedEventArgs e)
@@ -529,119 +524,12 @@ namespace AssetsManager.Views.Controls.Viewer
             Cleanup();
         }
 
-        private SceneModel BuildSceneModelFromVisual(ModelVisual3D visual, string name)
-        {
-            if (visual == null) return null;
-            var sceneModel = new SceneModel { Name = name, IsVisible = true };
-
-            void ExtractGeometryModels(Model3D model, Transform3D parentTransform)
-            {
-                Transform3D combined = Transform3D.Identity;
-                if (parentTransform != null && parentTransform != Transform3D.Identity)
-                {
-                    if (model.Transform != null && model.Transform != Transform3D.Identity)
-                    {
-                        var group = new Transform3DGroup();
-                        group.Children.Add(model.Transform);
-                        group.Children.Add(parentTransform);
-                        combined = group;
-                    }
-                    else
-                    {
-                        combined = parentTransform;
-                    }
-                }
-                else if (model.Transform != null && model.Transform != Transform3D.Identity)
-                {
-                    combined = model.Transform;
-                }
-
-                if (model is GeometryModel3D geomModel)
-                {
-                    if (geomModel.Geometry is MeshGeometry3D mesh)
-                    {
-                        var transformedMesh = new MeshGeometry3D();
-                        transformedMesh.TriangleIndices = mesh.TriangleIndices;
-                        transformedMesh.TextureCoordinates = mesh.TextureCoordinates;
-                        transformedMesh.Normals = mesh.Normals;
-
-                        foreach (var pos in mesh.Positions)
-                        {
-                            transformedMesh.Positions.Add(combined.Transform(pos));
-                        }
-
-                        var part = new ModelPart(
-                            name + "_" + sceneModel.Parts.Count,
-                            new GeometryModel3D(transformedMesh, geomModel.Material))
-                        {
-                            ForceUnlit = true,
-                            TreatBaseTextureAsSrgb = true
-                        };
-
-                        if (geomModel.Material is DiffuseMaterial diffuse)
-                        {
-                            if (diffuse.Brush is ImageBrush imgBrush && imgBrush.ImageSource is BitmapSource bitmap)
-                            {
-                                string texName = "tex_" + part.Name;
-                                part.AllTextures[texName] = bitmap;
-                                part.SelectedTextureName = texName;
-                                part.UseBaseTextureAlpha = true;
-                                float opacity = (float)Math.Clamp(imgBrush.Opacity, 0.0, 1.0);
-                                part.ColorTint = new Vector4(1f, 1f, 1f, opacity);
-                                if (opacity < 1f) part.AlphaCutoff = 0f;
-                            }
-                            else if (diffuse.Brush is SolidColorBrush solidBrush)
-                            {
-                                var color = solidBrush.Color;
-                                float opacity = (float)Math.Clamp(solidBrush.Opacity, 0.0, 1.0);
-                                part.ColorTint = new Vector4(
-                                    color.R / 255f,
-                                    color.G / 255f,
-                                    color.B / 255f,
-                                    color.A / 255f * opacity);
-                                if (part.ColorTint.W < 1f) part.AlphaCutoff = 0f;
-                            }
-                        }
-
-                        sceneModel.AddPart(part);
-                    }
-                }
-                else if (model is Model3DGroup group)
-                {
-                    foreach (var child in group.Children)
-                    {
-                        ExtractGeometryModels(child, combined);
-                    }
-                }
-            }
-
-            if (visual.Content != null)
-            {
-                ExtractGeometryModels(visual.Content, visual.Transform ?? Transform3D.Identity);
-            }
-
-            return sceneModel;
-        }
-
         public void SetupScene()
         {
             if (_cameraController != null)
                 _cameraController.IsMapGroundCollisionEnabled = false;
 
-            if (_groundVisual == null)
-            {
-                _groundVisual = SceneElements.CreateGroundPlane(
-                    AppSettings,
-                    LogService,
-                    AppSettings?.CustomGroundLogoPath,
-                    AppSettings?.GroundLogoScale ?? 1.0,
-                    AppSettings?.GroundLogoOpacity ?? 1.0);
-                Viewport.Children.Add(_groundVisual);
-            }
-            _groundModel = BuildSceneModelFromVisual(_groundVisual, "Ground");
-
-            // Ensure initial state is applied
-            SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
+            RequestGroundTextureRefresh();
         }
 
         public void ApplyStudioParameters()
@@ -700,16 +588,14 @@ namespace AssetsManager.Views.Controls.Viewer
                 _cameraController?.Dispose();
                 _cameraController = null;
 
-                _groundVisual = null;
-
                 // Liberar los recursos de renderizado OpenGL de forma aislada
                 var meshRenderer = _meshRenderer;
                 _meshRenderer = null;
                 RunReleaseStep(nameof(GlMeshRenderer), () => meshRenderer?.Dispose(), gpuBound: true);
 
-                var gridRenderer = _gridRenderer;
-                _gridRenderer = null;
-                RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
+                var surfaceRenderer = _previewSurfaceRenderer;
+                _previewSurfaceRenderer = null;
+                RunReleaseStep(nameof(PreviewSurfaceRenderer), () => surfaceRenderer?.Dispose(), gpuBound: true);
 
                 var skyRenderer = _skyRenderer;
                 _skyRenderer = null;
@@ -1428,20 +1314,6 @@ namespace AssetsManager.Views.Controls.Viewer
             if (Viewport.Camera is PerspectiveCamera camera)
             {
                 camera.FieldOfView = _viewModel.FieldOfView;
-            }
-        }
-
-        public void SetGroundVisibility(bool isVisible)
-        {
-            if (_groundVisual == null) return;
-
-            if (isVisible && !Viewport.Children.Contains(_groundVisual))
-            {
-                Viewport.Children.Add(_groundVisual);
-            }
-            else if (!isVisible && Viewport.Children.Contains(_groundVisual))
-            {
-                Viewport.Children.Remove(_groundVisual);
             }
         }
 

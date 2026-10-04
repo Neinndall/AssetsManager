@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Models.Viewer;
@@ -12,8 +13,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void GroundUsesThePreviewWorldScale()
         {
-            Assert.Equal(3200f, VfxPreviewSurfaceRenderer.GroundSize);
-            Assert.Equal(-0.5f, VfxPreviewSurfaceRenderer.GroundDrop);
+            Assert.Equal(3200f, PreviewSurfaceRenderer.GroundSize);
+            Assert.Equal(-0.5f, PreviewSurfaceRenderer.GroundDrop);
         }
 
         [Fact]
@@ -102,11 +103,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void StageUsesReferenceViewportScale()
         {
-            Assert.Equal(VfxRigMotion.ChampionHeight * 16f, VfxPreviewSurfaceRenderer.StageSize);
-            Assert.Equal(-0.5f, VfxPreviewSurfaceRenderer.GroundDrop);
-            Assert.Equal(100f, VfxPreviewSurfaceRenderer.GridCellSize);
-            Assert.Equal(500f, VfxPreviewSurfaceRenderer.GridSectionSize);
-            Assert.Equal(1.5f, VfxPreviewSurfaceRenderer.GridFadeStrength);
+            Assert.Equal(VfxRigMotion.ChampionHeight * 16f, PreviewSurfaceRenderer.StageSize);
+            Assert.Equal(-0.5f, PreviewSurfaceRenderer.GroundDrop);
+            Assert.Equal(100f, PreviewSurfaceRenderer.GridCellSize);
+            Assert.Equal(500f, PreviewSurfaceRenderer.GridSectionSize);
+            Assert.Equal(1.5f, PreviewSurfaceRenderer.GridFadeStrength);
         }
 
         [Fact]

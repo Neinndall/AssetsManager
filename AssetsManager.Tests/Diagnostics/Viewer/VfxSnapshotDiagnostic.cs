@@ -13,6 +13,7 @@ using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Vfx.Parsing;
+using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
@@ -138,7 +139,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 Speed = 1
             });
 
-            using var surface = args.Contains("--preview-stage") ? new VfxPreviewSurfaceRenderer() : null;
+            using var surface = args.Contains("--preview-stage") ? new PreviewSurfaceRenderer() : null;
             surface?.Initialize(gl, groundTexture: null);
             if (surface != null)
                 Console.WriteLine("[Snapshot] Coverage includes the preview surface; compare particle placement visually.");
@@ -268,7 +269,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         }
 
         private static float[] Draw(GL gl, VfxRenderSession session, uint framebuffer, uint size, double time,
-            Matrix4x4 viewProjection, Matrix4x4 view, VfxPreviewSurfaceRenderer surface)
+            Matrix4x4 viewProjection, Matrix4x4 view, PreviewSurfaceRenderer surface)
         {
             session.Seek(time);
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);

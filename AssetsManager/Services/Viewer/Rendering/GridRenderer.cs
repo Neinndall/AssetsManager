@@ -31,14 +31,23 @@ void main() { FragColor = uColor; }";
 
         public void Initialize(GL gl, bool gles, float yHeight = 0f)
         {
+            ArgumentNullException.ThrowIfNull(gl);
+            if (_ready) return;
             _gl = gl;
-            _program = GlShaderCompiler.CreateProgram(gl, gles, VertexBody, FragmentBody);
-            _uMvp = _gl.GetUniformLocation(_program, "uMvp");
-            _uColor = _gl.GetUniformLocation(_program, "uColor");
-
-            float[] verts = BuildGeometry(20, 100f, yHeight, out _gridVertexCount, out _axisOffset);
-            UploadVerts(verts);
-            _ready = true;
+            try
+            {
+                _program = GlShaderCompiler.CreateProgram(gl, gles, VertexBody, FragmentBody);
+                _uMvp = _gl.GetUniformLocation(_program, "uMvp");
+                _uColor = _gl.GetUniformLocation(_program, "uColor");
+                float[] verts = BuildGeometry(20, 100f, yHeight, out _gridVertexCount, out _axisOffset);
+                UploadVerts(verts);
+                _ready = true;
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
         }
 
         private void UploadVerts(float[] verts)
@@ -57,23 +66,39 @@ void main() { FragColor = uColor; }";
         {
             if (!_ready) return;
 
-            // System.Numerics is row-major; uploading directly with transpose=false makes GL
-            // read it column-major (= the transpose), which is what column-vector GLSL needs.
-            var m = viewProjection;
-            _gl.UseProgram(_program);
-            _gl.UniformMatrix4(_uMvp, 1, false, in m.M11);
-            _gl.BindVertexArray(_vao);
+            _gl.GetInteger(GLEnum.CurrentProgram, out int previousProgram);
+            _gl.GetInteger(GLEnum.VertexArrayBinding, out int previousVao);
+            _gl.GetInteger(GLEnum.DepthFunc, out int previousDepthFunction);
+            _gl.GetInteger(GLEnum.DepthWritemask, out int previousDepthWrite);
+            bool depthTest = _gl.IsEnabled(EnableCap.DepthTest);
+            bool blend = _gl.IsEnabled(EnableCap.Blend);
+            try
+            {
+                // Grid depth must not depend on whether Ground was drawn in this frame.
+                _gl.Enable(EnableCap.DepthTest);
+                _gl.DepthFunc(DepthFunction.Lequal);
+                _gl.DepthMask(true);
+                _gl.Disable(EnableCap.Blend);
+                _gl.UseProgram(_program);
+                _gl.UniformMatrix4(_uMvp, 1, false, in viewProjection.M11);
+                _gl.BindVertexArray(_vao);
 
-            _gl.Uniform4(_uColor, 0.16f, 0.19f, 0.27f, 1f);
-            _gl.DrawArrays((GLEnum)PrimitiveType.Lines, 0, (uint)_gridVertexCount);
-
-            _gl.Uniform4(_uColor, 0.21f, 0.89f, 0.76f, 1f);
-            _gl.DrawArrays((GLEnum)PrimitiveType.Lines, _axisOffset, 2);
-            _gl.Uniform4(_uColor, 0.42f, 0.36f, 0.90f, 1f);
-            _gl.DrawArrays((GLEnum)PrimitiveType.Lines, _axisOffset + 2, 2);
-
-            _gl.BindVertexArray(0);
-            _gl.UseProgram(0);
+                _gl.Uniform4(_uColor, 0.16f, 0.19f, 0.27f, 1f);
+                _gl.DrawArrays((GLEnum)PrimitiveType.Lines, 0, (uint)_gridVertexCount);
+                _gl.Uniform4(_uColor, 0.21f, 0.89f, 0.76f, 1f);
+                _gl.DrawArrays((GLEnum)PrimitiveType.Lines, _axisOffset, 2);
+                _gl.Uniform4(_uColor, 0.42f, 0.36f, 0.90f, 1f);
+                _gl.DrawArrays((GLEnum)PrimitiveType.Lines, _axisOffset + 2, 2);
+            }
+            finally
+            {
+                if (depthTest) _gl.Enable(EnableCap.DepthTest); else _gl.Disable(EnableCap.DepthTest);
+                _gl.DepthFunc((DepthFunction)previousDepthFunction);
+                _gl.DepthMask(previousDepthWrite != 0);
+                if (blend) _gl.Enable(EnableCap.Blend); else _gl.Disable(EnableCap.Blend);
+                _gl.BindVertexArray((uint)previousVao);
+                _gl.UseProgram((uint)previousProgram);
+            }
         }
 
         private static float[] BuildGeometry(int halfCells, float cell, float yHeight, out int gridVerts, out int axisOffset)
@@ -96,7 +121,7 @@ void main() { FragColor = uColor; }";
 
         public void Dispose()
         {
-            if (!_ready) return;
+            if (_gl == null) return;
 
             try
             {
@@ -108,15 +133,13 @@ void main() { FragColor = uColor; }";
             {
                 // The OpenGL context owns these handles and reclaims them on teardown.
             }
-            catch (Exception)
-            {
-            }
             finally
             {
                 _vbo = 0;
                 _vao = 0;
                 _program = 0;
                 _ready = false;
+                _gl = null;
             }
         }
     }

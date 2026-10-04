@@ -4,32 +4,41 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Media.Media3D;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Utils;
-using Material3D = System.Windows.Media.Media3D.Material;
 
 namespace AssetsManager.Views.Helpers
 {
     /// <summary>
     /// Centralized provider for viewport environment elements:
-    /// ground stage (LTK dynamic WAD texture or fallback), studio skybox cubemap (dynamic WAD cubemap), and 3D visual helpers.
+    /// shared ground appearance and studio skybox cubemap (dynamic WAD cubemap).
     /// </summary>
     public static class SceneElements
     {
         public const double GroundLevel = 1000;
+        public const float GroundSize = 2000f;
         public const string GroundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/ground_rift.dds";
         public const string SkyboxChunkVirtualPath = "assets/maps/skyboxes/riots_sru_skybox_cubemap.dds";
-        private const double GroundLogoElevation = 2.0;
         public const int SceneTextureMaxSize = 2048;
 
-        #region Stage Ground Cache & Loader
+        #region Ground Cache & Loader
 
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, BitmapSource> _groundLogoTextureCache = new();
         private static readonly object GroundLock = new();
         private static BitmapSource _cachedGroundTexture;
         private static bool _groundLoaded;
+        private static BitmapSource _cachedGroundAppearanceTexture;
+        private static GroundAppearanceKey? _cachedGroundAppearance;
+        private static BitmapSource _cachedGroundLogo;
+        private static (string Path, long Modified, long Length)? _cachedGroundLogoFile;
+
+        private readonly record struct GroundAppearanceKey(
+            string Path, long Modified, long Length, double Scale, double Opacity);
+
+        internal static bool IsGroundLogoSetting(string propertyName) =>
+            string.IsNullOrEmpty(propertyName)
+            || propertyName is nameof(AppSettings.CustomGroundLogoPath)
+                or nameof(AppSettings.GroundLogoScale) or nameof(AppSettings.GroundLogoOpacity);
 
         public static void ClearGroundCache()
         {
@@ -37,28 +46,96 @@ namespace AssetsManager.Views.Helpers
             {
                 _groundLoaded = false;
                 _cachedGroundTexture = null;
+                _cachedGroundAppearanceTexture = null;
+                _cachedGroundAppearance = null;
+                _cachedGroundLogo = null;
+                _cachedGroundLogoFile = null;
             }
         }
 
-        public static BitmapSource LoadStageGroundTexture(AppSettings settings, LogService logService)
+        public static BitmapSource LoadGroundTexture(AppSettings settings, LogService logService)
         {
             lock (GroundLock)
             {
-                if (_groundLoaded)
-                    return _cachedGroundTexture;
-
-                _groundLoaded = true;
                 try
                 {
-                    _cachedGroundTexture = LoadBundledGround(logService);
-                    return _cachedGroundTexture;
+                    if (!_groundLoaded)
+                    {
+                        _cachedGroundTexture = LoadBundledGround(logService);
+                        _groundLoaded = true;
+                    }
+
+                    string path = settings?.CustomGroundLogoPath;
+                    var file = string.IsNullOrWhiteSpace(path) ? null : new FileInfo(path);
+                    var appearance = new GroundAppearanceKey(
+                        file?.Exists == true ? file.FullName : null,
+                        file?.Exists == true ? file.LastWriteTimeUtc.Ticks : 0,
+                        file?.Exists == true ? file.Length : 0,
+                        Math.Clamp(settings?.GroundLogoScale ?? 1.0, 0.25, 1.5),
+                        Math.Clamp(settings?.GroundLogoOpacity ?? 1.0, 0.0, 1.0));
+                    if (_cachedGroundAppearance == appearance)
+                        return _cachedGroundAppearanceTexture;
+
+                    BitmapSource groundTexture = _cachedGroundTexture;
+                    if (appearance.Path != null && appearance.Opacity > 0)
+                    {
+                        var logoFile = (appearance.Path, appearance.Modified, appearance.Length);
+                        if (_cachedGroundLogoFile != logoFile)
+                        {
+                            _cachedGroundLogo = TextureUtils.LoadTextureFromFile(
+                                appearance.Path, SceneTextureMaxSize, SceneTextureMaxSize);
+                            _cachedGroundLogoFile = logoFile;
+                        }
+                        if (_cachedGroundLogo != null)
+                            groundTexture = ComposeGroundTexture(
+                                _cachedGroundTexture, _cachedGroundLogo, appearance.Scale, appearance.Opacity);
+                    }
+                    else
+                    {
+                        _cachedGroundLogo = null;
+                        _cachedGroundLogoFile = null;
+                    }
+                    _cachedGroundAppearanceTexture = groundTexture;
+                    _cachedGroundAppearance = appearance;
+                    return _cachedGroundAppearanceTexture;
                 }
                 catch (Exception ex)
                 {
-                    logService?.LogError(ex, "Failed to load stage ground texture.");
-                    return null;
+                    logService?.LogError(ex, "Failed to load preview ground texture.");
+                    return _cachedGroundTexture;
                 }
             }
+        }
+
+        internal static BitmapSource ComposeGroundTexture(
+            BitmapSource ground, BitmapSource logo, double scale, double opacity)
+        {
+            int width = SceneTextureMaxSize;
+            int height = SceneTextureMaxSize;
+            double maxSize = 850.0 / GroundSize * Math.Clamp(scale, 0.25, 1.5);
+            double aspect = (double)logo.PixelWidth / logo.PixelHeight;
+            double logoWidth = width * maxSize * Math.Min(1.0, aspect);
+            double logoHeight = height * maxSize / Math.Max(1.0, aspect);
+            var visual = new DrawingVisual();
+            using (DrawingContext drawing = visual.RenderOpen())
+            {
+                if (ground != null)
+                    drawing.DrawImage(ground, new Rect(0, 0, width, height));
+                else
+                    drawing.DrawRectangle(new SolidColorBrush(Color.FromRgb(35, 42, 50)), null,
+                        new Rect(0, 0, width, height));
+                drawing.PushOpacity(Math.Clamp(opacity, 0.0, 1.0));
+                // Ground UVs run in the opposite vertical direction to the former logo overlay.
+                drawing.PushTransform(new ScaleTransform(1, -1, width / 2.0, height / 2.0));
+                drawing.DrawImage(logo, new Rect((width - logoWidth) / 2, (height - logoHeight) / 2,
+                    logoWidth, logoHeight));
+                drawing.Pop();
+                drawing.Pop();
+            }
+            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(visual);
+            bitmap.Freeze();
+            return bitmap;
         }
 
         private static BitmapSource LoadBundledGround(LogService logService)
@@ -225,121 +302,6 @@ namespace AssetsManager.Views.Helpers
             {
                 return null;
             }
-        }
-
-        #endregion
-
-        #region 3D Visual Helpers (Helix / WPF Ground Plane)
-
-        private static BitmapSource LoadGroundLogoTexture(string path, LogService logService)
-        {
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
-
-            return _groundLogoTextureCache.GetOrAdd(path, p =>
-            {
-                try
-                {
-                    return TextureUtils.LoadTextureFromFile(p);
-                }
-                catch (Exception ex)
-                {
-                    logService?.LogError(ex, $"Failed to load ground logo: {p}");
-                    return null;
-                }
-            });
-        }
-
-        public static ModelVisual3D CreateGroundPlane(
-            LogService logService,
-            string groundLogoPath = null,
-            double groundLogoScale = 1.0,
-            double groundLogoOpacity = 1.0)
-        {
-            return CreateGroundPlane(null, logService, groundLogoPath, groundLogoScale, groundLogoOpacity);
-        }
-
-        public static ModelVisual3D CreateGroundPlane(
-            AppSettings settings,
-            LogService logService,
-            string groundLogoPath = null,
-            double groundLogoScale = 1.0,
-            double groundLogoOpacity = 1.0)
-        {
-            MeshGeometry3D groundMesh = new MeshGeometry3D();
-
-            // Ground plane size (2000x2000 units, half = 1000)
-            const double half = 1000;
-            groundMesh.Positions = new Point3DCollection()
-            {
-                new Point3D(-half, GroundLevel, -half), // Bottom-left
-                new Point3D(half, GroundLevel, -half),  // Bottom-right
-                new Point3D(half, GroundLevel, half),   // Top-right
-                new Point3D(-half, GroundLevel, half)   // Top-left
-            };
-
-            // Define triangle indices (two triangles for a square)
-            groundMesh.TriangleIndices = new Int32Collection() { 0, 3, 2, 0, 2, 1 };
-
-            // Define texture coordinates
-            groundMesh.TextureCoordinates = new PointCollection()
-            {
-                new System.Windows.Point(0, 1),
-                new System.Windows.Point(1, 1),
-                new System.Windows.Point(1, 0),
-                new System.Windows.Point(0, 0)
-            };
-
-            BitmapSource groundTexture = LoadStageGroundTexture(settings, logService);
-
-            Material3D groundMaterial;
-            if (groundTexture != null)
-            {
-                groundMaterial = new DiffuseMaterial(new ImageBrush(groundTexture));
-            }
-            else
-            {
-                // Fallback to LTK's token flat color (#232a32) if game files are not present
-                groundMaterial = new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Color.FromRgb(35, 42, 50)));
-            }
-
-            GeometryModel3D groundModel = new GeometryModel3D(groundMesh, groundMaterial);
-            var scene = new Model3DGroup();
-            scene.Children.Add(groundModel);
-
-            BitmapSource groundLogo = LoadGroundLogoTexture(groundLogoPath, logService);
-            if (groundLogo != null)
-            {
-                double logoMaxSize = 850 * Math.Clamp(groundLogoScale, 0.25, 1.5);
-                double aspectRatio = (double)groundLogo.PixelWidth / groundLogo.PixelHeight;
-                double logoWidth = aspectRatio >= 1 ? logoMaxSize : logoMaxSize * aspectRatio;
-                double logoHeight = aspectRatio >= 1 ? logoMaxSize / aspectRatio : logoMaxSize;
-
-                var logoMesh = new MeshGeometry3D
-                {
-                    Positions = new Point3DCollection
-                    {
-                        new Point3D(-logoWidth / 2, GroundLevel + GroundLogoElevation, -logoHeight / 2),
-                        new Point3D(logoWidth / 2, GroundLevel + GroundLogoElevation, -logoHeight / 2),
-                        new Point3D(logoWidth / 2, GroundLevel + GroundLogoElevation, logoHeight / 2),
-                        new Point3D(-logoWidth / 2, GroundLevel + GroundLogoElevation, logoHeight / 2)
-                    },
-                    TriangleIndices = new Int32Collection { 0, 3, 2, 0, 2, 1 },
-                    TextureCoordinates = new PointCollection
-                    {
-                        new Point(0, 0), new Point(1, 0), new Point(1, 1), new Point(0, 1)
-                    }
-                };
-
-                var logoBrush = new ImageBrush(groundLogo)
-                {
-                    Stretch = Stretch.Uniform,
-                    Opacity = Math.Clamp(groundLogoOpacity, 0.0, 1.0)
-                };
-                RenderOptions.SetBitmapScalingMode(logoBrush, BitmapScalingMode.HighQuality);
-                scene.Children.Add(new GeometryModel3D(logoMesh, new DiffuseMaterial(logoBrush)));
-            }
-
-            return new ModelVisual3D { Content = scene };
         }
 
         #endregion
