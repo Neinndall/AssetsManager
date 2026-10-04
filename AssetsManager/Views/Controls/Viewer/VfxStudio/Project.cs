@@ -30,6 +30,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ReleaseCurrentProject()
         {
+            _pendingSnapshot = null;
             _scanCancellation?.Cancel();
             _scanCancellation = null;
             _model.IsProjectLoading = false;

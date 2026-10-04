@@ -1,10 +1,13 @@
 using System;
 using System.Buffers;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
+using AssetsManager.Services.Core;
+using Microsoft.Win32;
 using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer.Rendering
@@ -17,6 +20,64 @@ namespace AssetsManager.Services.Viewer.Rendering
     {
         private const int UhdWidth = 3840;
         private const int UhdHeight = 2160;
+
+        internal sealed record SnapshotRequest(string FilePath, int Width, int Height);
+
+        internal static SnapshotRequest RequestUhdSnapshot(
+            bool viewportReady, int sourceWidth, int sourceHeight, string name, LogService log)
+        {
+            if (!viewportReady || sourceWidth <= 0 || sourceHeight <= 0)
+            {
+                log?.LogWarning("The OpenGL viewport is not ready for high-definition capture.");
+                return null;
+            }
+            string fileName = string.Join("_", (string.IsNullOrWhiteSpace(name) ? "Viewport" : name)
+                .Split(Path.GetInvalidFileNameChars()));
+            var dialog = new SaveFileDialog
+            {
+                FileName = $"{fileName}_{DateTime.Now:yyyyMMdd_HHmmss}.png",
+                Filter = "PNG Image (*.png)|*.png|All Files (*.*)|*.*",
+                Title = "Save Viewport Snapshot",
+                DefaultExt = "png"
+            };
+            if (dialog.ShowDialog() != true) return null;
+            (int width, int height) = CalculateUhdSize(sourceWidth, sourceHeight);
+            ImageExportUtils.ValidateDimensions(width, height);
+            return new SnapshotRequest(dialog.FileName, width, height);
+        }
+
+        internal void ProcessPendingSnapshot(
+            ref SnapshotRequest pending, GL gl, int restoreWidth, int restoreHeight,
+            Action<int, int> renderScene, LogService log)
+        {
+            SnapshotRequest request = pending;
+            if (request == null) return;
+            pending = null;
+            try
+            {
+                BitmapSource snapshot = Capture(gl, request.Width, request.Height, restoreWidth, restoreHeight,
+                    () => renderScene(request.Width, request.Height));
+                _ = SaveWithFeedbackAsync(snapshot, request.FilePath, log);
+            }
+            catch (Exception ex)
+            {
+                log?.LogError(ex, $"Failed to render high-definition snapshot to {request.FilePath}");
+            }
+        }
+
+        private async Task SaveWithFeedbackAsync(BitmapSource snapshot, string filePath, LogService log)
+        {
+            try
+            {
+                await SaveAsync(snapshot, filePath);
+                log?.LogInteractiveSuccess($"Snapshot saved ({snapshot.PixelWidth}x{snapshot.PixelHeight})",
+                    filePath, Path.GetFileName(filePath));
+            }
+            catch (Exception ex)
+            {
+                log?.LogError(ex, $"Failed to save high-definition snapshot to {filePath}");
+            }
+        }
 
         public static (int Width, int Height) CalculateUhdSize(int sourceWidth, int sourceHeight)
         {

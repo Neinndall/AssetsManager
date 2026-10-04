@@ -201,6 +201,20 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (!_isActive || !IsVisible) return;
 
+            int width = OpenTkControl.FrameBufferWidth;
+            int height = OpenTkControl.FrameBufferHeight;
+            if (width <= 0 || height <= 0) return;
+            float dt = ResolveSimulationFrameDelta(delta, _discardNextSimulationDelta);
+            _discardNextSimulationDelta = false;
+            RenderViewportScene(width, height, dt);
+            _snapshotService.ProcessPendingSnapshot(ref _pendingSnapshot, _gl, width, height,
+                (captureWidth, captureHeight) => RenderViewportScene(captureWidth, captureHeight, 0f, snapshot: true), LogService);
+        }
+
+        private void RenderViewportScene(int width, int height, float dt, bool snapshot = false)
+        {
+            _gl.Viewport(0, 0, (uint)width, (uint)height);
+
             if (_groundTextureDirty)
             {
                 _groundTextureDirty = false;
@@ -221,9 +235,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _championAwaitingFirstPose = false;
             }
 
-            float dt = ResolveSimulationFrameDelta(delta, _discardNextSimulationDelta);
-            _discardNextSimulationDelta = false;
-            AdvanceCharacterAutoRotate(dt);
+            if (!snapshot) AdvanceCharacterAutoRotate(dt);
 
             // Update background clear color matching main viewer (Dark Studio)
             switch (_model.BgMode)
@@ -264,7 +276,7 @@ namespace AssetsManager.Views.Controls.Viewer
             var up = new Vector3((float)camera.UpDirection.X, (float)camera.UpDirection.Y, (float)camera.UpDirection.Z);
             var view = Matrix4x4.CreateLookAt(eye, target, up);
 
-            float aspect = (float)Math.Max(1, OpenTkControl.ActualWidth) / (float)Math.Max(1, OpenTkControl.ActualHeight);
+            float aspect = (float)width / height;
             bool hasMapScene = _mapSceneRuntime != null;
             float projectionNear = hasMapScene
                 ? ViewerViewportControl.CalculateProjectionNearPlane(lookDir, isMapGeometry: true)
@@ -287,7 +299,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _ => Matrix4x4.Identity
             };
             var viewProj = view * proj;
-            _characterInteractionController?.Update(viewProj);
+            if (!snapshot) _characterInteractionController?.Update(viewProj);
 
             // OpenTK has the current context here, so deferred session creation and resource
             // preparation are safe even when WPF selected the system before the GL control was ready.
@@ -298,7 +310,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _mapGeometryRenderer?.ProcessRetainedResources();
 
             bool characterBackdrop = _mapSceneIsCharacterBackdrop && _model.IsSkinWorkspace;
-            if (characterBackdrop)
+            if (characterBackdrop && !snapshot)
             {
                 AdvanceCurrentVfxPlayback(dt);
                 UpdateChampionPoseForFrame();
@@ -334,8 +346,11 @@ namespace AssetsManager.Views.Controls.Viewer
             _frameTerrainDepth = 0;
             if (_mapSceneRuntime != null)
             {
-                AdvanceMapCharacterClip(dt);
-                _mapSceneRuntime.Update(viewProj, dt);
+                if (!snapshot)
+                {
+                    AdvanceMapCharacterClip(dt);
+                    _mapSceneRuntime.Update(viewProj, dt);
+                }
                 // Three.js draws all scene opaque queues before any transparent queue.
                 for (int phase = 0; phase < 2; phase++)
                 {
@@ -350,7 +365,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         _model.PreviewShaders,
                         transparentPass: phase == 1);
                     if (phase == 0)
-                        CaptureTerrainDepth();
+                        CaptureTerrainDepth(width, height);
                     if (_mapSceneRuntime.ShowStructures)
                     {
                         _mapCharacterRenderer?.Render(
@@ -373,10 +388,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     RenderChampionMesh(viewProj, view, proj, eye);
                     RenderSceneActorMeshes(viewProj, view, proj, eye);
-                    UpdateCharacterArmatureOverlay(viewProj);
+                    if (!snapshot) UpdateCharacterArmatureOverlay(viewProj);
                 }
-                uint mapViewportWidth = (uint)Math.Max(1d, OpenTkControl.ActualWidth);
-                uint mapViewportHeight = (uint)Math.Max(1d, OpenTkControl.ActualHeight);
+                uint mapViewportWidth = (uint)width;
+                uint mapViewportHeight = (uint)height;
                 _mapPostEffectsRenderer?.CaptureSceneDepth(
                     EffectiveMapPostEffects(),
                     EffectiveMapSsao(),
@@ -406,9 +421,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 bool shouldDrawSceneVfx = HasSelectedMapClipReady() ||
                     (characterBackdrop && ShouldRenderCharacterVfx() && IsFocusedActorVisible && !_championAwaitingFirstPose);
                 if (shouldDrawSceneVfx && _vfxRenderer?.ActiveSystem != null)
-                    PrepareParticleSession(_vfxRenderer, sun, viewProj, view);
+                    PrepareParticleSession(_vfxRenderer, sun, viewProj, view, width, height);
                 if (characterBackdrop)
-                    PrepareSceneActorParticles(sun, viewProj, view);
+                    PrepareSceneActorParticles(sun, viewProj, view, width, height);
                 RenderPreparedParticlePasses();
             }
             else
@@ -420,20 +435,23 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (!characterBackdrop)
             {
-                AdvanceCurrentVfxPlayback(dt);
-                UpdateChampionPoseForFrame();
-                AdvanceSceneActors(dt);
+                if (!snapshot)
+                {
+                    AdvanceCurrentVfxPlayback(dt);
+                    UpdateChampionPoseForFrame();
+                    AdvanceSceneActors(dt);
+                }
                 RenderChampionMesh(viewProj, view, proj, eye);
                 RenderSceneActorMeshes(viewProj, view, proj, eye);
-                UpdateCharacterArmatureOverlay(viewProj);
+                if (!snapshot) UpdateCharacterArmatureOverlay(viewProj);
             }
 
             // Without a MAP, every Character session still shares one particle pass after all meshes.
             if (_mapSceneRuntime == null)
             {
                 if (_vfxRenderer != null && ShouldRenderCharacterVfx() && IsFocusedActorVisible && !_championAwaitingFirstPose)
-                    PrepareParticleSession(_vfxRenderer, null, viewProj, view);
-                PrepareSceneActorParticles(null, viewProj, view);
+                    PrepareParticleSession(_vfxRenderer, null, viewProj, view, width, height);
+                PrepareSceneActorParticles(null, viewProj, view, width, height);
                 RenderPreparedParticlePasses();
             }
             _model.LiveParticleCount = (_vfxRenderer?.LiveParticleCount ?? 0) + SceneActorParticleCount();
@@ -445,8 +463,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     EffectiveMapSsao(),
                     view,
                     proj,
-                    (uint)Math.Max(1d, OpenTkControl.ActualWidth),
-                    (uint)Math.Max(1d, OpenTkControl.ActualHeight));
+                    (uint)width,
+                    (uint)height);
             }
 
             // Glow the champion's game shaders wrote, once every mesh, particle and post effect is drawn.
@@ -454,8 +472,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (AppSettings?.StudioParameters?.EnableFxaa ?? true)
             {
-                int aaWidth = (int)Math.Max(1d, OpenTkControl.ActualWidth);
-                int aaHeight = (int)Math.Max(1d, OpenTkControl.ActualHeight);
                 if (AppSettings?.StudioParameters?.AntiAliasingMode == "Smaa")
                 {
                     if (_smaaRenderer == null)
@@ -463,12 +479,12 @@ namespace AssetsManager.Views.Controls.Viewer
                         _smaaRenderer = new SmaaPostEffectsRenderer();
                         _smaaRenderer.Initialize(_gl);
                     }
-                    _smaaRenderer.Render(aaWidth, aaHeight);
+                    _smaaRenderer.Render(width, height);
                 }
                 else
                 {
                     EnsureFxaaRenderer();
-                    _fxaaRenderer?.Render(aaWidth, aaHeight);
+                    _fxaaRenderer?.Render(width, height);
                 }
             }
             else
@@ -486,18 +502,18 @@ namespace AssetsManager.Views.Controls.Viewer
                     emitter.ActiveParticleCount = _vfxRenderer.GetEmitterLiveCount(emitter.SourceOrder);
             }
 
-            QueuePlayheadRefresh();
+            if (!snapshot) QueuePlayheadRefresh();
         }
 
         /// <summary>Copies the depth the map geometry just wrote, before structures and characters draw over it.</summary>
-        private void CaptureTerrainDepth()
+        private void CaptureTerrainDepth(int width, int height)
         {
             if (_gl == null)
                 return;
 
             _terrainDepthCapture ??= new AssetsManager.Services.Viewer.Rendering.Core.GlSceneCapture(_gl);
-            _frameTerrainWidth = (uint)Math.Max(1d, OpenTkControl.ActualWidth);
-            _frameTerrainHeight = (uint)Math.Max(1d, OpenTkControl.ActualHeight);
+            _frameTerrainWidth = (uint)width;
+            _frameTerrainHeight = (uint)height;
             _terrainDepthCapture.Capture(_frameTerrainWidth, _frameTerrainHeight, captureColor: false, captureDepth: true);
             _frameTerrainDepth = _terrainDepthCapture.DepthTexture;
         }

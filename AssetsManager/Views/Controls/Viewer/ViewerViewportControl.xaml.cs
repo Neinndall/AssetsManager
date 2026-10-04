@@ -22,7 +22,6 @@ using AssetsManager.Utils;
 using AssetsManager.Utils.Viewport;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Helpers;
-using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Threading;
 using OpenTK.Wpf;
@@ -309,8 +308,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private TimeSpan _lastRenderedAt;
         private TimeSpan _lastInvalidatedAt;
         private TimeSpan _nextLimitedFrame;
-        private sealed record SnapshotRequest(string FilePath, int Width, int Height);
-        private SnapshotRequest _pendingSnapshot;
+        private OpenGlSnapshotService.SnapshotRequest _pendingSnapshot;
 
         private SceneModel _activeSceneModel;
         private AnimationModel _activeAnimationModel;
@@ -1319,85 +1317,17 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ProcessPendingSnapshot()
         {
-            SnapshotRequest request = _pendingSnapshot;
-            if (request == null)
-                return;
-
-            _pendingSnapshot = null;
-
-            try
-            {
-                BitmapSource snapshot = _snapshotService.Capture(
-                    _gl,
-                    request.Width,
-                    request.Height,
-                    OpenTkControl.FrameBufferWidth,
-                    OpenTkControl.FrameBufferHeight,
-                    () => RenderScene(request.Width, request.Height, TimeSpan.Zero));
-                _ = SaveSnapshotAsync(snapshot, request.FilePath);
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, $"Failed to render high-definition snapshot to {request.FilePath}");
-            }
-        }
-
-        private async Task SaveSnapshotAsync(BitmapSource snapshot, string filePath)
-        {
-            try
-            {
-                await _snapshotService.SaveAsync(snapshot, filePath);
-                LogService.LogInteractiveSuccess(
-                    $"Snapshot saved ({snapshot.PixelWidth}x{snapshot.PixelHeight})",
-                    filePath,
-                    Path.GetFileName(filePath));
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, $"Failed to save high-definition snapshot to {filePath}");
-            }
-        }
-
-        private bool TryGetSnapshotSize(out int width, out int height)
-        {
-            width = OpenTkControl.FrameBufferWidth;
-            height = OpenTkControl.FrameBufferHeight;
-            return OpenTkControl.IsVisible && width > 0 && height > 0;
+            _snapshotService.ProcessPendingSnapshot(ref _pendingSnapshot, _gl,
+                OpenTkControl.FrameBufferWidth, OpenTkControl.FrameBufferHeight,
+                (width, height) => RenderScene(width, height, TimeSpan.Zero), LogService);
         }
 
         public void InitiateHighDefinitionSnapshot()
         {
-            if (!TryGetSnapshotSize(out _, out _))
-            {
-                LogService.LogWarning("The OpenGL viewport is not ready for high-definition capture.");
-                return;
-            }
-
-            if (_activeSceneModel == null || string.IsNullOrEmpty(_activeSceneModel.Name))
-            {
-                LogService.LogWarning("No model loaded to name the screenshot automatically. Using default name.");
-            }
-
-            string modelName = _activeSceneModel?.Name ?? "Model";
-            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            string defaultFileName = $"{modelName}_{timestamp}.png";
-            var saveFileDialog = new SaveFileDialog
-            {
-                FileName = defaultFileName,
-                Filter = "PNG Image (*.png)|*.png|All Files (*.*)|*.*",
-                Title = "Save Viewport Snapshot",
-                DefaultExt = "png"
-            };
-
-            if (saveFileDialog.ShowDialog() == true)
-            {
-                string filePath = saveFileDialog.FileName;
-                (int width, int height) = OpenGlSnapshotService.CalculateUhdSize(
-                    OpenTkControl.FrameBufferWidth,
-                    OpenTkControl.FrameBufferHeight);
-                ImageExportUtils.ValidateDimensions(width, height);
-                _pendingSnapshot = new SnapshotRequest(filePath, width, height);
-            }
+            _pendingSnapshot = OpenGlSnapshotService.RequestUhdSnapshot(
+                _gl != null && OpenTkControl.IsVisible, OpenTkControl.FrameBufferWidth,
+                OpenTkControl.FrameBufferHeight, _activeSceneModel?.Name ?? "Model", LogService);
+            if (_pendingSnapshot != null) OpenTkControl.InvalidateVisual();
         }
 
         private void ViewportSnapshotButton_Click(object sender, RoutedEventArgs e)

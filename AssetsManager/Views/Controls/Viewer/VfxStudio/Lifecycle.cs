@@ -166,6 +166,7 @@ namespace AssetsManager.Views.Controls.Viewer
         /// </summary>
         public void Deactivate()
         {
+            _pendingSnapshot = null;
             CloseAllToolbarPopups();
             _isActive = false;
             _pendingSystem = null;

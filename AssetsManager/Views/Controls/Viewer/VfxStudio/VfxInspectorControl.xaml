@@ -758,6 +758,16 @@
                                     </StackPanel>
                                 </Border>
 
+                                <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
+                                <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0,0,0">
+                                    <Button x:Name="ViewportSnapshotButton"
+                                            Click="ViewportSnapshotButton_Click"
+                                            Style="{StaticResource TransparentIconButton}"
+                                            ToolTip="Take 4K Snapshot" Width="30" Height="30">
+                                        <materialIcons:MaterialIcon Kind="Camera" Width="13" Height="13"/>
+                                    </Button>
+                                </Border>
+
                                 <!-- Popups for display & camera options -->
                                 <Popup x:Name="PreviewShowPopup"
                                        PlacementTarget="{Binding ElementName=PreviewShowButton}"

@@ -577,22 +577,24 @@ namespace AssetsManager.Views.Controls.Viewer
             VfxRenderSession session,
             MapSunData sun,
             Matrix4x4 viewProjection,
-            Matrix4x4 view)
+            Matrix4x4 view,
+            int width,
+            int height)
         {
             session.SetSun(sun);
-            session.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
+            session.SetViewportSize(width, height);
             session.SetTerrainDepth(_frameTerrainDepth, _frameTerrainWidth, _frameTerrainHeight);
             if (session.PrepareRenderFrame(viewProjection, view, _model.PreviewViewMode, _model.EffectivePreviewWireOverlay))
                 _preparedParticlePasses.Add(session);
         }
 
-        private void PrepareSceneActorParticles(MapSunData sun, Matrix4x4 viewProjection, Matrix4x4 view)
+        private void PrepareSceneActorParticles(MapSunData sun, Matrix4x4 viewProjection, Matrix4x4 view, int width, int height)
         {
             if (!_model.IsSkinWorkspace || !_model.CharacterEffectsEnabled) return;
             foreach ((VfxSceneActor actor, VfxSceneActorRuntime runtime) in _sceneActorRuntimes)
             {
                 if (actor.IsVisible && runtime.Session.ActiveSystem != null)
-                    PrepareParticleSession(runtime.Session, sun, viewProjection, view);
+                    PrepareParticleSession(runtime.Session, sun, viewProjection, view, width, height);
             }
         }
 
