@@ -474,6 +474,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Fixed effects disappearing near surfaces when fallback shaders use an orthographic camera.
   - VFX Studio / Fixed incorrect mesh colors and fading when erosion or a second texture is used with fallback shaders.
   - VFX Studio / Fixed effects losing transparency and fading when game shaders are enabled.
   - VFX Studio / Preserved texture clamping and repeating rules in custom particle materials.

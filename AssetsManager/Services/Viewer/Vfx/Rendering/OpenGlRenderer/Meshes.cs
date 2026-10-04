@@ -296,7 +296,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Vector4 meshSoftControl = ResolveSoftParticleControl(es.Def.BlendMode);
             _meshUniforms.Uniform4(_meshUniforms.SoftParticleParams, meshSoftParams.X, meshSoftParams.Y, meshSoftParams.Z, meshSoftParams.W);
             _meshUniforms.Uniform4(_meshUniforms.SoftParticleControl, meshSoftControl.X, meshSoftControl.Y, meshSoftControl.Z, meshSoftControl.W);
-            _meshUniforms.Uniform2(_meshUniforms.DepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y);
+            _meshUniforms.Uniform4(_meshUniforms.DepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y,
+                _depthProjectionValue.Z, _depthProjectionValue.W);
             _meshUniforms.Uniform2(_meshUniforms.ViewportSize, (float)_capture.Width, (float)_capture.Height);
             if (!native)
             {

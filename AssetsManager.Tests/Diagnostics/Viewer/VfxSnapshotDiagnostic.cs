@@ -29,7 +29,7 @@ using PixelFormat = Silk.NET.OpenGL.PixelFormat;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--stock-shaders] [--trace-emitter NAME] [--no-owner] [--rig Still|Trail|Missile] [--trace-layout] [--frame-scale 1] [--preview-stage] [--single-burst-emitter NAME,NAME]`:
+    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--stock-shaders] [--orthographic] [--trace-emitter NAME] [--no-owner] [--rig Still|Trail|Missile] [--trace-layout] [--frame-scale 1] [--preview-stage] [--single-burst-emitter NAME,NAME]`:
     /// plays one VFX system of an installed BIN the way VFX Studio does (VfxRenderSession, game particle shaders,
     /// resources extracted from the WADs) and writes a PNG per time over a mid-grey backdrop. With --per-emitter
     /// each root emitter is also drawn alone and measured: how much of the frame it darkens or brightens.
@@ -43,7 +43,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         {
             if (args.Length < 3)
             {
-                Console.WriteLine("Usage: vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--stock-shaders]");
+                Console.WriteLine("Usage: vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--stock-shaders] [--orthographic]");
                 return;
             }
             string binPath = args[0].Replace('\\', '/').ToLowerInvariant();
@@ -152,7 +152,12 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 float.IsFinite(frameScale) && frameScale > 0f)
                 frame = frame with { Position = frame.Target + (frame.Position - frame.Target) * frameScale };
             Matrix4x4 view = Matrix4x4.CreateLookAt(frame.Position, frame.Target, Vector3.UnitY);
-            Matrix4x4 projection = Matrix4x4.CreatePerspectiveFieldOfView(40f * MathF.PI / 180f, 1f, VfxPreviewCamera.NearPlane, VfxPreviewCamera.FarPlane);
+            bool orthographic = args.Contains("--orthographic");
+            float orthoSize = 2f * Vector3.Distance(frame.Position, frame.Target) * MathF.Tan(20f * MathF.PI / 180f);
+            Matrix4x4 projection = orthographic
+                ? Matrix4x4.CreateOrthographic(orthoSize, orthoSize, VfxPreviewCamera.NearPlane, VfxPreviewCamera.FarPlane)
+                : Matrix4x4.CreatePerspectiveFieldOfView(40f * MathF.PI / 180f, 1f, VfxPreviewCamera.NearPlane, VfxPreviewCamera.FarPlane);
+            Console.WriteLine($"[Snapshot] Camera projection: {(orthographic ? "orthographic" : "perspective")}");
             Matrix4x4 viewProjection = view * projection;
 
             IReadOnlyList<VfxEmitterDefinition> emitters = system.Emitters ?? Array.Empty<VfxEmitterDefinition>();

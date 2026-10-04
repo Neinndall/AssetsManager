@@ -52,7 +52,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         // LTK draws wireframe twins with the preview accent and a dedicated alpha.
         private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
         private bool _gles;
-        private Vector2 _depthProjectionValue;
+        private Vector4 _depthProjectionValue;
         private int _renderBatchDepth;
         private GlStateSnapshot _renderBatchState;
 
@@ -359,7 +359,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             var camUp = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitY, inv));
             var camPos = inv.Translation;
             Matrix4x4 projection = inv * viewProj;
-            _depthProjectionValue = new Vector2(projection.M33, projection.M43);
+            _depthProjectionValue = new Vector4(projection.M33, projection.M43, projection.M34, projection.M44);
 
             GlStateSnapshot ownedState = _renderBatchDepth == 0 ? CaptureGlState() : null;
 
@@ -385,7 +385,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _particleUniforms.Uniform1(_particleUniforms.ErosionTex, 4);
             _particleUniforms.Uniform1(_particleUniforms.SceneDepthTex, 6);
             _particleUniforms.Uniform2(_particleUniforms.ViewportSize, (float)_capture.Width, (float)_capture.Height);
-            _particleUniforms.Uniform2(_particleUniforms.DepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y);
+            _particleUniforms.Uniform4(_particleUniforms.DepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y,
+                _depthProjectionValue.Z, _depthProjectionValue.W);
             _particleUniforms.Uniform1(_particleUniforms.WireframePass, useWireframe ? 1 : 0);
             _particleUniforms.Uniform4(
                 _particleUniforms.WireframeColor,
