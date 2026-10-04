@@ -1778,6 +1778,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     return hashMatch;
                 }
             }
+            else
+            {
+                // Extraction can retain the hash filename even after the BIN path is resolved.
+                string virtualPath = PathUtils.ToVirtualPath(texturePath).ToLowerInvariant();
+                if (string.IsNullOrEmpty(Path.GetExtension(virtualPath))) virtualPath += ".tex";
+                string chunkKey = $"{XxHash64Ext.Hash(virtualPath):x16}";
+                return availableKeys.FirstOrDefault(key =>
+                    FileKey(key).Equals(chunkKey, StringComparison.OrdinalIgnoreCase));
+            }
 
             return null;
         }

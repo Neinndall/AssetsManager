@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
@@ -43,7 +45,11 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             using var binStream = File.OpenRead(binPath);
             var binTree = new BinTree(binStream);
 
-            SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(binTree);
+            var log = new LogService(new Serilog.LoggerConfiguration().CreateLogger());
+            using var hashes = new HashResolverService(new DirectoriesCreator(), log);
+            hashes.LoadAllHashesAsync().GetAwaiter().GetResult();
+            SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(
+                binTree, hashes.ResolveHash, hashes.ResolveBinEntry, sknPath);
 
             Console.WriteLine($"\n--- METADATA READ FROM BIN ---");
             Console.WriteLine($"Default Texture Path: {metadata.DefaultTexturePath ?? "<none>"}");
@@ -64,10 +70,15 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 }
             }
 
-            string binDirectory = Path.GetDirectoryName(binPath);
-            var availableTextureFiles = Directory.EnumerateFiles(binDirectory, "*.*", SearchOption.AllDirectories)
+            string modelDirectory = Path.GetDirectoryName(sknPath ?? binPath);
+            var availableTextureFiles = Directory.EnumerateFiles(modelDirectory, "*.*", SearchOption.TopDirectoryOnly)
                 .Where(p => p.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
-                .ToDictionary(p => Path.GetFileNameWithoutExtension(p).ToLowerInvariant(), p => p, StringComparer.OrdinalIgnoreCase);
+                .Concat(metadata.ReferencedTexturePaths.Select(path =>
+                    SknMaterialTextureResolver.TryResolveTexturePath(sknPath ?? binPath, path)))
+                .Where(path => path != null)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .GroupBy(path => PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(path)), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
             Console.WriteLine($"\nDiscovered {availableTextureFiles.Count} texture files in project directory.");
 
@@ -86,7 +97,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             if (sknPath != null && File.Exists(sknPath))
             {
                 Console.WriteLine($"\n--- AUDITING SKN SUBMESHES ---");
-                var skn = SkinnedMesh.ReadFromSimpleSkin(sknPath);
+                using var skn = SkinnedMesh.ReadFromSimpleSkin(sknPath);
 
                 foreach (var range in skn.Ranges)
                 {

@@ -1317,6 +1317,43 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 ignoreCase: true);
         }
 
+        [Theory]
+        [InlineData("3f75ecc09a351797")]
+        [InlineData("3F75ECC09A351797.tex")]
+        [InlineData("textures/3f75ecc09a351797.tex")]
+        public void MatchTextureKey_BindsResolvedVirtualPathToHashNamedTexture(string available)
+        {
+            const string authored = @"ASSETS\Characters\Kayn\Skins\Skin32\Kayn_Skin32_Base_TX_CM.tex";
+            Assert.Equal(available, SknResolver.MatchTextureKey(authored, new[] { available }));
+            Assert.Null(SknResolver.MatchTextureKey(authored, new[] { "9ad3aebb54ee9fb6" }));
+            Assert.Equal("kayn_skin32_base_tx_cm", SknResolver.MatchTextureKey(authored,
+                new[] { available, "kayn_skin32_base_tx_cm" }));
+        }
+
+        [Fact]
+        public void Resolve_PreservesSubmeshAndMaterialBindingsWhenCatalogLearnsExtractedHashNames()
+        {
+            const string body = "assets/characters/kayn/skins/skin32/kayn_skin32_base_tx_cm.tex";
+            const string slayer = "assets/characters/kayn/skins/skin32/kayn_skin32_slayer_tx_cm.tex";
+            const string helmetMaterial = "Characters/Kayn/Skins/Skin32/Materials/Helmet";
+            var tree = CreateSkinTree(body,
+                materialOverride: CreateOverride("Body_Slayer", CreateTextureLink("texture", slayer)),
+                materialOverride2: CreateOverride("Helmet", new BinTreeObjectLink(
+                    Fnv1a.HashLower("material"), Fnv1a.HashLower(helmetMaterial))),
+                material: CreateMaterial(helmetMaterial, CreateSampler("Diffuse_Texture", slayer)));
+            var extractedKeys = new[] { "3f75ecc09a351797", "9ad3aebb54ee9fb6" };
+
+            SknMaterialTextureResolution before = SknResolver.Resolve(tree, extractedKeys);
+            SknMaterialTextureResolution after = SknResolver.Resolve(tree, extractedKeys, ResolveTestTexturePath);
+
+            foreach (SknMaterialTextureResolution resolution in new[] { before, after })
+            {
+                Assert.Equal("3f75ecc09a351797", resolution.ResolveMaterialDefinition("Body_Base").BaseTextureName);
+                Assert.Equal("9ad3aebb54ee9fb6", resolution.ResolveMaterialDefinition("Body_Slayer").BaseTextureName);
+                Assert.Equal("9ad3aebb54ee9fb6", resolution.ResolveMaterialDefinition("Helmet").BaseTextureName);
+            }
+        }
+
         [Fact]
         public void ResolveTextureDirectory_UsesCompanionThemeParent()
         {

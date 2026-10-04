@@ -477,6 +477,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Skin textures stored by hash remain correctly assigned after updating hashes.
   - Comparator / Refreshing a selected backup now updates Base Version, its directory and Quick Select when returning to the view.
   - Explorer / Leaving the view cancels loading with status bar feedback and releases the tree so returning starts a fresh load.
   - Viewer / Fixed attached effects drifting from moving models with path-following poses.
