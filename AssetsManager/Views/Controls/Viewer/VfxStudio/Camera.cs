@@ -298,9 +298,5 @@ namespace AssetsManager.Views.Controls.Viewer
                 new Vector3(reach, VfxRigMotion.ChampionHeight, reach));
         }
 
-        private void ResetCamera_Click(object sender, RoutedEventArgs e)
-        {
-            ResetCamera();
-        }
     }
 }

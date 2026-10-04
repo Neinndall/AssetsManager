@@ -311,12 +311,6 @@ namespace AssetsManager.Views.Controls.Viewer
             SeekTimeline(seekTime);
         }
 
-        private void StepBack_Click(object sender, RoutedEventArgs e)
-            => StepPlayback(-1);
-
-        private void StepForward_Click(object sender, RoutedEventArgs e)
-            => StepPlayback(1);
-
         private void StepPlayback(int frames)
         {
             if (_model == null || frames == 0) return;
@@ -372,7 +366,7 @@ namespace AssetsManager.Views.Controls.Viewer
             switch (e.Key)
             {
                 case Key.Space:
-                    PlayPauseToggle_Click(this, new RoutedEventArgs());
+                    TogglePlayback();
                     break;
                 case Key.Left:
                     StepPlayback(shift ? -6 : -1);
@@ -417,65 +411,6 @@ namespace AssetsManager.Views.Controls.Viewer
             SeekTimeline(0d);
             if (wasPlaying) _vfxRenderer?.Play();
             UpdatePlayheadPosition();
-        }
-
-        private void PlayPauseToggle_Click(object sender, RoutedEventArgs e)
-        {
-            if (_model == null) return;
-
-            if (_model.IsPlaying)
-            {
-                _vfxRenderer?.Pause();
-                _model.IsPlaying = false;
-                return;
-            }
-
-            if (TryPlaySelectedTimedPreview(restartWhenPlaying: false))
-                return;
-
-            if (_model.SelectedSystem != null)
-            {
-                if (!HasSelectedSystemReady())
-                {
-                    RequestSystemInspection(_model.SelectedSystem);
-                }
-                else if (_model.CurrentTime >= _model.TotalDuration)
-                {
-                    _vfxRenderer.Stop();
-                    _model.CurrentTime = 0;
-                    _vfxRenderer.Seek(0);
-                    _vfxRenderer.Play();
-                    _model.IsPlaying = true;
-                }
-                else
-                {
-                    _vfxRenderer.Play();
-                    _model.IsPlaying = true;
-                }
-            }
-        }
-
-        private void StopToBindPose_Click(object sender, RoutedEventArgs e)
-        {
-            if (_model == null) return;
-
-            AnimationClipCatalogItem bindPose = _model.DetectedAnimations.FirstOrDefault(item => item.IsBindPose);
-            if (bindPose != null)
-            {
-                _model.SelectedAnimation = bindPose;
-            }
-            else
-            {
-                _animationClipCancellation?.Cancel();
-                _activeAnimationClip = null;
-                ResetChampionToBindPose();
-                _model.StatusText = "Character in Bind pose (T-Pose).";
-                _model.TotalDuration = 0d;
-                _model.CurrentTime = 0d;
-                _model.IsPlaying = false;
-                _vfxRenderer?.SetSystem(null);
-                OpenTkControl?.InvalidateVisual();
-            }
         }
 
         private void Ruler_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -556,5 +491,55 @@ namespace AssetsManager.Views.Controls.Viewer
 
 
         private static string GetBlendModeName(int blendMode) => VfxBlendModes.Describe(blendMode);
+
+        private void SetPreviewLoopEnabled(bool enabled)
+        {
+            if (enabled)
+            {
+                double span = ResolveTimelineDuration(_model.TotalDuration);
+                _model.ActiveLoopStart = 0d;
+                _model.ActiveLoopDuration = span;
+            }
+
+            _model.IsPreviewLoopEnabled = enabled;
+
+            // Standalone Systems also use the rig lifecycle loop. Clips and Spells are
+            // replayed by the common timeline loop and do not need a separate engine path.
+            if (_model.IsRawSystemsMode && _vfxRenderer != null &&
+                _vfxRenderer.RigSettings.IsLooping != enabled)
+            {
+                _vfxRenderer.RigSettings = _vfxRenderer.RigSettings with { IsLooping = enabled };
+            }
+
+            UpdateTimelineTrackMetrics();
+            UpdatePlayheadPosition();
+        }
+
+        private void ResetPreviewLoopRange(double duration)
+        {
+            double span = ResolveTimelineDuration(duration);
+            _model.TotalDuration = span;
+            _model.ActiveLoopStart = 0d;
+            _model.ActiveLoopDuration = span;
+        }
+
+        private void UpdatePreviewLoopRangeForDuration(double duration)
+        {
+            double span = ResolveTimelineDuration(duration);
+            _model.TotalDuration = span;
+            if (!_model.IsPreviewLoopEnabled)
+            {
+                _model.ActiveLoopStart = 0d;
+                _model.ActiveLoopDuration = span;
+                return;
+            }
+
+            (double from, double to) = ClampPreviewLoop(
+                _model.ActiveLoopStart,
+                _model.ActiveLoopDuration > 0d ? _model.ActiveLoopDuration : span,
+                span);
+            _model.ActiveLoopStart = from;
+            _model.ActiveLoopDuration = to;
+        }
     }
 }

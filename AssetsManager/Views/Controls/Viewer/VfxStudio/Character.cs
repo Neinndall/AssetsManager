@@ -10,6 +10,7 @@ using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Loading;
+using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Hashing;
@@ -19,6 +20,8 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class VfxInspectorControl
     {
+        private AnimationClipCatalogItem _bindPoseReturnAnimation;
+
         private void RefreshCharacterInteractionTarget()
         {
             SynchronizeSceneActorsListSelection();
@@ -637,5 +640,51 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private string ResolveSknPath(string authoredPath, string searchDir)
             => VfxLoadingService?.ResolveAssetPath(authoredPath, searchDir, ".skn");
+
+        private void StopToBindPose()
+        {
+            if (_model == null) return;
+
+            AnimationClipCatalogItem bindPose = _model.DetectedAnimations.FirstOrDefault(item => item.IsBindPose);
+            if (bindPose != null)
+            {
+                _model.SelectedAnimation = bindPose;
+            }
+            else
+            {
+                _animationClipCancellation?.Cancel();
+                _activeAnimationClip = null;
+                ResetChampionToBindPose();
+                _model.StatusText = "Character in Bind pose (T-Pose).";
+                _model.TotalDuration = 0d;
+                _model.CurrentTime = 0d;
+                _model.IsPlaying = false;
+                _vfxRenderer?.SetSystem(null);
+                OpenTkControl?.InvalidateVisual();
+            }
+        }
+
+        private void SetBindPosePreview(bool enabled)
+        {
+            if (enabled)
+            {
+                _bindPoseReturnAnimation = _model.SelectedAnimation;
+                _model.IsAnimationMode = true;
+                StopToBindPose();
+            }
+            else
+            {
+                AnimationClipCatalogItem animation = _bindPoseReturnAnimation != null &&
+                    _model.DetectedAnimations.Contains(_bindPoseReturnAnimation)
+                    ? _bindPoseReturnAnimation : VfxClipCatalog.OpeningClip(_model.DetectedAnimations);
+                if (animation is { IsBindPose: false })
+                {
+                    _model.IsAnimationMode = true;
+                    _model.SelectedAnimation = animation;
+                    _bindPoseReturnAnimation = null;
+                }
+            }
+
+        }
     }
 }

@@ -79,61 +79,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _vfxRenderer?.Play();
         }
 
-        private void Play_Click(object sender, RoutedEventArgs e)
-        {
-            if (TryPlaySelectedTimedPreview(restartWhenPlaying: true))
-                return;
-
-            if (_model.SelectedSystem != null)
-            {
-                if (!HasSelectedSystemReady())
-                {
-                    RequestSystemInspection(_model.SelectedSystem);
-                }
-                else
-                {
-                    _vfxRenderer.Stop();
-                    _model.CurrentTime = 0;
-                    _vfxRenderer.Seek(0);
-                    _vfxRenderer.Play();
-                    _model.IsPlaying = true;
-                }
-            }
-        }
-
-        private void StopResume_Click(object sender, RoutedEventArgs e)
-        {
-            if (_model.IsPlaying)
-            {
-                _vfxRenderer?.Pause();
-                _model.IsPlaying = false;
-            }
-            else
-            {
-                if (TryPlaySelectedTimedPreview(restartWhenPlaying: false))
-                    return;
-
-                if (_model.SelectedSystem != null)
-                {
-                    if (!HasSelectedSystemReady())
-                    {
-                        RequestSystemInspection(_model.SelectedSystem);
-                    }
-                    else if (_vfxRenderer.PlaybackTime >= _model.TotalDuration)
-                    {
-                        _vfxRenderer.Stop();
-                        _vfxRenderer.Play();
-                        _model.IsPlaying = true;
-                    }
-                    else
-                    {
-                        _vfxRenderer.Play();
-                        _model.IsPlaying = true;
-                    }
-                }
-            }
-        }
-
         private bool _isUserSeeking;
 
         private void TimeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -150,16 +95,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private void TimeSlider_PreviewMouseUp(object sender, MouseButtonEventArgs e)
         {
             _isUserSeeking = false;
-        }
-
-        private void Speed_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_model == null) return;
-            if (SpeedComboBox?.SelectedItem is ComboBoxItem item &&
-                float.TryParse(item.Tag?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out float speed))
-            {
-                SetPlaybackSpeed(speed, updateControl: false);
-            }
         }
 
         private void SyncChancePinControls()
@@ -179,28 +114,13 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void ChancePinToggle_Click(object sender, RoutedEventArgs e)
+        private void ApplyPinnedBirthChance(float? chance)
         {
             if (_model?.HasStandaloneSystem != true || _vfxRenderer == null) return;
-            if (ChancePinToggle.IsChecked == true)
-                ApplyPinnedBirthChance((float)ChancePinSlider.Value);
-            else
-                _vfxRenderer.SetPinnedBirthChance(null);
-        }
-
-        private void ChancePinSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (_isUpdatingChancePinControls || !IsLoaded || ChancePinToggle?.IsChecked != true ||
-                _model?.HasStandaloneSystem != true || _vfxRenderer == null) return;
-            ApplyPinnedBirthChance((float)e.NewValue);
-        }
-
-        private void ApplyPinnedBirthChance(float chance)
-        {
-            chance = Math.Clamp(chance, 0f, 1f);
-            _vfxRenderer?.SetPinnedBirthChance(chance);
-            if (ChancePinValueText != null)
-                ChancePinValueText.Text = chance.ToString("F2", CultureInfo.InvariantCulture);
+            if (chance.HasValue) chance = Math.Clamp(chance.Value, 0f, 1f);
+            _vfxRenderer.SetPinnedBirthChance(chance);
+            if (chance.HasValue && ChancePinValueText != null)
+                ChancePinValueText.Text = chance.Value.ToString("F2", CultureInfo.InvariantCulture);
         }
 
         private void SetPlaybackSpeed(double speed, bool updateControl = true)
@@ -248,5 +168,40 @@ namespace AssetsManager.Views.Controls.Viewer
             return PlaybackSpeedDetents[0];
         }
 
+        private void TogglePlayback()
+        {
+            if (_model == null) return;
+
+            if (_model.IsPlaying)
+            {
+                _vfxRenderer?.Pause();
+                _model.IsPlaying = false;
+                return;
+            }
+
+            if (TryPlaySelectedTimedPreview(restartWhenPlaying: false))
+                return;
+
+            if (_model.SelectedSystem != null)
+            {
+                if (!HasSelectedSystemReady())
+                {
+                    RequestSystemInspection(_model.SelectedSystem);
+                }
+                else if (_model.CurrentTime >= _model.TotalDuration)
+                {
+                    _vfxRenderer.Stop();
+                    _model.CurrentTime = 0;
+                    _vfxRenderer.Seek(0);
+                    _vfxRenderer.Play();
+                    _model.IsPlaying = true;
+                }
+                else
+                {
+                    _vfxRenderer.Play();
+                    _model.IsPlaying = true;
+                }
+            }
+        }
     }
 }

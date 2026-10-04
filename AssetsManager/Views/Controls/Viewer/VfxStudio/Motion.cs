@@ -14,7 +14,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 item.Tag is not string preset || preset == _model.RigPresetText)
                 return;
 
-            SetRigPreset_Click(item, e);
+            if (Enum.TryParse(preset, out VfxRigPreset rigPreset))
+                SetRigPreset(rigPreset);
         }
 
         private void RerollSeed_Click(object sender, RoutedEventArgs e)
@@ -27,33 +28,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _standaloneRunMemory[key] = memory with { Seed = NextPlaybackSeed(memory.Seed) };
 
             InspectSystem(_inspectedSystem);
-        }
-
-        private void SetRigPreset_Click(object sender, RoutedEventArgs e)
-        {
-            if (!_model.IsRawSystemsMode) return;
-            if (sender is not FrameworkElement { Tag: string tagStr } ||
-                !Enum.TryParse(tagStr, out VfxRigPreset preset))
-            {
-                return;
-            }
-
-            VfxRigSettings current = _vfxRenderer?.RigSettings ?? VfxRigSettings.ForPreset(_model.RigPreset);
-            VfxRigSettings settings = current.WithPreset(preset) with
-            {
-                IsLooping = _model.IsPreviewLoopEnabled
-            };
-            _model.RigPreset = preset;
-            if (_vfxRenderer != null)
-            {
-                _vfxRenderer.RigSettings = settings;
-                double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
-                UpdatePreviewLoopRangeForDuration(duration);
-                _model.CurrentTime = _vfxRenderer.PlaybackTime;
-                _vfxRenderer.Play();
-                _model.IsPlaying = true;
-            }
-            UpdateRigControlValues();
         }
 
         private void ApplyRigTuning(VfxRigSettings settings)
@@ -144,5 +118,25 @@ namespace AssetsManager.Views.Controls.Viewer
             ApplyRigTuning(_vfxRenderer.RigSettings with { OrbitPeriod = (float)e.NewValue });
         }
 
+        private void SetRigPreset(VfxRigPreset preset)
+        {
+            if (!_model.IsRawSystemsMode) return;
+            VfxRigSettings current = _vfxRenderer?.RigSettings ?? VfxRigSettings.ForPreset(_model.RigPreset);
+            VfxRigSettings settings = current.WithPreset(preset) with
+            {
+                IsLooping = _model.IsPreviewLoopEnabled
+            };
+            _model.RigPreset = preset;
+            if (_vfxRenderer != null)
+            {
+                _vfxRenderer.RigSettings = settings;
+                double duration = ResolveTimelineDuration(_vfxRenderer.RigDuration);
+                UpdatePreviewLoopRangeForDuration(duration);
+                _model.CurrentTime = _vfxRenderer.PlaybackTime;
+                _vfxRenderer.Play();
+                _model.IsPlaying = true;
+            }
+            UpdateRigControlValues();
+        }
     }
 }

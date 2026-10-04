@@ -4,15 +4,11 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Session;
-using AssetsManager.Services.Viewer.Vfx.Composition;
-using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class VfxInspectorControl
     {
-        private AnimationClipCatalogItem _bindPoseReturnAnimation;
-
         private void ViewportSnapshotButton_Click(object sender, RoutedEventArgs e)
         {
             _pendingSnapshot = OpenGlSnapshotService.RequestUhdSnapshot(
@@ -56,26 +52,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void PreviewBindPoseToggle_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not ToggleButton toggle) return;
-
-            if (toggle.IsChecked == true)
-            {
-                _bindPoseReturnAnimation = _model.SelectedAnimation;
-                _model.IsAnimationMode = true;
-                StopToBindPose_Click(sender, e);
-            }
-            else
-            {
-                AnimationClipCatalogItem animation = _bindPoseReturnAnimation != null &&
-                    _model.DetectedAnimations.Contains(_bindPoseReturnAnimation)
-                    ? _bindPoseReturnAnimation : VfxClipCatalog.OpeningClip(_model.DetectedAnimations);
-                if (animation is { IsBindPose: false })
-                {
-                    _model.IsAnimationMode = true;
-                    _model.SelectedAnimation = animation;
-                    _bindPoseReturnAnimation = null;
-                }
-            }
-
+            SetBindPosePreview(toggle.IsChecked == true);
             toggle.GetBindingExpression(ToggleButton.IsCheckedProperty)?.UpdateTarget();
         }
 
@@ -177,54 +154,48 @@ namespace AssetsManager.Views.Controls.Viewer
             SetPreviewLoopEnabled(toggleButton.IsChecked == true);
         }
 
-        private void SetPreviewLoopEnabled(bool enabled)
+        private void ResetCamera_Click(object sender, RoutedEventArgs e)
         {
-            if (enabled)
-            {
-                double span = ResolveTimelineDuration(_model.TotalDuration);
-                _model.ActiveLoopStart = 0d;
-                _model.ActiveLoopDuration = span;
-            }
-
-            _model.IsPreviewLoopEnabled = enabled;
-
-            // Standalone Systems also use the rig lifecycle loop. Clips and Spells are
-            // replayed by the common timeline loop and do not need a separate engine path.
-            if (_model.IsRawSystemsMode && _vfxRenderer != null &&
-                _vfxRenderer.RigSettings.IsLooping != enabled)
-            {
-                _vfxRenderer.RigSettings = _vfxRenderer.RigSettings with { IsLooping = enabled };
-            }
-
-            UpdateTimelineTrackMetrics();
-            UpdatePlayheadPosition();
+            ResetCamera();
         }
 
-        private void ResetPreviewLoopRange(double duration)
+        private void StepBack_Click(object sender, RoutedEventArgs e)
+            => StepPlayback(-1);
+
+        private void StepForward_Click(object sender, RoutedEventArgs e)
+            => StepPlayback(1);
+
+        private void PlayPauseToggle_Click(object sender, RoutedEventArgs e)
+            => TogglePlayback();
+
+        private void SetRigPreset_Click(object sender, RoutedEventArgs e)
         {
-            double span = ResolveTimelineDuration(duration);
-            _model.TotalDuration = span;
-            _model.ActiveLoopStart = 0d;
-            _model.ActiveLoopDuration = span;
+            if (sender is FrameworkElement { Tag: string tag } &&
+                Enum.TryParse(tag, out VfxRigPreset preset))
+                SetRigPreset(preset);
         }
 
-        private void UpdatePreviewLoopRangeForDuration(double duration)
+        private void Speed_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            double span = ResolveTimelineDuration(duration);
-            _model.TotalDuration = span;
-            if (!_model.IsPreviewLoopEnabled)
+            if (_model == null) return;
+            if (SpeedComboBox?.SelectedItem is ComboBoxItem item &&
+                float.TryParse(item.Tag?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out float speed))
             {
-                _model.ActiveLoopStart = 0d;
-                _model.ActiveLoopDuration = span;
-                return;
+                SetPlaybackSpeed(speed, updateControl: false);
             }
+        }
 
-            (double from, double to) = ClampPreviewLoop(
-                _model.ActiveLoopStart,
-                _model.ActiveLoopDuration > 0d ? _model.ActiveLoopDuration : span,
-                span);
-            _model.ActiveLoopStart = from;
-            _model.ActiveLoopDuration = to;
+        private void ChancePinToggle_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyPinnedBirthChance(ChancePinToggle.IsChecked == true
+                ? (float)ChancePinSlider.Value : null);
+        }
+
+        private void ChancePinSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingChancePinControls || !IsLoaded || ChancePinToggle?.IsChecked != true ||
+                _model?.HasStandaloneSystem != true || _vfxRenderer == null) return;
+            ApplyPinnedBirthChance((float)e.NewValue);
         }
     }
 }
