@@ -13,6 +13,20 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
+        <Style x:Key="InspectorGroupTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="InspectorGroupDescriptionStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Opacity" Value="0.8"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
         <!-- Compact TreeView Expander ToggleButton for VFX Studio Browser -->
         <Style x:Key="TreeViewToggleButton" TargetType="ToggleButton">
             <Setter Property="Focusable" Value="False"/>
@@ -1823,22 +1837,59 @@
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="MAP BACKDROP" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="Environment &amp; stage scene" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                        <TextBlock Text="Map selection and scene settings" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                                 </Grid>
                             </ToggleButton>
 
                             <!-- MAP BACKDROP CARD -->
-                            <Border Margin="0,0,0,12" Padding="14,12" CornerRadius="12" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                    Visibility="{Binding IsChecked, ElementName=VfxMapBackdropSection, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <StackPanel>
-                                    <CheckBox Content="Enable MAP backdrop" IsChecked="{Binding CharacterBackdropEnabled, Mode=TwoWay}" IsEnabled="{Binding HasCharacterBackdropOptions}" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,8"/>
-                                    <ComboBox ItemsSource="{Binding CharacterBackdrops}" SelectedItem="{Binding SelectedCharacterBackdrop, Mode=TwoWay}" DisplayMemberPath="Label" IsEnabled="{Binding CharacterBackdropEnabled}" Style="{StaticResource ModernComboBox}" Height="28" Margin="0,0,0,10"/>
-                                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MapStateControlsTemplate}"
-                                                    Visibility="{Binding HasActiveCharacterBackdrop, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                </StackPanel>
-                            </Border>
+                            <StackPanel Margin="0,0,0,12"
+                                        Visibility="{Binding IsChecked, ElementName=VfxMapBackdropSection, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Border Padding="14,12" CornerRadius="12" Background="{StaticResource CardBackground}"
+                                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialIcons:MaterialIcon Kind="MapOutline" Width="16" Height="16" Foreground="#38BDF8"
+                                                                        VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="Environment" Style="{StaticResource InspectorGroupTitleStyle}"/>
+                                                <TextBlock Text="Preview the character on a map." Style="{StaticResource InspectorGroupDescriptionStyle}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <CheckBox Content="Enable map backdrop" IsChecked="{Binding CharacterBackdropEnabled, Mode=TwoWay}"
+                                                  IsEnabled="{Binding HasCharacterBackdropOptions}" Style="{StaticResource ModernCheckBox}" Margin="0"/>
+                                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding CharacterBackdropEnabled}">
+                                            <TextBlock Text="MAP" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,6"/>
+                                            <ComboBox ItemsSource="{Binding CharacterBackdrops}" SelectedItem="{Binding SelectedCharacterBackdrop, Mode=TwoWay}"
+                                                      DisplayMemberPath="Label" Style="{StaticResource ModernComboBox}" Height="28" ToolTip="Select backdrop map"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                                <Border Padding="14,12" Margin="0,8,0,0" CornerRadius="12" Background="{StaticResource CardBackground}"
+                                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                        Visibility="{Binding HasActiveCharacterBackdrop, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialIcons:MaterialIcon Kind="LayersOutline" Width="16" Height="16" Foreground="#38BDF8"
+                                                                        VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="Map state" Style="{StaticResource InspectorGroupTitleStyle}"/>
+                                                <TextBlock Text="Transformations, layers and decorations." Style="{StaticResource InspectorGroupDescriptionStyle}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MapStateControlsTemplate}"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
 
 
                             <!-- TRANSFORM HEADER -->
@@ -1897,7 +1948,7 @@
                                                 <materialIcons:MaterialIcon Kind="Refresh" Width="13" Height="13"/>
                                             </Button>
                                         </Grid>
-                                        
+
                                         <!-- X Axis -->
                                         <Grid Margin="0,2,0,8">
                                             <Grid.ColumnDefinitions>
@@ -2090,7 +2141,7 @@
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="GEOMETRY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                        <TextBlock Text="Armature and submesh textures" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                        <TextBlock Text="Forms, skeleton and submeshes" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                                 </Grid>
@@ -2099,15 +2150,21 @@
                             <!-- GEOMETRY CONTENT -->
                             <StackPanel Visibility="{Binding IsChecked, ElementName=VfxCharacterGeometrySection, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,0,12">
                                 <Border Background="{StaticResource CardBackground}" CornerRadius="12"
-                                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,10" Margin="0,0,0,8"
+                                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,12" Margin="0,0,0,8"
                                         Visibility="{Binding HasCharacterForms, Converter={StaticResource BoolToVisibilityConverter}}">
                                     <StackPanel>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                            <materialIcons:MaterialIcon Kind="LayersOutline" Width="14" Height="14"
-                                                                        Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                            <TextBlock Text="FORM" FontSize="10.5" FontWeight="Bold"
-                                                       Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                                        </StackPanel>
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialIcons:MaterialIcon Kind="LayersOutline" Width="16" Height="16"
+                                                                        Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="Form" Style="{StaticResource InspectorGroupTitleStyle}"/>
+                                                <TextBlock Text="Switch the character's appearance." Style="{StaticResource InspectorGroupDescriptionStyle}"/>
+                                            </StackPanel>
+                                        </Grid>
                                         <ComboBox ItemsSource="{Binding CharacterForms}" DisplayMemberPath="Label"
                                                   SelectedItem="{Binding SelectedCharacterForm, Mode=TwoWay}"
                                                   Style="{StaticResource ModernComboBox}" Height="28"
@@ -2116,85 +2173,99 @@
                                 </Border>
 
                                 <!-- Armature Card -->
-                                <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,10" Margin="0,0,0,8">
-                                    <UniformGrid Columns="2">
-                                        <CheckBox Content="Show armature" IsChecked="{Binding ShowCharacterArmature, Mode=TwoWay}" IsEnabled="{Binding HasCharacterSkeleton}" Style="{StaticResource ModernCheckBox}"/>
-                                        <CheckBox Content="Joint names" IsChecked="{Binding ShowCharacterJointNames, Mode=TwoWay}" IsEnabled="{Binding ShowCharacterArmature}" Style="{StaticResource ModernCheckBox}"/>
-                                    </UniformGrid>
+                                <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,12" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialIcons:MaterialIcon Kind="Human" Width="16" Height="16"
+                                                                        Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="Skeleton" Style="{StaticResource InspectorGroupTitleStyle}"/>
+                                                <TextBlock Text="Inspect bones and joint labels." Style="{StaticResource InspectorGroupDescriptionStyle}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <CheckBox Content="Show armature" IsChecked="{Binding ShowCharacterArmature, Mode=TwoWay}" IsEnabled="{Binding HasCharacterSkeleton}" Style="{StaticResource ModernCheckBox}" Margin="0"/>
+                                        <CheckBox Content="Joint names" IsChecked="{Binding ShowCharacterJointNames, Mode=TwoWay}" IsEnabled="{Binding ShowCharacterArmature}" Style="{StaticResource ModernCheckBox}" Margin="24,8,0,0"/>
+                                    </StackPanel>
                                 </Border>
 
                                 <!-- Submeshes Header Bar -->
-                                <Border Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="12,8" Margin="0,0,0,8">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="LayersOutline" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="SUBMESHES" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                            <TextBlock Text="Visibility &amp; material textures" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
-                                        </StackPanel>
-                                        <Button Grid.Column="2" Click="ResetCharacterSubmeshOverrides_Click" Style="{StaticResource SmallTextButtonStyle}"
-                                                Content="RESET ALL" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
-                                    </Grid>
+                                <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,12">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="LayersOutline" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="Submeshes" Style="{StaticResource InspectorGroupTitleStyle}"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Click="ResetCharacterSubmeshOverrides_Click" Style="{StaticResource SmallTextButtonStyle}"
+                                                    Content="RESET ALL" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                        </Grid>
+                                        <TextBlock Text="Visibility and textures." Style="{StaticResource InspectorGroupDescriptionStyle}" Margin="26,2,0,4"/>
+
+                                    <!-- Submeshes List -->
+                                    <ItemsControl ItemsSource="{Binding CharacterSubmeshes}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8"
+                                                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                                        Margin="0,8,0,0" Padding="10,10">
+                                                    <StackPanel>
+                                                        <!-- Top: mesh icon + name + override indicator + visibility checkbox -->
+                                                        <Grid Margin="0,0,0,6">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="CubeOutline" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,7,0"/>
+
+                                                            <TextBlock Grid.Column="1" Text="{Binding Name}"
+                                                                       FontWeight="SemiBold" FontSize="11"
+                                                                       Foreground="{StaticResource TextPrimary}"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis"/>
+
+                                                            <Border Grid.Column="2" Width="6" Height="6" CornerRadius="3" Background="{StaticResource AccentBrush}" Margin="6,0,8,0" VerticalAlignment="Center" ToolTip="Manually overridden"
+                                                                    Visibility="{Binding IsOverridden, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                                                            <CheckBox Grid.Column="3"
+                                                                      IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                                      Style="{StaticResource ModernCheckBox}"
+                                                                      VerticalAlignment="Center"
+                                                                      ToolTip="Toggle Submesh Visibility"/>
+                                                        </Grid>
+
+                                                        <!-- Bottom: texture icon + dropdown -->
+                                                        <Grid VerticalAlignment="Center">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="TextureBox" Width="13" Height="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                                            <ComboBox Grid.Column="1"
+                                                                      ItemsSource="{Binding AvailableTextureNames}"
+                                                                      SelectedItem="{Binding SelectedTextureName, Mode=TwoWay}"
+                                                                      Style="{StaticResource ModernComboBox}"
+                                                                      Height="28"
+                                                                      ToolTip="Select submesh texture"/>
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    </StackPanel>
                                 </Border>
-
-                                <!-- Submeshes List -->
-                                <ItemsControl ItemsSource="{Binding CharacterSubmeshes}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="{StaticResource CardBackground}" CornerRadius="8"
-                                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                                    Margin="0,0,0,6" Padding="10,8">
-                                                <StackPanel>
-                                                    <!-- Top: mesh icon + name + override indicator + visibility checkbox -->
-                                                    <Grid Margin="0,0,0,6">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        
-                                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="CubeOutline" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                                        
-                                                        <TextBlock Grid.Column="1" Text="{Binding Name}"
-                                                                   FontWeight="SemiBold" FontSize="11"
-                                                                   Foreground="{StaticResource TextPrimary}"
-                                                                   VerticalAlignment="Center"
-                                                                   TextTrimming="CharacterEllipsis"/>
-
-                                                        <Border Grid.Column="2" Width="6" Height="6" CornerRadius="3" Background="{StaticResource AccentBrush}" Margin="6,0,8,0" VerticalAlignment="Center" ToolTip="Manually overridden"
-                                                                Visibility="{Binding IsOverridden, Converter={StaticResource BoolToVisibilityConverter}}"/>
-
-                                                        <CheckBox Grid.Column="3"
-                                                                  IsChecked="{Binding IsVisible, Mode=TwoWay}"
-                                                                  Style="{StaticResource ModernCheckBox}"
-                                                                  VerticalAlignment="Center"
-                                                                  ToolTip="Toggle Submesh Visibility"/>
-                                                    </Grid>
-
-                                                    <!-- Bottom: texture icon + dropdown -->
-                                                    <Grid VerticalAlignment="Center">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="TextureBox" Width="13" Height="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                                        <ComboBox Grid.Column="1"
-                                                                  ItemsSource="{Binding AvailableTextureNames}"
-                                                                  SelectedItem="{Binding SelectedTextureName, Mode=TwoWay}"
-                                                                  Style="{StaticResource ModernComboBox}"
-                                                                  Height="28"
-                                                                  ToolTip="Select submesh texture"/>
-                                                    </Grid>
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
                             </StackPanel>
                         </StackPanel>
 

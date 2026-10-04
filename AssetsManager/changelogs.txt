@@ -162,6 +162,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio / Reorganized Geometry and Map Backdrop with descriptive headings and grouped controls.
   - Viewer / Unified camera preset calculations for the normal Viewer and VFX Studio while preserving their current views.
   - VFX Studio / Select Scene Actors with Ctrl-click or Shift-click and move the selected group with the viewport gizmo.
   - VFX Studio / Timeline groups playback, time and speed on the left and emitter filtering on the right, with Loop enabled by default and T-Pose in the viewport.
