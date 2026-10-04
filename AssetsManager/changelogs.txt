@@ -163,6 +163,7 @@ New Features
 
 Improvements
   - VFX Studio / Reorganized Geometry and Map Backdrop with descriptive headings and grouped controls.
+  - VFX Studio / Reduced the top spacing inside submesh cards.
   - Viewer / Unified camera preset calculations for the normal Viewer and VFX Studio while preserving their current views.
   - VFX Studio / Select Scene Actors with Ctrl-click or Shift-click and move the selected group with the viewport gizmo.
   - VFX Studio / Timeline groups playback, time and speed on the left and emitter filtering on the right, with Loop enabled by default and T-Pose in the viewport.
@@ -470,6 +471,7 @@ Improvements
   - Input and confirmation dialogs now support Enter/Escape keys with automatic focus.
 
 Changes
+  - Diagnostics / Added a clip audit to inspect animation names and file sources.
   - VFX Studio / Renamed the champion visibility tooltip to Show/Hide Champion.
   - VFX Studio / Unified toolbar actions for camera fitting, snapshots and playback, removing redundant actions.
   - VFX Studio / Removed emitter editing and BIN saving while keeping effect inspection and playback.
@@ -482,6 +484,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Recognized form names on older body materials, removing the duplicate Base entry on Kayn Skin0.
   - VFX Studio / Shaders now load unnamed material textures from WAD files, restoring dark wings and fabrics on Janna Skin67.
   - VFX Studio / Fixed missing body parts with Shaders enabled on skins with large skeletons, including Janna Skin67.
   - Viewer / Auto Rotate keeps the current angle when stopped and shares its behavior between normal Viewer and VFX Studio.

@@ -240,15 +240,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Theory]
-        [InlineData("Base")]
-        [InlineData("Form 1")]
-        public void KaynFormOptionsKeepAuthoredBaseGearWithoutAddingAnotherBase(string baseName)
+        [InlineData("Base", false)]
+        [InlineData("Form 1", false)]
+        [InlineData("Base", true)]
+        [InlineData("Form 1", true)]
+        public void KaynFormOptionsKeepAuthoredBaseGearWithoutAddingAnotherBase(string baseName, bool legacyMaterials)
         {
             using var model = new SceneModel();
             string[] names = { "Base", "Assassin", "Slayer" };
+            string MaterialName(string name) => legacyMaterials
+                ? name == "Base" ? "Kayn_Base_Mat" : $"Kayn_Base_{name}_Mat"
+                : "Body_" + name;
             foreach (string name in names)
-                model.AddPart(new ModelPart("Body_" + name, new GeometryModel3D()));
-            uint[] hashes = names.Select(name => Fnv1a.HashLower("Body_" + name)).ToArray();
+                model.AddPart(new ModelPart(MaterialName(name), new GeometryModel3D()));
+            uint[] hashes = names.Select(name => Fnv1a.HashLower(MaterialName(name))).ToArray();
             var forms = names.Select((name, index) => new VfxCharacterFormDefinition(
                 (uint)(10 + index), index, index == 0 ? baseName : $"Form {index + 1}",
                 new[] { hashes[index] }, hashes.Where(hash => hash != hashes[index]).ToArray(),
@@ -299,6 +304,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.True(options[0].Definition.IsBase);
             Assert.Equal(new[] { -1, 0, 1 }, options.Select(option => option.Definition.GearIndex));
             Assert.Equal(forms, options.Skip(1).Select(option => option.Definition));
+        }
+
+        [Theory]
+        [InlineData("Example_Base_Mat", "Base")]
+        [InlineData("Example_Base_Dark_Mat", "Dark")]
+        [InlineData("Example_Base_Gold_Mat", "Gold")]
+        [InlineData("Example_Baseball_Mat", "Form 1")]
+        [InlineData("Example_Hair_Mat", "Form 1")]
+        public void FormLabelsUseShownBodyTokensWithoutDependingOnCharacterName(string materialName, string expected)
+        {
+            using var model = new SceneModel();
+            model.AddPart(new ModelPart(materialName, new GeometryModel3D()));
+            var form = new VfxCharacterFormDefinition(1, 0, "Form 1",
+                new[] { Fnv1a.HashLower(materialName) }, Array.Empty<uint>());
+
+            Assert.Equal(expected, VfxCharacterFormSemantics.FormLabel(form, model));
         }
 
         [Fact]

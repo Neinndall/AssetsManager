@@ -246,16 +246,36 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
                 else
                 {
                     // A body label is only presentation; authored hashes still control visibility.
-                    string bodyName = model?.Parts?.FirstOrDefault(part =>
-                        part.Name.StartsWith("Body_", StringComparison.OrdinalIgnoreCase) &&
-                        definition.ShowSubmeshHashes.Contains(Fnv1a.HashLower(part.Name)))?.Name;
-                    if (bodyName != null)
-                        label = bodyName["Body_".Length..].Replace('_', ' ');
+                    string bodyLabel = model?.Parts?
+                        .Where(part => definition.ShowSubmeshHashes.Contains(Fnv1a.HashLower(part.Name)))
+                        .Select(part => BodyFormLabel(part.Name))
+                        .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name));
+                    if (bodyLabel != null)
+                        label = bodyLabel;
                 }
             }
             if (string.IsNullOrWhiteSpace(label))
                 label = $"Form {definition.GearIndex + 1}";
             return label;
+        }
+
+        private static string BodyFormLabel(string submeshName)
+        {
+            if (submeshName.StartsWith("Body_", StringComparison.OrdinalIgnoreCase))
+                return submeshName["Body_".Length..].Replace('_', ' ');
+
+            // Older body materials place the form after an arbitrary character prefix.
+            const string suffix = "_Mat";
+            int baseIndex = submeshName.IndexOf("_Base", StringComparison.OrdinalIgnoreCase);
+            if (baseIndex < 0 || !submeshName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                return null;
+            string token = submeshName[(baseIndex + 1)..^suffix.Length];
+            if (token.Equals("Base", StringComparison.OrdinalIgnoreCase))
+                return "Base";
+            if (!token.StartsWith("Base_", StringComparison.OrdinalIgnoreCase))
+                return null;
+            token = token["Base_".Length..].Replace('_', ' ').Trim();
+            return token.Length > 0 ? char.ToUpperInvariant(token[0]) + token[1..] : null;
         }
 
         private static string ResolveNameFromTextureSwaps(int gearIndex, SceneModel model)
