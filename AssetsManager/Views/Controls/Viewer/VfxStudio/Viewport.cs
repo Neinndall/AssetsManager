@@ -17,6 +17,9 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class VfxInspectorControl
     {
+        private readonly OpenGlSnapshotService _snapshotService = new();
+        private OpenGlSnapshotService.SnapshotRequest _pendingSnapshot;
+
         [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
         private static extern IntPtr wglGetProcAddress(string procName);
 

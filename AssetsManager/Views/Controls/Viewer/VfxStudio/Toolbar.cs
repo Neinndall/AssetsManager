@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Views.Models.Viewer;
@@ -11,6 +12,15 @@ namespace AssetsManager.Views.Controls.Viewer
     public partial class VfxInspectorControl
     {
         private AnimationClipCatalogItem _bindPoseReturnAnimation;
+
+        private void ViewportSnapshotButton_Click(object sender, RoutedEventArgs e)
+        {
+            _pendingSnapshot = OpenGlSnapshotService.RequestUhdSnapshot(
+                _gl != null && _isActive && !_isCleanedUp && OpenTkControl.IsVisible,
+                OpenTkControl.FrameBufferWidth, OpenTkControl.FrameBufferHeight,
+                _model.SelectedWorkspaceTab?.Title ?? "VFXStudio", LogService);
+            if (_pendingSnapshot != null) OpenTkControl.InvalidateVisual();
+        }
 
         private void PreviewBindPoseToggle_Click(object sender, RoutedEventArgs e)
         {
