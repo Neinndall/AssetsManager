@@ -13,6 +13,7 @@ using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Viewport;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
@@ -656,7 +657,7 @@ namespace AssetsManager.Views.Controls.Viewer
             double radius = Math.Sqrt(1500d * 1500d + 300d * 300d + 1500d * 1500d);
             double aspect = Math.Max(1d, OpenTkControl.ActualWidth) /
                             Math.Max(1d, OpenTkControl.ActualHeight);
-            double distance = ViewerViewportControl.CalculateMapFrameDistance(radius, 45d, aspect);
+            double distance = CameraPresets.CalculateMapFrameDistance(radius, 45d, aspect);
             Point3D position = target + direction * distance;
             _cameraController.SnapTo(position, target - position, VfxCameraUpDirection);
         }

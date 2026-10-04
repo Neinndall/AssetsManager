@@ -8,6 +8,7 @@ using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
+using AssetsManager.Utils.Viewport;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
@@ -272,7 +273,7 @@ namespace AssetsManager.Views.Controls.Viewer
             try { _model.PreviewCameraPreset = state.Preset; }
             finally { _suppressCameraPresetFit = false; }
             _cameraController.MapNavigationGroundHeight = null;
-            ApplyCameraDistanceLimits(VfxPreviewCamera.Stand(state.Preset), tab.Kind == VfxWorkspaceTabKind.Map);
+            ApplyCameraDistanceLimits(CameraPresets.ForStudio(state.Preset), tab.Kind == VfxWorkspaceTabKind.Map);
             ProjectionCamera camera;
             if (state.Orthographic)
             {

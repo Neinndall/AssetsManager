@@ -5,6 +5,7 @@ using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
+using AssetsManager.Utils.Viewport;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 {
@@ -20,36 +21,36 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void CameraPresetsUseTheReferenceLensesAndAxes()
         {
-            VfxCameraStand game = VfxPreviewCamera.Stand(VfxPreviewCameraPreset.Game);
+            CameraStand game = CameraPresets.ForStudio(VfxPreviewCameraPreset.Game);
             Assert.False(game.Orthographic);
             Assert.Equal(40f, game.FieldOfView);
             Assert.Equal(1000f, game.Nearest);
             Assert.Equal(2250f, game.Farthest);
-            Assert.Equal(2f, VfxPreviewCamera.NearPlane);
-            Assert.Equal(20000f, VfxPreviewCamera.FarPlane);
+            Assert.Equal(2f, CameraPresets.StudioNearPlane);
+            Assert.Equal(20000f, CameraPresets.StudioFarPlane);
 
             float pitch = 56f * MathF.PI / 180f;
             Vector3 expectedGame = Vector3.Normalize(new Vector3(0f, MathF.Sin(pitch), -MathF.Cos(pitch)));
             AssertVector(expectedGame, game.Direction);
             AssertVector(Vector3.UnitY, game.Up);
 
-            VfxCameraStand orbit = VfxPreviewCamera.Stand(VfxPreviewCameraPreset.Orbit);
+            CameraStand orbit = CameraPresets.ForStudio(VfxPreviewCameraPreset.Orbit);
             Assert.False(orbit.Orthographic);
             Assert.Equal(45f, orbit.FieldOfView);
             Assert.Null(orbit.Nearest);
             Assert.Null(orbit.Farthest);
 
-            VfxCameraStand top = VfxPreviewCamera.Stand(VfxPreviewCameraPreset.Top);
+            CameraStand top = CameraPresets.ForStudio(VfxPreviewCameraPreset.Top);
             Assert.True(top.Orthographic);
             AssertVector(Vector3.UnitY, top.Direction);
             AssertVector(Vector3.UnitZ, top.Up);
 
-            VfxCameraStand front = VfxPreviewCamera.Stand(VfxPreviewCameraPreset.Front);
+            CameraStand front = CameraPresets.ForStudio(VfxPreviewCameraPreset.Front);
             Assert.True(front.Orthographic);
             AssertVector(Vector3.UnitZ, front.Direction);
             AssertVector(Vector3.UnitY, front.Up);
 
-            VfxCameraStand side = VfxPreviewCamera.Stand(VfxPreviewCameraPreset.Side);
+            CameraStand side = CameraPresets.ForStudio(VfxPreviewCameraPreset.Side);
             Assert.True(side.Orthographic);
             AssertVector(Vector3.UnitX, side.Direction);
             AssertVector(Vector3.UnitY, side.Up);
@@ -61,8 +62,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             const float width = 920f;
             const float aspect = 16f / 9f;
 
-            float reach = VfxPreviewCamera.ReachOfOrthographicWidth(width, aspect);
-            float restoredWidth = VfxPreviewCamera.OrthographicWidthOfReach(reach, aspect);
+            float reach = CameraPresets.ReachOfOrthographicWidth(width, aspect);
+            float restoredWidth = CameraPresets.OrthographicWidthOfReach(reach, aspect);
 
             Assert.True(float.IsFinite(reach));
             Assert.True(reach > 0f);

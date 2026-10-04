@@ -11,6 +11,7 @@ using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
+using AssetsManager.Utils.Viewport;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer
 {
@@ -71,8 +72,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
         public void ProjectionPlanesPreserveDepthPrecisionAtMapScale()
         {
             var lookDirection = new Vector3(0f, -18000f, -15000f);
-            float nearPlane = ViewerViewportControl.CalculateProjectionNearPlane(lookDirection);
-            float farPlane = ViewerViewportControl.CalculateProjectionFarPlane(lookDirection);
+            float nearPlane = CameraPresets.CalculateProjectionNearPlane(lookDirection);
+            float farPlane = CameraPresets.CalculateProjectionFarPlane(lookDirection);
 
             Assert.InRange(nearPlane, 200f, 250f);
             Assert.True(farPlane > 90000f);
@@ -84,7 +85,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
         {
             var lookDirection = new Vector3(0f, -100f, 0f);
 
-            float nearPlane = ViewerViewportControl.CalculateProjectionNearPlane(
+            float nearPlane = CameraPresets.CalculateProjectionNearPlane(
                 lookDirection,
                 isMapGeometry: true);
 
@@ -94,7 +95,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
         [Fact]
         public void ProjectionNearPlaneAllowsSubUnitMapDistance()
         {
-            float nearPlane = ViewerViewportControl.CalculateProjectionNearPlane(
+            float nearPlane = CameraPresets.CalculateProjectionNearPlane(
                 Vector3.UnitY,
                 isMapGeometry: true);
 
@@ -169,7 +170,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
         {
             var target = new Point3D(10, 20, 30);
 
-            var pose = ViewerViewportControl.CalculateCameraView(view, target, 25);
+            var pose = CameraPresets.CalculateCameraView(view, target, 25);
 
             Assert.NotNull(pose);
             Assert.Equal(

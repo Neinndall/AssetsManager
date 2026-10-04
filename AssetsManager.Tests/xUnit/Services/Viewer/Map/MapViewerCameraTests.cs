@@ -1,9 +1,9 @@
 using System.Numerics;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Viewer.Rendering;
-using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Helpers;
 using Xunit;
+using AssetsManager.Utils.Viewport;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 {
@@ -14,7 +14,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         {
             double radius = System.Math.Sqrt(1500d * 1500d + 300d * 300d + 1500d * 1500d);
 
-            double distance = ViewerViewportControl.CalculateMapFrameDistance(
+            double distance = CameraPresets.CalculateMapFrameDistance(
                 radius,
                 45d,
                 16d / 9d);
@@ -27,8 +27,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         {
             double radius = System.Math.Sqrt(1500d * 1500d + 300d * 300d + 1500d * 1500d);
 
-            double wide = ViewerViewportControl.CalculateMapFrameDistance(radius, 45d, 16d / 9d);
-            double narrow = ViewerViewportControl.CalculateMapFrameDistance(radius, 45d, 0.5d);
+            double wide = CameraPresets.CalculateMapFrameDistance(radius, 45d, 16d / 9d);
+            double narrow = CameraPresets.CalculateMapFrameDistance(radius, 45d, 0.5d);
 
             Assert.True(narrow > wide);
         }

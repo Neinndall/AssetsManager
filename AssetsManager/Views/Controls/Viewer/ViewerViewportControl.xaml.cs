@@ -151,8 +151,8 @@ namespace AssetsManager.Views.Controls.Viewer
             var proj = Matrix4x4.CreatePerspectiveFieldOfView(
                 fovRadians,
                 aspect,
-                CalculateProjectionNearPlane(lookDir),
-                CalculateProjectionFarPlane(lookDir));
+                CameraPresets.CalculateProjectionNearPlane(lookDir),
+                CameraPresets.CalculateProjectionFarPlane(lookDir));
             var viewProj = view * proj;
             _modelInteractionController?.Update(viewProj);
 
@@ -1162,30 +1162,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SnapCamera() => ResetCamera(false);
 
-        internal static float CalculateProjectionNearPlane(
-            Vector3 lookDirection,
-            bool isMapGeometry = false)
-        {
-            float cameraDistance = lookDirection.Length();
-            if (!float.IsFinite(cameraDistance) || cameraDistance <= 0f)
-                return isMapGeometry ? 0.01f : 1f;
-
-            return isMapGeometry
-                ? Math.Clamp(cameraDistance * 0.001f, 0.01f, 2.5f)
-                : Math.Clamp(cameraDistance * 0.01f, 0.1f, 500f);
-        }
-
-        internal static float CalculateProjectionFarPlane(Vector3 lookDirection)
-        {
-            float cameraDistance = lookDirection.Length();
-            if (!float.IsFinite(cameraDistance) || cameraDistance <= 0f)
-            {
-                return 100000f;
-            }
-
-            return Math.Max(100000f, cameraDistance * 4f);
-        }
-
         private void SetCameraView_Click(object sender, RoutedEventArgs e)
         {
             if (_cameraController == null || sender is not Button btn || btn.Tag is not string viewType) return;
@@ -1202,72 +1178,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (distance < 50) distance = 250;
             }
 
-            var pose = CalculateCameraView(viewType, targetPoint, distance);
+            var pose = CameraPresets.CalculateCameraView(viewType, targetPoint, distance);
             if (pose == null) return;
 
             _cameraController.SnapTo(
                 pose.Value.Position,
                 pose.Value.LookDirection,
                 pose.Value.UpDirection);
-        }
-
-        internal static (
-            Point3D Position,
-            Vector3D LookDirection,
-            Vector3D UpDirection)? CalculateCameraView(
-                string viewType,
-                Point3D target,
-                double distance)
-        {
-            if (!double.IsFinite(distance) || distance <= 0)
-            {
-                return null;
-            }
-
-            Vector3D worldUp = new Vector3D(0, 1, 0);
-            return viewType switch
-            {
-                "Front" => (
-                    target + new Vector3D(0, 0, distance),
-                    new Vector3D(0, 0, -distance),
-                    worldUp),
-                "Back" => (
-                    target + new Vector3D(0, 0, -distance),
-                    new Vector3D(0, 0, distance),
-                    worldUp),
-                "Left" => (
-                    target + new Vector3D(-distance, 0, 0),
-                    new Vector3D(distance, 0, 0),
-                    worldUp),
-                "Right" => (
-                    target + new Vector3D(distance, 0, 0),
-                    new Vector3D(-distance, 0, 0),
-                    worldUp),
-                "Top" => (
-                    target + new Vector3D(0, distance, 0),
-                    new Vector3D(0, -distance, 0),
-                    new Vector3D(0, 0, -1)),
-                "Bottom" => (
-                    target + new Vector3D(0, -distance, 0),
-                    new Vector3D(0, distance, 0),
-                    new Vector3D(0, 0, 1)),
-                _ => null
-            };
-        }
-
-        internal static double CalculateMapFrameDistance(double radius, double fovDegrees, double aspect)
-        {
-            if (!double.IsFinite(radius) || radius <= 0d ||
-                !double.IsFinite(fovDegrees) || fovDegrees <= 0d || fovDegrees >= 180d ||
-                !double.IsFinite(aspect) || aspect <= 0d)
-            {
-                return 0d;
-            }
-
-            double vertical = fovDegrees * Math.PI / 180d;
-            double horizontal = 2d * Math.Atan(Math.Tan(vertical / 2d) * aspect);
-            double half = Math.Min(vertical, horizontal) / 2d;
-            return radius / Math.Sin(half) * 1.15d;
         }
 
         private bool TryGetModelBounds(

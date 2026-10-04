@@ -9,6 +9,7 @@ using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Utils.Rendering;
+using AssetsManager.Utils.Viewport;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
@@ -49,7 +50,7 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 _model.PreviewCameraPreset = VfxPreviewCameraPreset.Orbit;
-                ApplyCameraDistanceLimits(VfxPreviewCamera.Stand(VfxPreviewCameraPreset.Orbit), TryGetStandaloneMapCenter(out _));
+                ApplyCameraDistanceLimits(CameraPresets.ForStudio(VfxPreviewCameraPreset.Orbit), TryGetStandaloneMapCenter(out _));
             }
             finally
             {
@@ -78,13 +79,13 @@ namespace AssetsManager.Views.Controls.Viewer
             float aspect = OpenTkControl.ActualHeight > 0d
                 ? (float)Math.Max(1d, OpenTkControl.ActualWidth) / (float)OpenTkControl.ActualHeight
                 : 1f;
-            double reach = VfxPreviewCamera.ReachOfOrthographicWidth(
+            double reach = CameraPresets.ReachOfOrthographicWidth(
                 (float)Math.Max(1d, orthographic.Width),
                 aspect);
             Point3D position = target + fromTarget * reach;
 
             // Carry the exact target, orientation and visible span into the perspective camera.
-            _previewPerspectiveCamera.FieldOfView = VfxPreviewCamera.OrbitFieldOfView;
+            _previewPerspectiveCamera.FieldOfView = CameraPresets.OrbitFieldOfView;
             _previewPerspectiveCamera.Position = position;
             _previewPerspectiveCamera.LookDirection = target - position;
             _previewPerspectiveCamera.UpDirection = orthographic.UpDirection;
@@ -95,7 +96,7 @@ namespace AssetsManager.Views.Controls.Viewer
         /// Zoom limits of a camera stand. A standalone MAP frees the reach to the whole map unless the stand
         /// bounds it: the Game camera keeps its game reach there too.
         /// </summary>
-        private void ApplyCameraDistanceLimits(VfxCameraStand stand, bool standaloneMap)
+        private void ApplyCameraDistanceLimits(CameraStand stand, bool standaloneMap)
         {
             bool mapReach = standaloneMap && stand.Farthest == null;
             _cameraController.PerspectiveMinDistance = mapReach ? 10d : stand.Nearest ?? (standaloneMap ? 1000d : 0d);
@@ -106,7 +107,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_cameraController == null) return;
 
-            VfxCameraStand stand = VfxPreviewCamera.Stand(preset);
+            CameraStand stand = CameraPresets.ForStudio(preset);
             bool isStandaloneMap = TryGetStandaloneMapCenter(out _);
             ApplyCameraDistanceLimits(stand, isStandaloneMap);
 
@@ -126,7 +127,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 FrameCurrentPreview(stand);
         }
 
-        private void FrameCurrentPreview(VfxCameraStand stand)
+        private void FrameCurrentPreview(CameraStand stand)
         {
             if (_cameraController == null) return;
 
@@ -144,7 +145,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (TryGetStandaloneMapCenter(out _) &&
                 _model.PreviewCameraPreset == VfxPreviewCameraPreset.Orbit)
             {
-                var mapOrbitStand = new VfxCameraStand(
+                var mapOrbitStand = new CameraStand(
                     Vector3.Normalize(new Vector3(280f, 150f, 400f)),
                     Vector3.UnitY,
                     stand.FieldOfView,
@@ -248,7 +249,7 @@ namespace AssetsManager.Views.Controls.Viewer
             return Vector3.Zero;
         }
 
-        private void FramePreviewBounds(VfxDefinitionBounds bounds, VfxCameraStand stand)
+        private void FramePreviewBounds(VfxDefinitionBounds bounds, CameraStand stand)
         {
             if (_cameraController == null) return;
 

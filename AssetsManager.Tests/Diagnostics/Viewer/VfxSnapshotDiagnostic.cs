@@ -26,6 +26,7 @@ using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 using Silk.NET.OpenGL;
 using PixelFormat = Silk.NET.OpenGL.PixelFormat;
+using AssetsManager.Utils.Viewport;
 
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
@@ -156,8 +157,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             bool orthographic = args.Contains("--orthographic");
             float orthoSize = 2f * Vector3.Distance(frame.Position, frame.Target) * MathF.Tan(20f * MathF.PI / 180f);
             Matrix4x4 projection = orthographic
-                ? Matrix4x4.CreateOrthographic(orthoSize, orthoSize, VfxPreviewCamera.NearPlane, VfxPreviewCamera.FarPlane)
-                : Matrix4x4.CreatePerspectiveFieldOfView(40f * MathF.PI / 180f, 1f, VfxPreviewCamera.NearPlane, VfxPreviewCamera.FarPlane);
+                ? Matrix4x4.CreateOrthographic(orthoSize, orthoSize, CameraPresets.StudioNearPlane, CameraPresets.StudioFarPlane)
+                : Matrix4x4.CreatePerspectiveFieldOfView(40f * MathF.PI / 180f, 1f, CameraPresets.StudioNearPlane, CameraPresets.StudioFarPlane);
             Console.WriteLine($"[Snapshot] Camera projection: {(orthographic ? "orthographic" : "perspective")}");
             Matrix4x4 viewProjection = view * projection;
 

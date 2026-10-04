@@ -11,6 +11,7 @@ using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Utils.Viewport;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
@@ -279,11 +280,11 @@ namespace AssetsManager.Views.Controls.Viewer
             float aspect = (float)width / height;
             bool hasMapScene = _mapSceneRuntime != null;
             float projectionNear = hasMapScene
-                ? ViewerViewportControl.CalculateProjectionNearPlane(lookDir, isMapGeometry: true)
-                : VfxPreviewCamera.NearPlane;
+                ? CameraPresets.CalculateProjectionNearPlane(lookDir, isMapGeometry: true)
+                : CameraPresets.StudioNearPlane;
             float projectionFar = hasMapScene
-                ? ViewerViewportControl.CalculateProjectionFarPlane(lookDir)
-                : VfxPreviewCamera.FarPlane;
+                ? CameraPresets.CalculateProjectionFarPlane(lookDir)
+                : CameraPresets.StudioFarPlane;
             Matrix4x4 proj = camera switch
             {
                 PerspectiveCamera perspective => Matrix4x4.CreatePerspectiveFieldOfView(
