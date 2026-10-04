@@ -231,12 +231,11 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_championModel == null || !_model.IsSkinWorkspace) return;
 
-            double autoYaw = CharacterAutoRotation(FocusedActor);
             _championModel.PositionX = _model.CharacterPositionX;
             _championModel.PositionY = _model.CharacterPositionY;
             _championModel.PositionZ = _model.CharacterPositionZ;
             _championModel.RotationX = _model.CharacterRotationX;
-            _championModel.RotationY = _model.CharacterRotationY + autoYaw;
+            _championModel.RotationY = _model.CharacterRotationY;
             _championModel.RotationZ = _model.CharacterRotationZ;
             _championModel.Scale = _championAuthoredScale * _model.CharacterScaleMultiplier;
 
@@ -254,10 +253,9 @@ namespace AssetsManager.Views.Controls.Viewer
             if (!_model.IsSkinWorkspace)
                 return Matrix4x4.Identity;
 
-            double autoYaw = CharacterAutoRotation(FocusedActor);
             return VfxCharacterViewportSemantics.CharacterPlacementWorld(
                 _model.CharacterRotationX,
-                _model.CharacterRotationY + autoYaw,
+                _model.CharacterRotationY,
                 _model.CharacterRotationZ,
                 _model.CharacterScaleMultiplier,
                 _model.CharacterPositionX,

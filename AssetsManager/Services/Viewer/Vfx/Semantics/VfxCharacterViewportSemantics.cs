@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Semantics
@@ -18,21 +20,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
         internal static bool MapCharacterClipOwnsVfxRenderer(bool hasActiveClip, bool groupHasPreviewClip) =>
             hasActiveClip || groupHasPreviewClip;
 
-        internal static double AdvanceAutoRotation(double degrees, double deltaSeconds, double speedDegreesPerSecond = 30d)
+        internal static void RotateSelectedActors(IEnumerable<VfxSceneActor> actors, double deltaSeconds, string backdropKey)
         {
-            if (!double.IsFinite(degrees)) degrees = 0d;
-            if (!double.IsFinite(deltaSeconds) || deltaSeconds <= 0d) return NormalizeDegrees(degrees);
-            if (!double.IsFinite(speedDegreesPerSecond)) speedDegreesPerSecond = 30d;
-            return NormalizeDegrees(degrees + deltaSeconds * speedDegreesPerSecond);
-        }
-
-        internal static double ActorAutoRotation(VfxSceneActor actor, bool enabled, double degrees) =>
-            enabled && actor?.IsSelected == true ? degrees : 0d;
-
-        private static double NormalizeDegrees(double degrees)
-        {
-            double normalized = degrees % 360d;
-            return normalized < 0d ? normalized + 360d : normalized;
+            foreach (VfxSceneActor actor in actors)
+            {
+                if (!actor.IsSelected) continue;
+                actor.RotationY = ViewerAutoRotation.Advance(actor.RotationY, deltaSeconds);
+                actor.PlacementCustomized = true;
+                actor.PlacedOnKey = backdropKey;
+            }
         }
 
         /// <summary>

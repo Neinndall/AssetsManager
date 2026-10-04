@@ -22,11 +22,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private void RefreshCharacterInteractionTarget()
         {
             SynchronizeSceneActorsListSelection();
-            if (_model.CharacterAutoRotate)
-            {
-                ApplyCharacterPlacement();
-                ApplySceneActorPlacements();
-            }
             // Picking sees every visible Character; the gizmo translates only the selected group.
             _characterInteractionModels.Clear();
             SceneModel focused = _championModel != null && _model.IsSkinWorkspace && IsFocusedActorVisible
@@ -107,16 +102,19 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            // Match the normal Viewer: one calm 30-degree/second orbit. This is a transient layer over
-            // the user's authored placement, so disabling Auto Rotate restores the exact manual yaw.
-            _characterAutoRotateDegrees = VfxCharacterViewportSemantics.AdvanceAutoRotation(
-                _characterAutoRotateDegrees,
-                deltaSeconds);
+            if (FocusedActor?.IsSelected == true)
+                FocusedActor.RotationY = _model.CharacterRotationY;
+            VfxCharacterViewportSemantics.RotateSelectedActors(
+                _model.SelectedWorkspaceTab.Actors, deltaSeconds, ActiveCharacterBackdropKey());
+            if (FocusedActor?.IsSelected == true)
+            {
+                _isApplyingCharacterViewportState = true;
+                try { _model.CharacterRotationY = FocusedActor.RotationY; }
+                finally { _isApplyingCharacterViewportState = false; }
+            }
             ApplyCharacterPlacement();
+            ApplySceneActorPlacements();
         }
-
-        private double CharacterAutoRotation(VfxSceneActor actor) =>
-            VfxCharacterViewportSemantics.ActorAutoRotation(actor, _model.CharacterAutoRotate, _characterAutoRotateDegrees);
 
         private void ClearCharacterArmatureOverlay()
         {

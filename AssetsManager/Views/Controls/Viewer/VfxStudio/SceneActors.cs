@@ -349,7 +349,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _sceneActorRuntimes[actor] = runtime;
             runtime.SetGameStates(actor.EnabledGameStates);
-            runtime.ApplyPlacement(actor, CharacterAutoRotation(actor));
+            runtime.ApplyPlacement(actor);
             actor.StatusText = runtime.DescribePlayback();
             RefreshCharacterInteractionTarget();
             OpenTkControl?.InvalidateVisual();
@@ -552,8 +552,6 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_sceneActorRuntimes.Count == 0 || !_model.IsSkinWorkspace) return;
             foreach ((VfxSceneActor actor, VfxSceneActorRuntime runtime) in _sceneActorRuntimes)
             {
-                if (_model.CharacterAutoRotate)
-                    runtime.ApplyPlacement(actor, CharacterAutoRotation(actor));
                 runtime.Advance(deltaSeconds, !actor.IsPlaybackPaused, _model.Speed, actor);
             }
         }
@@ -561,7 +559,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ApplySceneActorPlacements()
         {
             foreach ((VfxSceneActor actor, VfxSceneActorRuntime runtime) in _sceneActorRuntimes)
-                runtime.ApplyPlacement(actor, CharacterAutoRotation(actor));
+                runtime.ApplyPlacement(actor);
             OpenTkControl?.InvalidateVisual();
         }
 
@@ -649,7 +647,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 actor.PositionZ += delta.Z;
                 actor.PlacedOnKey = sourceKey;
                 if (_sceneActorRuntimes.TryGetValue(actor, out VfxSceneActorRuntime runtime))
-                    runtime.ApplyPlacement(actor, CharacterAutoRotation(actor));
+                    runtime.ApplyPlacement(actor);
             }
         }
 

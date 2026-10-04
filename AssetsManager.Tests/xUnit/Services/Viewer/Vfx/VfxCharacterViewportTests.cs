@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Windows.Input;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Helpers;
@@ -73,18 +74,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void AutoRotateMatchesViewerSpeedAndWrapsWithoutChangingPlacementYaw()
+        public void SharedAutoRotationKeepsItsAngleWhenStoppedAndResumesAtViewerSpeed()
         {
-            double phase = VfxCharacterViewportSemantics.AdvanceAutoRotation(350d, 1d);
-            Assert.Equal(20d, phase, 8);
-
-            double manualYaw = 35d;
-            Assert.Equal(55d, manualYaw + phase, 8);
-            Assert.Equal(35d, manualYaw, 8);
+            double yaw = ViewerAutoRotation.Advance(350d, 1d);
+            Assert.Equal(20d, yaw, 8);
+            Assert.Equal(yaw, ViewerAutoRotation.Advance(yaw, 0d));
+            Assert.Equal(50d, ViewerAutoRotation.Advance(yaw, 1d), 8);
+            Assert.Equal(345d, ViewerAutoRotation.Advance(-45d, 1d), 8);
+            double stepped = 350d;
+            for (int i = 0; i < 4; i++) stepped = ViewerAutoRotation.Advance(stepped, .25d);
+            Assert.Equal(yaw, stepped, 8);
         }
 
         [Fact]
-        public void AutoRotateFollowsSingleAndGroupSelectionAndRestoresManualActorPlacement()
+        public void AutoRotateKeepsActorAnglesAcrossStopsSelectionChangesAndResume()
         {
             using var loading = new VfxLoadingService();
             var first = new VfxSceneActor(new VfxSkinItem { OwnerName = "Aatrox", SkinIndex = 0 })
@@ -108,28 +111,40 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     modifiers, item => item.IsSelected, (item, selected) => item.IsSelected = selected);
                 if (actor?.IsSelected == true) tab.FocusedActor = actor;
             }
-            void Verify(double phase, double firstYaw, double secondYaw, bool enabled = true)
+            void Verify(double deltaSeconds, double firstYaw, double secondYaw, bool enabled = true)
             {
+                if (enabled)
+                    VfxCharacterViewportSemantics.RotateSelectedActors(tab.Actors, deltaSeconds, "stage");
                 for (int i = 0; i < runtimes.Length; i++)
-                    runtimes[i].ApplyPlacement(tab.Actors[i],
-                        VfxCharacterViewportSemantics.ActorAutoRotation(tab.Actors[i], enabled, phase));
+                    runtimes[i].ApplyPlacement(tab.Actors[i]);
                 Assert.Equal(firstYaw, runtimes[0].Model.RotationY);
                 Assert.Equal(secondYaw, runtimes[1].Model.RotationY);
                 Assert.Equal(-100d, runtimes[0].Model.PositionX);
                 Assert.Equal(100d, runtimes[1].Model.PositionX);
-                Assert.Equal(35d, first.RotationY);
-                Assert.Equal(90d, second.RotationY);
+                Assert.Equal(firstYaw, first.RotationY);
+                Assert.Equal(secondYaw, second.RotationY);
             }
             try
             {
-                Verify(30d, 65d, 90d);
+                Verify(1d, 65d, 90d);
+                Assert.True(first.PlacementCustomized);
+                Assert.Equal("stage", first.PlacedOnKey);
+                Assert.False(second.PlacementCustomized);
+                Verify(1d, 65d, 90d, enabled: false);
+                Verify(0d, 65d, 90d);
+                Verify(.5d, 80d, 90d);
                 Select(second);
-                Verify(60d, 35d, 150d);
+                Verify(1d, 80d, 120d);
                 Select(first, ModifierKeys.Control);
-                Verify(90d, 125d, 180d);
-                Verify(90d, 35d, 90d, enabled: false);
+                Verify(1d, 110d, 150d);
+                Verify(1d, 110d, 150d, enabled: false);
                 Select(null);
-                Verify(120d, 35d, 90d);
+                Verify(1d, 110d, 150d);
+                Select(first);
+                Verify(1d, 140d, 150d);
+                var copy = tab.CopyForBackdrop("copy", "map", "Map");
+                Assert.Equal(140d, copy.Actors[0].RotationY);
+                Assert.Equal(150d, copy.Actors[1].RotationY);
             }
             finally
             {

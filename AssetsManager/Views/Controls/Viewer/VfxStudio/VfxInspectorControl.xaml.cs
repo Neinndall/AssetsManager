@@ -95,7 +95,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private VfxCubeMapData _genericSkyCube;
         private VfxCubeMapData _mapSkyCube;
         private bool _skyCubeDirty;
-        private double _characterAutoRotateDegrees;
         private readonly List<SceneModel> _characterInteractionModels = new();
         private ViewportModelInteractionController _characterInteractionController;
         private MapCharacterRuntimeGroup _activeMapCharacterGroup;

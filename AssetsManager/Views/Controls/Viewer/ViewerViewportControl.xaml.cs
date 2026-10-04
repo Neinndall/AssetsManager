@@ -981,17 +981,16 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_viewModel.IsAutoRotateActive)
             {
-                double rotationDelta = 30.0 * deltaTime;
                 if (IsDiffMode)
                 {
                     foreach (SceneModel model in _loadedModels)
-                        model.RotationY = (model.RotationY + rotationDelta) % 360;
+                        model.RotationY = ViewerAutoRotation.Advance(model.RotationY, deltaTime);
                     foreach (SceneModel model in _auxiliaryModels)
-                        model.RotationY = (model.RotationY + rotationDelta) % 360;
+                        model.RotationY = ViewerAutoRotation.Advance(model.RotationY, deltaTime);
                 }
                 else if (_activeSceneModel != null)
                 {
-                    _activeSceneModel.RotationY = (_activeSceneModel.RotationY + rotationDelta) % 360;
+                    _activeSceneModel.RotationY = ViewerAutoRotation.Advance(_activeSceneModel.RotationY, deltaTime);
                 }
             }
 

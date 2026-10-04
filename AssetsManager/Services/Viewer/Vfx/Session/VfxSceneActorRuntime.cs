@@ -409,22 +409,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         /// <summary>Applies the actor placement to the mesh and to its character-attached VFX.</summary>
-        internal void ApplyPlacement(VfxSceneActor actor, double autoYawDegrees)
+        internal void ApplyPlacement(VfxSceneActor actor)
         {
             if (actor == null) return;
-            double yaw = actor.RotationY + autoYawDegrees;
             Model.PositionX = actor.PositionX;
             Model.PositionY = actor.PositionY;
             Model.PositionZ = actor.PositionZ;
             Model.RotationX = actor.RotationX;
-            Model.RotationY = yaw;
+            Model.RotationY = actor.RotationY;
             Model.RotationZ = actor.RotationZ;
             Model.Scale = AuthoredScale * actor.ScaleMultiplier;
 
             // Owner joints already carry the authored skinScale; only the user multiplier goes here.
             Session.SetWorldTransform(VfxCharacterViewportSemantics.CharacterPlacementWorld(
                 actor.RotationX,
-                yaw,
+                actor.RotationY,
                 actor.RotationZ,
                 actor.ScaleMultiplier,
                 actor.PositionX,
