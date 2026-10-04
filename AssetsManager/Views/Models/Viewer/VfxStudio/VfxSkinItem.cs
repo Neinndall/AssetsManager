@@ -17,6 +17,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         public ObservableCollection<VfxBrowserSection> Sections { get; } = new();
         public ObservableCollection<object> SpellItems { get; } = new();
+        public string KindLabel { get; init; }
         public string Title => !string.IsNullOrWhiteSpace(BrowserTitle)
             ? BrowserTitle
             : SkinIndex == int.MaxValue

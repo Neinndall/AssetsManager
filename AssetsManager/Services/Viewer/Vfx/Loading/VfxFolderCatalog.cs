@@ -68,6 +68,7 @@ internal static class VfxFolderCatalog
         uint skinClass = Fnv1a.HashLower("SkinCharacterDataProperties");
         uint systemClass = Fnv1a.HashLower("VfxSystemDefinitionData");
         uint spellClass = Fnv1a.HashLower("SpellObject");
+        Dictionary<(string Character, int Index), string> skinKinds = DiscoverSkinKinds(root, cancellationToken);
 
         foreach (string path in Directory.EnumerateFiles(root, "*.bin", SearchOption.AllDirectories))
         {
@@ -110,11 +111,20 @@ internal static class VfxFolderCatalog
                 string stem = Path.GetFileNameWithoutExtension(path);
                 int index = stem.StartsWith("skin", StringComparison.OrdinalIgnoreCase) &&
                     int.TryParse(stem.AsSpan(4), out int id) ? id : int.MaxValue;
+                string[] segments = Split(path);
+                int characterAt = IndexOf(segments, "characters");
+                string kindLabel = null;
+                if (skin && characterAt >= 0 && characterAt + 2 < segments.Length
+                    && segments[characterAt + 2].Equals("skins", StringComparison.OrdinalIgnoreCase))
+                {
+                    skinKinds.TryGetValue((segments[characterAt + 1].ToLowerInvariant(), index), out kindLabel);
+                }
                 var entry = new VfxSkinItem
                 {
                     DisplayName = Path.GetRelativePath(root, path),
                     BinPath = Path.GetFullPath(path),
-                    SkinIndex = index
+                    SkinIndex = index,
+                    KindLabel = kindLabel
                 };
                 (skin ? skins : effects).Add(entry);
             }
@@ -193,6 +203,42 @@ internal static class VfxFolderCatalog
             .FirstOrDefault() ?? Array.Empty<MapVariantData>();
 
         return new ScanResult(entries, spells.ToArray(), selectedVariants);
+    }
+
+    private static Dictionary<(string Character, int Index), string> DiscoverSkinKinds(
+        string root,
+        CancellationToken cancellationToken)
+    {
+        var kinds = new Dictionary<(string Character, int Index), string>();
+        IEnumerable<string> skinRoots = Directory.EnumerateDirectories(root, "skins", SearchOption.AllDirectories);
+        if (Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .Equals("skins", StringComparison.OrdinalIgnoreCase))
+        {
+            skinRoots = skinRoots.Prepend(root);
+        }
+
+        foreach (string skinRoot in skinRoots)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DirectoryInfo character = Directory.GetParent(skinRoot);
+            if (character?.Parent?.Name.Equals("characters", StringComparison.OrdinalIgnoreCase) != true) continue;
+
+            foreach (string directory in Directory.EnumerateDirectories(skinRoot))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string name = Path.GetFileName(directory);
+                int index;
+                if (name.Equals("base", StringComparison.OrdinalIgnoreCase)) index = 0;
+                else if (!name.StartsWith("skin", StringComparison.OrdinalIgnoreCase)
+                    || !int.TryParse(name.AsSpan(4), out index)) continue;
+
+                // A chroma can reference another skin's mesh; classify its own folder, as Chroma Library does.
+                string kind = Directory.EnumerateFiles(directory, "*.skn").Any() ? "Skin"
+                    : Directory.EnumerateFiles(directory, "*.tex").Any() ? "Chroma" : null;
+                if (kind != null) kinds[(character.Name.ToLowerInvariant(), index)] = kind;
+            }
+        }
+        return kinds;
     }
 
     private static IReadOnlyList<MapSceneSource> DiscoverMapSources(

@@ -994,6 +994,55 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void FolderCatalogLabelsSkinsAndChromasFromTheirOwnAssetFolders()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"AssetsManagerSkinKinds_{Guid.NewGuid():N}");
+            var cases = new[]
+            {
+                (Character: "kayn", Index: 0, Folder: "base", Kind: "Skin"),
+                (Character: "kayn", Index: 1, Folder: "skin01", Kind: "Skin"),
+                (Character: "kayn", Index: 2, Folder: "skin02", Kind: "Skin"),
+                (Character: "kayn", Index: 3, Folder: "skin03", Kind: "Chroma"),
+                (Character: "kayn", Index: 4, Folder: "skin04", Kind: (string)null),
+                (Character: "other", Index: 3, Folder: "skin03", Kind: "Skin")
+            };
+            try
+            {
+                foreach (var item in cases)
+                {
+                    string bins = Path.Combine(root, "data", "characters", item.Character, "skins");
+                    Directory.CreateDirectory(bins);
+                    WriteSkinBin(Path.Combine(bins, $"skin{item.Index}.bin"));
+                    if (item.Kind == null) continue;
+
+                    string assets = Path.Combine(root, "assets", "characters", item.Character, "skins", item.Folder);
+                    Directory.CreateDirectory(assets);
+                    string extension = item.Kind == "Skin" ? ".skn" : ".tex";
+                    File.WriteAllBytes(Path.Combine(assets, "model" + extension), Array.Empty<byte>());
+                    if (item.Kind == "Chroma")
+                    {
+                        string particles = Path.Combine(assets, "particles");
+                        Directory.CreateDirectory(particles);
+                        File.WriteAllBytes(Path.Combine(particles, "effect.skn"), Array.Empty<byte>());
+                    }
+                }
+
+                var entries = VfxFolderCatalog.Scan(root, System.Threading.CancellationToken.None);
+
+                Assert.Equal(cases.Length, entries.Count);
+                foreach (var item in cases)
+                {
+                    string bin = Path.Combine(root, "data", "characters", item.Character, "skins", $"skin{item.Index}.bin");
+                    Assert.Equal(item.Kind, Assert.Single(entries, entry => entry.BinPath == bin).KindLabel);
+                }
+            }
+            finally
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void FolderCatalogListsEveryMapGeometryWithoutSelectingAPrimaryMap()
         {
             string parent = Path.Combine(Path.GetTempPath(), "AssetsManagerMapCatalog", Guid.NewGuid().ToString("N"));
