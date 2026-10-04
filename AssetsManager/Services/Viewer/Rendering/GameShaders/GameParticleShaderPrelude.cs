@@ -140,6 +140,9 @@ void particleFeed(){
     particleTint = uColor;
     particleErosion = uErosionDrive;
 " : @"
+    // Ribbon geometry repacks the driver lanes and carries the resolved lookup separately.
+    if (uPrimitiveKind == 5 || uPrimitiveKind == 6 || uPrimitiveKind == 8 || uPrimitiveKind == 10)
+        particleLookup = vRibbonLookup;
     particleTint = vColor;
     particleErosion = vErosionDrive;
 ") + @"

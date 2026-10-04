@@ -178,7 +178,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                                  .Where(item => string.Equals(item.Def.Name, traced, StringComparison.OrdinalIgnoreCase)))
                         Console.WriteLine($"[Snapshot] trace t={time:0.00} {state.Def.Name} age={state.Age:0.000} burstDone={state.BurstDone} " +
                                           $"initial={state.InitialEmissionDone} finishedAt={state.FinishedAt:0.000} visible={state.IsVisible} particles={state.Particles.Count} " +
-                                          $"texture={state.Texture} reflection={state.ReflectionTexture} meshVao={state.MeshVao} " +
+                                          $"texture={state.Texture} palette={state.PaletteTexture} reflection={state.ReflectionTexture} meshVao={state.MeshVao} " +
+                                          $"program={session.GameParticleFallback(state, state.Def.IsMeshPrimitive) ?? "game"} " +
                                           string.Join(" ", state.Particles.Take(3).Select(particle => $"[age={particle.Age:0.000} life={particle.Life:0.000}]")));
                     foreach (var state in session.Graphs.SelectMany(graph => graph.Runtimes).SelectMany(runtime => runtime.Emitters)
                                  .Where(item => string.Equals(item.Def.Name, traced, StringComparison.OrdinalIgnoreCase) && item.Def.HasResolvedCustomMaterial).Take(1))
@@ -225,11 +226,14 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     int live = session.GetEmitterLiveCount(order);
                     if (live == 0 && emitterDarker + emitterBrighter < 0.001f) continue;
                     VfxEmitterDefinition emitter = emitters[order];
+                    string fallback = session.TryGetRootEmitterState(order, out var emitterState)
+                        ? session.GameParticleFallback(emitterState, emitter.IsMeshPrimitive)
+                        : session.GameParticleFallback(emitter, emitter.IsMeshPrimitive);
                     (float faintDarker, float faintBrighter) = Coverage(alone, 0.01f);
                     Console.WriteLine($"[Snapshot]   #{order} {emitter.Name} live={live} blend={emitter.BlendMode} " +
                                       $"darker={emitterDarker:P1} brighter={emitterBrighter:P1} touched={faintDarker + faintBrighter:P1} " +
                                       $"soft={emitter.SoftParticle != null} erosion={emitter.AlphaErosion != null} mult={emitter.TextureMultPath != null} " +
-                                      $"program={session.GameParticleFallback(emitter, emitter.IsMeshPrimitive) ?? "game"}");
+                                      $"program={fallback ?? "game"}");
                     SavePng(alone, size, Path.Combine(output, $"{stem}_t{time.ToString("0.00", CultureInfo.InvariantCulture)}_e{order:00}_{Sanitize(emitter.Name)}.png"));
                 }
             }

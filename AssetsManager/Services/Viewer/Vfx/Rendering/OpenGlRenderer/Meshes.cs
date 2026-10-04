@@ -383,7 +383,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     meshRotation.Y,
                     meshRotation.Z);
                 _meshUniforms.Uniform3(_meshUniforms.GameLookupDrivers, instances[o + 11],
-                    new Vector3(instances[o + 12], instances[o + 13], instances[o + 14]).Length(), instances[o + 35]);
+                    new Vector3(instances[o + 12], instances[o + 13], instances[o + 14]).Length(), instances[o + 34]);
                 _meshUniforms.Uniform4(_meshUniforms.Color, instances[o + 5], instances[o + 6], instances[o + 7], instances[o + 8]);
                 _meshUniforms.Uniform2(_meshUniforms.BirthUvOffset, instances[o + 19], instances[o + 20]);
                 _meshUniforms.Uniform2(_meshUniforms.UvScale, instances[o + 21], instances[o + 22]);

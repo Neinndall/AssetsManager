@@ -43,6 +43,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         internal string GameParticleFallback(VfxEmitterDefinition emitter, bool mesh) =>
             _renderer == null ? "Renderer not initialized." : _renderer.GameParticleFallback(emitter, mesh);
 
+        internal string GameParticleFallback(VfxPlaybackRuntime.EmitterState emitter, bool mesh) =>
+            _renderer == null ? "Renderer not initialized." : _renderer.GameParticleFallback(emitter, mesh);
+
         internal void SetSun(MapSunData sun)
         {
             if (_renderer != null) _renderer.Sun = sun;

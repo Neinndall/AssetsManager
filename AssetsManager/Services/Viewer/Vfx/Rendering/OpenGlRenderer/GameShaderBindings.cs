@@ -29,15 +29,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return (depth || inputs.Depth, inputs.Color);
         }
 
-        /// <summary>Why the emitter draws with the stock program instead of the game's: null when the game's program is used.</summary>
+        /// <summary>Shader fallback from authored data; live resource readiness is checked by the state overload.</summary>
         internal string GameParticleFallback(VfxEmitterDefinition emitter, bool mesh) =>
             _gameShaders == null ? "Game shaders are unavailable." : _gameShaders.ParticleProgramFallback(emitter, mesh);
+
+        internal string GameParticleFallback(VfxPlaybackRuntime.EmitterState emitter, bool mesh) =>
+            GameParticleFallback(emitter.Def, mesh) ??
+            (HasGameParticleResources(emitter) ? null : "Palette texture is unavailable.");
+
+        private static bool HasGameParticleResources(VfxPlaybackRuntime.EmitterState emitter) =>
+            emitter.Def.HasResolvedCustomMaterial || emitter.Def.PaletteDefinition is null || emitter.PaletteTexture != 0;
 
         private static bool HasParticleDraw(VfxPlaybackRuntime.EmitterState emitter) =>
             emitter.InstanceCount > 0 && emitter.IsVisible && (!emitter.Def.IsMeshPrimitive || emitter.MeshVao != 0);
 
         private int ParticlePassCount(VfxPlaybackRuntime.EmitterState emitter, bool mesh, bool wireframe) =>
-            wireframe || emitter.Def.DrawsAsProjection || !HasParticleDraw(emitter) ? 0 : _gameShaders?.GetParticlePassCount(emitter.Def, mesh) ?? 0;
+            wireframe || emitter.Def.DrawsAsProjection || !HasParticleDraw(emitter) || !HasGameParticleResources(emitter)
+                ? 0 : _gameShaders?.GetParticlePassCount(emitter.Def, mesh) ?? 0;
 
         private bool ParticlePassTransparent(VfxPlaybackRuntime.EmitterState emitter, int pass, bool wireframe) =>
             HasParticleDraw(emitter) && IsParticlePassTransparent(emitter.Def, wireframe, !emitter.Def.DrawsAsProjection && emitter.Def.HasResolvedCustomMaterial
@@ -56,7 +64,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private bool UseGameParticle(VfxPlaybackRuntime.EmitterState emitter, bool mesh, int pass, bool wireframe)
         {
-            uint program = wireframe ? 0 : _gameShaders?.UseParticleProgram(emitter.Def, mesh, pass) ?? 0;
+            // A palettized native pass cannot use a white substitute while its palette uploads or is missing.
+            uint program = wireframe || !HasGameParticleResources(emitter)
+                ? 0 : _gameShaders?.UseParticleProgram(emitter.Def, mesh, pass) ?? 0;
             if (program == 0)
             {
                 for (uint unit = 0; unit < 16; unit++) _gl.BindSampler(unit, 0);
