@@ -163,7 +163,7 @@ New Features
 
 Improvements
   - Viewer / Improved ground logo filtering when reduced or viewed from a distance.
-  - 3D Studio / Made submesh cards more compact with visibility beside the texture selector and clearer names.
+  - 3D Studio / Submeshes now use independent compact cards with visibility beside the texture selector.
   - Monitor / Versions now supports Shift-click ranges and Ctrl+Shift-click to add ranges to the selection.
   - VFX Studio / Reorganized Geometry and Map Backdrop with descriptive headings and grouped controls.
   - VFX Studio / Reduced the top spacing inside submesh cards.
@@ -488,6 +488,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - 3D Studio / Game State now starts collapsed and closes with Collapse All.
   - VFX Studio / Recognized form names on older body materials, removing the duplicate Base entry on Kayn Skin0.
   - VFX Studio / Shaders now load unnamed material textures from WAD files, restoring dark wings and fabrics on Janna Skin67.
   - VFX Studio / Fixed missing body parts with Shaders enabled on skins with large skeletons, including Janna Skin67.

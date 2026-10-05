@@ -2091,7 +2091,7 @@
 
                             <!-- GAME STATE: buffs the skin's dynamic materials read (in combat, R form, passive ready...) -->
                             <StackPanel Visibility="{Binding HasCharacterGameStates, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <ToggleButton x:Name="CharacterGameStateSection" IsChecked="True" Style="{StaticResource CollapsibleSectionHeaderStyle}" Margin="0,0,0,4">
+                                <ToggleButton x:Name="CharacterGameStateSection" IsChecked="False" Style="{StaticResource CollapsibleSectionHeaderStyle}" Margin="0,0,0,4">
                                     <Grid Margin="8,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -2193,7 +2193,7 @@
                                 </Border>
 
                                 <!-- Submeshes Header Bar -->
-                                <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,12">
+                                <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,12" Margin="0,0,0,8">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,4">
                                             <Grid.ColumnDefinitions>
@@ -2209,6 +2209,8 @@
                                                     Content="RESET ALL" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
                                         </Grid>
                                         <TextBlock Text="Visibility and textures." Style="{StaticResource InspectorGroupDescriptionStyle}" Margin="26,2,0,4"/>
+                                    </StackPanel>
+                                </Border>
 
                                     <!-- Submeshes List -->
                                     <ItemsControl ItemsSource="{Binding CharacterSubmeshes}">
@@ -2216,7 +2218,7 @@
                                             <DataTemplate>
                                                 <Border Background="{StaticResource CardBackground}" CornerRadius="8"
                                                         BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                                        Margin="0,6,0,0" Padding="10,8">
+                                                        Margin="0,0,0,6" Padding="10,8">
                                                     <StackPanel>
                                                         <!-- Top: mesh identity and override indicator -->
                                                         <Grid Margin="0,0,0,8">
@@ -2226,7 +2228,7 @@
                                                                 <ColumnDefinition Width="Auto"/>
                                                             </Grid.ColumnDefinitions>
 
-                                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="CubeOutline" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="CubeOutline" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,8,0"/>
 
                                                             <TextBlock Grid.Column="1" Text="{Binding Name}"
                                                                        FontWeight="SemiBold" FontSize="12"
@@ -2263,8 +2265,6 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                    </StackPanel>
-                                </Border>
                             </StackPanel>
                         </StackPanel>
 

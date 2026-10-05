@@ -13,6 +13,7 @@ namespace AssetsManager.Views.Controls.Viewer
             StudioSceneActorsSection.IsChecked = false;
             MapBackdropSection.IsChecked = false;
             CharacterTransformSection.IsChecked = false;
+            CharacterGameStateSection.IsChecked = false;
             CharacterGeometrySection.IsChecked = false;
             MapSceneSection.IsChecked = false;
             MapLookSection.IsChecked = false;
