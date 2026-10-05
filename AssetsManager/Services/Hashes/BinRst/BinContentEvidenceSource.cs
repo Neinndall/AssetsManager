@@ -505,6 +505,191 @@ namespace AssetsManager.Services.Hashes
             "Weapon0", "Weapon1", "Weapon2", "Weapon3", "Level1", "Level2", "Level3", "Level4"
         };
 
+        internal static readonly string[] CommonAnimationClipNames =
+        {
+            // Core Movement & Transitions
+            "Idle1", "Idle2", "Idle3", "Idle4", "Idle_Base", "Idle_In", "Idle_Out", "Idle_Trans", "Idle_Turn", "Idle_Turn_Left", "Idle_Turn_Right",
+            "Run", "Run_Base", "Run_Fast", "Run_Hurt", "Run_In", "Run_Out", "Run_Trans", "Run_To_Idle", "Run_ToRun", "Run_Idle_Trans", "RunIn", "RunOut",
+            "Run_Homeguard", "Run_Homeguard_IN", "Run_Homeguard_Into", "Run_Homeguard_Out", "Run_HomeguardOut", "Run_Homeguard_OUT", "Run_Homeguard_RunIn",
+            "Run_Homeguard_Slayer", "Run_Homeguard_To_Idle", "Run_Homeguard_To_Idle_Homeguard", "Run_Homeguard_toRun", "Run_Homeguard_To_Run",
+            "Run_Homeguard_Trans", "Run_Homeguard_Trans_to_Run", "Run_Homeguard_Trans_to_Run_Fast", "Run_Homeguard_var01", "Run_HomeguardVarient",
+            "RunHUnt_To_Idle", "Run_ICE", "Run_Sprint", "Run_Combat", "Run_Aggro", "Run_Slow", "Run_SuperSlayer", "Run_Fly", "Run_Glide", "Run_Swim",
+            "Walk", "Walk_Base", "Walk_In", "Walk_Out", "Walk_Trans", "Walk_To_Idle", "Walk_Combat",
+
+            // Attacks & Crits
+            "Attack1", "Attack2", "Attack3", "Attack4", "Attack5", "Attack1_Crit", "Attack2_Crit", "Attack3_Crit", "Attack4_Crit", "Attack_Crit",
+            "Attack1_To_Idle", "Attack2_To_Idle", "Attack3_To_Idle", "Attack4_To_Idle", "Attack1_ToIdle", "Attack2_ToIdle", "Attack1ToIdle", "Attack2ToIdle",
+            "Attack1_Dash", "Attack2_Dash", "Attack1_BASE", "Attack2_BASE", "Attack1_Fast", "Attack2_Fast", "Attack1_Spell", "Attack2_Spell",
+            "Crit", "Crit1", "Crit2", "Crit_Attack",
+
+            // Spells (Q, W, E, R / Spell 1 to 4)
+            "Spell1", "Spell2", "Spell3", "Spell4", "Spell1_Cast", "Spell2_Cast", "Spell3_Cast", "Spell4_Cast",
+            "Spell1_Windup", "Spell2_Windup", "Spell3_Windup", "Spell4_Windup",
+            "Spell1_Channel", "Spell2_Channel", "Spell3_Channel", "Spell4_Channel",
+            "Spell1_Loop", "Spell2_Loop", "Spell3_Loop", "Spell4_Loop",
+            "Spell1_Mis", "Spell2_Mis", "Spell3_Mis", "Spell4_Mis",
+            "Spell1_In", "Spell2_In", "Spell3_In", "Spell4_In",
+            "Spell1_Out", "Spell2_Out", "Spell3_Out", "Spell4_Out",
+            "Spell1_End", "Spell2_End", "Spell3_End", "Spell4_End",
+            "Spell1_Trans", "Spell2_Trans", "Spell3_Trans", "Spell4_Trans",
+            "Spell1_To_Idle", "Spell2_To_Idle", "Spell3_To_Idle", "Spell4_To_Idle",
+            "Spell1_ToRun", "Spell2_ToRun", "Spell3_ToRun", "Spell4_ToRun",
+            "Spell1_Start", "Spell2_Start", "Spell3_Start", "Spell4_Start",
+            "Spell1_Recast", "Spell2_Recast", "Spell3_Recast", "Spell4_Recast",
+            "Spell1_Hold", "Spell2_Hold", "Spell3_Hold", "Spell4_Hold",
+
+            // Recall, Death & Respawn
+            "Recall", "Recall_Base", "Recall_In", "Recall_Out", "Recall_Loop", "Recall_Windup", "Recall_LeadIn", "Recall_End", "Recall_Lead_In",
+            "Death", "Death_Base", "Death_In", "Death_Out", "Death1", "Death2", "Death3", "Death_Idle", "Death_Resurrect",
+            "Respawn", "Respawn_Base", "Respawn_In", "Respawn_Out",
+
+            // Emotes & Socials
+            "Dance", "Dance_In", "Dance_Out", "Dance_Loop", "Dance1", "Dance2",
+            "Taunt", "Taunt_In", "Taunt_Out", "Taunt_Loop", "Taunt1", "Taunt2",
+            "Joke", "Joke_In", "Joke_Out", "Joke_Loop", "Joke1", "Joke2",
+            "Laugh", "Laugh_In", "Laugh_Out", "Laugh_Loop", "Laugh1", "Laugh2",
+            "Cheer", "Cheer1", "Cheer2",
+
+            // Crowd Control, Turns & Game Events
+            "Channel", "Channel_In", "Channel_Out", "Channel_Loop", "Channel_W", "Channel_R",
+            "Turn_Left", "Turn_Right", "Turn_180", "Turn_90", "Turn_L", "Turn_R",
+            "Stun", "Stun_In", "Stun_Out", "Stun_Loop", "Stunned",
+            "Knockup", "Knockup_In", "Knockup_Out", "Knockup_Loop",
+            "Fear", "Fear_In", "Fear_Out", "Fear_Loop",
+            "Charm", "Charm_In", "Charm_Out", "Charm_Loop",
+            "Sleep", "Sleep_In", "Sleep_Out", "Sleep_Loop",
+            "Spawn", "Spawn_Base", "Spawn_In", "Spawn_Out",
+            "Victory", "Victory_Base", "Victory_Loop",
+            "Lose", "Lose_Base", "Lose_Loop"
+        };
+
+        internal static readonly string[] CommonAnimationTracks =
+        {
+            "Default", "Override", "Additive", "UpperBody", "LowerBody", "Head", "Torso", "Pelvis", "Arms",
+            "Movement", "Action", "Face", "Weapon", "Wings", "Tail", "Base", "FullBody"
+        };
+
+        internal static readonly string[] CommonAnimationMasks =
+        {
+            "Base", "UpperBody", "LowerBody", "Head", "Torso", "Pelvis", "Arms", "Weapon", "Wings", "Tail",
+            "Additive", "FullBody", "NoRoot", "Root", "Default"
+        };
+
+        internal static readonly string[] CommonAnimationSyncGroups =
+        {
+            "Default", "Run", "Walk", "Idle", "Movement", "Combat", "Action"
+        };
+
+        private static bool TryMatchAnimationFileCandidates(
+            uint targetHash,
+            string animFilePath,
+            string champName,
+            string skinNum,
+            string path,
+            string wadPath,
+            InternalHashEvidenceMatcher matcher)
+        {
+            if (string.IsNullOrWhiteSpace(animFilePath)) return false;
+            string norm = animFilePath.Replace('\\', '/');
+            if (norm.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
+                norm = norm[..^4];
+
+            int lastSlash = norm.LastIndexOf('/');
+            string leaf = lastSlash >= 0 ? norm[(lastSlash + 1)..] : norm;
+            if (string.IsNullOrWhiteSpace(leaf)) return false;
+
+            // Check before dot if present (e.g. recall.skins_ahri_skin14)
+            int dotIdx = leaf.IndexOf('.');
+            if (dotIdx > 0)
+            {
+                string beforeDot = leaf[..dotIdx];
+                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, beforeDot, path, wadPath, targetHash))
+                    return true;
+                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, char.ToUpperInvariant(beforeDot[0]) + beforeDot[1..], path, wadPath, targetHash))
+                    return true;
+            }
+
+            var stems = new List<string>(8) { leaf };
+
+            if (!string.IsNullOrEmpty(champName))
+            {
+                string cPrefix = champName + "_";
+                if (leaf.StartsWith(cPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    string rem = leaf[cPrefix.Length..];
+                    stems.Add(rem);
+                    if (rem.StartsWith("skin", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int nextU = rem.IndexOf('_');
+                        if (nextU > 0 && nextU < rem.Length - 1)
+                            stems.Add(rem[(nextU + 1)..]);
+                    }
+                    else if (rem.StartsWith("base_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        stems.Add(rem[5..]);
+                    }
+                }
+            }
+
+            int firstUnderscore = leaf.IndexOf('_');
+            if (firstUnderscore > 0 && firstUnderscore < leaf.Length - 1)
+            {
+                stems.Add(leaf[(firstUnderscore + 1)..]);
+            }
+
+            for (int u = leaf.IndexOf('_'); u >= 0 && u < leaf.Length - 1; u = leaf.IndexOf('_', u + 1))
+            {
+                stems.Add(leaf[(u + 1)..]);
+            }
+
+            foreach (string stem in stems)
+            {
+                if (string.IsNullOrWhiteSpace(stem)) continue;
+
+                // 1. Raw stem
+                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, stem, path, wadPath, targetHash))
+                    return true;
+
+                string[] tokens = stem.Split('_', StringSplitOptions.RemoveEmptyEntries);
+                if (tokens.Length == 0) continue;
+
+                // 2. PascalCase with underscores (e.g. Run_Homeguard_To_Run)
+                string[] casedTokens = tokens.Select(t => char.ToUpperInvariant(t[0]) + t[1..].ToLowerInvariant()).ToArray();
+                string pascalUnderscore = string.Join("_", casedTokens);
+                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, pascalUnderscore, path, wadPath, targetHash))
+                    return true;
+
+                // 3. PascalCase without underscores (e.g. RunHomeguardToRun, RunIn)
+                string pascalConcat = string.Concat(casedTokens);
+                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, pascalConcat, path, wadPath, targetHash))
+                    return true;
+
+                // 4. Uppercase acronyms on last token (e.g. Run_Homeguard_IN, Run_Homeguard_OUT, Run_ICE)
+                if (tokens.Length > 1)
+                {
+                    string lastLower = tokens[^1].ToLowerInvariant();
+                    if (lastLower is "in" or "out" or "ice" or "fast" or "a" or "b" or "c" or "d")
+                    {
+                        string[] acroTokens = (string[])casedTokens.Clone();
+                        acroTokens[^1] = acroTokens[^1].ToUpperInvariant();
+                        if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, string.Join("_", acroTokens), path, wadPath, targetHash))
+                            return true;
+                    }
+                }
+
+                // 5. Transition casing ("_to_" lowercase e.g. Run_Homeguard_to_Run, Run_Homeguard_toRun)
+                bool hasTo = tokens.Any(t => t.Equals("to", StringComparison.OrdinalIgnoreCase));
+                if (hasTo)
+                {
+                    string[] toTokens = tokens.Select(t => t.Equals("to", StringComparison.OrdinalIgnoreCase) ? "to" : (char.ToUpperInvariant(t[0]) + t[1..].ToLowerInvariant())).ToArray();
+                    if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, string.Join("_", toTokens), path, wadPath, targetHash))
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool TryGetNumericOrStringId(
             Dictionary<uint, BinTreeProperty> properties,
             out string id)
@@ -1129,6 +1314,8 @@ namespace AssetsManager.Services.Hashes
 
             void MatchAnimationGraphData(uint entryHash, BinTreeObject item)
             {
+                string champName = null;
+                string skinNum = null;
                 if (!string.IsNullOrEmpty(path))
                 {
                     string normalizedPath = InternalHashEvidenceMatcher.NormalizeCandidate(path);
@@ -1139,7 +1326,16 @@ namespace AssetsManager.Services.Hashes
                         int slash = sub.IndexOf('/');
                         if (slash > 0)
                         {
-                            string champName = sub[..slash];
+                            champName = sub[..slash];
+                            int skinIdx = sub.IndexOf("skin", StringComparison.OrdinalIgnoreCase);
+                            if (skinIdx >= 0)
+                            {
+                                int end = skinIdx + 4;
+                                while (end < sub.Length && char.IsDigit(sub[end])) end++;
+                                if (end > skinIdx + 4)
+                                    skinNum = sub[(skinIdx + 4)..end];
+                            }
+
                             MatchObservedEntry(entryHash, $"Characters/{champName}/Animations/Base");
                             for (int skin = 0; skin < 200; skin++)
                             {
@@ -1150,32 +1346,158 @@ namespace AssetsManager.Services.Hashes
                     }
                 }
 
+                // 1. Clips Map (mClipDataMap)
                 if (item.Properties.TryGetValue(Fnv1a.HashLower("mClipDataMap"), out BinTreeProperty clipMapProp) &&
                     clipMapProp is BinTreeMap clipMap)
                 {
                     foreach (var pair in clipMap)
                     {
-                        if (pair.Key is BinTreeHash clipHash &&
-                            pair.Value is BinTreeStruct clipStruct &&
-                            clipStruct.Properties.TryGetValue(Fnv1a.HashLower("mAnimationResourceData"), out BinTreeProperty resProp) &&
-                            resProp is BinTreeStruct resStruct &&
-                            TryGetString(resStruct.Properties, "mAnimationFilePath", out string animFilePath))
-                        {
-                            if (!animFilePath.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) continue;
-                            string animStem = animFilePath[..^4];
-                            int firstSlash = animStem.IndexOf('/');
-                            if (firstSlash < 0) continue;
-                            animStem = UpperAfterUnderscore(animStem[(firstSlash + 1)..]);
+                        if (pair.Key is not BinTreeHash clipHash || clipHash.Value == 0) continue;
+                        uint targetHash = clipHash.Value;
 
-                            // Clip names are underscore suffixes of the ANM stem, Riot-cased (Idle_Base).
-                            for (int underscore = animStem.LastIndexOf('_');
-                                 underscore >= 0;
-                                 underscore = underscore == 0 ? -1 : animStem.LastIndexOf('_', underscore - 1))
+                        bool matched = false;
+                        if (pair.Value is BinTreeStruct clipStruct)
+                        {
+                            // A. Direct string clip names if preserved in struct
+                            if (TryGetString(clipStruct.Properties, "mClipName", out string cName) && !string.IsNullOrWhiteSpace(cName))
+                                matched = matcher.CheckContextualCandidate(InternalHashKind.BinHashes, cName, path, wadPath, targetHash);
+                            if (!matched && TryGetString(clipStruct.Properties, "mAnimationName", out string aName) && !string.IsNullOrWhiteSpace(aName))
+                                matched = matcher.CheckContextualCandidate(InternalHashKind.BinHashes, aName, path, wadPath, targetHash);
+
+                            // B. Resolve animation file path (from string or WadChunkLink / U64)
+                            string animFilePath = null;
+                            if (!matched && clipStruct.Properties.TryGetValue(Fnv1a.HashLower("mAnimationResourceData"), out BinTreeProperty resProp) &&
+                                resProp is BinTreeStruct resStruct)
                             {
-                                if (underscore + 1 < animStem.Length &&
-                                    matcher.CheckContextualCandidate(InternalHashKind.BinHashes, animStem[(underscore + 1)..], path, wadPath, clipHash.Value))
+                                if (TryGetString(resStruct.Properties, "mAnimationFilePath", out string s))
+                                    animFilePath = s;
+                                else if (resStruct.Properties.TryGetValue(Fnv1a.HashLower("mAnimationFilePath"), out BinTreeProperty linkProp))
+                                {
+                                    ulong linkVal = linkProp switch
+                                    {
+                                        BinTreeWadChunkLink link => link.Value,
+                                        BinTreeU64 u64 => u64.Value,
+                                        _ => 0
+                                    };
+                                    if (linkVal != 0 && resolver != null)
+                                    {
+                                        string resolved = resolver.ResolveHash(linkVal);
+                                        if (!string.IsNullOrEmpty(resolved) && resolved.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
+                                            animFilePath = resolved;
+                                    }
+                                }
+
+                                if (string.IsNullOrEmpty(animFilePath) && TryGetString(resStruct.Properties, "mAnimationName", out string resAnimName))
+                                {
+                                    matched = matcher.CheckContextualCandidate(InternalHashKind.BinHashes, resAnimName, path, wadPath, targetHash);
+                                }
+                            }
+
+                            if (!matched && string.IsNullOrEmpty(animFilePath))
+                            {
+                                if (TryGetString(clipStruct.Properties, "mAnimationFilePath", out string s2))
+                                    animFilePath = s2;
+                                else if (clipStruct.Properties.TryGetValue(Fnv1a.HashLower("mAnimationFilePath"), out BinTreeProperty linkProp2))
+                                {
+                                    ulong linkVal2 = linkProp2 switch
+                                    {
+                                        BinTreeWadChunkLink link2 => link2.Value,
+                                        BinTreeU64 u64_2 => u64_2.Value,
+                                        _ => 0
+                                    };
+                                    if (linkVal2 != 0 && resolver != null)
+                                    {
+                                        string resolved2 = resolver.ResolveHash(linkVal2);
+                                        if (!string.IsNullOrEmpty(resolved2) && resolved2.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
+                                            animFilePath = resolved2;
+                                    }
+                                }
+                            }
+
+                            // C. Generate all candidate forms from animFilePath
+                            if (!matched && !string.IsNullOrWhiteSpace(animFilePath))
+                            {
+                                matched = TryMatchAnimationFileCandidates(targetHash, animFilePath, champName, skinNum, path, wadPath, matcher);
+                            }
+                        }
+
+                        // D. Fallback fast-path: Universal high-frequency animation clip names
+                        if (!matched)
+                        {
+                            foreach (string commonClip in CommonAnimationClipNames)
+                            {
+                                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, commonClip, path, wadPath, targetHash))
                                     break;
                             }
+                        }
+                    }
+                }
+
+                // 2. Track Data Map (mTrackDataMap)
+                if (item.Properties.TryGetValue(Fnv1a.HashLower("mTrackDataMap"), out BinTreeProperty trackMapProp) &&
+                    trackMapProp is BinTreeMap trackMap)
+                {
+                    foreach (var pair in trackMap)
+                    {
+                        if (pair.Key is BinTreeHash trackHash && trackHash.Value != 0)
+                        {
+                            foreach (string track in CommonAnimationTracks)
+                            {
+                                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, track, path, wadPath, trackHash.Value))
+                                    break;
+                            }
+                        }
+                    }
+                }
+
+                // 3. Mask Data Map (mMaskDataMap)
+                if (item.Properties.TryGetValue(Fnv1a.HashLower("mMaskDataMap"), out BinTreeProperty maskMapProp) &&
+                    maskMapProp is BinTreeMap maskMap)
+                {
+                    foreach (var pair in maskMap)
+                    {
+                        if (pair.Key is BinTreeHash maskHash && maskHash.Value != 0)
+                        {
+                            foreach (string mask in CommonAnimationMasks)
+                            {
+                                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, mask, path, wadPath, maskHash.Value))
+                                    break;
+                            }
+                        }
+                    }
+                }
+
+                // 4. Sync Group Data Map (mSyncGroupDataMap)
+                if (item.Properties.TryGetValue(Fnv1a.HashLower("mSyncGroupDataMap"), out BinTreeProperty syncMapProp) &&
+                    syncMapProp is BinTreeMap syncMap)
+                {
+                    foreach (var pair in syncMap)
+                    {
+                        if (pair.Key is BinTreeHash syncHash && syncHash.Value != 0)
+                        {
+                            foreach (string sync in CommonAnimationSyncGroups)
+                            {
+                                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, sync, path, wadPath, syncHash.Value))
+                                    break;
+                            }
+                        }
+                    }
+                }
+
+                // 5. Event Data Map (mEventDataMap)
+                if (item.Properties.TryGetValue(Fnv1a.HashLower("mEventDataMap"), out BinTreeProperty eventMapProp) &&
+                    eventMapProp is BinTreeMap eventMap)
+                {
+                    foreach (var pair in eventMap)
+                    {
+                        if (pair.Key is BinTreeHash eventHash && eventHash.Value != 0 && pair.Value is BinTreeStruct eventStruct)
+                        {
+                            if (TryGetString(eventStruct.Properties, "mName", out string evName) && !string.IsNullOrWhiteSpace(evName))
+                                matcher.CheckContextualCandidate(InternalHashKind.BinHashes, evName, path, wadPath, eventHash.Value);
+                            if (TryGetString(eventStruct.Properties, "mEffectName", out string effName) && !string.IsNullOrWhiteSpace(effName))
+                                matcher.CheckContextualCandidate(InternalHashKind.BinHashes, effName, path, wadPath, eventHash.Value);
+                            if (TryGetString(eventStruct.Properties, "mEffectKey", out string effKey) && !string.IsNullOrWhiteSpace(effKey))
+                                matcher.CheckContextualCandidate(InternalHashKind.BinHashes, effKey, path, wadPath, eventHash.Value);
                         }
                     }
                 }
@@ -1677,7 +1999,9 @@ namespace AssetsManager.Services.Hashes
 
             static string UpperAfterUnderscore(string value)
             {
+                if (string.IsNullOrEmpty(value)) return value;
                 var chars = value.ToCharArray();
+                chars[0] = char.ToUpperInvariant(chars[0]);
                 for (int index = 1; index < chars.Length; index++)
                     if (chars[index - 1] == '_') chars[index] = char.ToUpperInvariant(chars[index]);
                 return new string(chars);

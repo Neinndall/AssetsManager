@@ -1548,6 +1548,70 @@ namespace AssetsManager.Services.Hashes
                     CheckEntry($"Maps/Shipping/Map22/Augments/Set{set}/DA_{set}_{stem}TraitAugment");
                 }
             }
+
+            // 7. Universal Animation Clips and Graph Structures (InternalHashKind.BinHashes)
+            if (matcher.GetRemainingCount(InternalHashKind.BinHashes) > 0)
+            {
+                foreach (string clip in BinContentEvidenceSource.CommonAnimationClipNames)
+                {
+                    uint h = Fnv1a.HashLower(clip);
+                    if (matcher.IsRemaining(InternalHashKind.BinHashes, h))
+                    {
+                        matcher.CheckSchemaCandidate(
+                            InternalHashKind.BinHashes,
+                            clip,
+                            InternalHashGuessStrategy.CrossDictionary,
+                            "AnimationClipLattice",
+                            InternalHashEvidence.BinObjectLatticePattern,
+                            preserveCasing: true);
+                    }
+                }
+
+                foreach (string track in BinContentEvidenceSource.CommonAnimationTracks)
+                {
+                    uint h = Fnv1a.HashLower(track);
+                    if (matcher.IsRemaining(InternalHashKind.BinHashes, h))
+                    {
+                        matcher.CheckSchemaCandidate(
+                            InternalHashKind.BinHashes,
+                            track,
+                            InternalHashGuessStrategy.CrossDictionary,
+                            "AnimationTrackLattice",
+                            InternalHashEvidence.BinObjectLatticePattern,
+                            preserveCasing: true);
+                    }
+                }
+
+                foreach (string mask in BinContentEvidenceSource.CommonAnimationMasks)
+                {
+                    uint h = Fnv1a.HashLower(mask);
+                    if (matcher.IsRemaining(InternalHashKind.BinHashes, h))
+                    {
+                        matcher.CheckSchemaCandidate(
+                            InternalHashKind.BinHashes,
+                            mask,
+                            InternalHashGuessStrategy.CrossDictionary,
+                            "AnimationMaskLattice",
+                            InternalHashEvidence.BinObjectLatticePattern,
+                            preserveCasing: true);
+                    }
+                }
+
+                foreach (string sync in BinContentEvidenceSource.CommonAnimationSyncGroups)
+                {
+                    uint h = Fnv1a.HashLower(sync);
+                    if (matcher.IsRemaining(InternalHashKind.BinHashes, h))
+                    {
+                        matcher.CheckSchemaCandidate(
+                            InternalHashKind.BinHashes,
+                            sync,
+                            InternalHashGuessStrategy.CrossDictionary,
+                            "AnimationSyncGroupLattice",
+                            InternalHashEvidence.BinObjectLatticePattern,
+                            preserveCasing: true);
+                    }
+                }
+            }
         }
 
         private static bool IsTextCandidatePath(string path) => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
