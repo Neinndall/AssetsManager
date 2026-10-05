@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.IO;
 using System.Linq;
@@ -5,7 +6,6 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Helpers
@@ -177,7 +177,7 @@ namespace AssetsManager.Views.Helpers
         #region Studio Skybox Cubemap Cache & Loader
 
         private static readonly object SkyLock = new();
-        private static VfxCubeMapData _cachedGenericSky;
+        private static CubeMapData _cachedGenericSky;
         private static bool _skyAttempted;
 
         public static void ClearSkyCache()
@@ -198,13 +198,13 @@ namespace AssetsManager.Views.Helpers
             ClearSkyCache();
         }
 
-        internal static VfxCubeMapData LoadGenericSkyCube(LogService logService) =>
+        internal static CubeMapData LoadGenericSkyCube(LogService logService) =>
             LoadGenericSkyCube(null, logService);
 
         /// <summary>
         /// Loads the official Summoner's Rift sky cubemap from Map11.wad.client matching LTK Manager.
         /// </summary>
-        internal static VfxCubeMapData LoadGenericSkyCube(AppSettings settings, LogService logService)
+        internal static CubeMapData LoadGenericSkyCube(AppSettings settings, LogService logService)
         {
             lock (SkyLock)
             {
@@ -226,10 +226,10 @@ namespace AssetsManager.Views.Helpers
             }
         }
 
-        private static VfxCubeMapData LoadSkyFromGame(AppSettings settings, LogService logService)
+        private static CubeMapData LoadSkyFromGame(AppSettings settings, LogService logService)
         {
             using var stream = OpenMap11Chunk(settings, SkyboxChunkVirtualPath, logService);
-            return stream == null ? null : VfxCubeMapDecoder.Decode(stream);
+            return stream == null ? null : CubeMapDecoder.Decode(stream);
         }
 
         #endregion

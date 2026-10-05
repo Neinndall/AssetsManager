@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.IO;
 using System.Linq;
@@ -35,7 +36,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private GlMeshRenderer _meshRenderer;
         private PreviewSurfaceRenderer _previewSurfaceRenderer;
         private SkyRenderer _skyRenderer;
-        private VfxCubeMapData _genericSkyCube;
+        private CubeMapData _genericSkyCube;
         private bool _skyCubeDirty;
         private FxaaPostEffectsRenderer _fxaaRenderer;
         private SmaaPostEffectsRenderer _smaaRenderer;

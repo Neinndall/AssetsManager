@@ -39,7 +39,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 
             string fullRoot = Path.GetFullPath(root);
             string requested = string.IsNullOrWhiteSpace(mapEntry) ? DefaultMap : mapEntry;
-            MapSceneSource source = VfxFolderCatalog.ScanBrowser(fullRoot, CancellationToken.None, null, null)
+            MapSceneSource source = StudioProjectCatalog.ScanBrowser(fullRoot, CancellationToken.None, null, null)
                 .MapSources
                 .FirstOrDefault(candidate => string.Equals(candidate.Map.Value, requested, StringComparison.OrdinalIgnoreCase));
             if (source == null)

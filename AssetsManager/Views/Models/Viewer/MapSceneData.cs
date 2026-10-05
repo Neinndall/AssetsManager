@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Resources;
@@ -43,7 +44,7 @@ namespace AssetsManager.Views.Models.Viewer
         public MapTerrainData Terrain { get; }
 
         /// <summary>Decoded MapSkin environment cubes, keyed by the reference each skin declares.</summary>
-        public IReadOnlyDictionary<MapTextureReference, VfxCubeMapData> EnvironmentCubes { get; }
+        public IReadOnlyDictionary<MapTextureReference, CubeMapData> EnvironmentCubes { get; }
 
         public MapSceneData(
             MapSceneSource source,
@@ -69,7 +70,7 @@ namespace AssetsManager.Views.Models.Viewer
             MapSceneVisibility visibility = null,
             BinTree sharedMaterials = null,
             MapTerrainData terrain = null,
-            IReadOnlyDictionary<MapTextureReference, VfxCubeMapData> environmentCubes = null)
+            IReadOnlyDictionary<MapTextureReference, CubeMapData> environmentCubes = null)
         {
             Source = source;
             Assets = assets;
@@ -94,7 +95,7 @@ namespace AssetsManager.Views.Models.Viewer
             PostEffects = postEffects;
             AmbientOcclusion = ambientOcclusion;
             Terrain = terrain;
-            EnvironmentCubes = environmentCubes ?? new Dictionary<MapTextureReference, VfxCubeMapData>();
+            EnvironmentCubes = environmentCubes ?? new Dictionary<MapTextureReference, CubeMapData>();
         }
     }
 }

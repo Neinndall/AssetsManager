@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,10 +18,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         private static readonly string[] AnimationExtensions = { ".anm" };
         private static readonly string[] BinExtensions = { ".bin" };
 
-        private readonly Dictionary<string, VfxResourceIndex> _indexes = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, ProjectResourceIndex> _indexes = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, BitmapSource> _textures = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _missingTextures = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, VfxCubeMapData> _cubeMaps = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, CubeMapData> _cubeMaps = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _missingCubeMaps = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, VfxMeshData?> _meshes =
             new(StringComparer.OrdinalIgnoreCase);
@@ -68,20 +69,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             if (_textures.TryGetValue(key, out var texture)) return texture;
             if (_missingTextures.Contains(key)) return null;
             string resolved = ResolvePath(authoredPath, searchDirectory, TextureExtensions);
-            return resolved != null && VfxCubeMapDecoder.HasCubeHeader(resolved)
+            return resolved != null && CubeMapDecoder.HasCubeHeader(resolved)
                 ? ResolveCubeMap(authoredPath, searchDirectory)
                 : ResolveTexture(authoredPath, searchDirectory);
         }
 
-        public VfxCubeMapData ResolveCubeMap(string authoredPath, string searchDirectory)
+        public CubeMapData ResolveCubeMap(string authoredPath, string searchDirectory)
         {
             if (string.IsNullOrWhiteSpace(authoredPath) || string.IsNullOrWhiteSpace(searchDirectory)) return null;
             string key = CreateKey(authoredPath, searchDirectory);
-            if (_cubeMaps.TryGetValue(key, out VfxCubeMapData cached)) return cached;
+            if (_cubeMaps.TryGetValue(key, out CubeMapData cached)) return cached;
             if (_missingCubeMaps.Contains(key)) return null;
 
             string resolvedPath = ResolvePath(authoredPath, searchDirectory, TextureExtensions);
-            VfxCubeMapData cube = resolvedPath == null ? null : VfxCubeMapDecoder.Decode(resolvedPath);
+            CubeMapData cube = resolvedPath == null ? null : CubeMapDecoder.Decode(resolvedPath);
             if (cube?.IsValid != true)
             {
                 _missingCubeMaps.Add(key);
@@ -340,11 +341,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             return GetIndex(root).Resolve(authoredPath, OrderedExtensions(authoredPath, extensions));
         }
 
-        private VfxResourceIndex GetIndex(string root)
+        private ProjectResourceIndex GetIndex(string root)
         {
             string fullRoot = Path.GetFullPath(root);
-            if (_indexes.TryGetValue(fullRoot, out VfxResourceIndex index)) return index;
-            index = VfxResourceIndex.Build(fullRoot);
+            if (_indexes.TryGetValue(fullRoot, out ProjectResourceIndex index)) return index;
+            index = ProjectResourceIndex.Build(fullRoot);
             _indexes[fullRoot] = index;
             return index;
         }

@@ -10,7 +10,7 @@ using AssetsManager.Services.Viewer.Vfx.Loading;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-bundle-materials <skin.bin> [--no-install]`: loads a skin BIN through VfxLoadingService as VFX Studio does and counts
+    /// `vfx-bundle-materials <skin.bin> [--no-install]`: loads a skin BIN through VfxLoadingService as 3D Studio does and counts
     /// the emitters whose custom material resolved, and how many of those carry a game program to draw with.
     /// </summary>
     internal static class VfxBundleMaterialsDiagnostic

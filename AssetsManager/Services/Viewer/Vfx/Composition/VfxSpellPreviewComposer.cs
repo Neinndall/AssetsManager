@@ -22,7 +22,7 @@ internal static class VfxSpellPreviewComposer
     private const double TimingTolerance = 0.00001d;
 
     internal static VfxSpellPreviewPlan Build(
-        VfxSpellBrowserItem spell,
+        StudioSpellBrowserItem spell,
         VfxLoadingService.Bundle bundle,
         IReadOnlyList<AnimationClipCatalogItem> clips,
         Func<AnimationClipCatalogItem, double, string, (Vector3 Origin, Vector3 Forward)?> launchFrameAt,

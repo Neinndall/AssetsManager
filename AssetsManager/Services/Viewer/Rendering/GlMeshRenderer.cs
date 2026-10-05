@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -21,7 +22,7 @@ namespace AssetsManager.Services.Viewer.Rendering
     public sealed class GlMeshRenderer : IDisposable
     {
         /// <summary>Environment cube PBR game shaders light from (IBL); the preview sky the viewport shows.</summary>
-        internal VfxCubeMapData ImageLight { get; set; }
+        internal CubeMapData ImageLight { get; set; }
 
         private static readonly Vector3 ReferenceCharacterLightDirection =
             Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
@@ -129,7 +130,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3 lightDir2,
             Vector3 lightColor2,
             Vector3 ambientColor,
-            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            StudioViewMode viewMode = StudioViewMode.Lit,
             bool wireOverlay = false,
             bool shadersEnabled = false,
             bool mirrorCharacterX = false,
@@ -168,8 +169,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ImageLight: ImageLight);
             (bool solids, bool wireframe, float wireOpacity) =
                 MapGeometryRenderer.ResolveViewPasses(viewMode, wireOverlay, supportsWireframe: !_gles);
-            VfxPreviewViewMode solidMode = viewMode == VfxPreviewViewMode.Wireframe
-                ? VfxPreviewViewMode.Lit
+            StudioViewMode solidMode = viewMode == StudioViewMode.Wireframe
+                ? StudioViewMode.Lit
                 : viewMode;
 
             UseStockProgram(
@@ -358,7 +359,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3 lightColor2,
             Vector3 ambientColor,
             float materialTimeSeconds,
-            VfxPreviewViewMode viewMode,
+            StudioViewMode viewMode,
             bool shadersEnabled,
             IReadOnlyList<Matrix4x4> gameSkinningMatrices)
         {
@@ -524,7 +525,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3 lightColor2,
             Vector3 ambientColor,
             float materialTimeSeconds,
-            VfxPreviewViewMode viewMode,
+            StudioViewMode viewMode,
             bool wireframePass)
         {
             IEnumerable<ModelPart> parts = model.Parts;
@@ -575,7 +576,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3 lightColor2,
             Vector3 ambientColor,
             float materialTimeSeconds,
-            VfxPreviewViewMode viewMode,
+            StudioViewMode viewMode,
             bool wireframePass,
             ref uint lastBoundTex0)
         {
@@ -600,7 +601,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (!wireframePass)
             {
                 _gl.Uniform1(_uWireframePass, 0);
-                if (viewMode == VfxPreviewViewMode.Untextured)
+                if (viewMode == StudioViewMode.Untextured)
                 {
                     ApplyUntexturedPartState();
                     _gl.ActiveTexture(TextureUnit.Texture0);
@@ -653,7 +654,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gl.Uniform2(_uMaterialUvScroll, uvScroll.X, uvScroll.Y);
                     _gl.Uniform1(
                         _uMaterialUnlit,
-                        viewMode == VfxPreviewViewMode.Unshaded || part.UsesUnlitShading ? 1 : 0);
+                        viewMode == StudioViewMode.Unshaded || part.UsesUnlitShading ? 1 : 0);
                     _gl.Uniform1(
                         _uMaterialPremultipliedAlpha,
                         material?.RenderState.PremultipliedAlpha == true ? 1 : 0);
@@ -672,16 +673,16 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         internal static bool UsesGameShaders(
-            VfxPreviewViewMode viewMode,
+            StudioViewMode viewMode,
             bool shadersEnabled,
             bool wireframePass = false) =>
-            !wireframePass && shadersEnabled && viewMode == VfxPreviewViewMode.Lit;
+            !wireframePass && shadersEnabled && viewMode == StudioViewMode.Lit;
 
         private static bool IsPreviewAlphaBlended(
             ModelPart part,
-            VfxPreviewViewMode viewMode,
+            StudioViewMode viewMode,
             bool wireframePass) =>
-            !wireframePass && viewMode != VfxPreviewViewMode.Untextured && part.IsAlphaBlended;
+            !wireframePass && viewMode != StudioViewMode.Untextured && part.IsAlphaBlended;
 
         private void ApplyUntexturedPartState()
         {

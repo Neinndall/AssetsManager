@@ -38,7 +38,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var log = new LogService(new Serilog.LoggerConfiguration().CreateLogger());
             var provider = new WadContentProvider(log, new WadNodeLoaderService(null, log), new DirectoriesCreator(), new SvgParser());
             var resolver = new MapAssetResolver(provider, settings);
-            MapSceneSource source = VfxFolderCatalog.ScanBrowser(root, CancellationToken.None, null, null)
+            MapSceneSource source = StudioProjectCatalog.ScanBrowser(root, CancellationToken.None, null, null)
                 .MapSources.First(scene => scene.Map.Value.Equals("Maps/MapGeometry/Map11/Base_SRX", StringComparison.OrdinalIgnoreCase));
             var loader = new MapSceneLoadingService(resolver, new MapGeometryDecoder(), new MapMaterialParser(),
                 new MapPlaceableParser(), new MapCharacterParser(), new MapParticleParser(),
@@ -294,9 +294,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     Matrix4x4 vp = view * projection;
                     runtime.ShowParticles = true;
                     runtime.Update(vp, 1f / 60);
-                    foreach (var mode in new[] { VfxPreviewViewMode.Lit, VfxPreviewViewMode.Wireframe })
+                    foreach (var mode in new[] { StudioViewMode.Lit, StudioViewMode.Wireframe })
                     {
-                        bool overlay = mode == VfxPreviewViewMode.Lit;
+                        bool overlay = mode == StudioViewMode.Lit;
                         geometry.Render(vp, view, projection, eye, 3f, viewMode: mode, wireOverlay: overlay);
                         characters.Render(runtime.CharacterGroups, vp, view, projection, eye, 3f, scene.Sun,
                             runtime.Hidden, viewMode: mode, wireOverlay: overlay, lightGrid: scene.LightGrid);

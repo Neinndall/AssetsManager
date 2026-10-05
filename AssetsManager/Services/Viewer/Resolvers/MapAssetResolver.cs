@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -22,7 +23,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
     {
         private readonly WadContentProvider _wadContentProvider;
         private readonly AppSettings _appSettings;
-        private readonly ConcurrentDictionary<string, Lazy<VfxResourceIndex>> _projectIndexes =
+        private readonly ConcurrentDictionary<string, Lazy<ProjectResourceIndex>> _projectIndexes =
             new(StringComparer.OrdinalIgnoreCase);
 
         public MapAssetResolver(
@@ -462,11 +463,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return GetProjectIndex(fullRoot).Resolve(stem, Array.Empty<string>());
         }
 
-        private VfxResourceIndex GetProjectIndex(string fullRoot) =>
+        private ProjectResourceIndex GetProjectIndex(string fullRoot) =>
             _projectIndexes.GetOrAdd(
                     Path.GetFullPath(fullRoot),
-                    root => new Lazy<VfxResourceIndex>(
-                        () => VfxResourceIndex.Build(root),
+                    root => new Lazy<ProjectResourceIndex>(
+                        () => ProjectResourceIndex.Build(root),
                         LazyThreadSafetyMode.ExecutionAndPublication))
                 .Value;
 

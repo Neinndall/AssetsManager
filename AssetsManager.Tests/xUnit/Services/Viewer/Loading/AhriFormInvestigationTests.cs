@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Semantics;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -59,7 +60,7 @@ public sealed class AhriFormInvestigationTests(ITestOutputHelper output)
             foreach (int gear in new[] { 0, 1, 2, 0 })
             {
                 part.EquippedGearIndex = gear;
-                VfxCharacterFormSemantics.RestoreAuthoredTextures(new[] { part });
+                CharacterFormSemantics.RestoreAuthoredTextures(new[] { part });
                 string expected = gear == 0 ? material.BaseTextureName : gear == 1 ? sample.Form2 : sample.Form3;
                 Assert.Equal(expected, part.SelectedTextureName);
                 Assert.Same(material, part.MaterialDefinition);

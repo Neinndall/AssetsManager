@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using AssetsManager.Utils;
 using System.Collections.Generic;
@@ -199,7 +200,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         public uint UploadTexture(ReadOnlySpan<byte> bgra, int width, int height)
             => _textures.Upload(bgra, width, height);
 
-        internal uint UploadCubeMap(VfxCubeMapData cube)
+        internal uint UploadCubeMap(CubeMapData cube)
             => _textures.UploadCube(cube);
 
         public void CaptureScene(uint width, uint height, bool captureColor, bool captureDepth)

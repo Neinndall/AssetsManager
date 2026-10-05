@@ -58,12 +58,12 @@ namespace AssetsManager.Views
 
             ChromaSelectionControl.ChromaLoadingService = chromaLoadingService;
 
-            VfxInspectorControl.LogService = _logService;
-            VfxInspectorControl.AppSettings = appSettings;
-            VfxInspectorControl.SknLoadingService = sknLoadingService;
-            VfxInspectorControl.VfxLoadingService = _vfxLoadingService;
-            VfxInspectorControl.MapViewerSceneService = mapViewerSceneService;
-            VfxInspectorControl.ExitRequested += (_, _) => _viewModel.IsVfxStudioVisible = false;
+            StudioControl.LogService = _logService;
+            StudioControl.AppSettings = appSettings;
+            StudioControl.SknLoadingService = sknLoadingService;
+            StudioControl.VfxLoadingService = _vfxLoadingService;
+            StudioControl.MapViewerSceneService = mapViewerSceneService;
+            StudioControl.ExitRequested += (_, _) => _viewModel.IsStudioVisible = false;
 
             // Peer-to-Peer wiring between sub-controls
             PanelControl.Viewport = ViewportControl;
@@ -95,15 +95,15 @@ namespace AssetsManager.Views
                 UpdateProjectExplorerRowHeight();
             }
 
-            if (e.PropertyName == nameof(ViewerWindowModel.IsVfxStudioVisible))
+            if (e.PropertyName == nameof(ViewerWindowModel.IsStudioVisible))
             {
-                if (_viewModel.IsVfxStudioVisible)
+                if (_viewModel.IsStudioVisible)
                 {
-                    VfxInspectorControl.Activate();
+                    StudioControl.Activate();
                 }
                 else
                 {
-                    VfxInspectorControl.Deactivate();
+                    StudioControl.Deactivate();
                 }
             }
         }
@@ -117,9 +117,9 @@ namespace AssetsManager.Views
         private async void OpenFile_Click(object sender, RoutedEventArgs e) => await PanelControl.OpenSknModel();
         private void OpenChromaFile_Click(object sender, RoutedEventArgs e) => PanelControl.OpenChromaFolder();
 
-        private void OpenVfxInspector_Click(object sender, RoutedEventArgs e)
+        private void OpenStudio_Click(object sender, RoutedEventArgs e)
         {
-            _viewModel.IsVfxStudioVisible = true;
+            _viewModel.IsStudioVisible = true;
         }
 
         private void OpenProjectFolder_Click(object sender, RoutedEventArgs e)
@@ -200,14 +200,14 @@ namespace AssetsManager.Views
             if (_isCleanedUp) return;
             _isCleanedUp = true;
 
-            _viewModel.IsVfxStudioVisible = false;
+            _viewModel.IsStudioVisible = false;
 
             // Keep teardown independent so one faulty consumer cannot prevent the others from releasing resources.
-            RunCleanupStep(nameof(VfxInspectorControl), () => VfxInspectorControl?.Cleanup());
+            RunCleanupStep(nameof(StudioControl), () => StudioControl?.Cleanup());
             RunCleanupStep(nameof(ViewportControl), () => ViewportControl?.Cleanup());
             RunCleanupStep(nameof(PanelControl), () => PanelControl?.Cleanup());
 
-            // VFX Studio owns the shared loader within ViewerWindow, so release it after the studio teardown.
+            // 3D Studio owns the shared loader within ViewerWindow, so release it after the studio teardown.
             RunCleanupStep(nameof(VfxLoadingService), () => _vfxLoadingService?.Dispose());
         }
 

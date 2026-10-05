@@ -11,7 +11,7 @@ using LeagueToolkit.Hashing;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-linked-bin-census`: walks the linked BINs of every installed champion skin breadth first, as VFX Studio does,
+    /// `vfx-linked-bin-census`: walks the linked BINs of every installed champion skin breadth first, as 3D Studio does,
     /// and reports how many files each skin reaches and how many VFX systems sit beyond the 32-file cap.
     /// </summary>
     internal static class VfxLinkedBinCensusDiagnostic

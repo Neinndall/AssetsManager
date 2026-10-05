@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Vfx.Resources;
@@ -14,15 +15,15 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
     internal sealed class GameShaderImageLight : IDisposable
     {
         private readonly GL _gl;
-        private VfxCubeMapData _source;
+        private CubeMapData _source;
         private uint _texture;
-        private VfxCubeMapData _cubeSource;
+        private CubeMapData _cubeSource;
         private uint _cube;
 
         internal GameShaderImageLight(GL gl) => _gl = gl;
 
         /// <returns>The array texture of <paramref name="cube"/>, uploaded once per cube, or 0 without one.</returns>
-        internal uint Resolve(VfxCubeMapData cube)
+        internal uint Resolve(CubeMapData cube)
         {
             if (cube?.IsValid != true)
                 return 0;
@@ -71,7 +72,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         }
 
         /// <returns>The sky as a raw mipmapped cube map for ENV_CUBE, uploaded once per cube, or 0 without one.</returns>
-        internal uint ResolveCube(VfxCubeMapData cube)
+        internal uint ResolveCube(CubeMapData cube)
         {
             if (cube?.IsValid != true)
                 return 0;

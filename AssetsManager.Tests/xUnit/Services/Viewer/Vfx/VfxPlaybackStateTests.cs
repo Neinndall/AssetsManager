@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Semantics;
 using System.Collections.Generic;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
@@ -61,7 +62,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void InspectorModelSoloMuteAndMeshPropertiesNotifyBindings()
         {
-            var model = new VfxInspectorModel();
+            var model = new StudioModel();
             var changed = new List<string>();
             model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
@@ -75,16 +76,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.False(model.ShowChampionMesh);
             Assert.True(model.HasChampionMesh);
 
-            Assert.Contains(nameof(VfxInspectorModel.HasAnySolo), changed);
-            Assert.Contains(nameof(VfxInspectorModel.IsAllMuted), changed);
-            Assert.Contains(nameof(VfxInspectorModel.ShowChampionMesh), changed);
-            Assert.Contains(nameof(VfxInspectorModel.HasChampionMesh), changed);
+            Assert.Contains(nameof(StudioModel.HasAnySolo), changed);
+            Assert.Contains(nameof(StudioModel.IsAllMuted), changed);
+            Assert.Contains(nameof(StudioModel.ShowChampionMesh), changed);
+            Assert.Contains(nameof(StudioModel.HasChampionMesh), changed);
         }
 
         [Fact]
         public void InspectorProjectIdentityAndWorkspaceTabsNotifyBindings()
         {
-            var model = new VfxInspectorModel();
+            var model = new StudioModel();
             var changed = new List<string>();
             model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
@@ -93,12 +94,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal("AatroxProject", model.ProjectName);
             Assert.Equal(@"C:\mods\AatroxProject", model.ProjectPath);
             Assert.True(model.HasProject);
-            Assert.Contains(nameof(VfxInspectorModel.ProjectName), changed);
-            Assert.Contains(nameof(VfxInspectorModel.ProjectPath), changed);
-            Assert.Contains(nameof(VfxInspectorModel.HasProject), changed);
+            Assert.Contains(nameof(StudioModel.ProjectName), changed);
+            Assert.Contains(nameof(StudioModel.ProjectPath), changed);
+            Assert.Contains(nameof(StudioModel.HasProject), changed);
 
-            var first = new VfxWorkspaceTab { Key = "skin:0", Title = "Aatrox · Skin 0", Kind = VfxWorkspaceTabKind.Skin };
-            var second = new VfxWorkspaceTab { Key = "skin:1", Title = "Aatrox · Skin 1", Kind = VfxWorkspaceTabKind.Skin };
+            var first = new StudioWorkspaceTab { Key = "skin:0", Title = "Aatrox · Skin 0", Kind = StudioWorkspaceTabKind.Skin };
+            var second = new StudioWorkspaceTab { Key = "skin:1", Title = "Aatrox · Skin 1", Kind = StudioWorkspaceTabKind.Skin };
             model.WorkspaceTabs.Add(first);
             model.WorkspaceTabs.Add(second);
             model.NotifyWorkspaceTabsChanged();
@@ -112,19 +113,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.False(first.IsSelected);
             Assert.True(second.IsSelected);
             Assert.Same(second, model.SelectedWorkspaceTab);
-            Assert.Contains(nameof(VfxInspectorModel.HasWorkspaceTabs), changed);
-            Assert.Contains(nameof(VfxInspectorModel.SelectedWorkspaceTab), changed);
+            Assert.Contains(nameof(StudioModel.HasWorkspaceTabs), changed);
+            Assert.Contains(nameof(StudioModel.SelectedWorkspaceTab), changed);
         }
 
         [Fact]
         public void MapWorkspaceTabIdentityCanRetargetAndNotifiesBindings()
         {
-            var tab = new VfxWorkspaceTab
+            var tab = new StudioWorkspaceTab
             {
                 Key = "map:maps/mapgeometry/map11/base",
                 Title = "Base",
                 Subtitle = "Maps/MapGeometry/Map11/Base",
-                Kind = VfxWorkspaceTabKind.Map,
+                Kind = StudioWorkspaceTabKind.Map,
                 Payload = new object()
             };
             var changed = new List<string>();
@@ -140,18 +141,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal("Base_SRX", tab.Title);
             Assert.Equal("Maps/MapGeometry/Map11/Base_SRX", tab.Subtitle);
             Assert.Same(replacement, tab.Payload);
-            Assert.Contains(nameof(VfxWorkspaceTab.Key), changed);
-            Assert.Contains(nameof(VfxWorkspaceTab.Title), changed);
-            Assert.Contains(nameof(VfxWorkspaceTab.Subtitle), changed);
-            Assert.Contains(nameof(VfxWorkspaceTab.Payload), changed);
+            Assert.Contains(nameof(StudioWorkspaceTab.Key), changed);
+            Assert.Contains(nameof(StudioWorkspaceTab.Title), changed);
+            Assert.Contains(nameof(StudioWorkspaceTab.Subtitle), changed);
+            Assert.Contains(nameof(StudioWorkspaceTab.Payload), changed);
         }
 
         [Fact]
         public void SkinSceneTabFollowsItsFocusedActorAndCountsExtraCharacters()
         {
-            var kayn = new VfxSceneActor(new VfxSkinItem { OwnerName = "Kayn", BrowserTitle = "Base", BinPath = @"C:\p\kayn\skin0.bin" });
-            var rhaast = new VfxSceneActor(new VfxSkinItem { OwnerName = "Kayn", BrowserTitle = "Rhaast", BinPath = @"C:\p\kayn\skin8.bin" });
-            var tab = new VfxWorkspaceTab { Key = "skin:kayn", Kind = VfxWorkspaceTabKind.Skin };
+            var kayn = new StudioSceneActor(new StudioSkinItem { OwnerName = "Kayn", BrowserTitle = "Base", BinPath = @"C:\p\kayn\skin0.bin" });
+            var rhaast = new StudioSceneActor(new StudioSkinItem { OwnerName = "Kayn", BrowserTitle = "Rhaast", BinPath = @"C:\p\kayn\skin8.bin" });
+            var tab = new StudioWorkspaceTab { Key = "skin:kayn", Kind = StudioWorkspaceTabKind.Skin };
             var changed = new List<string>();
             tab.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
@@ -168,18 +169,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal("Kayn · Rhaast", tab.Title);
             Assert.True(rhaast.IsFocused);
             Assert.False(kayn.IsFocused);
-            Assert.Contains(nameof(VfxWorkspaceTab.HasExtraActors), changed);
-            Assert.Contains(nameof(VfxWorkspaceTab.ExtraActorCount), changed);
-            Assert.Contains(nameof(VfxWorkspaceTab.FocusedActor), changed);
+            Assert.Contains(nameof(StudioWorkspaceTab.HasExtraActors), changed);
+            Assert.Contains(nameof(StudioWorkspaceTab.ExtraActorCount), changed);
+            Assert.Contains(nameof(StudioWorkspaceTab.FocusedActor), changed);
         }
 
         [Fact]
         public void SceneActorSkinIdentityUsesTheCanonicalBinPath()
         {
-            var skin = new VfxSkinItem { BinPath = @"C:\p\kayn\skins\skin0.bin" };
-            var sameFile = new VfxSkinItem { BinPath = @"C:\P\Kayn\skins\..\skins\SKIN0.bin" };
-            var other = new VfxSkinItem { BinPath = @"C:\p\kayn\skins\skin8.bin" };
-            var actor = new VfxSceneActor(skin);
+            var skin = new StudioSkinItem { BinPath = @"C:\p\kayn\skins\skin0.bin" };
+            var sameFile = new StudioSkinItem { BinPath = @"C:\P\Kayn\skins\..\skins\SKIN0.bin" };
+            var other = new StudioSkinItem { BinPath = @"C:\p\kayn\skins\skin8.bin" };
+            var actor = new StudioSceneActor(skin);
 
             Assert.True(actor.HasSkin(skin));
             Assert.True(actor.HasSkin(sameFile));
@@ -190,9 +191,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void GroupSelectionSurvivesFocusChangesAndBackdropCopies()
         {
-            var first = new VfxSceneActor(new VfxSkinItem { BinPath = @"C:\p\first.bin" });
-            var second = new VfxSceneActor(new VfxSkinItem { BinPath = @"C:\p\second.bin" });
-            var tab = new VfxWorkspaceTab { Key = "scene", Kind = VfxWorkspaceTabKind.Skin };
+            var first = new StudioSceneActor(new StudioSkinItem { BinPath = @"C:\p\first.bin" });
+            var second = new StudioSceneActor(new StudioSkinItem { BinPath = @"C:\p\second.bin" });
+            var tab = new StudioWorkspaceTab { Key = "scene", Kind = StudioWorkspaceTabKind.Skin };
             tab.Actors.Add(first);
             tab.Actors.Add(second);
             tab.FocusedActor = first;
@@ -204,7 +205,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.False(first.IsFocused);
             Assert.True(second.IsFocused);
 
-            VfxWorkspaceTab copy = tab.CopyForBackdrop("backdrop", "map", "Map");
+            StudioWorkspaceTab copy = tab.CopyForBackdrop("backdrop", "map", "Map");
             Assert.All(copy.Actors, actor => Assert.True(actor.IsSelected));
             copy.Actors[0].IsSelected = false;
             Assert.True(first.IsSelected);
@@ -214,13 +215,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         public void CompatibleFormsExcludeOwnerMeshMismatchesUnlessTheyReloadTheModel()
         {
             var owner = new VfxOwnerSceneContext("ASSETS/Kayn/Skin0/Kayn.skn", "ASSETS/Kayn/Skin0/Kayn.skl", 1f);
-            var shared = new VfxCharacterFormDefinition(1, 0, "Darkin", null, null, MeshPath: @"assets\kayn\skin0\kayn.skn");
-            var materials = new VfxCharacterFormDefinition(2, 1, "Shadow", null, null, HasMaterialOverrides: true);
-            var otherMesh = new VfxCharacterFormDefinition(3, 2, "Other", null, null, MeshPath: "ASSETS/Kayn/Skin8/Rhaast.skn");
-            var otherSkeleton = new VfxCharacterFormDefinition(4, 3, "Rig", null, null, SkeletonPath: "ASSETS/Kayn/Skin8/Rhaast.skl");
+            var shared = new CharacterFormDefinition(1, 0, "Darkin", null, null, MeshPath: @"assets\kayn\skin0\kayn.skn");
+            var materials = new CharacterFormDefinition(2, 1, "Shadow", null, null, HasMaterialOverrides: true);
+            var otherMesh = new CharacterFormDefinition(3, 2, "Other", null, null, MeshPath: "ASSETS/Kayn/Skin8/Rhaast.skn");
+            var otherSkeleton = new CharacterFormDefinition(4, 3, "Rig", null, null, SkeletonPath: "ASSETS/Kayn/Skin8/Rhaast.skl");
             var reloading = materials with { PathHash = 5, ReloadsModel = true };
 
-            IReadOnlyList<VfxCharacterFormDefinition> compatible = VfxCharacterFormSemantics.CompatibleForms(
+            IReadOnlyList<CharacterFormDefinition> compatible = CharacterFormSemantics.CompatibleForms(
                 new[] { shared, materials, otherMesh, otherSkeleton, reloading, null },
                 owner);
 
@@ -230,7 +231,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void MapVariantPickerRequiresAnActiveMapPreview()
         {
-            var model = new VfxInspectorModel();
+            var model = new StudioModel();
             model.SetMapVariants(new[]
             {
                 new MapVariantData("Default", MapPath.FromEntryPath("Maps/MapGeometry/Map11/Base")),
@@ -250,7 +251,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void InspectorEmitterSelectionMovesTheSelectedMarker()
         {
-            var model = new VfxInspectorModel();
+            var model = new StudioModel();
             var first = new VfxEmitterDiagnosticItem { Name = "First" };
             var second = new VfxEmitterDiagnosticItem { Name = "Second" };
 
@@ -274,7 +275,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void InspectorModelEmitterFilterAndPreviewPropertiesNotifyBindings()
         {
-            var model = new VfxInspectorModel();
+            var model = new StudioModel();
             var changed = new List<string>();
             model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
@@ -282,8 +283,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             Assert.Equal("Trail", model.EmitterFilterText);
             Assert.True(model.HasEmitterFilter);
-            Assert.Contains(nameof(VfxInspectorModel.EmitterFilterText), changed);
-            Assert.Contains(nameof(VfxInspectorModel.HasEmitterFilter), changed);
+            Assert.Contains(nameof(StudioModel.EmitterFilterText), changed);
+            Assert.Contains(nameof(StudioModel.HasEmitterFilter), changed);
 
             Assert.True(model.ShowPreviewGrid);
             Assert.False(model.ShowPreviewGround);
@@ -292,17 +293,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             model.ShowPreviewGround = true;
             Assert.Equal(2, model.PreviewDisplayCount);
-            Assert.Contains(nameof(VfxInspectorModel.ShowPreviewGround), changed);
+            Assert.Contains(nameof(StudioModel.ShowPreviewGround), changed);
 
             model.ShowPreviewStage = true;
             Assert.Equal(3, model.PreviewDisplayCount);
-            Assert.Contains(nameof(VfxInspectorModel.ShowPreviewStage), changed);
+            Assert.Contains(nameof(StudioModel.ShowPreviewStage), changed);
 
             model.ShowPreviewGrid = false;
             Assert.True(model.ShowPreviewGround);
             Assert.True(model.ShowPreviewStage);
             Assert.Equal(2, model.PreviewDisplayCount);
-            Assert.Contains(nameof(VfxInspectorModel.ShowPreviewGrid), changed);
+            Assert.Contains(nameof(StudioModel.ShowPreviewGrid), changed);
 
             var item = new VfxEmitterDiagnosticItem { Name = "TrailDark" };
             item.PropertyChanged += (_, e) => changed.Add(e.PropertyName);

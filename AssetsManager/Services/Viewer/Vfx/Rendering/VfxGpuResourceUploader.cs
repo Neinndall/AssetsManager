@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -21,7 +22,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private readonly Dictionary<BitmapSource, uint> _textures =
             new(ReferenceEqualityComparer.Instance);
-        private readonly Dictionary<VfxCubeMapData, uint> _cubeMaps =
+        private readonly Dictionary<CubeMapData, uint> _cubeMaps =
             new(ReferenceEqualityComparer.Instance);
 
         private readonly List<string> _pendingProgramKeys = new();
@@ -61,13 +62,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                             emitter.PendingTextureMult is BitmapSource ||
                             emitter.PendingDistortionTexture is BitmapSource ||
                             emitter.PendingErosionTexture is BitmapSource ||
-                            emitter.PendingReflectionTexture is VfxCubeMapData { IsValid: true } ||
+                            emitter.PendingReflectionTexture is CubeMapData { IsValid: true } ||
                             emitter.PendingPaletteTexture is BitmapSource ||
                             emitter.PendingColorGradient is BitmapSource ||
                             emitter.PendingMesh != null)
                             return true;
                         foreach (object resource in emitter.PendingProgramTextures.Values)
-                            if (resource is BitmapSource or VfxCubeMapData { IsValid: true })
+                            if (resource is BitmapSource or CubeMapData { IsValid: true })
                                 return true;
                     }
             return false;
@@ -128,7 +129,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             foreach (string path in _pendingProgramKeys)
             {
                 object pending = emitter.PendingProgramTextures[path];
-                uint handle = pending is VfxCubeMapData
+                uint handle = pending is CubeMapData
                     ? UploadCubeMap(ref pending, emitter.ProgramTextures.GetValueOrDefault(path), renderer, ref budget)
                     : UploadTexture(ref pending, emitter.ProgramTextures.GetValueOrDefault(path), renderer, ref budget);
                 if (pending == null) emitter.PendingProgramTextures.Remove(path);
@@ -186,7 +187,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             VfxOpenGlRenderer renderer,
             ref UploadBudget budget)
         {
-            if (pending is not VfxCubeMapData cube || !cube.IsValid)
+            if (pending is not CubeMapData cube || !cube.IsValid)
                 return currentTexture;
 
             if (!_cubeMaps.TryGetValue(cube, out uint texture))

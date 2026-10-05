@@ -39,7 +39,7 @@ Captures are 1280 x 720 RGBA8 in OpenGL row order. `--allow-gl-errors` as the th
 
 ## Debug navigation follow-up
 
-The user reported remaining camera stutter in Debug after the first optimization. GLWpfControl 4.3.6 draws synchronously on the WPF dispatcher, including graphics interop synchronization. Its continuous visual invalidation can schedule rendering ahead of pending input. VFX Studio now coalesces composition-driven frame requests at Background priority, allowing queued Input operations to run before invalidation, pauses requests while invisible, and cancels them on deactivation/disposal. GL drawing and simulation remain on their original thread. Timeline refreshes are coalesced at Background priority and skipped while the timeline is hidden.
+The user reported remaining camera stutter in Debug after the first optimization. GLWpfControl 4.3.6 draws synchronously on the WPF dispatcher, including graphics interop synchronization. Its continuous visual invalidation can schedule rendering ahead of pending input. 3D Studio now coalesces composition-driven frame requests at Background priority, allowing queued Input operations to run before invalidation, pauses requests while invisible, and cancels them on deactivation/disposal. GL drawing and simulation remain on their original thread. Timeline refreshes are coalesced at Background priority and skipped while the timeline is hidden.
 
 The scalar/vector uniform cache now compares primitive fields directly and rejects inactive locations before converting floats. Native quad camera calculations and matrix uploads are shared per program within each render pass, with camera state reset for each pass. Debug optimization settings, VFX simulation and shader sources remain unchanged.
 

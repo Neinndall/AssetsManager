@@ -122,27 +122,46 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         [Fact]
         public void GameShadersOnlyRunForTheLitMaterialSurface()
         {
-            Assert.False(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Lit, shadersEnabled: false));
-            Assert.True(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Lit, shadersEnabled: true));
-            Assert.False(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Unshaded, shadersEnabled: true));
-            Assert.False(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Untextured, shadersEnabled: true));
-            Assert.False(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Wireframe, shadersEnabled: true));
-            Assert.False(GlMeshRenderer.UsesGameShaders(VfxPreviewViewMode.Lit, shadersEnabled: true, wireframePass: true));
+            Assert.False(GlMeshRenderer.UsesGameShaders(StudioViewMode.Lit, shadersEnabled: false));
+            Assert.True(GlMeshRenderer.UsesGameShaders(StudioViewMode.Lit, shadersEnabled: true));
+            Assert.False(GlMeshRenderer.UsesGameShaders(StudioViewMode.Unshaded, shadersEnabled: true));
+            Assert.False(GlMeshRenderer.UsesGameShaders(StudioViewMode.Untextured, shadersEnabled: true));
+            Assert.False(GlMeshRenderer.UsesGameShaders(StudioViewMode.Wireframe, shadersEnabled: true));
+            Assert.False(GlMeshRenderer.UsesGameShaders(StudioViewMode.Lit, shadersEnabled: true, wireframePass: true));
         }
 
         [Fact]
-        public void VfxStudioDisplayDefaultsMatchReferenceGameShadersOptIn()
+        public void StudioDisplayDefaultsMatchReferenceGameShadersOptIn()
         {
             AppSettings settings = AppSettings.GetDefaultSettings();
 
-            Assert.Equal("Lit", settings.VfxStudio.ViewMode);
-            Assert.False(settings.VfxStudio.WireOverlay);
+            Assert.Equal("Lit", settings.Studio.ViewMode);
+            Assert.False(settings.Studio.WireOverlay);
+        }
+
+        [Fact]
+        public void StudioDisplayPreferencesRoundTripWithTheExistingSettingsKey()
+        {
+            const string savedJson = """
+                {"VfxStudio":{"CameraPreset":"Top","StageVisible":true,"ViewMode":"Untextured","WireOverlay":true}}
+                """;
+            AppSettings settings = Newtonsoft.Json.JsonConvert.DeserializeObject<AppSettings>(savedJson);
+
+            Assert.Equal("Top", settings.Studio.CameraPreset);
+            Assert.True(settings.Studio.StageVisible);
+            Assert.Equal("Untextured", settings.Studio.ViewMode);
+            Assert.True(settings.Studio.WireOverlay);
+
+            var saved = Newtonsoft.Json.Linq.JObject.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(settings));
+            Assert.Null(saved["Studio"]);
+            Assert.True(Newtonsoft.Json.Linq.JToken.DeepEquals(
+                Newtonsoft.Json.Linq.JObject.Parse(savedJson)["VfxStudio"], saved["VfxStudio"]));
         }
 
         [Fact]
         public void HeavyPreviewContentStartsOffEverySession()
         {
-            var model = new VfxInspectorModel();
+            var model = new StudioModel();
 
             Assert.False(model.PreviewShaders);
             Assert.False(model.CharacterEffectsEnabled);
@@ -153,7 +172,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         [Fact]
         public void HeavyPreviewTogglesAreNotPersisted()
         {
-            string json = Newtonsoft.Json.JsonConvert.SerializeObject(AppSettings.GetDefaultSettings().VfxStudio);
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(AppSettings.GetDefaultSettings().Studio);
 
             Assert.DoesNotContain("ShadersEnabled", json);
             Assert.DoesNotContain("ChampionVfxEnabled", json);
@@ -162,7 +181,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
-        public void VfxStudioCharacterSpaceMirrorsXWithoutChangingTheNormalViewerSpace()
+        public void StudioCharacterSpaceMirrorsXWithoutChangingTheNormalViewerSpace()
         {
             var model = new SceneModel
             {
@@ -186,18 +205,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
-        public void VfxStudioViewModeKeepsWireOverlayIndependent()
+        public void StudioViewModeKeepsWireOverlayIndependent()
         {
-            var model = new VfxInspectorModel
+            var model = new StudioModel
             {
                 PreviewWireOverlay = true,
-                PreviewViewMode = VfxPreviewViewMode.Unshaded
+                PreviewViewMode = StudioViewMode.Unshaded
             };
 
             Assert.False(model.CanPreviewWireOverlay);
             Assert.False(model.EffectivePreviewWireOverlay);
 
-            model.PreviewViewMode = VfxPreviewViewMode.Untextured;
+            model.PreviewViewMode = StudioViewMode.Untextured;
             Assert.True(model.CanPreviewWireOverlay);
             Assert.True(model.EffectivePreviewWireOverlay);
         }

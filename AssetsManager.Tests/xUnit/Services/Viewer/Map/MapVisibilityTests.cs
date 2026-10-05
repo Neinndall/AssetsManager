@@ -173,7 +173,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         public void InspectorOffersNamedStatesAndRequestsTheComposedState()
         {
             MapSceneVisibility visibility = Visibility();
-            var model = new VfxInspectorModel();
+            var model = new StudioModel();
             var requests = new List<MapVisibilityState>();
             model.MapVisibilityRequested += requests.Add;
             model.SetMapVisibility(

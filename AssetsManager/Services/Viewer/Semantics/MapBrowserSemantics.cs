@@ -11,7 +11,7 @@ namespace AssetsManager.Services.Viewer.Semantics
         AnimationClipDefinition Clip);
 
     /// <summary>
-    /// Projects one loaded MAP runtime into the semantic tree shared by VFX Studio.
+    /// Projects one loaded MAP runtime into the semantic tree shared by 3D Studio.
     /// </summary>
     internal static class MapBrowserSemantics
     {

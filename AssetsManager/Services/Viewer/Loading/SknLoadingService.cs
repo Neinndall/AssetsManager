@@ -105,7 +105,7 @@ namespace AssetsManager.Services.Viewer.Loading
 
         /// <summary>
         /// Loads an SKN while using the exact skin BIN already selected by the caller.
-        /// VFX Studio follows the authored skin/material bindings, so unrelated textures beside
+        /// 3D Studio follows the authored skin/material bindings, so unrelated textures beside
         /// the SKN are not decoded eagerly. This mirrors LTK's Skin viewport resource ownership.
         /// </summary>
         public Task<SceneModel> LoadModelWithSkinBin(

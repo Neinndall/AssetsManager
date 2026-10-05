@@ -16,7 +16,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition;
 
 /// <summary>
 /// Owns the animation assets behind AnimationGraph clips and resolves their authored event
-/// timelines for VFX Studio playback and inspection.
+/// timelines for 3D Studio playback and inspection.
 /// </summary>
 internal sealed class VfxClipCatalog : IDisposable
 {

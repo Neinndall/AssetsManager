@@ -23,9 +23,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Interaction
             {
                 try
                 {
-                    var first = new VfxSceneActor(new VfxSkinItem { BinPath = @"C:\p\first.bin" });
-                    var second = new VfxSceneActor(new VfxSkinItem { BinPath = @"C:\p\second.bin" });
-                    var tab = new VfxWorkspaceTab { Kind = VfxWorkspaceTabKind.Skin };
+                    var first = new StudioSceneActor(new StudioSkinItem { BinPath = @"C:\p\first.bin" });
+                    var second = new StudioSceneActor(new StudioSkinItem { BinPath = @"C:\p\second.bin" });
+                    var tab = new StudioWorkspaceTab { Kind = StudioWorkspaceTabKind.Skin };
                     tab.Actors.Add(first); tab.Actors.Add(second); tab.FocusedActor = first;
                     var list = new ListBox
                     {
@@ -33,7 +33,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Interaction
                     };
                     list.SelectionChanged += (_, _) =>
                     {
-                        foreach (VfxSceneActor actor in tab.Actors)
+                        foreach (StudioSceneActor actor in tab.Actors)
                             actor.IsSelected = list.SelectedItems.Contains(actor);
                     };
                     list.Measure(new Size(300, 200)); list.Arrange(new Rect(0, 0, 300, 200)); list.UpdateLayout();

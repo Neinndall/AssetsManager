@@ -26,7 +26,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
     /// <summary>
     /// `vfx-sweep [--champions] [--maps] [--filter TEXT] [--max-skins N] [--max-bins N] [--max-systems N] [--max-seconds N] [--custom-only] [--no-owner] [--csv FILE [--resume]]`:
     /// loads VFX systems of the installed BINs (skin BINs, the shared character BINs they link, map materials) the way
-    /// VFX Studio does and flags, per emitter:
+    /// 3D Studio does and flags, per emitter:
     /// resources it authors that the engine cannot load (split into absent from the game, not extracted and not
     /// decoded), emitters drawn with the stock program instead of the game's and why, root emitters that emit
     /// nothing during the sampled seconds (4 by default), child emitters alive past their first emission without a

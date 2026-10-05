@@ -75,7 +75,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
-        public void ParserResolvesCustomMaterialForPlacedMapSystemsLikeVfxStudio()
+        public void ParserResolvesCustomMaterialForPlacedMapSystemsLikeStudio()
         {
             const ulong customTextureHash = 0x1234567890abcdefUL;
             const string shaderPath = "Shaders/Particles/Test";

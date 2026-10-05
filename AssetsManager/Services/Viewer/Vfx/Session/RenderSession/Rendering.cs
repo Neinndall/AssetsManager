@@ -12,7 +12,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void Render(
             Matrix4x4 viewProjection,
             Matrix4x4 view,
-            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            StudioViewMode viewMode = StudioViewMode.Lit,
             bool wireOverlay = false)
         {
             if (!PrepareRenderFrame(viewProjection, view, viewMode, wireOverlay)) return;
@@ -54,7 +54,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         internal bool PrepareRenderFrame(
             Matrix4x4 viewProjection,
             Matrix4x4 view,
-            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            StudioViewMode viewMode = StudioViewMode.Lit,
             bool wireOverlay = false)
         {
             ProcessPendingGpuState();
@@ -146,19 +146,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         internal static (bool Shaded, bool Wireframe, float WireOpacity) ResolvePreviewPasses(
-            VfxPreviewViewMode mode,
+            StudioViewMode mode,
             bool wireOverlay,
             bool supportsWireframe)
         {
-            bool wireframeOnly = mode == VfxPreviewViewMode.Wireframe;
-            bool overlayAllowed = mode == VfxPreviewViewMode.Lit || mode == VfxPreviewViewMode.Untextured;
+            bool wireframeOnly = mode == StudioViewMode.Wireframe;
+            bool overlayAllowed = mode == StudioViewMode.Lit || mode == StudioViewMode.Untextured;
             bool shaded = !wireframeOnly || !supportsWireframe;
             bool wireframe = supportsWireframe && (wireframeOnly || (wireOverlay && overlayAllowed));
             float opacity = wireframeOnly ? 1f : 0.35f;
             return (shaded, wireframe, opacity);
         }
 
-        internal static float WireframeOpacity(VfxPreviewViewMode mode, bool wireOverlay = false)
+        internal static float WireframeOpacity(StudioViewMode mode, bool wireOverlay = false)
             => ResolvePreviewPasses(mode, wireOverlay, supportsWireframe: true).WireOpacity;
 
         public void Dispose()

@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -58,7 +59,7 @@ namespace AssetsManager.Services.Viewer.Loading
             _logService = logService;
         }
 
-        internal async Task<VfxCubeMapData> LoadBackdropSkyAsync(
+        internal async Task<CubeMapData> LoadBackdropSkyAsync(
             string projectRoot,
             CancellationToken cancellationToken = default)
         {
@@ -70,7 +71,7 @@ namespace AssetsManager.Services.Viewer.Loading
 
             await using Stream stream = await _assetResolver.OpenReadAsync(sky, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            return stream == null ? null : VfxCubeMapDecoder.Decode(stream);
+            return stream == null ? null : CubeMapDecoder.Decode(stream);
         }
 
         public Task<MapSceneData> LoadAsync(
@@ -166,7 +167,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 mapDocument,
                 source.Map,
                 _hashResolver == null ? null : _hashResolver.ResolveHash);
-            IReadOnlyDictionary<MapTextureReference, VfxCubeMapData> environmentCubes =
+            IReadOnlyDictionary<MapTextureReference, CubeMapData> environmentCubes =
                 await LoadEnvironmentCubesAsync(terrain, source.ProjectRoot, cancellationToken);
             IReadOnlyDictionary<string, MapTextureImage> textures = includePreviewTextures
                 ? await _textureLoadingService.LoadPreviewAsync(
@@ -232,12 +233,12 @@ namespace AssetsManager.Services.Viewer.Loading
         /// Decodes the environment cube of every MapSkin drawing the container. A missing or flat
         /// texture leaves that skin without reflections instead of failing the scene.
         /// </summary>
-        private async Task<IReadOnlyDictionary<MapTextureReference, VfxCubeMapData>> LoadEnvironmentCubesAsync(
+        private async Task<IReadOnlyDictionary<MapTextureReference, CubeMapData>> LoadEnvironmentCubesAsync(
             MapTerrainData terrain,
             string projectRoot,
             CancellationToken cancellationToken)
         {
-            var cubes = new Dictionary<MapTextureReference, VfxCubeMapData>();
+            var cubes = new Dictionary<MapTextureReference, CubeMapData>();
             foreach (MapTextureReference reference in terrain?.EnvironmentCubes ?? Enumerable.Empty<MapTextureReference>())
             {
                 MapResolvedAsset asset = await _assetResolver.ResolveReferenceAsync(
@@ -250,7 +251,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
                 if (stream == null)
                     continue;
-                VfxCubeMapData cube = await Task.Run(() => VfxCubeMapDecoder.Decode(stream), cancellationToken);
+                CubeMapData cube = await Task.Run(() => CubeMapDecoder.Decode(stream), cancellationToken);
                 if (cube?.IsValid == true)
                     cubes[reference] = cube;
                 else

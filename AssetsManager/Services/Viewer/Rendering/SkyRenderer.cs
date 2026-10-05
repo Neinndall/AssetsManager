@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Rendering.Core;
@@ -48,7 +49,7 @@ void main() {
         private uint _texture;
         private int _uViewProjection;
         private int _uSky;
-        private VfxCubeMapData _pendingCube;
+        private CubeMapData _pendingCube;
         private bool _replacePending;
         private bool _ready;
 
@@ -87,7 +88,7 @@ void main() {
             }
         }
 
-        internal void SetCube(VfxCubeMapData cube)
+        internal void SetCube(CubeMapData cube)
         {
             _pendingCube = cube;
             _replacePending = true;
@@ -140,7 +141,7 @@ void main() {
                 _texture = 0;
             }
 
-            VfxCubeMapData cube = _pendingCube;
+            CubeMapData cube = _pendingCube;
             _pendingCube = null;
             _texture = GlCubeMapUploader.Upload(_gl, cube, srgb: true);
         }

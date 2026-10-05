@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,7 +28,7 @@ namespace AssetsManager.Services.Viewer.Rendering
     internal sealed class MapCharacterRenderer : IDisposable
     {
         /// <summary>Environment cube PBR game shaders light from (IBL); the preview sky the viewport shows.</summary>
-        internal VfxCubeMapData ImageLight { get; set; }
+        internal CubeMapData ImageLight { get; set; }
 
         private sealed class SkinResources
         {
@@ -208,7 +209,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             IReadOnlySet<string> hidden = null,
             Vector3? untexturedLinear = null,
             Vector3? erroredLinear = null,
-            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            StudioViewMode viewMode = StudioViewMode.Lit,
             bool wireOverlay = false,
             bool shadersEnabled = true,
             MapLightGridData lightGrid = null,
@@ -222,15 +223,15 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (transparentPass != true)
             {
                 BuildQueues(groups, cameraPosition, timeSeconds, hidden);
-                PreparePassQueues(shadersEnabled && viewMode == VfxPreviewViewMode.Lit);
+                PreparePassQueues(shadersEnabled && viewMode == StudioViewMode.Lit);
             }
             if (_opaque.Count == 0 && _transparent.Count == 0)
                 return;
 
             (bool solids, bool wireframe, float wireOpacity) =
                 MapGeometryRenderer.ResolveViewPasses(viewMode, wireOverlay, supportsWireframe: !_gles);
-            VfxPreviewViewMode solidMode = viewMode == VfxPreviewViewMode.Wireframe
-                ? VfxPreviewViewMode.Lit
+            StudioViewMode solidMode = viewMode == StudioViewMode.Wireframe
+                ? StudioViewMode.Lit
                 : viewMode;
 
             var gameFrame = new GameShaderRuntime.Frame(
@@ -251,7 +252,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (solids)
                 {
                     _gl.Uniform1(_uWireframePass, 0);
-                    bool glows = Bloom != null && shadersEnabled && solidMode == VfxPreviewViewMode.Lit;
+                    bool glows = Bloom != null && shadersEnabled && solidMode == StudioViewMode.Lit;
                     if (transparentPass != true)
                     {
                         DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
@@ -471,7 +472,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             in GameShaderRuntime.Frame gameFrame,
             Vector3 untextured,
             Vector3 errored,
-            VfxPreviewViewMode viewMode,
+            StudioViewMode viewMode,
             bool shadersEnabled,
             bool wireframePass,
             ref Matrix4x4[] activePalette,
@@ -526,7 +527,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (_gameShaderRuntime != null)
                     _gameShaderRuntime.DrawIndexedPass(
                         _drawElements, command.Range.IndexCount, new IntPtr(checked(command.Range.StartIndex * sizeof(uint))),
-                        !wireframePass && command.Range.Transparent && command.Range.Material.RenderState.DoubleSided && viewMode != VfxPreviewViewMode.Untextured);
+                        !wireframePass && command.Range.Transparent && command.Range.Material.RenderState.DoubleSided && viewMode != StudioViewMode.Untextured);
                 else
                     _drawElements(
                         (uint)PrimitiveType.Triangles,
@@ -792,12 +793,12 @@ namespace AssetsManager.Services.Viewer.Rendering
             float timeSeconds,
             Vector3 untextured,
             Vector3 errored,
-            VfxPreviewViewMode viewMode,
+            StudioViewMode viewMode,
             float selfIllumination = 0f)
         {
             ModelMaterialDefinition material = range.Material;
-            bool forceUntextured = viewMode == VfxPreviewViewMode.Untextured;
-            bool forceUnshaded = viewMode == VfxPreviewViewMode.Unshaded;
+            bool forceUntextured = viewMode == StudioViewMode.Untextured;
+            bool forceUnshaded = viewMode == StudioViewMode.Unshaded;
             bool hasTexture = !forceUntextured && range.Texture != null;
             uint textureId = hasTexture
                 ? AcquireTexture(range.Texture, _textures, BaseTextureInternalFormat)

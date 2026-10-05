@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -3729,11 +3730,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         {
             Assert.Equal(
                 0f,
-                VfxInspectorControl.ResolveSimulationFrameDelta(TimeSpan.FromSeconds(12), discard: true),
+                StudioControl.ResolveSimulationFrameDelta(TimeSpan.FromSeconds(12), discard: true),
                 precision: 6);
             Assert.Equal(
                 0.025f,
-                VfxInspectorControl.ResolveSimulationFrameDelta(TimeSpan.FromSeconds(0.025), discard: false),
+                StudioControl.ResolveSimulationFrameDelta(TimeSpan.FromSeconds(0.025), discard: false),
                 precision: 6);
         }
 
@@ -3764,7 +3765,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         {
             Assert.Equal(
                 expected,
-                VfxInspectorControl.PlaybackStepTarget(currentTime, frames, span),
+                StudioControl.PlaybackStepTarget(currentTime, frames, span),
                 precision: 10);
         }
 
@@ -3780,14 +3781,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             int direction,
             double expected)
         {
-            Assert.Equal(expected, VfxInspectorControl.PlaybackSpeedDetent(speed, direction), precision: 6);
+            Assert.Equal(expected, StudioControl.PlaybackSpeedDetent(speed, direction), precision: 6);
         }
 
         [Fact]
         public void StandaloneRunStartsFromTheDeterministicSeed()
         {
-            Assert.Equal(1337, VfxInspectorControl.StandalonePlaybackSeed);
-            Assert.Equal(1338, VfxInspectorControl.NextPlaybackSeed(1337));
+            Assert.Equal(1337, StudioControl.StandalonePlaybackSeed);
+            Assert.Equal(1338, StudioControl.NextPlaybackSeed(1337));
         }
 
         [Theory]
@@ -3802,22 +3803,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         {
             Assert.Equal(
                 expected,
-                VfxInspectorControl.RememberedPlayhead(playhead, span),
+                StudioControl.RememberedPlayhead(playhead, span),
                 precision: 6);
         }
 
         [Fact]
         public void PreviewLoopDoesNotRestartGraphUnlessExplicitlyEnabled()
         {
-            Assert.False(VfxInspectorControl.ShouldRestartPreview(
+            Assert.False(StudioControl.ShouldRestartPreview(
                 enabled: false,
                 currentTime: 0.30,
                 boundary: 0.30));
-            Assert.False(VfxInspectorControl.ShouldRestartPreview(
+            Assert.False(StudioControl.ShouldRestartPreview(
                 enabled: true,
                 currentTime: 0.29,
                 boundary: 0.30));
-            Assert.True(VfxInspectorControl.ShouldRestartPreview(
+            Assert.True(StudioControl.ShouldRestartPreview(
                 enabled: true,
                 currentTime: 0.30,
                 boundary: 0.30));
@@ -3826,16 +3827,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void PreviewLoopKeepsAnAuthoredRangeInsideTheCurrentSpan()
         {
-            (double from, double to) = VfxInspectorControl.ClampPreviewLoop(0.5, 1.0, 2.0);
+            (double from, double to) = StudioControl.ClampPreviewLoop(0.5, 1.0, 2.0);
             Assert.Equal(0.5, from, 6);
             Assert.Equal(1.0, to, 6);
-            Assert.Equal(0.5, VfxInspectorControl.ResolvePreviewLoopRestart(from, to, 2.0), 6);
+            Assert.Equal(0.5, StudioControl.ResolvePreviewLoopRestart(from, to, 2.0), 6);
 
-            (from, to) = VfxInspectorControl.ClampPreviewLoop(1.0, 0.5, 2.0);
-            Assert.Equal(0.5 - VfxInspectorControl.PreviewLoopMinimumSpan, from, 6);
+            (from, to) = StudioControl.ClampPreviewLoop(1.0, 0.5, 2.0);
+            Assert.Equal(0.5 - StudioControl.PreviewLoopMinimumSpan, from, 6);
             Assert.Equal(0.5, to, 6);
 
-            (from, to) = VfxInspectorControl.ClampPreviewLoop(-1.0, 5.0, 2.0);
+            (from, to) = StudioControl.ClampPreviewLoop(-1.0, 5.0, 2.0);
             Assert.Equal(0.0, from, 6);
             Assert.Equal(2.0, to, 6);
         }
@@ -3843,8 +3844,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void TimelineUsesTheRealPlaybackDurationInsteadOfAnArtificialMinimum()
         {
-            Assert.Equal(0.30, VfxInspectorControl.ResolveTimelineDuration(0.30), 6);
-            Assert.Equal(10.0, VfxInspectorControl.ResolveTimelineDuration(double.PositiveInfinity), 6);
+            Assert.Equal(0.30, StudioControl.ResolveTimelineDuration(0.30), 6);
+            Assert.Equal(10.0, StudioControl.ResolveTimelineDuration(double.PositiveInfinity), 6);
         }
 
         [Fact]
@@ -4969,7 +4970,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 "timeline",
                 new[] { playable, disabled });
 
-            Assert.True(VfxInspectorControl.HasPlayableEmitters(system));
+            Assert.True(StudioControl.HasPlayableEmitters(system));
             Assert.Equal(1.5, VfxDurationCalculator.SystemSpan(system), precision: 3);
         }
 
@@ -4988,13 +4989,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 "disabled",
                 new[] { disabled });
 
-            Assert.False(VfxInspectorControl.HasPlayableEmitters(system));
+            Assert.False(StudioControl.HasPlayableEmitters(system));
         }
 
         [Fact]
         public void DelayedEmitterTrackStartsAtItsEmissionMarker()
         {
-            var metrics = VfxInspectorControl.CalculateEmitterTrackMetrics(
+            var metrics = StudioControl.CalculateEmitterTrackMetrics(
                 delay: 5,
                 duration: 3,
                 totalDuration: 13,
@@ -5019,7 +5020,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             try
             {
-                var index = VfxResourceIndex.Build(root);
+                var index = ProjectResourceIndex.Build(root);
                 string resolved = index.Resolve(
                     "assets/characters/hero/skins/skin1/particles/shared.tex",
                     new[] { ".tex" });
@@ -5044,7 +5045,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             try
             {
-                var index = VfxResourceIndex.Build(root);
+                var index = ProjectResourceIndex.Build(root);
                 string resolved = index.Resolve(
                     $"DATA/Characters/Hero/{extractedStem}_skins_skin28.bin",
                     new[] { ".bin" });
@@ -5070,7 +5071,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             try
             {
-                var index = VfxResourceIndex.Build(root);
+                var index = ProjectResourceIndex.Build(root);
 
                 Assert.Equal(
                     Path.GetFullPath(skeleton),

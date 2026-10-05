@@ -86,7 +86,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
 
             string requested = string.IsNullOrWhiteSpace(mapEntry) ? DefaultMap : mapEntry;
-            VfxFolderCatalog.BrowserCatalog catalog = VfxFolderCatalog.ScanBrowser(
+            StudioProjectCatalog.BrowserCatalog catalog = StudioProjectCatalog.ScanBrowser(
                 fullRoot,
                 CancellationToken.None,
                 resolveBinEntry: null,

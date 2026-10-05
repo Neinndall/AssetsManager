@@ -148,7 +148,7 @@ public class VfxClipCatalogTests
         };
         var bundle = new VfxLoadingService.Bundle();
         bundle.Clips.AddRange(new[] { gear, first, second });
-        var form = new VfxCharacterFormDefinition(123, 1, "Alternate",
+        var form = new CharacterFormDefinition(123, 1, "Alternate",
             Array.Empty<uint>(), Array.Empty<uint>());
         using var catalog = new VfxClipCatalog();
 

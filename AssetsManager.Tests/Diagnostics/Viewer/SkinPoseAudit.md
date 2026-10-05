@@ -16,7 +16,7 @@ Earth Dragon Attack1 uses an additive track and contains deltas rather than a co
 - `SkinPoseReader` reads only the effective selected skin's mesh properties, including form overlays. `SkinPoseDefinition` carries the data through material resolution and model loading.
 - `SkinPoseRuntime`, `SkinSpringRuntime` and `SkinConformRuntime` apply pose dynamics and clip cues. Static conform sampling uses a bounded deterministic take; unit movement drives live springs. Scene changes and seeks reset live state.
 - `SkinSocketResolver` resolves attachment points on the final pose without adding entries to the joint palette. Animation attachment sampling restores the displayed pose, including the MAP preview path.
-- Viewer and VFX Studio supply the model transform; MAP ambient and selected clip playback supply their graph cues and masks. Model placement and spawn resolution keep their existing responsibility.
+- Viewer and 3D Studio supply the model transform; MAP ambient and selected clip playback supply their graph cues and masks. Model placement and spawn resolution keep their existing responsibility.
 
 This is isolated clip preview, not a visual graph editor or the game's multi-track state machine. DynamicsChain physics and orientation drivers requiring live game state are preserved but not simulated.
 

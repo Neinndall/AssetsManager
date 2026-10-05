@@ -295,9 +295,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
         }
 
         [Fact]
-        public void VfxStudioCameraPreservesItsRealDistanceToTheOrigin()
+        public void StudioCameraPreservesItsRealDistanceToTheOrigin()
         {
-            PerspectiveCamera camera = VfxInspectorControl.CreateVfxCamera();
+            PerspectiveCamera camera = StudioControl.CreateVfxCamera();
             Point3D target = camera.Position + camera.LookDirection;
 
             Assert.Equal(new Point3D(0, 0, 0), target);

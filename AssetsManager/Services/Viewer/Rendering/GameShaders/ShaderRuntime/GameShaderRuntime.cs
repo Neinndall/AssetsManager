@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
 using AssetsManager.Shaders;
@@ -90,7 +91,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             EnvironmentFrame Environment = default,
             uint SceneColor = 0,
             uint SceneDepth = 0,
-            VfxCubeMapData ImageLight = null);
+            CubeMapData ImageLight = null);
 
         internal const string SceneColorTexture = "SAMPLER_BACK_BUFFER_COPY_SharedTexture";
         internal const string SceneDepthTexture = "sDepthTexture_SharedTexture";

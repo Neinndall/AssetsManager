@@ -47,7 +47,9 @@ namespace AssetsManager.Utils
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StudioParameters)));
         }
 
-        public VfxStudioSettings VfxStudio { get; set; } = new();
+        // Preserve the existing settings key across the Studio rename.
+        [JsonProperty("VfxStudio")]
+        public StudioSettings Studio { get; set; } = new();
         public bool AssetWatcherUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
         public bool SaveJsonHistory { get; set; }
@@ -263,32 +265,32 @@ namespace AssetsManager.Utils
                 }
 
                 // The normal Viewer owns only its ordinary scene preferences. View mode, wire overlay
-                // and translated game shaders belong to VFX Studio, matching the reference viewport.
+                // and translated game shaders belong to 3D Studio, matching the reference viewport.
                 if (jsonObject["VfxStudio"] == null && jsonObject["StudioParameters"] is JObject studioJson &&
                     (studioJson["VfxCameraPreset"] != null || studioJson["VfxWireframeMode"] != null))
                 {
                     string legacyWire = studioJson.Value<string>("VfxWireframeMode") ?? "Off";
-                    settings.VfxStudio = new VfxStudioSettings
+                    settings.Studio = new StudioSettings
                     {
                         CameraPreset = studioJson.Value<string>("VfxCameraPreset") ?? "Orbit",
-                        ViewMode = LegacyVfxViewMode(legacyWire),
+                        ViewMode = LegacyStudioViewMode(legacyWire),
                         WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase)
                     };
                     needsResave = true;
                 }
-                else if (jsonObject["VfxStudio"] is JObject vfxStudioJson &&
-                         vfxStudioJson["ViewMode"] == null &&
-                         vfxStudioJson["WireframeMode"] != null)
+                else if (jsonObject["VfxStudio"] is JObject studioDisplayJson &&
+                         studioDisplayJson["ViewMode"] == null &&
+                         studioDisplayJson["WireframeMode"] != null)
                 {
-                    string legacyWire = vfxStudioJson.Value<string>("WireframeMode") ?? "Off";
-                    settings.VfxStudio ??= new VfxStudioSettings();
-                    settings.VfxStudio.ViewMode = LegacyVfxViewMode(legacyWire);
-                    settings.VfxStudio.WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase);
+                    string legacyWire = studioDisplayJson.Value<string>("WireframeMode") ?? "Off";
+                    settings.Studio ??= new StudioSettings();
+                    settings.Studio.ViewMode = LegacyStudioViewMode(legacyWire);
+                    settings.Studio.WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase);
                     needsResave = true;
                 }
 
                 settings.StudioParameters ??= GetDefaultSettings().StudioParameters;
-                settings.VfxStudio ??= GetDefaultSettings().VfxStudio;
+                settings.Studio ??= GetDefaultSettings().Studio;
 
                 if (jsonObject["StudioParameters"] is JObject currentStudioJson &&
                     currentStudioJson["SkyVisible"] == null &&
@@ -299,22 +301,22 @@ namespace AssetsManager.Utils
                 }
 
                 // A previous AssetsManager build temporarily shared these controls through
-                // StudioParameters. Carry those saved choices back into VFX Studio once, then keep
+                // StudioParameters. Carry those saved choices back into 3D Studio once, then keep
                 // both viewers independent.
                 JObject sharedDisplayJson = jsonObject["StudioParameters"] as JObject;
-                JObject savedVfxJson = jsonObject["VfxStudio"] as JObject;
-                if (savedVfxJson?["ViewMode"] == null)
+                JObject savedStudioJson = jsonObject["VfxStudio"] as JObject;
+                if (savedStudioJson?["ViewMode"] == null)
                 {
                     string sharedViewMode = sharedDisplayJson?.Value<string>("ViewMode");
                     if (!string.IsNullOrWhiteSpace(sharedViewMode))
-                        settings.VfxStudio.ViewMode = sharedViewMode;
+                        settings.Studio.ViewMode = sharedViewMode;
                     needsResave = true;
                 }
-                if (savedVfxJson?["WireOverlay"] == null)
+                if (savedStudioJson?["WireOverlay"] == null)
                 {
                     bool? sharedWireOverlay = sharedDisplayJson?.Value<bool?>("WireOverlay");
                     if (sharedWireOverlay.HasValue)
-                        settings.VfxStudio.WireOverlay = sharedWireOverlay.Value;
+                        settings.Studio.WireOverlay = sharedWireOverlay.Value;
                     needsResave = true;
                 }
                 settings.MonitoredAssets ??= new SafeList<MonitoredAsset>();
@@ -350,7 +352,7 @@ namespace AssetsManager.Utils
             }
         }
 
-        private static string LegacyVfxViewMode(string legacyWireframeMode) =>
+        private static string LegacyStudioViewMode(string legacyWireframeMode) =>
             legacyWireframeMode?.ToLowerInvariant() switch
             {
                 "only" => "Wireframe",
@@ -398,7 +400,7 @@ namespace AssetsManager.Utils
                     TransparentBackground = false,
                     EnableFxaa = true
                 },
-                VfxStudio = new VfxStudioSettings
+                Studio = new StudioSettings
                 {
                     CameraPreset = "Orbit",
                     StageVisible = false,
@@ -455,7 +457,7 @@ namespace AssetsManager.Utils
             GroundLogoScale = defaultSettings.GroundLogoScale;
             GroundLogoOpacity = defaultSettings.GroundLogoOpacity;
             StudioParameters = defaultSettings.StudioParameters;
-            VfxStudio = defaultSettings.VfxStudio;
+            Studio = defaultSettings.Studio;
             AudioExportFormat = defaultSettings.AudioExportFormat;
             ImageExportFormat = defaultSettings.ImageExportFormat;
             SaveJsonHistory = defaultSettings.SaveJsonHistory;
@@ -570,10 +572,10 @@ namespace AssetsManager.Utils
     }
 
     /// <summary>
-    /// Persisted VFX Studio display choices. Shaders, Champion VFX, Map VFX and Map Structures are
+    /// Persisted 3D Studio display choices. Shaders, Champion VFX, Map VFX and Map Structures are
     /// session-only: they start off on every launch so heavy content loads only when requested.
     /// </summary>
-    public class VfxStudioSettings
+    public class StudioSettings
     {
         public string CameraPreset { get; set; } = "Orbit";
         public bool StageVisible { get; set; }

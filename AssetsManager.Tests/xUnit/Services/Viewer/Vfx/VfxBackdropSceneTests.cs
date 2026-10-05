@@ -10,7 +10,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void BackdropCopyKeepsSourceSceneAndMutableActorStateIndependent()
         {
-            var original = new VfxSceneActor(new VfxSkinItem { OwnerName = "Aatrox", BinPath = @"C:\project\skin0.bin" })
+            var original = new StudioSceneActor(new StudioSkinItem { OwnerName = "Aatrox", BinPath = @"C:\project\skin0.bin" })
             {
                 PositionX = 12,
                 RotationY = 25,
@@ -23,12 +23,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             };
             original.EnabledGameStates.Add("Transformed");
             original.SubmeshOverrides[9] = false;
-            var source = new VfxWorkspaceTab { Key = "skin:aatrox", Kind = VfxWorkspaceTabKind.Skin, CharacterEffectsEnabled = true, MapEffectsEnabled = false, ShadersEnabled = true };
+            var source = new StudioWorkspaceTab { Key = "skin:aatrox", Kind = StudioWorkspaceTabKind.Skin, CharacterEffectsEnabled = true, MapEffectsEnabled = false, ShadersEnabled = true };
             source.Actors.Add(original);
             source.FocusedActor = original;
 
-            VfxWorkspaceTab copy = source.CopyForBackdrop("copy", "map11/base_srx", "base_srx");
-            VfxSceneActor actor = copy.FocusedActor;
+            StudioWorkspaceTab copy = source.CopyForBackdrop("copy", "map11/base_srx", "base_srx");
+            StudioSceneActor actor = copy.FocusedActor;
             Assert.NotSame(original, actor);
             Assert.Same(original.Skin, actor.Skin);
             Assert.Equal(12d, actor.PositionX);
@@ -62,10 +62,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void MultiActorBackdropPreservesFocusAndRelativePlacement()
         {
-            var skin = new VfxSkinItem { BinPath = @"C:\project\skin0.bin" };
-            var source = new VfxWorkspaceTab { Key = "source", Kind = VfxWorkspaceTabKind.Skin };
-            var first = new VfxSceneActor(skin) { PositionX = 10 };
-            var second = new VfxSceneActor(skin) { PositionX = 110, IsVisible = false };
+            var skin = new StudioSkinItem { BinPath = @"C:\project\skin0.bin" };
+            var source = new StudioWorkspaceTab { Key = "source", Kind = StudioWorkspaceTabKind.Skin };
+            var first = new StudioSceneActor(skin) { PositionX = 10 };
+            var second = new StudioSceneActor(skin) { PositionX = 110, IsVisible = false };
             source.Actors.Add(first);
             source.Actors.Add(second);
             source.FocusedActor = second;
@@ -84,11 +84,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [InlineData(true, 500d)]
         public void BackdropCameraFollowsSubjectWithoutChangingFramingOrSource(bool orthographic, double span)
         {
-            var state = new VfxWorkspaceCameraState(new Point3D(20, 220, 500),
+            var state = new StudioWorkspaceCameraState(new Point3D(20, 220, 500),
                 new Vector3D(-10, -100, -500), new Vector3D(0, 1, 0), orthographic, span,
-                VfxPreviewCameraPreset.Orbit);
-            var source = new VfxWorkspaceTab { Key = "source", Kind = VfxWorkspaceTabKind.Skin, CameraState = state };
-            var actor = new VfxSceneActor(new VfxSkinItem { BinPath = @"C:\project\skin0.bin" });
+                StudioCameraPreset.Orbit);
+            var source = new StudioWorkspaceTab { Key = "source", Kind = StudioWorkspaceTabKind.Skin, CameraState = state };
+            var actor = new StudioSceneActor(new StudioSkinItem { BinPath = @"C:\project\skin0.bin" });
             source.Actors.Add(actor);
             source.FocusedActor = actor;
             var copy = source.CopyForBackdrop("copy", "map11/base_srx", "base_srx");
@@ -123,21 +123,21 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [InlineData(true, true)]
         public void BackdropKeepsChampionAndMapEffectsIndependent(bool characterEffects, bool mapEffects)
         {
-            var model = new VfxInspectorModel
+            var model = new StudioModel
             {
                 CharacterEffectsEnabled = characterEffects,
                 MapParticlesVisible = mapEffects
             };
             Assert.Equal(characterEffects, model.CharacterEffectsEnabled);
             Assert.Equal(mapEffects, model.MapParticlesVisible);
-            var source = new VfxWorkspaceTab
+            var source = new StudioWorkspaceTab
             {
                 Key = "source",
-                Kind = VfxWorkspaceTabKind.Skin,
+                Kind = StudioWorkspaceTabKind.Skin,
                 CharacterEffectsEnabled = characterEffects,
                 MapEffectsEnabled = mapEffects
             };
-            var actor = new VfxSceneActor(new VfxSkinItem { BinPath = @"C:\project\skin0.bin" });
+            var actor = new StudioSceneActor(new StudioSkinItem { BinPath = @"C:\project\skin0.bin" });
             source.Actors.Add(actor);
             source.FocusedActor = actor;
             var copy = source.CopyForBackdrop("copy", "map11/base_srx", "base_srx");

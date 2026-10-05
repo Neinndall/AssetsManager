@@ -33,27 +33,27 @@ namespace AssetsManager.Utils.Viewport
             VfxRigMotion.ChampionHeight * 0.40f,
             0f);
 
-        internal static CameraStand ForStudio(VfxPreviewCameraPreset preset)
+        internal static CameraStand ForStudio(StudioCameraPreset preset)
             => preset switch
             {
-                VfxPreviewCameraPreset.Game => new(
+                StudioCameraPreset.Game => new(
                     GameDirection(),
                     Vector3.UnitY,
                     GameFieldOfView,
                     Orthographic: false,
                     Nearest: GameNearestReach,
                     Farthest: GameFarthestReach),
-                VfxPreviewCameraPreset.Top => new(
+                StudioCameraPreset.Top => new(
                     Vector3.UnitY,
                     Vector3.UnitZ,
                     OrbitFieldOfView,
                     Orthographic: true),
-                VfxPreviewCameraPreset.Front => new(
+                StudioCameraPreset.Front => new(
                     Vector3.UnitZ,
                     Vector3.UnitY,
                     OrbitFieldOfView,
                     Orthographic: true),
-                VfxPreviewCameraPreset.Side => new(
+                StudioCameraPreset.Side => new(
                     Vector3.UnitX,
                     Vector3.UnitY,
                     OrbitFieldOfView,

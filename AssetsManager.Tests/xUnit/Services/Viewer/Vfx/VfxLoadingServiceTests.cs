@@ -1,3 +1,5 @@
+using AssetsManager.Services.Viewer.Resources;
+using AssetsManager.Services.Viewer.Loading;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -39,7 +41,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 string assetPath = Path.Combine(assets, "effect.bin");
                 File.WriteAllBytes(dataPath, Array.Empty<byte>());
                 File.WriteAllBytes(assetPath, Array.Empty<byte>());
-                var index = VfxResourceIndex.Build(root);
+                var index = ProjectResourceIndex.Build(root);
                 Assert.Equal(dataPath, Assert.Single(index.ResolveLinkedAll("DATA/Shared/Effect.bin", new[] { ".bin" })));
                 Assert.Equal(assetPath, Assert.Single(index.ResolveLinkedAll("ASSETS/Shared/Effect.bin", new[] { ".bin" })));
             }
@@ -65,7 +67,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 string stem = collisionName ? "shared" : new string('c', 236);
                 string extractedName = stem + (collisionName ? " (1)" : string.Empty) + extension;
                 File.WriteAllBytes(Path.Combine(directory, extractedName), Array.Empty<byte>());
-                var index = VfxResourceIndex.Build(root);
+                var index = ProjectResourceIndex.Build(root);
                 string dependency = $"data/characters/hero/{stem}_skins_skin28.bin";
 
                 Assert.Empty(index.ResolveLinkedAll(dependency, new[] { ".bin" }));
@@ -86,7 +88,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             try
             {
                 File.WriteAllBytes(Path.Combine(existingDirectory, "shared.tex"), new byte[] { 1 });
-                var index = VfxResourceIndex.Build(root);
+                var index = ProjectResourceIndex.Build(root);
 
                 string resolved = index.Resolve(
                     "assets/characters/hero/skins/skin1/particles/shared.tex",
@@ -946,7 +948,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 string animPath = Path.Combine(animDir, "lulu_attack1.anm");
                 File.WriteAllBytes(animPath, Array.Empty<byte>());
 
-                var index = VfxResourceIndex.Build(root);
+                var index = ProjectResourceIndex.Build(root);
 
                 string relPath = "assets/characters/lulu/skins/base/animations/lulu_attack1.anm";
                 ulong hash = XxHash64Ext.Hash(relPath);
@@ -982,7 +984,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 WriteSkinBin(champSkin);
                 WriteSkinBin(petSkin);
 
-                var skins = VfxFolderCatalog.Scan(root, System.Threading.CancellationToken.None);
+                var skins = StudioProjectCatalog.Scan(root, System.Threading.CancellationToken.None);
                 Assert.Equal(2, skins.Count);
                 Assert.Equal(champSkin, skins[0].BinPath);
                 Assert.Equal(petSkin, skins[1].BinPath);
@@ -1027,7 +1029,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     }
                 }
 
-                var entries = VfxFolderCatalog.Scan(root, System.Threading.CancellationToken.None);
+                var entries = StudioProjectCatalog.Scan(root, System.Threading.CancellationToken.None);
 
                 Assert.Equal(cases.Length, entries.Count);
                 foreach (var item in cases)
@@ -1058,7 +1060,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 File.WriteAllBytes(Path.Combine(map12, "base_other.mapgeo"), Array.Empty<byte>());
                 File.WriteAllBytes(Path.Combine(map12, "base_other.materials.bin"), Array.Empty<byte>());
 
-                VfxFolderCatalog.BrowserCatalog catalog = VfxFolderCatalog.ScanBrowser(
+                StudioProjectCatalog.BrowserCatalog catalog = StudioProjectCatalog.ScanBrowser(
                     root,
                     System.Threading.CancellationToken.None,
                     resolveBinEntry: null);
@@ -1068,7 +1070,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Assert.Equal("Maps/MapGeometry/Map12/Base_Other", catalog.MapSources[1].Map.Value, ignoreCase: true);
                 Assert.All(catalog.MapSources, source => Assert.Equal(Path.GetFullPath(root), source.ProjectRoot));
 
-                VfxBrowserFolder mapRoot = Assert.Single(catalog.Roots);
+                StudioBrowserFolder mapRoot = Assert.Single(catalog.Roots);
                 Assert.Equal("MapGeometry", mapRoot.Title);
                 MapBrowserNode[] nodes = mapRoot.Children.OfType<MapBrowserNode>().ToArray();
                 Assert.Equal(2, nodes.Length);
@@ -1140,7 +1142,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     },
                     Array.Empty<string>());
 
-                VfxFolderCatalog.BrowserCatalog catalog = VfxFolderCatalog.ScanBrowser(
+                StudioProjectCatalog.BrowserCatalog catalog = StudioProjectCatalog.ScanBrowser(
                     root,
                     System.Threading.CancellationToken.None,
                     resolveBinEntry: null);
@@ -1184,7 +1186,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     new[] { new BinTreeObject(spellPath, "SpellObject", Array.Empty<BinTreeProperty>()) },
                     Array.Empty<string>());
 
-                VfxFolderCatalog.BrowserCatalog catalog = VfxFolderCatalog.ScanBrowser(
+                StudioProjectCatalog.BrowserCatalog catalog = StudioProjectCatalog.ScanBrowser(
                     root,
                     System.Threading.CancellationToken.None,
                     hash => hash == spellHash ? spellPath : null);
@@ -1193,30 +1195,30 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 // preview choices beside the authored Skin entries.
                 Assert.Contains(catalog.Entries, entry => entry.BinPath == Path.GetFullPath(themeTier));
 
-                VfxBrowserFolder characters = Assert.Single(catalog.Roots);
+                StudioBrowserFolder characters = Assert.Single(catalog.Roots);
                 Assert.Equal("Characters", characters.Title);
                 Assert.True(characters.IsExpanded);
                 Assert.Equal(2, characters.Children.Count);
 
-                VfxBrowserFolder yunaraNode = Assert.IsType<VfxBrowserFolder>(characters.Children[0]);
+                StudioBrowserFolder yunaraNode = Assert.IsType<StudioBrowserFolder>(characters.Children[0]);
                 Assert.Equal("PetChibiYunara", yunaraNode.Title);
                 Assert.Equal("Companion", yunaraNode.Subtitle);
                 Assert.Equal(new[] { "Skins" },
-                    yunaraNode.Children.Cast<VfxBrowserFolder>().Select(folder => folder.Title));
+                    yunaraNode.Children.Cast<StudioBrowserFolder>().Select(folder => folder.Title));
 
-                VfxBrowserFolder skins = Assert.IsType<VfxBrowserFolder>(yunaraNode.Children[0]);
-                VfxSkinItem skin = Assert.IsType<VfxSkinItem>(Assert.Single(skins.Children));
+                StudioBrowserFolder skins = Assert.IsType<StudioBrowserFolder>(yunaraNode.Children[0]);
+                StudioSkinItem skin = Assert.IsType<StudioSkinItem>(Assert.Single(skins.Children));
                 Assert.Equal("Skin 1", skin.Title);
                 Assert.Equal("PetChibiYunara", skin.OwnerName);
                 Assert.Equal(new[] { "Systems", "Clips", "Spells" }, skin.Sections.Select(section => section.Title));
 
-                VfxBrowserFolder spellGroup = Assert.IsType<VfxBrowserFolder>(Assert.Single(skin.SpellItems));
+                StudioBrowserFolder spellGroup = Assert.IsType<StudioBrowserFolder>(Assert.Single(skin.SpellItems));
                 Assert.Equal("Q", spellGroup.Title);
-                VfxSpellBrowserItem spell = Assert.IsType<VfxSpellBrowserItem>(Assert.Single(spellGroup.Children));
+                StudioSpellBrowserItem spell = Assert.IsType<StudioSpellBrowserItem>(Assert.Single(spellGroup.Children));
                 Assert.Equal("Missile", spell.Name);
                 Assert.Equal(spellPath, spell.ObjectPath);
 
-                VfxBrowserFolder zoeNode = Assert.IsType<VfxBrowserFolder>(characters.Children[1]);
+                StudioBrowserFolder zoeNode = Assert.IsType<StudioBrowserFolder>(characters.Children[1]);
                 Assert.Equal("PetChibiZoe", zoeNode.Title);
             }
             finally

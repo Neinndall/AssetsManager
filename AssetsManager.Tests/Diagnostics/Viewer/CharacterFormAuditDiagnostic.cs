@@ -1,3 +1,5 @@
+using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Semantics;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -48,7 +50,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             {
                 using var stream = File.OpenRead(path);
                 var tree = new BinTree(stream);
-                var data = VfxCharacterFormParser.ParseDocument(tree);
+                var data = CharacterFormParser.ParseDocument(tree);
                 Console.WriteLine($"[Forms] {path} objects={tree.Objects.Count} primaryGear={data.PrimaryGearUpgradePathHashes.Count} gearDefinitions={data.GearForms.Count}");
                 foreach (string dependency in tree.Dependencies) Console.WriteLine($"dependency={dependency}");
                 uint Hash(string field) => LeagueToolkit.Hashing.Fnv1a.HashLower(field);
@@ -59,7 +61,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 Console.WriteLine($"baseMesh={baseMesh} baseSkeleton={baseSkeleton}");
                 if (inspectMesh) PrintMesh("base", mesh, Name);
                 var owner = VfxAnimationParser.ExtractOwnerSceneContext(tree);
-                foreach (var form in VfxCharacterFormParser.Resolve(new[] { data }, Name, owner))
+                foreach (var form in CharacterFormParser.Resolve(new[] { data }, Name, owner))
                 {
                     bool sameMesh = string.IsNullOrWhiteSpace(form.MeshPath) || string.Equals(form.MeshPath, baseMesh, StringComparison.OrdinalIgnoreCase);
                     bool sameSkeleton = string.IsNullOrWhiteSpace(form.SkeletonPath) || string.Equals(form.SkeletonPath, baseSkeleton, StringComparison.OrdinalIgnoreCase);
@@ -109,9 +111,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 });
             }
             Console.WriteLine($"[Preview Forms] {path} authored={bundle.CharacterForms.Count}");
-            foreach (var option in VfxCharacterFormSemantics.FormOptions(bundle.CharacterForms, bundle.OwnerSceneContext, model))
+            foreach (var option in CharacterFormSemantics.FormOptions(bundle.CharacterForms, bundle.OwnerSceneContext, model))
             {
-                var hidden = VfxCharacterFormSemantics.HiddenSubmeshes(bundle.OwnerSceneContext.InitialHiddenSubmeshHashes,
+                var hidden = CharacterFormSemantics.HiddenSubmeshes(bundle.OwnerSceneContext.InitialHiddenSubmeshHashes,
                     option.Definition, model.Parts, bundle.OwnerSceneContext.SubmeshConditions);
                 Console.WriteLine($"label={option.Label} gear={option.Definition.GearIndex} path={option.Definition.PathHash:x8} " +
                     $"visible=[{string.Join(",", model.Parts.Where(part => !hidden.Contains(LeagueToolkit.Hashing.Fnv1a.HashLower(part.Name))).Select(part => part.Name))}]");

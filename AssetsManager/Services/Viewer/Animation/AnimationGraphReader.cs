@@ -9,7 +9,7 @@ namespace AssetsManager.Services.Viewer.Animation
 {
     /// <summary>
     /// Viewer-level facade over the audited AnimationGraph decoder. MAP and VFX consume the
-    /// same graph semantics without making MAP code depend on the VFX Studio parsing namespace.
+    /// same graph semantics without making MAP code depend on the 3D Studio parsing namespace.
     /// </summary>
     internal static class AnimationGraphReader
     {

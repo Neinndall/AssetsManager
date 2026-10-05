@@ -51,7 +51,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Matrix4x4 view,
             uint viewportWidth,
             uint viewportHeight,
-            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            StudioViewMode viewMode = StudioViewMode.Lit,
             bool wireOverlay = false)
         {
             if (!PrepareRenderFrame(runtimes, viewProjection, view, viewportWidth, viewportHeight, viewMode, wireOverlay))
@@ -77,7 +77,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Matrix4x4 view,
             uint viewportWidth,
             uint viewportHeight,
-            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            StudioViewMode viewMode = StudioViewMode.Lit,
             bool wireOverlay = false)
         {
             if (!_ready || runtimes == null || runtimes.Count == 0)

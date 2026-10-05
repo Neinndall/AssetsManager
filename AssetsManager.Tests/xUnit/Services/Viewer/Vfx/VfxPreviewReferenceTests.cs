@@ -21,7 +21,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void CameraPresetsUseTheReferenceLensesAndAxes()
         {
-            CameraStand game = CameraPresets.ForStudio(VfxPreviewCameraPreset.Game);
+            CameraStand game = CameraPresets.ForStudio(StudioCameraPreset.Game);
             Assert.False(game.Orthographic);
             Assert.Equal(40f, game.FieldOfView);
             Assert.Equal(1000f, game.Nearest);
@@ -34,23 +34,23 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             AssertVector(expectedGame, game.Direction);
             AssertVector(Vector3.UnitY, game.Up);
 
-            CameraStand orbit = CameraPresets.ForStudio(VfxPreviewCameraPreset.Orbit);
+            CameraStand orbit = CameraPresets.ForStudio(StudioCameraPreset.Orbit);
             Assert.False(orbit.Orthographic);
             Assert.Equal(45f, orbit.FieldOfView);
             Assert.Null(orbit.Nearest);
             Assert.Null(orbit.Farthest);
 
-            CameraStand top = CameraPresets.ForStudio(VfxPreviewCameraPreset.Top);
+            CameraStand top = CameraPresets.ForStudio(StudioCameraPreset.Top);
             Assert.True(top.Orthographic);
             AssertVector(Vector3.UnitY, top.Direction);
             AssertVector(Vector3.UnitZ, top.Up);
 
-            CameraStand front = CameraPresets.ForStudio(VfxPreviewCameraPreset.Front);
+            CameraStand front = CameraPresets.ForStudio(StudioCameraPreset.Front);
             Assert.True(front.Orthographic);
             AssertVector(Vector3.UnitZ, front.Direction);
             AssertVector(Vector3.UnitY, front.Up);
 
-            CameraStand side = CameraPresets.ForStudio(VfxPreviewCameraPreset.Side);
+            CameraStand side = CameraPresets.ForStudio(StudioCameraPreset.Side);
             Assert.True(side.Orthographic);
             AssertVector(Vector3.UnitX, side.Direction);
             AssertVector(Vector3.UnitY, side.Up);
@@ -73,7 +73,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void SkyGroundGridAndStageDisplayPreferencesAreIndependent()
         {
-            var model = new VfxInspectorModel();
+            var model = new StudioModel();
 
             Assert.False(model.ShowPreviewSky);
             Assert.True(model.ShowPreviewGrid);
@@ -114,14 +114,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void ViewModesUseIndependentWireOverlayLikeCurrentLtk()
         {
-            Assert.Equal((true, false, 0.35f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Lit, false, true));
-            Assert.Equal((true, true, 0.35f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Lit, true, true));
-            Assert.Equal((true, false, 0.35f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Unshaded, true, true));
-            Assert.Equal((true, true, 0.35f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Untextured, true, true));
-            Assert.Equal((false, true, 1f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Wireframe, false, true));
-            Assert.Equal((true, false, 1f), VfxRenderSession.ResolvePreviewPasses(VfxPreviewViewMode.Wireframe, false, false));
-            Assert.Equal(1f, VfxRenderSession.WireframeOpacity(VfxPreviewViewMode.Wireframe));
-            Assert.Equal(0.35f, VfxRenderSession.WireframeOpacity(VfxPreviewViewMode.Lit, true));
+            Assert.Equal((true, false, 0.35f), VfxRenderSession.ResolvePreviewPasses(StudioViewMode.Lit, false, true));
+            Assert.Equal((true, true, 0.35f), VfxRenderSession.ResolvePreviewPasses(StudioViewMode.Lit, true, true));
+            Assert.Equal((true, false, 0.35f), VfxRenderSession.ResolvePreviewPasses(StudioViewMode.Unshaded, true, true));
+            Assert.Equal((true, true, 0.35f), VfxRenderSession.ResolvePreviewPasses(StudioViewMode.Untextured, true, true));
+            Assert.Equal((false, true, 1f), VfxRenderSession.ResolvePreviewPasses(StudioViewMode.Wireframe, false, true));
+            Assert.Equal((true, false, 1f), VfxRenderSession.ResolvePreviewPasses(StudioViewMode.Wireframe, false, false));
+            Assert.Equal(1f, VfxRenderSession.WireframeOpacity(StudioViewMode.Wireframe));
+            Assert.Equal(0.35f, VfxRenderSession.WireframeOpacity(StudioViewMode.Lit, true));
 
             Assert.Contains("uniform int uWireframePass;", VfxShaderSource.ParticleFragment);
             Assert.Contains("uniform vec4 uWireframeColor;", VfxShaderSource.ParticleFragment);

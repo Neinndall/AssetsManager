@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -88,7 +89,7 @@ namespace AssetsManager.Services.Viewer.Loading
             CancellationToken cancellationToken = default)
             => _runtimeFactory.CreateVfxResourcesAsync(catalog, projectRoot, cancellationToken);
 
-        internal Task<VfxCubeMapData> LoadBackdropSkyAsync(
+        internal Task<CubeMapData> LoadBackdropSkyAsync(
             string projectRoot,
             CancellationToken cancellationToken = default)
             => _sceneLoadingService.LoadBackdropSkyAsync(projectRoot, cancellationToken);

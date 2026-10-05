@@ -57,7 +57,7 @@
                 </Grid>
             </Border>
 
-            <!-- 3D & VFX Inspector -->
+            <!-- 3D Viewer and Studio -->
             <Border Style="{StaticResource SettingsCard}" Margin="0,12,12,12">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -68,9 +68,9 @@
                         <Border Background="{StaticResource HoverColor}" Width="42" Height="42" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="CubeOutline" Foreground="{StaticResource AccentPurple}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="3D Viewer &amp; VFX Inspector" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                        <TextBlock Text="Model Viewer &amp; 3D Studio" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Grid.Row="1" Text="Inspect champions, skins, and maps in 3D with animation playback. Includes a dedicated VFX particle inspector with keyframe curves and timeline scrubbing." 
+                    <TextBlock Grid.Row="1" Text="Explore models and chromas, or open 3D Studio to inspect characters, animations, maps and visual effects with scene controls and timeline playback."
                                FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </Grid>
             </Border>

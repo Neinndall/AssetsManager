@@ -472,6 +472,7 @@ Improvements
   - Input and confirmation dialogs now support Enter/Escape keys with automatic focus.
 
 Changes
+  - Viewer / Renamed VFX Studio to 3D Studio and refreshed its entry card to reflect models, animations, maps and visual effects.
   - Diagnostics / Added a clip audit to inspect animation names and file sources.
   - VFX Studio / Renamed the champion visibility tooltip to Show/Hide Champion.
   - VFX Studio / Unified toolbar actions for camera fitting, snapshots and playback, removing redundant actions.

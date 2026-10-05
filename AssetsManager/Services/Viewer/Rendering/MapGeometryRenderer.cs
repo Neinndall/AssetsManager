@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -286,9 +287,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             _terrainPaintImage = null;
         }
 
-        private void UploadEnvironmentCubes(IReadOnlyDictionary<MapTextureReference, VfxCubeMapData> cubes)
+        private void UploadEnvironmentCubes(IReadOnlyDictionary<MapTextureReference, CubeMapData> cubes)
         {
-            foreach ((MapTextureReference reference, VfxCubeMapData cube) in cubes ?? new Dictionary<MapTextureReference, VfxCubeMapData>())
+            foreach ((MapTextureReference reference, CubeMapData cube) in cubes ?? new Dictionary<MapTextureReference, CubeMapData>())
             {
                 uint texture = GlCubeMapUploader.Upload(_gl, cube, srgb: false, mipmaps: true);
                 if (texture != 0)
@@ -399,7 +400,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         /// <summary>
         /// Drops only grace-period resources that no longer have an active owner. This is used by
-        /// an explicit VFX Studio project exit while the OpenGL context is current; active resources
+        /// an explicit 3D Studio project exit while the OpenGL context is current; active resources
         /// are never touched.
         /// </summary>
         internal void PurgeReleasedResources()
@@ -414,7 +415,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Matrix4x4 projection,
             Vector3 eye,
             float timeSeconds,
-            VfxPreviewViewMode viewMode = VfxPreviewViewMode.Lit,
+            StudioViewMode viewMode = StudioViewMode.Lit,
             bool wireOverlay = false,
             bool shadersEnabled = true,
             bool? transparentPass = null)
@@ -424,8 +425,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             (bool solids, bool wireframe, float wireOpacity) =
                 ResolveViewPasses(viewMode, wireOverlay, supportsWireframe: !_gles);
-            VfxPreviewViewMode solidMode = viewMode == VfxPreviewViewMode.Wireframe
-                ? VfxPreviewViewMode.Lit
+            StudioViewMode solidMode = viewMode == StudioViewMode.Wireframe
+                ? StudioViewMode.Lit
                 : viewMode;
             var gameFrame = new GameShaderRuntime.Frame(
                 view,
@@ -436,7 +437,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 Environment: ResolveEnvironmentFrame());
 
             DrawPlan solidPlan = _plan;
-            if (shadersEnabled && solidMode == VfxPreviewViewMode.Lit && _gameShaderRuntime != null)
+            if (shadersEnabled && solidMode == StudioViewMode.Lit && _gameShaderRuntime != null)
             {
                 if (!ReferenceEquals(_programPlanSource, _plan))
                 {
@@ -468,7 +469,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         GameShaderRuntime.Frame transparentFrame = WithScreenCapture(
                             gameFrame,
                             solidPlan,
-                            shadersEnabled && solidMode == VfxPreviewViewMode.Lit);
+                            shadersEnabled && solidMode == StudioViewMode.Lit);
                         DrawGroups(solidPlan.TransparentGroups, solidMode, shadersEnabled, in transparentFrame);
                     }
                 }
@@ -582,12 +583,12 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         internal static (bool Solids, bool Wireframe, float WireOpacity) ResolveViewPasses(
-            VfxPreviewViewMode viewMode,
+            StudioViewMode viewMode,
             bool wireOverlay,
             bool supportsWireframe)
         {
-            bool wireframeOnly = viewMode == VfxPreviewViewMode.Wireframe;
-            bool overlayAllowed = viewMode == VfxPreviewViewMode.Lit || viewMode == VfxPreviewViewMode.Untextured;
+            bool wireframeOnly = viewMode == StudioViewMode.Wireframe;
+            bool overlayAllowed = viewMode == StudioViewMode.Lit || viewMode == StudioViewMode.Untextured;
             bool solids = !wireframeOnly || !supportsWireframe;
             bool wireframe = supportsWireframe && (wireframeOnly || (wireOverlay && overlayAllowed));
             return (solids, wireframe, wireframeOnly ? 1f : 0.35f);
@@ -595,7 +596,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void DrawGroups(
             IReadOnlyList<DrawGroup> groups,
-            VfxPreviewViewMode viewMode,
+            StudioViewMode viewMode,
             bool shadersEnabled,
             in GameShaderRuntime.Frame gameFrame)
         {
@@ -618,7 +619,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     ? TransitionMaterial(bound.Material)
                     : bound.Material;
                 int passCount = shadersEnabled &&
-                                viewMode == VfxPreviewViewMode.Lit &&
+                                viewMode == StudioViewMode.Lit &&
                                 _gameShaderRuntime != null &&
                                 material?.Program != null
                     ? _gameShaderRuntime.GetStaticPassCount(material)
@@ -671,7 +672,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (_gameShaderRuntime != null)
                     _gameShaderRuntime.DrawIndexedPass(
                         _drawElements, group.IndexCount, new IntPtr(checked(group.StartIndex * sizeof(uint))),
-                        bound.Transparent && bound.RenderState.DoubleSided && viewMode != VfxPreviewViewMode.Untextured);
+                        bound.Transparent && bound.RenderState.DoubleSided && viewMode != StudioViewMode.Untextured);
                 else
                     _drawElements(
                         (uint)PrimitiveType.Triangles,
@@ -748,11 +749,11 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
         }
 
-        private void ApplyMaterial(BoundMaterial bound, VfxPreviewViewMode viewMode)
+        private void ApplyMaterial(BoundMaterial bound, StudioViewMode viewMode)
         {
             MapMaterialDefinition material = bound.Material;
-            bool untextured = viewMode == VfxPreviewViewMode.Untextured;
-            bool unshaded = viewMode == VfxPreviewViewMode.Unshaded;
+            bool untextured = viewMode == StudioViewMode.Untextured;
+            bool unshaded = viewMode == StudioViewMode.Unshaded;
             MaterialTexture texture = null;
             bool hasTexture = !untextured &&
                               !string.IsNullOrWhiteSpace(bound.MaterialPath) &&

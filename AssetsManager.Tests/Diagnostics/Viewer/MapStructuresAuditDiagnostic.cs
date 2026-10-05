@@ -47,7 +47,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
 
             string fullRoot = Path.GetFullPath(root);
-            MapSceneSource source = VfxFolderCatalog.ScanBrowser(fullRoot, CancellationToken.None, null, null)
+            MapSceneSource source = StudioProjectCatalog.ScanBrowser(fullRoot, CancellationToken.None, null, null)
                 .MapSources
                 .FirstOrDefault(candidate => string.Equals(candidate.Map.Value, DefaultMap, StringComparison.OrdinalIgnoreCase));
             if (source == null)

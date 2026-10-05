@@ -192,10 +192,10 @@ namespace AssetsManager.Tests.xUnit.Utils.Rendering
         [Fact]
         public void BufferGrowthCalculatesExponentialPowerOfTwo()
         {
-            Assert.Equal(64, VfxBufferGrowthUtils.CalculateNextCapacity(0, 32, minimumLength: 64));
-            Assert.Equal(128, VfxBufferGrowthUtils.CalculateNextCapacity(64, 65));
-            Assert.Equal(256, VfxBufferGrowthUtils.CalculateNextCapacity(64, 150));
-            Assert.Equal(64, VfxBufferGrowthUtils.CalculateNextCapacity(64, 60)); // No growth needed
+            Assert.Equal(64, BufferGrowthUtils.CalculateNextCapacity(0, 32, minimumLength: 64));
+            Assert.Equal(128, BufferGrowthUtils.CalculateNextCapacity(64, 65));
+            Assert.Equal(256, BufferGrowthUtils.CalculateNextCapacity(64, 150));
+            Assert.Equal(64, BufferGrowthUtils.CalculateNextCapacity(64, 60)); // No growth needed
         }
 
         private static VfxEmitterDefinition CreateDefinition() =>

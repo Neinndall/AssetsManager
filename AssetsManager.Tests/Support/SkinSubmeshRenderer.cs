@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -39,7 +40,7 @@ namespace AssetsManager.Tests.Support
 
         private readonly GL _gl;
         private readonly AppSettings _settings;
-        private readonly VfxCubeMapData _sky;
+        private readonly CubeMapData _sky;
         private readonly uint _framebuffer;
         private readonly uint _colour;
         private readonly uint _depth;
@@ -53,7 +54,7 @@ namespace AssetsManager.Tests.Support
 
         internal uint Size { get; }
 
-        internal SkinSubmeshRenderer(GL gl, AppSettings settings, VfxCubeMapData sky, uint size = 128)
+        internal SkinSubmeshRenderer(GL gl, AppSettings settings, CubeMapData sky, uint size = 128)
         {
             _gl = gl;
             _settings = settings;

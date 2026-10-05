@@ -17,88 +17,98 @@
                     <!-- Default Content (Buttons) -->
                     <StackPanel x:Name="DefaultEmptyStateContent" Visibility="{Binding IsLoadingVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                         <!-- HERO HEADER: Centered Model -->
-                        <StackPanel Margin="0,0,0,32" HorizontalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
-                                <Border Background="#1A00E676" CornerRadius="4" Padding="8,3" VerticalAlignment="Center" Margin="0,0,10,0">
-                                    <TextBlock Text="3D WORKSPACE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
-                                </Border>
-                                <TextBlock Text="INTERACTIVE STUDIO" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Opacity="0.7"/>
-                            </StackPanel>
-                            <TextBlock Text="Model Viewer" FontSize="42" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="-2,0,0,0"/>
-                            <TextBlock Text="Visualize 3D champions, animations, maps, and visual effects in real-time." FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" Opacity="0.8"/>
+                        <StackPanel Margin="0,0,0,36" HorizontalAlignment="Center">
+                            <Border Background="#1A00E676" CornerRadius="6" Padding="10,4" HorizontalAlignment="Center" Margin="0,0,0,12">
+                                <TextBlock Text="3D WORKSPACE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
+                            </Border>
+                            <TextBlock Text="Model Viewer" FontSize="42" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Explore 3D models, animations, chromas and maps." FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" TextAlignment="Center"/>
                         </StackPanel>
 
                         <!-- Action Cards -->
-                        <UniformGrid Columns="3" HorizontalAlignment="Center">
+                        <Grid HorizontalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
                             <!-- Open Project Folder Card -->
-                            <Button Style="{StaticResource SelectionCardButtonStyle}"
+                            <Button Grid.Column="0" Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenProjectFolder_Click"
-                                    Width="180" Height="160">
+                                    Width="240" MinHeight="200" Margin="0" Padding="20,24">
                                 <StackPanel>
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
-                                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="52" Height="52" Margin="0,0,0,18">
+                                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="28" Height="28" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
                                     <TextBlock Text="Load Project"
-                                               FontWeight="SemiBold"
+                                               FontWeight="Bold"
                                                FontSize="14"
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Explore models &amp; animations"
-                                               FontSize="12"
-                                               Foreground="{StaticResource TextMuted}"
+                                    <TextBlock FontSize="12"
+                                               Foreground="{StaticResource TextSecondary}"
                                                HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
-                                               Margin="0,4,0,0"/>
+                                               LineHeight="18" Margin="0,6,0,0">
+                                        <Run Text="Browse extracted models"/><LineBreak/>
+                                        <Run Text="and play their animations."/>
+                                    </TextBlock>
                                 </StackPanel>
                             </Button>
 
                             <!-- Load Chroma Card -->
-                            <Button Style="{StaticResource SelectionCardButtonStyle}"
+                            <Button Grid.Column="2" Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenChromaFile_Click"
-                                    Width="180" Height="160">
+                                    Width="240" MinHeight="200" Margin="0" Padding="20,24">
                                 <StackPanel>
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
-                                        <materialIcons:MaterialIcon Kind="Palette" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="52" Height="52" Margin="0,0,0,18">
+                                        <materialIcons:MaterialIcon Kind="Palette" Width="28" Height="28" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
                                     <TextBlock Text="Chroma Library"
-                                               FontWeight="SemiBold"
+                                               FontWeight="Bold"
                                                FontSize="14"
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Browse variants &amp; textures"
-                                               FontSize="12"
-                                               Foreground="{StaticResource TextMuted}"
+                                    <TextBlock FontSize="12"
+                                               Foreground="{StaticResource TextSecondary}"
                                                HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
-                                               Margin="0,4,0,0"/>
+                                               LineHeight="18" Margin="0,6,0,0">
+                                        <Run Text="Compare chroma variants"/><LineBreak/>
+                                        <Run Text="and preview their textures."/>
+                                    </TextBlock>
                                 </StackPanel>
                             </Button>
 
-                            <!-- VFX Inspector Card -->
-                            <Button Style="{StaticResource SelectionCardButtonStyle}"
-                                    Click="OpenVfxInspector_Click"
-                                    Width="180" Height="160">
+                            <!-- 3D Studio Card -->
+                            <Button Grid.Column="4" Style="{StaticResource SelectionCardButtonStyle}"
+                                    Click="OpenStudio_Click"
+                                    Width="240" MinHeight="200" Margin="0" Padding="20,24">
                                 <StackPanel>
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
-                                        <materialIcons:MaterialIcon Kind="Sparkles" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="52" Height="52" Margin="0,0,0,18">
+                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="28" Height="28" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="VFX Studio"
-                                               FontWeight="SemiBold"
+                                    <TextBlock Text="3D Studio"
+                                               FontWeight="Bold"
                                                FontSize="14"
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Inspect VFX, champions &amp; maps"
-                                               FontSize="12"
-                                               Foreground="{StaticResource TextMuted}"
+                                    <TextBlock FontSize="12"
+                                               Foreground="{StaticResource TextSecondary}"
                                                HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
-                                               Margin="0,4,0,0"/>
+                                               LineHeight="18" Margin="0,6,0,0">
+                                        <Run Text="Models, animations &amp; maps"/><LineBreak/>
+                                        <Run Text="with visual effects."/>
+                                    </TextBlock>
                                 </StackPanel>
                             </Button>
-                        </UniformGrid>
+                        </Grid>
                     </StackPanel>
                     
                     <!-- Loading Indicator (Enhanced) -->
@@ -212,9 +222,9 @@
             <viewer:ChromaSelectionControl x:Name="ChromaSelectionControl"
                                            Visibility="{Binding ViewModel.IsChromaGalleryVisible, ElementName=PanelControl, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-            <!-- VFX STUDIO VIEW -->
-            <viewer:VfxInspectorControl x:Name="VfxInspectorControl"
-                                        Visibility="{Binding DataContext.IsVfxStudioVisible, ElementName=ViewerRoot, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            <!-- 3D STUDIO VIEW -->
+            <viewer:StudioControl x:Name="StudioControl"
+                                        Visibility="{Binding DataContext.IsStudioVisible, ElementName=ViewerRoot, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </Grid>
     </Grid>
 </UserControl>

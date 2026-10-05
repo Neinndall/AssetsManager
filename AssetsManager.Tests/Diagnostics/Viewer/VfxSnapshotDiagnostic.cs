@@ -32,7 +32,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
     /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--stock-shaders] [--orthographic] [--trace-emitter NAME] [--no-owner] [--rig Still|Trail|Missile] [--trace-layout] [--frame-scale 1] [--preview-stage] [--single-burst-emitter NAME,NAME]`:
-    /// plays one VFX system of an installed BIN the way VFX Studio does (VfxRenderSession, game particle shaders,
+    /// plays one VFX system of an installed BIN the way 3D Studio does (VfxRenderSession, game particle shaders,
     /// resources extracted from the WADs) and writes a PNG per time over a mid-grey backdrop. With --per-emitter
     /// each root emitter is also drawn alone and measured: how much of the frame it darkens or brightens.
     /// A skin BIN also supplies its Character (SKN/SKL) to AttachedMesh emitters, drawn in bind pose.

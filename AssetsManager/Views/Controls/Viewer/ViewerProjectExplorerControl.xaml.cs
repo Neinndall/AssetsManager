@@ -264,7 +264,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     }
                 }
 
-                // MAP projects are owned exclusively by VFX Studio. The main Viewer project
+                // MAP projects are owned exclusively by 3D Studio. The main Viewer project
                 // explorer remains focused on character/model assets and must not expose .mapgeo.
                 var allowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {

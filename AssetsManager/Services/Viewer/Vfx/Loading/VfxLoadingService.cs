@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Parsing;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -50,7 +51,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
 
         /// <summary>
         /// Resolves a BIN object path hash through the same catalog used by the generic BIN tools.
-        /// VFX Studio uses this only for semantic browser discovery (for example Character Spells).
+        /// 3D Studio uses this only for semantic browser discovery (for example Character Spells).
         /// </summary>
         internal string ResolveBinEntryPath(uint pathHash)
             => _hashResolverService?.ResolveBinEntry(pathHash);
@@ -72,8 +73,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             public List<AnimationClipDefinition> Clips { get; private set; } = new();
             public List<AnimationGraphDefinition> AnimationGraphs { get; private set; } = new();
             public List<VfxIdleEffectDefinition> IdleEffects { get; private set; } = new();
-            public IReadOnlyList<VfxCharacterFormDefinition> CharacterForms { get; internal set; } =
-                Array.Empty<VfxCharacterFormDefinition>();
+            public IReadOnlyList<CharacterFormDefinition> CharacterForms { get; internal set; } =
+                Array.Empty<CharacterFormDefinition>();
             public VfxOwnerSceneContext OwnerSceneContext { get; set; }
             public List<string> LoadedBins { get; private set; } = new();
             public List<string> MissingDependencies { get; private set; } = new();
@@ -84,7 +85,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             {
             }
 
-            private Bundle(Bundle source, VfxCharacterFormDefinition form)
+            private Bundle(Bundle source, CharacterFormDefinition form)
             {
                 PrimaryBinPath = source.PrimaryBinPath;
                 Systems = source.Systems;
@@ -113,7 +114,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 CharacterGearIndex = form.GearIndex;
             }
 
-            internal Bundle CreateCharacterPlaybackView(VfxCharacterFormDefinition form)
+            internal Bundle CreateCharacterPlaybackView(CharacterFormDefinition form)
                 => form == null ? this : new Bundle(this, form);
         }
 
@@ -199,7 +200,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 var clipKeys = new HashSet<(uint Graph, uint Clip)>();
                 var graphKeys = new HashSet<uint>();
                 var queue = new Queue<string>();
-                var characterFormDocuments = new List<VfxCharacterFormDocumentData>();
+                var characterFormDocuments = new List<CharacterFormDocumentData>();
                 var loadedTrees = new List<BinTree>();
                 // VFX custom materials link CustomShaderDefs the global shader BIN declares; without it a
                 // material keeps its textures but no game program, and draws with the stock particle shader.
@@ -324,7 +325,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         shaderTrees);
                 }
 
-                bundle.CharacterForms = VfxCharacterFormParser.Resolve(
+                bundle.CharacterForms = CharacterFormParser.Resolve(
                     characterFormDocuments, ResolveBinEntryPath, bundle.OwnerSceneContext);
                 log?.Log($"Loaded {bundle.Systems.Count} VFX systems.");
             }

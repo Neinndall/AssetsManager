@@ -71,7 +71,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 Assert.True(particlePlacement.CanHide);
                 Assert.Contains("X 40", particlePlacement.InspectorSummary);
 
-                var inspector = new VfxInspectorModel
+                var inspector = new StudioModel
                 {
                     SelectedMapNode = system
                 };

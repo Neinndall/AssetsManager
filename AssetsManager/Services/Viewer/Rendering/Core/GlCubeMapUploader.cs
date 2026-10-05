@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using Silk.NET.OpenGL;
@@ -18,7 +19,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         /// Generates the mip chain for shaders that pick a level by glossiness (<c>textureLod</c> on ENV_CUBE).
         /// </param>
         /// <returns>The cube texture, or 0 when the data is not a complete cube.</returns>
-        internal static uint Upload(GL gl, VfxCubeMapData cube, bool srgb, bool mipmaps = false)
+        internal static uint Upload(GL gl, CubeMapData cube, bool srgb, bool mipmaps = false)
         {
             ArgumentNullException.ThrowIfNull(gl);
             if (cube?.IsValid != true)

@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
 using AssetsManager.Services.Viewer.Rendering.Core;
@@ -11,7 +12,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     internal static class VfxBufferGrowth
     {
         internal static int NextLength(int currentLength, int requiredLength, int minimumLength = 64)
-            => AssetsManager.Utils.Rendering.VfxBufferGrowthUtils.CalculateNextCapacity(currentLength, requiredLength, minimumLength);
+            => AssetsManager.Utils.Rendering.BufferGrowthUtils.CalculateNextCapacity(currentLength, requiredLength, minimumLength);
     }
 
     internal sealed class VfxTextureResourceCache : IDisposable
@@ -53,7 +54,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return texture;
         }
 
-        internal uint UploadCube(VfxCubeMapData cube)
+        internal uint UploadCube(CubeMapData cube)
         {
             uint texture = GlCubeMapUploader.Upload(_gl, cube, srgb: false);
             if (texture != 0)

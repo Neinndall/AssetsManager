@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Parsing;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -48,7 +49,7 @@ namespace AssetsManager.Views.Models.Viewer
         VfxOwnerSceneContext OwnerSceneContext,
         IReadOnlyList<VfxIdleEffectDefinition> IdleEffects = null,
         IReadOnlyList<AnimationGraphDefinition> AnimationGraphs = null,
-        VfxCharacterFormDocumentData CharacterFormData = null);
+        CharacterFormDocumentData CharacterFormData = null);
 
     /// <summary>
     /// Domain graph for a League VFX system and its emitter nodes.
