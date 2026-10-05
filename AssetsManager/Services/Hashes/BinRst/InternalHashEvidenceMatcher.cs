@@ -112,37 +112,11 @@ namespace AssetsManager.Services.Hashes
             foreach (var key in hits)
             {
                 InternalHashGuessMatch match = _matches[key];
-                if (!accepted && match.IsVerified)
-                {
-                    match = Demote(match);
-                    _matches[key] = match;
-                    _targets[key.Kind].Add(key.Hash);
-                    _verifiedValues.Remove((key.Kind, (uint)key.Hash));
-                }
                 _pendingMatches.Add(match);
                 _onMatchFound?.Invoke(match);
             }
             return new NoiseGateResult(gate.Name, hits.Count, gate.ExpectedChanceMatches, accepted);
         }
-
-        private static InternalHashGuessMatch Demote(InternalHashGuessMatch match) => new()
-        {
-            Hash = match.Hash,
-            LookupHash = match.LookupHash,
-            HashBits = match.HashBits,
-            Value = match.Value,
-            Kind = match.Kind,
-            Strategy = match.Strategy,
-            Source = match.Source,
-            SourceWad = match.SourceWad,
-            SourceBin = match.SourceBin,
-            IsVerified = false,
-            VerificationSchema = match.VerificationSchema,
-            Confidence = InternalHashConfidence.Candidate,
-            Evidence = match.Evidence,
-            EvidenceOrigin = match.EvidenceOrigin,
-            FoundAtUtc = match.FoundAtUtc
-        };
 
         private double ChanceOfAnyMatch(InternalHashKind kind) => GetRemainingCount(kind) / HashSpace;
 

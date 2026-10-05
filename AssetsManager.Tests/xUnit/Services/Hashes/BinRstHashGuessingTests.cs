@@ -1682,7 +1682,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
-        public void NoisyGateDemotesSchemaHitsToCandidates()
+        public void NoisyGateKeepsSchemaHitsVerifiedAndPromotable()
         {
             const string candidate = "SyntheticNoisyType";
             uint hash = Fnv1a.HashLower(candidate);
@@ -1698,9 +1698,9 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 
             Assert.False(result.Accepted);
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
-            Assert.False(match.IsVerified);
-            Assert.False(match.CanPromote);
-            Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
+            Assert.True(match.IsVerified);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
             Assert.Single(matcher.TakePendingMatches());
         }
 
