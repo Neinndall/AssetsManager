@@ -530,7 +530,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             using (var stream = File.OpenRead(filePath))
             {
-                var animationAsset = AnimationAsset.Load(stream);
+                var animationAsset = AssetsManager.Services.Viewer.Animation.SampledAnimationAsset.Load(stream);
                 var animationData = new AnimationData { AnimationAsset = animationAsset, Name = animationName };
                 var animationModel = new AnimationModel(animationData);
 

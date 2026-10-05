@@ -317,7 +317,7 @@ internal sealed class VfxClipCatalog : IDisposable
         cancellationToken.ThrowIfCancellationRequested();
         IAnimationAsset loaded;
         using (var stream = File.OpenRead(path))
-            loaded = AnimationAsset.Load(stream);
+            loaded = SampledAnimationAsset.Load(stream, cancellationToken);
 
         if (cancellationToken.IsCancellationRequested)
         {

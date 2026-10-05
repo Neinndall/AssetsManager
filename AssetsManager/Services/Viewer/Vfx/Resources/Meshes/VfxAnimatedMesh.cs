@@ -199,7 +199,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         {
             if (string.IsNullOrWhiteSpace(animationPath)) return null;
             using var stream = File.OpenRead(animationPath);
-            return AnimationAsset.Load(stream);
+            return SampledAnimationAsset.Load(stream);
         }
 
         public void Dispose() => _animation?.Dispose();

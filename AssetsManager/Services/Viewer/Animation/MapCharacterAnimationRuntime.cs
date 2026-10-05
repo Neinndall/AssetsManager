@@ -406,7 +406,7 @@ namespace AssetsManager.Services.Viewer.Animation
             {
                 await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
                 if (stream == null) return null;
-                IAnimationAsset animation = AnimationAsset.Load(stream);
+                IAnimationAsset animation = SampledAnimationAsset.Load(stream, cancellationToken);
                 _sources[animationPath] = animation;
                 return animation;
             }
