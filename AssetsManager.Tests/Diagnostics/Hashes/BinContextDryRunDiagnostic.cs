@@ -35,7 +35,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             var store = new BinRstHashGuessingStore(directories);
             var targets = new Dictionary<InternalHashKind, HashSet<ulong>>();
             foreach (InternalHashKind kind in new[] { InternalHashKind.BinEntries, InternalHashKind.BinFields, InternalHashKind.BinTypes, InternalHashKind.BinHashes })
-                targets[kind] = await store.LoadCurrentUnknownAsync(kind, CancellationToken.None);
+                targets[kind] = await store.LoadUnknownAsync(kind, CancellationToken.None);
             var before = targets.ToDictionary(p => p.Key, p => p.Value.Count);
             var matcher = new InternalHashEvidenceMatcher(targets);
             var casing = BinPathCasing.FromKnownNames((await store.LoadKnownAsync(InternalHashKind.BinEntries, CancellationToken.None)).Values);

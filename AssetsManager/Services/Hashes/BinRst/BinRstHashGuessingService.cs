@@ -738,11 +738,11 @@ namespace AssetsManager.Services.Hashes
                 bool isRst = kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64;
                 if (isRst)
                     targets[kind] = includeRst
-                        ? await _store.LoadCurrentUnknownAsync(kind, cancellationToken)
+                        ? await _store.LoadUnknownAsync(kind, cancellationToken)
                         : new HashSet<ulong>();
                 else if (IsBinKind(kind))
                     targets[kind] = includeBin
-                        ? await _store.LoadCurrentUnknownAsync(kind, cancellationToken)
+                        ? await _store.LoadUnknownAsync(kind, cancellationToken)
                         : new HashSet<ulong>();
                 else
                     targets[kind] = new HashSet<ulong>();

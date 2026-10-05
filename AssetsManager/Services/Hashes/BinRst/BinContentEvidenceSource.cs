@@ -646,25 +646,21 @@ namespace AssetsManager.Services.Hashes
             {
                 if (string.IsNullOrWhiteSpace(stem)) continue;
 
-                // 1. Raw stem
-                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, stem, path, wadPath, targetHash))
-                    return true;
-
                 string[] tokens = stem.Split('_', StringSplitOptions.RemoveEmptyEntries);
                 if (tokens.Length == 0) continue;
 
-                // 2. PascalCase with underscores (e.g. Run_Homeguard_To_Run)
+                // 1. PascalCase with underscores (e.g. Idle_Base, Run_Homeguard_To_Run - CDragon standard)
                 string[] casedTokens = tokens.Select(t => char.ToUpperInvariant(t[0]) + t[1..].ToLowerInvariant()).ToArray();
                 string pascalUnderscore = string.Join("_", casedTokens);
                 if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, pascalUnderscore, path, wadPath, targetHash))
                     return true;
 
-                // 3. PascalCase without underscores (e.g. RunHomeguardToRun, RunIn)
+                // 2. PascalCase without underscores (e.g. RunHomeguardToRun, RunIn)
                 string pascalConcat = string.Concat(casedTokens);
                 if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, pascalConcat, path, wadPath, targetHash))
                     return true;
 
-                // 4. Uppercase acronyms on last token (e.g. Run_Homeguard_IN, Run_Homeguard_OUT, Run_ICE)
+                // 3. Uppercase acronyms on last token (e.g. Run_Homeguard_IN, Run_Homeguard_OUT, Run_ICE)
                 if (tokens.Length > 1)
                 {
                     string lastLower = tokens[^1].ToLowerInvariant();
@@ -677,7 +673,7 @@ namespace AssetsManager.Services.Hashes
                     }
                 }
 
-                // 5. Transition casing ("_to_" lowercase e.g. Run_Homeguard_to_Run, Run_Homeguard_toRun)
+                // 4. Transition casing ("_to_" lowercase e.g. Run_Homeguard_to_Run, Run_Homeguard_toRun)
                 bool hasTo = tokens.Any(t => t.Equals("to", StringComparison.OrdinalIgnoreCase));
                 if (hasTo)
                 {
@@ -685,6 +681,10 @@ namespace AssetsManager.Services.Hashes
                     if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, string.Join("_", toTokens), path, wadPath, targetHash))
                         return true;
                 }
+
+                // 5. Raw stem fallback (if stem already had mixed casing or special chars)
+                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, stem, path, wadPath, targetHash))
+                    return true;
             }
 
             return false;

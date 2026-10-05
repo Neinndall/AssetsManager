@@ -1507,7 +1507,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             ulong target = XxHash3.HashToUInt64(Encoding.UTF8.GetBytes(candidate.ToLowerInvariant())) & ((1UL << 38) - 1);
 
             File.WriteAllText(
-                Path.Combine(bridge.Directories.HashLabPath, "current.rst.xxh3.38.txt"),
+                Path.Combine(bridge.Directories.HashLabPath, "unknowns.rst.xxh3.38.txt"),
                 target.ToString("x16"));
             File.WriteAllText(
                 Path.Combine(bridge.Directories.HashLabPath, "internal.rst.patch.txt"),

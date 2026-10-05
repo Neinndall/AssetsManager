@@ -52,17 +52,8 @@ namespace AssetsManager.Services.Hashes
             return result;
         }
 
-        public async Task<HashSet<ulong>> LoadCurrentUnknownAsync(InternalHashKind kind, CancellationToken cancellationToken)
-        {
-            var result = new HashSet<ulong>();
-            string path = GetCurrentPath(kind);
-            if (!File.Exists(path)) path = GetPrimaryUnknownPath(kind);
-            if (!File.Exists(path)) return result;
-            using var reader = new StreamReader(path);
-            while (await reader.ReadLineAsync(cancellationToken) is string line)
-                if (ulong.TryParse(line.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong hash)) result.Add(hash);
-            return result;
-        }
+        public Task<HashSet<ulong>> LoadCurrentUnknownAsync(InternalHashKind kind, CancellationToken cancellationToken) =>
+            LoadUnknownAsync(kind, cancellationToken);
 
         public async Task<IReadOnlyList<InternalHashGuessMatch>> LoadResearchAsync(CancellationToken cancellationToken)
         {
@@ -104,11 +95,16 @@ namespace AssetsManager.Services.Hashes
                     historical.ExceptWith(knownLookups);
                     if (!IsRst(pair.Key))
                     {
-                        current.Remove(0);
                         historical.Remove(0);
                     }
-                    await WriteUnknownAtomicallyAsync(GetCurrentPath(pair.Key), current, pair.Key, cancellationToken);
                     await WriteUnknownAtomicallyAsync(GetPrimaryUnknownPath(pair.Key), historical, pair.Key, cancellationToken);
+
+                    // Clean up obsolete legacy current.<kind>.txt if it exists from previous versions
+                    string legacyCurrent = GetCurrentPath(pair.Key);
+                    if (File.Exists(legacyCurrent))
+                    {
+                        try { File.Delete(legacyCurrent); } catch { }
+                    }
                 }
                 await WriteTextAtomicallyAsync(Path.Combine(_directories.HashLabPath, $"internal.{domain}.patch.txt"), new[] { patchFingerprint }, cancellationToken);
             }
@@ -131,7 +127,7 @@ namespace AssetsManager.Services.Hashes
                 foreach (var group in groups)
                 {
                     var resolvedLookups = group.Select(match => match.LookupHash).ToHashSet();
-                    foreach (string path in GetUnknownPaths(group.Key).Append(GetCurrentPath(group.Key)))
+                    foreach (string path in GetUnknownPaths(group.Key))
                     {
                         if (!File.Exists(path)) continue;
                         var remaining = new HashSet<ulong>();
@@ -140,6 +136,13 @@ namespace AssetsManager.Services.Hashes
                                 if (ulong.TryParse(line.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong hash) &&
                                     !resolvedLookups.Contains(hash)) remaining.Add(hash);
                         await WriteUnknownAtomicallyAsync(path, remaining, group.Key, cancellationToken);
+                    }
+
+                    // Clean up obsolete legacy current.<kind>.txt if it exists
+                    string legacyCurrent = GetCurrentPath(group.Key);
+                    if (File.Exists(legacyCurrent))
+                    {
+                        try { File.Delete(legacyCurrent); } catch { }
                     }
                 }
             }
@@ -326,6 +329,8 @@ namespace AssetsManager.Services.Hashes
         private IEnumerable<string> GetUnknownPaths(InternalHashKind kind)
         {
             yield return GetPrimaryUnknownPath(kind);
+            string legacyCurrent = GetCurrentPath(kind);
+            if (File.Exists(legacyCurrent)) yield return legacyCurrent;
             if (kind == InternalHashKind.RstXxh64)
                 foreach (int bits in new[] { 38, 39, 40 }) yield return Path.Combine(_directories.HashLabPath, $"unknowns.rst.xxh64.{bits}.txt");
         }
