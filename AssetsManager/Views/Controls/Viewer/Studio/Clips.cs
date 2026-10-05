@@ -46,7 +46,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_clipCatalog == null || _activeBundle == null || VfxLoadingService == null)
                 return Array.Empty<AnimationClipCatalogItem>();
 
-            return ViewerSynchronizationService.MergeClips(FocusedActor, _championModel, _clipCatalog.BuildMetadata(
+            return SynchronizationService.MergeClips(FocusedActor, _championModel, _clipCatalog.BuildMetadata(
                 GetCharacterPlaybackBundle(),
                 path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
                 parameter), parameter);
@@ -166,7 +166,7 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 _model.StatusText = $"{selectedItem.DisplayName} · loading animation...";
-                AnimationClipCatalogItem animItem = await ViewerSynchronizationService.PrepareClipAsync(
+                AnimationClipCatalogItem animItem = await SynchronizationService.PrepareClipAsync(
                     selectedItem, catalog, playbackBundle, VfxLoadingService,
                     _animationSearchDirectory, LogService, operation.Token);
                 operation.Token.ThrowIfCancellationRequested();

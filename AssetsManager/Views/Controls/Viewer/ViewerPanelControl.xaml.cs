@@ -30,7 +30,7 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class ViewerPanelControl : UserControl
     {
-        private readonly ViewerSynchronizationService _synchronization = new();
+        private readonly SynchronizationService _synchronization = new();
         private readonly ViewerPanelModel _viewModel;
         public ViewerPanelModel ViewModel => _viewModel;
 
@@ -150,7 +150,7 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         private void SyncLoadingForAllModels() =>
-            ViewerSynchronizationService.ShareAnimations(
+            SynchronizationService.ShareAnimations(
                 _viewModel.AnimationModels.Select(animation => animation.AnimationData), _viewModel.LoadedModels);
 
         private void HandleSelectedModelChanged()
@@ -490,7 +490,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 // Sync current animations (v3.2.3.1)
                 if (_viewModel.IsAnimationSyncEnabled && _viewModel.AnimationModels.Count > 0)
                 {
-                    ViewerSynchronizationService.ShareAnimations(
+                    SynchronizationService.ShareAnimations(
                         _viewModel.AnimationModels.Select(animation => animation.AnimationData), new[] { newModel });
                 }
 
@@ -536,7 +536,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (_viewModel.IsAnimationSyncEnabled)
                 {
-                    ViewerSynchronizationService.ShareAnimations(new[] { animationData }, _viewModel.LoadedModels);
+                    SynchronizationService.ShareAnimations(new[] { animationData }, _viewModel.LoadedModels);
                 }
                 else
                 {

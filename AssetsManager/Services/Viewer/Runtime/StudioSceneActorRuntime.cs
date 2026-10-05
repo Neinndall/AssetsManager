@@ -220,7 +220,7 @@ namespace AssetsManager.Services.Viewer.Runtime
 
             AnimationClipCatalogItem prepared = requested == null
                 ? null
-                : await ViewerSynchronizationService.PrepareClipAsync(requested, ClipCatalog,
+                : await SynchronizationService.PrepareClipAsync(requested, ClipCatalog,
                     PlaybackBundle, _loading, SearchDirectory, log, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -239,7 +239,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             ClipCatalog.BuildMetadata(PlaybackBundle, ResolveAnimationPath, actor?.AnimationParameter);
 
         internal IReadOnlyList<AnimationClipCatalogItem> Clips(StudioSceneActor actor) =>
-            ViewerSynchronizationService.MergeClips(actor, Model, OwnClips(actor), actor?.AnimationParameter);
+            SynchronizationService.MergeClips(actor, Model, OwnClips(actor), actor?.AnimationParameter);
 
         internal async Task<bool> PlaySynchronizedClipAsync(AnimationClipCatalogItem source,
             StudioSceneActor actor, LogService log, Func<bool> isCurrent)
@@ -257,14 +257,14 @@ namespace AssetsManager.Services.Viewer.Runtime
                 actor.SelectedSpellPathHash = null;
                 return true;
             }
-            AnimationClipCatalogItem requested = ViewerSynchronizationService.MatchingClip(Clips(actor), source);
+            AnimationClipCatalogItem requested = SynchronizationService.MatchingClip(Clips(actor), source);
             if (requested == null) return false;
             float? parameter = source.ParameterValue.HasValue && requested.ParameterValues is { Count: > 1 }
                 ? AnimationGraphPlayback.NearestParameter(requested.ParameterValues, source.ParameterValue.Value)
                 : requested.ParameterValue;
             requested = requested with { ParameterValue = parameter };
             if (Clip != null && Clip.Clip == requested.Clip && Clip.ParameterValue == parameter) return true;
-            AnimationClipCatalogItem prepared = await ViewerSynchronizationService.PrepareClipAsync(requested,
+            AnimationClipCatalogItem prepared = await SynchronizationService.PrepareClipAsync(requested,
                 ClipCatalog, PlaybackBundle, _loading, SearchDirectory, log, _lifetime.Token);
             if (generation != _clipGeneration || !isCurrent() || prepared?.AnimationAsset == null) return false;
             StartClip(prepared);
@@ -373,7 +373,7 @@ namespace AssetsManager.Services.Viewer.Runtime
 
             if (transportTime.HasValue)
             {
-                double wanted = ViewerSynchronizationService.ClampTime(transportTime.Value, LoopDuration);
+                double wanted = SynchronizationService.ClampTime(transportTime.Value, LoopDuration);
                 double difference = wanted - Session.PlaybackTime;
                 if (difference < 0d || difference > 0.1d) Session.Seek(wanted);
                 else if (difference > 0d)
@@ -418,7 +418,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         {
             if (Clip?.AnimationAsset == null || Session.ActiveSystem == null) return;
             Session.Seek(loop ? VfxClipCueEvaluator.FoldedTime(time, LoopDuration)
-                : ViewerSynchronizationService.ClampTime(time, LoopDuration));
+                : SynchronizationService.ClampTime(time, LoopDuration));
         }
 
         private void ApplyBindPose()

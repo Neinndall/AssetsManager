@@ -20,12 +20,12 @@ using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer;
 
-public sealed class ViewerSynchronizationServiceTests
+public sealed class SynchronizationServiceTests
 {
     [Fact]
     public void VisibilityMatchesNamesAndDoesNotReenterThroughModelEvents()
     {
-        var synchronization = new ViewerSynchronizationService();
+        var synchronization = new SynchronizationService();
         var first = Model("Body");
         var second = Model("BODY");
         var unrelated = Model("Sword");
@@ -50,7 +50,7 @@ public sealed class ViewerSynchronizationServiceTests
     [Fact]
     public void TextureSynchronizationPreservesVariantBitmapsAndOriginalSelectionSlot()
     {
-        var synchronization = new ViewerSynchronizationService();
+        var synchronization = new SynchronizationService();
         var first = Model("Body", "base", "extra");
         var second = Model("body", "other", "base.dds");
         var third = Model("body", "chroma", "chroma_extra");
@@ -76,7 +76,7 @@ public sealed class ViewerSynchronizationServiceTests
         var second = Model("body", "chroma");
         first.Parts[0].SelectedTextureName = "extra";
         second.Parts[0].SelectedTextureName = "chroma";
-        new ViewerSynchronizationService().SynchronizeParts(first.Parts[0], new[] { second }, textures: true);
+        new SynchronizationService().SynchronizeParts(first.Parts[0], new[] { second }, textures: true);
         Assert.Equal("chroma", second.Parts[0].SelectedTextureName);
     }
 
@@ -87,9 +87,9 @@ public sealed class ViewerSynchronizationServiceTests
         var target = new SceneModel();
         var own = new AnimationData { Name = "Idle" };
         target.Animations.Add(own);
-        ViewerSynchronizationService.ShareAnimations(new[] { source, new AnimationData { Name = "Run" } }, new[] { target });
+        SynchronizationService.ShareAnimations(new[] { source, new AnimationData { Name = "Run" } }, new[] { target });
         Assert.Equal(2, target.Animations.Count);
-        Assert.Same(own, ViewerSynchronizationService.MatchingAnimation(target, new AnimationData { Name = "IDLE" }));
+        Assert.Same(own, SynchronizationService.MatchingAnimation(target, new AnimationData { Name = "IDLE" }));
     }
 
     [Fact]
@@ -135,17 +135,17 @@ public sealed class ViewerSynchronizationServiceTests
         using var catalog = new VfxClipCatalog();
         bundle.Clips.Add(Clip("Idle", "idle.anm"));
         var item = Assert.Single(catalog.BuildMetadata(bundle, path => path));
-        var source = new SynchronizedAnimationSource(item, bundle, "source", ViewerSynchronizationService.SkeletonSignature(sourceRig));
-        ViewerSynchronizationService.ImportClips(actor, target, new[] { source }, Array.Empty<AnimationClipCatalogItem>());
-        var merged = ViewerSynchronizationService.MergeClips(actor, target, Array.Empty<AnimationClipCatalogItem>());
+        var source = new SynchronizedAnimationSource(item, bundle, "source", SynchronizationService.SkeletonSignature(sourceRig));
+        SynchronizationService.ImportClips(actor, target, new[] { source }, Array.Empty<AnimationClipCatalogItem>());
+        var merged = SynchronizationService.MergeClips(actor, target, Array.Empty<AnimationClipCatalogItem>());
         Assert.Equal(differentHierarchy ? 0 : 1, merged.Count);
         if (!differentHierarchy)
         {
             Assert.Same(source, merged[0].SharedSource);
             var own = item with { FilePath = "own.anm" };
-            Assert.Same(own, Assert.Single(ViewerSynchronizationService.MergeClips(actor, target, new[] { own })));
+            Assert.Same(own, Assert.Single(SynchronizationService.MergeClips(actor, target, new[] { own })));
             target.Skeleton = Rig("Root", "Hand", child: false);
-            Assert.Empty(ViewerSynchronizationService.MergeClips(actor, target, merged));
+            Assert.Empty(SynchronizationService.MergeClips(actor, target, merged));
         }
     }
 
@@ -173,11 +173,11 @@ public sealed class ViewerSynchronizationServiceTests
             var actor = Actor();
             var model = new SceneModel { Skeleton = Rig("Root", "Hand", true) };
             var source = new SynchronizedAnimationSource(metadata, sourceBundle, directory,
-                ViewerSynchronizationService.SkeletonSignature(model.Skeleton));
-            ViewerSynchronizationService.ImportClips(actor, model, new[] { source }, Array.Empty<AnimationClipCatalogItem>());
-            var imported = Assert.Single(ViewerSynchronizationService.MergeClips(actor, model, Array.Empty<AnimationClipCatalogItem>()));
-            var own = await ViewerSynchronizationService.PrepareClipAsync(metadata, firstCatalog, sourceBundle, loading, directory, null, CancellationToken.None);
-            var shared = await ViewerSynchronizationService.PrepareClipAsync(imported, secondCatalog, new VfxLoadingService.Bundle(), loading, "unused", null, CancellationToken.None);
+                SynchronizationService.SkeletonSignature(model.Skeleton));
+            SynchronizationService.ImportClips(actor, model, new[] { source }, Array.Empty<AnimationClipCatalogItem>());
+            var imported = Assert.Single(SynchronizationService.MergeClips(actor, model, Array.Empty<AnimationClipCatalogItem>()));
+            var own = await SynchronizationService.PrepareClipAsync(metadata, firstCatalog, sourceBundle, loading, directory, null, CancellationToken.None);
+            var shared = await SynchronizationService.PrepareClipAsync(imported, secondCatalog, new VfxLoadingService.Bundle(), loading, "unused", null, CancellationToken.None);
             Assert.NotNull(own.AnimationAsset);
             Assert.NotNull(shared.AnimationAsset);
             Assert.NotSame(own.AnimationAsset, shared.AnimationAsset);

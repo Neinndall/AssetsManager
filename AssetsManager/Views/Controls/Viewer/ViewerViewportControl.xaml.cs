@@ -659,7 +659,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 foreach (SceneModel model in _loadedModels)
                 {
-                    AnimationData data = ViewerSynchronizationService.MatchingAnimation(model, animationModel.AnimationData);
+                    AnimationData data = SynchronizationService.MatchingAnimation(model, animationModel.AnimationData);
                     if (data != null)
                         ActivateAnimation(model, data);
                     else if (model.CurrentAnimation != null)
@@ -684,7 +684,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     foreach (SceneModel model in _loadedModels)
                     {
-                        AnimationData data = ViewerSynchronizationService.MatchingAnimation(model, animationModel.AnimationData);
+                        AnimationData data = SynchronizationService.MatchingAnimation(model, animationModel.AnimationData);
                         if (data == null) continue;
                         ActivateAnimation(model, data);
                         model.IsAnimationPaused = true;
@@ -705,7 +705,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (model == null || data?.AnimationAsset == null) return;
 
-            ViewerSynchronizationService.StartAnimation(model, data);
+            SynchronizationService.StartAnimation(model, data);
             _lastModelUpdates.Remove(model);
         }
 
@@ -718,12 +718,12 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 foreach (SceneModel model in _loadedModels)
                 {
-                    ViewerSynchronizationService.PauseAnimation(model, newPausedState);
+                    SynchronizationService.PauseAnimation(model, newPausedState);
                 }
             }
             else
             {
-                ViewerSynchronizationService.PauseAnimation(_activeSceneModel, newPausedState);
+                SynchronizationService.PauseAnimation(_activeSceneModel, newPausedState);
             }
 
             Panel?.SetAnimationPlayingState(_activeAnimationModel, !newPausedState, true);
@@ -736,7 +736,7 @@ namespace AssetsManager.Views.Controls.Viewer
             void SeekModel(SceneModel model)
             {
                 if (model?.CurrentAnimation == null) return;
-                ViewerSynchronizationService.SeekAnimation(model, time.TotalSeconds);
+                SynchronizationService.SeekAnimation(model, time.TotalSeconds);
                 _lastModelUpdates.Remove(model);
             }
 
@@ -772,7 +772,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (model == null) return;
             _lastModelUpdates.Remove(model);
-            ViewerSynchronizationService.StopAnimation(model);
+            SynchronizationService.StopAnimation(model);
         }
 
         public void RemoveAnimation(AnimationModel animationModel)

@@ -27,7 +27,7 @@ namespace AssetsManager.Views.Controls.Viewer
     public partial class StudioControl
     {
         internal const int MaxSceneActors = 8;
-        private readonly ViewerSynchronizationService _synchronization = new();
+        private readonly SynchronizationService _synchronization = new();
         private const double SceneActorSpacing = 180d;
 
         private readonly Dictionary<StudioSceneActor, StudioSceneActorRuntime> _sceneActorRuntimes = new();
@@ -406,21 +406,21 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.SelectedWorkspaceTab.IsAnimationSyncEnabled != true ||
                 _championModel.Skeleton == null || _activeBundle == null || _clipCatalog == null) return;
             var sources = new List<SynchronizedAnimationSource>();
-            sources.AddRange(ViewerSynchronizationService.ExportClips(FocusedActor, _championModel, _clipCatalog.BuildMetadata(GetCharacterPlaybackBundle(),
+            sources.AddRange(SynchronizationService.ExportClips(FocusedActor, _championModel, _clipCatalog.BuildMetadata(GetCharacterPlaybackBundle(),
                 path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"), _model.AnimationParameter),
                 GetCharacterPlaybackBundle(), _animationSearchDirectory));
             foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
-                sources.AddRange(ViewerSynchronizationService.ExportClips(actor, runtime.Model,
+                sources.AddRange(SynchronizationService.ExportClips(actor, runtime.Model,
                     runtime.OwnClips(actor), runtime.PlaybackBundle, runtime.SearchDirectory));
-            ViewerSynchronizationService.ImportClips(FocusedActor, _championModel, sources, _model.DetectedAnimations);
+            SynchronizationService.ImportClips(FocusedActor, _championModel, sources, _model.DetectedAnimations);
             foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
-                ViewerSynchronizationService.ImportClips(actor, runtime.Model, sources, runtime.OwnClips(actor));
+                SynchronizationService.ImportClips(actor, runtime.Model, sources, runtime.OwnClips(actor));
             RefreshFocusedImportedClips();
         }
 
         private void RefreshFocusedImportedClips()
         {
-            var merged = ViewerSynchronizationService.MergeClips(FocusedActor, _championModel, _model.DetectedAnimations);
+            var merged = SynchronizationService.MergeClips(FocusedActor, _championModel, _model.DetectedAnimations);
             foreach (var stale in _model.DetectedAnimations.Where(item => item.SharedSource != null && !merged.Contains(item)).ToArray())
             {
                 _model.DetectedAnimations.Remove(stale);

@@ -14,7 +14,7 @@ using LeagueToolkit.Core.Animation;
 namespace AssetsManager.Services.Viewer.Runtime;
 
 /// <summary>Shared synchronization rules; viewers retain scene membership and runtime ownership.</summary>
-internal sealed class ViewerSynchronizationService
+internal sealed class SynchronizationService
 {
     private bool _applying;
 
