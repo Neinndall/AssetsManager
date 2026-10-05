@@ -280,7 +280,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationClipCancellation = null;
         }
 
-        private void ResetPreviewContextForSelection()
+        private void ResetPreviewContextForSelection(bool preserveCharacterPose = false)
         {
             CancelTimedPreviewPreparation();
             _activeSpellPlan = null;
@@ -301,23 +301,20 @@ namespace AssetsManager.Views.Controls.Viewer
                 _isUpdatingAnimationParameter = false;
             }
 
-            // A context switch must not leave the old Clip pose driving the owner. While the
-            // next Clip/Spell loads, on a neutral Skin selection, or for a standalone System,
-            // the Champion returns to bind pose and owner-joint attachments resolve from it.
-            // A Character that just entered the viewport keeps the pose it arrived with (none, or
-            // the one a promoted scene actor was playing) until its opening clip is ready.
-            if (!_championAwaitingFirstPose)
+            // Clip selection keeps the last rendered pose until the replacement is ready.
+            // A newly installed Character also keeps its opening pose until preparation finishes.
+            if (!preserveCharacterPose && !_championAwaitingFirstPose)
                 ResetChampionToBindPose();
         }
 
-        private void BeginExclusivePreviewSelection()
+        private void BeginExclusivePreviewSelection(bool preserveCharacterPose = false)
         {
             if (_inspectedSystem != null)
                 RememberStandaloneRun(_inspectedSystem);
             _pendingSystem = null;
             _inspectedSystem = null;
             _pendingSpell = null;
-            ResetPreviewContextForSelection();
+            ResetPreviewContextForSelection(preserveCharacterPose);
         }
 
         private string ResolvePreviewSearchDirectory()

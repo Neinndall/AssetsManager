@@ -494,6 +494,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - 3D Studio / Switching animation clips keeps the last pose visible while loading instead of briefly showing the T-pose.
   - VFX Studio / Fixed inaccurate soft-particle fading with game shaders in large orthographic views.
   - Viewer / Compressed animations now retain the same pose when seeking backward or replaying.
   - 3D Studio / Restored missing child particle effects from shared skin files.

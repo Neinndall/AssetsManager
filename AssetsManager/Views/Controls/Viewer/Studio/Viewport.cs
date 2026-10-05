@@ -559,6 +559,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
+            // A pending clip resets the playhead, but the last visible pose must stay frozen.
+            if (_model.SelectedAnimation is { IsBindPose: false } && _activeAnimationClip == null)
+                return;
+
             ApplyAnimationClipCues(_model.CurrentTime);
             if (_championModel.CurrentAnimation != null && _championModel.Skeleton != null)
             {

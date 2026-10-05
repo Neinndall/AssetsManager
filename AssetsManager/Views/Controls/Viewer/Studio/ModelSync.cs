@@ -87,7 +87,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_isUpdatingCharacterForms) return;
                 if (_model.SelectedAnimation != null)
                 {
-                    BeginExclusivePreviewSelection();
+                    BeginExclusivePreviewSelection(preserveCharacterPose: !_model.SelectedAnimation.IsBindPose);
                     if (_model.SelectedAnimation.IsBindPose)
                     {
                         _animationClipCancellation?.Cancel();
