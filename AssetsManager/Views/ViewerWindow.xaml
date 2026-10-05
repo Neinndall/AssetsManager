@@ -29,18 +29,18 @@
                         <Grid HorizontalAlignment="Center">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="20"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="20"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <!-- Open Project Folder Card -->
                             <Button Grid.Column="0" Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenProjectFolder_Click"
-                                    Width="240" MinHeight="200" Margin="0" Padding="20,24">
+                                    Width="180" Height="160" Margin="0" Padding="20">
                                 <StackPanel>
-                                    <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="52" Height="52" Margin="0,0,0,18">
-                                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="28" Height="28" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,14">
+                                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
                                     <TextBlock Text="Load Project"
                                                FontWeight="Bold"
@@ -52,9 +52,9 @@
                                                HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
-                                               LineHeight="18" Margin="0,6,0,0">
-                                        <Run Text="Browse extracted models"/><LineBreak/>
-                                        <Run Text="and play their animations."/>
+                                               LineHeight="16" Margin="0,4,0,0">
+                                        <Run Text="Browse models"/><LineBreak/>
+                                        <Run Text="and animations"/>
                                     </TextBlock>
                                 </StackPanel>
                             </Button>
@@ -62,10 +62,10 @@
                             <!-- Load Chroma Card -->
                             <Button Grid.Column="2" Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenChromaFile_Click"
-                                    Width="240" MinHeight="200" Margin="0" Padding="20,24">
+                                    Width="180" Height="160" Margin="0" Padding="20">
                                 <StackPanel>
-                                    <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="52" Height="52" Margin="0,0,0,18">
-                                        <materialIcons:MaterialIcon Kind="Palette" Width="28" Height="28" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,14">
+                                        <materialIcons:MaterialIcon Kind="Palette" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
                                     <TextBlock Text="Chroma Library"
                                                FontWeight="Bold"
@@ -77,9 +77,9 @@
                                                HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
-                                               LineHeight="18" Margin="0,6,0,0">
-                                        <Run Text="Compare chroma variants"/><LineBreak/>
-                                        <Run Text="and preview their textures."/>
+                                               LineHeight="16" Margin="0,4,0,0">
+                                        <Run Text="Compare variants"/><LineBreak/>
+                                        <Run Text="and textures"/>
                                     </TextBlock>
                                 </StackPanel>
                             </Button>
@@ -87,10 +87,10 @@
                             <!-- 3D Studio Card -->
                             <Button Grid.Column="4" Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenStudio_Click"
-                                    Width="240" MinHeight="200" Margin="0" Padding="20,24">
+                                    Width="180" Height="160" Margin="0" Padding="20">
                                 <StackPanel>
-                                    <Border Background="{StaticResource HoverColor}" CornerRadius="12" Width="52" Height="52" Margin="0,0,0,18">
-                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="28" Height="28" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,14">
+                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
                                     <TextBlock Text="3D Studio"
                                                FontWeight="Bold"
@@ -102,9 +102,9 @@
                                                HorizontalAlignment="Center"
                                                TextAlignment="Center"
                                                TextWrapping="Wrap"
-                                               LineHeight="18" Margin="0,6,0,0">
-                                        <Run Text="Models, animations &amp; maps"/><LineBreak/>
-                                        <Run Text="with visual effects."/>
+                                               LineHeight="16" Margin="0,4,0,0">
+                                        <Run Text="Models &amp; animations"/><LineBreak/>
+                                        <Run Text="Maps &amp; effects"/>
                                     </TextBlock>
                                 </StackPanel>
                             </Button>
