@@ -14,6 +14,51 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 {
     public sealed class GameParticleProgramResolverTests
     {
+        public static System.Collections.Generic.IEnumerable<object[]> SoftDepthVariants()
+        {
+            foreach (bool mesh in new[] { false, true })
+            foreach (bool soft in new[] { false, true })
+            foreach (bool mult in new[] { false, true })
+            foreach (bool palette in new[] { false, true })
+                yield return new object[] { mesh, soft, mult, palette };
+        }
+
+        [Theory]
+        [MemberData(nameof(SoftDepthVariants))]
+        public void NativeSoftDepthAdapterPreservesReflectedBuffersAndOtherFeatures(
+            bool mesh, bool soft, bool mult, bool palette)
+        {
+            string root = FindInstalledShaderCacheRoot();
+            if (root == null) return;
+            var emitter = Emitter() with
+            {
+                PrimitiveKind = mesh ? VfxPrimitiveKind.Mesh : VfxPrimitiveKind.CameraQuad,
+                IsMeshPrimitive = mesh,
+                SoftParticle = soft ? new VfxSoftParticleDefinition(0, 10, 100, 10) : null,
+                TextureMultPath = mult ? "mult.tex" : null,
+                PaletteDefinition = palette
+                    ? new VfxPaletteDefinition(32, VfxCurve3.Const(new Vector3(6, 0, 0)), "palette.tex") : null
+            };
+            GameMaterialProgram program = GameParticleProgramResolver.Create(emitter, mesh);
+            string cache = Path.Combine(root, @"Game\DATA\FINAL\ShaderCache.dx11.wad.client");
+            using var wad = new WadFile(cache);
+            var bytecode = Assert.Single(GameShaderProgramResolver.ReadProgram(program, wad, cache).Passes).Bytecode;
+            Assert.True(bytecode.Ready, bytecode.Failure);
+            var translated = GameShaderTranslator.Translate(bytecode.Program.Vertex, bytecode.Program.VertexReflection,
+                bytecode.Program.Pixel, bytecode.Program.PixelReflection);
+            Assert.True(translated.Ready, translated.Failure);
+            Assert.Equal(soft, translated.Program.Pixel.Applied.Contains(GameShaderTranslator.AppliedPatch.OrthographicParticleDepth));
+            Assert.Equal(soft, translated.Program.Pixel.Glsl.Contains("uParticleOrthographicDepthSpan", StringComparison.Ordinal));
+            Assert.DoesNotContain(GameShaderTranslator.AppliedPatch.OrthographicParticleDepth, translated.Program.Vertex.Applied);
+            foreach (var reflected in bytecode.Program.PixelReflection.ConstantBuffers)
+            {
+                var block = Assert.Single(translated.Program.Pixel.Sidecar.Blocks, value => value.Name == reflected.Name);
+                Assert.Equal(reflected.Size, block.Size);
+                Assert.Equal(reflected.Members.Select(member => (member.Name, member.Offset, member.Size)),
+                    block.Members.Select(member => (member.Name, member.Offset, member.Size)));
+            }
+        }
+
         [Theory]
         [InlineData(VfxPrimitiveKind.CameraQuad, null)]
         [InlineData(VfxPrimitiveKind.CameraQuad, "")]

@@ -494,6 +494,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Fixed inaccurate soft-particle fading with game shaders in large orthographic views.
   - Viewer / Compressed animations now retain the same pose when seeking backward or replaying.
   - 3D Studio / Restored missing child particle effects from shared skin files.
   - 3D Studio / Spell clips now apply material changes linked to their spells.

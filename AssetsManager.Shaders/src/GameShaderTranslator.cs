@@ -13,7 +13,7 @@ namespace AssetsManager.Shaders
     /// Translates DXBC shader stages into OpenGL-compatible GLSL through the
     /// dxbc-spirv/SPIRV-Cross pipeline used by the game-shader preview path.
     /// </summary>
-    public static class GameShaderTranslator
+    public static partial class GameShaderTranslator
     {
         private const uint OpName = 5;
         private const uint OpExtension = 10;
@@ -60,7 +60,8 @@ namespace AssetsManager.Shaders
             BaseVertexZero,
             BaseInstanceZero,
             MipLevelsOne,
-            SafeReciprocal
+            SafeReciprocal,
+            OrthographicParticleDepth
         }
 
         public enum MemberScalar
@@ -169,6 +170,11 @@ namespace AssetsManager.Shaders
                 .ToArray();
             string normalizedGlsl = NormalizeConstantBuffers(crossed.Glsl, reflection);
             (string glsl, IReadOnlyList<AppliedPatch> glslApplied) = PatchGlsl(normalizedGlsl, stage, extents);
+            if (stage == Stage.Pixel)
+            {
+                (glsl, bool depthAdapted) = OrthographicParticleDepth(glsl, reflection);
+                if (depthAdapted) glslApplied = glslApplied.Append(AppliedPatch.OrthographicParticleDepth).ToArray();
+            }
             IReadOnlyList<AppliedPatch> applied = patched.Applied
                 .Concat(glslApplied)
                 .Distinct()

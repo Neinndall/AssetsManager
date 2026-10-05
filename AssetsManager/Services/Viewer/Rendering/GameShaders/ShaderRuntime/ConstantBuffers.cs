@@ -18,6 +18,17 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             CharacterDraw? character, VfxEmitterDefinition particle = null,
             IReadOnlyDictionary<string, Vector4> overrides = null)
         {
+            // This preview-only uniform avoids subtracting huge reciprocal depths in orthographic views.
+            if (runtime.ParticleOrthographicDepthSpan >= 0)
+            {
+                float span = frame.Projection.M34 == 0f && frame.Projection.M33 != 0f
+                    ? MathF.Abs(2f / frame.Projection.M33) : 0f;
+                if (span != runtime.UploadedParticleDepthSpan)
+                {
+                    _gl.Uniform1(runtime.ParticleOrthographicDepthSpan, span);
+                    runtime.UploadedParticleDepthSpan = span;
+                }
+            }
             bool skinned = character.HasValue || particle != null;
             foreach (BlockRuntime block in runtime.Blocks)
             {

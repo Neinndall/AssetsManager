@@ -150,6 +150,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         {
             private readonly GL _gl;
             internal readonly uint Program;
+            internal readonly int ParticleOrthographicDepthSpan;
+            internal float UploadedParticleDepthSpan = float.NaN;
             internal readonly IReadOnlyList<BlockRuntime> Blocks;
             internal readonly IReadOnlyList<SamplerRuntime> Samplers;
             internal readonly IReadOnlyDictionary<uint, string> Attributes;
@@ -166,6 +168,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             {
                 _gl = gl;
                 Program = program;
+                ParticleOrthographicDepthSpan = gl.GetUniformLocation(program, "uParticleOrthographicDepthSpan");
                 Blocks = blocks;
                 Samplers = samplers;
                 Attributes = attributes;

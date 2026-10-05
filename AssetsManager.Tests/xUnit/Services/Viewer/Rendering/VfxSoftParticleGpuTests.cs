@@ -26,13 +26,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             foreach (float gap in new[] { 0.1f, 5f, 10f })
             foreach (bool orthographic in new[] { false, true })
             foreach (bool fallback in new[] { false, true })
-                yield return new object[] { primitive, mode, gap, orthographic, fallback };
+            foreach (var range in new[] { (Near: 1f, Far: 201f), (Near: 2f, Far: 20000f) })
+            foreach (float distance in orthographic && range.Far == 20000f
+                         ? new[] { 60f, 10000f, 19000f } : new[] { 60f })
+                yield return new object[] { primitive, mode, gap, orthographic, fallback, range.Near, range.Far, distance };
         }
 
         [Theory]
         [MemberData(nameof(SoftCases))]
         public void SceneIntersectionFadeMatchesTheWorldSpaceGap(
-            VfxPrimitiveKind primitive, int mode, float gap, bool orthographic, bool fallback)
+            VfxPrimitiveKind primitive, int mode, float gap, bool orthographic, bool fallback, float near, float far, float distance)
         {
             string install = InstalledSkins.FindInstall();
             if (install == null) return;
@@ -57,7 +60,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             {
                 bool mesh = primitive is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
                 bool trail = primitive is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail;
-                float z = -(60f - gap);
+                float z = -(distance - gap);
                 var definition = new VfxEmitterDefinition("soft", VfxCurveF.Const(1), VfxCurveF.Const(1),
                     null, 0, 0, false, false, mode, VfxCurve3.Const(Vector3.One), null,
                     VfxCurve4.Const(Vector4.One), null, null, null, null, VfxCurve3.Const(Vector3.Zero),
@@ -108,18 +111,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                         new float[] { 0, 0, 1, 0, 0.5f, 1 }, null);
 
                 Matrix4x4 projection = orthographic
-                    ? Matrix4x4.CreateOrthographic(100, 100, 1, 201)
-                    : Matrix4x4.CreatePerspectiveFieldOfView(1, 1, 1, 201);
-                Vector4 sceneClip = Vector4.Transform(new Vector4(0, 0, -60, 1), projection);
+                    ? Matrix4x4.CreateOrthographic(100, 100, near, far)
+                    : Matrix4x4.CreatePerspectiveFieldOfView(1, 1, near, far);
                 Vector4 background = new(0.2f, 0.4f, 0.6f, 0.3f);
-                gl.Viewport(0, 0, 64, 64);
-                gl.DepthMask(true);
-                gl.DepthFunc(DepthFunction.Lequal);
-                gl.ClearDepth((sceneClip.Z / sceneClip.W + 1) * 0.5);
-                gl.ClearColor(background.X, background.Y, background.Z, background.W);
-                gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-                renderer.CaptureScene(64, 64, captureColor: false, captureDepth: true);
-                renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, projection, Matrix4x4.Identity);
+                void Draw(Matrix4x4 camera)
+                {
+                    Vector4 sceneClip = Vector4.Transform(new Vector4(0, 0, -distance, 1), camera);
+                    gl.Viewport(0, 0, 64, 64);
+                    gl.DepthMask(true);
+                    gl.DepthFunc(DepthFunction.Lequal);
+                    gl.ClearDepth((sceneClip.Z / sceneClip.W + 1) * 0.5);
+                    gl.ClearColor(background.X, background.Y, background.Z, background.W);
+                    gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+                    renderer.CaptureScene(64, 64, captureColor: false, captureDepth: true);
+                    renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, camera, Matrix4x4.Identity);
+                }
+                // Reuse the same programs across projection changes, then a second identical frame.
+                Draw(orthographic
+                    ? Matrix4x4.CreatePerspectiveFieldOfView(1, 1, near, far)
+                    : Matrix4x4.CreateOrthographic(100, 100, 2, 20000));
+                Draw(projection);
+                Draw(projection);
                 Assert.Equal(fallback
                     ? "ShaderCache.dx11.wad.client was not found in the configured game installs." : null,
                     renderer.GameParticleFallback(emitter, mesh));
@@ -132,7 +144,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 Vector4 expected = ComposeSoft(mode, prepared, background, fade);
                 for (int channel = 0; channel < 4; channel++)
                     Assert.True(Math.Abs(pixel[channel] - MathF.Round(expected[channel] * 255)) <= 2,
-                        $"{primitive}, mode={mode}, gap={gap}, ortho={orthographic}, fallback={fallback}: " +
+                        $"{primitive}, mode={mode}, gap={gap}, ortho={orthographic}, fallback={fallback}, range={near}..{far}, distance={distance}: " +
                         $"channel {channel} expected {MathF.Round(expected[channel] * 255)}, got {pixel[channel]}; " +
                         $"RGBA=({string.Join(",", pixel)}).");
                 Assert.Equal(GLEnum.NoError, gl.GetError());
