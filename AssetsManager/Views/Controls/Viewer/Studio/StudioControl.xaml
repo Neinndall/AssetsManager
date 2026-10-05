@@ -27,6 +27,65 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
+        <Style x:Key="InspectorSynchronizationOptionStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Border x:Name="Surface" Background="{StaticResource SidebarBackground}" CornerRadius="10"/>
+                            <Grid Margin="{TemplateBinding Padding}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+                                <Grid Grid.Column="1" Width="16" Height="16" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <Border x:Name="Indicator" Background="{StaticResource DarkBackground}"
+                                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4"/>
+                                    <Path x:Name="CheckMark" Data="M3.5,8 L6.5,11 L12.5,4.5"
+                                          Stroke="White" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Stretch="Uniform" Margin="3" Visibility="Collapsed"/>
+                                </Grid>
+                            </Grid>
+                            <Border x:Name="AccentStrip" Width="2" HorizontalAlignment="Left" Margin="0,8"
+                                    Background="{StaticResource AccentBrush}" Visibility="Collapsed" IsHitTestVisible="False"/>
+                            <Border x:Name="Outline" CornerRadius="10" BorderBrush="{StaticResource BorderColor}"
+                                    BorderThickness="1" IsHitTestVisible="False"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#155C85FF"/>
+                                <Setter TargetName="Outline" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Outline" Property="BorderThickness" Value="1.5"/>
+                                <Setter TargetName="Indicator" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Indicator" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="AccentStrip" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="{StaticResource HoverColor}"/>
+                                <Setter TargetName="Outline" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Outline" Property="BorderThickness" Value="1.5"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Outline" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Outline" Property="BorderThickness" Value="1.5"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Compact TreeView Expander ToggleButton for 3D Studio Browser -->
         <Style x:Key="TreeViewToggleButton" TargetType="ToggleButton">
             <Setter Property="Focusable" Value="False"/>
@@ -2175,32 +2234,96 @@
                                     <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                                 </Grid>
                             </ToggleButton>
-                            <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,12" Margin="0,0,0,12"
+                            <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="12,10" Margin="0,0,0,12"
                                     Visibility="{Binding IsChecked, ElementName=StudioSynchronizationSection, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <StackPanel>
-                                    <TextBlock FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,12">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Text" Value="Changes apply to actors in this scene."/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding CanSynchronizeScene}" Value="False">
-                                                        <Setter Property="Text" Value="Add at least two actors to synchronize this scene."/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Kind="AccountGroupOutline" Width="14" Height="14"
+                                                                    Foreground="{StaticResource AccentBlue}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="Link actors in this scene."/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CanSynchronizeScene}" Value="False">
+                                                            <Setter Property="Text" Value="Add an actor to enable sync."/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
                                     <StackPanel IsEnabled="{Binding CanSynchronizeScene}">
-                                        <TextBlock Text="MESHES" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentPurple}" Margin="0,0,0,8"/>
-                                        <CheckBox Content="Sync Meshes" Style="{StaticResource ModernCheckBox}" IsChecked="{Binding SelectedWorkspaceTab.IsMeshSyncEnabled, Mode=TwoWay}" Margin="0,0,0,2"/>
-                                        <TextBlock Text="Link matching submesh visibility" FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="24,0,0,10"/>
-                                        <CheckBox Content="Sync Textures" Style="{StaticResource ModernCheckBox}" IsChecked="{Binding SelectedWorkspaceTab.IsTextureSyncEnabled, Mode=TwoWay}" Margin="0,0,0,2"/>
-                                        <TextBlock Text="Link texture slots across variants" FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="24,0,0,10"/>
-                                        <TextBlock Text="ANIMATIONS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" Margin="0,8,0,8"/>
-                                        <CheckBox Content="Sync Anims Load" Style="{StaticResource ModernCheckBox}" IsChecked="{Binding SelectedWorkspaceTab.IsAnimationSyncEnabled, Mode=TwoWay}" Margin="0,0,0,2"/>
-                                        <TextBlock Text="Share clips between compatible skeletons" FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="24,0,0,10"/>
-                                        <CheckBox Content="Sync Anims" Style="{StaticResource ModernCheckBox}" IsChecked="{Binding SelectedWorkspaceTab.IsAnimationPlaybackSyncEnabled, Mode=TwoWay}" Margin="0,0,0,2"/>
-                                        <TextBlock Text="Link clip, playback and timeline" FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="24,0,0,10"/>
+                                        <TextBlock Text="APPEARANCE" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentPurple}" Margin="0,0,0,6"/>
+                                        <CheckBox Style="{StaticResource InspectorSynchronizationOptionStyle}"
+                                                  IsChecked="{Binding SelectedWorkspaceTab.IsMeshSyncEnabled, Mode=TwoWay}" AutomationProperties.Name="Sync meshes">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="32" Height="32" CornerRadius="8" Background="#18BB86FC" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <materialIcons:MaterialIcon Kind="CubeOutline" Width="18" Height="18" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="Sync meshes" Style="{StaticResource InspectorGroupTitleStyle}" FontSize="11.5"/>
+                                                    <TextBlock Text="Match submesh visibility." Style="{StaticResource InspectorGroupDescriptionStyle}" FontSize="9.5"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </CheckBox>
+                                        <CheckBox Style="{StaticResource InspectorSynchronizationOptionStyle}" Margin="0"
+                                                  IsChecked="{Binding SelectedWorkspaceTab.IsTextureSyncEnabled, Mode=TwoWay}" AutomationProperties.Name="Sync textures">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="32" Height="32" CornerRadius="8" Background="#18BB86FC" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <materialIcons:MaterialIcon Kind="PaletteOutline" Width="18" Height="18" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="Sync textures" Style="{StaticResource InspectorGroupTitleStyle}" FontSize="11.5"/>
+                                                    <TextBlock Text="Match texture slots." Style="{StaticResource InspectorGroupDescriptionStyle}" FontSize="9.5"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </CheckBox>
+                                        <TextBlock Text="ANIMATIONS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" Margin="0,10,0,6"/>
+                                        <CheckBox Style="{StaticResource InspectorSynchronizationOptionStyle}"
+                                                  IsChecked="{Binding SelectedWorkspaceTab.IsAnimationSyncEnabled, Mode=TwoWay}" AutomationProperties.Name="Share animation clips">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="32" Height="32" CornerRadius="8" Background="#1800D1FF" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <materialIcons:MaterialIcon Kind="MoviePlayOutline" Width="18" Height="18" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="Share clips" Style="{StaticResource InspectorGroupTitleStyle}" FontSize="11.5"/>
+                                                    <TextBlock Text="For compatible skeletons." Style="{StaticResource InspectorGroupDescriptionStyle}" FontSize="9.5"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </CheckBox>
+                                        <CheckBox Style="{StaticResource InspectorSynchronizationOptionStyle}" Margin="0"
+                                                  IsChecked="{Binding SelectedWorkspaceTab.IsAnimationPlaybackSyncEnabled, Mode=TwoWay}" AutomationProperties.Name="Sync animation playback">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="32" Height="32" CornerRadius="8" Background="#1800D1FF" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <materialIcons:MaterialIcon Kind="Sync" Width="18" Height="18" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="Sync playback" Style="{StaticResource InspectorGroupTitleStyle}" FontSize="11.5"/>
+                                                    <TextBlock Text="Link clip and timeline." Style="{StaticResource InspectorGroupDescriptionStyle}" FontSize="9.5"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </CheckBox>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
