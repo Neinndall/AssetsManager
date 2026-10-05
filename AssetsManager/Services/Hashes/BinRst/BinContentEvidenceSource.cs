@@ -694,7 +694,7 @@ namespace AssetsManager.Services.Hashes
             Dictionary<uint, BinTreeProperty> properties,
             out string id)
         {
-            foreach (string field in new[] { "mId", "id", "mID", "mItemId", "mItemID", "itemID", "itemId" })
+            foreach (string field in new[] { "ID", "mId", "id", "mID", "mItemId", "mItemID", "itemID", "itemId" })
             {
                 uint hash = Fnv1a.HashLower(field);
                 if (properties.TryGetValue(hash, out BinTreeProperty prop))
@@ -882,6 +882,15 @@ namespace AssetsManager.Services.Hashes
 
             void MatchEntry(uint entryHash, BinTreeObject item)
             {
+                if (TryGetString(item.Properties, "AugmentNameId", out string generalAugName))
+                {
+                    MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/Augments/{generalAugName}");
+                    foreach (int mapId in new[] { 11, 12, 21, 22, 30, 33, 35 })
+                    {
+                        MatchObservedEntry(entryHash, $"Maps/Shipping/Map{mapId}/AugmentTags/{generalAugName}");
+                    }
+                }
+
                 if (item.ClassHash is uint classHash)
                 {
                     if (NamedEntryTypes.Contains(classHash))
@@ -946,15 +955,26 @@ namespace AssetsManager.Services.Hashes
                             MatchObservedEntry(entryHash, $"LCU/Collectibles/EsportsTeams/{teamId}_{teamName}");
                         }
                     }
-                    else if (classHash == Fnv1a.HashLower("TftDamageSkinData") || classHash == 0x967b16cd ||
+                    else if (classHash == Fnv1a.HashLower("TFTDamageSkin") ||
+                             classHash == Fnv1a.HashLower("TftDamageSkinData") ||
+                             classHash == 0x967b16cd ||
                              classHash == Fnv1a.HashLower("DamageSkin") ||
                              (!string.IsNullOrEmpty(path) && path.Contains("TFTDamageSkins", StringComparison.OrdinalIgnoreCase)))
                     {
-                        if (TryGetString(item.Properties, "mDamageSkinName", out string damageName) ||
-                            TryGetString(item.Properties, "mName", out damageName) ||
+                        string resolvedEntryPath = null;
+                        if (TryGetString(item.Properties, "mName", out string damageName) ||
                             TryGetString(item.Properties, "name", out damageName) ||
+                            TryGetString(item.Properties, "mDamageSkinName", out damageName) ||
                             TryGetLeafFromPath(path, "TFTDamageSkins", out damageName))
                         {
+                            int lastUnderscore = damageName.LastIndexOf('_');
+                            if (lastUnderscore > 0 && lastUnderscore < damageName.Length - 1)
+                            {
+                                string baseName = damageName[..lastUnderscore];
+                                resolvedEntryPath = $"Loadouts/TFTDamageSkins/{baseName}/{damageName}";
+                                MatchObservedEntry(entryHash, resolvedEntryPath);
+                            }
+
                             for (int tier = 1; tier <= 3; tier++)
                             {
                                 string tierEntry = $"Loadouts/TFTDamageSkins/{damageName}/{damageName}_Tier{tier}";
@@ -964,6 +984,23 @@ namespace AssetsManager.Services.Hashes
                                 {
                                     MatchObservedEntry((uint)dmgResLink.Value, $"{tierEntry}/ResourceBin/Resources");
                                 }
+                            }
+                        }
+
+                        string entryPath = resolver?.ResolveBinEntry(entryHash);
+                        if (entryPath != null && (entryPath.StartsWith("0x", StringComparison.OrdinalIgnoreCase) || entryPath.StartsWith("[", StringComparison.Ordinal)))
+                            entryPath = null;
+                        if (string.IsNullOrEmpty(entryPath))
+                            entryPath = resolvedEntryPath;
+
+                        if (!string.IsNullOrEmpty(entryPath))
+                        {
+                            if (TryGetHashOrU32(item.Properties, "VfxResourceResolver", out uint vfxRes) ||
+                                TryGetHashOrU32(item.Properties, "mVFXResourceResolver", out vfxRes))
+                            {
+                                string resPath = $"{entryPath}/ResourceBin/Resources";
+                                MatchObservedEntry(vfxRes, resPath);
+                                matcher.CheckContextualCandidate(InternalHashKind.BinHashes, resPath, path, wadPath, vfxRes);
                             }
                         }
                     }
@@ -993,13 +1030,18 @@ namespace AssetsManager.Services.Hashes
                             MatchObservedEntry(entryHash, $"Loadouts/Regalia/Banners/Ranked/{bannerName}");
                         }
                     }
-                    else if (classHash == Fnv1a.HashLower("TftPassItem") || classHash == Fnv1a.HashLower("TftBattlePassData") ||
+                    else if (classHash == Fnv1a.HashLower("TftPassAsset") ||
+                             classHash == Fnv1a.HashLower("TftPassItem") ||
+                             classHash == Fnv1a.HashLower("TftBattlePassData") ||
                              (!string.IsNullOrEmpty(path) && path.Contains("Passes/Tft", StringComparison.OrdinalIgnoreCase)))
                     {
-                        if (TryGetString(item.Properties, "mName", out string passAssetName) ||
+                        if (TryGetString(item.Properties, "internalName", out string passAssetName) ||
+                            TryGetString(item.Properties, "mInternalName", out passAssetName) ||
+                            TryGetString(item.Properties, "mName", out passAssetName) ||
                             TryGetString(item.Properties, "mAssetName", out passAssetName) ||
                             TryGetString(item.Properties, "name", out passAssetName))
                         {
+                            MatchObservedEntry(entryHash, $"Passes/TFT/Assets/{passAssetName}");
                             MatchObservedEntry(entryHash, $"Passes/Tft/Assets/{passAssetName}");
                         }
                     }
@@ -1010,7 +1052,66 @@ namespace AssetsManager.Services.Hashes
                     else if (classHash == Fnv1a.HashLower("TFTRoundData"))
                         MatchEntryPattern(entryHash, item, "mName", value => $"Maps/Shipping/Map22/Rounds/{value}");
                     else if (classHash == Fnv1a.HashLower("TftItemData"))
-                        MatchEntryPattern(entryHash, item, "mName", value => $"Maps/Shipping/Map22/Items/{value}");
+                    {
+                        if (TryGetString(item.Properties, "mName", out string itemName) ||
+                            TryGetString(item.Properties, "name", out itemName))
+                        {
+                            for (int set = 1; set < 30; set++)
+                            {
+                                MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Sets/TFTSet{set}/Augments/{itemName}");
+                                MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Sets/TFTSet{set}/Items/{itemName}");
+                                MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Augments/Set{set}/{itemName}");
+                            }
+                            MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Items/{itemName}");
+                            MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Augments/{itemName}");
+                            MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Augments/Shared/{itemName}");
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("TftItemList"))
+                    {
+                        if (TryGetString(item.Properties, "name", out string listName) ||
+                            TryGetString(item.Properties, "mName", out listName))
+                        {
+                            for (int set = 1; set < 30; set++)
+                            {
+                                MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Sets/TFTSet{set}/{listName}");
+                            }
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("GuestOfHonor"))
+                    {
+                        if (TryGetString(item.Properties, "name", out string guestName) ||
+                            TryGetString(item.Properties, "mName", out guestName))
+                        {
+                            MatchObservedEntry(entryHash, $"Maps/Shipping/Map30/GuestOfHonor/{guestName}");
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("TftZoomSkin"))
+                    {
+                        string zoomEntry = null;
+                        if (TryGetString(item.Properties, "name", out string zoomName) ||
+                            TryGetString(item.Properties, "mName", out zoomName))
+                        {
+                            zoomEntry = $"Loadouts/TFTZoomSkins/{zoomName}";
+                            MatchObservedEntry(entryHash, zoomEntry);
+                        }
+                        string entryPath = resolver?.ResolveBinEntry(entryHash);
+                        if (entryPath != null && (entryPath.StartsWith("0x", StringComparison.OrdinalIgnoreCase) || entryPath.StartsWith("[", StringComparison.Ordinal)))
+                            entryPath = null;
+                        if (string.IsNullOrEmpty(entryPath))
+                            entryPath = zoomEntry;
+
+                        if (!string.IsNullOrEmpty(entryPath))
+                        {
+                            if (TryGetHashOrU32(item.Properties, "VfxResourceResolver", out uint resHash) ||
+                                TryGetHashOrU32(item.Properties, "mVFXResourceResolver", out resHash))
+                            {
+                                string resPath = $"{entryPath}/ResourceBin/Resources";
+                                MatchObservedEntry(resHash, resPath);
+                                matcher.CheckContextualCandidate(InternalHashKind.BinHashes, resPath, path, wadPath, resHash);
+                            }
+                        }
+                    }
                     else if (classHash == Fnv1a.HashLower("TftSetData"))
                         MatchEntryPattern(entryHash, item, "name", value => $"Maps/Shipping/Map22/Sets/{value}");
                     else if (classHash == Fnv1a.HashLower("TooltipFormat"))
@@ -1086,12 +1187,30 @@ namespace AssetsManager.Services.Hashes
                     }
                     else if (classHash == Fnv1a.HashLower("TftPlaybook"))
                     {
-                        if (TryGetString(item.Properties, "name", out string playbook))
+                        string playbookEntry = null;
+                        if (TryGetString(item.Properties, "name", out string playbook) ||
+                            TryGetString(item.Properties, "mName", out playbook))
                         {
-                            MatchObservedEntry(entryHash, $"Loadouts/TFTPlaybooks/{playbook}");
-                            if (item.Properties.TryGetValue(Fnv1a.HashLower("VfxResourceResolver"), out BinTreeProperty playbookResolver) &&
-                                playbookResolver is BinTreeHash playbookResolverHash)
-                                matcher.CheckContextualCandidate(InternalHashKind.BinHashes, $"Loadouts/TFTPlaybooks/{playbook}/Resources", path, wadPath, playbookResolverHash.Value);
+                            string cleanName = playbook.Replace(" ", "");
+                            playbookEntry = $"Loadouts/TFTPlaybooks/{cleanName}";
+                            MatchObservedEntry(entryHash, playbookEntry);
+                        }
+
+                        string entryPath = resolver?.ResolveBinEntry(entryHash);
+                        if (entryPath != null && (entryPath.StartsWith("0x", StringComparison.OrdinalIgnoreCase) || entryPath.StartsWith("[", StringComparison.Ordinal)))
+                            entryPath = null;
+                        if (string.IsNullOrEmpty(entryPath))
+                            entryPath = playbookEntry;
+
+                        if (!string.IsNullOrEmpty(entryPath))
+                        {
+                            if (TryGetHashOrU32(item.Properties, "VfxResourceResolver", out uint playbookResHash) ||
+                                TryGetHashOrU32(item.Properties, "mVFXResourceResolver", out playbookResHash))
+                            {
+                                string resPath = $"{entryPath}/Resources";
+                                MatchObservedEntry(playbookResHash, resPath);
+                                matcher.CheckContextualCandidate(InternalHashKind.BinHashes, resPath, path, wadPath, playbookResHash);
+                            }
                         }
                     }
                     else if (classHash == Fnv1a.HashLower("TftTraitData"))
@@ -1107,6 +1226,10 @@ namespace AssetsManager.Services.Hashes
                             TryGetString(item.Properties, "name", out augName))
                         {
                             MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/Augments/{augName}");
+                            foreach (int mapId in new[] { 11, 12, 21, 22, 30, 33, 35 })
+                            {
+                                MatchObservedEntry(entryHash, $"Maps/Shipping/Map{mapId}/AugmentTags/{augName}");
+                            }
                             MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/Augments/{augName}/{augName}");
                             MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/Augments/{augName}/Resources");
                             MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/RUBY/{augName}/{augName}");
@@ -1167,7 +1290,10 @@ namespace AssetsManager.Services.Hashes
                         MatchGameModeItemList(item);
                     }
                     else if (classHash == Fnv1a.HashLower("CompanionData"))
+                    {
                         MatchAnyEntryString(item, "speciesLink");
+                        MatchAnyEntryString(item, "mSpeciesLink");
+                    }
                     else if (classHash == Fnv1a.HashLower("ViewControllerSet"))
                         MatchStringsInField(item, "SpecifiedGameModes");
                     else if (classHash == Fnv1a.HashLower("ViewControllerList"))
@@ -2030,6 +2156,21 @@ namespace AssetsManager.Services.Hashes
                     return true;
                 }
                 value = null;
+                return false;
+            }
+
+            static bool TryGetHashOrU32(Dictionary<uint, BinTreeProperty> properties, string field, out uint hash)
+            {
+                if (properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property))
+                {
+                    switch (property)
+                    {
+                        case BinTreeHash h when h.Value != 0: hash = h.Value; return true;
+                        case BinTreeU32 u when u.Value != 0: hash = u.Value; return true;
+                        case BinTreeObjectLink link when link.Value != 0: hash = (uint)link.Value; return true;
+                    }
+                }
+                hash = 0;
                 return false;
             }
 

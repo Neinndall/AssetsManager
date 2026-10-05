@@ -2132,6 +2132,137 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(Fnv1a.HashLower("Movement"), rewind);
         }
 
+        [Fact]
+        public void BinContentResolvesCommunityDragonPatterns()
+        {
+            var targets = CreateTargets();
+
+            // 1. TftPassAsset: internalName -> Passes/TFT/Assets/{name}
+            const string passAssetExpected = "Passes/TFT/Assets/Set13Pass";
+            uint passAssetHash = Fnv1a.HashLower(passAssetExpected);
+            targets[InternalHashKind.BinEntries].Add(passAssetHash);
+
+            // 2. GuestOfHonor: name -> Maps/Shipping/Map30/GuestOfHonor/{name}
+            const string guestExpected = "Maps/Shipping/Map30/GuestOfHonor/Ambessa";
+            uint guestHash = Fnv1a.HashLower(guestExpected);
+            targets[InternalHashKind.BinEntries].Add(guestHash);
+
+            // 3. TftZoomSkin: name -> Loadouts/TFTZoomSkins/{name}, VfxResourceResolver -> {entry}/ResourceBin/Resources
+            const string zoomExpected = "Loadouts/TFTZoomSkins/ZoomSkin01";
+            uint zoomHash = Fnv1a.HashLower(zoomExpected);
+            const string zoomResExpected = "Loadouts/TFTZoomSkins/ZoomSkin01/ResourceBin/Resources";
+            uint zoomResHash = Fnv1a.HashLower(zoomResExpected);
+            targets[InternalHashKind.BinEntries].Add(zoomHash);
+            targets[InternalHashKind.BinHashes].Add(zoomResHash);
+
+            // 4. TftItemData: mName -> Maps/Shipping/Map22/Sets/TFTSet13/Items/{name} & Augments/Shared/{name}
+            const string tftItemExpected = "Maps/Shipping/Map22/Sets/TFTSet13/Items/TFT13_Item_BrawlerEmblem";
+            uint tftItemHash = Fnv1a.HashLower(tftItemExpected);
+            targets[InternalHashKind.BinEntries].Add(tftItemHash);
+
+            // 5. TftItemList: name -> Maps/Shipping/Map22/Sets/TFTSet13/{name}
+            const string tftListExpected = "Maps/Shipping/Map22/Sets/TFTSet13/Set13Augments";
+            uint tftListHash = Fnv1a.HashLower(tftListExpected);
+            targets[InternalHashKind.BinEntries].Add(tftListHash);
+
+            // 6. TFTDamageSkin: mName -> Loadouts/TFTDamageSkins/{name}/{tiered_name}, VfxResourceResolver -> {entry}/ResourceBin/Resources
+            const string dmgExpected = "Loadouts/TFTDamageSkins/Boom_Fire/Boom_Fire_Tier1";
+            uint dmgHash = Fnv1a.HashLower(dmgExpected);
+            const string dmgResExpected = "Loadouts/TFTDamageSkins/Boom_Fire/Boom_Fire_Tier1/ResourceBin/Resources";
+            uint dmgResHash = Fnv1a.HashLower(dmgResExpected);
+            targets[InternalHashKind.BinEntries].Add(dmgHash);
+            targets[InternalHashKind.BinHashes].Add(dmgResHash);
+
+            // 7. TftPlaybook: name (with spaces) -> Loadouts/TFTPlaybooks/{cleanName}, VfxResourceResolver -> {entry}/Resources
+            const string playbookExpected = "Loadouts/TFTPlaybooks/TFTSet13Playbook";
+            uint playbookHash = Fnv1a.HashLower(playbookExpected);
+            const string playbookResExpected = "Loadouts/TFTPlaybooks/TFTSet13Playbook/Resources";
+            uint playbookResHash = Fnv1a.HashLower(playbookResExpected);
+            targets[InternalHashKind.BinEntries].Add(playbookHash);
+            targets[InternalHashKind.BinHashes].Add(playbookResHash);
+
+            // 8. AugmentNameId: AugmentNameId -> Maps/Shipping/Map30/AugmentTags/{augName}
+            const string augTagExpected = "Maps/Shipping/Map30/AugmentTags/GoldenTicket";
+            uint augTagHash = Fnv1a.HashLower(augTagExpected);
+            targets[InternalHashKind.BinEntries].Add(augTagHash);
+
+            // 9. ChallengeConfigData: ID (BinU64) -> LCU/Challenges/Config/{id}/Config
+            const string challengeExpected = "LCU/Challenges/Config/202601/Config";
+            uint challengeHash = Fnv1a.HashLower(challengeExpected);
+            targets[InternalHashKind.BinEntries].Add(challengeHash);
+
+            // 10. CompanionData: speciesLink -> Loadouts/Companions/Pengu
+            const string companionExpected = "Loadouts/Companions/Pengu";
+            uint companionHash = Fnv1a.HashLower(companionExpected);
+            targets[InternalHashKind.BinEntries].Add(companionHash);
+
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(passAssetHash, Fnv1a.HashLower("TftPassAsset"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("internalName"), "Set13Pass")
+                }),
+                new BinTreeObject(guestHash, Fnv1a.HashLower("GuestOfHonor"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "Ambessa")
+                }),
+                new BinTreeObject(zoomHash, Fnv1a.HashLower("TftZoomSkin"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "ZoomSkin01"),
+                    new BinTreeHash(Fnv1a.HashLower("VfxResourceResolver"), zoomResHash)
+                }),
+                new BinTreeObject(tftItemHash, Fnv1a.HashLower("TftItemData"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mName"), "TFT13_Item_BrawlerEmblem")
+                }),
+                new BinTreeObject(tftListHash, Fnv1a.HashLower("TftItemList"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "Set13Augments")
+                }),
+                new BinTreeObject(dmgHash, Fnv1a.HashLower("TFTDamageSkin"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mName"), "Boom_Fire_Tier1"),
+                    new BinTreeHash(Fnv1a.HashLower("VfxResourceResolver"), dmgResHash)
+                }),
+                new BinTreeObject(playbookHash, Fnv1a.HashLower("TftPlaybook"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "TFT Set13 Playbook"),
+                    new BinTreeHash(Fnv1a.HashLower("VfxResourceResolver"), playbookResHash)
+                }),
+                new BinTreeObject(augTagHash, Fnv1a.HashLower("AugmentData"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("AugmentNameId"), "GoldenTicket")
+                }),
+                new BinTreeObject(challengeHash, Fnv1a.HashLower("ChallengeConfigData"), new BinTreeProperty[]
+                {
+                    new BinTreeU64(Fnv1a.HashLower("ID"), 202601)
+                }),
+                new BinTreeObject(companionHash, Fnv1a.HashLower("CompanionSpeciesData"), Array.Empty<BinTreeProperty>()),
+                new BinTreeObject(0x99999999, Fnv1a.HashLower("CompanionData"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("speciesLink"), companionExpected)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "test.bin");
+
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinEntries && m.Value == passAssetExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinEntries && m.Value == guestExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinEntries && m.Value == zoomExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinHashes && m.Value == zoomResExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinEntries && m.Value == tftItemExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinEntries && m.Value == tftListExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinEntries && m.Value == dmgExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinHashes && m.Value == dmgResExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinEntries && m.Value == playbookExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinHashes && m.Value == playbookResExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinEntries && m.Value == augTagExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinEntries && m.Value == challengeExpected);
+            Assert.Contains(matcher.Matches, m => m.Kind == InternalHashKind.BinEntries && m.Value == companionExpected);
+        }
+
         private static void CheckCandidates(
             InternalHashEvidenceMatcher matcher,
             BinRstHashGuessingService.TokenWordlist wordlist,
