@@ -1997,15 +1997,6 @@ namespace AssetsManager.Services.Hashes
             static bool TryGetString(Dictionary<uint, BinTreeProperty> properties, string field, out string value) =>
                 TryGetStringByHash(properties, Fnv1a.HashLower(field), out value);
 
-            static string UpperAfterUnderscore(string value)
-            {
-                if (string.IsNullOrEmpty(value)) return value;
-                var chars = value.ToCharArray();
-                chars[0] = char.ToUpperInvariant(chars[0]);
-                for (int index = 1; index < chars.Length; index++)
-                    if (chars[index - 1] == '_') chars[index] = char.ToUpperInvariant(chars[index]);
-                return new string(chars);
-            }
 
             static bool TryGetStringOrOptional(Dictionary<uint, BinTreeProperty> properties, string field, out string value)
             {

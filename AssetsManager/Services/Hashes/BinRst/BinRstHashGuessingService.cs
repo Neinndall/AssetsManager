@@ -1389,7 +1389,13 @@ namespace AssetsManager.Services.Hashes
             void CheckEntry(string candidate)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                matcher.CheckSchemaCandidate(InternalHashKind.BinEntries, candidate, InternalHashEvidence.BinObjectLatticePattern, preserveCasing: true);
+                matcher.CheckResearchCandidate(
+                    InternalHashKind.BinEntries,
+                    candidate,
+                    InternalHashGuessStrategy.CrossDictionary,
+                    "BinObjectLattice",
+                    InternalHashEvidence.BinObjectLatticePattern,
+                    verified: true);
             }
 
             // 1. LCU Challenges Lattice (LCU/Challenges/Config/{id}/Config)
@@ -1557,13 +1563,13 @@ namespace AssetsManager.Services.Hashes
                     uint h = Fnv1a.HashLower(clip);
                     if (matcher.IsRemaining(InternalHashKind.BinHashes, h))
                     {
-                        matcher.CheckSchemaCandidate(
+                        matcher.CheckResearchCandidate(
                             InternalHashKind.BinHashes,
                             clip,
                             InternalHashGuessStrategy.CrossDictionary,
                             "AnimationClipLattice",
                             InternalHashEvidence.BinObjectLatticePattern,
-                            preserveCasing: true);
+                            verified: true);
                     }
                 }
 
@@ -1572,13 +1578,13 @@ namespace AssetsManager.Services.Hashes
                     uint h = Fnv1a.HashLower(track);
                     if (matcher.IsRemaining(InternalHashKind.BinHashes, h))
                     {
-                        matcher.CheckSchemaCandidate(
+                        matcher.CheckResearchCandidate(
                             InternalHashKind.BinHashes,
                             track,
                             InternalHashGuessStrategy.CrossDictionary,
                             "AnimationTrackLattice",
                             InternalHashEvidence.BinObjectLatticePattern,
-                            preserveCasing: true);
+                            verified: true);
                     }
                 }
 
@@ -1587,13 +1593,13 @@ namespace AssetsManager.Services.Hashes
                     uint h = Fnv1a.HashLower(mask);
                     if (matcher.IsRemaining(InternalHashKind.BinHashes, h))
                     {
-                        matcher.CheckSchemaCandidate(
+                        matcher.CheckResearchCandidate(
                             InternalHashKind.BinHashes,
                             mask,
                             InternalHashGuessStrategy.CrossDictionary,
                             "AnimationMaskLattice",
                             InternalHashEvidence.BinObjectLatticePattern,
-                            preserveCasing: true);
+                            verified: true);
                     }
                 }
 
@@ -1602,13 +1608,13 @@ namespace AssetsManager.Services.Hashes
                     uint h = Fnv1a.HashLower(sync);
                     if (matcher.IsRemaining(InternalHashKind.BinHashes, h))
                     {
-                        matcher.CheckSchemaCandidate(
+                        matcher.CheckResearchCandidate(
                             InternalHashKind.BinHashes,
                             sync,
                             InternalHashGuessStrategy.CrossDictionary,
                             "AnimationSyncGroupLattice",
                             InternalHashEvidence.BinObjectLatticePattern,
-                            preserveCasing: true);
+                            verified: true);
                     }
                 }
             }
