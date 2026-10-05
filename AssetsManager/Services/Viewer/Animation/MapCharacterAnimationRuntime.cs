@@ -114,7 +114,7 @@ namespace AssetsManager.Services.Viewer.Animation
                     continue;
                 }
 
-                IAnimationAsset animation = AnimationGraphPlayback.CreatePlaylist(steps);
+                IAnimationAsset animation = AnimationGraphPlayback.CreatePlaylist(steps, preparedClips, asset.AnimationGraph);
                 IReadOnlyList<AnimationClipTimedCue> timedCues = BuildTimedCues(preparedClips, steps);
                 var state = new PoseState(
                     animation,
@@ -179,7 +179,8 @@ namespace AssetsManager.Services.Viewer.Animation
             if (steps.Count == 0)
                 return false;
 
-            IAnimationAsset animation = AnimationGraphPlayback.CreatePlaylist(steps);
+            IAnimationAsset animation = AnimationGraphPlayback.CreatePlaylist(steps,
+                preparedSteps.Select(step => step.Clip).ToArray(), asset.AnimationGraph);
             IReadOnlyList<AnimationClipTimedCue> timedCues = BuildTimedCues(preparedSteps.Select(step => step.Clip).ToArray(), steps);
             var evaluator = new AnimationService(_logService);
             evaluator.SetPoseCues(timedCues, asset.AnimationGraph?.Masks);
@@ -331,8 +332,7 @@ namespace AssetsManager.Services.Viewer.Animation
                                 at,
                                 until,
                                 visibility.ShowSubmeshHashes,
-                                visibility.HideSubmeshHashes,
-                                tick));
+                                visibility.HideSubmeshHashes));
                             break;
                         case AnimationJointSnapEventDefinition snap:
                             cues.Add(new AnimationJointSnapCue(

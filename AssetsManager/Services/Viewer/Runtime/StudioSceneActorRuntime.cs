@@ -334,8 +334,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             _formHiddenSubmeshes = null;
             _visibilityTimeline = clip == null
                 ? Array.Empty<VfxClipCueEvaluator.VisibilityEntry>()
-                : VfxClipCueEvaluator.BuildVisibilityTimeline(clip.TimedCues, FormHiddenSubmeshes,
-                    Model.Parts.Select(part => part.Name));
+                : VfxClipCueEvaluator.BuildVisibilityTimeline(clip.TimedCues, FormHiddenSubmeshes);
             Animation.SetPoseCues(clip?.TimedCues,
                 Bundle.AnimationGraphs.FirstOrDefault(graph => graph.PathHash == clip?.Clip?.GraphPathHash)?.Masks);
             _hiddenDirty = true;

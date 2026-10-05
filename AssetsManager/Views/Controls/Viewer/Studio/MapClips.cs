@@ -81,8 +81,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     .Select(Fnv1a.HashLower);
                 _mapAnimationVisibilityTimeline = VfxClipCueEvaluator.BuildVisibilityTimeline(
                     selection.Group.Animation.PreparedClipCues(selection.Clip),
-                    initiallyHidden,
-                    selection.Group.Asset?.Mesh?.Ranges.Select(range => range.Name));
+                    initiallyHidden);
                 _mapAnimationVisibilityDuration = duration;
 
                 MapCharacterVfxCatalog catalog = selection.Group.Asset?.Vfx ?? MapCharacterVfxCatalog.Empty;

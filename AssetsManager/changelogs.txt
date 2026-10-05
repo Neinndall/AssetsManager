@@ -496,7 +496,7 @@ Changes
 
 Bug Fixes
   - Hash Lab / Improved challenge config discovery and TFT loadout resource resolution.
-  - 3D Studio / Prevented brief gaps when animation clips switch between submesh variants.
+  - 3D Studio / Animation sequences now use their authored pose transitions and preserve original submesh timing.
   - 3D Studio / Switching animation clips keeps the last pose visible while loading instead of briefly showing the T-pose.
   - VFX Studio / Fixed inaccurate soft-particle fading with game shaders in large orthographic views.
   - Viewer / Compressed animations now retain the same pose when seeking backward or replaying.

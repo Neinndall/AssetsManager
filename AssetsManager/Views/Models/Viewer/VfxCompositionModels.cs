@@ -59,8 +59,7 @@ namespace AssetsManager.Views.Models.Viewer
         double AtSeconds,
         double? UntilSeconds,
         IReadOnlyList<uint> ShowSubmeshHashes,
-        IReadOnlyList<uint> HideSubmeshHashes,
-        double FrameDurationSeconds = 0d)
+        IReadOnlyList<uint> HideSubmeshHashes)
         : AnimationClipTimedCue(AtSeconds, UntilSeconds);
 
     public sealed record AnimationJointSnapCue(
@@ -137,7 +136,16 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<AnimationClipDefinition> Clips,
         IReadOnlyList<AnimationTrackDefinition> Tracks,
         IReadOnlyList<AnimationMaskDefinition> Masks,
-        IReadOnlyList<AnimationSyncGroupDefinition> SyncGroups);
+        IReadOnlyList<AnimationSyncGroupDefinition> SyncGroups,
+        IReadOnlyList<AnimationBlendDefinition> Blends = null);
+
+    public abstract record AnimationBlendDefinition(uint FromClipHash, uint ToClipHash);
+
+    public sealed record AnimationTimeBlendDefinition(uint FromClipHash, uint ToClipHash, float Duration)
+        : AnimationBlendDefinition(FromClipHash, ToClipHash);
+
+    public sealed record AnimationTransitionClipBlendDefinition(uint FromClipHash, uint ToClipHash, uint ClipHash)
+        : AnimationBlendDefinition(FromClipHash, ToClipHash);
 
     /// <summary>
     /// One AnimationGraph clip. Atomic clips name an .anm; composite clips name children.

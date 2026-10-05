@@ -24,6 +24,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_trackDataMap = VfxParsingHash.Fnv1a("mTrackDataMap");
         private static readonly uint F_maskDataMap = VfxParsingHash.Fnv1a("mMaskDataMap");
         private static readonly uint F_syncGroupDataMap = VfxParsingHash.Fnv1a("mSyncGroupDataMap");
+        private static readonly uint F_blendDataTable = VfxParsingHash.Fnv1a("mBlendDataTable");
+        private static readonly uint F_blendTime = VfxParsingHash.Fnv1a("mTime");
+        private static readonly uint TimeBlendClass = VfxParsingHash.Fnv1a("TimeBlendData");
+        private static readonly uint TransitionClipBlendClass = VfxParsingHash.Fnv1a("TransitionClipBlendData");
         private static readonly uint F_clipTickDuration = VfxParsingHash.Fnv1a("mTickDuration");
         private static readonly uint F_clipStartFrame = VfxParsingHash.Fnv1a("startFrame");
         private static readonly uint F_clipEndFrame = VfxParsingHash.Fnv1a("EndFrame");
@@ -287,9 +291,38 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     clips,
                     tracks,
                     masks,
-                    syncGroups));
+                    syncGroups,
+                    ReadAnimationBlends(owner.Properties)));
             }
             return graphs;
+        }
+
+        private static IReadOnlyList<AnimationBlendDefinition> ReadAnimationBlends(
+            IReadOnlyDictionary<uint, BinTreeProperty> properties)
+        {
+            if (Get(properties, F_blendDataTable) is not BinTreeMap map)
+                return Array.Empty<AnimationBlendDefinition>();
+
+            var result = new List<AnimationBlendDefinition>();
+            foreach (var pair in map)
+            {
+                if (pair.Key is not BinTreeU64 key || pair.Value is not BinTreeStruct blend) continue;
+                // The directed pair packs the source clip into the high half and the target into the low half.
+                uint from = (uint)(key.Value >> 32), to = (uint)key.Value;
+                if (blend.ClassHash == TimeBlendClass)
+                {
+                    float duration = GetF32(blend.Properties, F_blendTime) ?? 0.2f;
+                    if (float.IsFinite(duration) && duration >= 0f)
+                        result.Add(new AnimationTimeBlendDefinition(from, to, duration));
+                }
+                else if (blend.ClassHash == TransitionClipBlendClass)
+                {
+                    uint clipHash = AsU32(Get(blend.Properties, F_clipName)) ?? 0u;
+                    if (clipHash != 0u)
+                        result.Add(new AnimationTransitionClipBlendDefinition(from, to, clipHash));
+                }
+            }
+            return result;
         }
 
         private static IReadOnlyList<AnimationTrackDefinition> ReadAnimationTracks(

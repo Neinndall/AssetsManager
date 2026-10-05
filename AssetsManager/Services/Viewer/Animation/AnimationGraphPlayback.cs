@@ -176,8 +176,11 @@ namespace AssetsManager.Services.Viewer.Animation
             return until.HasValue && until.Value > at ? until : null;
         }
 
-        internal static IAnimationAsset CreatePlaylist(IReadOnlyList<IAnimationAsset> steps) =>
-            new AnimationPlaylistAsset(steps ?? Array.Empty<IAnimationAsset>());
+        internal static IAnimationAsset CreatePlaylist(
+            IReadOnlyList<IAnimationAsset> steps,
+            IReadOnlyList<AnimationClipDefinition> clips = null,
+            AnimationGraphDefinition graph = null) =>
+            new AnimationPlaylistAsset(steps ?? Array.Empty<IAnimationAsset>(), clips, graph);
 
         internal static void Evaluate(IAnimationAsset animation, float time,
             IDictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> pose, RigResource skeleton)
@@ -230,43 +233,5 @@ namespace AssetsManager.Services.Viewer.Animation
             }
         }
 
-        private sealed class AnimationPlaylistAsset : IGraphPoseAnimationAsset
-        {
-            private readonly IReadOnlyList<IAnimationAsset> _steps;
-
-            internal AnimationPlaylistAsset(IReadOnlyList<IAnimationAsset> steps)
-            {
-                _steps = steps;
-                Duration = steps.Sum(step => step.Duration);
-                Fps = steps.Count > 0 ? steps[0].Fps : 30f;
-            }
-
-            public float Duration { get; }
-            public float Fps { get; }
-            public bool IsDisposed { get; private set; }
-            public void Dispose() => IsDisposed = true;
-
-            public void Evaluate(
-                float time,
-                IDictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> pose)
-                => Evaluate(time, pose, null);
-
-            public void Evaluate(float time,
-                IDictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> pose, RigResource skeleton)
-            {
-                if (IsDisposed) return;
-                float remaining = Math.Clamp(time, 0f, Duration);
-                for (int index = 0; index < _steps.Count; index++)
-                {
-                    IAnimationAsset step = _steps[index];
-                    if (remaining < step.Duration || index == _steps.Count - 1)
-                    {
-                        AnimationGraphPlayback.Evaluate(step, Math.Min(remaining, step.Duration), pose, skeleton);
-                        return;
-                    }
-                    remaining -= step.Duration;
-                }
-            }
-        }
     }
 }

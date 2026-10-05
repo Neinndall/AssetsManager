@@ -348,8 +348,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _animationVisibilityTimeline = VfxClipCueEvaluator.BuildVisibilityTimeline(
                 clip.TimedCues,
-                _animationBaseHiddenSubmeshes,
-                _activeSpellPlan == null ? _championModel.Parts.Select(part => part.Name) : null);
+                _animationBaseHiddenSubmeshes);
             _championAnimationService?.SetPoseCues(clip.TimedCues,
                 _activeBundle?.AnimationGraphs.FirstOrDefault(graph => graph.PathHash == clip.Clip.GraphPathHash)?.Masks);
             ApplyAnimationClipCues(0d);

@@ -244,8 +244,7 @@ internal sealed class VfxClipCatalog : IDisposable
                             at,
                             until,
                             visibility.ShowSubmeshHashes,
-                            visibility.HideSubmeshHashes,
-                            tick));
+                            visibility.HideSubmeshHashes));
                         break;
                     case AnimationJointSnapEventDefinition snap:
                         timedCues.Add(new AnimationJointSnapCue(
@@ -297,7 +296,7 @@ internal sealed class VfxClipCatalog : IDisposable
         {
             FilePath = playlist[0].Path,
             Duration = passTime,
-            AnimationAsset = AnimationGraphPlayback.CreatePlaylist(steps),
+            AnimationAsset = AnimationGraphPlayback.CreatePlaylist(steps, playlist.Select(step => step.Clip).ToArray(), graph),
             Composition = merged,
             TimedCues = timedCues.OrderBy(cue => cue.AtSeconds).ToArray(),
             EventCount = eventCount,
