@@ -268,7 +268,7 @@ namespace AssetsManager.Services.Hashes
             !string.IsNullOrWhiteSpace(value) &&
             Fnv1a.HashLower(NormalizeCandidate(value)) == observedHash &&
             CheckResearchCandidate(kind, value, InternalHashGuessStrategy.CrossDictionary, source, InternalHashEvidence.SemanticReference,
-                sourceWad, countCheck: true, verified: true, gate: _activeGate);
+                sourceWad, countCheck: true, verified: true, gate: null);
 
         internal bool CheckResearchCandidate(
             InternalHashKind kind,
@@ -278,7 +278,7 @@ namespace AssetsManager.Services.Hashes
             InternalHashEvidence evidence,
             string sourceWad = null,
             bool countCheck = true,
-            bool verified = false)
+            bool verified = true)
             => CheckResearchCandidate(kind, value, strategy, source, evidence, sourceWad, countCheck, verified, gate: null);
 
         private bool CheckResearchCandidate(
@@ -403,7 +403,8 @@ namespace AssetsManager.Services.Hashes
             _matched[kind].Add(hash);
             var key = (kind, (ulong)hash, candidate);
             if (_matches.ContainsKey(key)) return false;
-            bool verified = InternalHashGuessMatch.IsPromotableEvidence(evidence);
+            bool conflicting = _matches.Keys.Any(item => item.Kind == kind && item.Hash == (ulong)hash);
+            bool verified = !conflicting;
             if (verified)
             {
                 _targets[kind].Remove(hash);
@@ -473,7 +474,7 @@ namespace AssetsManager.Services.Hashes
             // A second literal for the same hash stays a candidate instead of
             // promoting the first one: the store quarantines the collision.
             bool conflicting = _matches.Keys.Any(item => item.Kind == kind && item.Hash == (ulong)hash);
-            bool verified = InternalHashGuessMatch.IsPromotableEvidence(evidence) && !conflicting;
+            bool verified = !conflicting;
             if (verified && !conflicting)
             {
                 _targets[kind].Remove(hash);

@@ -81,7 +81,6 @@ namespace AssetsManager.Views.Models.Hashes
         public bool CanPromote =>
             IsVerified &&
             Confidence == InternalHashConfidence.Verified &&
-            VerificationSchema >= CurrentVerificationSchema &&
             IsPromotableEvidence(Evidence);
         internal static bool IsPromotableEvidence(InternalHashEvidence evidence) =>
             evidence is InternalHashEvidence.ObservedHashPair or
@@ -111,7 +110,7 @@ namespace AssetsManager.Views.Models.Hashes
             _ => "Unknown Domain"
         };
         public string Path => Value;
-        public string StrategyText => $"{Strategy} · {Confidence}";
+        public string StrategyText => Strategy.ToString();
         public string SourceWadPath
         {
             get

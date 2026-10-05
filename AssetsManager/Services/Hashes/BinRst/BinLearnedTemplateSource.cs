@@ -253,7 +253,6 @@ namespace AssetsManager.Services.Hashes
                         }
 
                     var targets = group.Select(p => p).DistinctBy(p => p.Hash).ToList();
-                    matcher.AddGateNoise(candidates.Count * (double)targets.Count / 4294967296.0);
                     foreach (Pending pending in targets)
                     {
                         if (ambiguous.Contains(pending.Hash) || !candidates.TryGetValue(pending.Hash, out string name)) continue;
