@@ -22,6 +22,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering;
 public sealed class GroundAppearanceTests
 {
     [Fact]
+    public void SmallLogoAveragesFineDetailWithoutChangingItsSource() => RunSta(() =>
+    {
+        BitmapSource logo = StripedBitmap();
+        BitmapSource composed = SceneElements.ComposeGroundTexture(SolidBitmap(0, 0, 0), logo, 0.25, 1);
+        for (int x = 950; x < 1100; x += 7)
+            Assert.InRange(Pixel(composed, x, 1024)[0], (byte)72, (byte)98);
+
+        Assert.Equal(new byte[] { 255, 255, 255, 255 }, Pixel(logo, 0, 0));
+        Assert.Equal(new byte[] { 0, 0, 0, 255 }, Pixel(logo, 1, 0));
+    });
+
+    [Fact]
     public void CompositionPreservesLogoOrientationAspectAlphaAndScale() => RunSta(() =>
     {
         BitmapSource ground = SolidBitmap(0, 0, 255);
@@ -106,6 +118,7 @@ public sealed class GroundAppearanceTests
         gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
             TextureTarget.Texture2D, target, 0);
         uint depth = gl.GenRenderbuffer();
+        uint sampler = gl.GenSampler();
         gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, depth);
         gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.DepthComponent24, 32, 32);
         gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
@@ -142,6 +155,22 @@ public sealed class GroundAppearanceTests
             Assert.InRange(color[1], (byte)95, (byte)97);
             Assert.InRange(color[2], (byte)63, (byte)65);
 
+            // A previous material's nearest sampler must not alias fine ground detail.
+            gl.SamplerParameter(sampler, SamplerParameterI.MinFilter, (int)TextureMinFilter.Nearest);
+            gl.SamplerParameter(sampler, SamplerParameterI.MagFilter, (int)TextureMagFilter.Nearest);
+            gl.BindSampler(0, sampler);
+            renderer.SetGroundTexture(StripedBitmap());
+            Draw(true);
+            for (int x = 11; x < 22; x++)
+            {
+                byte[] filtered = new byte[4];
+                gl.ReadPixels(x, 16, 1, 1, GlPixelFormat.Rgba, PixelType.UnsignedByte, filtered.AsSpan());
+                Assert.InRange(filtered[0], (byte)145, (byte)168);
+            }
+            gl.GetInteger(GLEnum.SamplerBinding, out int restoredSampler);
+            Assert.Equal(sampler, (uint)restoredSampler);
+            gl.BindSampler(0, 0);
+
             // A nearer surface must occlude the ground instead of being painted over.
             renderer.SetGroundTexture(SolidBitmap(255, 0, 0));
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
@@ -173,6 +202,8 @@ public sealed class GroundAppearanceTests
         }
         finally
         {
+            gl.BindSampler(0, 0);
+            gl.DeleteSampler(sampler);
             gl.DeleteFramebuffer(framebuffer);
             gl.DeleteRenderbuffer(depth);
             gl.DeleteTexture(target);
@@ -181,6 +212,21 @@ public sealed class GroundAppearanceTests
 
     private static BitmapSource SolidBitmap(byte red, byte green, byte blue) =>
         BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[] { blue, green, red, 255 }, 4);
+
+    private static BitmapSource StripedBitmap()
+    {
+        const int size = 513;
+        byte[] pixels = new byte[size * size * 4];
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            int offset = (y * size + x) * 4;
+            byte color = x % 3 == 0 ? (byte)255 : (byte)0;
+            pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = color;
+            pixels[offset + 3] = 255;
+        }
+        return BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
+    }
 
     private static byte[] Pixel(BitmapSource bitmap, int x, int y)
     {

@@ -207,6 +207,7 @@ void main() {
             _gl.GetInteger(GLEnum.ActiveTexture, out int previousActiveTexture);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.GetInteger(GLEnum.TextureBinding2D, out int previousTexture0);
+            _gl.GetInteger(GLEnum.SamplerBinding, out int previousSampler0);
             _gl.GetInteger(GLEnum.DepthWritemask, out int previousDepthWrite);
             _gl.GetInteger(GLEnum.DepthFunc, out int previousDepthFunction);
             bool depthTest = _gl.IsEnabled(EnableCap.DepthTest);
@@ -226,6 +227,8 @@ void main() {
                 _gl.Uniform1(_groundTextured, _groundTexture != 0 ? 1 : 0);
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 _gl.BindTexture(TextureTarget.Texture2D, _groundTexture);
+                // Scene samplers must not override the ground's filtering or wrapping.
+                _gl.BindSampler(0, 0);
                 _gl.BindVertexArray(_groundVao);
                 _gl.DrawArrays(PrimitiveType.TriangleFan, 0, 4);
             }
@@ -238,6 +241,7 @@ void main() {
                 if (cullFace) _gl.Enable(EnableCap.CullFace); else _gl.Disable(EnableCap.CullFace);
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 _gl.BindTexture(TextureTarget.Texture2D, (uint)previousTexture0);
+                _gl.BindSampler(0, (uint)previousSampler0);
                 _gl.ActiveTexture((TextureUnit)previousActiveTexture);
                 _gl.BindBuffer(BufferTargetARB.ArrayBuffer, (uint)previousArrayBuffer);
                 _gl.BindVertexArray((uint)previousVao);
@@ -365,7 +369,8 @@ void main() {
                     Silk.NET.OpenGL.PixelFormat.Bgra,
                     PixelType.UnsignedByte,
                     new ReadOnlySpan<byte>(pixels));
-                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+                _gl.GenerateMipmap(TextureTarget.Texture2D);
+                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
                 _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
                 _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
                 _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);

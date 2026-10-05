@@ -116,6 +116,11 @@ namespace AssetsManager.Views.Helpers
             double aspect = (double)logo.PixelWidth / logo.PixelHeight;
             double logoWidth = width * maxSize * Math.Min(1.0, aspect);
             double logoHeight = height * maxSize / Math.Max(1.0, aspect);
+            int logoPixelWidth = Math.Max(1, (int)Math.Round(logoWidth));
+            int logoPixelHeight = Math.Max(1, (int)Math.Round(logoHeight));
+            // RenderTargetBitmap does not reliably prefilter minified DrawImage content.
+            if (logoPixelWidth < logo.PixelWidth || logoPixelHeight < logo.PixelHeight)
+                logo = TextureUtils.ResizeBitmapSource(logo, logoPixelWidth, logoPixelHeight);
             var visual = new DrawingVisual();
             using (DrawingContext drawing = visual.RenderOpen())
             {
