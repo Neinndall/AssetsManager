@@ -2146,7 +2146,7 @@
                                             <ItemsControl ItemsSource="{Binding CharacterGameStates}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <CheckBox Content="{Binding Name}" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
+                                                        <CheckBox Content="{Binding DisplayName}" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
                                                                   IsChecked="{Binding IsEnabled, Mode=TwoWay}"/>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>

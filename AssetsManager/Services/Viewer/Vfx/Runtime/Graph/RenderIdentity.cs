@@ -89,7 +89,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     VfxSystemDefinition childDefinition = ResolveSystem(
                         child,
                         _systems,
-                        definition.ResourceMap ?? _resourceMap);
+                        definition.ResourceMap,
+                        _resourceMap);
                     if (childDefinition is null) continue;
 
                     string emitterPath = string.IsNullOrEmpty(path)

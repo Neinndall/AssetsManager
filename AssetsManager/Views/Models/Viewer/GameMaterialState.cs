@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Views.Models.Viewer
@@ -29,6 +30,15 @@ namespace AssetsManager.Views.Models.Viewer
 
         internal bool IsPlaying(uint animationHash) => Animations != null && Animations.Contains(animationHash);
 
+        internal static string SpellBuffKey(uint spellHash) => $"spell:{spellHash:x8}";
+
+        internal static bool TrySpellBuffHash(string key, out uint hash)
+        {
+            hash = 0;
+            return key?.StartsWith("spell:", StringComparison.OrdinalIgnoreCase) == true &&
+                   uint.TryParse(key.AsSpan(6), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out hash);
+        }
+
         /// <summary>The hash animation conditions name a clip by: its name, or the hex hash an unresolved name keeps.</summary>
         internal static uint AnimationHash(string clipName) =>
             clipName?.Length == 8 && uint.TryParse(clipName, System.Globalization.NumberStyles.HexNumber, null, out uint hash)
@@ -43,15 +53,30 @@ namespace AssetsManager.Views.Models.Viewer
         /// The state a preview character is in with <paramref name="buffs"/> on while <paramref name="clip"/> and its
         /// parallel clips play; null at rest.
         /// </returns>
-        internal static GameMaterialState Preview(IEnumerable<string> buffs, AnimationClipCatalogItem clip)
+        internal static GameMaterialState Preview(IEnumerable<string> buffs, AnimationClipCatalogItem clip,
+            IReadOnlyDictionary<uint, VfxSpellPreview> spells = null)
         {
             var animations = new HashSet<uint>();
             if (clip != null && !clip.IsBindPose)
             {
                 animations.Add(AnimationHash(clip.Name));
+                if (clip.Clip?.OwnerPathHash > 0)
+                    animations.Add(clip.Clip.OwnerPathHash);
                 animations.UnionWith(clip.Clip?.ChildClipHashes ?? Array.Empty<uint>());
             }
             var enabled = new HashSet<string>(buffs ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+            // A clip preview has no gameplay scripts. Use the spell's authored cast-clip link
+            // to supply its spell-keyed material state without changing the actor's manual toggles.
+            if (spells != null)
+            {
+                foreach (var spell in spells)
+                {
+                    bool cast = !string.IsNullOrWhiteSpace(spell.Value?.AnimationName) &&
+                                animations.Contains(AnimationHash(spell.Value.AnimationName));
+                    if (cast || (!string.IsNullOrWhiteSpace(spell.Value?.ScriptName) && enabled.Contains(spell.Value.ScriptName)))
+                        enabled.Add(SpellBuffKey(spell.Key));
+                }
+            }
             return enabled.Count == 0 && animations.Count == 0 ? null : new GameMaterialState(0, enabled, animations);
         }
     }

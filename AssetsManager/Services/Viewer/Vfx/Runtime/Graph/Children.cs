@@ -190,7 +190,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             VfxSystemDefinition definition = ResolveSystem(
                 child,
                 _systems,
-                parentRuntime.Definition.ResourceMap ?? _resourceMap);
+                parentRuntime.Definition.ResourceMap,
+                _resourceMap);
             if (definition is null) return;
 
             int particleCapacity = ChildCapacityOf(definition);
@@ -385,14 +386,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         internal static VfxSystemDefinition ResolveSystem(
             VfxChildSystemReference reference,
             IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
-            IReadOnlyDictionary<uint, uint> resourceMap)
+            IReadOnlyDictionary<uint, uint> resourceMap,
+            IReadOnlyDictionary<uint, uint> inheritedResourceMap = null)
         {
             if (reference is null) return null;
             if (reference.SystemHash != 0 && systems.TryGetValue(reference.SystemHash, out VfxSystemDefinition definition))
                 return definition;
             if (reference.EffectKey != 0)
             {
-                if (resourceMap.TryGetValue(reference.EffectKey, out uint mappedHash))
+                uint mappedHash = 0;
+                bool resolverHit = resourceMap?.TryGetValue(reference.EffectKey, out mappedHash) == true;
+                // Shared particle BINs can omit skin-specific child keys. An authored local
+                // entry still wins, including an explicit null or unavailable target.
+                if (!resolverHit)
+                    resolverHit = inheritedResourceMap?.TryGetValue(reference.EffectKey, out mappedHash) == true;
+                if (resolverHit)
                 {
                     // An effect key only names a child through its ResourceResolver scope.
                     // A resolver hit is authoritative even when it maps to null or to an unavailable object.

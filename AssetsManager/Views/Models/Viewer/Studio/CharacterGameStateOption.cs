@@ -9,14 +9,16 @@ namespace AssetsManager.Views.Models.Viewer
         private readonly Action _changed;
         private bool _isEnabled;
 
-        internal CharacterGameStateOption(string name, bool enabled, Action changed)
+        internal CharacterGameStateOption(string name, bool enabled, Action changed, string displayName = null)
         {
             Name = name;
+            DisplayName = displayName ?? name;
             _isEnabled = enabled;
             _changed = changed;
         }
 
         public string Name { get; }
+        public string DisplayName { get; }
 
         public bool IsEnabled
         {

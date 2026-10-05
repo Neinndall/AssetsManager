@@ -240,8 +240,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             {
                 // A buff the preview turns on counts as fully stacked (Irelia's passive: stepValue remaps 0..3 stacks to
                 // -3..0); drivers remap or compare the count, so an ample one reaches their maximum.
-                var buff = new GameMaterialBoolCondition(GameMaterialBoolKind.Buff,
-                    Name: fields.TryGetValue(Hash("mScriptName"), out var script) && script is BinTreeString name ? name.Value : null);
+                var buff = new GameMaterialBoolCondition(GameMaterialBoolKind.Buff, Name: ReadBuffKey(driver));
                 conditions.Add(buff);
                 return state => new Vector4(buff.Evaluate(state) == true ? FullStacks : 0f);
             }
@@ -406,8 +405,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return new(GameMaterialBoolKind.Gear, gear);
             }
             if (driver.ClassHash == Hash("HasBuffDynamicMaterialBoolDriver"))
-                return new(GameMaterialBoolKind.Buff,
-                    Name: driver.Properties.TryGetValue(Hash("mScriptName"), out var script) && script is BinTreeString name ? name.Value : null);
+                return new(GameMaterialBoolKind.Buff, Name: ReadBuffKey(driver));
             if (driver.ClassHash == Hash("IsDeadDynamicMaterialBoolDriver"))
                 return new(GameMaterialBoolKind.Dead);
             if (driver.ClassHash == Hash("IsAnimationPlayingDynamicMaterialBoolDriver"))
@@ -462,6 +460,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 driver.Properties.TryGetValue(Hash("mDriver"), out var inner))
                 return new(GameMaterialBoolKind.Not, Children: new[] { ReadCondition(inner, depth + 1) });
             return new(GameMaterialBoolKind.Unsupported);
+        }
+
+        private static string ReadBuffKey(BinTreeStruct driver)
+        {
+            if (driver.Properties.TryGetValue(Hash("Spell"), out var spell) && spell is BinTreeHash { Value: > 0 } hash)
+                return GameMaterialState.SpellBuffKey(hash.Value);
+
+            return driver.Properties.TryGetValue(Hash("mScriptName"), out var script) && script is BinTreeString name
+                ? name.Value : null;
         }
     }
 }

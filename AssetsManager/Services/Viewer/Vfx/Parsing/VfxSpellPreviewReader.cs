@@ -33,13 +33,16 @@ internal static class VfxSpellPreviewReader
     {
         if (spellObject == null) return null;
         var issues = new List<VfxSpellIssue>();
+        string scriptName = spellObject.Properties.TryGetValue(Fnv1a.HashLower("mScriptName"), out var script) &&
+                            script is BinTreeString scriptText ? scriptText.Value : null;
         if (!TryExpectedStruct(spellObject.Properties, "mSpell", "mSpell", SpellDataResourceClass, issues, out BinTreeStruct spell))
         {
             return new VfxSpellPreview(
                 null, null, null, 0u, null, null, null, null, 0u, null, issues)
             {
                 HasSpellData = false,
-                HasBuffData = TryProperty(spellObject.Properties, "mBuff", out _)
+                HasBuffData = TryProperty(spellObject.Properties, "mBuff", out _),
+                ScriptName = scriptName
             };
         }
 
@@ -94,7 +97,7 @@ internal static class VfxSpellPreviewReader
             missile,
             missileEffectKey,
             missileEffectName,
-            issues);
+            issues) { ScriptName = scriptName };
     }
 
     internal static VfxSpellAvailability AvailabilityOf(VfxSpellPreview preview, bool includeImpact = true)

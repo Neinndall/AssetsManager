@@ -46,11 +46,13 @@ namespace AssetsManager.Views.Models.Viewer
         public bool HasCharacterGameStates => CharacterGameStates.Count > 0;
 
         /// <summary>Offers <paramref name="buffs"/> as toggles, on when <paramref name="enabled"/> holds them.</summary>
-        internal void SetCharacterGameStates(IEnumerable<string> buffs, IReadOnlySet<string> enabled, Action changed)
+        internal void SetCharacterGameStates(IEnumerable<string> buffs, IReadOnlySet<string> enabled, Action changed,
+            Func<string, string> displayName = null)
         {
             CharacterGameStates.Clear();
             foreach (string buff in buffs ?? Array.Empty<string>())
-                CharacterGameStates.Add(new CharacterGameStateOption(buff, enabled?.Contains(buff) == true, changed));
+                CharacterGameStates.Add(new CharacterGameStateOption(buff, enabled?.Contains(buff) == true, changed,
+                    displayName?.Invoke(buff)));
             OnPropertyChanged(nameof(HasCharacterGameStates));
         }
 

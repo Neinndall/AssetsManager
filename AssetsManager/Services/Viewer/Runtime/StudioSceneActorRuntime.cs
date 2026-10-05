@@ -330,7 +330,7 @@ namespace AssetsManager.Services.Viewer.Runtime
 
         private void ConfigureClipCues(AnimationClipCatalogItem clip)
         {
-            Model.GameState = GameMaterialState.Preview(_gameStates, clip);
+            Model.GameState = GameMaterialState.Preview(_gameStates, clip, PlaybackBundle.SpellPreviews);
             _formHiddenSubmeshes = null;
             _visibilityTimeline = clip == null
                 ? Array.Empty<VfxClipCueEvaluator.VisibilityEntry>()

@@ -490,6 +490,8 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - 3D Studio / Restored missing child particle effects from shared skin files.
+  - 3D Studio / Spell clips now apply material changes linked to their spells.
   - 3D Studio / Game State now starts collapsed and closes with Collapse All.
   - VFX Studio / Recognized form names on older body materials, removing the duplicate Base entry on Kayn Skin0.
   - VFX Studio / Shaders now load unnamed material textures from WAD files, restoring dark wings and fabrics on Janna Skin67.

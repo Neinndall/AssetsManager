@@ -26,7 +26,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     .Concat(material.TextureSwaps.SelectMany(swap => swap.Options.SelectMany(option => option.Condition.Buffs()))))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(buff => buff, StringComparer.OrdinalIgnoreCase);
-            _model.SetCharacterGameStates(buffs, FocusedActor?.EnabledGameStates, OnCharacterGameStateChanged);
+            _model.SetCharacterGameStates(buffs, FocusedActor?.EnabledGameStates, OnCharacterGameStateChanged,
+                CharacterGameStateLabel);
             UpdateChampionGameState();
         }
 
@@ -55,11 +56,23 @@ namespace AssetsManager.Views.Controls.Viewer
         private IEnumerable<string> EnabledCharacterGameStates() =>
             _model.CharacterGameStates.Where(option => option.IsEnabled).Select(option => option.Name);
 
+        private string CharacterGameStateLabel(string key)
+        {
+            if (!GameMaterialState.TrySpellBuffHash(key, out uint hash)) return key;
+            if (_activeBundle?.SpellPreviews.TryGetValue(hash, out var spell) == true &&
+                !string.IsNullOrWhiteSpace(spell.ScriptName)) return spell.ScriptName;
+
+            string path = VfxLoadingService?.ResolveBinEntryPath(hash);
+            return !string.IsNullOrWhiteSpace(path) && !path.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? path.Split('/').Last() : $"{hash:x8}";
+        }
+
         private void UpdateChampionGameState()
         {
             if (_championModel == null)
                 return;
-            _championModel.GameState = GameMaterialState.Preview(EnabledCharacterGameStates(), _playingAnimationClip);
+            _championModel.GameState = GameMaterialState.Preview(EnabledCharacterGameStates(), _playingAnimationClip,
+                _activeBundle?.SpellPreviews);
             // A paused or bind-pose preview draws on demand; the new state needs its own frame.
             OpenTkControl?.InvalidateVisual();
         }

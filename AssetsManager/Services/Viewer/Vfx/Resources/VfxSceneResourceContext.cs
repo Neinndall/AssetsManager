@@ -159,7 +159,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 if (system == null || !reachable.TryAdd(system.PathHash, system))
                     continue;
 
-                IReadOnlyDictionary<uint, uint> resolver = system.ResourceMap ?? resourceMap;
                 foreach (VfxEmitterDefinition emitter in system.Emitters ?? Array.Empty<VfxEmitterDefinition>())
                 {
                     foreach (VfxChildSystemReference child in emitter?.ChildParticleSet?.Children ?? Array.Empty<VfxChildSystemReference>())
@@ -167,10 +166,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                         if (child == null)
                             continue;
 
-                        uint childHash = child.SystemHash;
-                        if (childHash == 0 && child.EffectKey != 0)
-                            resolver.TryGetValue(child.EffectKey, out childHash);
-                        if (childHash != 0 && systems.TryGetValue(childHash, out VfxSystemDefinition childSystem))
+                        VfxSystemDefinition childSystem = VfxPlaybackGraphRuntime.ResolveSystem(
+                            child, systems, system.ResourceMap, resourceMap);
+                        if (childSystem != null)
                             pending.Enqueue(childSystem);
                     }
                 }

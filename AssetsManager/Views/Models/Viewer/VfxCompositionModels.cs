@@ -273,6 +273,7 @@ namespace AssetsManager.Views.Models.Viewer
     {
         public bool HasSpellData { get; init; } = true;
         public bool HasBuffData { get; init; }
+        internal string ScriptName { get; init; }
         public bool HasInvalidIssues => Issues?.Any(issue => issue.Kind == VfxSpellIssueKind.Invalid) == true;
         public bool HasInvalidHitEffectFields => Issues?.Any(issue =>
             issue.Kind == VfxSpellIssueKind.Invalid &&

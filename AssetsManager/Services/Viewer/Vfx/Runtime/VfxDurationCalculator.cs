@@ -129,7 +129,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         VfxSystemDefinition childSystem = VfxPlaybackGraphRuntime.ResolveSystem(
                             child,
                             systems,
-                            system.ResourceMap ?? resourceMap);
+                            system.ResourceMap,
+                            resourceMap);
                         if (childSystem is null) continue;
                         childDuration = Math.Max(
                             childDuration,

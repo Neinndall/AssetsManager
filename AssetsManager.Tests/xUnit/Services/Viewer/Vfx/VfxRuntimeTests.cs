@@ -1261,6 +1261,53 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new Dictionary<uint, uint>()));
         }
 
+        [Theory]
+        [InlineData(null, 2u)]
+        [InlineData(3u, 3u)]
+        [InlineData(0u, 0u)]
+        [InlineData(999u, 0u)]
+        public void ChildResolutionInheritsSkinKeysOnlyWhenTheDocumentOmitsThem(uint? localHash, uint expectedHash)
+        {
+            const uint effectKey = 77;
+            var localResolver = new Dictionary<uint, uint> { [88] = 0 };
+            if (localHash.HasValue) localResolver[effectKey] = localHash.Value;
+            var skinResolver = new Dictionary<uint, uint> { [effectKey] = 2 };
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference(string.Empty, 0, effectKey) }, false,
+                    VfxCurveF.Zero, VfxCurve3.Const(Vector3.Zero), 0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter }, ResourceMap: localResolver);
+            var systems = new Dictionary<uint, VfxSystemDefinition> { [1] = parent };
+            foreach (uint hash in new[] { 2u, 3u })
+                systems[hash] = new VfxSystemDefinition(hash, $"child-{hash}", $"child-{hash}",
+                    new[] { CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+                    {
+                        ParticleLifetime = VfxCurveF.Const(hash)
+                    } }, ResourceMap: new Dictionary<uint, uint>());
+            var graph = new VfxPlaybackGraphRuntime(parent, Matrix4x4.Identity, 7, systems, skinResolver,
+                (definition, transform, seed) =>
+                {
+                    var runtime = new VfxPlaybackRuntime(seed);
+                    runtime.SetSystem(definition, transform);
+                    return runtime;
+                });
+
+            graph.Update(0.02f);
+
+            if (expectedHash == 0)
+                Assert.Single(graph.Runtimes);
+            else
+            {
+                Assert.Equal(2, graph.Runtimes.Count);
+                Assert.Same(systems[expectedHash], graph.Runtimes[1].Definition);
+            }
+            Assert.Equal(Math.Max(1u, expectedHash), VfxDurationCalculator.Calculate(parent, systems, skinResolver));
+            var reachable = VfxSceneResourceContext.ReachableSystems(systems, skinResolver, new[] { parent });
+            Assert.Equal(expectedHash == 0 ? new[] { 1u } : new[] { 1u, expectedHash }, reachable.Keys.OrderBy(hash => hash));
+        }
+
         [Fact]
         public void ChildPoolCapacityMatchesLtkPeakDemandBuckets()
         {
