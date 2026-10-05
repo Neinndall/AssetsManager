@@ -244,7 +244,8 @@ internal sealed class VfxClipCatalog : IDisposable
                             at,
                             until,
                             visibility.ShowSubmeshHashes,
-                            visibility.HideSubmeshHashes));
+                            visibility.HideSubmeshHashes,
+                            tick));
                         break;
                     case AnimationJointSnapEventDefinition snap:
                         timedCues.Add(new AnimationJointSnapCue(

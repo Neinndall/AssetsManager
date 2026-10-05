@@ -59,7 +59,8 @@ namespace AssetsManager.Views.Models.Viewer
         double AtSeconds,
         double? UntilSeconds,
         IReadOnlyList<uint> ShowSubmeshHashes,
-        IReadOnlyList<uint> HideSubmeshHashes)
+        IReadOnlyList<uint> HideSubmeshHashes,
+        double FrameDurationSeconds = 0d)
         : AnimationClipTimedCue(AtSeconds, UntilSeconds);
 
     public sealed record AnimationJointSnapCue(

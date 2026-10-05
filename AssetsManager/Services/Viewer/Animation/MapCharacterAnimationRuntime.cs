@@ -331,7 +331,8 @@ namespace AssetsManager.Services.Viewer.Animation
                                 at,
                                 until,
                                 visibility.ShowSubmeshHashes,
-                                visibility.HideSubmeshHashes));
+                                visibility.HideSubmeshHashes,
+                                tick));
                             break;
                         case AnimationJointSnapEventDefinition snap:
                             cues.Add(new AnimationJointSnapCue(

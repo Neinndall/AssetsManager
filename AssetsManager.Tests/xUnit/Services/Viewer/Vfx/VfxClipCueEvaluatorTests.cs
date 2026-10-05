@@ -2,12 +2,109 @@
 using System.Collections.Generic;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Hashing;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx;
 
 public class VfxClipCueEvaluatorTests
 {
+    [Theory]
+    [InlineData(0.5, 0.5333333611488342, "Wing", "R_Wing")]
+    [InlineData(6.133333683013916, 6.1666669845581055, "Wing", "R_Wing")]
+    [InlineData(1.0, 1.02, "Sword", "Empowered_Sword")]
+    [InlineData(1.0, 1.02, "Empowered_Sword", "Sword")]
+    public void PreviewReplacesTheWholeGroupWithoutAnEmptyFrame(double start, double replacement, string first, string second)
+    {
+        uint outgoing = Fnv1a.HashLower(first), incoming = Fnv1a.HashLower(second);
+        uint cloak = Fnv1a.HashLower("Cloak");
+        AnimationClipTimedCue[] cues =
+        {
+            new AnimationSubmeshVisibilityCue(start, 8d, Array.Empty<uint>(), new[] { outgoing, cloak }, 1d / 30d),
+            new AnimationSubmeshVisibilityCue(replacement, 7d, new[] { incoming }, Array.Empty<uint>(), 1d / 30d)
+        };
+        var timeline = VfxClipCueEvaluator.BuildVisibilityTimeline(cues, new[] { incoming }, new[] { first, second, "Cloak" });
+        double middle = (start + replacement) / 2d;
+        foreach (double time in new[] { replacement, middle, start - 0.01d, middle, replacement })
+        {
+            var hidden = VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, time);
+            Assert.Equal(time >= replacement, hidden.Contains(outgoing));
+            Assert.Equal(time >= replacement, hidden.Contains(cloak));
+            Assert.Equal(time < replacement, hidden.Contains(incoming));
+        }
+        Assert.Contains(incoming, VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, 7.1d));
+        Assert.DoesNotContain(outgoing, VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, 8.1d));
+        Assert.DoesNotContain(outgoing, VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, VfxClipCueEvaluator.FoldedTime(9d, 9d)));
+        Assert.Equal(start, cues[0].AtSeconds);
+    }
+
+    [Theory]
+    [InlineData("Other", 1.02, 1d / 30d)]
+    [InlineData("R_Wing", 1.1, 1d / 30d)]
+    [InlineData("R_Wing", 1.02, 0d)]
+    public void UnrelatedLongOrUntimedChangesKeepTheirAuthoredTimes(string second, double replacement, double frame)
+    {
+        uint outgoing = Fnv1a.HashLower("Wing"), incoming = Fnv1a.HashLower(second);
+        AnimationClipTimedCue[] cues =
+        {
+            new AnimationSubmeshVisibilityCue(1d, null, Array.Empty<uint>(), new[] { outgoing }, frame),
+            new AnimationSubmeshVisibilityCue(replacement, null, new[] { incoming }, Array.Empty<uint>(), frame)
+        };
+        var timeline = VfxClipCueEvaluator.BuildVisibilityTimeline(cues, new[] { incoming }, new[] { "Wing", second });
+        Assert.Contains(outgoing, VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, 1.01d));
+    }
+
+    [Fact]
+    public void ExplicitAuthoredModeAndAmbiguousVariantsKeepTheGap()
+    {
+        uint wing = Fnv1a.HashLower("Wing"), first = Fnv1a.HashLower("R_Wing"), second = Fnv1a.HashLower("Other_Wing");
+        AnimationClipTimedCue[] cues =
+        {
+            new AnimationSubmeshVisibilityCue(1d, null, Array.Empty<uint>(), new[] { wing }, 1d / 30d),
+            new AnimationSubmeshVisibilityCue(1.02d, null, new[] { first, second }, Array.Empty<uint>(), 1d / 30d)
+        };
+        var raw = VfxClipCueEvaluator.BuildVisibilityTimeline(cues, new[] { first, second });
+        var ambiguous = VfxClipCueEvaluator.BuildVisibilityTimeline(cues, new[] { first, second }, new[] { "Wing", "R_Wing", "Other_Wing" });
+        Assert.Contains(wing, VfxClipCueEvaluator.HiddenSubmeshesAt(raw, 1.01d));
+        Assert.Contains(wing, VfxClipCueEvaluator.HiddenSubmeshesAt(ambiguous, 1.01d));
+    }
+
+    [Fact]
+    public void UnsortedCuesCannotDelayTheIncomingEntryAgainAndReopenTheGap()
+    {
+        uint wing = Fnv1a.HashLower("Wing"), replacement = Fnv1a.HashLower("R_Wing");
+        uint sword = Fnv1a.HashLower("Sword"), nextSword = Fnv1a.HashLower("Empowered_Sword");
+        AnimationClipTimedCue[] cues =
+        {
+            new AnimationSubmeshVisibilityCue(1.02d, null, new[] { replacement }, new[] { sword }, 1d / 30d),
+            new AnimationSubmeshVisibilityCue(1.04d, null, new[] { nextSword }, Array.Empty<uint>(), 1d / 30d),
+            new AnimationSubmeshVisibilityCue(1d, null, Array.Empty<uint>(), new[] { wing }, 1d / 30d)
+        };
+        var timeline = VfxClipCueEvaluator.BuildVisibilityTimeline(cues, new[] { replacement, nextSword },
+            new[] { "Wing", "R_Wing", "Sword", "Empowered_Sword" });
+        var middle = VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, 1.01d);
+        Assert.DoesNotContain(wing, middle);
+        Assert.DoesNotContain(sword, middle);
+        var next = VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, 1.03d);
+        Assert.Contains(wing, next);
+        Assert.DoesNotContain(replacement, next);
+        Assert.Contains(sword, next);
+    }
+
+    [Fact]
+    public void AShortVisibilityPulseIsNotExtendedIntoItsReplacement()
+    {
+        uint wing = Fnv1a.HashLower("Wing"), replacement = Fnv1a.HashLower("R_Wing");
+        AnimationClipTimedCue[] cues =
+        {
+            new AnimationSubmeshVisibilityCue(1d, 1.01d, Array.Empty<uint>(), new[] { wing }, 1d / 30d),
+            new AnimationSubmeshVisibilityCue(1.02d, null, new[] { replacement }, Array.Empty<uint>(), 1d / 30d)
+        };
+        var timeline = VfxClipCueEvaluator.BuildVisibilityTimeline(cues, new[] { replacement }, new[] { "Wing", "R_Wing" });
+        Assert.Contains(wing, VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, 1.005d));
+        Assert.DoesNotContain(wing, VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, 1.015d));
+    }
+
     [Fact]
     public void VisibilityCueAppliesAtStartAndRestoresAtEnd()
     {
