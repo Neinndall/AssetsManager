@@ -25,7 +25,12 @@ namespace AssetsManager.Views
         private readonly ChromaLoadingService _chromaLoadingService;
         private readonly VfxLoadingService _vfxLoadingService;
         private readonly CustomMessageBoxService _customMessageBoxService;
-        private ViewerProjectControl _projectControl;
+        private Grid _projectView;
+        private ViewerViewportControl _viewportControl;
+        private ViewerPanelControl _panelControl;
+        private ViewerProjectExplorerControl _projectExplorer;
+        private RowDefinition _projectExplorerRow;
+        private double _lastExplorerHeight = 220;
         private StudioControl _studioControl;
         private bool _isCleanedUp;
 
@@ -57,7 +62,14 @@ namespace AssetsManager.Views
 
         private void OnViewModelPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (_isCleanedUp || e.PropertyName != nameof(ViewerWindowModel.IsStudioVisible)) return;
+            if (_isCleanedUp) return;
+
+            if (e.PropertyName == nameof(ViewerWindowModel.IsProjectExplorerVisible))
+            {
+                UpdateProjectExplorerRowHeight();
+                return;
+            }
+            if (e.PropertyName != nameof(ViewerWindowModel.IsStudioVisible)) return;
 
             if (_viewModel.IsStudioVisible)
             {
@@ -104,13 +116,103 @@ namespace AssetsManager.Views
         {
             if (_isCleanedUp) return;
 
-            if (_projectControl == null)
+            if (_projectView == null)
+                CreateProjectView();
+
+            _projectExplorer.LoadProjectFolder(folderPath);
+            _viewModel.IsProjectExplorerVisible = true;
+            _panelControl.ViewModel.ShowMainContent();
+        }
+
+        private void CreateProjectView()
+        {
+            // Keep the template unmaterialized until the user accepts a project folder.
+            _projectView = (Grid)((DataTemplate)Resources["ProjectViewTemplate"]).LoadContent();
+            _viewportControl = (ViewerViewportControl)_projectView.FindName("ViewportControl");
+            _panelControl = (ViewerPanelControl)_projectView.FindName("PanelControl");
+            _projectExplorer = (ViewerProjectExplorerControl)_projectView.FindName("ProjectExplorer");
+            _projectExplorerRow = (RowDefinition)_projectView.FindName("ProjectExplorerRow");
+
+            _viewportControl.LogService = _logService;
+            _viewportControl.AppSettings = _appSettings;
+            _panelControl.SknLoadingService = _sknLoadingService;
+            _panelControl.LogService = _logService;
+            _panelControl.CustomMessageBoxService = _customMessageBoxService;
+            _panelControl.TaskCancellationManager = _taskCancellationManager;
+            _panelControl.WindowViewModel = _viewModel;
+            _panelControl.Viewport = _viewportControl;
+            _panelControl.ViewModel.ViewportViewModel = _viewportControl.ViewModel;
+            _viewportControl.Panel = _panelControl;
+            _panelControl.ProjectExplorer = _projectExplorer;
+
+            _projectExplorer.ModelSelected += ProjectExplorer_ModelSelected;
+            _projectExplorer.AnimationsSelected += (_, paths) => _panelControl.LoadAnimationsDirectly(paths);
+            _projectExplorer.CloseRequested += (_, _) => _viewModel.IsProjectExplorerVisible = false;
+            _projectView.DataContext = _panelControl.ViewModel;
+            ProjectHost.Content = _projectView;
+            UpdateProjectExplorerRowHeight();
+        }
+
+        private async void ProjectExplorer_ModelSelected(object sender, string filePath)
+        {
+            var extension = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
+            bool isImage = SupportedFileTypes.IsImage(filePath);
+            if (!isImage)
             {
-                _projectControl = new ViewerProjectControl(_viewModel, _logService,
-                    _taskCancellationManager, _appSettings, _sknLoadingService, _customMessageBoxService);
-                ProjectHost.Content = _projectControl;
+                _projectExplorer.ClearImagePreview();
             }
-            _projectControl.OpenProject(folderPath);
+
+            if (extension == ".skl")
+            {
+                _panelControl.LoadSkeleton(filePath);
+            }
+            else if (isImage)
+            {
+                ShowProjectImagePreview(filePath);
+            }
+            else if (extension == ".anm")
+            {
+                _panelControl.LoadAnimationDirectly(filePath);
+            }
+            else
+            {
+                _panelControl.ViewModel.ShowMainContent();
+                await _panelControl.LoadInitialModel(filePath);
+            }
+        }
+
+        private void ShowProjectImagePreview(string filePath)
+        {
+            try
+            {
+                _projectExplorer.ShowImagePreview(filePath, TextureUtils.LoadTextureFromFile(filePath));
+            }
+            catch (Exception ex)
+            {
+                _projectExplorer.ClearImagePreview();
+                _logService.LogError(ex, $"[IMAGE PREVIEW] Failed to load preview image: {filePath}");
+            }
+        }
+
+        private void UpdateProjectExplorerRowHeight()
+        {
+            if (_projectExplorerRow == null) return;
+
+            if (_viewModel.IsProjectExplorerVisible)
+            {
+                _projectExplorerRow.MinHeight = 120;
+                _projectExplorerRow.Height = new GridLength(_lastExplorerHeight > 0 ? _lastExplorerHeight : 220);
+            }
+            else
+            {
+                // Save current height if it's set and greater than 0
+                if (_projectExplorerRow.Height.IsAbsolute && _projectExplorerRow.Height.Value > 0)
+                {
+                    _lastExplorerHeight = _projectExplorerRow.Height.Value;
+                }
+                _projectExplorerRow.MinHeight = 0;
+                _projectExplorerRow.Height = new GridLength(0);
+            }
         }
 
         public void CleanupResources()
@@ -122,10 +224,14 @@ namespace AssetsManager.Views
             _viewModel.IsStudioVisible = false;
             if (_studioControl != null)
                 _studioControl.ExitRequested -= OnStudioExitRequested;
+            if (_projectExplorer != null)
+                _projectExplorer.ModelSelected -= ProjectExplorer_ModelSelected;
 
             // A failed teardown must not prevent the other route or the shared loader from being released.
             RunCleanupStep(nameof(StudioControl), () => _studioControl?.Cleanup());
-            RunCleanupStep(nameof(ViewerProjectControl), () => _projectControl?.Cleanup());
+            RunCleanupStep(nameof(ViewerProjectExplorerControl), () => _projectExplorer?.ClearWorkspace());
+            RunCleanupStep(nameof(ViewerViewportControl), () => _viewportControl?.Cleanup());
+            RunCleanupStep(nameof(ViewerPanelControl), () => _panelControl?.Cleanup());
             RunCleanupStep(nameof(VfxLoadingService), () => _vfxLoadingService.Dispose());
         }
 

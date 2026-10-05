@@ -6,7 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
-  - Viewer / The start menu now loads only the selected viewer, keeping hidden viewports paused until needed.
+  - Viewer / The start menu initializes only the selected viewer and pauses hidden viewports.
   - 3D Studio / Added scene synchronization controls for submesh visibility, textures, compatible animation loading and playback in the Inspector.
   - VFX Studio / Added Take 4K Snapshot to save the current viewport as a high-resolution PNG.
   - VFX Studio / Ground now uses the same custom logo, size and opacity settings as Load Project and Chroma Library, with live updates.
