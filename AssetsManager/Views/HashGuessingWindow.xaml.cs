@@ -300,6 +300,9 @@ namespace AssetsManager.Views
             };
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-reverse-suffix", Name = "SuffixFoldingEngine", Description = "Reverse-fold 45+ class/field suffixes in state space (O(Words))", BadgeText = "🚀 FAST", BadgeBrush = accentGreen });
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-family-lattice", Name = "BaseClassFamilyLattice", Description = "Inherit sibling suffixes & vocabulary from base classes", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-container-def", Name = "ContainerElementSynthesizer", Description = "Synthesize [Class][PropertySingular]Definition/Data from list containers", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-dual-stem", Name = "DualStemAffixCracker", Description = "Crack shared stems for interface & field pairs under 64-bit joint constraints", BadgeText = "🚀 FAST", BadgeBrush = accentPurple });
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-bracket-audit", Name = "RegistrationBracketAudit", Description = "Audit candidate types against client RTTI reflection brackets and eliminate false collisions", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-crossdomain", Name = "CrossDomainDictionary", Description = "Known types as fields, known fields as types, 3D bones", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
             _allMethods.Add(binSchema);
 

@@ -611,10 +611,10 @@ namespace AssetsManager.Services.Hashes
                     MatchObjectPathFromEntry(pair.Key, item);
 
                 foreach (BinTreeProperty property in item.Properties.Values)
-                    Visit(property);
+                    Visit(property, item.ClassHash);
             }
             foreach (var item in tree.DataOverrides)
-                Visit(item.Property);
+                Visit(item.Property, 0);
 
             MatchCollectedItemHashes();
 
@@ -1283,23 +1283,102 @@ namespace AssetsManager.Services.Hashes
             }
             void MatchAnyEntry(string value) => matcher.CheckContextualCandidate(InternalHashKind.BinEntries, value, path, wadPath, localTargets: localTargets);
 
-            void Visit(BinTreeProperty property)
+            void Visit(BinTreeProperty property, uint parentClassHash = 0)
             {
+                if (property is BinTreeContainer containerProp && parentClassHash != 0)
+                {
+                    MatchContainerElementEvidence(parentClassHash, property.NameHash, containerProp);
+                }
+
                 switch (property)
                 {
                     case BinTreeStruct structure:
-                        foreach (BinTreeProperty child in structure.Properties.Values) Visit(child);
+                        uint structClass = structure.ClassHash != 0 ? structure.ClassHash : parentClassHash;
+                        foreach (BinTreeProperty child in structure.Properties.Values) Visit(child, structClass);
                         break;
                     case BinTreeContainer container:
-                        foreach (BinTreeProperty child in container.Elements) Visit(child);
+                        foreach (BinTreeProperty child in container.Elements)
+                        {
+                            if (child is BinTreeStruct childStruct && childStruct.ClassHash != 0)
+                                Visit(childStruct, childStruct.ClassHash);
+                            else
+                                Visit(child, parentClassHash);
+                        }
                         break;
                     case BinTreeOptional option when option.Value != null:
-                        Visit(option.Value);
+                        Visit(option.Value, parentClassHash);
                         break;
                     case BinTreeMap map:
                         MatchGenericHashLinkMap(map);
-                        foreach (var child in map) { Visit(child.Key); Visit(child.Value); }
+                        foreach (var child in map) { Visit(child.Key, parentClassHash); Visit(child.Value, parentClassHash); }
                         break;
+                }
+            }
+
+            void MatchContainerElementEvidence(uint parentClassHash, uint fieldHash, BinTreeContainer container)
+            {
+                if (container.Elements.Count == 0 || fieldHash == 0) return;
+                foreach (BinTreeProperty elem in container.Elements)
+                {
+                    if (elem is BinTreeStruct childStruct && childStruct.ClassHash != 0)
+                    {
+                        uint childClass = childStruct.ClassHash;
+                        if (!matcher.IsRemaining(InternalHashKind.BinTypes, childClass)) continue;
+
+                        string parentName = resolver?.ResolveBinType(parentClassHash);
+                        string fieldName = resolver?.ResolveBinField(fieldHash);
+                        if (string.IsNullOrWhiteSpace(parentName) || string.IsNullOrWhiteSpace(fieldName) ||
+                            parentName.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ||
+                            fieldName.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        string stem = StripContainerSuffix(parentName);
+                        string singular = Singularize(fieldName);
+
+                        var candidates = new List<string>(14)
+                        {
+                            stem + singular + "Definition",
+                            stem + singular + "Data",
+                            parentName + singular + "Definition",
+                            parentName + singular + "Data",
+                            singular + "Definition",
+                            singular + "Data",
+                            stem + singular,
+                            parentName + singular
+                        };
+
+                        if (fieldName.EndsWith("tags", StringComparison.OrdinalIgnoreCase))
+                        {
+                            candidates.Add(stem + "TagDefinition");
+                            candidates.Add(stem + "RegionTagDefinition");
+                            candidates.Add(stem + "TerrainTagDefinition");
+                            candidates.Add(stem + "TagsLink");
+                            candidates.Add(stem + "RegionTagsLink");
+                        }
+
+                        if (fieldName.EndsWith("VfxSystems", StringComparison.OrdinalIgnoreCase))
+                        {
+                            candidates.Add(stem + "VfxData");
+                            candidates.Add(stem + "VfxSystemData");
+                        }
+
+                        foreach (string candidate in candidates)
+                        {
+                            if (Fnv1a.HashLower(candidate) == childClass)
+                            {
+                                matcher.CheckContextualCandidate(
+                                    InternalHashKind.BinTypes,
+                                    candidate,
+                                    path,
+                                    wadPath,
+                                    childClass,
+                                    InternalHashEvidence.ContainerElementConvention);
+                                break;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1370,6 +1449,39 @@ namespace AssetsManager.Services.Hashes
                         break;
                 }
             }
+
+            static string StripContainerSuffix(string name)
+            {
+                if (string.IsNullOrEmpty(name)) return name;
+                foreach (string sfx in new[] { "Config", "Definition", "Settings", "Parameters", "Data", "Container", "List", "Manager", "System" })
+                {
+                    if (name.EndsWith(sfx, StringComparison.Ordinal) && name.Length > sfx.Length + 2)
+                        return name[..^sfx.Length];
+                }
+                return name;
+            }
+
+            static string Singularize(string name)
+            {
+                if (string.IsNullOrWhiteSpace(name)) return name;
+                if (name.EndsWith("ies", StringComparison.OrdinalIgnoreCase) && name.Length > 4)
+                    return UpperFirst(name[..^3] + "y");
+                if (name.EndsWith("List", StringComparison.OrdinalIgnoreCase) && name.Length > 4)
+                    return UpperFirst(name[..^4]);
+                if (name.EndsWith("Map", StringComparison.OrdinalIgnoreCase) && name.Length > 4)
+                    return UpperFirst(name[..^3]);
+                if (name.EndsWith("Array", StringComparison.OrdinalIgnoreCase) && name.Length > 5)
+                    return UpperFirst(name[..^5]);
+                if (name.EndsWith('s') || name.EndsWith('S'))
+                {
+                    if (name.EndsWith("ss", StringComparison.OrdinalIgnoreCase)) return UpperFirst(name);
+                    return UpperFirst(name[..^1]);
+                }
+                return UpperFirst(name);
+            }
+
+            static string UpperFirst(string str) =>
+                string.IsNullOrEmpty(str) ? str : char.ToUpperInvariant(str[0]) + str[1..];
         }
     }
 }

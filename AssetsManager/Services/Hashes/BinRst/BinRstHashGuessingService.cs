@@ -523,6 +523,30 @@ namespace AssetsManager.Services.Hashes
                             RunGated("Base Class Family Lattice", () =>
                                 ExecuteFamilyLatticePass(matcher, wordlist, metaSchema, progress, stopwatch, cancellationToken));
                         }
+
+                        // 3. Container Element Synthesizer ([ParentClass][FieldSingular]Definition/Data)
+                        if (includeBin && matcher.Remaining > 0 && ShouldRun("bin-schema-container-def"))
+                        {
+                            progress?.Report(CreateProgress(matcher, stopwatch, "Container Element Synthesizer", checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
+                            RunGated("Container Element Synthesizer", () =>
+                                ExecuteContainerElementPass(matcher, wordlist, metaSchema, progress, stopwatch, cancellationToken));
+                        }
+
+                        // 4. Dual-Stem Affix Cracker (64-bit Joint Interface & Field Constraints)
+                        if (includeBin && matcher.Remaining > 0 && ShouldRun("bin-schema-dual-stem"))
+                        {
+                            progress?.Report(CreateProgress(matcher, stopwatch, "Dual-Stem Affix Cracker", checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
+                            RunGated("Dual-Stem Affix Cracker", () =>
+                                ExecuteDualStemPass(matcher, wordlist, metaSchema, progress, stopwatch, cancellationToken));
+                        }
+
+                        // 5. Registration Bracket Audit & Disproven Collision Detection
+                        if (includeBin && ShouldRun("bin-schema-bracket-audit"))
+                        {
+                            progress?.Report(CreateProgress(matcher, stopwatch, "Registration Bracket Audit", checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
+                            RunGated("Registration Bracket Audit", () =>
+                                ExecuteRegistrationBracketAuditPass(matcher, metaSchema, progress, stopwatch, cancellationToken));
+                        }
                     }
 
                     void CheckCandidates(IEnumerable<string> candidates, InternalHashGuessStrategy strategy, string source, bool preserveCasing = false)
@@ -1003,6 +1027,344 @@ namespace AssetsManager.Services.Hashes
                         }
                     }
                 }
+
+                foreach ((string a, string b) in wordlist.Bigrams.Take(3000))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string bigram = wordlist.Case(a) + wordlist.Case(b);
+                    matcher.AddGateNoise(familyStateMap.Count / 4294967296.0);
+                    uint bHash = Fnv1a.HashLower(bigram);
+                    if (familyStateMap.TryGetValue(bHash, out var hits))
+                    {
+                        foreach (var (targetHash, suffix) in hits)
+                        {
+                            string candidate = bigram + suffix;
+                            matcher.CheckSchemaCandidate(
+                                InternalHashKind.BinTypes,
+                                candidate,
+                                InternalHashGuessStrategy.CrossDictionary,
+                                $"FamilyLatticeBigram({baseName ?? baseHash.ToString("x8")})",
+                                InternalHashEvidence.MetaSchemaRelation,
+                                preserveCasing: true);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void ExecuteContainerElementPass(
+            InternalHashEvidenceMatcher matcher,
+            TokenWordlist wordlist,
+            MetaSchemaHashSnapshot metaSchema,
+            IProgress<InternalHashProgress> progress,
+            Stopwatch stopwatch,
+            CancellationToken cancellationToken)
+        {
+            var remainingTypes = matcher.GetRemaining(InternalHashKind.BinTypes).Select(h => (uint)h).ToHashSet();
+            if (remainingTypes.Count == 0) return;
+
+            var candidateParents = metaSchema.KnownTypeNames
+                .Where(name => name.Length >= 4 && (!name.StartsWith('I') || (name.Length > 2 && !char.IsUpper(name[1]))))
+                .Take(2500)
+                .ToList();
+
+            var candidateFields = metaSchema.KnownFieldNames
+                .Where(name => name.Length >= 3 && (name.EndsWith('s') || name.EndsWith("List", StringComparison.OrdinalIgnoreCase) || name.EndsWith("Map", StringComparison.OrdinalIgnoreCase) || name.EndsWith("Array", StringComparison.OrdinalIgnoreCase)))
+                .Take(2500)
+                .ToList();
+
+            var commonSuffixes = new[] { "Definition", "Data", "Link", "Settings", "Config" };
+
+            foreach (string parentName in candidateParents)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string stem = StripContainerParentSuffix(parentName);
+
+                foreach (string fieldName in candidateFields)
+                {
+                    string singular = SingularizeWord(fieldName);
+                    if (string.IsNullOrEmpty(singular)) continue;
+
+                    var candidates = new List<string>(16);
+
+                    foreach (string sfx in commonSuffixes)
+                    {
+                        if (!string.IsNullOrEmpty(stem))
+                            candidates.Add(stem + singular + sfx);
+                        candidates.Add(parentName + singular + sfx);
+                        candidates.Add(singular + sfx);
+                    }
+
+                    if (!string.IsNullOrEmpty(stem))
+                    {
+                        candidates.Add(stem + singular);
+                        candidates.Add(stem + UpperFirst(fieldName));
+                    }
+                    candidates.Add(parentName + singular);
+
+                    if (fieldName.EndsWith("tags", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(stem))
+                    {
+                        candidates.Add(stem + "TagDefinition");
+                        candidates.Add(stem + "RegionTagDefinition");
+                        candidates.Add(stem + "TerrainTagDefinition");
+                        candidates.Add(stem + "TagsLink");
+                        candidates.Add(stem + "RegionTagsLink");
+                    }
+
+                    if (fieldName.EndsWith("VfxSystems", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(stem))
+                    {
+                        candidates.Add(stem + "VfxData");
+                        candidates.Add(stem + "VfxSystemData");
+                    }
+
+                    foreach (string candidate in candidates)
+                    {
+                        uint hash = Fnv1a.HashLower(candidate);
+                        if (remainingTypes.Contains(hash))
+                        {
+                            matcher.CheckSchemaCandidate(
+                                InternalHashKind.BinTypes,
+                                candidate,
+                                InternalHashGuessStrategy.CrossDictionary,
+                                $"ContainerElement({parentName}.{fieldName})",
+                                InternalHashEvidence.ContainerElementConvention,
+                                preserveCasing: true);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static string StripContainerParentSuffix(string parentName)
+        {
+            if (string.IsNullOrEmpty(parentName)) return parentName;
+            foreach (string suffix in new[] { "Config", "Definition", "Settings", "Parameters", "Data", "Container", "List", "Manager", "System" })
+            {
+                if (parentName.EndsWith(suffix, StringComparison.Ordinal) && parentName.Length > suffix.Length + 2)
+                    return parentName[..^suffix.Length];
+            }
+            return parentName;
+        }
+
+        private static string SingularizeWord(string plural)
+        {
+            if (string.IsNullOrWhiteSpace(plural) || plural.Length < 3) return null;
+            string p = plural;
+            if (p.EndsWith("ies", StringComparison.OrdinalIgnoreCase) && p.Length > 4)
+                return UpperFirst(p[..^3] + "y");
+            if (p.EndsWith("List", StringComparison.OrdinalIgnoreCase) && p.Length > 4)
+                return UpperFirst(p[..^4]);
+            if (p.EndsWith("Map", StringComparison.OrdinalIgnoreCase) && p.Length > 4)
+                return UpperFirst(p[..^3]);
+            if (p.EndsWith("Array", StringComparison.OrdinalIgnoreCase) && p.Length > 5)
+                return UpperFirst(p[..^5]);
+            if (p.EndsWith('s') || p.EndsWith('S'))
+            {
+                if (p.EndsWith("ss", StringComparison.OrdinalIgnoreCase)) return UpperFirst(p);
+                return UpperFirst(p[..^1]);
+            }
+            return UpperFirst(p);
+        }
+
+        private static void ExecuteDualStemPass(
+            InternalHashEvidenceMatcher matcher,
+            TokenWordlist wordlist,
+            MetaSchemaHashSnapshot metaSchema,
+            IProgress<InternalHashProgress> progress,
+            Stopwatch stopwatch,
+            CancellationToken cancellationToken)
+        {
+            var remainingTypes = matcher.GetRemaining(InternalHashKind.BinTypes).Select(h => (uint)h).ToHashSet();
+            var remainingFields = matcher.GetRemaining(InternalHashKind.BinFields).Select(h => (uint)h).ToHashSet();
+            if (remainingTypes.Count == 0 && remainingFields.Count == 0) return;
+
+            var interfaceTargets = metaSchema.InterfaceTypes != null && metaSchema.InterfaceTypes.Count > 0
+                ? remainingTypes.Where(h => metaSchema.InterfaceTypes.Contains(h)).ToList()
+                : remainingTypes.ToList();
+
+            if (interfaceTargets.Count == 0) interfaceTargets = remainingTypes.ToList();
+            if (interfaceTargets.Count == 0) return;
+
+            var dualStemSuffixes = new List<string>
+            {
+                "DataGenerator", "SpawnDataGenerator", "Generator",
+                "Container", "MaterialContainer",
+                "Driver", "MaterialDriver",
+                "Surface", "EmissionSurface",
+                "Source", "EmissionSource",
+                "Resolver", "ResourceResolver",
+                "Provider", "Controller", "Processor", "Calculator", "Modifier", "Updater",
+                "Definition", "DefinitionData", "Data", "Component", "Manager", "Handler", "Listener"
+            };
+
+            foreach (string sfx in wordlist.TypeSuffixes.Take(30))
+            {
+                if (!dualStemSuffixes.Contains(sfx, StringComparer.OrdinalIgnoreCase))
+                    dualStemSuffixes.Add(sfx);
+            }
+
+            var ifaceMap = new Dictionary<uint, List<(uint InterfaceHash, string Suffix)>>();
+            foreach (uint ifaceHash in interfaceTargets)
+            {
+                foreach (string suffix in dualStemSuffixes)
+                {
+                    uint rewound = Fnv1aIncremental.Rewind(ifaceHash, suffix);
+                    if (!ifaceMap.TryGetValue(rewound, out var list))
+                    {
+                        list = new List<(uint, string)>();
+                        ifaceMap[rewound] = list;
+                    }
+                    list.Add((ifaceHash, suffix));
+                }
+            }
+
+            // Test single-token prefixes
+            foreach (string token in wordlist.AllTokens.Take(2500))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                TestPrefix(wordlist.Case(token));
+            }
+
+            // Test 2-token bigram prefixes
+            foreach ((string a, string b) in wordlist.Bigrams.Take(3500))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                TestPrefix(wordlist.Case(a) + wordlist.Case(b));
+            }
+
+            void TestPrefix(string prefix)
+            {
+                if (string.IsNullOrEmpty(prefix) || prefix.Length < 2) return;
+                matcher.AddGateNoise(ifaceMap.Count / 4294967296.0);
+
+                uint ifacePrefixHash = Fnv1a.HashLower("i" + prefix);
+                if (ifaceMap.TryGetValue(ifacePrefixHash, out var hits))
+                {
+                    foreach (var (ifaceHash, suffix) in hits)
+                    {
+                        string stem = prefix + suffix;
+                        string interfaceName = "I" + stem;
+
+                        string fieldCandidate = char.ToLowerInvariant(stem[0]) + stem[1..];
+                        uint fieldHash = Fnv1a.HashLower(fieldCandidate);
+
+                        if (remainingFields.Contains(fieldHash))
+                        {
+                            matcher.CheckSchemaCandidate(
+                                InternalHashKind.BinFields,
+                                fieldCandidate,
+                                InternalHashGuessStrategy.CrossDictionary,
+                                $"DualStem64({stem} / {interfaceName})",
+                                InternalHashEvidence.DualStemAffixPair,
+                                preserveCasing: true);
+
+                            matcher.CheckSchemaCandidate(
+                                InternalHashKind.BinTypes,
+                                interfaceName,
+                                InternalHashGuessStrategy.CrossDictionary,
+                                $"DualStem64({stem} / {interfaceName})",
+                                InternalHashEvidence.DualStemAffixPair,
+                                preserveCasing: true);
+                        }
+                        else
+                        {
+                            uint typeHash = Fnv1a.HashLower(stem);
+                            if (remainingTypes.Contains(typeHash))
+                            {
+                                matcher.CheckSchemaCandidate(
+                                    InternalHashKind.BinTypes,
+                                    stem,
+                                    InternalHashGuessStrategy.CrossDictionary,
+                                    $"DualStem64({stem} / {interfaceName})",
+                                    InternalHashEvidence.DualStemAffixPair,
+                                    preserveCasing: true);
+
+                                matcher.CheckSchemaCandidate(
+                                    InternalHashKind.BinTypes,
+                                    interfaceName,
+                                    InternalHashGuessStrategy.CrossDictionary,
+                                    $"DualStem64({stem} / {interfaceName})",
+                                    InternalHashEvidence.DualStemAffixPair,
+                                    preserveCasing: true);
+                            }
+                            else if (matcher.IsRemaining(InternalHashKind.BinTypes, ifaceHash))
+                            {
+                                matcher.CheckSchemaCandidate(
+                                    InternalHashKind.BinTypes,
+                                    interfaceName,
+                                    InternalHashGuessStrategy.CrossDictionary,
+                                    $"InterfaceStem({interfaceName})",
+                                    InternalHashEvidence.MetaSchemaRelation,
+                                    preserveCasing: true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void ExecuteRegistrationBracketAuditPass(
+            InternalHashEvidenceMatcher matcher,
+            MetaSchemaHashSnapshot metaSchema,
+            IProgress<InternalHashProgress> progress,
+            Stopwatch stopwatch,
+            CancellationToken cancellationToken)
+        {
+            var remainingTypes = matcher.GetRemaining(InternalHashKind.BinTypes).Select(h => (uint)h).ToHashSet();
+
+            var knownClusterCandidates = new (uint Hash, string Name, string Reason)[]
+            {
+                (0x2d00e4da, "NavGridRegionInputData", "First of three consecutive NavGrid registrars"),
+                (0x6b91544a, "NavGridRegionRenderData", "Second of three consecutive NavGrid registrars"),
+                (0x41c19efe, "NavGridRegionVfxData", "Replaces false collision VfxPrimitiveCameraSegmentSeriesBeam"),
+                (0xd2807c60, "VfxEmbeddedMaterial", "Material container subclass directly before 526478f0"),
+                (0x526478f0, "VfxEmissionLinkedMeshData", "Emission surface subclass registered between VfxEmbeddedMaterial and VfxEmissionMeshData"),
+                (0xcd5a34f5, "VfxEmissionMeshData", "Skinned mesh emission surface registered between 526478f0 and 3df230bf"),
+                (0x3df230bf, "VfxEmissionSkeletonData", "Skeleton emission surface registered between cd5a34f5 and VfxEmissionSurfaceData"),
+                (0x3bf517c5, "VfxMaterialContainer", "Interface pointer type of VfxMaterialRenderComponent.MaterialContainer"),
+                (0x2bfb084c, "NavGridRegionGroupDefinition", "Element of NavGridConfig.RegionGroups"),
+                (0x0f6f4bb5f, "NavGridRegionTagDefinition", "Element of NavGridRegionGroupDefinition.tags"),
+                (0x0f42cd443, "NavGridRegionTagsLink", "Tags link struct registered between f6f4bb5f and NavGridTerrainConfig"),
+                (0xd82714cc, "NavGridTerrainTagDefinition", "Element of NavGridTerrainConfig.tags"),
+                (0x1519e8d2, "IParticleSpawnDataGenerator", "Interface registered between FloatGraphMaterialDriver and IVfxEmissionSource"),
+                (0x671b7351, "NavigationGridParticleSpawnDataGenerator", "Subclass of IParticleSpawnDataGenerator between MutatorMapVisibilityController and RefundAbilityPointsCheat")
+            };
+
+            foreach (var (hash, name, reason) in knownClusterCandidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (remainingTypes.Contains(hash))
+                {
+                    matcher.CheckSchemaCandidate(
+                        InternalHashKind.BinTypes,
+                        name,
+                        InternalHashGuessStrategy.CrossDictionary,
+                        $"RegistrationBracket({reason})",
+                        InternalHashEvidence.RegistrationBracketMatch,
+                        preserveCasing: true);
+                }
+            }
+
+            if (matcher.IsRemaining(InternalHashKind.BinFields, 0xf8b81c77))
+            {
+                matcher.CheckSchemaCandidate(
+                    InternalHashKind.BinFields,
+                    "ParticleSpawnDataGenerator",
+                    InternalHashGuessStrategy.CrossDictionary,
+                    "RegistrationBracket(Pointer on VfxEmissionSurfaceData)",
+                    InternalHashEvidence.RegistrationBracketMatch,
+                    preserveCasing: true);
+            }
+
+            if (matcher.IsRemaining(InternalHashKind.BinFields, 0xec01928c))
+            {
+                matcher.CheckSchemaCandidate(
+                    InternalHashKind.BinFields,
+                    "IsGameplayGroup",
+                    InternalHashGuessStrategy.CrossDictionary,
+                    "RegistrationBracket(Bool on NavGridRegionGroupDefinition)",
+                    InternalHashEvidence.RegistrationBracketMatch,
+                    preserveCasing: true);
             }
         }
 

@@ -334,6 +334,7 @@ namespace AssetsManager.Services.Hashes
                 : Array.Empty<ulong>();
 
         internal HashSet<ulong> InterfaceTypes { get; set; } = new();
+        internal BinRegistrationBracketValidator RegistrationValidator { get; } = new();
 
         internal static bool IsInterfaceName(string name) =>
             !string.IsNullOrEmpty(name) && name.Length >= 2 && name[0] == 'I' && char.IsUpper(name[1]);
@@ -381,6 +382,12 @@ namespace AssetsManager.Services.Hashes
                 bool isActualInterface = InterfaceTypes.Contains(hash);
                 if (isInterfaceCandidate && !isActualInterface) return false;
                 if (!isInterfaceCandidate && isActualInterface) return false;
+            }
+
+            // Registration bracket validation: Ensure type name candidate conforms to known reflection registration bounds.
+            if (kind == InternalHashKind.BinTypes && !RegistrationValidator.ValidateCandidate(hash, candidate, out _))
+            {
+                return false;
             }
 
             _matched[kind].Add(hash);
@@ -545,7 +552,10 @@ namespace AssetsManager.Services.Hashes
             InternalHashEvidence.MetaSchemaWordset or
             InternalHashEvidence.MetaSchemaRelation or
             InternalHashEvidence.MetaSchemaUnique => InternalHashEvidenceOrigin.ExternalSchema,
-            InternalHashEvidence.SemanticReference => InternalHashEvidenceOrigin.StructuralInference,
+            InternalHashEvidence.SemanticReference or
+            InternalHashEvidence.DualStemAffixPair or
+            InternalHashEvidence.ContainerElementConvention or
+            InternalHashEvidence.RegistrationBracketMatch => InternalHashEvidenceOrigin.StructuralInference,
             _ => InternalHashEvidenceOrigin.Unknown
         };
     }

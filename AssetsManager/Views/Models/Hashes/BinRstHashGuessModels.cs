@@ -43,7 +43,10 @@ namespace AssetsManager.Views.Models.Hashes
         MetaSchemaUnique,
         OwningEntryString,
         OwningFileString,
-        GamePathExactMatch
+        GamePathExactMatch,
+        DualStemAffixPair,
+        ContainerElementConvention,
+        RegistrationBracketMatch
     }
 
     public enum InternalHashEvidenceOrigin
@@ -88,7 +91,10 @@ namespace AssetsManager.Views.Models.Hashes
                 InternalHashEvidence.MetaSchemaWordset or
                 InternalHashEvidence.MetaSchemaRelation or
                 InternalHashEvidence.MetaSchemaUnique or
-                InternalHashEvidence.SemanticReference;
+                InternalHashEvidence.SemanticReference or
+                InternalHashEvidence.DualStemAffixPair or
+                InternalHashEvidence.ContainerElementConvention or
+                InternalHashEvidence.RegistrationBracketMatch;
         public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64
             ? Hash.ToString("x16")
             : ((uint)Hash).ToString("x8");
