@@ -2214,49 +2214,48 @@
                                     <ItemsControl ItemsSource="{Binding CharacterSubmeshes}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8"
+                                                <Border Background="{StaticResource CardBackground}" CornerRadius="8"
                                                         BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                                        Margin="0,8,0,0" Padding="10,8,10,10">
+                                                        Margin="0,6,0,0" Padding="10,8">
                                                     <StackPanel>
-                                                        <!-- Top: mesh icon + name + override indicator + visibility checkbox -->
-                                                        <Grid Margin="0,0,0,6">
+                                                        <!-- Top: mesh identity and override indicator -->
+                                                        <Grid Margin="0,0,0,8">
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="Auto"/>
                                                                 <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="Auto"/>
                                                                 <ColumnDefinition Width="Auto"/>
                                                             </Grid.ColumnDefinitions>
 
                                                             <materialIcons:MaterialIcon Grid.Column="0" Kind="CubeOutline" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,7,0"/>
 
                                                             <TextBlock Grid.Column="1" Text="{Binding Name}"
-                                                                       FontWeight="SemiBold" FontSize="11"
+                                                                       FontWeight="SemiBold" FontSize="12"
                                                                        Foreground="{StaticResource TextPrimary}"
                                                                        VerticalAlignment="Center"
-                                                                       TextTrimming="CharacterEllipsis"/>
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       ToolTip="{Binding Name}"/>
 
                                                             <Border Grid.Column="2" Width="6" Height="6" CornerRadius="3" Background="{StaticResource AccentBrush}" Margin="6,0,8,0" VerticalAlignment="Center" ToolTip="Manually overridden"
                                                                     Visibility="{Binding IsOverridden, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-                                                            <CheckBox Grid.Column="3"
-                                                                      IsChecked="{Binding IsVisible, Mode=TwoWay}"
-                                                                      Style="{StaticResource ModernCheckBox}"
-                                                                      VerticalAlignment="Center"
-                                                                      ToolTip="Toggle Submesh Visibility"/>
                                                         </Grid>
 
-                                                        <!-- Bottom: texture icon + dropdown -->
+                                                        <!-- Bottom: visibility checkbox and texture selection -->
                                                         <Grid VerticalAlignment="Center">
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="Auto"/>
                                                                 <ColumnDefinition Width="*"/>
                                                             </Grid.ColumnDefinitions>
-                                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="TextureBox" Width="13" Height="13" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                                            <CheckBox Grid.Column="0"
+                                                                      IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                                      Style="{StaticResource ModernCheckBox}"
+                                                                      VerticalAlignment="Center" Margin="0,0,10,0"
+                                                                      ToolTip="Toggle submesh visibility"/>
                                                             <ComboBox Grid.Column="1"
                                                                       ItemsSource="{Binding AvailableTextureNames}"
                                                                       SelectedItem="{Binding SelectedTextureName, Mode=TwoWay}"
                                                                       Style="{StaticResource ModernComboBox}"
-                                                                      Height="28"
+                                                                      Height="30" FontSize="11"
                                                                       ToolTip="Select submesh texture"/>
                                                         </Grid>
                                                     </StackPanel>

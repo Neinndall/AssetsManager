@@ -162,6 +162,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - 3D Studio / Made submesh cards more compact with visibility beside the texture selector and clearer names.
   - Monitor / Versions now supports Shift-click ranges and Ctrl+Shift-click to add ranges to the selection.
   - VFX Studio / Reorganized Geometry and Map Backdrop with descriptive headings and grouped controls.
   - VFX Studio / Reduced the top spacing inside submesh cards.
