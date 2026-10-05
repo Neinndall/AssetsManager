@@ -164,7 +164,7 @@ New Features
 
 Improvements
   - 3D Studio / Chroma Library now opens from the workspace toolbar and loads variants into Studio tabs or the current scene.
-  - Viewer / Improved ground logo filtering when reduced or viewed from a distance.
+  - Viewer / Ground logos retain their original resolution, with sharper scaled and angled views and clean transparent edges.
   - 3D Studio / Submeshes now use independent compact cards with visibility beside the texture selector.
   - Monitor / Versions now supports Shift-click ranges and Ctrl+Shift-click to add ranges to the selection.
   - VFX Studio / Reorganized Geometry and Map Backdrop with descriptive headings and grouped controls.

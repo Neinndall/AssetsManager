@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Utils.Rendering;
+using AssetsManager.Views.Helpers;
 using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer.Rendering
@@ -19,6 +20,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         internal const float GridFadeStrength = 1.5f;
 
         private const int GroundStride = 5 * sizeof(float);
+        private const GLEnum MaximumTextureAnisotropy = (GLEnum)0x84FF;
+        private const TextureParameterName TextureAnisotropy = (TextureParameterName)0x84FE;
 
         private GL _gl;
         private GridRenderer _gridRenderer;
@@ -28,9 +31,17 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _groundVbo;
         private uint _groundTexture;
         private BitmapSource _groundTextureSource;
+        private uint _logoTexture;
+        private BitmapSource _logoTextureSource;
+        private Vector2 _logoUvSize = Vector2.One;
+        private float _logoOpacity;
+        private float _anisotropy = 1;
         private int _groundViewProjection;
         private int _groundTextureUniform;
         private int _groundTextured;
+        private int _groundLogoUniform;
+        private int _groundLogoSizeUniform;
+        private int _groundLogoOpacityUniform;
 
         private uint _stageProgram;
         private uint _stageVao;
@@ -56,16 +67,32 @@ in vec2 vUv;
 out vec4 fragColor;
 uniform sampler2D uTexture;
 uniform int uTextured;
+uniform sampler2D uLogo;
+uniform vec2 uLogoSize;
+uniform float uLogoOpacity;
+vec3 srgbToLinear(vec3 value) {
+    return mix(pow((value + 0.055) / 1.055, vec3(2.4)), value / 12.92,
+        lessThanEqual(value, vec3(0.04045)));
+}
 vec3 linearToSrgb(vec3 value) {
     vec3 low = value * 12.92;
     vec3 high = 1.055 * pow(max(value, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055;
     return mix(high, low, lessThanEqual(value, vec3(0.0031308)));
 }
 void main() {
-    vec4 color = uTextured != 0 ? texture(uTexture, vUv) : vec4(0.0);
-    fragColor = uTextured != 0
-        ? vec4(linearToSrgb(color.rgb), color.a)
-        : vec4(0.137, 0.165, 0.196, 1.0);
+    vec4 color = uTextured != 0 ? texture(uTexture, vUv)
+        : vec4(srgbToLinear(vec3(35.0, 42.0, 50.0) / 255.0), 1.0);
+    // Preserve the logo's original orientation on the ground's reversed vertical UVs.
+    vec2 logoUv = vec2(vUv.x - 0.5, 0.5 - vUv.y) / uLogoSize + 0.5;
+    vec2 logoDx = dFdx(logoUv);
+    vec2 logoDy = dFdy(logoUv);
+    if (uLogoOpacity > 0.0 && all(greaterThanEqual(logoUv, vec2(0.0)))
+        && all(lessThanEqual(logoUv, vec2(1.0)))) {
+        // Premultiplication precedes filtering, so transparent RGB cannot bleed into the logo.
+        vec4 logo = textureGrad(uLogo, logoUv, logoDx, logoDy) * uLogoOpacity;
+        color = vec4(logo.rgb + color.rgb * (1.0 - logo.a), logo.a + color.a * (1.0 - logo.a));
+    }
+    fragColor = vec4(linearToSrgb(color.rgb), color.a);
 }";
 
         private const string StageVertexShader = @"
@@ -116,7 +143,7 @@ void main() {
     fragColor = vec4(lineColor, line * fade);
 }";
 
-        internal void Initialize(GL gl, BitmapSource groundTexture,
+        internal void Initialize(GL gl, GroundAppearance appearance,
             float groundSize = GroundSize, float groundHeight = GroundDrop, float gridHeight = 0f)
         {
             ArgumentNullException.ThrowIfNull(gl);
@@ -127,9 +154,15 @@ void main() {
 
             try
             {
+                if (gl.IsExtensionPresent("GL_EXT_texture_filter_anisotropic")
+                    || gl.IsExtensionPresent("GL_ARB_texture_filter_anisotropic"))
+                {
+                    gl.GetFloat(MaximumTextureAnisotropy, out float maximumAnisotropy);
+                    _anisotropy = Math.Clamp(maximumAnisotropy, 1, 16);
+                }
                 _gridRenderer = new GridRenderer();
                 _gridRenderer.Initialize(_gl, gles, gridHeight);
-                InitializeGround(gles, groundTexture, groundSize, groundHeight);
+                InitializeGround(gles, appearance, groundSize, groundHeight);
                 InitializeStage(gles);
                 _ready = true;
             }
@@ -158,12 +191,15 @@ void main() {
                 _gridRenderer?.Render(viewProjection);
         }
 
-        private void InitializeGround(bool gles, BitmapSource groundTexture, float size, float height)
+        private void InitializeGround(bool gles, GroundAppearance appearance, float size, float height)
         {
             _groundProgram = GlShaderCompiler.CreateProgram(_gl, gles, GroundVertexShader, GroundFragmentShader);
             _groundViewProjection = _gl.GetUniformLocation(_groundProgram, "uViewProjection");
             _groundTextureUniform = _gl.GetUniformLocation(_groundProgram, "uTexture");
             _groundTextured = _gl.GetUniformLocation(_groundProgram, "uTextured");
+            _groundLogoUniform = _gl.GetUniformLocation(_groundProgram, "uLogo");
+            _groundLogoSizeUniform = _gl.GetUniformLocation(_groundProgram, "uLogoSize");
+            _groundLogoOpacityUniform = _gl.GetUniformLocation(_groundProgram, "uLogoOpacity");
 
             float half = size * 0.5f;
             float[] vertices =
@@ -186,17 +222,34 @@ void main() {
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
             _gl.BindVertexArray(0);
 
-            SetGroundTexture(groundTexture);
+            SetGroundAppearance(appearance);
         }
 
-        internal void SetGroundTexture(BitmapSource source)
+        internal void SetGroundAppearance(GroundAppearance appearance)
         {
-            if (_gl == null || ReferenceEquals(_groundTextureSource, source)) return;
-
-            uint replacement = source == null ? 0 : UploadTexture(source);
-            if (_groundTexture != 0) _gl.DeleteTexture(_groundTexture);
-            _groundTexture = replacement;
-            _groundTextureSource = source;
+            if (_gl == null) return;
+            bool groundChanged = !ReferenceEquals(_groundTextureSource, appearance.Texture);
+            bool logoChanged = !ReferenceEquals(_logoTextureSource, appearance.Logo);
+            uint ground = groundChanged ? 0 : _groundTexture;
+            uint logo = logoChanged ? 0 : _logoTexture;
+            try
+            {
+                if (groundChanged) ground = appearance.Texture == null ? 0 : UploadTexture(appearance.Texture);
+                if (logoChanged) logo = appearance.Logo == null ? 0 : UploadTexture(appearance.Logo, premultiplyAlpha: true);
+            }
+            catch
+            {
+                if (groundChanged && ground != 0) _gl.DeleteTexture(ground);
+                throw;
+            }
+            if (groundChanged && _groundTexture != 0) _gl.DeleteTexture(_groundTexture);
+            if (logoChanged && _logoTexture != 0) _gl.DeleteTexture(_logoTexture);
+            _groundTexture = ground;
+            _logoTexture = logo;
+            _groundTextureSource = appearance.Texture;
+            _logoTextureSource = appearance.Logo;
+            _logoUvSize = appearance.LogoUvSize;
+            _logoOpacity = appearance.Opacity;
         }
 
         private void RenderGround(Matrix4x4 viewProjection)
@@ -208,6 +261,9 @@ void main() {
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.GetInteger(GLEnum.TextureBinding2D, out int previousTexture0);
             _gl.GetInteger(GLEnum.SamplerBinding, out int previousSampler0);
+            _gl.ActiveTexture(TextureUnit.Texture1);
+            _gl.GetInteger(GLEnum.TextureBinding2D, out int previousTexture1);
+            _gl.GetInteger(GLEnum.SamplerBinding, out int previousSampler1);
             _gl.GetInteger(GLEnum.DepthWritemask, out int previousDepthWrite);
             _gl.GetInteger(GLEnum.DepthFunc, out int previousDepthFunction);
             bool depthTest = _gl.IsEnabled(EnableCap.DepthTest);
@@ -225,10 +281,16 @@ void main() {
                 _gl.UniformMatrix4(_groundViewProjection, 1, false, in viewProjection.M11);
                 _gl.Uniform1(_groundTextureUniform, 0);
                 _gl.Uniform1(_groundTextured, _groundTexture != 0 ? 1 : 0);
+                _gl.Uniform1(_groundLogoUniform, 1);
+                _gl.Uniform2(_groundLogoSizeUniform, _logoUvSize.X, _logoUvSize.Y);
+                _gl.Uniform1(_groundLogoOpacityUniform, _logoTexture != 0 ? _logoOpacity : 0f);
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 _gl.BindTexture(TextureTarget.Texture2D, _groundTexture);
                 // Scene samplers must not override the ground's filtering or wrapping.
                 _gl.BindSampler(0, 0);
+                _gl.ActiveTexture(TextureUnit.Texture1);
+                _gl.BindTexture(TextureTarget.Texture2D, _logoTexture);
+                _gl.BindSampler(1, 0);
                 _gl.BindVertexArray(_groundVao);
                 _gl.DrawArrays(PrimitiveType.TriangleFan, 0, 4);
             }
@@ -242,6 +304,9 @@ void main() {
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 _gl.BindTexture(TextureTarget.Texture2D, (uint)previousTexture0);
                 _gl.BindSampler(0, (uint)previousSampler0);
+                _gl.ActiveTexture(TextureUnit.Texture1);
+                _gl.BindTexture(TextureTarget.Texture2D, (uint)previousTexture1);
+                _gl.BindSampler(1, (uint)previousSampler1);
                 _gl.ActiveTexture((TextureUnit)previousActiveTexture);
                 _gl.BindBuffer(BufferTargetARB.ArrayBuffer, (uint)previousArrayBuffer);
                 _gl.BindVertexArray((uint)previousVao);
@@ -342,7 +407,7 @@ void main() {
             }
         }
 
-        private uint UploadTexture(BitmapSource source)
+        private uint UploadTexture(BitmapSource source, bool premultiplyAlpha = false)
         {
             BitmapSource bitmap = source;
             if (bitmap.Format != PixelFormats.Bgra32)
@@ -350,8 +415,8 @@ void main() {
 
             int width = bitmap.PixelWidth;
             int height = bitmap.PixelHeight;
-            int stride = width * 4;
-            var pixels = new byte[height * stride];
+            int stride = checked(width * 4);
+            var pixels = new byte[checked(height * stride)];
             bitmap.CopyPixels(new Int32Rect(0, 0, width, height), pixels, stride, 0);
 
             uint texture = _gl.GenTexture();
@@ -359,21 +424,35 @@ void main() {
             try
             {
                 _gl.BindTexture(TextureTarget.Texture2D, texture);
-                _gl.TexImage2D(
-                    TextureTarget.Texture2D,
-                    0,
-                    InternalFormat.Srgb8Alpha8,
-                    (uint)width,
-                    (uint)height,
-                    0,
-                    Silk.NET.OpenGL.PixelFormat.Bgra,
-                    PixelType.UnsignedByte,
-                    new ReadOnlySpan<byte>(pixels));
+                if (premultiplyAlpha)
+                {
+                    // Linear premultiplied color keeps bilinear, mipmap and anisotropic filtering alpha-correct.
+                    var linear = new float[pixels.Length];
+                    for (int i = 0; i < pixels.Length; i += 4)
+                    {
+                        float alpha = pixels[i + 3] / 255f;
+                        linear[i] = SrgbToLinear[pixels[i + 2]] * alpha;
+                        linear[i + 1] = SrgbToLinear[pixels[i + 1]] * alpha;
+                        linear[i + 2] = SrgbToLinear[pixels[i]] * alpha;
+                        linear[i + 3] = alpha;
+                    }
+                    _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba16f,
+                        (uint)width, (uint)height, 0, Silk.NET.OpenGL.PixelFormat.Rgba,
+                        PixelType.Float, new ReadOnlySpan<float>(linear));
+                }
+                else
+                {
+                    _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Srgb8Alpha8,
+                        (uint)width, (uint)height, 0, Silk.NET.OpenGL.PixelFormat.Bgra,
+                        PixelType.UnsignedByte, new ReadOnlySpan<byte>(pixels));
+                }
                 _gl.GenerateMipmap(TextureTarget.Texture2D);
                 _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
                 _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
                 _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
                 _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+                if (_anisotropy > 1)
+                    _gl.TexParameter(TextureTarget.Texture2D, TextureAnisotropy, _anisotropy);
                 return texture;
             }
             catch
@@ -385,6 +464,19 @@ void main() {
             {
                 _gl.BindTexture(TextureTarget.Texture2D, (uint)previousTexture);
             }
+        }
+
+        private static readonly float[] SrgbToLinear = CreateSrgbToLinearTable();
+
+        private static float[] CreateSrgbToLinearTable()
+        {
+            var values = new float[256];
+            for (int i = 0; i < values.Length; i++)
+            {
+                float value = i / 255f;
+                values[i] = value <= 0.04045f ? value / 12.92f : MathF.Pow((value + 0.055f) / 1.055f, 2.4f);
+            }
+            return values;
         }
 
         public void Dispose()
@@ -399,6 +491,7 @@ void main() {
             {
                 _gridRenderer?.Dispose();
                 if (_groundTexture != 0) _gl?.DeleteTexture(_groundTexture);
+                if (_logoTexture != 0) _gl?.DeleteTexture(_logoTexture);
                 if (_groundVbo != 0) _gl?.DeleteBuffer(_groundVbo);
                 if (_groundVao != 0) _gl?.DeleteVertexArray(_groundVao);
                 if (_groundProgram != 0) _gl?.DeleteProgram(_groundProgram);
@@ -415,6 +508,9 @@ void main() {
                 _gridRenderer = null;
                 _groundTexture = 0;
                 _groundTextureSource = null;
+                _logoTexture = 0;
+                _logoTextureSource = null;
+                _anisotropy = 1;
                 _groundVbo = 0;
                 _groundVao = 0;
                 _groundProgram = 0;

@@ -141,7 +141,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             });
 
             using var surface = args.Contains("--preview-stage") ? new PreviewSurfaceRenderer() : null;
-            surface?.Initialize(gl, groundTexture: null);
+            surface?.Initialize(gl, appearance: default);
             if (surface != null)
                 Console.WriteLine("[Snapshot] Coverage includes the preview surface; compare particle placement visually.");
             session.RigPreset = rig;

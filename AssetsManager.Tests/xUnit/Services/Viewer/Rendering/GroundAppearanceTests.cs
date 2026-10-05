@@ -21,42 +21,36 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering;
 
 public sealed class GroundAppearanceTests
 {
-    [Fact]
-    public void SmallLogoAveragesFineDetailWithoutChangingItsSource() => RunSta(() =>
+    [Theory]
+    [InlineData(4, 2, 1, 0.425, 0.2125)]
+    [InlineData(2, 4, 1, 0.2125, 0.425)]
+    [InlineData(1024, 1024, 0.25, 0.10625, 0.10625)]
+    [InlineData(4, 2, 0, 0.10625, 0.053125)]
+    [InlineData(4, 2, 2, 0.6375, 0.31875)]
+    public void LogoSizePreservesAspectAndClampsWithoutResampling(
+        int width, int height, double scale, double expectedWidth, double expectedHeight) => RunSta(() =>
     {
-        BitmapSource logo = StripedBitmap();
-        BitmapSource composed = SceneElements.ComposeGroundTexture(SolidBitmap(0, 0, 0), logo, 0.25, 1);
-        for (int x = 950; x < 1100; x += 7)
-            Assert.InRange(Pixel(composed, x, 1024)[0], (byte)72, (byte)98);
-
-        Assert.Equal(new byte[] { 255, 255, 255, 255 }, Pixel(logo, 0, 0));
-        Assert.Equal(new byte[] { 0, 0, 0, 255 }, Pixel(logo, 1, 0));
+        BitmapSource logo = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32,
+            null, new byte[width * height * 4], width * 4);
+        var appearance = new GroundAppearance(null, logo, scale, 0.7);
+        Assert.Same(logo, appearance.Logo);
+        Assert.InRange(appearance.LogoUvSize.X - expectedWidth, -0.000001, 0.000001);
+        Assert.InRange(appearance.LogoUvSize.Y - expectedHeight, -0.000001, 0.000001);
+        Assert.Equal(0.7f, appearance.Opacity);
+        Assert.Equal(width, appearance.Logo.PixelWidth);
+        Assert.Equal(height, appearance.Logo.PixelHeight);
     });
 
-    [Fact]
-    public void CompositionPreservesLogoOrientationAspectAlphaAndScale() => RunSta(() =>
+    [Theory]
+    [InlineData(double.NaN, double.PositiveInfinity, 0.425, 1)]
+    [InlineData(double.NegativeInfinity, -1, 0.425, 0)]
+    [InlineData(1, 2, 0.425, 1)]
+    public void InvalidAppearanceValuesCannotReachShader(
+        double scale, double opacity, double expectedSize, double expectedOpacity) => RunSta(() =>
     {
-        BitmapSource ground = SolidBitmap(0, 0, 255);
-        byte[] pixels =
-        {
-            0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255,
-            0, 255, 0, 128, 0, 255, 0, 128, 0, 255, 0, 128, 0, 255, 0, 128
-        };
-        BitmapSource logo = BitmapSource.Create(4, 2, 96, 96, PixelFormats.Bgra32, null, pixels, 16);
-        BitmapSource composed = SceneElements.ComposeGroundTexture(ground, logo, 1, 0.5);
-
-        Assert.True(composed.IsFrozen);
-        byte[] upper = Pixel(composed, 1024, 874);
-        Assert.InRange(upper[1], (byte)62, (byte)66);
-        Assert.InRange(upper[0], (byte)189, (byte)193);
-        byte[] lower = Pixel(composed, 1024, 1174);
-        Assert.InRange(lower[2], (byte)126, (byte)130);
-        Assert.Equal(new byte[] { 255, 0, 0, 255 }, Pixel(composed, 1024, 1400));
-
-        BitmapSource small = SceneElements.ComposeGroundTexture(ground, logo, 0, 1);
-        Assert.Equal(new byte[] { 255, 0, 0, 255 }, Pixel(small, 1174, 1024));
-        BitmapSource large = SceneElements.ComposeGroundTexture(ground, logo, 2, 1);
-        Assert.Equal((byte)255, Pixel(large, 1600, 1200)[2]);
+        var appearance = new GroundAppearance(null, SolidBitmap(0, 0, 0), scale, opacity);
+        Assert.Equal(expectedSize, appearance.LogoUvSize.X, 5);
+        Assert.Equal(expectedOpacity, appearance.Opacity, 5);
     });
 
     [Fact]
@@ -69,31 +63,74 @@ public sealed class GroundAppearanceTests
         {
             SavePng(path, SolidBitmap(255, 0, 0));
             var settings = new AppSettings { CustomGroundLogoPath = path };
-            BitmapSource first = SceneElements.LoadGroundTexture(settings, bridge.LogService);
-            Assert.NotNull(first);
-            Assert.Same(first, SceneElements.LoadGroundTexture(settings, bridge.LogService));
-            Assert.Equal((byte)255, Pixel(first, 1024, 1024)[2]);
+            GroundAppearance first = SceneElements.LoadGroundAppearance(settings, bridge.LogService);
+            Assert.NotNull(first.Logo);
+            Assert.NotNull(first.Texture);
+            Assert.Equal(2048, first.Texture.PixelWidth);
+            Assert.Equal(2048, first.Texture.PixelHeight);
+            Assert.Same(first.Logo, SceneElements.LoadGroundAppearance(settings, bridge.LogService).Logo);
+            Assert.Equal((byte)255, Pixel(first.Logo, 0, 0)[2]);
 
             DateTime modified = File.GetLastWriteTimeUtc(path);
             SavePng(path, SolidBitmap(0, 255, 0));
             File.SetLastWriteTimeUtc(path, modified.AddSeconds(2));
-            BitmapSource replaced = SceneElements.LoadGroundTexture(settings, bridge.LogService);
-            Assert.NotSame(first, replaced);
-            Assert.Equal((byte)255, Pixel(replaced, 1024, 1024)[1]);
+            GroundAppearance replaced = SceneElements.LoadGroundAppearance(settings, bridge.LogService);
+            Assert.NotSame(first.Logo, replaced.Logo);
+            Assert.Same(first.Texture, replaced.Texture);
+            Assert.Equal((byte)255, Pixel(replaced.Logo, 0, 0)[1]);
 
             settings.GroundLogoScale = 0.25;
-            Assert.NotSame(replaced, SceneElements.LoadGroundTexture(settings, bridge.LogService));
-            BitmapSource plain = SceneElements.LoadGroundTexture(new AppSettings(), bridge.LogService);
+            settings.GroundLogoOpacity = 0.7;
+            GroundAppearance smaller = SceneElements.LoadGroundAppearance(settings, bridge.LogService);
+            Assert.Same(replaced.Logo, smaller.Logo);
+            Assert.Same(replaced.Texture, smaller.Texture);
+            Assert.Equal(0.10625f, smaller.LogoUvSize.X, 5);
+            Assert.Equal(0.7f, smaller.Opacity);
             settings.GroundLogoOpacity = 0;
-            Assert.Same(plain, SceneElements.LoadGroundTexture(settings, bridge.LogService));
-            settings.GroundLogoOpacity = 1;
+            Assert.Same(replaced.Logo, SceneElements.LoadGroundAppearance(settings, bridge.LogService).Logo);
+
             settings.CustomGroundLogoPath = Path.Combine(bridge.RootPath, "missing.png");
-            Assert.Same(plain, SceneElements.LoadGroundTexture(settings, bridge.LogService));
+            GroundAppearance missing = SceneElements.LoadGroundAppearance(settings, bridge.LogService);
+            Assert.Null(missing.Logo);
+            Assert.Same(first.Texture, missing.Texture);
+            settings.CustomGroundLogoPath = path;
+            GroundAppearance restored = SceneElements.LoadGroundAppearance(settings, bridge.LogService);
+            Assert.NotSame(replaced.Logo, restored.Logo);
+            Assert.Equal((byte)255, Pixel(restored.Logo, 0, 0)[1]);
         }
         finally
         {
             SceneElements.ClearGroundCache();
         }
+    });
+
+    [Fact]
+    public void LogoLargerThan2048RetainsSourcePixelsAcrossSettingsChanges() => RunSta(() =>
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        string path = Path.Combine(bridge.RootPath, "wide-logo.png");
+        const int width = 3072;
+        const int height = 128;
+        byte[] pixels = new byte[width * height * 4];
+        pixels[3] = 255;
+        pixels[^2] = 255;
+        pixels[^1] = 255;
+        SavePng(path, BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, width * 4));
+        SceneElements.ClearGroundCache();
+        try
+        {
+            var settings = new AppSettings { CustomGroundLogoPath = path, GroundLogoScale = 0.25, GroundLogoOpacity = 0.7 };
+            GroundAppearance appearance = SceneElements.LoadGroundAppearance(settings, bridge.LogService);
+            Assert.True(appearance.Logo.IsFrozen);
+            Assert.Equal(width, appearance.Logo.PixelWidth);
+            Assert.Equal(height, appearance.Logo.PixelHeight);
+            Assert.Equal(new byte[] { 0, 0, 0, 255 }, Pixel(appearance.Logo, 0, 0));
+            Assert.Equal(new byte[] { 0, 0, 255, 255 }, Pixel(appearance.Logo, width - 1, height - 1));
+            settings.GroundLogoScale = 1.5;
+            settings.GroundLogoOpacity = 1;
+            Assert.Same(appearance.Logo, SceneElements.LoadGroundAppearance(settings, bridge.LogService).Logo);
+        }
+        finally { SceneElements.ClearGroundCache(); }
     });
 
     [Theory]
@@ -106,8 +143,7 @@ public sealed class GroundAppearanceTests
         using var gl = GL.GetApi(context.GetProcAddress);
         using var renderer = new PreviewSurfaceRenderer();
         BitmapSource ground = SolidBitmap(0, 0, 255);
-        BitmapSource composed = SceneElements.ComposeGroundTexture(ground, SolidBitmap(255, 0, 0), 1, 1);
-        renderer.Initialize(gl, composed, size, height, gridHeight);
+        renderer.Initialize(gl, new GroundAppearance(ground, SolidBitmap(255, 0, 0)), size, height, gridHeight);
 
         uint target = gl.GenTexture();
         gl.BindTexture(TextureTarget.Texture2D, target);
@@ -145,11 +181,11 @@ public sealed class GroundAppearanceTests
             gl.ReadPixels(25, 16, 1, 1, GlPixelFormat.Rgba, PixelType.UnsignedByte, outside.AsSpan());
             Assert.Equal(new byte[] { 0, 255, 0, 255 }, outside);
             Assert.Equal(new byte[] { 0, 255, 0, 255 }, Draw(false));
-            renderer.SetGroundTexture(ground);
+            renderer.SetGroundAppearance(new GroundAppearance(ground));
             gl.GetInteger(GLEnum.TextureBinding2D, out int binding);
             Assert.Equal(target, (uint)binding);
             Assert.Equal(new byte[] { 0, 0, 255, 255 }, Draw(true));
-            renderer.SetGroundTexture(SolidBitmap(128, 96, 64));
+            renderer.SetGroundAppearance(new GroundAppearance(SolidBitmap(128, 96, 64)));
             byte[] color = Draw(true);
             Assert.InRange(color[0], (byte)127, (byte)129);
             Assert.InRange(color[1], (byte)95, (byte)97);
@@ -159,7 +195,7 @@ public sealed class GroundAppearanceTests
             gl.SamplerParameter(sampler, SamplerParameterI.MinFilter, (int)TextureMinFilter.Nearest);
             gl.SamplerParameter(sampler, SamplerParameterI.MagFilter, (int)TextureMagFilter.Nearest);
             gl.BindSampler(0, sampler);
-            renderer.SetGroundTexture(StripedBitmap());
+            renderer.SetGroundAppearance(new GroundAppearance(StripedBitmap()));
             Draw(true);
             for (int x = 11; x < 22; x++)
             {
@@ -171,17 +207,67 @@ public sealed class GroundAppearanceTests
             Assert.Equal(sampler, (uint)restoredSampler);
             gl.BindSampler(0, 0);
 
+            // Both texture units must ignore inherited material samplers and restore the caller's bindings.
+            gl.ActiveTexture(TextureUnit.Texture1);
+            gl.BindTexture(TextureTarget.Texture2D, target);
+            gl.BindSampler(1, sampler);
+            BitmapSource logo = TransparentStripedBitmap();
+            BitmapSource black = SolidBitmap(0, 0, 0);
+            renderer.SetGroundAppearance(new GroundAppearance(black, logo, 0.25, 0.7));
+            byte[] transparent = Draw(true);
+            // Half opaque red / half transparent cyan: only red may contribute after minification.
+            Assert.InRange(transparent[0], (byte)158, (byte)162);
+            Assert.Equal((byte)0, transparent[1]);
+            Assert.Equal((byte)0, transparent[2]);
+            gl.GetInteger(GLEnum.ActiveTexture, out int restoredUnit);
+            Assert.Equal((int)TextureUnit.Texture1, restoredUnit);
+            gl.GetInteger(GLEnum.TextureBinding2D, out int restoredTexture);
+            Assert.Equal(target, (uint)restoredTexture);
+            gl.GetInteger(GLEnum.SamplerBinding, out restoredSampler);
+            Assert.Equal(sampler, (uint)restoredSampler);
+
+            renderer.SetGroundAppearance(new GroundAppearance(black, logo, 0.25, 0));
+            Assert.Equal(new byte[] { 0, 0, 0, 255 }, Draw(true));
+            renderer.SetGroundAppearance(new GroundAppearance(black, logo, 1.5, 1));
+            Assert.InRange(Draw(true)[0], (byte)186, (byte)189);
+            gl.BindSampler(1, 0);
+            gl.BindTexture(TextureTarget.Texture2D, 0);
+            gl.ActiveTexture(TextureUnit.Texture0);
+
+            byte[] rows =
+            {
+                0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255,
+                0, 255, 0, 128, 0, 255, 0, 128, 0, 255, 0, 128, 0, 255, 0, 128
+            };
+            BitmapSource twoRows = BitmapSource.Create(4, 2, 96, 96, PixelFormats.Bgra32, null, rows, 16);
+            renderer.SetGroundAppearance(new GroundAppearance(ground, twoRows, 1, 0.5));
+            Matrix4x4 closeViewProjection = Matrix4x4.CreateLookAt(new Vector3(0, height + 3000, 0),
+                new Vector3(0, height, 0), -Vector3.UnitZ)
+                * Matrix4x4.CreateOrthographic(size * 0.425f, size * 0.425f, 1, 5000);
+            gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            renderer.Render(closeViewProjection, false, true, false);
+            byte[] upper = new byte[4];
+            byte[] lower = new byte[4];
+            gl.ReadPixels(16, 20, 1, 1, GlPixelFormat.Rgba, PixelType.UnsignedByte, upper.AsSpan());
+            gl.ReadPixels(16, 11, 1, 1, GlPixelFormat.Rgba, PixelType.UnsignedByte, lower.AsSpan());
+            Assert.InRange(upper[0], (byte)186, (byte)189);
+            Assert.Equal((byte)0, upper[1]);
+            Assert.InRange(upper[2], (byte)186, (byte)189);
+            Assert.Equal((byte)0, lower[0]);
+            Assert.InRange(lower[1], (byte)135, (byte)139);
+            Assert.InRange(lower[2], (byte)223, (byte)226);
+
             // A nearer surface must occlude the ground instead of being painted over.
-            renderer.SetGroundTexture(SolidBitmap(255, 0, 0));
+            renderer.SetGroundAppearance(new GroundAppearance(SolidBitmap(255, 0, 0)));
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
             renderer.Render(Matrix4x4.CreateTranslation(0, 10, 0) * viewProjection, false, true, false);
-            renderer.SetGroundTexture(ground);
+            renderer.SetGroundAppearance(new GroundAppearance(ground));
             renderer.Render(viewProjection, false, true, false);
             byte[] occluded = new byte[4];
             gl.ReadPixels(16, 16, 1, 1, GlPixelFormat.Rgba, PixelType.UnsignedByte, occluded.AsSpan());
             Assert.Equal(new byte[] { 255, 0, 0, 255 }, occluded);
 
-            renderer.SetGroundTexture(null);
+            renderer.SetGroundAppearance(new GroundAppearance(null));
             byte[] fallback = Draw(true);
             Assert.InRange(fallback[0], (byte)34, (byte)36);
 
@@ -202,6 +288,9 @@ public sealed class GroundAppearanceTests
         }
         finally
         {
+            gl.ActiveTexture(TextureUnit.Texture1);
+            gl.BindSampler(1, 0);
+            gl.ActiveTexture(TextureUnit.Texture0);
             gl.BindSampler(0, 0);
             gl.DeleteSampler(sampler);
             gl.DeleteFramebuffer(framebuffer);
@@ -224,6 +313,21 @@ public sealed class GroundAppearanceTests
             byte color = x % 3 == 0 ? (byte)255 : (byte)0;
             pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = color;
             pixels[offset + 3] = 255;
+        }
+        return BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
+    }
+
+    private static BitmapSource TransparentStripedBitmap()
+    {
+        const int size = 1024;
+        byte[] pixels = new byte[size * size * 4];
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            int offset = (y * size + x) * 4;
+            bool opaque = x % 2 == 0;
+            pixels[offset] = pixels[offset + 1] = opaque ? (byte)0 : (byte)255;
+            pixels[offset + 2] = pixels[offset + 3] = opaque ? (byte)255 : (byte)0;
         }
         return BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
     }

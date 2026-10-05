@@ -2,14 +2,32 @@ using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Windows;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Helpers
 {
+    internal readonly record struct GroundAppearance(
+        BitmapSource Texture, BitmapSource Logo = null, double LogoScale = 1, double LogoOpacity = 1)
+    {
+        internal Vector2 LogoUvSize
+        {
+            get
+            {
+                if (Logo == null) return Vector2.One;
+                double scale = double.IsFinite(LogoScale) ? Math.Clamp(LogoScale, 0.25, 1.5) : 1;
+                double size = 850.0 / SceneElements.GroundSize * scale;
+                double aspect = (double)Logo.PixelWidth / Logo.PixelHeight;
+                return new Vector2((float)(size * Math.Min(1, aspect)), (float)(size / Math.Max(1, aspect)));
+            }
+        }
+
+        internal float Opacity => double.IsFinite(LogoOpacity) ? (float)Math.Clamp(LogoOpacity, 0, 1) : 1;
+    }
+
     /// <summary>
     /// Centralized provider for viewport environment elements:
     /// shared ground appearance and studio skybox cubemap (dynamic WAD cubemap).
@@ -20,20 +38,14 @@ namespace AssetsManager.Views.Helpers
         public const float GroundSize = 2000f;
         public const string GroundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/ground_rift.dds";
         public const string SkyboxChunkVirtualPath = "assets/maps/skyboxes/riots_sru_skybox_cubemap.dds";
-        public const int SceneTextureMaxSize = 2048;
 
         #region Ground Cache & Loader
 
         private static readonly object GroundLock = new();
         private static BitmapSource _cachedGroundTexture;
         private static bool _groundLoaded;
-        private static BitmapSource _cachedGroundAppearanceTexture;
-        private static GroundAppearanceKey? _cachedGroundAppearance;
         private static BitmapSource _cachedGroundLogo;
         private static (string Path, long Modified, long Length)? _cachedGroundLogoFile;
-
-        private readonly record struct GroundAppearanceKey(
-            string Path, long Modified, long Length, double Scale, double Opacity);
 
         internal static bool IsGroundLogoSetting(string propertyName) =>
             string.IsNullOrEmpty(propertyName)
@@ -46,14 +58,12 @@ namespace AssetsManager.Views.Helpers
             {
                 _groundLoaded = false;
                 _cachedGroundTexture = null;
-                _cachedGroundAppearanceTexture = null;
-                _cachedGroundAppearance = null;
                 _cachedGroundLogo = null;
                 _cachedGroundLogoFile = null;
             }
         }
 
-        public static BitmapSource LoadGroundTexture(AppSettings settings, LogService logService)
+        internal static GroundAppearance LoadGroundAppearance(AppSettings settings, LogService logService)
         {
             lock (GroundLock)
             {
@@ -67,80 +77,29 @@ namespace AssetsManager.Views.Helpers
 
                     string path = settings?.CustomGroundLogoPath;
                     var file = string.IsNullOrWhiteSpace(path) ? null : new FileInfo(path);
-                    var appearance = new GroundAppearanceKey(
-                        file?.Exists == true ? file.FullName : null,
-                        file?.Exists == true ? file.LastWriteTimeUtc.Ticks : 0,
-                        file?.Exists == true ? file.Length : 0,
-                        Math.Clamp(settings?.GroundLogoScale ?? 1.0, 0.25, 1.5),
-                        Math.Clamp(settings?.GroundLogoOpacity ?? 1.0, 0.0, 1.0));
-                    if (_cachedGroundAppearance == appearance)
-                        return _cachedGroundAppearanceTexture;
-
-                    BitmapSource groundTexture = _cachedGroundTexture;
-                    if (appearance.Path != null && appearance.Opacity > 0)
+                    if (file?.Exists == true)
                     {
-                        var logoFile = (appearance.Path, appearance.Modified, appearance.Length);
+                        var logoFile = (file.FullName, file.LastWriteTimeUtc.Ticks, file.Length);
                         if (_cachedGroundLogoFile != logoFile)
                         {
-                            _cachedGroundLogo = TextureUtils.LoadTextureFromFile(
-                                appearance.Path, SceneTextureMaxSize, SceneTextureMaxSize);
+                            _cachedGroundLogo = TextureUtils.LoadTextureFromFile(file.FullName);
                             _cachedGroundLogoFile = logoFile;
                         }
-                        if (_cachedGroundLogo != null)
-                            groundTexture = ComposeGroundTexture(
-                                _cachedGroundTexture, _cachedGroundLogo, appearance.Scale, appearance.Opacity);
                     }
                     else
                     {
                         _cachedGroundLogo = null;
                         _cachedGroundLogoFile = null;
                     }
-                    _cachedGroundAppearanceTexture = groundTexture;
-                    _cachedGroundAppearance = appearance;
-                    return _cachedGroundAppearanceTexture;
+                    return new GroundAppearance(_cachedGroundTexture, _cachedGroundLogo,
+                        settings?.GroundLogoScale ?? 1, settings?.GroundLogoOpacity ?? 1);
                 }
                 catch (Exception ex)
                 {
                     logService?.LogError(ex, "Failed to load preview ground texture.");
-                    return _cachedGroundTexture;
+                    return new GroundAppearance(_cachedGroundTexture);
                 }
             }
-        }
-
-        internal static BitmapSource ComposeGroundTexture(
-            BitmapSource ground, BitmapSource logo, double scale, double opacity)
-        {
-            int width = SceneTextureMaxSize;
-            int height = SceneTextureMaxSize;
-            double maxSize = 850.0 / GroundSize * Math.Clamp(scale, 0.25, 1.5);
-            double aspect = (double)logo.PixelWidth / logo.PixelHeight;
-            double logoWidth = width * maxSize * Math.Min(1.0, aspect);
-            double logoHeight = height * maxSize / Math.Max(1.0, aspect);
-            int logoPixelWidth = Math.Max(1, (int)Math.Round(logoWidth));
-            int logoPixelHeight = Math.Max(1, (int)Math.Round(logoHeight));
-            // RenderTargetBitmap does not reliably prefilter minified DrawImage content.
-            if (logoPixelWidth < logo.PixelWidth || logoPixelHeight < logo.PixelHeight)
-                logo = TextureUtils.ResizeBitmapSource(logo, logoPixelWidth, logoPixelHeight);
-            var visual = new DrawingVisual();
-            using (DrawingContext drawing = visual.RenderOpen())
-            {
-                if (ground != null)
-                    drawing.DrawImage(ground, new Rect(0, 0, width, height));
-                else
-                    drawing.DrawRectangle(new SolidColorBrush(Color.FromRgb(35, 42, 50)), null,
-                        new Rect(0, 0, width, height));
-                drawing.PushOpacity(Math.Clamp(opacity, 0.0, 1.0));
-                // Ground UVs run in the opposite vertical direction to the former logo overlay.
-                drawing.PushTransform(new ScaleTransform(1, -1, width / 2.0, height / 2.0));
-                drawing.DrawImage(logo, new Rect((width - logoWidth) / 2, (height - logoHeight) / 2,
-                    logoWidth, logoHeight));
-                drawing.Pop();
-                drawing.Pop();
-            }
-            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(visual);
-            bitmap.Freeze();
-            return bitmap;
         }
 
         private static BitmapSource LoadBundledGround(LogService logService)
@@ -152,7 +111,7 @@ namespace AssetsManager.Views.Helpers
                 if (streamInfo?.Stream != null)
                 {
                     using var stream = streamInfo.Stream;
-                    return TextureUtils.LoadTexture(stream, ".dds", SceneTextureMaxSize);
+                    return TextureUtils.LoadTexture(stream, ".dds");
                 }
             }
             catch (Exception ex)
@@ -166,7 +125,7 @@ namespace AssetsManager.Views.Helpers
                 try
                 {
                     using var stream = File.OpenRead(diskPath);
-                    return TextureUtils.LoadTexture(stream, ".dds", SceneTextureMaxSize);
+                    return TextureUtils.LoadTexture(stream, ".dds");
                 }
                 catch (Exception ex)
                 {

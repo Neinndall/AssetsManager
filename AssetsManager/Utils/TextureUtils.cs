@@ -523,29 +523,6 @@ namespace AssetsManager.Utils
             return LoadTexture(textureStream, extension, null, null);
         }
 
-        internal static BitmapSource ResizeBitmapSource(BitmapSource source, int width, int height)
-        {
-            if (source.Format != PixelFormats.Bgra32)
-                source = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
-
-            byte[] pixels = new byte[checked(source.PixelWidth * source.PixelHeight * 4)];
-            source.CopyPixels(pixels, checked(source.PixelWidth * 4), 0);
-            using Image<Bgra32> image = Image.LoadPixelData<Bgra32>(pixels, source.PixelWidth, source.PixelHeight);
-            image.Mutate(x => x.Resize(new ResizeOptions
-            {
-                Size = new Size(width, height),
-                Mode = ResizeMode.Stretch,
-                Sampler = KnownResamplers.Lanczos3,
-                PremultiplyAlpha = true
-            }));
-            byte[] resized = new byte[checked(width * height * 4)];
-            image.CopyPixelDataTo(resized);
-            BitmapSource bitmap = BitmapSource.Create(
-                width, height, 96, 96, PixelFormats.Bgra32, null, resized, checked(width * 4));
-            bitmap.Freeze();
-            return bitmap;
-        }
-
         public static BitmapSource LoadTextureFromFile(string filePath, int? maxWidth = null, int? maxHeight = null)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return null;

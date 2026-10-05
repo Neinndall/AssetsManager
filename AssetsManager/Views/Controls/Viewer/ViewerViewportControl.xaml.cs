@@ -266,7 +266,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_previewSurfaceRenderer == null)
             {
                 var surfaces = new PreviewSurfaceRenderer();
-                surfaces.Initialize(_gl, SceneElements.LoadGroundTexture(AppSettings, LogService),
+                surfaces.Initialize(_gl, SceneElements.LoadGroundAppearance(AppSettings, LogService),
                     groundSize: SceneElements.GroundSize, groundHeight: (float)SceneElements.GroundLevel,
                     gridHeight: (float)SceneElements.GroundLevel);
                 _previewSurfaceRenderer = surfaces;
@@ -277,7 +277,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _groundTextureDirty = false;
                 try
                 {
-                    _previewSurfaceRenderer.SetGroundTexture(SceneElements.LoadGroundTexture(AppSettings, LogService));
+                    _previewSurfaceRenderer.SetGroundAppearance(SceneElements.LoadGroundAppearance(AppSettings, LogService));
                 }
                 catch (Exception ex)
                 {

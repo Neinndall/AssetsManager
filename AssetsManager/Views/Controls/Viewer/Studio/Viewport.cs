@@ -3,7 +3,6 @@ using System;
 using System.Numerics;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
-using System.Windows.Media.Imaging;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Rendering;
@@ -108,9 +107,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
                 if (_previewSurfaceRenderer == null)
                 {
-                    BitmapSource groundTexture = SceneElements.LoadGroundTexture(AppSettings, LogService);
+                    GroundAppearance appearance = SceneElements.LoadGroundAppearance(AppSettings, LogService);
                     _previewSurfaceRenderer = new PreviewSurfaceRenderer();
-                    _previewSurfaceRenderer.Initialize(_gl, groundTexture);
+                    _previewSurfaceRenderer.Initialize(_gl, appearance);
                     _groundTextureDirty = false;
                 }
 
@@ -225,7 +224,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _groundTextureDirty = false;
                 try
                 {
-                    _previewSurfaceRenderer?.SetGroundTexture(SceneElements.LoadGroundTexture(AppSettings, LogService));
+                    _previewSurfaceRenderer?.SetGroundAppearance(SceneElements.LoadGroundAppearance(AppSettings, LogService));
                 }
                 catch (Exception ex)
                 {
