@@ -304,6 +304,7 @@ namespace AssetsManager.Views
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-dual-stem", Name = "DualStemAffixCracker", Description = "Crack shared stems for interface & field pairs under 64-bit joint constraints", BadgeText = "🚀 FAST", BadgeBrush = accentPurple });
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-bracket-audit", Name = "RegistrationBracketAudit", Description = "Audit candidate types against client RTTI reflection brackets and eliminate false collisions", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-crossdomain", Name = "CrossDomainDictionary", Description = "Known types as fields, known fields as types, 3D bones", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-object-lattice", Name = "BinObjectLattices", Description = "Lattice discovery for challenges, gear, damage skins, map chunks and augments", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
             _allMethods.Add(binSchema);
 
             // RST (Domain 3)

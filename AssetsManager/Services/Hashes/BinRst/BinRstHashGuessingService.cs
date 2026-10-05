@@ -547,6 +547,14 @@ namespace AssetsManager.Services.Hashes
                             RunGated("Registration Bracket Audit", () =>
                                 ExecuteRegistrationBracketAuditPass(matcher, metaSchema, progress, stopwatch, cancellationToken));
                         }
+
+                        // 6. Bin Object Path Lattices (PR #49: Challenges, Gear, DamageSkins, MapChunks, Boons)
+                        if (includeBin && matcher.Remaining > 0 && ShouldRun("bin-schema-object-lattice"))
+                        {
+                            progress?.Report(CreateProgress(matcher, stopwatch, "Bin Object Path Lattices", checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
+                            RunGated("Bin Object Path Lattices", () =>
+                                ExecuteBinObjectLatticePass(matcher, wordlist, metaSchema, progress, stopwatch, cancellationToken));
+                        }
                     }
 
                     void CheckCandidates(IEnumerable<string> candidates, InternalHashGuessStrategy strategy, string source, bool preserveCasing = false)
@@ -1365,6 +1373,180 @@ namespace AssetsManager.Services.Hashes
                     "RegistrationBracket(Bool on NavGridRegionGroupDefinition)",
                     InternalHashEvidence.RegistrationBracketMatch,
                     preserveCasing: true);
+            }
+        }
+
+        private static void ExecuteBinObjectLatticePass(
+            InternalHashEvidenceMatcher matcher,
+            TokenWordlist wordlist,
+            MetaSchemaHashSnapshot metaSchema,
+            IProgress<InternalHashProgress> progress,
+            Stopwatch stopwatch,
+            CancellationToken cancellationToken)
+        {
+            if (matcher.GetRemainingCount(InternalHashKind.BinEntries) == 0) return;
+
+            void CheckEntry(string candidate)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                matcher.CheckSchemaCandidate(InternalHashKind.BinEntries, candidate, InternalHashEvidence.BinObjectLatticePattern, preserveCasing: true);
+            }
+
+            // 1. LCU Challenges Lattice (LCU/Challenges/Config/{id}/Config)
+            // PR #49: Crauzer identified 413 ChallengeConfigData entries under LCU/Challenges/Config/<ID>/Config
+            var challengeIds = new List<int>();
+            for (int i = 1; i <= 250; i++) challengeIds.Add(i);
+            for (int baseId = 100000; baseId <= 600000; baseId += 100000)
+            {
+                for (int i = 0; i <= 4000; i++)
+                {
+                    challengeIds.Add(baseId + i);
+                }
+            }
+
+            foreach (int id in challengeIds)
+            {
+                CheckEntry($"LCU/Challenges/Config/{id}/Config");
+                CheckEntry($"LCU/Challenges/Config/{id}");
+                if (matcher.GetRemainingCount(InternalHashKind.BinEntries) == 0) return;
+            }
+
+            // 2. Champion Skin Gear Lattice (Characters/{Champ}/Skins/Skin{N}/Gear/{GearName})
+            var gearNames = new[]
+            {
+                "Default", "Ult", "Ultimate", "Base", "Melee", "Ranged", "Shadow",
+                "Form1", "Form2", "Form3", "Form4", "Level6", "level11", "Level11", "Level16", "level16",
+                "Normal", "Spell1", "Spell2", "Spell3", "Spell4", "Empowered", "Frenzy", "Mounted", "Biped",
+                "Transformation", "WraithForm", "Demon", "Wings", "Crown_1", "Crown_2", "Bound", "Unbound",
+                "UltForm", "Rage", "Tier1", "Tier2", "Tier3", "SlotMachine1", "SlotMachine2", "SlotMachine3",
+                "Weapon0", "Weapon1", "Weapon2", "Weapon3", "Level1", "Level2", "Level3", "Level4"
+            };
+
+            var candidateChamps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (metaSchema?.KnownTypeNames != null)
+            {
+                foreach (string typeName in metaSchema.KnownTypeNames)
+                {
+                    if (typeName.StartsWith("Character", StringComparison.OrdinalIgnoreCase) && typeName.Length > 9)
+                        candidateChamps.Add(typeName[9..]);
+                }
+            }
+            if (wordlist?.AllTokens != null)
+            {
+                foreach (string tok in wordlist.AllTokens)
+                {
+                    if (tok.Length >= 3 && char.IsUpper(tok[0]) && !tok.EndsWith("Data", StringComparison.Ordinal) && !tok.EndsWith("Def", StringComparison.Ordinal))
+                    {
+                        candidateChamps.Add(wordlist.Case(tok));
+                    }
+                }
+            }
+
+            foreach (string champ in candidateChamps.Take(300))
+            {
+                for (int skin = 0; skin <= 60; skin++)
+                {
+                    string skinPath = $"Characters/{champ}/Skins/Skin{skin}";
+                    CheckEntry($"{skinPath}/Resources");
+
+                    foreach (string gear in gearNames)
+                    {
+                        CheckEntry($"{skinPath}/Gear/{gear}");
+                    }
+                    CheckEntry($"{skinPath}/Gear/Skin{skin}");
+
+                    if (matcher.GetRemainingCount(InternalHashKind.BinEntries) == 0) return;
+                }
+            }
+
+            // 3. TFT Damage Skins Lattice (Loadouts/TFTDamageSkins/{Name}/{Name}_Tier{1..3})
+            var damageSkinStems = new[]
+            {
+                "AatroxTheDarkinBlade", "AbyssalChasm", "AhriOrbofDeception", "Ahri_Prestige_SpiritBlossom",
+                "AkaliPerfectExecution", "Akali_StarGuardian", "AnnieSummonTibbers", "Annie_BlueHaired",
+                "AprilFools_Celebration", "ArcaneWarwick_Skin", "Arm", "Ashe_Volley", "Baron_Bite",
+                "Blitzcrank_RocketGrab", "BloodMoon_Execution", "Brand_Pyroclasm", "Caitlyn_AceInTheHole",
+                "Choncc_BellyFlop", "Cyberpunk_Laser", "DarkStar_Singularity", "Dragon_Breath",
+                "Ekko_Chronobreak", "Elementalist_Lux", "Ezreal_TrueshotBarrage", "Garen_DemacianJustice",
+                "Hextech_Beam", "Jinx_SuperMegaDeathRocket", "KaiSa_IcathianRain", "KhaZix_TasteTheirFear",
+                "LeeSin_DragonRage", "Lux_FinalSpark", "Malphite_UnstoppableForce", "MissFortune_BulletTime",
+                "Mordekaiser_RealmOfDeath", "Morgana_SoulShackles", "Nami_TidalWave", "Nautilus_DepthCharge",
+                "Nocturne_Paranoia", "Pengu_Party", "Poro_King", "Pyke_DeathFromBelow", "Riven_BladeOfTheExile",
+                "Senna_DawningShadow", "Sett_Showstopper", "StarGuardian_MagicalBlast", "Teemo_NoxiousTrap",
+                "Thresh_DeathSentence", "Vayne_SilverBolts", "Veigar_PrimordialBurst", "Warwick_InfiniteDuress",
+                "Yasuo_LastBreath", "Yone_FateSealed", "Zed_DeathMark"
+            };
+
+            foreach (string dName in damageSkinStems)
+            {
+                for (int tier = 1; tier <= 3; tier++)
+                {
+                    CheckEntry($"Loadouts/TFTDamageSkins/{dName}/{dName}_Tier{tier}");
+                    CheckEntry($"Loadouts/TFTDamageSkins/{dName}/{dName}_Tier{tier}/ResourceBin/Resources");
+                }
+            }
+
+            // 4. ARAM Boons Lattice (Loadouts/AramBoons/ARAM_Boon_{1..30}/ARAM_Boon_{1..30})
+            for (int boon = 1; boon <= 30; boon++)
+            {
+                CheckEntry($"Loadouts/AramBoons/ARAM_Boon_{boon}/ARAM_Boon_{boon}");
+            }
+
+            // 5. Map Placeable Chunks Lattice (Map11 & Map22)
+            var map11Themes = new[] { "Bloom", "Boba_SRS", "Boba_SRS_Act2A", "Boba_SRS_Act2B" };
+            var map11SubChunks = new[]
+            {
+                "Art", "Audio", "VFX", "Lighting", "Esports_Banners", "Hall_Of_Legends",
+                "SRS_Chemtech", "SRS_Cloud", "SRS_Earth", "SRS_Fire", "SRS_Geometry",
+                "SRS_Ground", "SRS_Hextech", "SRS_Ocean", "SRS_Shop", "SRS_Structures",
+                "SRX_Particles", "SRX_Chemtech_VFX"
+            };
+
+            foreach (string theme in map11Themes)
+            {
+                CheckEntry($"Maps/MapGeometry/Map11/Chunks/{theme}");
+                CheckEntry($"Maps/MapGeometry/Map11/Chunks/{theme}_Audio");
+                foreach (string sc in map11SubChunks)
+                {
+                    CheckEntry($"Maps/MapGeometry/Map11/Chunks/{theme}/{sc}");
+                }
+            }
+
+            var map22Themes = new[]
+            {
+                "Anniversary", "7yAnniversary", "Astronaut", "BattleStadium", "BilgewaterBay",
+                "ChosenOfTheWolf", "Cyberpunk", "DawnbringerNightbringer", "EliteVipRoom",
+                "EnchantedForest", "FirelightsHideout", "ImmortalJourney", "LanternFestivalStreet",
+                "LunarRevelModern", "MagicDuel", "MagicLibrary", "NeonDJ", "RetroDreamscape",
+                "Shurima", "SoulFighter2026", "StreetFashion", "SushiConveyorBelt", "Targon",
+                "TeaTerraces", "TheBridge", "Worlds", "BattleAcademia", "InkBiome_Earth",
+                "InkBiome_Ocean", "InkBiome_Sky"
+            };
+
+            var map22SubChunks = new[] { "Art", "Audio", "VFX", "Lighting", "Props", "Skybox", "Ground", "Structures", "Geometry" };
+
+            foreach (string theme in map22Themes)
+            {
+                CheckEntry($"Maps/MapGeometry/Map22/Chunks/{theme}");
+                CheckEntry($"Maps/MapGeometry/Map22/Chunks/{theme}_Audio");
+                foreach (string sc in map22SubChunks)
+                {
+                    CheckEntry($"Maps/MapGeometry/Map22/Chunks/{theme}/{sc}");
+                    CheckEntry($"Maps/MapGeometry/Map22/Chunks/{theme}/{sc}_{theme}");
+                }
+            }
+            CheckEntry("Maps/MapGeometry/Map22/Chunks/BattleAcademia/Intor_BattleAcademia");
+
+            // 6. TFT Augments Lattice (Maps/Shipping/Map22/Augments/Set{Set}/{AugmentName})
+            for (int set = 10; set <= 18; set++)
+            {
+                foreach (string tok in (wordlist?.AllTokens ?? Enumerable.Empty<string>()).Take(150))
+                {
+                    string stem = wordlist.Case(tok);
+                    CheckEntry($"Maps/Shipping/Map22/Augments/Set{set}/DA_{set}_{stem}");
+                    CheckEntry($"Maps/Shipping/Map22/Augments/Set{set}/DA_{set}_{stem}Augment");
+                    CheckEntry($"Maps/Shipping/Map22/Augments/Set{set}/DA_{set}_{stem}TraitAugment");
+                }
             }
         }
 

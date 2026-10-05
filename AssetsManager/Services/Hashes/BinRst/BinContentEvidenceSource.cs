@@ -495,6 +495,54 @@ namespace AssetsManager.Services.Hashes
                 InternalHashEvidence.SemanticReference);
         }
 
+        private static readonly string[] CommonGearNames =
+        {
+            "Default", "Ult", "Ultimate", "Base", "Melee", "Ranged", "Shadow",
+            "Form1", "Form2", "Form3", "Form4", "Level6", "level11", "Level11", "Level16", "level16",
+            "Normal", "Spell1", "Spell2", "Spell3", "Spell4", "Empowered", "Frenzy", "Mounted", "Biped",
+            "Transformation", "WraithForm", "Demon", "Wings", "Crown_1", "Crown_2", "Bound", "Unbound",
+            "UltForm", "Rage", "Tier1", "Tier2", "Tier3", "SlotMachine1", "SlotMachine2", "SlotMachine3",
+            "Weapon0", "Weapon1", "Weapon2", "Weapon3", "Level1", "Level2", "Level3", "Level4"
+        };
+
+        private static bool TryGetNumericOrStringId(
+            Dictionary<uint, BinTreeProperty> properties,
+            out string id)
+        {
+            foreach (string field in new[] { "mId", "id", "mID", "mItemId", "mItemID", "itemID", "itemId" })
+            {
+                uint hash = Fnv1a.HashLower(field);
+                if (properties.TryGetValue(hash, out BinTreeProperty prop))
+                {
+                    switch (prop)
+                    {
+                        case BinTreeU32 u32: id = u32.Value.ToString(); return true;
+                        case BinTreeI32 i32: id = i32.Value.ToString(); return true;
+                        case BinTreeU64 u64: id = u64.Value.ToString(); return true;
+                        case BinTreeI64 i64: id = i64.Value.ToString(); return true;
+                        case BinTreeString str when !string.IsNullOrWhiteSpace(str.Value):
+                            id = str.Value.Trim(); return true;
+                    }
+                }
+            }
+            id = null;
+            return false;
+        }
+
+        private static bool TryGetLeafFromPath(string filePath, string folderSegment, out string leaf)
+        {
+            leaf = null;
+            if (string.IsNullOrEmpty(filePath)) return false;
+            string norm = InternalHashEvidenceMatcher.NormalizeCandidate(filePath);
+            int idx = norm.IndexOf(folderSegment, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) return false;
+            string sub = norm[(idx + folderSegment.Length)..].TrimStart('/');
+            int slash = sub.IndexOf('/');
+            leaf = slash > 0 ? sub[..slash] : sub;
+            if (leaf.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) leaf = leaf[..^4];
+            return !string.IsNullOrWhiteSpace(leaf);
+        }
+
         // TFT content is prefixed by its set: "TFT14_..." -> 14.
         private static bool TryGetTftSet(string name, out int set)
         {
@@ -692,6 +740,83 @@ namespace AssetsManager.Services.Hashes
                                     MatchLinkedEntry(gdsLink.Value);
                             }
                         }
+                        MatchMapPlaceableContainerLattice(entryHash, item, path);
+                    }
+                    else if (classHash == Fnv1a.HashLower("ChallengeConfigData") || classHash == 0xb36600f0)
+                    {
+                        if (TryGetNumericOrStringId(item.Properties, out string challengeId))
+                        {
+                            MatchObservedEntry(entryHash, $"LCU/Challenges/Config/{challengeId}/Config");
+                            MatchObservedEntry(entryHash, $"LCU/Challenges/Config/{challengeId}");
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("CollectiblesEsportsTeamData") || classHash == 0xe2fd6db7)
+                    {
+                        if (TryGetNumericOrStringId(item.Properties, out string teamId) &&
+                            (TryGetString(item.Properties, "mName", out string teamName) ||
+                             TryGetString(item.Properties, "mTeamName", out teamName) ||
+                             TryGetString(item.Properties, "name", out teamName)))
+                        {
+                            MatchObservedEntry(entryHash, $"Lcu/Collectibles/EsportsTeams/{teamId}_{teamName}");
+                            MatchObservedEntry(entryHash, $"LCU/Collectibles/EsportsTeams/{teamId}_{teamName}");
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("TftDamageSkinData") || classHash == 0x967b16cd ||
+                             classHash == Fnv1a.HashLower("DamageSkin") ||
+                             (!string.IsNullOrEmpty(path) && path.Contains("TFTDamageSkins", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        if (TryGetString(item.Properties, "mDamageSkinName", out string damageName) ||
+                            TryGetString(item.Properties, "mName", out damageName) ||
+                            TryGetString(item.Properties, "name", out damageName) ||
+                            TryGetLeafFromPath(path, "TFTDamageSkins", out damageName))
+                        {
+                            for (int tier = 1; tier <= 3; tier++)
+                            {
+                                string tierEntry = $"Loadouts/TFTDamageSkins/{damageName}/{damageName}_Tier{tier}";
+                                MatchObservedEntry(entryHash, tierEntry);
+                                MatchObservedEntry(entryHash, $"{tierEntry}/ResourceBin/Resources");
+                                if (TryGetObjectLink(item.Properties, "mResourceResolver", out BinTreeObjectLink dmgResLink) && dmgResLink.Value != 0)
+                                {
+                                    MatchObservedEntry((uint)dmgResLink.Value, $"{tierEntry}/ResourceBin/Resources");
+                                }
+                            }
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("AramBoonData") || classHash == 0x78b217f2 ||
+                             classHash == Fnv1a.HashLower("AramBoon") ||
+                             (!string.IsNullOrEmpty(path) && path.Contains("AramBoons", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        if (TryGetString(item.Properties, "mName", out string boonName) ||
+                            TryGetString(item.Properties, "name", out boonName) ||
+                            TryGetLeafFromPath(path, "AramBoons", out boonName))
+                        {
+                            MatchObservedEntry(entryHash, $"Loadouts/AramBoons/{boonName}/{boonName}");
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("SummonerBannerData") ||
+                             classHash == Fnv1a.HashLower("RegaliaBanner") ||
+                             (!string.IsNullOrEmpty(path) && (path.Contains("SummonerBanners", StringComparison.OrdinalIgnoreCase) || path.Contains("Regalia", StringComparison.OrdinalIgnoreCase))))
+                    {
+                        if (TryGetString(item.Properties, "mName", out string bannerName) ||
+                            TryGetString(item.Properties, "name", out bannerName))
+                        {
+                            for (int tier = 1; tier <= 5; tier++)
+                            {
+                                MatchObservedEntry(entryHash, $"Loadouts/SummonerBanners/Flags/{bannerName}/Flag_{tier}");
+                            }
+                            MatchObservedEntry(entryHash, $"Loadouts/Regalia/Banners/Other/{bannerName}");
+                            MatchObservedEntry(entryHash, $"Loadouts/Regalia/Banners/Ranked/{bannerName}");
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("TftPassItem") || classHash == Fnv1a.HashLower("TftBattlePassData") ||
+                             (!string.IsNullOrEmpty(path) && path.Contains("Passes/Tft", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        if (TryGetString(item.Properties, "mName", out string passAssetName) ||
+                            TryGetString(item.Properties, "mAssetName", out passAssetName) ||
+                            TryGetString(item.Properties, "name", out passAssetName))
+                        {
+                            MatchObservedEntry(entryHash, $"Passes/Tft/Assets/{passAssetName}");
+                        }
                     }
                     else if (classHash == Fnv1a.HashLower("CharacterRecord") || classHash == Fnv1a.HashLower("TFTCharacterRecord"))
                         MatchCharacterRecord(entryHash, item);
@@ -746,8 +871,20 @@ namespace AssetsManager.Services.Hashes
                         MatchEntryFromCandidates(entryHash, item, "mName", new[] { "TFT", "Cherry", "Slime", "Strawberry", "Ultbook" }
                             .Select(mode => (Func<string, string>)(value => $"Cheats/GameModes/{mode}/{value}")));
                         // TFT cheats live under their set folder, named by the cheat's TFT{N}_ prefix.
-                        if (TryGetString(item.Properties, "mName", out string cheatName) && TryGetTftSet(cheatName, out int cheatSet))
-                            MatchObservedEntry(entryHash, $"Cheats/GameModes/TFT/TFT{cheatSet}/{cheatName}");
+                        if (TryGetString(item.Properties, "mName", out string cheatName))
+                        {
+                            if (TryGetTftSet(cheatName, out int cheatSet))
+                                MatchObservedEntry(entryHash, $"Cheats/GameModes/TFT/TFT{cheatSet}/{cheatName}");
+
+                            if (TryGetString(item.Properties, "mChampionName", out string champName))
+                            {
+                                MatchObservedEntry(entryHash, $"Cheats/ChampSpecific/{champName}/{cheatName}");
+                            }
+                            else if (!string.IsNullOrEmpty(path) && TryGetLeafFromPath(path, "characters", out string champFromPath))
+                            {
+                                MatchObservedEntry(entryHash, $"Cheats/ChampSpecific/{champFromPath}/{cheatName}");
+                            }
+                        }
                     }
                     else if (classHash == Fnv1a.HashLower("TrophyData"))
                     {
@@ -778,25 +915,62 @@ namespace AssetsManager.Services.Hashes
                     else if (classHash == Fnv1a.HashLower("MapSkin"))
                         MatchEntryFromCandidates(entryHash, item, "name", new[] { 11, 12, 21, 22, 30, 33, 35 }
                             .Select(map => (Func<string, string>)(value => $"Maps/Shipping/Map{map}/MapSkins/{value}")));
-                    else if (classHash == Fnv1a.HashLower("AugmentData"))
+                    else if (classHash == Fnv1a.HashLower("AugmentData") || classHash == Fnv1a.HashLower("TftAugmentData"))
                     {
-                        if (TryGetString(item.Properties, "AugmentNameId", out string augName))
+                        if (TryGetString(item.Properties, "AugmentNameId", out string augName) ||
+                            TryGetString(item.Properties, "mName", out augName) ||
+                            TryGetString(item.Properties, "name", out augName))
                         {
                             MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/Augments/{augName}");
+                            MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/Augments/{augName}/{augName}");
+                            MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/Augments/{augName}/Resources");
+                            MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/RUBY/{augName}/{augName}");
+                            MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/ULTBOOK/{augName}/{augName}");
+
+                            if (TryGetTftSet(augName, out int augSet))
+                            {
+                                MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Augments/Set{augSet}/{augName}");
+                            }
+                            for (int s = 10; s <= 20; s++)
+                            {
+                                if (MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Augments/Set{s}/{augName}"))
+                                    break;
+                            }
+
                             if (TryGetObjectLink(item.Properties, "RootSpell", out BinTreeObjectLink rootSpellLink) && rootSpellLink.Value != 0)
                             {
                                 MatchObservedEntry((uint)rootSpellLink.Value, $"Maps/ModeSpecificData/Augments/{augName}/Augment_{augName}");
                             }
+                            if (TryGetObjectLink(item.Properties, "mResourceResolver", out BinTreeObjectLink augResLink) && augResLink.Value != 0)
+                            {
+                                MatchObservedEntry((uint)augResLink.Value, $"Maps/ModeSpecificData/Augments/{augName}/Resources");
+                            }
                         }
                     }
-                    else if (classHash == Fnv1a.HashLower("ItemGroup"))
+                    else if (classHash == Fnv1a.HashLower("ItemGroup") || classHash == 0x160b6ce9 ||
+                             classHash == Fnv1a.HashLower("ItemGroupData"))
                     {
                         if (item.Properties.TryGetValue(Fnv1a.HashLower("mItemGroupID"), out BinTreeProperty idProp) &&
                             idProp is BinTreeHash idHash && idHash.Value != 0)
                         {
                             string idStr = ResolveHashValue(idHash.Value);
                             if (!string.IsNullOrWhiteSpace(idStr))
+                            {
                                 MatchObservedEntry(entryHash, $"Items/ItemGroup/{idStr}");
+                                MatchObservedEntry(entryHash, $"Items/ItemGroups/{idStr}");
+                                MatchObservedEntry(entryHash, $"Items/ItemGroups/Unique/{idStr}");
+                            }
+                        }
+                        if (TryGetString(item.Properties, "mName", out string grpName) ||
+                            TryGetString(item.Properties, "name", out grpName))
+                        {
+                            MatchObservedEntry(entryHash, $"Items/ItemGroups/{grpName}");
+                            MatchObservedEntry(entryHash, $"Items/ItemGroups/Unique/{grpName}");
+                            MatchObservedEntry(entryHash, $"Items/ItemModifiers/{grpName}");
+                        }
+                        if (TryGetNumericOrStringId(item.Properties, out string gNumId))
+                        {
+                            MatchObservedEntry(entryHash, $"Items/ItemGroups/Unique/{gNumId}");
                         }
                     }
                     else if (classHash == Fnv1a.HashLower("ItemShopGameModeData"))
@@ -828,6 +1002,50 @@ namespace AssetsManager.Services.Hashes
                     {
                         MatchEntryDirect(entryHash, item, "mapPath");
                         MatchHashLinkMap(item, "chunks");
+                    }
+                }
+            }
+
+            void MatchMapPlaceableContainerLattice(uint entryHash, BinTreeObject item, string filePath)
+            {
+                if (string.IsNullOrEmpty(filePath)) return;
+                string norm = InternalHashEvidenceMatcher.NormalizeCandidate(filePath);
+                if (!norm.Contains("mapgeometry", StringComparison.OrdinalIgnoreCase)) return;
+
+                int mapIdx = norm.IndexOf("mapgeometry/map", StringComparison.OrdinalIgnoreCase);
+                if (mapIdx < 0) return;
+                string afterMap = norm[(mapIdx + "mapgeometry/map".Length)..];
+                int slash = afterMap.IndexOf('/');
+                if (slash <= 0) return;
+                string mapNum = afterMap[..slash];
+
+                string theme = null;
+                int chunksIdx = norm.IndexOf("/chunks/", StringComparison.OrdinalIgnoreCase);
+                if (chunksIdx >= 0)
+                {
+                    string afterChunks = norm[(chunksIdx + "/chunks/".Length)..];
+                    int nextSlash = afterChunks.IndexOf('/');
+                    theme = nextSlash > 0 ? afterChunks[..nextSlash] : afterChunks;
+                    if (theme.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) theme = theme[..^4];
+                }
+
+                if (!string.IsNullOrEmpty(theme))
+                {
+                    string[] subChunks =
+                    {
+                        "Art", "Audio", "VFX", "Lighting", "Props", "Skybox", "Ground", "Structures", "Geometry",
+                        "Esports_Banners", "Hall_Of_Legends", "SRS_Chemtech", "SRS_Cloud", "SRS_Earth", "SRS_Fire",
+                        "SRS_Geometry", "SRS_Ground", "SRS_Hextech", "SRS_Ocean", "SRS_Shop", "SRS_Structures",
+                        "SRX_Particles", "SRX_Chemtech_VFX", "Intor_BattleAcademia"
+                    };
+
+                    MatchObservedEntry(entryHash, $"Maps/MapGeometry/Map{mapNum}/Chunks/{theme}");
+                    MatchObservedEntry(entryHash, $"Maps/MapGeometry/Map{mapNum}/Chunks/{theme}_Audio");
+
+                    foreach (string sc in subChunks)
+                    {
+                        if (MatchObservedEntry(entryHash, $"Maps/MapGeometry/Map{mapNum}/Chunks/{theme}/{sc}")) break;
+                        if (MatchObservedEntry(entryHash, $"Maps/MapGeometry/Map{mapNum}/Chunks/{theme}/{sc}_{theme}")) break;
                     }
                 }
             }
@@ -1048,6 +1266,78 @@ namespace AssetsManager.Services.Hashes
                             parts[2].Equals("Skins", StringComparison.OrdinalIgnoreCase))
                         {
                             MatchObservedEntry((uint)animGraphLink.Value, $"Characters/{parts[1]}/Animations/{parts[3]}");
+                        }
+                    }
+
+                    // PR #49: Match Gear entries (Characters/{Champ}/Skins/Skin{N}/Gear/{GearName})
+                    string[] skinParts = skinPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                    string skinSubFolder = skinParts.Length >= 4 ? skinParts[3] : null;
+
+                    // 1. Inspect skinUpgradeData -> gearSkinUpgrades / mGearSkinUpgrades or mGearList
+                    BinTreeContainer gearContainer = null;
+                    if (item.Properties.TryGetValue(Fnv1a.HashLower("skinUpgradeData"), out BinTreeProperty upProp) &&
+                        upProp is BinTreeEmbedded upEmbedded &&
+                        (upEmbedded.Properties.TryGetValue(0xcb522723, out BinTreeProperty upgradesProp) ||
+                         upEmbedded.Properties.TryGetValue(Fnv1a.HashLower("gearSkinUpgrades"), out upgradesProp) ||
+                         upEmbedded.Properties.TryGetValue(Fnv1a.HashLower("mGearSkinUpgrades"), out upgradesProp)) &&
+                        upgradesProp is BinTreeContainer upCont)
+                    {
+                        gearContainer = upCont;
+                    }
+                    else if (item.Properties.TryGetValue(Fnv1a.HashLower("mGearList"), out BinTreeProperty gearListProp) &&
+                             gearListProp is BinTreeContainer glCont)
+                    {
+                        gearContainer = glCont;
+                    }
+
+                    if (gearContainer != null)
+                    {
+                        foreach (BinTreeProperty elem in gearContainer.Elements)
+                        {
+                            if (elem is BinTreeObjectLink gearLink && gearLink.Value != 0)
+                            {
+                                uint gearHash = (uint)gearLink.Value;
+                                if (tree.Objects.TryGetValue(gearHash, out BinTreeObject gearObj))
+                                {
+                                    if (TryGetString(gearObj.Properties, "mGearName", out string gName) ||
+                                        TryGetString(gearObj.Properties, "mName", out gName) ||
+                                        TryGetString(gearObj.Properties, "name", out gName))
+                                    {
+                                        MatchObservedEntry(gearHash, $"{skinPath}/Gear/{gName}");
+                                    }
+                                }
+
+                                foreach (string cg in CommonGearNames)
+                                {
+                                    if (MatchObservedEntry(gearHash, $"{skinPath}/Gear/{cg}"))
+                                        break;
+                                }
+
+                                if (!string.IsNullOrEmpty(skinSubFolder))
+                                    MatchObservedEntry(gearHash, $"{skinPath}/Gear/{skinSubFolder}");
+                            }
+                        }
+                    }
+
+                    // 2. Also check any standalone GearSkinUpgrade (0x27dd6361) objects declared in this skin's tree
+                    foreach (var pair in tree.Objects)
+                    {
+                        if (pair.Value.ClassHash == 0x27dd6361)
+                        {
+                            uint gHash = pair.Key;
+                            if (TryGetString(pair.Value.Properties, "mGearName", out string gName) ||
+                                TryGetString(pair.Value.Properties, "mName", out gName) ||
+                                TryGetString(pair.Value.Properties, "name", out gName))
+                            {
+                                MatchObservedEntry(gHash, $"{skinPath}/Gear/{gName}");
+                            }
+                            foreach (string cg in CommonGearNames)
+                            {
+                                if (MatchObservedEntry(gHash, $"{skinPath}/Gear/{cg}"))
+                                    break;
+                            }
+                            if (!string.IsNullOrEmpty(skinSubFolder))
+                                MatchObservedEntry(gHash, $"{skinPath}/Gear/{skinSubFolder}");
                         }
                     }
                 }

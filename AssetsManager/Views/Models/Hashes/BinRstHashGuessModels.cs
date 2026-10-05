@@ -46,7 +46,8 @@ namespace AssetsManager.Views.Models.Hashes
         GamePathExactMatch,
         DualStemAffixPair,
         ContainerElementConvention,
-        RegistrationBracketMatch
+        RegistrationBracketMatch,
+        BinObjectLatticePattern
     }
 
     public enum InternalHashEvidenceOrigin
@@ -94,7 +95,8 @@ namespace AssetsManager.Views.Models.Hashes
                 InternalHashEvidence.SemanticReference or
                 InternalHashEvidence.DualStemAffixPair or
                 InternalHashEvidence.ContainerElementConvention or
-                InternalHashEvidence.RegistrationBracketMatch;
+                InternalHashEvidence.RegistrationBracketMatch or
+                InternalHashEvidence.BinObjectLatticePattern;
         public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64
             ? Hash.ToString("x16")
             : ((uint)Hash).ToString("x8");

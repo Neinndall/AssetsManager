@@ -77,6 +77,7 @@ New Features
   - Hash Guessing Lab / Expanded Game Basic Suite and GrepWad with universal champion asset discovery spanning HD texture prefixes (2x_, 4x_, tft_, sd_), sub-props, 3D meshes, and core animations.
   - Hash Guessing Lab / Calibrated combinatorial candidate budgets to 100M per algorithm, reducing extended and custom suite runtimes by over 80%.
   - Hash Guessing Lab / Added container element synthesis, 64-bit dual-stem cracking, and reflection registration order bracketing for BIN guessing.
+  - Hash Guessing Lab / Added bin object lattice discovery for challenge configs, skin gear, damage skins, map chunks, and augments.
   - Universal Converter now exports WEM and standard audio to OGG, WAV, MP3, or FLAC through vgmstream and FFmpeg.
   - Wad Comparison / Redesigned the Overview dashboard into a modern, symmetrical Patch Intelligence Dashboard featuring Net Payload & Hash KPIs, 6 Game System & Content Domains, Asset Type Distribution with percentage progress bars, Critical Size Impact file tracking, and Top Altered WAD Packages.
   - Wad Comparison / Optimized comparison metrics aggregation (CalculateInsights) into a single-pass O(N) pipeline for instant recalculations with zero UI latency.
@@ -492,6 +493,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Compressed animations now retain the same pose when seeking backward or replaying.
   - 3D Studio / Restored missing child particle effects from shared skin files.
   - 3D Studio / Spell clips now apply material changes linked to their spells.
   - 3D Studio / Game State now starts collapsed and closes with Collapse All.

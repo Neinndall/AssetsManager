@@ -555,7 +555,8 @@ namespace AssetsManager.Services.Hashes
             InternalHashEvidence.SemanticReference or
             InternalHashEvidence.DualStemAffixPair or
             InternalHashEvidence.ContainerElementConvention or
-            InternalHashEvidence.RegistrationBracketMatch => InternalHashEvidenceOrigin.StructuralInference,
+            InternalHashEvidence.RegistrationBracketMatch or
+            InternalHashEvidence.BinObjectLatticePattern => InternalHashEvidenceOrigin.StructuralInference,
             _ => InternalHashEvidenceOrigin.Unknown
         };
     }
