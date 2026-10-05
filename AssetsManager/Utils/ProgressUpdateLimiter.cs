@@ -7,18 +7,20 @@ namespace AssetsManager.Utils
     {
         private readonly IProgress<T> _target;
         private readonly long _minimumIntervalTicks;
+        private readonly Func<T, T, T> _accumulator;
         private readonly object _sync = new();
         private long _lastUpdateTimestamp;
         private T _pending;
         private bool _hasPending;
 
-        public ProgressUpdateLimiter(IProgress<T> target, TimeSpan minimumInterval)
+        public ProgressUpdateLimiter(IProgress<T> target, TimeSpan minimumInterval, Func<T, T, T> accumulator = null)
         {
             _target = target ?? throw new ArgumentNullException(nameof(target));
             if (minimumInterval < TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(minimumInterval));
 
             _minimumIntervalTicks = (long)(minimumInterval.TotalSeconds * Stopwatch.Frequency);
+            _accumulator = accumulator;
         }
 
         public void Report(T value)
@@ -28,7 +30,9 @@ namespace AssetsManager.Utils
                 long now = Stopwatch.GetTimestamp();
                 if (_lastUpdateTimestamp != 0 && now - _lastUpdateTimestamp < _minimumIntervalTicks)
                 {
-                    _pending = value;
+                    _pending = _hasPending && _accumulator != null
+                        ? _accumulator(_pending, value)
+                        : value;
                     _hasPending = true;
                     return;
                 }

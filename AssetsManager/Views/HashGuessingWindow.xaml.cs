@@ -963,6 +963,16 @@ namespace AssetsManager.Views
 
             try
             {
+                var matchProgress = new Progress<InternalHashGuessMatch>(match =>
+                {
+                    if (displayedMatchHashes.Add(match.Hash))
+                    {
+                        _viewModel.Matches.Add(match);
+                        string timeText = FormatElapsedTime(stopwatch.Elapsed);
+                        _viewModel.StatusText = $"{domainName} {action} · {_viewModel.Matches.Count:N0} found · Time: {timeText}";
+                    }
+                });
+
                 var uiProgress = new Progress<InternalHashProgress>(p =>
                 {
                     if (p.NewMatches != null && p.NewMatches.Count > 0)
@@ -1008,13 +1018,47 @@ namespace AssetsManager.Views
                 });
                 var internalProgressLimiter = new ProgressUpdateLimiter<InternalHashProgress>(
                     uiProgress,
-                    HashLabProgressUpdateInterval);
+                    HashLabProgressUpdateInterval,
+                    (prev, next) =>
+                    {
+                        if (prev.NewMatches == null || prev.NewMatches.Count == 0) return next;
+                        if (next.NewMatches == null || next.NewMatches.Count == 0)
+                        {
+                            return new InternalHashProgress
+                            {
+                                ProcessedWads = next.ProcessedWads,
+                                TotalWads = next.TotalWads,
+                                ProcessedFiles = next.ProcessedFiles,
+                                FoundMatches = next.FoundMatches,
+                                RemainingUnknowns = next.RemainingUnknowns,
+                                CheckedCandidates = next.CheckedCandidates,
+                                Elapsed = next.Elapsed,
+                                CurrentStage = next.CurrentStage,
+                                NewMatches = prev.NewMatches
+                            };
+                        }
+                        var merged = new List<InternalHashGuessMatch>(prev.NewMatches.Count + next.NewMatches.Count);
+                        merged.AddRange(prev.NewMatches);
+                        merged.AddRange(next.NewMatches);
+                        return new InternalHashProgress
+                        {
+                            ProcessedWads = next.ProcessedWads,
+                            TotalWads = next.TotalWads,
+                            ProcessedFiles = next.ProcessedFiles,
+                            FoundMatches = next.FoundMatches,
+                            RemainingUnknowns = next.RemainingUnknowns,
+                            CheckedCandidates = next.CheckedCandidates,
+                            Elapsed = next.Elapsed,
+                            CurrentStage = next.CurrentStage,
+                            NewMatches = merged
+                        };
+                    });
                 IProgress<InternalHashProgress> progress = internalProgressLimiter;
 
                 InternalHashRunResult result = action switch
                 {
-                    InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods),
-                    InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods),
+                    InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods, matchProgress: matchProgress),
+                    InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods, matchProgress: matchProgress),
                     _ => throw new ArgumentOutOfRangeException(nameof(action))
                 };
                 internalProgressLimiter.Flush();

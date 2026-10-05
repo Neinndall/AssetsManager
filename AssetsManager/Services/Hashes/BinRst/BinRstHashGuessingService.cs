@@ -242,12 +242,13 @@ namespace AssetsManager.Services.Hashes
             bool includeRst,
             IProgress<InternalHashProgress> progress,
             CancellationToken cancellationToken,
-            IReadOnlySet<string> selectedSubMethods = null)
+            IReadOnlySet<string> selectedSubMethods = null,
+            IProgress<InternalHashGuessMatch> matchProgress = null)
         {
             ValidateRoot(rootDirectory);
             await EnsureInventoryAsync(rootDirectory, includeBin, includeRst, progress, cancellationToken);
             await _resolver.LoadAllHashesAsync();
-            var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken);
+            var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken, matchProgress == null ? null : matchProgress.Report);
             var stopwatch = Stopwatch.StartNew();
             progress?.Report(CreateProgress(matcher, stopwatch, "Loading game hashes dictionary", 0));
             string[] wads = EnumerateWadContainers(rootDirectory, includeBin, includeRst);
@@ -346,6 +347,10 @@ namespace AssetsManager.Services.Hashes
                                     });
                                 }
                                 scanned++;
+                                if ((scanned & 0x7f) == 0)
+                                {
+                                    progress?.Report(CreateProgress(matcher, stopwatch, $"Scanning {Path.GetFileName(wadPath)}", scanned, index, totalSources));
+                                }
                             }
                         }
                         catch (Exception)
@@ -426,11 +431,12 @@ namespace AssetsManager.Services.Hashes
             bool includeRst,
             IProgress<InternalHashProgress> progress,
             CancellationToken cancellationToken,
-            IReadOnlySet<string> selectedSubMethods = null)
+            IReadOnlySet<string> selectedSubMethods = null,
+            IProgress<InternalHashGuessMatch> matchProgress = null)
         {
             ValidateRoot(rootDirectory);
             await EnsureInventoryAsync(rootDirectory, includeBin, includeRst, progress, cancellationToken);
-            var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken);
+            var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken, matchProgress == null ? null : matchProgress.Report);
             var stopwatch = Stopwatch.StartNew();
             progress?.Report(CreateProgress(matcher, stopwatch, "Loading catalogs", 0));
             var binKnown = new List<string>();
@@ -493,6 +499,7 @@ namespace AssetsManager.Services.Hashes
                         finally
                         {
                             LogGate(matcher.EndGate());
+                            progress?.Report(CreateProgress(matcher, stopwatch, name, checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
                         }
                     }
 
@@ -719,7 +726,11 @@ namespace AssetsManager.Services.Hashes
                 .Replace(Path.DirectorySeparatorChar, '/')
                 .Replace(Path.AltDirectorySeparatorChar, '/');
 
-        private async Task<InternalHashEvidenceMatcher> CreateMatcherAsync(bool includeBin, bool includeRst, CancellationToken cancellationToken)
+        private async Task<InternalHashEvidenceMatcher> CreateMatcherAsync(
+            bool includeBin,
+            bool includeRst,
+            CancellationToken cancellationToken,
+            Action<InternalHashGuessMatch> onMatchFound = null)
         {
             var targets = new Dictionary<InternalHashKind, HashSet<ulong>>();
             foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
@@ -736,7 +747,7 @@ namespace AssetsManager.Services.Hashes
                 else
                     targets[kind] = new HashSet<ulong>();
             }
-            return new InternalHashEvidenceMatcher(targets);
+            return new InternalHashEvidenceMatcher(targets, onMatchFound);
         }
 
         private async Task<Dictionary<ulong, string>> LoadWadPathsAsync(bool includeLcu, CancellationToken cancellationToken)
@@ -1386,6 +1397,7 @@ namespace AssetsManager.Services.Hashes
         {
             if (matcher.GetRemainingCount(InternalHashKind.BinEntries) == 0) return;
 
+            int checkCount = 0;
             void CheckEntry(string candidate)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -1396,6 +1408,11 @@ namespace AssetsManager.Services.Hashes
                     "BinObjectLattice",
                     InternalHashEvidence.BinObjectLatticePattern,
                     verified: true);
+                checkCount++;
+                if ((checkCount & 0x1fff) == 0)
+                {
+                    progress?.Report(CreateProgress(matcher, stopwatch, "Bin Object Path Lattices", checkCount));
+                }
             }
 
             // 1. LCU Challenges Lattice (LCU/Challenges/Config/{id}/Config)

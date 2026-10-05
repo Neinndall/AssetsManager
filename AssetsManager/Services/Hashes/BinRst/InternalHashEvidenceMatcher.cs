@@ -37,7 +37,11 @@ namespace AssetsManager.Services.Hashes
 
         internal readonly record struct NoiseGateResult(string Name, int Hits, double ExpectedChanceMatches, bool Accepted);
 
-        internal InternalHashEvidenceMatcher(Dictionary<InternalHashKind, HashSet<ulong>> targets)
+        private readonly Action<InternalHashGuessMatch> _onMatchFound;
+
+        internal InternalHashEvidenceMatcher(
+            Dictionary<InternalHashKind, HashSet<ulong>> targets,
+            Action<InternalHashGuessMatch> onMatchFound = null)
         {
             foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
                 if (!targets.ContainsKey(kind)) targets[kind] = new HashSet<ulong>();
@@ -45,6 +49,7 @@ namespace AssetsManager.Services.Hashes
             _matched = Enum.GetValues<InternalHashKind>().ToDictionary(
                 kind => kind,
                 kind => new HashSet<ulong>());
+            _onMatchFound = onMatchFound;
         }
 
         internal IReadOnlyCollection<InternalHashGuessMatch> Matches => _matches.Values;
@@ -115,6 +120,7 @@ namespace AssetsManager.Services.Hashes
                     _verifiedValues.Remove((key.Kind, (uint)key.Hash));
                 }
                 _pendingMatches.Add(match);
+                _onMatchFound?.Invoke(match);
             }
             return new NoiseGateResult(gate.Name, hits.Count, gate.ExpectedChanceMatches, accepted);
         }
@@ -143,7 +149,11 @@ namespace AssetsManager.Services.Hashes
         // Gated hits stay out of the live feed until their gate decides whether they are trustworthy.
         private void Publish(InternalHashGuessMatch match, NoiseGate gate)
         {
-            if (gate == null) _pendingMatches.Add(match);
+            if (gate == null)
+            {
+                _pendingMatches.Add(match);
+                _onMatchFound?.Invoke(match);
+            }
             else gate.Hits.Add((match.Kind, match.Hash, match.Value));
         }
 
@@ -496,6 +506,7 @@ namespace AssetsManager.Services.Hashes
             _matches[key] = match;
             if (verified && !conflicting) _verifiedValues[(kind, hash)] = value;
             _pendingMatches.Add(match);
+            _onMatchFound?.Invoke(match);
         }
 
         private void CheckRst(
@@ -531,6 +542,7 @@ namespace AssetsManager.Services.Hashes
                 };
                 _matches[(kind, fullHash, value)] = match;
                 _pendingMatches.Add(match);
+                _onMatchFound?.Invoke(match);
                 break;
             }
         }
