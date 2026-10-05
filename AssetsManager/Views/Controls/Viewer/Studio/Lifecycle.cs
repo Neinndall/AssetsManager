@@ -180,7 +180,11 @@ namespace AssetsManager.Views.Controls.Viewer
         private void OnControlVisibilityChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (_isCleanedUp) return;
-            if (IsVisible) _discardNextSimulationDelta = true;
+            if (IsVisible)
+            {
+                _discardNextSimulationDelta = true;
+                EnsureOpenGlStarted();
+            }
             SetRenderLoopRunning(_isActive && IsVisible);
         }
 
@@ -196,7 +200,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void EnsureOpenGlStarted()
         {
-            if (!_isActive || _isGlStarted || _isCleanedUp || !IsLoaded) return;
+            if (!_isActive || _isGlStarted || _isCleanedUp || !IsLoaded || !IsVisible) return;
 
             try
             {

@@ -7,14 +7,11 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Utils;
+using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Views
 {
-    /// <summary>
-    /// Passive orchestrator for the Viewer module.
-    /// Responsibility: Dependency Injection and Peer-to-Peer linking between sub-controls.
-    /// </summary>
     public partial class ViewerWindow : UserControl
     {
         public ViewerWindowModel ViewModel => _viewModel;
@@ -22,9 +19,15 @@ namespace AssetsManager.Views
         private readonly ViewerWindowModel _viewModel;
         private readonly LogService _logService;
         private readonly TaskCancellationManager _taskCancellationManager;
+        private readonly AppSettings _appSettings;
+        private readonly SknLoadingService _sknLoadingService;
+        private readonly MapViewerSceneService _mapViewerSceneService;
+        private readonly ChromaLoadingService _chromaLoadingService;
         private readonly VfxLoadingService _vfxLoadingService;
+        private readonly CustomMessageBoxService _customMessageBoxService;
+        private ViewerProjectControl _projectControl;
+        private StudioControl _studioControl;
         private bool _isCleanedUp;
-        private double _lastExplorerHeight = 220;
 
         public ViewerWindow(
             LogService logService,
@@ -36,183 +39,101 @@ namespace AssetsManager.Views
             VfxLoadingService vfxLoadingService,
             CustomMessageBoxService customMessageBoxService)
         {
-            InitializeComponent();
- 
             _viewModel = new ViewerWindowModel();
-            DataContext = _viewModel;
- 
             _logService = logService;
             _taskCancellationManager = taskCancellationManager;
+            _appSettings = appSettings;
+            _sknLoadingService = sknLoadingService;
+            _mapViewerSceneService = mapViewerSceneService;
+            _chromaLoadingService = chromaLoadingService;
             _vfxLoadingService = vfxLoadingService;
- 
-            // Service injection (Peer-to-Peer Support)
-            ViewportControl.LogService = _logService;
-            ViewportControl.AppSettings = appSettings;
+            _customMessageBoxService = customMessageBoxService;
 
-            PanelControl.SknLoadingService = sknLoadingService;
-            PanelControl.LogService = _logService;
-            PanelControl.CustomMessageBoxService = customMessageBoxService;
-            PanelControl.TaskCancellationManager = _taskCancellationManager;
-            PanelControl.WindowViewModel = _viewModel;
-
-            StudioControl.ChromaLoadingService = chromaLoadingService;
-            StudioControl.CustomMessageBoxService = customMessageBoxService;
-
-            StudioControl.LogService = _logService;
-            StudioControl.AppSettings = appSettings;
-            StudioControl.SknLoadingService = sknLoadingService;
-            StudioControl.VfxLoadingService = _vfxLoadingService;
-            StudioControl.MapViewerSceneService = mapViewerSceneService;
-            StudioControl.ExitRequested += (_, _) => _viewModel.IsStudioVisible = false;
-
-            // Peer-to-Peer wiring between sub-controls
-            PanelControl.Viewport = ViewportControl;
-            PanelControl.ViewModel.ViewportViewModel = ViewportControl.ViewModel;
-
-            ViewportControl.Panel = PanelControl;
-
-            PanelControl.ProjectExplorer = ProjectExplorer;
-
-            // Project Explorer event wiring
-            ProjectExplorer.ModelSelected += ProjectExplorer_ModelSelected;
-            ProjectExplorer.AnimationsSelected += (_, paths) => PanelControl.LoadAnimationsDirectly(paths);
-            ProjectExplorer.CloseRequested += (_, _) => _viewModel.IsProjectExplorerVisible = false;
-
+            InitializeComponent();
+            DataContext = _viewModel;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-
-            // Set initial state
-            UpdateProjectExplorerRowHeight();
-
             Unloaded += OnViewerUnloaded;
         }
 
         private void OnViewModelPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(ViewerWindowModel.IsProjectExplorerVisible))
+            if (_isCleanedUp || e.PropertyName != nameof(ViewerWindowModel.IsStudioVisible)) return;
+
+            if (_viewModel.IsStudioVisible)
             {
-                UpdateProjectExplorerRowHeight();
+                if (_studioControl == null)
+                {
+                    _studioControl = new StudioControl
+                    {
+                        ChromaLoadingService = _chromaLoadingService,
+                        CustomMessageBoxService = _customMessageBoxService,
+                        LogService = _logService,
+                        AppSettings = _appSettings,
+                        SknLoadingService = _sknLoadingService,
+                        VfxLoadingService = _vfxLoadingService,
+                        MapViewerSceneService = _mapViewerSceneService
+                    };
+                    _studioControl.ExitRequested += OnStudioExitRequested;
+                    StudioHost.Content = _studioControl;
+                }
+                _studioControl.Activate();
             }
-
-            if (e.PropertyName == nameof(ViewerWindowModel.IsStudioVisible))
+            else
             {
-                if (_viewModel.IsStudioVisible)
-                {
-                    StudioControl.Activate();
-                }
-                else
-                {
-                    StudioControl.Deactivate();
-                }
+                _studioControl?.Deactivate();
             }
         }
 
-        private void OnViewerUnloaded(object sender, RoutedEventArgs e)
-        {
-            CleanupResources();
-        }
+        private void OnStudioExitRequested(object sender, EventArgs e) => _viewModel.IsStudioVisible = false;
 
-        // Empty-state handlers: thin 1-liners that delegate to the Panel
-        private async void OpenFile_Click(object sender, RoutedEventArgs e) => await PanelControl.OpenSknModel();
+        private void OnViewerUnloaded(object sender, RoutedEventArgs e) => CleanupResources();
 
-        private void OpenStudio_Click(object sender, RoutedEventArgs e)
-        {
-            _viewModel.IsStudioVisible = true;
-        }
+        private void OpenStudio_Click(object sender, RoutedEventArgs e) => _viewModel.IsStudioVisible = true;
 
         private void OpenProjectFolder_Click(object sender, RoutedEventArgs e)
         {
+            if (_isCleanedUp) return;
+
             var folderBrowser = new OpenFolderDialog { Title = "Select extracted WAD root folder" };
-            if (folderBrowser.ShowDialog() == true)
-            {
-                ProjectExplorer.LoadProjectFolder(folderBrowser.FolderName);
-                _viewModel.IsProjectExplorerVisible = true;
-                PanelControl.ViewModel.ShowMainContent();
-            }
+            if (folderBrowser.ShowDialog() != true) return;
+
+            OpenProject(folderBrowser.FolderName);
         }
 
-        private async void ProjectExplorer_ModelSelected(object sender, string filePath)
+        private void OpenProject(string folderPath)
         {
-            var extension = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
-            bool isImage = SupportedFileTypes.IsImage(filePath);
-            if (!isImage)
-            {
-                ProjectExplorer.ClearImagePreview();
-            }
+            if (_isCleanedUp) return;
 
-            if (extension == ".skl")
+            if (_projectControl == null)
             {
-                PanelControl.LoadSkeleton(filePath);
+                _projectControl = new ViewerProjectControl(_viewModel, _logService,
+                    _taskCancellationManager, _appSettings, _sknLoadingService, _customMessageBoxService);
+                ProjectHost.Content = _projectControl;
             }
-            else if (isImage)
-            {
-                ShowProjectImagePreview(filePath);
-            }
-            else if (extension == ".anm")
-            {
-                PanelControl.LoadAnimationDirectly(filePath);
-            }
-            else
-            {
-                PanelControl.ViewModel.ShowMainContent();
-                await PanelControl.LoadInitialModel(filePath);
-            }
-        }
-
-        private void ShowProjectImagePreview(string filePath)
-        {
-            try
-            {
-                ProjectExplorer.ShowImagePreview(filePath, TextureUtils.LoadTextureFromFile(filePath));
-            }
-            catch (Exception ex)
-            {
-                ProjectExplorer.ClearImagePreview();
-                _logService.LogError(ex, $"[IMAGE PREVIEW] Failed to load preview image: {filePath}");
-            }
-        }
-
-        private void UpdateProjectExplorerRowHeight()
-        {
-            if (ProjectExplorerRow == null) return;
-
-            if (_viewModel.IsProjectExplorerVisible)
-            {
-                ProjectExplorerRow.MinHeight = 120;
-                ProjectExplorerRow.Height = new GridLength(_lastExplorerHeight > 0 ? _lastExplorerHeight : 220);
-            }
-            else
-            {
-                // Save current height if it's set and greater than 0
-                if (ProjectExplorerRow.Height.IsAbsolute && ProjectExplorerRow.Height.Value > 0)
-                {
-                    _lastExplorerHeight = ProjectExplorerRow.Height.Value;
-                }
-                ProjectExplorerRow.MinHeight = 0;
-                ProjectExplorerRow.Height = new GridLength(0);
-            }
+            _projectControl.OpenProject(folderPath);
         }
 
         public void CleanupResources()
         {
             if (_isCleanedUp) return;
             _isCleanedUp = true;
-
+            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            Unloaded -= OnViewerUnloaded;
             _viewModel.IsStudioVisible = false;
+            if (_studioControl != null)
+                _studioControl.ExitRequested -= OnStudioExitRequested;
 
-            // Keep teardown independent so one faulty consumer cannot prevent the others from releasing resources.
-            RunCleanupStep(nameof(StudioControl), () => StudioControl?.Cleanup());
-            RunCleanupStep(nameof(ViewportControl), () => ViewportControl?.Cleanup());
-            RunCleanupStep(nameof(PanelControl), () => PanelControl?.Cleanup());
-
-            // 3D Studio owns the shared loader within ViewerWindow, so release it after the studio teardown.
-            RunCleanupStep(nameof(VfxLoadingService), () => _vfxLoadingService?.Dispose());
+            // A failed teardown must not prevent the other route or the shared loader from being released.
+            RunCleanupStep(nameof(StudioControl), () => _studioControl?.Cleanup());
+            RunCleanupStep(nameof(ViewerProjectControl), () => _projectControl?.Cleanup());
+            RunCleanupStep(nameof(VfxLoadingService), () => _vfxLoadingService.Dispose());
         }
 
         private void RunCleanupStep(string componentName, Action cleanup)
         {
             try
             {
-                cleanup?.Invoke();
+                cleanup();
             }
             catch (Exception ex)
             {

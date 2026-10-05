@@ -4,14 +4,23 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:viewer="clr-namespace:AssetsManager.Views.Controls.Viewer"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
     <Grid>
         <!-- CUERPO -->
         <Grid>
             <!-- LANDING PAGE / EMPTY STATE -->
-            <Grid x:Name="EmptyStatePanel" Visibility="{Binding ViewModel.IsMainContentVisible, ElementName=PanelControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="{Binding Content.ViewModel.IsMainContentVisible, ElementName=ProjectHost, FallbackValue=Visible, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsStudioVisible}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     
                     <!-- Default Content (Buttons) -->
@@ -116,84 +125,21 @@
                 </StackPanel>
             </Grid>
 
-            <!-- MAIN CONTENT (Viewport + Panel + Project Explorer) -->
-            <Grid x:Name="MainContentGrid" Visibility="{Binding ViewModel.IsMainContentVisible, ElementName=PanelControl, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>    <!-- Col 0: Viewport & Content Browser -->
-                    <ColumnDefinition Width="Auto"/> <!-- Col 1: Panel Splitter -->
-                    <ColumnDefinition Width="360" MinWidth="280" MaxWidth="450"/> <!-- Col 2: Controls Panel -->
-                </Grid.ColumnDefinitions>
+            <ContentControl x:Name="ProjectHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                <ContentControl.Style>
+                    <Style TargetType="ContentControl">
+                        <Setter Property="Visibility" Value="{Binding Content.ViewModel.IsMainContentVisible, ElementName=ProjectHost, FallbackValue=Collapsed, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsStudioVisible}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ContentControl.Style>
+            </ContentControl>
 
-                <!-- Left section: Viewport (top) and Project Explorer (bottom) -->
-                <Grid Grid.Column="0" x:Name="LeftSectionGrid">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Grid.ColumnSpan" Value="1"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ViewModel.IsMaximized, ElementName=ViewportControl}" Value="True">
-                                    <Setter Property="Grid.ColumnSpan" Value="3"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition x:Name="ProjectExplorerRow" Height="220" MinHeight="120" MaxHeight="400"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Row 0: Viewport -->
-                    <viewer:ViewerViewportControl Grid.Row="0" x:Name="ViewportControl">
-                        <viewer:ViewerViewportControl.Style>
-                            <Style TargetType="viewer:ViewerViewportControl">
-                                <Setter Property="Margin" Value="0"/>
-                                <Setter Property="Grid.RowSpan" Value="1"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ViewModel.IsMaximized, ElementName=ViewportControl}" Value="True">
-                                        <Setter Property="Grid.RowSpan" Value="3"/>
-                                        <Setter Property="Margin" Value="0,0,4,0"/>
-                                        <Setter Property="Panel.ZIndex" Value="1"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </viewer:ViewerViewportControl.Style>
-                    </viewer:ViewerViewportControl>
-
-                    <!-- Horizontal GridSplitter (resizes Viewport and Project Explorer) -->
-                    <GridSplitter Grid.Row="1"
-                                  HorizontalAlignment="Stretch"
-                                  VerticalAlignment="Center"
-                                  Height="4"
-                                  Background="Transparent"
-                                  ResizeBehavior="PreviousAndNext"
-                                  ResizeDirection="Rows"
-                                  Visibility="{Binding IsProjectExplorerVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-
-                    <!-- Project Explorer / Content Browser Panel (Row 2) -->
-                    <viewer:ViewerProjectExplorerControl Grid.Row="2" x:Name="ProjectExplorer"
-                                                         Visibility="{Binding IsProjectExplorerVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                </Grid>
-
-                <!-- Panel GridSplitter (resizes Left Section and PanelControl) -->
-                <GridSplitter Grid.Column="1"
-                              x:Name="MainGridSplitter"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Stretch"
-                              Width="4"
-                              Background="Transparent"
-                              ResizeBehavior="PreviousAndNext"
-                              ResizeDirection="Columns"
-                              Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
-                
-                <!-- Column 2: Controls Panel -->
-                <viewer:ViewerPanelControl Grid.Column="2" x:Name="PanelControl"
-                                           Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
-            </Grid>
-
-
-            <!-- 3D STUDIO VIEW -->
-            <viewer:StudioControl x:Name="StudioControl"
-                                        Visibility="{Binding DataContext.IsStudioVisible, ElementName=ViewerRoot, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            <ContentControl x:Name="StudioHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                            Visibility="{Binding IsStudioVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </Grid>
     </Grid>
 </UserControl>

@@ -106,7 +106,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             TimeSpan renderTime = _renderStopwatch.Elapsed;
             TimeSpan frameDelta = _lastRenderedAt == TimeSpan.Zero
-                ? delta
+                ? TimeSpan.Zero
                 : renderTime - _lastRenderedAt;
 
             _lastRenderedAt = renderTime;
@@ -345,6 +345,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             Loaded += OnViewportLoaded;
             Unloaded += OnViewportUnloaded;
+            IsVisibleChanged += OnViewportVisibilityChanged;
             // WASD over the viewport moves the camera (polled each frame); keep the key from focused controls.
             PreviewKeyDown += (_, e) => e.Handled |= _cameraController?.IsNavigationKey(e.Key) == true;
 
@@ -390,7 +391,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ApplyFpsLimitMode()
         {
-            if (_isCleanedUp || !_isOpenTkStarted || OpenTkControl == null) return;
+            if (_isCleanedUp || !_isOpenTkStarted || OpenTkControl == null || !IsLoaded || !IsVisible) return;
 
             ResetRenderTiming();
 
@@ -447,7 +448,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         internal void EnsureOpenTkStarted(OpenTK.Windowing.Common.IGraphicsContext contextToUse = null)
         {
-            if (_isOpenTkStarted || OpenTkControl == null) return;
+            if (_isCleanedUp || _isOpenTkStarted || OpenTkControl == null) return;
 
             var settings = new GLWpfControlSettings
             {
@@ -476,13 +477,32 @@ namespace AssetsManager.Views.Controls.Viewer
             InitializeModelInteraction();
             _cameraController = new CustomCameraController(Viewport3D, CameraInputSurface);
 
+            ApplyStudioParameters();
+            UpdateViewportRendering();
+        }
+
+        private void OnViewportVisibilityChanged(object sender, DependencyPropertyChangedEventArgs e) =>
+            UpdateViewportRendering();
+
+        private void UpdateViewportRendering()
+        {
             if (_isCleanedUp) return;
 
-            ApplyStudioParameters();
+            if (!IsLoaded || !IsVisible)
+            {
+                if (_isCompositionTargetHooked)
+                {
+                    CompositionTarget.Rendering -= OnCompositionTargetRendering;
+                    _isCompositionTargetHooked = false;
+                }
+                return;
+            }
+
             EnsureOpenTkStarted();
             ApplyFpsLimitMode();
             OpenTkControl.InvalidateVisual();
             _fpsStopwatch.Restart();
+            _framesSinceFpsUpdate = 0;
         }
 
         private void OnAppSettingsPropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -549,6 +569,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_isCleanedUp) return;
             _isCleanedUp = true;
+            IsVisibleChanged -= OnViewportVisibilityChanged;
             try
             {
                 _pendingSnapshot = null;
