@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using AssetsManager.Services.Viewer.Animation;
+using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Runtime;
@@ -32,7 +33,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (clips != null) clips.Items = CollectionViewSource.GetDefaultView(_model.DetectedAnimations);
             if (spells != null) spells.Items = CollectionViewSource.GetDefaultView(_browserSkin.SpellItems);
             _model.IsRawSystemsMode = true;
-            LoadBinFile(_browserSkin.BinPath);
+            LoadSkinSource(_browserSkin);
         }
 
         private void BrowserItem_Expanded(object sender, RoutedEventArgs e)
@@ -178,9 +179,11 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.ActiveLoopDuration = 0;
         }
 
-        private async void LoadBinFile(string binFilePath)
+        private async void LoadSkinSource(StudioSkinItem skin)
         {
-            if (!File.Exists(binFilePath)) return;
+            if (!File.Exists(skin.SourcePath)) return;
+            string binFilePath = skin.IdentityPath;
+            string searchDirectory = skin.ResourceRoot ?? _model.RootPath;
 
             StudioSceneActorRuntime adoption = TakePendingActorAdoption(binFilePath);
             ClearLoadedSkinState();
@@ -195,7 +198,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 // A promoted scene actor already carries this Skin's bundle, model and decoded clips.
                 var bundle = adoption?.Bundle ??
-                    await VfxLoadingService.LoadAsync(binFilePath, LogService, operation.Token);
+                    (string.IsNullOrEmpty(skin.BinPath) ? new VfxLoadingService.Bundle()
+                        : await VfxLoadingService.LoadAsync(skin.BinPath, LogService, operation.Token));
                 if (operation.IsCancellationRequested || _isCleanedUp) return;
                 _activeBundle = bundle;
                 if (adoption != null)
@@ -207,7 +211,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 // AnimationGraph metadata is independent from the preview mesh. Populate the
                 // picker immediately; ANM payloads are decoded only when a clip/spell needs one.
-                BindAnimationCatalog(_model.RootPath);
+                BindAnimationCatalog(searchDirectory);
 
                 foreach (var (hash, sysDef) in _activeBundle.Systems)
                 {
@@ -266,7 +270,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 // Selecting a skin loads its owner model and browser data only. A VFX system
                 // starts exclusively from an explicit System selection in the browser.
-                TryLoadChampionModelAsync(_model.RootPath);
+                TryLoadChampionModelAsync(searchDirectory);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)

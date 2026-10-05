@@ -14,6 +14,75 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class StudioControl
     {
+        private void OpenChromaLibrary_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model.IsChromaLibraryVisible)
+                _model.IsChromaLibraryVisible = false;
+            else if (!string.IsNullOrEmpty(StudioChromaLibrary.ViewModel.CurrentSourcePath))
+                _model.IsChromaLibraryVisible = true;
+            else
+                ChooseChromaFolder();
+        }
+
+        private async void ChooseChromaFolder()
+        {
+            if (_isCleanedUp || ChromaLoadingService == null) return;
+            var dialog = new OpenFolderDialog
+            {
+                Title = "Select the skins folder for Chroma Library",
+                InitialDirectory = StudioChromaLibrary.ViewModel.CurrentSourcePath ?? _model.RootPath
+            };
+            if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+            _model.IsChromaLibraryVisible = true;
+            await StudioChromaLibrary.InitializeAsync(dialog.FolderName);
+        }
+
+        private void LoadStudioChromas(IReadOnlyList<ChromaSkinModel> selected, bool addToScene)
+        {
+            if (_isCleanedUp || SknLoadingService == null || VfxLoadingService == null || selected.Count == 0) return;
+            var skins = selected.Select(AssetsManager.Services.Viewer.Loading.ChromaLoadingService.CreateStudioSkin).ToList();
+            if (skins.Any(skin => skin == null))
+            {
+                CustomMessageBoxService?.ShowWarning("Chroma Unavailable",
+                    "A selected model or texture folder is no longer available. Choose the skins folder again.",
+                    Window.GetWindow(this));
+                return;
+            }
+            StudioWorkspaceTab current = _model.SelectedWorkspaceTab;
+            int existing = current?.Kind == StudioWorkspaceTabKind.Skin ? current.Actors.Count : 0;
+            int additions = skins.Count(skin => current?.Kind != StudioWorkspaceTabKind.Skin ||
+                !current.Actors.Any(actor => actor.HasSkin(skin)));
+            if (addToScene && existing + additions > MaxSceneActors)
+            {
+                CustomMessageBoxService?.ShowWarning("Scene Limit",
+                    $"A scene holds up to {MaxSceneActors} characters. Select fewer chromas or open them in tabs.",
+                    Window.GetWindow(this));
+                return;
+            }
+            if (string.IsNullOrEmpty(_model.RootPath))
+            {
+                _model.RootPath = skins[0].ResourceRoot;
+                _ = ScanRootDirectoryAsync(_model.RootPath);
+            }
+            foreach (StudioSkinItem skin in skins)
+            {
+                if (addToScene) AddSkinToScene(skin);
+                else OpenSkin(skin, ownTab: true);
+            }
+            _model.IsChromaLibraryVisible = false;
+            OpenTkControl?.InvalidateVisual();
+        }
+
+        private void StudioOptions_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Button button && button.ContextMenu != null)
+            {
+                button.ContextMenu.DataContext = _model;
+                button.ContextMenu.PlacementTarget = button;
+                button.ContextMenu.IsOpen = true;
+            }
+        }
+
         private void ExitStudio_Click(object sender, RoutedEventArgs e)
         {
             if (_isExitPending) return;
@@ -31,6 +100,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ReleaseCurrentProject()
         {
+            _model.IsChromaLibraryVisible = false;
+            StudioChromaLibrary.Reset();
             _pendingSnapshot = null;
             _scanCancellation?.Cancel();
             _scanCancellation = null;

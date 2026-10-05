@@ -11,6 +11,17 @@ namespace AssetsManager.Views.Models.Viewer
     public partial class StudioModel : INotifyPropertyChanged
     {
         private string _rootPath;
+        private bool _isChromaLibraryVisible;
+        public bool IsChromaLibraryVisible
+        {
+            get => _isChromaLibraryVisible;
+            set
+            {
+                if (_isChromaLibraryVisible == value) return;
+                _isChromaLibraryVisible = value;
+                OnPropertyChanged();
+            }
+        }
         private StudioSkinItem _selectedSkin;
         private StudioWorkspaceTab _selectedWorkspaceTab;
         private string _searchQuery;
@@ -61,6 +72,12 @@ namespace AssetsManager.Views.Models.Viewer
 
         private void SelectedWorkspaceTab_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(StudioWorkspaceTab.HasExtraActors))
+                OnPropertyChanged(nameof(CanSynchronizeScene));
+            if (e.PropertyName is nameof(StudioWorkspaceTab.IsMeshSyncEnabled) or
+                nameof(StudioWorkspaceTab.IsTextureSyncEnabled) or nameof(StudioWorkspaceTab.IsAnimationSyncEnabled) or
+                nameof(StudioWorkspaceTab.IsAnimationPlaybackSyncEnabled))
+                OnPropertyChanged(e.PropertyName);
             if (e.PropertyName is nameof(StudioWorkspaceTab.FocusedActor) or
                 nameof(StudioWorkspaceTab.Title) or nameof(StudioWorkspaceTab.Subtitle))
                 NotifyViewportSelectionChanged();
@@ -174,6 +191,7 @@ namespace AssetsManager.Views.Models.Viewer
                 }
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsSkinWorkspace));
+                OnPropertyChanged(nameof(CanSynchronizeScene));
                 OnPropertyChanged(nameof(IsMapWorkspace));
                 OnPropertyChanged(nameof(HasContextInspector));
                 OnPropertyChanged(nameof(IsInspectorPanelVisible));
@@ -183,6 +201,7 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public bool IsSkinWorkspace => SelectedWorkspaceTab?.Kind == StudioWorkspaceTabKind.Skin;
+        public bool CanSynchronizeScene => IsSkinWorkspace && SelectedWorkspaceTab.Actors.Count > 1;
         public bool HasContextInspector => IsSkinWorkspace || IsMapWorkspace || HasStandaloneSystem;
         public bool IsInspectorPanelVisible => HasContextInspector && InspectorVisible;
 

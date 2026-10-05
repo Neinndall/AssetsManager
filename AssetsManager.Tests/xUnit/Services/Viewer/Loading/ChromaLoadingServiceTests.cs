@@ -8,6 +8,15 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Services.Viewer.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Loading;
+using LeagueToolkit.Core.Mesh;
+using LeagueToolkit.Core.Memory;
+using LeagueToolkit.Core.Renderer;
+using CommunityToolkit.HighPerformance.Buffers;
+using System.Threading;
+using System.Windows;
+using System.Windows.Threading;
 using Serilog;
 using Xunit;
 
@@ -15,6 +24,92 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Loading
 {
     public sealed class ChromaLoadingServiceTests
     {
+        private static readonly Lazy<Dispatcher> UiDispatcher = new(() =>
+        {
+            var ready = new TaskCompletionSource<Dispatcher>();
+            var thread = new Thread(() =>
+            {
+                var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                ready.SetResult(application.Dispatcher);
+                Dispatcher.Run();
+            }) { IsBackground = true };
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            return ready.Task.GetAwaiter().GetResult();
+        });
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public Task StudioChromaLoadsReplacementTexturesWithoutBin(bool reference) =>
+            UiDispatcher.Value.InvokeAsync(async () =>
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"am-studio-chroma-{Guid.NewGuid():N}");
+            try
+            {
+                CreateSkin(root, "skin02", true);
+                CreateSkin(root, "skin04", false);
+                string modelPath = Path.Combine(root, "skin02", "skin02.skn");
+                var description = SkinnedMeshVertex.COLOR;
+                var vertices = VertexBuffer.Create(description.Usage, description.Elements,
+                    VertexBuffer.AllocateForElements(description.Elements, 3));
+                var indices = MemoryOwner<byte>.Allocate(6);
+                for (ushort i = 0; i < 3; i++)
+                    BitConverter.TryWriteBytes(indices.Span.Slice(i * 2, 2), i);
+                using (var mesh = new SkinnedMesh(new[] { new SkinnedMeshRange("body", 0, 3, 0, 3) },
+                    vertices, IndexBuffer.Create(IndexFormat.U16, indices)))
+                    mesh.WriteSimpleSkin(modelPath);
+                string textures = Path.Combine(root, "skin04");
+                WriteSolidDds(Path.Combine(textures, "chroma_tx_cm.dds"));
+                var chroma = new ChromaSkinModel
+                {
+                    Name = "SKIN04", ModelPath = modelPath, TexturePath = textures, SourceRoot = root,
+                    SourceKind = reference ? ChromaSourceKind.Reference : ChromaSourceKind.Current
+                };
+                StudioSkinItem skin = ChromaLoadingService.CreateStudioSkin(chroma);
+                Assert.NotNull(skin);
+                Assert.Null(skin.BinPath);
+                Assert.Equal(textures, skin.IdentityPath);
+                Assert.Equal(root, skin.ResourceRoot);
+                if (reference) Assert.Contains("Reference", skin.DisplayName);
+                using var logger = new LoggerConfiguration().CreateLogger();
+                var log = new LogService(logger);
+                using var loading = new VfxLoadingService();
+                var sknLoading = new SknLoadingService(log);
+                var (focused, resolved) = await sknLoading.LoadStudioModelAsync(
+                    skin, new VfxLoadingService.Bundle(), null, loading, root, CancellationToken.None);
+                Assert.Equal(modelPath, resolved);
+                Assert.NotNull(focused);
+                using (focused)
+                    Assert.Contains("chroma_tx_cm", Assert.Single(focused.Parts).AllTextures.Keys);
+
+                var actor = new StudioSceneActor(skin);
+                StudioSceneActorRuntime runtime = await StudioSceneActorRuntime.LoadAsync(
+                    actor, loading, sknLoading, log, "unused-project-root", CancellationToken.None);
+                Assert.NotNull(runtime);
+                try
+                {
+                    Assert.Equal(root, runtime.SearchDirectory);
+                    Assert.Equal(textures, runtime.SourceIdentity);
+                    Assert.Contains("chroma_tx_cm", Assert.Single(runtime.Model.Parts).AllTextures.Keys);
+                    await runtime.PlayRememberedClipAsync(actor, log, CancellationToken.None);
+                }
+                finally { runtime.ReleaseCpuState(); }
+            }
+            finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+        }).Task.Unwrap();
+
+        private static void WriteSolidDds(string path)
+        {
+            uint[] header = { 0x20534444, 124, 0x100F, 1, 1, 4, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0x41, 0, 32,
+                0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000, 0x1000, 0, 0, 0, 0 };
+            using var stream = File.Create(path);
+            using var writer = new BinaryWriter(stream);
+            foreach (uint value in header) writer.Write(value);
+            writer.Write(0xFF00FF00u);
+        }
+
         [Fact]
         public async Task LoadFamiliesAsync_GroupsChromasUnderNearestPrimarySkin()
         {

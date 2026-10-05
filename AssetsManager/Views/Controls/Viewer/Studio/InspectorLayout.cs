@@ -11,6 +11,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             VfxMotionSection.IsChecked = false;
             StudioSceneActorsSection.IsChecked = false;
+            StudioSynchronizationSection.IsChecked = false;
             MapBackdropSection.IsChecked = false;
             CharacterTransformSection.IsChecked = false;
             CharacterGameStateSection.IsChecked = false;

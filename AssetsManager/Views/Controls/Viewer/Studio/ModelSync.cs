@@ -10,6 +10,33 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         private void OnModelPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(StudioWorkspaceTab.IsAnimationSyncEnabled))
+            {
+                SynchronizeStudioCatalogs();
+                _ = SynchronizeStudioPlaybackAsync();
+            }
+            else if (e.PropertyName == nameof(StudioWorkspaceTab.IsAnimationPlaybackSyncEnabled))
+            {
+                SynchronizeStudioTransport();
+                _ = SynchronizeStudioPlaybackAsync();
+            }
+            else if (e.PropertyName == nameof(StudioWorkspaceTab.IsMeshSyncEnabled) &&
+                     _model.SelectedWorkspaceTab.IsMeshSyncEnabled && _championModel != null)
+            {
+                foreach (ModelPart part in _championModel.Parts) SynchronizeStudioPart(part, textures: false);
+            }
+            else if (e.PropertyName == nameof(StudioWorkspaceTab.IsTextureSyncEnabled) &&
+                     _model.SelectedWorkspaceTab.IsTextureSyncEnabled && _championModel != null)
+            {
+                foreach (ModelPart part in _championModel.Parts) SynchronizeStudioPart(part, textures: true);
+            }
+            else if (e.PropertyName == nameof(StudioModel.IsPlaying))
+                SynchronizeStudioTransport();
+            if (e.PropertyName == nameof(StudioModel.IsChromaLibraryVisible))
+            {
+                _discardNextSimulationDelta = true;
+                SetRenderLoopRunning(_isActive && IsVisible);
+            }
             if (e.PropertyName == nameof(StudioModel.TimelineVisible))
             {
                 ApplyTimelineVisibility();
@@ -71,6 +98,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         _model.CurrentTime = 0d;
                         _model.IsPlaying = false;
                         _vfxRenderer?.SetSystem(null);
+                        _ = SynchronizeStudioPlaybackAsync();
                         OpenTkControl?.InvalidateVisual();
                     }
                     else

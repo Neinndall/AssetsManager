@@ -31,8 +31,6 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="20"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="20"/>
-                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <!-- Open Project Folder Card -->
                             <Button Grid.Column="0" Style="{StaticResource SelectionCardButtonStyle}"
@@ -59,33 +57,8 @@
                                 </StackPanel>
                             </Button>
 
-                            <!-- Load Chroma Card -->
-                            <Button Grid.Column="2" Style="{StaticResource SelectionCardButtonStyle}"
-                                    Click="OpenChromaFile_Click"
-                                    Width="180" Height="160" Margin="0" Padding="20">
-                                <StackPanel>
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,14">
-                                        <materialIcons:MaterialIcon Kind="Palette" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Chroma Library"
-                                               FontWeight="Bold"
-                                               FontSize="14"
-                                               Foreground="{StaticResource TextPrimary}"
-                                               HorizontalAlignment="Center"/>
-                                    <TextBlock FontSize="12"
-                                               Foreground="{StaticResource TextSecondary}"
-                                               HorizontalAlignment="Center"
-                                               TextAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               LineHeight="16" Margin="0,4,0,0">
-                                        <Run Text="Compare variants"/><LineBreak/>
-                                        <Run Text="and textures"/>
-                                    </TextBlock>
-                                </StackPanel>
-                            </Button>
-
                             <!-- 3D Studio Card -->
-                            <Button Grid.Column="4" Style="{StaticResource SelectionCardButtonStyle}"
+                            <Button Grid.Column="2" Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenStudio_Click"
                                     Width="180" Height="160" Margin="0" Padding="20">
                                 <StackPanel>
@@ -217,10 +190,6 @@
                                            Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
             </Grid>
 
-
-            <!-- CHROMA SELECTION OVERLAY -->
-            <viewer:ChromaSelectionControl x:Name="ChromaSelectionControl"
-                                           Visibility="{Binding ViewModel.IsChromaGalleryVisible, ElementName=PanelControl, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
             <!-- 3D STUDIO VIEW -->
             <viewer:StudioControl x:Name="StudioControl"

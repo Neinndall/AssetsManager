@@ -24,12 +24,33 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Utils.Rendering;
+using AssetsManager.Services.Viewer.Semantics;
+using AssetsManager.Services.Viewer.Vfx.Loading;
 
 
 namespace AssetsManager.Services.Viewer.Loading
 {
     public class SknLoadingService
     {
+        internal async Task<(SceneModel Model, string ModelPath)> LoadStudioModelAsync(
+            StudioSkinItem skin, VfxLoadingService.Bundle bundle, CharacterFormDefinition form,
+            VfxLoadingService loading, string searchDirectory,
+            CancellationToken token)
+        {
+            bool reloads = form is { ReloadsModel: true };
+            string path = reloads && !string.IsNullOrWhiteSpace(form.MeshPath)
+                ? loading.ResolveAssetPath(form.MeshPath, searchDirectory, ".skn")
+                : skin.ModelPath ?? loading.ResolveAssetPath(bundle?.OwnerSceneContext?.MeshPath, searchDirectory, ".skn");
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                return (null, path);
+
+            SceneModel model = !reloads && !string.IsNullOrEmpty(skin.TextureDirectory)
+                ? await LoadModel(path, skin.TextureDirectory, token)
+                : await LoadModelWithSkinBin(path, bundle?.PrimaryBinPath, searchDirectory,
+                    token, gearUpgradePathHash: reloads ? form.PathHash : 0u);
+            return (model, path);
+        }
+
         private const string ShaderDefinitionsPath = "data/shaders/shaders.bin";
         private readonly LogService _logService;
         private readonly HashResolverService _hashResolverService;

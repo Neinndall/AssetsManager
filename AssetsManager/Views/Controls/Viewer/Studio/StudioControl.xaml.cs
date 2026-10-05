@@ -158,6 +158,16 @@ namespace AssetsManager.Views.Controls.Viewer
 
         /// <summary>Injected by the host and shared with the main Viewer model pipeline.</summary>
         public SknLoadingService SknLoadingService { get; set; }
+        public ChromaLoadingService ChromaLoadingService
+        {
+            get => StudioChromaLibrary.ChromaLoadingService;
+            set => StudioChromaLibrary.ChromaLoadingService = value;
+        }
+        public CustomMessageBoxService CustomMessageBoxService
+        {
+            get => StudioChromaLibrary.CustomMessageBoxService;
+            set => StudioChromaLibrary.CustomMessageBoxService = value;
+        }
 
         /// <summary>Injected by the host and owned by ViewerWindow.</summary>
         public VfxLoadingService VfxLoadingService { get; set; }
@@ -202,6 +212,9 @@ namespace AssetsManager.Views.Controls.Viewer
             DataContext = _model;
             _model.PropertyChanged += OnModelPropertyChanged;
             _model.MapVisibilityRequested += OnMapVisibilityRequested;
+            StudioChromaLibrary.SelectionRequested += LoadStudioChromas;
+            StudioChromaLibrary.CloseRequested += (_, _) => _model.IsChromaLibraryVisible = false;
+            StudioChromaLibrary.SourceChangeRequested += (_, _) => ChooseChromaFolder();
 
             Loaded += OnControlLoaded;
             Unloaded += OnControlUnloaded;

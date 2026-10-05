@@ -659,7 +659,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 foreach (SceneModel model in _loadedModels)
                 {
-                    AnimationData data = FindMatchingAnimation(model, animationModel.AnimationData);
+                    AnimationData data = ViewerSynchronizationService.MatchingAnimation(model, animationModel.AnimationData);
                     if (data != null)
                         ActivateAnimation(model, data);
                     else if (model.CurrentAnimation != null)
@@ -674,13 +674,6 @@ namespace AssetsManager.Views.Controls.Viewer
             Panel?.SetAnimationPlayingState(animationModel, true, true);
         }
 
-        private static AnimationData FindMatchingAnimation(SceneModel model, AnimationData source)
-        {
-            if (model?.Animations == null || source == null) return null;
-            return model.Animations.FirstOrDefault(candidate =>
-                string.Equals(candidate.Name, source.Name, StringComparison.OrdinalIgnoreCase));
-        }
-
         public void PreviewAnimationAt(AnimationModel animationModel, TimeSpan time)
         {
             if (_activeSceneModel == null || animationModel?.AnimationData?.AnimationAsset == null) return;
@@ -691,7 +684,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     foreach (SceneModel model in _loadedModels)
                     {
-                        AnimationData data = FindMatchingAnimation(model, animationModel.AnimationData);
+                        AnimationData data = ViewerSynchronizationService.MatchingAnimation(model, animationModel.AnimationData);
                         if (data == null) continue;
                         ActivateAnimation(model, data);
                         model.IsAnimationPaused = true;
@@ -712,9 +705,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (model == null || data?.AnimationAsset == null) return;
 
-            model.CurrentAnimation = data.AnimationAsset;
-            model.AnimationTime = 0d;
-            model.IsAnimationPaused = false;
+            ViewerSynchronizationService.StartAnimation(model, data);
             _lastModelUpdates.Remove(model);
         }
 
@@ -727,13 +718,12 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 foreach (SceneModel model in _loadedModels)
                 {
-                    if (model.CurrentAnimation != null)
-                        model.IsAnimationPaused = newPausedState;
+                    ViewerSynchronizationService.PauseAnimation(model, newPausedState);
                 }
             }
             else
             {
-                _activeSceneModel.IsAnimationPaused = newPausedState;
+                ViewerSynchronizationService.PauseAnimation(_activeSceneModel, newPausedState);
             }
 
             Panel?.SetAnimationPlayingState(_activeAnimationModel, !newPausedState, true);
@@ -746,10 +736,7 @@ namespace AssetsManager.Views.Controls.Viewer
             void SeekModel(SceneModel model)
             {
                 if (model?.CurrentAnimation == null) return;
-                double duration = Math.Max(0d, model.CurrentAnimation.Duration);
-                model.AnimationTime = duration > 0d
-                    ? Math.Clamp(time.TotalSeconds, 0d, duration)
-                    : Math.Max(0d, time.TotalSeconds);
+                ViewerSynchronizationService.SeekAnimation(model, time.TotalSeconds);
                 _lastModelUpdates.Remove(model);
             }
 
@@ -785,12 +772,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (model == null) return;
             _lastModelUpdates.Remove(model);
-            model.CurrentAnimation = null;
-            model.AnimationTime = 0d;
-            model.IsAnimationPaused = true;
-            // Clearing the live palette returns the SKN to its authored bind/T-pose without
-            // forcing GPU bind-pose skinning (and therefore without changing the idle Lit pipeline).
-            model.SkinningMatrices = null;
+            ViewerSynchronizationService.StopAnimation(model);
         }
 
         public void RemoveAnimation(AnimationModel animationModel)

@@ -99,6 +99,8 @@ namespace AssetsManager.Views.Models.Viewer
         internal bool PlacementCustomized { get; set; }
         internal string PlacedOnKey { get; set; }
         internal Dictionary<uint, bool> SubmeshOverrides { get; } = new();
+        internal Dictionary<uint, string> TextureOverrides { get; } = new();
+        internal List<SynchronizedAnimationSource> ImportedAnimations { get; } = new();
 
         /// <summary>Each Character keeps its own transport: a paused actor stays paused off focus.</summary>
         internal bool IsPlaybackPaused { get; set; }
@@ -142,6 +144,8 @@ namespace AssetsManager.Views.Models.Viewer
             };
             foreach (var pair in SubmeshOverrides)
                 copy.SubmeshOverrides.Add(pair.Key, pair.Value);
+            foreach (var pair in TextureOverrides) copy.TextureOverrides[pair.Key] = pair.Value;
+            copy.ImportedAnimations.AddRange(ImportedAnimations);
             copy.EnabledGameStates.UnionWith(EnabledGameStates);
             return copy;
         }
@@ -151,10 +155,10 @@ namespace AssetsManager.Views.Models.Viewer
         internal static bool IsSameSkin(StudioSkinItem left, StudioSkinItem right)
         {
             if (ReferenceEquals(left, right)) return true;
-            if (string.IsNullOrWhiteSpace(left?.BinPath) || string.IsNullOrWhiteSpace(right?.BinPath)) return false;
+            if (string.IsNullOrWhiteSpace(left?.IdentityPath) || string.IsNullOrWhiteSpace(right?.IdentityPath)) return false;
             return string.Equals(
-                Path.GetFullPath(left.BinPath),
-                Path.GetFullPath(right.BinPath),
+                Path.GetFullPath(left.IdentityPath),
+                Path.GetFullPath(right.IdentityPath),
                 StringComparison.OrdinalIgnoreCase);
         }
 

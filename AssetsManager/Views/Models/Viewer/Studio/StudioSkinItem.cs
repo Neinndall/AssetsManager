@@ -18,6 +18,11 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<StudioBrowserSection> Sections { get; } = new();
         public ObservableCollection<object> SpellItems { get; } = new();
         public string KindLabel { get; init; }
+        public string ModelPath { get; init; }
+        public string TextureDirectory { get; init; }
+        public string ResourceRoot { get; init; }
+        internal string SourcePath => BinPath ?? ModelPath;
+        internal string IdentityPath => TextureDirectory ?? BinPath;
         public string Title => !string.IsNullOrWhiteSpace(BrowserTitle)
             ? BrowserTitle
             : SkinIndex == int.MaxValue

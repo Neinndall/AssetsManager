@@ -188,7 +188,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (!_isGlStarted || OpenTkControl == null) return;
             _viewportFrameScheduler ??= new ViewportFrameScheduler(Dispatcher, OpenTkControl.InvalidateVisual);
-            if (running && IsVisible)
+            if (running && IsVisible && !_model.IsChromaLibraryVisible)
                 _viewportFrameScheduler.Start();
             else
                 _viewportFrameScheduler.Stop();
@@ -234,6 +234,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _isExitPending = false;
             Deactivate();
             _isCleanedUp = true;
+            StudioChromaLibrary.Reset();
             UnsubscribeGroundLogoSettings();
             IsVisibleChanged -= OnControlVisibilityChanged;
             _viewportFrameScheduler?.Dispose();

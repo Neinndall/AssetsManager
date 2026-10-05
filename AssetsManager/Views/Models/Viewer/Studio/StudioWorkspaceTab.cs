@@ -25,6 +25,31 @@ namespace AssetsManager.Views.Models.Viewer
         private string _subtitle;
         private object _payload;
         private StudioSceneActor _focusedActor;
+        private bool _isMeshSyncEnabled;
+        private bool _isTextureSyncEnabled;
+        private bool _isAnimationSyncEnabled;
+        private bool _isAnimationPlaybackSyncEnabled;
+
+        public bool IsMeshSyncEnabled
+        {
+            get => _isMeshSyncEnabled;
+            set { if (_isMeshSyncEnabled == value) return; _isMeshSyncEnabled = value; OnPropertyChanged(); }
+        }
+        public bool IsTextureSyncEnabled
+        {
+            get => _isTextureSyncEnabled;
+            set { if (_isTextureSyncEnabled == value) return; _isTextureSyncEnabled = value; OnPropertyChanged(); }
+        }
+        public bool IsAnimationSyncEnabled
+        {
+            get => _isAnimationSyncEnabled;
+            set { if (_isAnimationSyncEnabled == value) return; _isAnimationSyncEnabled = value; OnPropertyChanged(); }
+        }
+        public bool IsAnimationPlaybackSyncEnabled
+        {
+            get => _isAnimationPlaybackSyncEnabled;
+            set { if (_isAnimationPlaybackSyncEnabled == value) return; _isAnimationPlaybackSyncEnabled = value; OnPropertyChanged(); }
+        }
 
         public StudioWorkspaceTab()
         {
@@ -142,7 +167,11 @@ namespace AssetsManager.Views.Models.Viewer
                 CharacterEffectsEnabled = CharacterEffectsEnabled,
                 MapEffectsEnabled = MapEffectsEnabled,
                 ShadersEnabled = ShadersEnabled,
-                StructuresVisible = StructuresVisible
+                StructuresVisible = StructuresVisible,
+                IsMeshSyncEnabled = IsMeshSyncEnabled,
+                IsTextureSyncEnabled = IsTextureSyncEnabled,
+                IsAnimationSyncEnabled = IsAnimationSyncEnabled,
+                IsAnimationPlaybackSyncEnabled = IsAnimationPlaybackSyncEnabled
             };
             foreach (StudioSceneActor actor in Actors)
             {

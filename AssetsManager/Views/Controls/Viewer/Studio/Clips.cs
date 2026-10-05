@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using AssetsManager.Services.Viewer.Animation;
+using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Views.Models.Viewer;
@@ -45,10 +46,10 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_clipCatalog == null || _activeBundle == null || VfxLoadingService == null)
                 return Array.Empty<AnimationClipCatalogItem>();
 
-            return _clipCatalog.BuildMetadata(
+            return ViewerSynchronizationService.MergeClips(FocusedActor, _championModel, _clipCatalog.BuildMetadata(
                 GetCharacterPlaybackBundle(),
                 path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
-                parameter);
+                parameter), parameter);
         }
 
         private bool TrySelectOpeningSkinAnimation()
@@ -165,12 +166,9 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 _model.StatusText = $"{selectedItem.DisplayName} · loading animation...";
-                AnimationClipCatalogItem animItem = await catalog.PrepareAsync(
-                    selectedItem,
-                    playbackBundle,
-                    path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"),
-                    LogService,
-                    operation.Token);
+                AnimationClipCatalogItem animItem = await ViewerSynchronizationService.PrepareClipAsync(
+                    selectedItem, catalog, playbackBundle, VfxLoadingService,
+                    _animationSearchDirectory, LogService, operation.Token);
                 operation.Token.ThrowIfCancellationRequested();
                 if (_isCleanedUp || animItem == null ||
                     !ReferenceEquals(operation, _animationClipCancellation) ||
@@ -235,6 +233,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     bundle.Systems,
                     playbackBundle.ResourceMap);
                 _model.IsPlaying = !startPaused;
+                SynchronizeStudioCatalogs();
+                _ = SynchronizeStudioPlaybackAsync();
                 _model.StatusText = $"{animItem.DisplayName} ({dur:F2}s) · {(animItem.HasVfx ? animItem.VfxSummary : "Animation only")}";
                 _model.LogMessages.Add($"[PLAY ANIMATION] {animItem.DisplayName} ({dur:F2}s) with {(animItem.Composition?.ResolvedCount ?? 0)} VFX events & {resolvedIdleVfx} resolved idle auras.");
                 UpdateTimelineTrackMetrics();
@@ -322,7 +322,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private string ResolvePreviewSearchDirectory()
         {
-            string searchDir = _model.RootPath;
+            string searchDir = _model.SelectedSkin?.ResourceRoot ?? _model.RootPath;
             return !string.IsNullOrEmpty(searchDir) && File.Exists(searchDir)
                 ? Path.GetDirectoryName(searchDir) ?? searchDir
                 : searchDir;

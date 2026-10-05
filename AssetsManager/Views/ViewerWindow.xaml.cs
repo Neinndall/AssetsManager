@@ -50,13 +50,13 @@ namespace AssetsManager.Views
             ViewportControl.AppSettings = appSettings;
 
             PanelControl.SknLoadingService = sknLoadingService;
-            PanelControl.ChromaLoadingService = chromaLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = customMessageBoxService;
             PanelControl.TaskCancellationManager = _taskCancellationManager;
             PanelControl.WindowViewModel = _viewModel;
 
-            ChromaSelectionControl.ChromaLoadingService = chromaLoadingService;
+            StudioControl.ChromaLoadingService = chromaLoadingService;
+            StudioControl.CustomMessageBoxService = customMessageBoxService;
 
             StudioControl.LogService = _logService;
             StudioControl.AppSettings = appSettings;
@@ -68,12 +68,10 @@ namespace AssetsManager.Views
             // Peer-to-Peer wiring between sub-controls
             PanelControl.Viewport = ViewportControl;
             PanelControl.ViewModel.ViewportViewModel = ViewportControl.ViewModel;
-            PanelControl.ChromaGallery = ChromaSelectionControl;
 
             ViewportControl.Panel = PanelControl;
 
             PanelControl.ProjectExplorer = ProjectExplorer;
-            ChromaSelectionControl.ParentPanel = PanelControl;
 
             // Project Explorer event wiring
             ProjectExplorer.ModelSelected += ProjectExplorer_ModelSelected;
@@ -115,7 +113,6 @@ namespace AssetsManager.Views
 
         // Empty-state handlers: thin 1-liners that delegate to the Panel
         private async void OpenFile_Click(object sender, RoutedEventArgs e) => await PanelControl.OpenSknModel();
-        private void OpenChromaFile_Click(object sender, RoutedEventArgs e) => PanelControl.OpenChromaFolder();
 
         private void OpenStudio_Click(object sender, RoutedEventArgs e)
         {

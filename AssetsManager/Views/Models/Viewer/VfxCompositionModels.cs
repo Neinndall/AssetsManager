@@ -328,6 +328,15 @@ namespace AssetsManager.Views.Models.Viewer
     }
 
     /// <summary>
+    /// Shared clip metadata and dependencies; receiving actors decode assets in their own catalogs.
+    /// </summary>
+    internal sealed record SynchronizedAnimationSource(
+        AnimationClipCatalogItem Item,
+        AssetsManager.Services.Viewer.Vfx.Loading.VfxLoadingService.Bundle Bundle,
+        string SearchDirectory,
+        string SkeletonSignature);
+
+    /// <summary>
     /// Resolved AnimationGraph clip ready for preview. The animation asset is owned by the
     /// catalog that created this entry; the entry itself only carries playback metadata.
     /// </summary>
@@ -347,6 +356,7 @@ namespace AssetsManager.Views.Models.Viewer
         float? ParameterValue = null)
     {
         public const string BindPoseName = "Bind pose";
+        internal SynchronizedAnimationSource SharedSource { get; init; }
 
         public bool IsBindPose => string.Equals(Name, BindPoseName, StringComparison.OrdinalIgnoreCase);
 

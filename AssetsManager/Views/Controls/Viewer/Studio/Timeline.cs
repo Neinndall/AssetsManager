@@ -335,6 +335,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.CurrentTime = time;
             SyncMapCharacterClipTime(time);
             _vfxRenderer?.Seek(time);
+            SynchronizeStudioTransport();
         }
 
         internal static double PlaybackStepTarget(double currentTime, int frames, double span)

@@ -30,11 +30,11 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class ViewerPanelControl : UserControl
     {
+        private readonly ViewerSynchronizationService _synchronization = new();
         private readonly ViewerPanelModel _viewModel;
         public ViewerPanelModel ViewModel => _viewModel;
 
         public SknLoadingService SknLoadingService { get; set; }
-        public ChromaLoadingService ChromaLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
@@ -43,7 +43,6 @@ namespace AssetsManager.Views.Controls.Viewer
         // Peer Controls (Direct communication)
         public ViewerWindowModel WindowViewModel { get; set; }
         public ViewerViewportControl Viewport { get; set; }
-        public ChromaSelectionControl ChromaGallery { get; set; }
 
         public ObservableRangeCollection<AnimationModel> AnimationModels => _viewModel.AnimationModels;
 
@@ -131,13 +130,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 UpdateHeroStats();
             }
-            else if (e.PropertyName == nameof(ViewerPanelModel.IsChromaGalleryVisible))
-            {
-                if (!_viewModel.IsChromaGalleryVisible)
-                {
-                    ChromaGallery?.ViewModel?.Reset();
-                }
-            }
         }
 
         private void OnPanelUnloaded(object sender, RoutedEventArgs e)
@@ -147,102 +139,19 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void HandleMeshVisibilityChanged(ModelPart sourcePart)
         {
-            if (!_viewModel.IsMeshSyncEnabled) return;
-
-            foreach (var model in _viewModel.LoadedModels)
-            {
-                // Find all parts with the same name (case-insensitive)
-                var targetParts = model.Parts.Where(p => string.Equals(p.Name, sourcePart.Name, StringComparison.OrdinalIgnoreCase)).ToList();
-
-                foreach (var targetPart in targetParts)
-                {
-                    if (targetPart != sourcePart)
-                    {
-                        try
-                        {
-                            // Temporal deactivation of sync to avoid infinite recursion
-                            model.IsMeshSyncEnabled = false;
-                            targetPart.IsVisible = sourcePart.IsVisible;
-                        }
-                        catch (Exception ex)
-                        {
-                            LogService.LogError(ex, $"Failed to sync part '{targetPart.Name}' in model '{model.Name}'");
-                        }
-                        finally
-                        {
-                            model.IsMeshSyncEnabled = true;
-                        }
-                    }
-                }
-            }
+            if (_viewModel.IsMeshSyncEnabled)
+                _synchronization.SynchronizeParts(sourcePart, _viewModel.LoadedModels, textures: false);
         }
 
         private void HandleMeshTextureChanged(ModelPart sourcePart)
         {
-            if (!_viewModel.IsTextureSyncEnabled) return;
-
-            foreach (var model in _viewModel.LoadedModels)
-            {
-                // Find all parts with the same name (case-insensitive)
-                var targetParts = model.Parts.Where(p => string.Equals(p.Name, sourcePart.Name, StringComparison.OrdinalIgnoreCase)).ToList();
-
-                foreach (var targetPart in targetParts)
-                {
-                    if (targetPart != sourcePart)
-                    {
-                        try
-                        {
-                            if (sourcePart.SelectedTextureName != null)
-                            {
-                                string sourceTexNormal = PathUtils.TruncateAtDot(sourcePart.SelectedTextureName);
-                                string exactMatch = targetPart.AvailableTextureNames.FirstOrDefault(t =>
-                                    string.Equals(PathUtils.TruncateAtDot(t), sourceTexNormal, StringComparison.OrdinalIgnoreCase));
-
-                                if (exactMatch != null)
-                                {
-                                    if (targetPart.SelectedTextureName != exactMatch)
-                                    {
-                                        targetPart.SelectedTextureName = exactMatch;
-                                    }
-                                }
-                                else
-                                {
-                                    // Fallback to index-based matching (for chromas which have differently named textures in the same order)
-                                    int sourceIndex = sourcePart.AvailableTextureNames.IndexOf(sourcePart.SelectedTextureName);
-                                    if (sourceIndex >= 0 && sourceIndex < targetPart.AvailableTextureNames.Count)
-                                    {
-                                        if (targetPart.SelectedTextureName != targetPart.AvailableTextureNames[sourceIndex])
-                                        {
-                                            targetPart.SelectedTextureName = targetPart.AvailableTextureNames[sourceIndex];
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            LogService.LogError(ex, $"Failed to sync texture for part '{targetPart.Name}' in model '{model.Name}'");
-                        }
-                    }
-                }
-            }
+            if (_viewModel.IsTextureSyncEnabled)
+                _synchronization.SynchronizeParts(sourcePart, _viewModel.LoadedModels, textures: true);
         }
 
-        private void SyncLoadingForAllModels()
-        {
-            if (_viewModel.AnimationModels.Count == 0) return;
-
-            foreach (var model in _viewModel.LoadedModels)
-            {
-                foreach (var animModel in _viewModel.AnimationModels)
-                {
-                    if (!model.Animations.Any(a => a.Name == animModel.Name))
-                    {
-                        model.Animations.Add(animModel.AnimationData);
-                    }
-                }
-            }
-        }
+        private void SyncLoadingForAllModels() =>
+            ViewerSynchronizationService.ShareAnimations(
+                _viewModel.AnimationModels.Select(animation => animation.AnimationData), _viewModel.LoadedModels);
 
         private void HandleSelectedModelChanged()
         {
@@ -518,86 +427,9 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel.SelectedAnimation = null;
         }
 
-        /// <summary>
-        /// Orchestrates the opening of the Chroma Gallery.
-        /// </summary>
-        public async void HandleChromaGalleryRequest(string skinsPath)
-        {
-            if (ChromaGallery == null) return;
-
-            ViewModel.IsChromaGalleryVisible = true;
-            await ChromaGallery.InitializeAsync(skinsPath);
-        }
-
-        /// <summary>
-        /// Handles the selection of a chroma from the gallery.
-        /// </summary>
-        public async void HandleChromaSelected(ChromaSkinModel skin)
-        {
-            if (!string.IsNullOrEmpty(skin.ModelPath))
-            {
-                // Cargamos primero el modelo en segundo plano
-                SceneModel previousModel = _viewModel.SelectedModel;
-                await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
-                if (!ReferenceEquals(previousModel, _viewModel.SelectedModel))
-                    LabelChromaModel(skin);
-
-                // Una vez cargado y con el viewport listo, ocultamos la galería
-                ViewModel.IsChromaGalleryVisible = false;
-            }
-            else
-            {
-                ViewModel.IsChromaGalleryVisible = false;
-                CustomMessageBoxService.ShowWarning("Model Not Found", "Could not automatically find the .skn model for this skin folder.", Window.GetWindow(this));
-            }
-        }
-
-        /// <summary>
-        /// Handles the selection of multiple chromas from the gallery.
-        /// </summary>
-        public async void HandleMultipleChromasSelected(List<ChromaSkinModel> skins)
-        {
-            var skinsWithModels = skins.Where(s => !string.IsNullOrEmpty(s.ModelPath)).ToList();
-
-            if (skinsWithModels.Count > 0)
-            {
-                // Mantenemos la galería abierta durante la carga para mostrar el estado
-                foreach (var skin in skinsWithModels)
-                {
-                    SceneModel previousModel = _viewModel.SelectedModel;
-                    await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
-                    if (!ReferenceEquals(previousModel, _viewModel.SelectedModel))
-                        LabelChromaModel(skin);
-                }
-
-                // Cerramos solo cuando todo está cargado
-                ViewModel.IsChromaGalleryVisible = false;
-            }
-            else
-            {
-                ViewModel.IsChromaGalleryVisible = false;
-                CustomMessageBoxService.ShowWarning("Models Not Found", "Could not automatically find the .skn models for the selected skins.", Window.GetWindow(this));
-            }
-        }
-
-        private void LabelChromaModel(ChromaSkinModel skin)
-        {
-            if (skin == null || _viewModel.SelectedModel == null)
-                return;
-
-            string modelName = Path.GetFileNameWithoutExtension(skin.ModelPath);
-            string modelSkinName = Path.GetFileName(Path.GetDirectoryName(skin.ModelPath));
-            string modelSkinSuffix = "_" + modelSkinName;
-            string chromaName = modelName.EndsWith(modelSkinSuffix, StringComparison.OrdinalIgnoreCase)
-                ? modelName[..^modelSkinSuffix.Length] + "_" + skin.Name.ToLowerInvariant()
-                : $"{skin.Name} ({modelName})";
-            _viewModel.SelectedModel.Name = chromaName +
-                (skin.IsReference ? " [REFERENCE]" : string.Empty);
-        }
-
         public async Task LoadInitialModel(string filePath)
         {
-            await ProcessModelLoading(filePath, null, true);
+            await ProcessModelLoading(filePath);
         }
 
         public void LoadSkeleton(string filePath)
@@ -614,7 +446,7 @@ namespace AssetsManager.Views.Controls.Viewer
             LogService.LogDebug($"Loaded skeleton: {Path.GetFileName(filePath)} for model {_viewModel.SelectedModel.Name}");
         }
 
-        public async Task ProcessModelLoading(string modelPath, string texturePath, bool isInitialLoad)
+        private async Task ProcessModelLoading(string modelPath)
         {
             // Start a new cancellable operation. If another load is already in flight
             // (rapid clicks, double-load) it will be cancelled and its result dropped.
@@ -627,14 +459,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             try
             {
-                if (string.IsNullOrEmpty(texturePath))
-                {
-                    newModel = await SknLoadingService.LoadModel(modelPath, cancellationToken);
-                }
-                else
-                {
-                    newModel = await SknLoadingService.LoadModel(modelPath, texturePath, cancellationToken);
-                }
+                newModel = await SknLoadingService.LoadModel(modelPath, cancellationToken);
             }
             catch (System.OperationCanceledException)
             {
@@ -650,18 +475,14 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (newModel != null)
             {
-                if (isInitialLoad)
-                {
-                    if (_viewModel.LoadedModels.Count == 0)
-                        Viewport?.ApplyStudioParameters();
+                if (_viewModel.LoadedModels.Count == 0)
+                    Viewport?.ApplyStudioParameters();
 
-                    Viewport?.SetupScene();
-                    ViewModel.ShowMainContent(); // MVVM State Update
-                }
+                Viewport?.SetupScene();
+                ViewModel.ShowMainContent();
 
                 // Initialize Transform
                 newModel.PositionY = SceneElements.GroundLevel;
-                newModel.SourceType = string.IsNullOrEmpty(texturePath) ? "Model" : "Chroma";
 
                 Viewport?.AddModel(newModel);
                 _viewModel.SelectedModelParts = newModel.Parts;
@@ -669,13 +490,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 // Sync current animations (v3.2.3.1)
                 if (_viewModel.IsAnimationSyncEnabled && _viewModel.AnimationModels.Count > 0)
                 {
-                    foreach (var animModel in _viewModel.AnimationModels)
-                    {
-                        if (!newModel.Animations.Any(a => a.Name == animModel.Name))
-                        {
-                            newModel.Animations.Add(animModel.AnimationData);
-                        }
-                    }
+                    ViewerSynchronizationService.ShareAnimations(
+                        _viewModel.AnimationModels.Select(animation => animation.AnimationData), new[] { newModel });
                 }
 
                 _viewModel.LoadedModels.Add(newModel);
@@ -720,13 +536,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (_viewModel.IsAnimationSyncEnabled)
                 {
-                    foreach (var model in _viewModel.LoadedModels)
-                    {
-                        if (!model.Animations.Any(animation => animation.Name == animationName))
-                        {
-                            model.Animations.Add(animationData);
-                        }
-                    }
+                    ViewerSynchronizationService.ShareAnimations(new[] { animationData }, _viewModel.LoadedModels);
                 }
                 else
                 {
@@ -813,25 +623,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        public void OpenChromaFolder()
-        {
-            var folderBrowserDialog = new OpenFolderDialog
-            {
-                Title = "Select the skins folder"
-            };
-
-            if (folderBrowserDialog.ShowDialog() == true)
-            {
-                string skinsPath = folderBrowserDialog.FolderName;
-                ProjectExplorer?.LoadProjectFolder(skinsPath);
-
-                if (ProjectExplorer != null && WindowViewModel != null)
-                    WindowViewModel.IsProjectExplorerVisible = true;
-
-                HandleChromaGalleryRequest(skinsPath);
-            }
-        }
-
         // STUDIO HANDLERS
         private void SnapshotButton_Click(object sender, RoutedEventArgs e)
         {
@@ -875,7 +666,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _modelLoadingCts?.Dispose();
                 _modelLoadingCts = null;
 
-                _viewModel.IsChromaGalleryVisible = false;
                 Viewport?.ResetScene();
                 ResetScene();
 

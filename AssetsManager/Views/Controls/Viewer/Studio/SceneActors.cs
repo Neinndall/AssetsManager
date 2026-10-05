@@ -27,6 +27,7 @@ namespace AssetsManager.Views.Controls.Viewer
     public partial class StudioControl
     {
         internal const int MaxSceneActors = 8;
+        private readonly ViewerSynchronizationService _synchronization = new();
         private const double SceneActorSpacing = 180d;
 
         private readonly Dictionary<StudioSceneActor, StudioSceneActorRuntime> _sceneActorRuntimes = new();
@@ -48,6 +49,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 : null;
 
         private bool IsFocusedActorVisible => FocusedActor?.IsVisible != false;
+        private bool HasCurrentFocusedModel => _championModel != null &&
+            FocusedActor?.HasSkin(_model.SelectedSkin) == true &&
+            !_sceneActorRuntimes.Values.Any(runtime => ReferenceEquals(runtime.Model, _championModel));
 
         /// <summary>
         /// Consumed by the next System/Clip/Spell start: the preview restored for a newly focused actor
@@ -349,17 +353,131 @@ namespace AssetsManager.Views.Controls.Viewer
         private void RegisterSceneActorRuntime(StudioSceneActor actor, StudioSceneActorRuntime runtime)
         {
             _sceneActorRuntimes[actor] = runtime;
+            ApplyActorTextureOverrides(actor, runtime.Model);
             runtime.SetGameStates(actor.EnabledGameStates);
             runtime.ApplyPlacement(actor);
             actor.StatusText = runtime.DescribePlayback();
             RefreshCharacterInteractionTarget();
             OpenTkControl?.InvalidateVisual();
+            if (HasCurrentFocusedModel)
+                foreach (ModelPart part in _championModel.Parts)
+                {
+                    SynchronizeStudioPart(part, textures: false);
+                    SynchronizeStudioPart(part, textures: true);
+                }
+            SynchronizeStudioCatalogs();
+            if (_model.SelectedWorkspaceTab?.IsAnimationPlaybackSyncEnabled == true)
+                _ = SynchronizeStudioPlaybackAsync();
+        }
+
+        private IEnumerable<SceneModel> ActiveCharacterModels()
+        {
+            if (_championModel != null) yield return _championModel;
+            foreach (StudioSceneActorRuntime runtime in _sceneActorRuntimes.Values)
+                yield return runtime.Model;
+        }
+
+        private static void ApplyActorTextureOverrides(StudioSceneActor actor, SceneModel model)
+        {
+            foreach (ModelPart part in model.Parts)
+                if (actor.TextureOverrides.TryGetValue(LeagueToolkit.Hashing.Fnv1a.HashLower(part.Name), out string texture) &&
+                    part.AvailableTextureNames.Contains(texture))
+                    part.SelectedTextureName = texture;
+        }
+
+        private void SynchronizeStudioPart(ModelPart source, bool textures)
+        {
+            StudioWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            if (!_model.CanSynchronizeScene || !HasCurrentFocusedModel ||
+                !(textures ? tab.IsTextureSyncEnabled : tab.IsMeshSyncEnabled)) return;
+            _synchronization.SynchronizeParts(source, ActiveCharacterModels(), textures, (model, part) =>
+            {
+                StudioSceneActor actor = SceneActorForModel(model);
+                if (actor == null) return;
+                uint hash = LeagueToolkit.Hashing.Fnv1a.HashLower(part.Name);
+                if (textures) actor.TextureOverrides[hash] = part.SelectedTextureName;
+                else actor.SubmeshOverrides[hash] = part.IsVisible;
+            });
+        }
+
+        private void SynchronizeStudioCatalogs()
+        {
+            if (!_model.CanSynchronizeScene || !HasCurrentFocusedModel ||
+                _model.SelectedWorkspaceTab.IsAnimationSyncEnabled != true ||
+                _championModel.Skeleton == null || _activeBundle == null || _clipCatalog == null) return;
+            var sources = new List<SynchronizedAnimationSource>();
+            sources.AddRange(ViewerSynchronizationService.ExportClips(FocusedActor, _championModel, _clipCatalog.BuildMetadata(GetCharacterPlaybackBundle(),
+                path => VfxLoadingService.ResolveAssetPath(path, _animationSearchDirectory, ".anm"), _model.AnimationParameter),
+                GetCharacterPlaybackBundle(), _animationSearchDirectory));
+            foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
+                sources.AddRange(ViewerSynchronizationService.ExportClips(actor, runtime.Model,
+                    runtime.OwnClips(actor), runtime.PlaybackBundle, runtime.SearchDirectory));
+            ViewerSynchronizationService.ImportClips(FocusedActor, _championModel, sources, _model.DetectedAnimations);
+            foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
+                ViewerSynchronizationService.ImportClips(actor, runtime.Model, sources, runtime.OwnClips(actor));
+            RefreshFocusedImportedClips();
+        }
+
+        private void RefreshFocusedImportedClips()
+        {
+            var merged = ViewerSynchronizationService.MergeClips(FocusedActor, _championModel, _model.DetectedAnimations);
+            foreach (var stale in _model.DetectedAnimations.Where(item => item.SharedSource != null && !merged.Contains(item)).ToArray())
+            {
+                _model.DetectedAnimations.Remove(stale);
+                if (ReferenceEquals(_model.SelectedAnimation, stale))
+                    _model.SelectedAnimation = _model.DetectedAnimations.FirstOrDefault(item => item.IsBindPose);
+            }
+            foreach (AnimationClipCatalogItem item in merged)
+                if (!_model.DetectedAnimations.Contains(item)) _model.DetectedAnimations.Add(item);
+        }
+
+        private async Task SynchronizeStudioPlaybackAsync()
+        {
+            StudioWorkspaceTab tab = _model.SelectedWorkspaceTab;
+            StudioSceneActor focus = FocusedActor;
+            AnimationClipCatalogItem selected = _model.SelectedAnimation;
+            if (!_model.CanSynchronizeScene || !HasCurrentFocusedModel || tab.IsAnimationPlaybackSyncEnabled != true || selected == null ||
+                _isSceneFocusHandover || _isSwitchingWorkspaceTab) return;
+            foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes.ToArray())
+            {
+                bool IsCurrent() => !_isCleanedUp && ReferenceEquals(tab, _model.SelectedWorkspaceTab) &&
+                    ReferenceEquals(focus, FocusedActor) && ReferenceEquals(selected, _model.SelectedAnimation) &&
+                    tab.IsAnimationPlaybackSyncEnabled && _sceneActorRuntimes.TryGetValue(actor, out var current) &&
+                    ReferenceEquals(current, runtime);
+                if (!IsCurrent()) return;
+                try
+                {
+                    bool changed = await runtime.PlaySynchronizedClipAsync(selected, actor, LogService, IsCurrent);
+                    if (!changed || !IsCurrent()) continue;
+                    actor.IsPlaybackPaused = !_model.IsPlaying;
+                    runtime.Seek(_model.CurrentTime, loop: false);
+                    actor.StatusText = runtime.DescribePlayback();
+                }
+                catch (OperationCanceledException) { }
+                catch (ObjectDisposedException) when (!IsCurrent()) { }
+                catch (Exception ex) { LogService?.LogError(ex, $"Failed to synchronize scene actor {actor.Title}."); }
+            }
+            OpenTkControl?.InvalidateVisual();
+        }
+
+        private void SynchronizeStudioTransport()
+        {
+            if (!_model.CanSynchronizeScene || !HasCurrentFocusedModel || _model.SelectedAnimation == null ||
+                _model.SelectedWorkspaceTab.IsAnimationPlaybackSyncEnabled != true ||
+                _isSceneFocusHandover || _isSwitchingWorkspaceTab) return;
+            foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
+            {
+                actor.IsPlaybackPaused = !_model.IsPlaying;
+                runtime.Seek(_model.CurrentTime, loop: false);
+            }
         }
 
         private StudioSceneActorRuntime TakeSceneActorRuntime(StudioSceneActor actor)
         {
             CancelSceneActorLoad(actor);
-            return _sceneActorRuntimes.Remove(actor, out StudioSceneActorRuntime runtime) ? runtime : null;
+            if (!_sceneActorRuntimes.Remove(actor, out StudioSceneActorRuntime runtime)) return null;
+            runtime.CancelClipPreparation();
+            return runtime;
         }
 
         /// <summary>
@@ -398,7 +516,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _championAnimationService,
                 session,
                 _clipCatalog,
-                ResolvePreviewSearchDirectory());
+                ResolvePreviewSearchDirectory()) { SourceIdentity = _model.SelectedSkin?.IdentityPath };
 
             _championModel = null;
             _championBundle = null;
@@ -447,9 +565,10 @@ namespace AssetsManager.Views.Controls.Viewer
         private StudioSceneActorRuntime TakePendingActorAdoption(string binFilePath)
         {
             StudioSceneActorRuntime adoption = _pendingActorAdoption;
-            if (adoption?.Bundle?.PrimaryBinPath == null ||
+            string identity = adoption?.SourceIdentity ?? adoption?.Bundle?.PrimaryBinPath;
+            if (identity == null ||
                 !string.Equals(
-                    Path.GetFullPath(adoption.Bundle.PrimaryBinPath),
+                    Path.GetFullPath(identity),
                     Path.GetFullPath(binFilePath),
                     StringComparison.OrdinalIgnoreCase))
             {
@@ -553,7 +672,10 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_sceneActorRuntimes.Count == 0 || !_model.IsSkinWorkspace) return;
             foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
             {
-                runtime.Advance(deltaSeconds, !actor.IsPlaybackPaused, _model.Speed, actor);
+                bool synchronized = _model.SelectedWorkspaceTab.IsAnimationPlaybackSyncEnabled &&
+                    _model.SelectedAnimation != null;
+                runtime.Advance(deltaSeconds, synchronized ? _model.IsPlaying : !actor.IsPlaybackPaused,
+                    _model.Speed, actor, synchronized ? _model.CurrentTime : null);
             }
         }
 

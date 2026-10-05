@@ -37,6 +37,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         private Func<string, uint, Matrix4x4?> _bindBoneProvider;
         private Func<string, uint, Matrix4x4?> _poseBoneProvider;
         private bool _hiddenDirty = true;
+        private int _clipGeneration;
 
         internal StudioSceneActorRuntime(
             VfxLoadingService loading,
@@ -74,6 +75,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         }
 
         internal VfxLoadingService.Bundle Bundle { get; }
+        internal string SourceIdentity { get; set; }
         internal VfxLoadingService.Bundle PlaybackBundle { get; }
         internal CharacterFormDefinition Form { get; }
         internal SceneModel Model { get; }
@@ -107,7 +109,9 @@ namespace AssetsManager.Services.Viewer.Runtime
             if (loading == null || sknLoading == null)
                 return null;
 
-            VfxLoadingService.Bundle bundle = await loading.LoadAsync(actor.Skin.BinPath, log, cancellationToken);
+            searchDirectory = actor.Skin.ResourceRoot ?? searchDirectory;
+            VfxLoadingService.Bundle bundle = string.IsNullOrEmpty(actor.Skin.BinPath) ? new VfxLoadingService.Bundle()
+                : await loading.LoadAsync(actor.Skin.BinPath, log, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
             // Resolve the actor's form first: a form that reloads the model brings its own SKN, SKL
@@ -116,19 +120,8 @@ namespace AssetsManager.Services.Viewer.Runtime
                 .CompatibleForms(bundle?.CharacterForms, bundle?.OwnerSceneContext)
                 .FirstOrDefault(candidate => candidate.PathHash == actor.SelectedCharacterFormPathHash);
             bool reloads = form is { ReloadsModel: true };
-            string authoredMesh = reloads && !string.IsNullOrWhiteSpace(form.MeshPath)
-                ? form.MeshPath
-                : bundle?.OwnerSceneContext?.MeshPath;
-            string sknPath = loading.ResolveAssetPath(authoredMesh, searchDirectory, ".skn");
-            if (string.IsNullOrEmpty(sknPath) || !File.Exists(sknPath))
-                return null;
-
-            SceneModel model = await sknLoading.LoadModelWithSkinBin(
-                sknPath,
-                bundle.PrimaryBinPath,
-                searchDirectory,
-                cancellationToken,
-                gearUpgradePathHash: reloads ? form.PathHash : 0u);
+            var (model, sknPath) = await sknLoading.LoadStudioModelAsync(
+                actor.Skin, bundle, form, loading, searchDirectory, cancellationToken);
             if (model == null)
                 return null;
 
@@ -158,7 +151,7 @@ namespace AssetsManager.Services.Viewer.Runtime
                     new AnimationService(log),
                     new VfxRenderSession(log, loading),
                     new VfxClipCatalog(),
-                    searchDirectory);
+                    searchDirectory) { SourceIdentity = actor.Skin.IdentityPath };
             }
             catch
             {
@@ -211,33 +204,78 @@ namespace AssetsManager.Services.Viewer.Runtime
                 CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
             cancellationToken = linked.Token;
             cancellationToken.ThrowIfCancellationRequested();
+            int generation = ++_clipGeneration;
             if (actor?.ShowsBindPose == true)
             {
                 ShowBindPose();
                 return;
             }
-            IReadOnlyList<AnimationClipCatalogItem> clips = ClipCatalog.BuildMetadata(
-                PlaybackBundle,
-                ResolveAnimationPath,
-                actor?.AnimationParameter);
+            IReadOnlyList<AnimationClipCatalogItem> clips = Clips(actor);
             AnimationClipCatalogItem requested = clips.FirstOrDefault(item =>
                     actor?.SelectedAnimationOwnerPathHash is uint owner &&
                     item.Clip?.OwnerPathHash == owner &&
                     (!actor.SelectedAnimationGraphPathHash.HasValue ||
-                     item.Clip.GraphPathHash == actor.SelectedAnimationGraphPathHash)) ??
+                    item.Clip.GraphPathHash == actor.SelectedAnimationGraphPathHash)) ??
                 VfxClipCatalog.OpeningClip(clips);
 
             AnimationClipCatalogItem prepared = requested == null
                 ? null
-                : await ClipCatalog.PrepareAsync(requested, PlaybackBundle, ResolveAnimationPath, log, cancellationToken);
+                : await ViewerSynchronizationService.PrepareClipAsync(requested, ClipCatalog,
+                    PlaybackBundle, _loading, SearchDirectory, log, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (generation != _clipGeneration) return;
             if (prepared?.AnimationAsset == null)
             {
                 ShowBindPose();
                 return;
             }
             StartClip(prepared);
+        }
+
+        internal void CancelClipPreparation() => ++_clipGeneration;
+
+        internal IReadOnlyList<AnimationClipCatalogItem> OwnClips(StudioSceneActor actor) =>
+            ClipCatalog.BuildMetadata(PlaybackBundle, ResolveAnimationPath, actor?.AnimationParameter);
+
+        internal IReadOnlyList<AnimationClipCatalogItem> Clips(StudioSceneActor actor) =>
+            ViewerSynchronizationService.MergeClips(actor, Model, OwnClips(actor), actor?.AnimationParameter);
+
+        internal async Task<bool> PlaySynchronizedClipAsync(AnimationClipCatalogItem source,
+            StudioSceneActor actor, LogService log, Func<bool> isCurrent)
+        {
+            int generation = ++_clipGeneration;
+            if (source.IsBindPose)
+            {
+                if (!isCurrent()) return false;
+                ShowBindPose();
+                actor.ShowsBindPose = true;
+                actor.SelectedAnimationFilePath = null;
+                actor.SelectedAnimationGraphPathHash = null;
+                actor.SelectedAnimationOwnerPathHash = null;
+                actor.SelectedSystemPathHash = null;
+                actor.SelectedSpellPathHash = null;
+                return true;
+            }
+            AnimationClipCatalogItem requested = ViewerSynchronizationService.MatchingClip(Clips(actor), source);
+            if (requested == null) return false;
+            float? parameter = source.ParameterValue.HasValue && requested.ParameterValues is { Count: > 1 }
+                ? AnimationGraphPlayback.NearestParameter(requested.ParameterValues, source.ParameterValue.Value)
+                : requested.ParameterValue;
+            requested = requested with { ParameterValue = parameter };
+            if (Clip != null && Clip.Clip == requested.Clip && Clip.ParameterValue == parameter) return true;
+            AnimationClipCatalogItem prepared = await ViewerSynchronizationService.PrepareClipAsync(requested,
+                ClipCatalog, PlaybackBundle, _loading, SearchDirectory, log, _lifetime.Token);
+            if (generation != _clipGeneration || !isCurrent() || prepared?.AnimationAsset == null) return false;
+            StartClip(prepared);
+            actor.ShowsBindPose = false;
+            actor.SelectedAnimationFilePath = requested.FilePath;
+            actor.SelectedAnimationGraphPathHash = requested.Clip?.GraphPathHash;
+            actor.SelectedAnimationOwnerPathHash = requested.Clip?.OwnerPathHash;
+            actor.SelectedSystemPathHash = null;
+            actor.SelectedSpellPathHash = null;
+            actor.AnimationParameter = requested.ParameterValue;
+            return true;
         }
 
         /// <summary>
@@ -323,7 +361,8 @@ namespace AssetsManager.Services.Viewer.Runtime
         /// Advances the actor on the shared transport. Background actors always loop their clip so a
         /// scene keeps moving while the focused actor is inspected.
         /// </summary>
-        internal void Advance(float deltaSeconds, bool playing, float speed, StudioSceneActor actor)
+        internal void Advance(float deltaSeconds, bool playing, float speed, StudioSceneActor actor,
+            double? transportTime = null)
         {
             if (Clip?.AnimationAsset == null || Session.ActiveSystem == null)
             {
@@ -332,7 +371,20 @@ namespace AssetsManager.Services.Viewer.Runtime
                 return;
             }
 
-            if (playing)
+            if (transportTime.HasValue)
+            {
+                double wanted = ViewerSynchronizationService.ClampTime(transportTime.Value, LoopDuration);
+                double difference = wanted - Session.PlaybackTime;
+                if (difference < 0d || difference > 0.1d) Session.Seek(wanted);
+                else if (difference > 0d)
+                {
+                    Session.Play();
+                    Session.ActiveSystem.Speed = 1d;
+                    Session.Update((float)difference);
+                }
+                if (!playing) Session.Pause();
+            }
+            else if (playing)
             {
                 Session.Play();
                 Session.ActiveSystem.Speed = speed;
@@ -362,10 +414,11 @@ namespace AssetsManager.Services.Viewer.Runtime
         }
 
         /// <summary>Moves the actor's clip to the transport time after an explicit seek.</summary>
-        internal void Seek(double time)
+        internal void Seek(double time, bool loop = true)
         {
             if (Clip?.AnimationAsset == null || Session.ActiveSystem == null) return;
-            Session.Seek(VfxClipCueEvaluator.FoldedTime(time, LoopDuration));
+            Session.Seek(loop ? VfxClipCueEvaluator.FoldedTime(time, LoopDuration)
+                : ViewerSynchronizationService.ClampTime(time, LoopDuration));
         }
 
         private void ApplyBindPose()

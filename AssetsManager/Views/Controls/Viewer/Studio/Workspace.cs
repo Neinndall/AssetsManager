@@ -57,7 +57,7 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         private static string SkinWorkspaceKey(StudioSkinItem skin) =>
-            $"skin:{Path.GetFullPath(skin.BinPath)}";
+            $"skin:{Path.GetFullPath(skin.IdentityPath)}";
 
         /// <summary>
         /// Finds or creates the Skin scene for a browser Skin. A Skin already composed into another
@@ -68,7 +68,7 @@ namespace AssetsManager.Views.Controls.Viewer
             bool ownTab = false,
             CharacterBackdropSeed inheritedBackdrop = null)
         {
-            if (skin == null || string.IsNullOrWhiteSpace(skin.BinPath)) return null;
+            if (skin == null || string.IsNullOrWhiteSpace(skin.IdentityPath)) return null;
             string key = SkinWorkspaceKey(skin);
             StudioWorkspaceTab tab = _model.WorkspaceTabs.FirstOrDefault(item =>
                 string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase));
@@ -374,7 +374,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (skin == null ||
                 !ReferenceEquals(_model.SelectedWorkspaceTab, tab) ||
                 !ReferenceEquals(_model.SelectedSkin, skin) ||
-                !string.Equals(Path.GetFullPath(skin.BinPath), Path.GetFullPath(loadedBinPath), StringComparison.OrdinalIgnoreCase))
+                !string.Equals(Path.GetFullPath(skin.IdentityPath), Path.GetFullPath(loadedBinPath), StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

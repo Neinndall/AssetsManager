@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Viewer;
 using Microsoft.Win32;
 
@@ -22,7 +23,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public ChromaLoadingService ChromaLoadingService { get; set; }
 
-        public ViewerPanelControl ParentPanel { get; set; }
+        public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public event Action<IReadOnlyList<ChromaSkinModel>, bool> SelectionRequested;
+        public event EventHandler CloseRequested;
+        public event EventHandler SourceChangeRequested;
+        private int _loadGeneration;
 
         public ChromaSelectionControl()
         {
@@ -35,6 +40,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public async Task InitializeAsync(string skinsPath)
         {
             if (ChromaLoadingService == null) return;
+            int generation = ++_loadGeneration;
 
             _currentSkinsPath = NormalizePath(skinsPath);
             _currentFamilies = new List<ChromaFamilyModel>();
@@ -44,6 +50,7 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 var families = await ChromaLoadingService.LoadFamiliesAsync(skinsPath);
+                if (generation != _loadGeneration) return;
                 TagSource(families, ChromaSourceKind.Current, _currentSkinsPath);
                 _currentFamilies = families;
                 ApplyCombinedFamilies();
@@ -55,6 +62,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
+                if (generation != _loadGeneration) return;
                 _viewModel.SetErrorState(ex.Message);
             }
         }
@@ -70,6 +78,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (ChromaLoadingService == null || string.IsNullOrWhiteSpace(_currentSkinsPath))
                 return;
 
+            int generation = _loadGeneration;
             var dialog = new OpenFolderDialog
             {
                 Title = "Select reference skins folder",
@@ -82,7 +91,7 @@ namespace AssetsManager.Views.Controls.Viewer
             string referencePath = NormalizePath(dialog.FolderName);
             if (PathsEqual(_currentSkinsPath, referencePath))
             {
-                ParentPanel?.CustomMessageBoxService?.ShowWarning(
+                CustomMessageBoxService?.ShowWarning(
                     "Same Chroma Source",
                     "Choose a different skins folder to use as the reference source.",
                     Window.GetWindow(this));
@@ -93,10 +102,11 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 var families = await ChromaLoadingService.LoadFamiliesAsync(referencePath);
+                if (generation != _loadGeneration) return;
                 if (families.Count == 0)
                 {
                     _viewModel.SetSuccessState();
-                    ParentPanel?.CustomMessageBoxService?.ShowWarning(
+                    CustomMessageBoxService?.ShowWarning(
                         "Reference Not Found",
                         "No chroma families were found in the selected reference folder.",
                         Window.GetWindow(this));
@@ -111,8 +121,9 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
+                if (generation != _loadGeneration) return;
                 _viewModel.SetSuccessState();
-                ParentPanel?.CustomMessageBoxService?.ShowWarning(
+                CustomMessageBoxService?.ShowWarning(
                     "Reference Load Failed",
                     $"Could not load the reference chromas: {ex.Message}",
                     Window.GetWindow(this));
@@ -144,18 +155,26 @@ namespace AssetsManager.Views.Controls.Viewer
                 chroma.IsSelected = isSelected;
         }
 
-        private void LoadSelectedButton_Click(object sender, RoutedEventArgs e)
+        private void LoadSelectedButton_Click(object sender, RoutedEventArgs e) => RequestSelection(false);
+
+        private void AddToSceneButton_Click(object sender, RoutedEventArgs e) => RequestSelection(true);
+
+        private void RequestSelection(bool addToScene)
         {
-            var selectedSkins = _viewModel.SelectedChromas.ToList();
-            if (selectedSkins.Count > 0)
-                ParentPanel?.HandleMultipleChromasSelected(selectedSkins);
+            var selected = _viewModel.SelectedChromas.ToList();
+            if (selected.Count > 0 && !_viewModel.IsLoading)
+                SelectionRequested?.Invoke(selected, addToScene);
         }
 
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (ParentPanel?.ViewModel != null)
-                ParentPanel.ViewModel.IsChromaGalleryVisible = false;
+        private void ChangeSourceButton_Click(object sender, RoutedEventArgs e) =>
+            SourceChangeRequested?.Invoke(this, EventArgs.Empty);
 
+        private void CloseButton_Click(object sender, RoutedEventArgs e) =>
+            CloseRequested?.Invoke(this, EventArgs.Empty);
+
+        public void Reset()
+        {
+            _loadGeneration++;
             _currentFamilies.Clear();
             _referenceFamilies.Clear();
             _currentSkinsPath = null;

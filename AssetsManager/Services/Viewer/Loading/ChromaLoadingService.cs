@@ -243,6 +243,42 @@ namespace AssetsManager.Services.Viewer.Loading
                 : int.MaxValue;
         }
 
+        internal static StudioSkinItem CreateStudioSkin(ChromaSkinModel chroma)
+        {
+            if (chroma == null || !File.Exists(chroma.ModelPath) || !Directory.Exists(chroma.TexturePath))
+                return null;
+
+            string name = Path.GetFileNameWithoutExtension(chroma.ModelPath);
+            string modelSkin = "_" + Path.GetFileName(Path.GetDirectoryName(chroma.ModelPath));
+            if (name.EndsWith(modelSkin, StringComparison.OrdinalIgnoreCase))
+                name = name[..^modelSkin.Length];
+            string digits = new string((chroma.Name ?? "").Where(char.IsDigit).ToArray());
+            return new StudioSkinItem
+            {
+                BinPath = SknMaterialTextureResolver.TryResolveBinPath(chroma.TexturePath),
+                ModelPath = Path.GetFullPath(chroma.ModelPath),
+                TextureDirectory = Path.GetFullPath(chroma.TexturePath),
+                ResourceRoot = FindResourceRoot(chroma.SourceRoot ?? chroma.TexturePath),
+                OwnerName = name,
+                BrowserTitle = chroma.Name,
+                DisplayName = $"{name} · {chroma.Name}{(chroma.IsReference ? " · Reference" : "")}",
+                SkinIndex = int.TryParse(digits, out int index) ? index : int.MaxValue,
+                KindLabel = "Chroma"
+            };
+        }
+
+        private static string FindResourceRoot(string path)
+        {
+            for (var directory = new DirectoryInfo(path); directory != null; directory = directory.Parent)
+            {
+                if (directory.Name.Equals("assets", StringComparison.OrdinalIgnoreCase))
+                    return directory.Parent?.FullName ?? directory.FullName;
+                if (Directory.Exists(Path.Combine(directory.FullName, "assets")))
+                    return directory.FullName;
+            }
+            return Path.GetFullPath(path);
+        }
+
         private readonly record struct PreviewData(
             BitmapSource Image,
             Color Color,

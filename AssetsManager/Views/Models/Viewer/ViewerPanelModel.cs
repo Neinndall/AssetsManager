@@ -15,7 +15,6 @@ namespace AssetsManager.Views.Models.Viewer
     public class ViewerPanelModel : INotifyPropertyChanged
     {
         // --- UI State Properties (v3.2.2.0) ---
-        private bool _isChromaGalleryVisible = false;
         private bool _isMainContentVisible = false;
         private bool _isAnimationSyncEnabled = false;
         private bool _isAnimationPlaybackSyncEnabled = false;
@@ -101,12 +100,6 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _selectedAnimation;
             set { if (_selectedAnimation != value) { _selectedAnimation = value; OnPropertyChanged(); } }
-        }
-
-        public bool IsChromaGalleryVisible
-        {
-            get => _isChromaGalleryVisible;
-            set { if (_isChromaGalleryVisible != value) { _isChromaGalleryVisible = value; OnPropertyChanged(); } }
         }
 
         public bool IsMainContentVisible

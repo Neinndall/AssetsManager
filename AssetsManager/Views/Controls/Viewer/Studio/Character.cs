@@ -1,4 +1,5 @@
 using AssetsManager.Services.Viewer.Semantics;
+using AssetsManager.Services.Viewer.Loading;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,7 +9,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using AssetsManager.Services.Viewer.Animation;
-using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Composition;
@@ -378,15 +378,12 @@ namespace AssetsManager.Views.Controls.Viewer
             var bundle = _activeBundle;
             try
             {
-                string authored = _activeBundle?.OwnerSceneContext?.MeshPath;
-                string sknPath = ResolveSknPath(authored, searchDir);
-
-                if (!string.IsNullOrEmpty(sknPath) && File.Exists(sknPath) && SknLoadingService != null)
+                var skin = _model.SelectedSkin;
+                if (skin != null && SknLoadingService != null)
                 {
-                    var loaded = await SknLoadingService.LoadModelWithSkinBin(
-                        sknPath,
-                        bundle?.PrimaryBinPath,
-                        searchDir);
+                    var (loaded, sknPath) = await SknLoadingService.LoadStudioModelAsync(
+                        skin, bundle, null, VfxLoadingService, searchDir,
+                        System.Threading.CancellationToken.None);
                     if (generation != _championLoadGeneration || !ReferenceEquals(bundle, _activeBundle) || _isCleanedUp)
                     {
                         loaded?.Dispose();
@@ -463,6 +460,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _model.HasCharacterSkeleton = _championModel.Skeleton?.Joints?.Count > 0;
+            if (FocusedActor != null) ApplyActorTextureOverrides(FocusedActor, _championModel);
 
             if (_championModel.GpuSkinningData == null &&
                 _championModel.Skeleton != null &&
@@ -490,6 +488,8 @@ namespace AssetsManager.Views.Controls.Viewer
             // The catalog may already be available from BIN load. Rebuild only when needed.
             if (_model.DetectedAnimations.Count == 0)
                 BindAnimationCatalog(searchDir);
+            RefreshFocusedImportedClips();
+            SynchronizeStudioCatalogs();
             if (!startPreview)
                 return;
 
@@ -574,11 +574,17 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             actor.SubmeshOverrides[option.NameHash] = option.IsVisible;
             ApplyEffectiveCharacterSubmeshes();
+            SynchronizeStudioPart(option.Part, textures: false);
             OpenTkControl?.InvalidateVisual();
         }
 
         private void CharacterSubmesh_TextureChanged(object sender, EventArgs e)
         {
+            if (sender is CharacterSubmeshOption option && FocusedActor is StudioSceneActor actor)
+            {
+                actor.TextureOverrides[option.NameHash] = option.SelectedTextureName;
+                SynchronizeStudioPart(option.Part, textures: true);
+            }
             OpenTkControl?.InvalidateVisual();
         }
 
@@ -586,6 +592,18 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (FocusedActor is not StudioSceneActor actor) return;
             actor.SubmeshOverrides.Clear();
+            actor.TextureOverrides.Clear();
+            if (_model.CanSynchronizeScene)
+                foreach (StudioSceneActor other in _model.SelectedWorkspaceTab.Actors.Where(other => other != actor))
+                {
+                    if (_model.SelectedWorkspaceTab.IsMeshSyncEnabled) other.SubmeshOverrides.Clear();
+                    if (_model.SelectedWorkspaceTab.IsTextureSyncEnabled)
+                    {
+                        other.TextureOverrides.Clear();
+                        if (_sceneActorRuntimes.TryGetValue(other, out var runtime))
+                            CharacterFormSemantics.RestoreAuthoredTextures(runtime.Model.Parts);
+                    }
+                }
             if (_championModel != null)
                 CharacterFormSemantics.RestoreAuthoredTextures(_championModel.Parts);
             ApplyEffectiveCharacterSubmeshes();
