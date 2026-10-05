@@ -2277,6 +2277,79 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             }
         }
 
+        [Fact]
+        public void ChallengeWithoutAnIdResolvesTheDefaultConfig()
+        {
+            const string expected = "LCU/Challenges/Config/0/Config";
+            uint hash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(hash, Fnv1a.HashLower("ChallengeConfigData"), Array.Empty<BinTreeProperty>())
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "test.bin");
+
+            Assert.Contains(matcher.Matches, match => match.Kind == InternalHashKind.BinEntries && match.Value == expected);
+        }
+
+        [Theory]
+        [InlineData("TFTDamageSkin", "mName", "Loadouts/TFTDamageSkins/Actual/Actual_Tier1", "ResourceBin/Resources")]
+        [InlineData("TftZoomSkin", "name", "Loadouts/TFTZoomSkins/Actual", "ResourceBin/Resources")]
+        [InlineData("TftPlaybook", "name", "Loadouts/TFTPlaybooks/Actual", "Resources")]
+        public void VfxResolverUsesAnAlreadyVerifiedEntryPath(string type, string field, string entryPath, string suffix)
+        {
+            uint entryHash = Fnv1a.HashLower(entryPath);
+            string expected = $"{entryPath}/{suffix}";
+            uint resourceHash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].UnionWith(new ulong[] { entryHash, resourceHash });
+            targets[InternalHashKind.BinHashes].Add(resourceHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            matcher.CheckContextualCandidate(InternalHashKind.BinEntries, entryPath, "previous.bin", observedHash: entryHash);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(entryHash, Fnv1a.HashLower(type), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower(field), "Different_Name"),
+                    new BinTreeHash(Fnv1a.HashLower("VfxResourceResolver"), resourceHash)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "test.bin");
+
+            Assert.Contains(matcher.Matches, match => match.Kind == InternalHashKind.BinEntries && match.Value == expected);
+            Assert.Contains(matcher.Matches, match => match.Kind == InternalHashKind.BinHashes && match.Value == expected);
+        }
+
+        [Theory]
+        [InlineData("TFTDamageSkin", "mName", "Loadouts/TFTDamageSkins/Different/Different_Name", "ResourceBin/Resources")]
+        [InlineData("TftZoomSkin", "name", "Loadouts/TFTZoomSkins/Different_Name", "ResourceBin/Resources")]
+        [InlineData("TftPlaybook", "name", "Loadouts/TFTPlaybooks/Different_Name", "Resources")]
+        public void VfxResolverDoesNotUseAnUnverifiedGuessedEntryPath(string type, string field, string entryPath, string suffix)
+        {
+            string expected = $"{entryPath}/{suffix}";
+            uint resourceHash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(0x12345678);
+            targets[InternalHashKind.BinHashes].Add(resourceHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x12345678, Fnv1a.HashLower(type), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower(field), "Different_Name"),
+                    new BinTreeHash(Fnv1a.HashLower("VfxResourceResolver"), resourceHash)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "test.bin");
+
+            Assert.DoesNotContain(matcher.Matches, match => match.Kind == InternalHashKind.BinHashes && match.Value == expected);
+        }
+
         private static Dictionary<InternalHashKind, HashSet<ulong>> CreateTargets() => new()
         {
             [InternalHashKind.BinEntries] = new(),

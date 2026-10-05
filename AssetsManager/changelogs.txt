@@ -495,6 +495,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Hash Lab / Improved challenge config discovery and TFT loadout resource resolution.
   - 3D Studio / Prevented brief gaps when animation clips switch between submesh variants.
   - 3D Studio / Switching animation clips keeps the last pose visible while loading instead of briefly showing the T-pose.
   - VFX Studio / Fixed inaccurate soft-particle fading with game shaders in large orthographic views.

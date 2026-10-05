@@ -943,6 +943,9 @@ namespace AssetsManager.Services.Hashes
                             MatchObservedEntry(entryHash, $"LCU/Challenges/Config/{challengeId}/Config");
                             MatchObservedEntry(entryHash, $"LCU/Challenges/Config/{challengeId}");
                         }
+                        if (!item.Properties.TryGetValue(Fnv1a.HashLower("ID"), out BinTreeProperty challengeIdProperty) ||
+                            challengeIdProperty is not BinTreeU64)
+                            MatchObservedEntry(entryHash, "LCU/Challenges/Config/0/Config");
                     }
                     else if (classHash == Fnv1a.HashLower("CollectiblesEsportsTeamData") || classHash == 0xe2fd6db7)
                     {
@@ -961,7 +964,6 @@ namespace AssetsManager.Services.Hashes
                              classHash == Fnv1a.HashLower("DamageSkin") ||
                              (!string.IsNullOrEmpty(path) && path.Contains("TFTDamageSkins", StringComparison.OrdinalIgnoreCase)))
                     {
-                        string resolvedEntryPath = null;
                         if (TryGetString(item.Properties, "mName", out string damageName) ||
                             TryGetString(item.Properties, "name", out damageName) ||
                             TryGetString(item.Properties, "mDamageSkinName", out damageName) ||
@@ -971,8 +973,7 @@ namespace AssetsManager.Services.Hashes
                             if (lastUnderscore > 0 && lastUnderscore < damageName.Length - 1)
                             {
                                 string baseName = damageName[..lastUnderscore];
-                                resolvedEntryPath = $"Loadouts/TFTDamageSkins/{baseName}/{damageName}";
-                                MatchObservedEntry(entryHash, resolvedEntryPath);
+                                MatchObservedEntry(entryHash, $"Loadouts/TFTDamageSkins/{baseName}/{damageName}");
                             }
 
                             for (int tier = 1; tier <= 3; tier++)
@@ -987,11 +988,7 @@ namespace AssetsManager.Services.Hashes
                             }
                         }
 
-                        string entryPath = resolver?.ResolveBinEntry(entryHash);
-                        if (entryPath != null && (entryPath.StartsWith("0x", StringComparison.OrdinalIgnoreCase) || entryPath.StartsWith("[", StringComparison.Ordinal)))
-                            entryPath = null;
-                        if (string.IsNullOrEmpty(entryPath))
-                            entryPath = resolvedEntryPath;
+                        string entryPath = ResolveEntryPath(entryHash);
 
                         if (!string.IsNullOrEmpty(entryPath))
                         {
@@ -1088,18 +1085,12 @@ namespace AssetsManager.Services.Hashes
                     }
                     else if (classHash == Fnv1a.HashLower("TftZoomSkin"))
                     {
-                        string zoomEntry = null;
                         if (TryGetString(item.Properties, "name", out string zoomName) ||
                             TryGetString(item.Properties, "mName", out zoomName))
                         {
-                            zoomEntry = $"Loadouts/TFTZoomSkins/{zoomName}";
-                            MatchObservedEntry(entryHash, zoomEntry);
+                            MatchObservedEntry(entryHash, $"Loadouts/TFTZoomSkins/{zoomName}");
                         }
-                        string entryPath = resolver?.ResolveBinEntry(entryHash);
-                        if (entryPath != null && (entryPath.StartsWith("0x", StringComparison.OrdinalIgnoreCase) || entryPath.StartsWith("[", StringComparison.Ordinal)))
-                            entryPath = null;
-                        if (string.IsNullOrEmpty(entryPath))
-                            entryPath = zoomEntry;
+                        string entryPath = ResolveEntryPath(entryHash);
 
                         if (!string.IsNullOrEmpty(entryPath))
                         {
@@ -1187,20 +1178,14 @@ namespace AssetsManager.Services.Hashes
                     }
                     else if (classHash == Fnv1a.HashLower("TftPlaybook"))
                     {
-                        string playbookEntry = null;
                         if (TryGetString(item.Properties, "name", out string playbook) ||
                             TryGetString(item.Properties, "mName", out playbook))
                         {
                             string cleanName = playbook.Replace(" ", "");
-                            playbookEntry = $"Loadouts/TFTPlaybooks/{cleanName}";
-                            MatchObservedEntry(entryHash, playbookEntry);
+                            MatchObservedEntry(entryHash, $"Loadouts/TFTPlaybooks/{cleanName}");
                         }
 
-                        string entryPath = resolver?.ResolveBinEntry(entryHash);
-                        if (entryPath != null && (entryPath.StartsWith("0x", StringComparison.OrdinalIgnoreCase) || entryPath.StartsWith("[", StringComparison.Ordinal)))
-                            entryPath = null;
-                        if (string.IsNullOrEmpty(entryPath))
-                            entryPath = playbookEntry;
+                        string entryPath = ResolveEntryPath(entryHash);
 
                         if (!string.IsNullOrEmpty(entryPath))
                         {
