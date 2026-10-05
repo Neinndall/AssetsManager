@@ -448,7 +448,6 @@
                                         <MenuItem Header="Close project" Click="CloseProject_Click" IsEnabled="{Binding HasProject}">
                                             <MenuItem.Icon><materialIcons:MaterialIcon Kind="FolderRemoveOutline" Width="16" Height="16"/></MenuItem.Icon>
                                         </MenuItem>
-                                        <Separator/>
                                         <MenuItem Header="Exit 3D Studio" Click="ExitStudio_Click">
                                             <MenuItem.Icon><materialIcons:MaterialIcon Kind="ExitToApp" Width="16" Height="16"/></MenuItem.Icon>
                                         </MenuItem>

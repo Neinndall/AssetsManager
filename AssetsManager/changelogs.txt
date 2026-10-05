@@ -163,6 +163,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - 3D Studio / Removed the separator from the project menu.
   - 3D Studio / Chroma Library now opens from the workspace toolbar and loads variants into Studio tabs or the current scene.
   - Viewer / Ground logos retain their original resolution, with sharper scaled and angled views and clean transparent edges.
   - 3D Studio / Submeshes now use independent compact cards with visibility beside the texture selector.
