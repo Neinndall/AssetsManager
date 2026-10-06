@@ -1,228 +1,159 @@
 <UserControl x:Class="AssetsManager.Views.ViewerWindow"
-             x:Name="ViewerRoot"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:views="clr-namespace:AssetsManager.Views"
-             xmlns:viewer="clr-namespace:AssetsManager.Views.Controls.Viewer"
-             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
+             xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             FontFamily="{StaticResource AppFontFamily}">
     <UserControl.Resources>
-        <DataTemplate x:Key="ProjectViewTemplate">
-            <!-- MAIN CONTENT (Viewport + Panel + Project Explorer) -->
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>    <!-- Col 0: Viewport & Content Browser -->
-                    <ColumnDefinition Width="Auto"/> <!-- Col 1: Panel Splitter -->
-                    <ColumnDefinition Width="360" MinWidth="280" MaxWidth="450"/> <!-- Col 2: Controls Panel -->
-                </Grid.ColumnDefinitions>
-
-                <!-- Left section: Viewport (top) and Project Explorer (bottom) -->
-                <Grid Grid.Column="0" x:Name="LeftSectionGrid">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Grid.ColumnSpan" Value="1"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ViewModel.IsMaximized, ElementName=ViewportControl}" Value="True">
-                                    <Setter Property="Grid.ColumnSpan" Value="3"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition x:Name="ProjectExplorerRow" Height="220" MinHeight="120" MaxHeight="400"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Row 0: Viewport -->
-                    <viewer:ViewerViewportControl Grid.Row="0" x:Name="ViewportControl">
-                        <viewer:ViewerViewportControl.Style>
-                            <Style TargetType="viewer:ViewerViewportControl">
-                                <Setter Property="Margin" Value="0"/>
-                                <Setter Property="Grid.RowSpan" Value="1"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ViewModel.IsMaximized, ElementName=ViewportControl}" Value="True">
-                                        <Setter Property="Grid.RowSpan" Value="3"/>
-                                        <Setter Property="Margin" Value="0,0,4,0"/>
-                                        <Setter Property="Panel.ZIndex" Value="1"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </viewer:ViewerViewportControl.Style>
-                    </viewer:ViewerViewportControl>
-
-                    <!-- Horizontal GridSplitter (resizes Viewport and Project Explorer) -->
-                    <GridSplitter Grid.Row="1"
-                                  HorizontalAlignment="Stretch"
-                                  VerticalAlignment="Center"
-                                  Height="4"
-                                  Background="Transparent"
-                                  ResizeBehavior="PreviousAndNext"
-                                  ResizeDirection="Rows"
-                                  Visibility="{Binding DataContext.IsProjectExplorerVisible, RelativeSource={RelativeSource AncestorType={x:Type views:ViewerWindow}}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-
-                    <!-- Project Explorer / Content Browser Panel (Row 2) -->
-                    <viewer:ViewerProjectExplorerControl Grid.Row="2" x:Name="ProjectExplorer"
-                                                         Visibility="{Binding DataContext.IsProjectExplorerVisible, RelativeSource={RelativeSource AncestorType={x:Type views:ViewerWindow}}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                </Grid>
-
-                <!-- Panel GridSplitter (resizes Left Section and PanelControl) -->
-                <GridSplitter Grid.Column="1"
-                              x:Name="MainGridSplitter"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Stretch"
-                              Width="4"
-                              Background="Transparent"
-                              ResizeBehavior="PreviousAndNext"
-                              ResizeDirection="Columns"
-                              Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
-
-                <!-- Column 2: Controls Panel -->
-                <viewer:ViewerPanelControl Grid.Column="2" x:Name="PanelControl"
-                                           Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
-            </Grid>
-        </DataTemplate>
+        <Style x:Key="HomeSectionTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        </Style>
+        <Style x:Key="HomeSectionDescription" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Opacity" Value="0.8"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="RecentProjectButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="{StaticResource HoverColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="{StaticResource HoverColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Surface" Property="Opacity" Value="0.75"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
     <Grid>
-        <!-- CUERPO -->
-        <Grid>
-            <!-- LANDING PAGE / EMPTY STATE -->
-            <Grid>
-                <Grid.Style>
-                    <Style TargetType="Grid">
-                        <Setter Property="Visibility" Value="{Binding Content.DataContext.IsMainContentVisible, ElementName=ProjectHost, FallbackValue=Visible, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsStudioVisible}" Value="True">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Grid.Style>
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                    
-                    <!-- Default Content (Buttons) -->
-                    <StackPanel x:Name="DefaultEmptyStateContent" Visibility="{Binding IsLoadingVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                        <!-- HERO HEADER: Centered Model -->
-                        <StackPanel Margin="0,0,0,36" HorizontalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
-                                <Border Background="#1A00E676" CornerRadius="6" Padding="10,4">
-                                    <TextBlock Text="3D WORKSPACE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
-                                </Border>
-                                <TextBlock Text="INTERACTIVE STUDIO" FontSize="11" FontWeight="Bold"
-                                           Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                            </StackPanel>
-                            <TextBlock Text="Model Viewer" FontSize="42" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Visualize 3D champions, animations, maps, vfx and shaders in real-time." FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" TextAlignment="Center"/>
-                        </StackPanel>
-
-                        <!-- Action Cards -->
-                        <Grid HorizontalAlignment="Center">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="20"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <!-- Open Project Folder Card -->
-                            <Button Grid.Column="0" Style="{StaticResource SelectionCardButtonStyle}"
-                                    Click="OpenProjectFolder_Click"
-                                    Width="180" Height="160" Margin="0" Padding="20">
-                                <StackPanel>
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,14">
-                                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Load Project"
-                                               FontWeight="Bold"
-                                               FontSize="14"
-                                               Foreground="{StaticResource TextPrimary}"
-                                               HorizontalAlignment="Center"/>
-                                    <TextBlock FontSize="12"
-                                               Foreground="{StaticResource TextSecondary}"
-                                               HorizontalAlignment="Center"
-                                               TextAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               LineHeight="16" Margin="0,4,0,0">
-                                        <Run Text="Browse models"/><LineBreak/>
-                                        <Run Text="and animations"/>
-                                    </TextBlock>
-                                </StackPanel>
-                            </Button>
-
-                            <!-- 3D Studio Card -->
-                            <Button Grid.Column="2" Style="{StaticResource SelectionCardButtonStyle}"
-                                    Click="OpenStudio_Click"
-                                    Width="180" Height="160" Margin="0" Padding="20">
-                                <StackPanel>
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,14">
-                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="3D Studio"
-                                               FontWeight="Bold"
-                                               FontSize="14"
-                                               Foreground="{StaticResource TextPrimary}"
-                                               HorizontalAlignment="Center"/>
-                                    <TextBlock FontSize="12"
-                                               Foreground="{StaticResource TextSecondary}"
-                                               HorizontalAlignment="Center"
-                                               TextAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               LineHeight="16" Margin="0,4,0,0">
-                                        <Run Text="Models &amp; animations"/><LineBreak/>
-                                        <Run Text="Maps &amp; effects"/>
-                                    </TextBlock>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
+                      Visibility="{Binding HasActiveContent, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+            <StackPanel MaxWidth="720" Margin="28,40" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                <Border Background="#1A00E676" CornerRadius="6" Padding="10,4" HorizontalAlignment="Center" Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal">
+                        <icons:MaterialIcon Kind="CubeOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0"/>
+                        <TextBlock Text="INTERACTIVE STUDIO" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center"/>
                     </StackPanel>
-                    
-                    <!-- Loading Indicator (Enhanced) -->
-                    <Grid x:Name="LoadingStateContent" Visibility="{Binding IsLoadingVisible, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0">
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <!-- Animated Spinner (Explorer Style) -->
-                            <materialIcons:MaterialIcon Kind="Sync" 
-                                                        Width="38" 
-                                                        Height="38" 
-                                                        Foreground="{StaticResource AccentBrush}"
-                                                        Style="{StaticResource SpinningIconStyle}"/>
-
-                            <!-- Title -->
-                            <TextBlock x:Name="LoadingTitleText"
-                                       Text="{Binding LoadingTitle}"
-                                       FontSize="24"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource TextPrimary}"
-                                       HorizontalAlignment="Center" 
-                                       Margin="0,18,0,8"/>
-
-                            <!-- Description -->
-                            <TextBlock x:Name="LoadingDescriptionText"
-                                       Text="{Binding LoadingDescription}"
-                                       FontSize="14"
-                                       Foreground="{StaticResource TextSecondary}"
-                                       HorizontalAlignment="Center"
-                                       TextAlignment="Center"/>
+                </Border>
+                <TextBlock Text="Model Viewer" FontSize="42" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextAlignment="Center"/>
+                <TextBlock Text="Characters, maps and effects. Build your next scene." FontSize="14" MaxWidth="600" HorizontalAlignment="Center"
+                           Foreground="{StaticResource TextSecondary}" Margin="0,8,0,28" TextWrapping="Wrap" TextAlignment="Center"/>
+                <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,40">
+                    <Button Click="OpenProject_Click" Style="{StaticResource SelectionCardButtonStyle}" Width="260" Height="86" Padding="16" Margin="6,0,6,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Width="44" Height="44" CornerRadius="10" Background="{StaticResource SidebarBackground}" Margin="0,0,14,0">
+                                <icons:MaterialIcon Kind="FolderOpenOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Open Project" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Choose a project folder" FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+                    <Button Click="OpenStudio_Click" Style="{StaticResource SelectionCardButtonStyle}" Width="260" Height="86" Padding="16" Margin="6,0,6,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Width="44" Height="44" CornerRadius="10" Background="{StaticResource SidebarBackground}" Margin="0,0,14,0">
+                                <icons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Enter Studio" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Start an empty workspace" FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+                </WrapPanel>
+                <Grid Margin="0,0,0,40">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <Border Width="48" Height="48" CornerRadius="10" Background="#14BB86FC" Margin="0,0,16,0" VerticalAlignment="Center">
+                        <icons:MaterialIcon Kind="PaletteOutline" Width="26" Height="26" Foreground="{StaticResource AccentPurple}"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Chroma Library" Style="{StaticResource HomeSectionTitle}"/>
+                        <TextBlock Text="Browse skin variants and reference collections." Style="{StaticResource HomeSectionDescription}"/>
+                    </StackPanel>
+                    <Button Grid.Column="2" Click="OpenChromas_Click" Style="{StaticResource SecondaryButton}" Content="Browse Chromas" Height="36" Padding="14,0" VerticalAlignment="Center"/>
+                </Grid>
+                <StackPanel HorizontalAlignment="Stretch">
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <Border Width="48" Height="48" CornerRadius="10" Background="#145C85FF" Margin="0,0,16,0" VerticalAlignment="Center">
+                            <icons:MaterialIcon Kind="History" Width="26" Height="26" Foreground="{StaticResource AccentBrush}"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Recent Projects" Style="{StaticResource HomeSectionTitle}"/>
+                            <TextBlock Text="Pick up where you left off." Style="{StaticResource HomeSectionDescription}"/>
                         </StackPanel>
+                        <Border Grid.Column="2" CornerRadius="6" Background="{StaticResource CardBackground}" Padding="8,4" VerticalAlignment="Center"
+                                Margin="12,0,0,0" Visibility="{Binding HasRecentProjects, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="{Binding RecentProjects.Count, StringFormat='{}{0} recent'}" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
+                        </Border>
                     </Grid>
-
+                    <ScrollViewer MaxHeight="192" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+                        <ItemsControl ItemsSource="{Binding RecentProjects}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource CardBackground}" CornerRadius="10" Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+                                            <Button Style="{StaticResource RecentProjectButton}" Click="OpenRecent_Click" Padding="12,8" ToolTip="{Binding Path}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                    <Border Width="42" Height="42" CornerRadius="10" Background="#145C85FF" VerticalAlignment="Center">
+                                                        <icons:MaterialIcon Kind="FolderOpenOutline" Width="22" Height="22" Foreground="{StaticResource AccentBrush}"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="12,0,12,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding Path}" FontSize="10" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                    <icons:MaterialIcon Grid.Column="2" Kind="ArrowTopRight" Width="18" Height="18" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Button>
+                                            <Button Grid.Column="1" Click="RemoveRecent_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" Padding="0"
+                                                    HorizontalAlignment="Center" VerticalAlignment="Center" ToolTip="Remove from recent projects">
+                                                <icons:MaterialIcon Kind="Close" Width="14" Height="14"/>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <Grid Margin="0,10,0,0" Visibility="{Binding HasRecentProjects, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <icons:MaterialIcon Kind="FolderOutline" Width="24" Height="24" Foreground="{StaticResource TextMuted}" Margin="0,0,12,0"/>
+                        <TextBlock Grid.Column="1" Text="Your projects will appear here after opening a folder." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    </Grid>
                 </StackPanel>
-            </Grid>
-
-            <ContentControl x:Name="ProjectHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
-                <ContentControl.Style>
-                    <Style TargetType="ContentControl">
-                        <Setter Property="Visibility" Value="{Binding Content.DataContext.IsMainContentVisible, ElementName=ProjectHost, FallbackValue=Collapsed, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsStudioVisible}" Value="True">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ContentControl.Style>
-            </ContentControl>
-
-            <ContentControl x:Name="StudioHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                            Visibility="{Binding IsStudioVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-        </Grid>
+            </StackPanel>
+        </ScrollViewer>
+        <ContentControl x:Name="StudioHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                        Visibility="{Binding IsStudioVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        <ContentControl x:Name="ChromaHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                        Visibility="{Binding IsChromaLibraryVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
     </Grid>
 </UserControl>

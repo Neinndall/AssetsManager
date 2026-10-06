@@ -24,6 +24,14 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
     internal sealed partial class GameHashGuesser
     {
         private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scannedWadCharacters = new();
+        private readonly ConditionalWeakTable<HashGuessEngine, RegaliaMatchIndex> _regaliaMatches = new();
+        private sealed record RegaliaMatchIndex(HashSet<ulong> Targets, Dictionary<ulong, string> Paths);
+
+        internal override void ReleaseMemory()
+        {
+            base.ReleaseMemory();
+            _regaliaMatches.Clear();
+        }
 
         internal override bool ShouldGrepExtension(string extension) =>
             extension is not ("dds" or "jpg" or "png" or "tga" or "ttf" or "otf" or "ogg" or "webm" or
@@ -164,10 +172,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 if (data.Array is not null && data.Count >= sizeof(int) && FileTypeDetector.IsPropertyBin(data.AsSpan()))
                 {
                     BinTree cachedTree = null;
+                    bool binParseAttempted = false;
                     BinTree GetCachedBinTree()
                     {
-                        if (cachedTree == null)
+                        if (!binParseAttempted)
                         {
+                            binParseAttempted = true;
                             using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
                             cachedTree = new BinTree(stream);
                         }
@@ -644,173 +654,179 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             }
         }
 
-        private IReadOnlyList<string> GetDynamicLoadoutRegaliaPaths(CancellationToken cancellationToken)
+        // Basic Suite retains its sorted, unique candidate traversal and progress counts.
+        private IReadOnlyList<string> GetDynamicLoadoutRegaliaPaths(CancellationToken cancellationToken) =>
+            Corpus.GetOrCreate("dynamic-loadout-regalia-paths", _ =>
+                EnumerateDynamicLoadoutRegaliaPaths(cancellationToken)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToList());
+
+        private IEnumerable<string> EnumerateDynamicLoadoutRegaliaPaths(CancellationToken cancellationToken)
         {
-            return Corpus.GetOrCreate("dynamic-loadout-regalia-paths", knownPaths =>
+            IReadOnlyList<string> knownPaths = KnownPaths;
+            var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var queueTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "", "ranked_5s_", "ranked_solo_5s_", "ranked_flex_5s_", "ranked_3s_", "ranked_tft_", "arena_" };
+            var tierTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var typeTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "", "_banner", "_crest", "_border", "_wings", "_flag", "_pedestal", "_badge" };
+            var sizeTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "", "_512x512", "_256x256", "_1024x1024", "_128x128" };
+            var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".tex", ".dds", ".png" };
+
+            var regaliaRegex = new Regex(@"^(?<dir>(?:assets|data)/loadouts/regalia/[^/]+/)(?<file>[^.]+)(?<ext>\.[^.]+)$", RegexOptions.IgnoreCase);
+            var trovesRegex = new Regex(@"^(?:plugins/rcp-be-lol-game-data/global/default/)?(?<dir>(?:assets|data)/ux/tft/troves_bannercontent/[^/]+/)(?<file>[^.]+)(?:\.[^./]+)?(?<ext>\.[^.]+)$", RegexOptions.IgnoreCase);
+
+            for (int i = 0; i < knownPaths.Count; i++)
             {
-                var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var queueTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "", "ranked_5s_", "ranked_solo_5s_", "ranked_flex_5s_", "ranked_3s_", "ranked_tft_", "arena_" };
-                var tierTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var typeTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "", "_banner", "_crest", "_border", "_wings", "_flag", "_pedestal", "_badge" };
-                var sizeTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "", "_512x512", "_256x256", "_1024x1024", "_128x128" };
-                var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".tex", ".dds", ".png" };
-
-                var regaliaRegex = new Regex(@"^(?<dir>(?:assets|data)/loadouts/regalia/[^/]+/)(?<file>[^.]+)(?<ext>\.[^.]+)$", RegexOptions.IgnoreCase);
-                var trovesRegex = new Regex(@"^(?:plugins/rcp-be-lol-game-data/global/default/)?(?<dir>(?:assets|data)/ux/tft/troves_bannercontent/[^/]+/)(?<file>[^.]+)(?:\.[^./]+)?(?<ext>\.[^.]+)$", RegexOptions.IgnoreCase);
-
-                for (int i = 0; i < knownPaths.Count; i++)
+                if ((i & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
+                string p = knownPaths[i];
+                if (p.StartsWith("assets/loadouts/summoneremotes/", StringComparison.OrdinalIgnoreCase))
+                    yield return Regex.Replace(p, @"_(?:inventory|glow)\.(?:tex|dds)$", "_selector.tex", RegexOptions.IgnoreCase);
+                if (p.Contains("loadouts/regalia", StringComparison.OrdinalIgnoreCase))
                 {
-                    string p = knownPaths[i];
-                    if (p.StartsWith("assets/loadouts/summoneremotes/", StringComparison.OrdinalIgnoreCase))
-                        candidates.Add(Regex.Replace(p, @"_(?:inventory|glow)\.(?:tex|dds)$", "_selector.tex", RegexOptions.IgnoreCase));
-                    if (p.Contains("loadouts/regalia", StringComparison.OrdinalIgnoreCase))
+                    Match match = regaliaRegex.Match(p);
+                    if (!match.Success) continue;
+
+                    directories.Add(match.Groups["dir"].Value.ToLowerInvariant());
+                    extensions.Add(match.Groups["ext"].Value.ToLowerInvariant());
+
+                    string file = match.Groups["file"].Value.ToLowerInvariant();
+                    string[] parts = file.Split('_', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string part in parts)
                     {
-                        Match match = regaliaRegex.Match(p);
-                        if (!match.Success) continue;
-
-                        directories.Add(match.Groups["dir"].Value.ToLowerInvariant());
-                        extensions.Add(match.Groups["ext"].Value.ToLowerInvariant());
-
-                        string file = match.Groups["file"].Value.ToLowerInvariant();
-                        string[] parts = file.Split('_', StringSplitOptions.RemoveEmptyEntries);
-                        foreach (string part in parts)
-                        {
-                            if (part.Contains('x') && part.All(c => char.IsDigit(c) || c == 'x'))
-                                sizeTokens.Add($"_{part}");
-                            else if (part is "iron" or "bronze" or "silver" or "gold" or "platinum" or "emerald" or "diamond" or "master" or "grandmaster" or "challenger" or "unranked")
-                                tierTokens.Add(part);
-                        }
-                    }
-                    else if (p.Contains("troves_bannercontent", StringComparison.OrdinalIgnoreCase))
-                    {
-                        Match match = trovesRegex.Match(p);
-                        if (!match.Success) continue;
-
-                        string dir = match.Groups["dir"].Value.ToLowerInvariant();
-                        string file = match.Groups["file"].Value.ToLowerInvariant();
-
-                        candidates.Add($"{dir}{file}.tex");
-                        candidates.Add($"{dir}{file}.dds");
-                        candidates.Add($"{dir}{file}.png");
-                    }
-                    else if (p.Contains("loadouts/companions", StringComparison.OrdinalIgnoreCase) || p.Contains(".cutscene.bin", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string clean = p;
-                        if (clean.StartsWith("plugins/rcp-be-lol-game-data/global/default/", StringComparison.OrdinalIgnoreCase))
-                            clean = clean[44..];
-                        if (clean.StartsWith("assets/", StringComparison.OrdinalIgnoreCase))
-                            clean = clean[7..];
-                        if (clean.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
-                            clean = clean[5..];
-
-                        candidates.Add(clean);
-                        candidates.Add($"data/{clean}");
-                        candidates.Add($"assets/{clean}");
+                        if (part.Contains('x') && part.All(c => char.IsDigit(c) || c == 'x'))
+                            sizeTokens.Add($"_{part}");
+                        else if (part is "iron" or "bronze" or "silver" or "gold" or "platinum" or "emerald" or "diamond" or "master" or "grandmaster" or "challenger" or "unranked")
+                            tierTokens.Add(part);
                     }
                 }
-
-                var cutscenePets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var petThemeTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "base", "tier1" };
-                for (int i = 0; i < knownPaths.Count; i++)
+                else if (p.Contains("troves_bannercontent", StringComparison.OrdinalIgnoreCase))
                 {
-                    string p = knownPaths[i];
-                    if (p.StartsWith("data/characters/pet", StringComparison.OrdinalIgnoreCase) ||
-                        p.StartsWith("assets/characters/pet", StringComparison.OrdinalIgnoreCase))
-                    {
-                        int slash1 = p.IndexOf('/', 16);
-                        if (slash1 > 0)
-                        {
-                            string pet = p[16..slash1];
-                            string cleanPet = pet.StartsWith("pet", StringComparison.OrdinalIgnoreCase) ? pet[3..] : pet;
-                            cutscenePets.Add(cleanPet);
-                            cutscenePets.Add(pet);
-                        }
-                    }
-                    if (p.Contains("/themes/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        int themeIdx = p.IndexOf("/themes/", StringComparison.OrdinalIgnoreCase);
-                        int nextSlash = p.IndexOf('/', themeIdx + 8);
-                        if (nextSlash > 0)
-                        {
-                            petThemeTokens.Add(p.Substring(themeIdx + 8, nextSlash - (themeIdx + 8)).ToLowerInvariant());
-                        }
-                    }
+                    Match match = trovesRegex.Match(p);
+                    if (!match.Success) continue;
+
+                    string dir = match.Groups["dir"].Value.ToLowerInvariant();
+                    string file = match.Groups["file"].Value.ToLowerInvariant();
+
+                    yield return $"{dir}{file}.tex";
+                    yield return $"{dir}{file}.dds";
+                    yield return $"{dir}{file}.png";
                 }
-
-                foreach (string pet in cutscenePets)
-                foreach (string theme in petThemeTokens)
+                else if (p.Contains("loadouts/companions", StringComparison.OrdinalIgnoreCase) || p.Contains(".cutscene.bin", StringComparison.OrdinalIgnoreCase))
                 {
-                    for (int tier = 1; tier <= 3; tier++)
-                    {
-                        candidates.Add($"loadouts/companions/{pet}_{theme}_{theme}_tier{tier}.cutscene.bin");
-                        candidates.Add($"loadouts/companions/{pet}_{theme}_tier{tier}.cutscene.bin");
-                        candidates.Add($"data/loadouts/companions/{pet}_{theme}_{theme}_tier{tier}.cutscene.bin");
-                        candidates.Add($"assets/loadouts/companions/{pet}_{theme}_{theme}_tier{tier}.cutscene.bin");
-                    }
+                    string clean = p;
+                    if (clean.StartsWith("plugins/rcp-be-lol-game-data/global/default/", StringComparison.OrdinalIgnoreCase))
+                        clean = clean[44..];
+                    if (clean.StartsWith("assets/", StringComparison.OrdinalIgnoreCase))
+                        clean = clean[7..];
+                    if (clean.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
+                        clean = clean[5..];
+
+                    yield return clean;
+                    yield return $"data/{clean}";
+                    yield return $"assets/{clean}";
                 }
+            }
 
-                var tftLoadoutStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < knownPaths.Count; i++)
+            var cutscenePets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var petThemeTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "base", "tier1" };
+            for (int i = 0; i < knownPaths.Count; i++)
+            {
+                if ((i & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
+                string p = knownPaths[i];
+                if (p.StartsWith("data/characters/pet", StringComparison.OrdinalIgnoreCase) ||
+                    p.StartsWith("assets/characters/pet", StringComparison.OrdinalIgnoreCase))
                 {
-                    string p = knownPaths[i];
-                    if (p.Contains("tftdamageskins", StringComparison.OrdinalIgnoreCase) ||
-                        p.Contains("tftzoomskins", StringComparison.OrdinalIgnoreCase))
+                    int slash1 = p.IndexOf('/', 16);
+                    if (slash1 > 0)
                     {
-                        int lastSlash = p.LastIndexOf('/');
-                        if (lastSlash < 0) continue;
-                        string filename = p[(lastSlash + 1)..];
-                        int dot = filename.IndexOf('.');
-                        string stem = dot > 0 ? filename[..dot] : filename;
-                        stem = stem.Replace("_tier1", "", StringComparison.OrdinalIgnoreCase)
-                                   .Replace("_tier2", "", StringComparison.OrdinalIgnoreCase)
-                                   .Replace("_tier3", "", StringComparison.OrdinalIgnoreCase)
-                                   .Replace("_small", "", StringComparison.OrdinalIgnoreCase)
-                                   .Replace("boom_", "", StringComparison.OrdinalIgnoreCase);
-                        if (stem.Length > 0 && !stem.All(char.IsDigit))
-                            tftLoadoutStems.Add(stem.ToLowerInvariant());
+                        string pet = p[16..slash1];
+                        string cleanPet = pet.StartsWith("pet", StringComparison.OrdinalIgnoreCase) ? pet[3..] : pet;
+                        cutscenePets.Add(cleanPet);
+                        cutscenePets.Add(pet);
                     }
                 }
-
-                string[] tftRootDirs = { "loadouts/", "global/loadouts/", "data/loadouts/", "assets/loadouts/" };
-                string[] tftTemplates =
+                if (p.Contains("/themes/", StringComparison.OrdinalIgnoreCase))
                 {
-                    "{0}.vfxdefinition.bin",
-                    "{0}.resourcebin.bin",
-                    "{0}_tier1.resourcebin.bin",
-                    "{0}_tier2.resourcebin.bin",
-                    "{0}_tier3.resourcebin.bin",
-                    "{0}_tier1.cutscene.bin",
-                    "{0}_tier2.cutscene.bin",
-                    "{0}_tier3.cutscene.bin",
-                    "{0}.cutscene.bin"
-                };
-
-                foreach (string stem in tftLoadoutStems)
-                {
-                    foreach (string root in tftRootDirs)
+                    int themeIdx = p.IndexOf("/themes/", StringComparison.OrdinalIgnoreCase);
+                    int nextSlash = p.IndexOf('/', themeIdx + 8);
+                    if (nextSlash > 0)
                     {
-                        foreach (string tpl in tftTemplates)
-                        {
-                            candidates.Add($"{root}tftdamageskins/{string.Format(CultureInfo.InvariantCulture, tpl, stem)}");
-                            candidates.Add($"{root}tftzoomskins/{string.Format(CultureInfo.InvariantCulture, tpl, stem)}");
-                        }
+                        petThemeTokens.Add(p.Substring(themeIdx + 8, nextSlash - (themeIdx + 8)).ToLowerInvariant());
                     }
                 }
+            }
 
-                foreach (string dir in directories)
-                foreach (string queue in queueTokens)
-                foreach (string tier in tierTokens)
-                foreach (string type in typeTokens)
-                foreach (string size in sizeTokens)
-                foreach (string ext in extensions)
+            foreach (string pet in cutscenePets)
+            foreach (string theme in petThemeTokens)
+            {
+                for (int tier = 1; tier <= 3; tier++)
                 {
-                    string candidate = $"{dir}{queue}{tier}{type}{size}{ext}".ToLowerInvariant().Replace("__", "_");
-                    candidates.Add(candidate);
+                    yield return $"loadouts/companions/{pet}_{theme}_{theme}_tier{tier}.cutscene.bin";
+                    yield return $"loadouts/companions/{pet}_{theme}_tier{tier}.cutscene.bin";
+                    yield return $"data/loadouts/companions/{pet}_{theme}_{theme}_tier{tier}.cutscene.bin";
+                    yield return $"assets/loadouts/companions/{pet}_{theme}_{theme}_tier{tier}.cutscene.bin";
                 }
+            }
 
-                return candidates.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
-            });
+            var tftLoadoutStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < knownPaths.Count; i++)
+            {
+                if ((i & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
+                string p = knownPaths[i];
+                if (p.Contains("tftdamageskins", StringComparison.OrdinalIgnoreCase) ||
+                    p.Contains("tftzoomskins", StringComparison.OrdinalIgnoreCase))
+                {
+                    int lastSlash = p.LastIndexOf('/');
+                    if (lastSlash < 0) continue;
+                    string filename = p[(lastSlash + 1)..];
+                    int dot = filename.IndexOf('.');
+                    string stem = dot > 0 ? filename[..dot] : filename;
+                    stem = stem.Replace("_tier1", "", StringComparison.OrdinalIgnoreCase)
+                               .Replace("_tier2", "", StringComparison.OrdinalIgnoreCase)
+                               .Replace("_tier3", "", StringComparison.OrdinalIgnoreCase)
+                               .Replace("_small", "", StringComparison.OrdinalIgnoreCase)
+                               .Replace("boom_", "", StringComparison.OrdinalIgnoreCase);
+                    if (stem.Length > 0 && !stem.All(char.IsDigit))
+                        tftLoadoutStems.Add(stem.ToLowerInvariant());
+                }
+            }
+
+            string[] tftRootDirs = { "loadouts/", "global/loadouts/", "data/loadouts/", "assets/loadouts/" };
+            string[] tftTemplates =
+            {
+                "{0}.vfxdefinition.bin",
+                "{0}.resourcebin.bin",
+                "{0}_tier1.resourcebin.bin",
+                "{0}_tier2.resourcebin.bin",
+                "{0}_tier3.resourcebin.bin",
+                "{0}_tier1.cutscene.bin",
+                "{0}_tier2.cutscene.bin",
+                "{0}_tier3.cutscene.bin",
+                "{0}.cutscene.bin"
+            };
+
+            foreach (string stem in tftLoadoutStems)
+            {
+                foreach (string root in tftRootDirs)
+                {
+                    foreach (string tpl in tftTemplates)
+                    {
+                        yield return $"{root}tftdamageskins/{string.Format(CultureInfo.InvariantCulture, tpl, stem)}";
+                        yield return $"{root}tftzoomskins/{string.Format(CultureInfo.InvariantCulture, tpl, stem)}";
+                    }
+                }
+            }
+
+            foreach (string dir in directories)
+            foreach (string queue in queueTokens)
+            foreach (string tier in tierTokens)
+            foreach (string type in typeTokens)
+            foreach (string size in sizeTokens)
+            foreach (string ext in extensions)
+            {
+                string candidate = $"{dir}{queue}{tier}{type}{size}{ext}".ToLowerInvariant().Replace("__", "_");
+                yield return candidate;
+            }
         }
 
         private static readonly Regex SkinPathRegex = new(
@@ -871,24 +887,40 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             if (unresolved.Count == 0) return;
 
-            var candidates = GetDynamicLoadoutRegaliaPaths(cancellationToken);
-            var candidateIndex = Corpus.GetOrCreate("dynamic-loadout-regalia-hashes", _ =>
+            // Cache only paths that match this run's targets, not the entire Cartesian product.
+            RegaliaMatchIndex index = _regaliaMatches.GetValue(engine, _ =>
+                BuildRegaliaMatchIndex(engine.UnknownHashes, cancellationToken));
+            var addedTargets = unresolved.Where(hash => !index.Targets.Contains(hash)).ToHashSet();
+            if (addedTargets.Count > 0)
             {
-                var index = new Dictionary<ulong, int>();
-                for (int i = 0; i < candidates.Count; i++)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    // Preserve the first path and candidate order, including hash collisions.
-                    index.TryAdd(XxHash64Ext.Hash(candidates[i]), i);
-                }
-                return index;
-            });
-            foreach (int index in unresolved.Where(candidateIndex.ContainsKey).Select(hash => candidateIndex[hash]).Order())
+                // Atlases can introduce unknown sprite hashes after the initial target snapshot.
+                RegaliaMatchIndex additional = BuildRegaliaMatchIndex(addedTargets, cancellationToken);
+                index.Targets.UnionWith(additional.Targets);
+                foreach (var pair in additional.Paths) index.Paths.Add(pair.Key, pair.Value);
+            }
+            foreach (string path in unresolved.Where(index.Paths.ContainsKey).Select(hash => index.Paths[hash])
+                         .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (engine.RemainingUnknownCount == 0) return;
-                Check(engine, candidates[index], HashGuessStrategy.BannerVariant, sourceWadPath, sourceChunkHash);
+                Check(engine, path, HashGuessStrategy.BannerVariant, sourceWadPath, sourceChunkHash);
             }
+        }
+
+        private RegaliaMatchIndex BuildRegaliaMatchIndex(IEnumerable<ulong> targetHashes, CancellationToken cancellationToken)
+        {
+            var targets = targetHashes.ToHashSet();
+            var paths = new Dictionary<ulong, string>();
+            foreach (string path in EnumerateDynamicLoadoutRegaliaPaths(cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ulong hash = XxHash64Ext.Hash(path);
+                if (!targets.Contains(hash)) continue;
+                // The old full index retained the first path in sorted order, even on a hash collision.
+                if (!paths.TryGetValue(hash, out string previous) || StringComparer.OrdinalIgnoreCase.Compare(path, previous) < 0)
+                    paths[hash] = path;
+            }
+            return new RegaliaMatchIndex(targets, paths);
         }
 
         private static void HarvestSubmeshTokens(string text, HashSet<string> smSet)

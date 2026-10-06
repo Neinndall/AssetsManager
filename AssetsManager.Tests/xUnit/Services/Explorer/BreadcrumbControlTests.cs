@@ -51,21 +51,5 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer
             Assert.DoesNotContain("Binding Nodes", xaml);
         }
 
-        [Fact]
-        public void ViewerUsesCompactBreadcrumbText()
-        {
-            string repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
-            string xaml = File.ReadAllText(Path.Combine(
-                repositoryRoot,
-                "AssetsManager",
-                "Views",
-                "Controls",
-                "Viewer",
-                "ViewerProjectExplorerControl.xaml"));
-
-            Assert.Matches(
-                @"<explorer:BreadcrumbControl[^>]*FontSize=""9\.5""",
-                xaml.ReplaceLineEndings(" "));
-        }
     }
 }

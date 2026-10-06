@@ -341,7 +341,7 @@
         </Setter>
     </Style>
 
-    <!-- [ViewerPanelControl.xaml] Botones de iconos circulares con fondo (ej: Play/Stop) -->
+    <!-- [Studio] Circular icon buttons for transport controls. -->
     <Style x:Key="IconButton" TargetType="Button">
         <Setter Property="Width" Value="21"/>
         <Setter Property="Height" Value="21"/>
@@ -583,7 +583,7 @@
         </Setter>
     </Style>
 
-    <!-- [MonitorWindow.xaml, ViewerPanelControl.xaml, FileGridControl.xaml] Selector segmentado (Tabs horizontales) -->
+    <!-- [MonitorWindow.xaml, Studio, FileGridControl.xaml] Segmented tab selector. -->
     <Style x:Key="SegmentedRadioButtonStyle" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
@@ -808,7 +808,7 @@
         </Setter>
     </Style>
 
-    <!-- [ViewerPanelControl.xaml] Botón toggle estilo baldosa (ej: Grid, Lightning) -->
+    <!-- [Studio] Tile toggles for scene display and lighting. -->
     <Style x:Key="ModernTileToggleButton" TargetType="ToggleButton">
         <Setter Property="Background" Value="{StaticResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
@@ -1117,7 +1117,7 @@
         </Style.Triggers>
     </Style>
 
-    <!-- [ViewerPanelControl.xaml] Collapsible section header (ToggleButton) with hover overlay and accent strip -->
+    <!-- [Studio] Collapsible section header (ToggleButton) with hover overlay and accent strip -->
     <Style x:Key="CollapsibleSectionHeaderStyle" TargetType="ToggleButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
@@ -1176,7 +1176,7 @@
         </Setter>
     </Style>
 
-    <!-- [ViewerPanelControl.xaml, TreeViewStyles.xaml] Animated chevron for any collapsible parent.
+    <!-- [Studio, TreeViewStyles.xaml] Animated chevron for any collapsible parent.
          Base angle is -90° (chevron pointing right) so the initial state is correct without
          depending on the DataTrigger's EnterActions. The DataTrigger animates to 0° (chevron
          pointing down) when the parent ToggleButton becomes checked (expanded). This avoids a

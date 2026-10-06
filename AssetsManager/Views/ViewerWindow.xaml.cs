@@ -1,246 +1,207 @@
 using System;
-using System.ComponentModel;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Win32;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Utils;
 using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Models.Viewer;
+using Microsoft.Win32;
 
 namespace AssetsManager.Views
 {
     public partial class ViewerWindow : UserControl
     {
-        public ViewerWindowModel ViewModel => _viewModel;
-
-        private readonly ViewerWindowModel _viewModel;
+        private readonly StudioHomeModel _model = new();
         private readonly LogService _logService;
         private readonly AppSettings _appSettings;
         private readonly SknLoadingService _sknLoadingService;
-        private readonly MapViewerSceneService _mapViewerSceneService;
+        private readonly MapViewerSceneService _mapSceneService;
         private readonly ChromaLoadingService _chromaLoadingService;
         private readonly VfxLoadingService _vfxLoadingService;
-        private readonly CustomMessageBoxService _customMessageBoxService;
-        private Grid _projectView;
-        private ViewerViewportControl _viewportControl;
-        private ViewerPanelControl _panelControl;
-        private ViewerProjectExplorerControl _projectExplorer;
-        private RowDefinition _projectExplorerRow;
-        private double _lastExplorerHeight = 220;
-        private StudioControl _studioControl;
+        private readonly CustomMessageBoxService _messageBox;
+        private StudioControl _studio;
+        private ChromaSelectionControl _homeChromas;
         private bool _isCleanedUp;
 
-        public ViewerWindow(
-            LogService logService,
-            AppSettings appSettings,
-            SknLoadingService sknLoadingService,
-            MapViewerSceneService mapViewerSceneService,
-            ChromaLoadingService chromaLoadingService,
-            VfxLoadingService vfxLoadingService,
+        public ViewerWindow(LogService logService, AppSettings appSettings,
+            SknLoadingService sknLoadingService, MapViewerSceneService mapViewerSceneService,
+            ChromaLoadingService chromaLoadingService, VfxLoadingService vfxLoadingService,
             CustomMessageBoxService customMessageBoxService)
         {
-            _viewModel = new ViewerWindowModel();
             _logService = logService;
             _appSettings = appSettings;
             _sknLoadingService = sknLoadingService;
-            _mapViewerSceneService = mapViewerSceneService;
+            _mapSceneService = mapViewerSceneService;
             _chromaLoadingService = chromaLoadingService;
             _vfxLoadingService = vfxLoadingService;
-            _customMessageBoxService = customMessageBoxService;
-
+            _messageBox = customMessageBoxService;
             InitializeComponent();
-            DataContext = _viewModel;
-            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-            Unloaded += OnViewerUnloaded;
+            DataContext = _model;
+            Loaded += OnLoaded;
+            Unloaded += OnUnloaded;
         }
 
-        private void OnViewModelPropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
             if (_isCleanedUp) return;
+            _appSettings.ConfigurationSaved -= OnConfigurationSaved;
+            _appSettings.ConfigurationSaved += OnConfigurationSaved;
+            RefreshRecentProjects();
+        }
 
-            if (e.PropertyName == nameof(ViewerWindowModel.IsProjectExplorerVisible))
+        private void OnConfigurationSaved(object sender, EventArgs e) => Dispatcher.InvokeAsync(() =>
+        {
+            if (!_isCleanedUp) RefreshRecentProjects();
+        });
+
+        private void RefreshRecentProjects() => _model.SetRecentProjects(_appSettings.StudioRecentProjects);
+
+        private void EnterStudio()
+        {
+            if (_isCleanedUp) return;
+            if (_studio == null)
             {
-                UpdateProjectExplorerRowHeight();
+                _studio = new StudioControl
+                {
+                    LogService = _logService, AppSettings = _appSettings,
+                    SknLoadingService = _sknLoadingService, MapViewerSceneService = _mapSceneService,
+                    ChromaLoadingService = _chromaLoadingService, VfxLoadingService = _vfxLoadingService,
+                    CustomMessageBoxService = _messageBox
+                };
+                _studio.ExitRequested += OnStudioExitRequested;
+                StudioHost.Content = _studio;
+            }
+            _model.IsStudioVisible = true;
+            _model.IsChromaLibraryVisible = false;
+            _studio.Activate();
+        }
+
+        private void OnStudioExitRequested(object sender, EventArgs e)
+        {
+            _studio.Deactivate();
+            _model.IsStudioVisible = false;
+            RefreshRecentProjects();
+        }
+
+        private void OpenStudio_Click(object sender, RoutedEventArgs e) => EnterStudio();
+
+        private void OpenProject_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFolderDialog { Title = "Open 3D Studio project folder" };
+            if (dialog.ShowDialog(Window.GetWindow(this)) == true) OpenProject(dialog.FolderName);
+        }
+
+        private void OpenRecent_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { DataContext: StudioRecentProject project }) OpenProject(project.Path);
+        }
+
+        private void OpenProject(string path)
+        {
+            if (_isCleanedUp) return;
+            if (!Directory.Exists(path))
+            {
+                _messageBox.ShowWarning("Project unavailable", "This project folder is no longer available. Open its new location or remove it from recent projects.", Window.GetWindow(this));
                 return;
             }
-            if (e.PropertyName != nameof(ViewerWindowModel.IsStudioVisible)) return;
-
-            if (_viewModel.IsStudioVisible)
-            {
-                if (_studioControl == null)
-                {
-                    _studioControl = new StudioControl
-                    {
-                        ChromaLoadingService = _chromaLoadingService,
-                        CustomMessageBoxService = _customMessageBoxService,
-                        LogService = _logService,
-                        AppSettings = _appSettings,
-                        SknLoadingService = _sknLoadingService,
-                        VfxLoadingService = _vfxLoadingService,
-                        MapViewerSceneService = _mapViewerSceneService
-                    };
-                    _studioControl.ExitRequested += OnStudioExitRequested;
-                    StudioHost.Content = _studioControl;
-                }
-                _studioControl.Activate();
-            }
-            else
-            {
-                _studioControl?.Deactivate();
-            }
+            EnterStudio();
+            _studio.LoadExtractedContainer(path);
         }
 
-        private void OnStudioExitRequested(object sender, EventArgs e) => _viewModel.IsStudioVisible = false;
+        private void RemoveRecent_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { DataContext: StudioRecentProject project }) return;
+            _appSettings.StudioRecentProjects = _appSettings.StudioRecentProjects
+                .Where(path => !string.Equals(path, project.Path, StringComparison.OrdinalIgnoreCase)).ToList();
+            try { _appSettings.Save(); }
+            catch (Exception ex) { _logService.LogError(ex, "Failed to save recent Studio projects."); }
+            RefreshRecentProjects();
+        }
 
-        private void OnViewerUnloaded(object sender, RoutedEventArgs e) => CleanupResources();
+        private async void OpenChromas_Click(object sender, RoutedEventArgs e)
+            => await ChooseHomeChromaFolderAsync();
 
-        private void OpenStudio_Click(object sender, RoutedEventArgs e) => _viewModel.IsStudioVisible = true;
-
-        private void OpenProjectFolder_Click(object sender, RoutedEventArgs e)
+        private async Task ChooseHomeChromaFolderAsync()
         {
             if (_isCleanedUp) return;
-
-            var folderBrowser = new OpenFolderDialog { Title = "Select extracted WAD root folder" };
-            if (folderBrowser.ShowDialog() != true) return;
-
-            OpenProject(folderBrowser.FolderName);
+            var dialog = new OpenFolderDialog
+            {
+                Title = "Select the skins folder for Chroma Library",
+                InitialDirectory = _homeChromas?.ViewModel.CurrentSourcePath ?? string.Empty
+            };
+            if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+            await ShowChromaLibraryAsync(dialog.FolderName);
         }
 
-        private void OpenProject(string folderPath)
+        internal async Task ShowChromaLibraryAsync(string skinsPath)
         {
-            if (_isCleanedUp) return;
-
-            if (_projectView == null)
-                CreateProjectView();
-
-            _projectExplorer.LoadProjectFolder(folderPath);
-            _viewModel.IsProjectExplorerVisible = true;
-            _panelControl.ViewModel.ShowMainContent();
-        }
-
-        private void CreateProjectView()
-        {
-            // Keep the template unmaterialized until the user accepts a project folder.
-            _projectView = (Grid)((DataTemplate)Resources["ProjectViewTemplate"]).LoadContent();
-            _viewportControl = (ViewerViewportControl)_projectView.FindName("ViewportControl");
-            _panelControl = (ViewerPanelControl)_projectView.FindName("PanelControl");
-            _projectExplorer = (ViewerProjectExplorerControl)_projectView.FindName("ProjectExplorer");
-            _projectExplorerRow = (RowDefinition)_projectView.FindName("ProjectExplorerRow");
-
-            _viewportControl.LogService = _logService;
-            _viewportControl.AppSettings = _appSettings;
-            _panelControl.SknLoadingService = _sknLoadingService;
-            _panelControl.LogService = _logService;
-            _panelControl.CustomMessageBoxService = _customMessageBoxService;
-            _panelControl.WindowViewModel = _viewModel;
-            _panelControl.Viewport = _viewportControl;
-            _panelControl.ViewModel.ViewportViewModel = _viewportControl.ViewModel;
-            _viewportControl.Panel = _panelControl;
-            _panelControl.ProjectExplorer = _projectExplorer;
-
-            _projectExplorer.ModelSelected += ProjectExplorer_ModelSelected;
-            _projectExplorer.AnimationsSelected += (_, paths) => _panelControl.LoadAnimationsDirectly(paths);
-            _projectExplorer.CloseRequested += (_, _) => _viewModel.IsProjectExplorerVisible = false;
-            _projectView.DataContext = _panelControl.ViewModel;
-            ProjectHost.Content = _projectView;
-            UpdateProjectExplorerRowHeight();
-        }
-
-        private async void ProjectExplorer_ModelSelected(object sender, string filePath)
-        {
-            var extension = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
-            bool isImage = SupportedFileTypes.IsImage(filePath);
-            if (!isImage)
+            if (_isCleanedUp || !Directory.Exists(skinsPath)) return;
+            if (_homeChromas == null)
             {
-                _projectExplorer.ClearImagePreview();
-            }
-
-            if (extension == ".skl")
-            {
-                _panelControl.LoadSkeleton(filePath);
-            }
-            else if (isImage)
-            {
-                ShowProjectImagePreview(filePath);
-            }
-            else if (extension == ".anm")
-            {
-                _panelControl.LoadAnimationDirectly(filePath);
-            }
-            else
-            {
-                _panelControl.ViewModel.ShowMainContent();
-                await _panelControl.LoadInitialModel(filePath);
-            }
-        }
-
-        private void ShowProjectImagePreview(string filePath)
-        {
-            try
-            {
-                _projectExplorer.ShowImagePreview(filePath, TextureUtils.LoadTextureFromFile(filePath));
-            }
-            catch (Exception ex)
-            {
-                _projectExplorer.ClearImagePreview();
-                _logService.LogError(ex, $"[IMAGE PREVIEW] Failed to load preview image: {filePath}");
-            }
-        }
-
-        private void UpdateProjectExplorerRowHeight()
-        {
-            if (_projectExplorerRow == null) return;
-
-            if (_viewModel.IsProjectExplorerVisible)
-            {
-                _projectExplorerRow.MinHeight = 120;
-                _projectExplorerRow.Height = new GridLength(_lastExplorerHeight > 0 ? _lastExplorerHeight : 220);
-            }
-            else
-            {
-                // Save current height if it's set and greater than 0
-                if (_projectExplorerRow.Height.IsAbsolute && _projectExplorerRow.Height.Value > 0)
+                _homeChromas = new ChromaSelectionControl
                 {
-                    _lastExplorerHeight = _projectExplorerRow.Height.Value;
-                }
-                _projectExplorerRow.MinHeight = 0;
-                _projectExplorerRow.Height = new GridLength(0);
+                    ChromaLoadingService = _chromaLoadingService,
+                    CustomMessageBoxService = _messageBox
+                };
+                _homeChromas.CloseRequested += OnHomeChromasCloseRequested;
+                _homeChromas.SourceChangeRequested += OnHomeChromasSourceChangeRequested;
+                _homeChromas.SelectionRequested += OnHomeChromasSelectionRequested;
+                ChromaHost.Content = _homeChromas;
             }
+            _model.IsChromaLibraryVisible = true;
+            await _homeChromas.InitializeAsync(skinsPath);
         }
+
+        private void OnHomeChromasCloseRequested(object sender, EventArgs e)
+        {
+            _model.IsChromaLibraryVisible = false;
+            _homeChromas.Reset();
+        }
+
+        private async void OnHomeChromasSourceChangeRequested(object sender, EventArgs e)
+            => await ChooseHomeChromaFolderAsync();
+
+        private void OnHomeChromasSelectionRequested(IReadOnlyList<ChromaSkinModel> selected, bool addToScene)
+        {
+            if (selected.Count == 0 || _isCleanedUp) return;
+            EnterStudio();
+            _studio.LoadChromas(selected, addToScene);
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e) => CleanupResources();
 
         public void CleanupResources()
         {
             if (_isCleanedUp) return;
             _isCleanedUp = true;
-            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
-            Unloaded -= OnViewerUnloaded;
-            _viewModel.IsStudioVisible = false;
-            if (_studioControl != null)
-                _studioControl.ExitRequested -= OnStudioExitRequested;
-            if (_projectExplorer != null)
-                _projectExplorer.ModelSelected -= ProjectExplorer_ModelSelected;
-
-            // A failed teardown must not prevent the other route or the shared loader from being released.
-            RunCleanupStep(nameof(StudioControl), () => _studioControl?.Cleanup());
-            RunCleanupStep(nameof(ViewerProjectExplorerControl), () => _projectExplorer?.ClearWorkspace());
-            RunCleanupStep(nameof(ViewerViewportControl), () => _viewportControl?.Cleanup());
-            RunCleanupStep(nameof(ViewerPanelControl), () => _panelControl?.Cleanup());
-            RunCleanupStep(nameof(VfxLoadingService), () => _vfxLoadingService.Dispose());
-        }
-
-        private void RunCleanupStep(string componentName, Action cleanup)
-        {
-            try
+            Loaded -= OnLoaded;
+            Unloaded -= OnUnloaded;
+            _appSettings.ConfigurationSaved -= OnConfigurationSaved;
+            if (_homeChromas != null)
             {
-                cleanup();
+                _homeChromas.CloseRequested -= OnHomeChromasCloseRequested;
+                _homeChromas.SourceChangeRequested -= OnHomeChromasSourceChangeRequested;
+                _homeChromas.SelectionRequested -= OnHomeChromasSelectionRequested;
+                _homeChromas.Reset();
+                ChromaHost.Content = null;
+                _homeChromas = null;
             }
-            catch (Exception ex)
+            if (_studio != null)
             {
-                _logService.LogDebug($"Notice during ViewerWindow {componentName} cleanup: {ex.Message}");
+                _studio.ExitRequested -= OnStudioExitRequested;
+                try { _studio.Cleanup(); }
+                catch (Exception ex) { _logService.LogError(ex, "Failed to release 3D Studio."); }
+                StudioHost.Content = null;
+                _studio = null;
             }
+            try { _vfxLoadingService.Dispose(); }
+            catch (Exception ex) { _logService.LogError(ex, "Failed to release Studio asset loader."); }
         }
     }
 }

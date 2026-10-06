@@ -44,7 +44,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
             Assert.Null(scene.SkinnedMesh);
             Assert.Null(scene.Skeleton);
             Assert.Empty(scene.Parts);
-            Assert.Empty(scene.Animations);
             Assert.Empty(textures);
             Assert.Null(part.Visual);
             Assert.Null(part.Geometry);

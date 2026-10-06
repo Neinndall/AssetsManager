@@ -11,6 +11,17 @@ namespace AssetsManager.Views.Models.Viewer
     public partial class StudioModel : INotifyPropertyChanged
     {
         private string _rootPath;
+        private bool _isProjectFilesVisible;
+        public bool IsProjectFilesVisible
+        {
+            get => _isProjectFilesVisible;
+            set
+            {
+                if (_isProjectFilesVisible == value) return;
+                _isProjectFilesVisible = value;
+                OnPropertyChanged();
+            }
+        }
         private bool _isChromaLibraryVisible;
         public bool IsChromaLibraryVisible
         {

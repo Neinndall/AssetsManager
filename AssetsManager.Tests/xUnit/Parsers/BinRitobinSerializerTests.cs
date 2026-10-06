@@ -16,6 +16,34 @@ namespace AssetsManager.Tests.xUnit.Parsers
     public sealed class BinRitobinSerializerTests
     {
         [Fact]
+        public async Task PreviewAndDiffPreserveWideMaterialNamesAndFollowingFields()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            using HashResolverService resolver = CreateResolver(bridge);
+            var serializer = new BinRitobinSerializer(resolver);
+            BinTree Create(ulong name) => new(new[]
+            {
+                new BinTreeObject(1, 0xff9d3409, new BinTreeProperty[]
+                {
+                    new BinTreeHash64(0x8d39bde6, name),
+                    new BinTreeString(Fnv1a.HashLower("nested"), "Following material data")
+                })
+            }, Array.Empty<string>());
+            byte[] before = WriteTree(Create(0xccdb6584d78a04f6));
+            byte[] after = WriteTree(Create(0xdddb6584d78a04f6));
+
+            string preview = await serializer.WriteBinTreeAsRitobinAsync(before);
+            var diff = await serializer.WriteBinDiffAsRitobinAsync(before, after);
+
+            Assert.Contains("hash = 0xccdb6584d78a04f6", preview);
+            Assert.Contains("Following material data", preview);
+            Assert.Contains("hash = 0xccdb6584d78a04f6", diff.OldRitobin);
+            Assert.Contains("hash = 0xdddb6584d78a04f6", diff.NewRitobin);
+            Assert.DoesNotContain("Following material data", diff.OldRitobin);
+            Assert.DoesNotContain("Following material data", diff.NewRitobin);
+        }
+
+        [Fact]
         public void BinRemainsPreviewableAndDiffableWithJsonHighlighting()
         {
             Assert.True(SupportedFileTypes.IsText("skin0.bin"));

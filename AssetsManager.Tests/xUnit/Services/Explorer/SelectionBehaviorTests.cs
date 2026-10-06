@@ -119,29 +119,6 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer
             }
         }
 
-        [Fact]
-        public void ViewerBrowserUsesExtendedFileSelection()
-        {
-            string repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
-            string browser = File.ReadAllText(Path.Combine(
-                repositoryRoot,
-                "AssetsManager",
-                "Views",
-                "Controls",
-                "Viewer",
-                "ViewerProjectExplorerControl.xaml"));
-            string gridStyle = File.ReadAllText(Path.Combine(repositoryRoot, "AssetsManager", "Themes", "FileGridStyles.xaml"));
-
-            Assert.Matches(
-                @"<ListBox[^>]*x:Name=""FilesListBox""[^>]*Style=""\{StaticResource ModernFileGridListBox\}""",
-                browser.ReplaceLineEndings(" "));
-            Assert.Matches(
-                @"<Style x:Key=""ModernFileGridListBox""[^>]*>.*?<Setter Property=""SelectionMode"" Value=""Extended""",
-                gridStyle.ReplaceLineEndings(" "));
-            Assert.Contains("Header=\"Load Animations\"", browser);
-            Assert.Contains("PreviewMouseRightButtonDown=\"FilesListBox_PreviewMouseRightButtonDown\"", browser);
-        }
-
         [Theory]
         [InlineData(ModifierKeys.None, true)]
         [InlineData(ModifierKeys.Control, false)]
@@ -253,31 +230,6 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer
             Assert.True(usedAnchor);
             Assert.False(wad.IsMultiSelected);
             Assert.False(type.IsMultiSelected);
-            Assert.True(first.IsMultiSelected);
-            Assert.True(middle.IsMultiSelected);
-            Assert.True(target.IsMultiSelected);
-        }
-
-        [Fact]
-        public void ViewerTreeRangeUsesSharedVisibleOrder()
-        {
-            var first = new ProjectExplorerNode { Name = "first" };
-            var middle = new ProjectExplorerNode { Name = "middle" };
-            var target = new ProjectExplorerNode { Name = "target" };
-            var root = new ProjectExplorerNode { Name = "root", IsExpanded = true };
-            root.Children.Add(first);
-            root.Children.Add(middle);
-            root.Children.Add(target);
-
-            Assert.True(SelectionBehavior.SelectTreeRange(
-                new ArrayList { root },
-                first,
-                target,
-                additive: false,
-                out bool usedAnchor));
-
-            Assert.True(usedAnchor);
-            Assert.False(root.IsMultiSelected);
             Assert.True(first.IsMultiSelected);
             Assert.True(middle.IsMultiSelected);
             Assert.True(target.IsMultiSelected);

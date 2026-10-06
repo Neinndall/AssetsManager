@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
 using AssetsManager.Services.Hashes.Guessers.Game;
@@ -75,6 +77,77 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 Assert.Equal("Global.wad.client", match.SourceWadPath);
                 Assert.Contains(42UL, engine.UnknownHashes);
             }
+        }
+
+        [Fact]
+        public void RegaliaGrepRetainsOnlyTargetsAndMatchesBasicSuiteOrder()
+        {
+            string[] seeds =
+            {
+                "assets/loadouts/summoneremotes/event/example_glow.tex",
+                "assets/loadouts/regalia/banners/gold_banner_256x256.tex",
+                "data/characters/petexample/themes/summer/model.bin",
+                "assets/ux/tft/troves_bannercontent/demo/example.tex",
+                "assets/loadouts/tftdamageskins/example_tier1.tex"
+            };
+            string[] targets =
+            {
+                "assets/loadouts/summoneremotes/event/example_selector.tex",
+                "assets/loadouts/regalia/banners/ranked_solo_5s_gold_banner_256x256.tex",
+                "loadouts/companions/example_summer_tier1.cutscene.bin",
+                "assets/ux/tft/troves_bannercontent/demo/example.dds",
+                "loadouts/tftdamageskins/example_tier3.resourcebin.bin"
+            };
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, seeds));
+            var hashes = targets.Select(path => XxHash64Ext.Hash(path)).Append(42UL).ToHashSet();
+            var basicOrder = new List<string>();
+            var basic = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(hashes), match => basicOrder.Add(match.Path));
+            guesser.GuessRegaliaAssets(basic, CancellationToken.None);
+            Assert.Equal(targets.OrderBy(path => path, StringComparer.OrdinalIgnoreCase), basicOrder);
+
+            var grepOrder = new List<string>();
+            var grep = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(hashes), match => grepOrder.Add(match.Path));
+            GrepLinks(guesser, grep, hashes, 100);
+            Assert.Equal(basicOrder, grepOrder);
+            Assert.Equal(new[] { 42UL }, grep.UnknownHashes);
+
+            // The index holds five matches, despite thousands of generated combinations.
+            object cache = typeof(GameHashGuesser).GetField("_regaliaMatches", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(guesser);
+            object[] args = { grep, null };
+            Assert.True((bool)cache.GetType().GetMethod("TryGetValue").Invoke(cache, args));
+            var paths = (Dictionary<ulong, string>)args[1].GetType().GetProperty("Paths").GetValue(args[1]);
+            Assert.Equal(targets.Length, paths.Count);
+        }
+
+        [Fact]
+        public void RegaliaGrepHandlesTargetsIntroducedAfterItsInitialSnapshot()
+        {
+            string[] targets =
+            {
+                "assets/loadouts/summoneremotes/event/first_selector.tex",
+                "assets/loadouts/summoneremotes/event/second_selector.tex"
+            };
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, targets.Select(path => path.Replace("_selector", "_glow"))));
+            ulong first = XxHash64Ext.Hash(targets[0]);
+            ulong second = XxHash64Ext.Hash(targets[1]);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { first, 42 });
+            GrepLinks(guesser, engine, new[] { first }, 100);
+            engine.EnsureUnknown(second);
+            GrepLinks(guesser, engine, new[] { second }, 200);
+            Assert.Equal(2, engine.Matches.Count);
+            Assert.Equal(targets[1], engine.Matches[second].Path);
+            Assert.Equal(200UL, engine.Matches[second].SourceChunkHash);
+        }
+
+        private static void GrepLinks(GameHashGuesser guesser, HashGuessEngine engine, IEnumerable<ulong> hashes, ulong chunk)
+        {
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(1, 2, hashes.Select((hash, index) => (BinTreeProperty)new BinTreeWadChunkLink((uint)index + 3, hash)).ToArray())
+            }, Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+            guesser.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()), "data/loadouts/example.bin", "Global.wad.client", chunk);
         }
     }
 }

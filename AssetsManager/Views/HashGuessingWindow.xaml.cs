@@ -627,45 +627,50 @@ namespace AssetsManager.Views
             {
                 try
                 {
-                    var items = _viewModel.Matches.Select(m =>
+                    var matches = _viewModel.Matches.ToArray();
+                    string fileName = dialog.FileName;
+                    await Task.Run(async () =>
                     {
-                        if (m is HashGuessMatch gm)
+                        var items = matches.Select(m =>
                         {
-                            return new
+                            if (m is HashGuessMatch gm)
                             {
-                                hash = gm.HashText,
-                                path = gm.Path,
-                                domain = gm.DomainText,
-                                strategy = gm.StrategyText,
-                                sourceWad = gm.SourceWadPath,
-                                foundAtUtc = gm.FoundAtUtc
-                            };
-                        }
-                        if (m is InternalHashGuessMatch im)
+                                return new
+                                {
+                                    hash = gm.HashText,
+                                    path = gm.Path,
+                                    domain = gm.DomainText,
+                                    strategy = gm.StrategyText,
+                                    sourceWad = gm.SourceWadPath,
+                                    foundAtUtc = gm.FoundAtUtc
+                                };
+                            }
+                            if (m is InternalHashGuessMatch im)
+                            {
+                                return new
+                                {
+                                    hash = im.HashText,
+                                    path = im.Value,
+                                    domain = im.DomainText,
+                                    strategy = im.Strategy.ToString(),
+                                    sourceWad = im.SourceWad,
+                                    foundAtUtc = im.FoundAtUtc
+                                };
+                            }
+                            return (object)m;
+                        }).ToList();
+
+                        var exportData = new
                         {
-                            return new
-                            {
-                                hash = im.HashText,
-                                path = im.Value,
-                                domain = im.DomainText,
-                                strategy = im.Strategy.ToString(),
-                                sourceWad = im.SourceWad,
-                                foundAtUtc = im.FoundAtUtc
-                            };
-                        }
-                        return (object)m;
-                    }).ToList();
+                            exportedAt = DateTime.UtcNow.ToString("o"),
+                            totalMatches = items.Count,
+                            matches = items
+                        };
 
-                    var exportData = new
-                    {
-                        exportedAt = DateTime.UtcNow.ToString("o"),
-                        totalMatches = items.Count,
-                        matches = items
-                    };
-
-                    string json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
-                    await File.WriteAllTextAsync(dialog.FileName, json);
-                    _logService.LogInteractiveSuccess($"Successfully exported {_viewModel.Matches.Count} matches to", dialog.FileName, Path.GetFileName(dialog.FileName));
+                        string json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
+                        await File.WriteAllTextAsync(fileName, json);
+                    });
+                    _logService.LogInteractiveSuccess($"Successfully exported {matches.Length} matches to", fileName, Path.GetFileName(fileName));
                 }
                 catch (Exception ex)
                 {
@@ -722,7 +727,7 @@ namespace AssetsManager.Views
             }
 
             var taskToken = _taskCancellationManager != null ? _taskCancellationManager.PrepareNewOperation() : CancellationToken.None;
-            var runCancellation = new CancellationTokenSource();
+            using var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, taskToken);
             var effectiveToken = linkedCts.Token;
@@ -831,34 +836,42 @@ namespace AssetsManager.Views
                     uiProgress,
                     HashLabProgressUpdateInterval);
                 IProgress<HashGuessProgress> progress = progressLimiter;
-                var matchProgress = new Progress<HashGuessMatch>(match =>
+                using var matchProgress = new DispatcherBatchProgress<HashGuessMatch>(Dispatcher, HashLabProgressUpdateInterval, match =>
                 {
                     if (displayedMatchHashes.Add(match.Hash))
                     {
                         _viewModel.Matches.Add(match);
-                        foundMatches++;
-                        UpdateLiveProgress(matches: foundMatches);
+                        foundMatches = Math.Max(foundMatches, displayedMatchHashes.Count);
                     }
-                });
-                var result = mode switch
+                }, () => UpdateLiveProgress(matches: foundMatches));
+                HashGuessRunResult result;
+                try
                 {
-                    HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                    HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                    HashGuessMode.BannerGuess => await _hashGuessingService.RunGameBannerGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                    HashGuessMode.GameCustom => await _hashGuessingService.RunGameCustomGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                    HashGuessMode.LcuScoped => await _hashGuessingService.RunLcuScopedPluginGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                    HashGuessMode.LcuModifiers => await _hashGuessingService.RunLcuUniversalModifierGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                    HashGuessMode.LcuMedia => await _hashGuessingService.RunLcuMediaGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                    HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                    HashGuessMode.LcuExtended => await _hashGuessingService.RunLcuExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                    HashGuessMode.LcuCustom => await _hashGuessingService.RunLcuCustomGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                    HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                    HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, effectiveToken, matchProgress),
-                    HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, effectiveToken, matchProgress),
-                    _ => throw new ArgumentOutOfRangeException(nameof(mode))
-                };
-                progressLimiter.Flush();
-                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                    // Include preparation and persistence, even when the service's initial awaits complete synchronously.
+                    result = await Task.Run(async () => mode switch
+                    {
+                        HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                        HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                        HashGuessMode.BannerGuess => await _hashGuessingService.RunGameBannerGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                        HashGuessMode.GameCustom => await _hashGuessingService.RunGameCustomGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                        HashGuessMode.LcuScoped => await _hashGuessingService.RunLcuScopedPluginGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                        HashGuessMode.LcuModifiers => await _hashGuessingService.RunLcuUniversalModifierGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                        HashGuessMode.LcuMedia => await _hashGuessingService.RunLcuMediaGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                        HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                        HashGuessMode.LcuExtended => await _hashGuessingService.RunLcuExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                        HashGuessMode.LcuCustom => await _hashGuessingService.RunLcuCustomGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                        HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                        HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, effectiveToken, matchProgress),
+                        HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, effectiveToken, matchProgress),
+                        _ => throw new ArgumentOutOfRangeException(nameof(mode))
+                    }, effectiveToken);
+                }
+                finally
+                {
+                    progressLimiter.Flush();
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                    await matchProgress.DrainAsync();
+                }
                 stopwatch.Stop();
                 string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                 _viewModel.Matches.AddRange(result.Matches.Where(match => displayedMatchHashes.Add(match.Hash)));
@@ -868,7 +881,7 @@ namespace AssetsManager.Views
                 _viewModel.IsProgressIndeterminate = false;
                 if (result.Matches.Count > 0)
                 {
-                    await _hashGuessingService.SaveMatchesAsync(result.Matches, CancellationToken.None);
+                    await Task.Run(() => _hashGuessingService.SaveMatchesAsync(result.Matches, CancellationToken.None));
                     _viewModel.StatusText = $"Completed in {elapsedTime}: {result.Matches.Count:N0} paths resolved and automatically added to main hash files.";
                 }
                 else
@@ -944,7 +957,7 @@ namespace AssetsManager.Views
             string domainName = includeBin ? "BIN" : "RST";
 
             var taskToken = _taskCancellationManager != null ? _taskCancellationManager.PrepareNewOperation() : CancellationToken.None;
-            var runCancellation = new CancellationTokenSource();
+            using var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, taskToken);
             var effectiveToken = linkedCts.Token;
@@ -963,29 +976,21 @@ namespace AssetsManager.Views
 
             try
             {
-                var matchProgress = new Progress<InternalHashGuessMatch>(match =>
+                using var matchProgress = new DispatcherBatchProgress<InternalHashGuessMatch>(Dispatcher, HashLabProgressUpdateInterval, match =>
                 {
                     if (displayedMatchHashes.Add(match.Hash))
                     {
                         _viewModel.Matches.Add(match);
-                        string timeText = FormatElapsedTime(stopwatch.Elapsed);
-                        _viewModel.StatusText = $"{domainName} {action} · {_viewModel.Matches.Count:N0} found · Time: {timeText}";
                     }
+                }, () =>
+                {
+                    string timeText = FormatElapsedTime(stopwatch.Elapsed);
+                    _viewModel.StatusText = $"{domainName} {action} · {_viewModel.Matches.Count:N0} found · Time: {timeText}";
                 });
 
                 var uiProgress = new Progress<InternalHashProgress>(p =>
                 {
-                    if (p.NewMatches != null && p.NewMatches.Count > 0)
-                    {
-                        foreach (var match in p.NewMatches)
-                        {
-                            if (displayedMatchHashes.Add(match.Hash))
-                            {
-                                _viewModel.Matches.Add(match);
-                            }
-                        }
-                    }
-
+                    // The live match callback carries every finding; NewMatches repeats that feed.
                     if (p.TotalWads > 0)
                     {
                         _viewModel.IsProgressIndeterminate = false;
@@ -1018,51 +1023,25 @@ namespace AssetsManager.Views
                 });
                 var internalProgressLimiter = new ProgressUpdateLimiter<InternalHashProgress>(
                     uiProgress,
-                    HashLabProgressUpdateInterval,
-                    (prev, next) =>
-                    {
-                        if (prev.NewMatches == null || prev.NewMatches.Count == 0) return next;
-                        if (next.NewMatches == null || next.NewMatches.Count == 0)
-                        {
-                            return new InternalHashProgress
-                            {
-                                ProcessedWads = next.ProcessedWads,
-                                TotalWads = next.TotalWads,
-                                ProcessedFiles = next.ProcessedFiles,
-                                FoundMatches = next.FoundMatches,
-                                RemainingUnknowns = next.RemainingUnknowns,
-                                CheckedCandidates = next.CheckedCandidates,
-                                Elapsed = next.Elapsed,
-                                CurrentStage = next.CurrentStage,
-                                NewMatches = prev.NewMatches
-                            };
-                        }
-                        var merged = new List<InternalHashGuessMatch>(prev.NewMatches.Count + next.NewMatches.Count);
-                        merged.AddRange(prev.NewMatches);
-                        merged.AddRange(next.NewMatches);
-                        return new InternalHashProgress
-                        {
-                            ProcessedWads = next.ProcessedWads,
-                            TotalWads = next.TotalWads,
-                            ProcessedFiles = next.ProcessedFiles,
-                            FoundMatches = next.FoundMatches,
-                            RemainingUnknowns = next.RemainingUnknowns,
-                            CheckedCandidates = next.CheckedCandidates,
-                            Elapsed = next.Elapsed,
-                            CurrentStage = next.CurrentStage,
-                            NewMatches = merged
-                        };
-                    });
+                    HashLabProgressUpdateInterval);
                 IProgress<InternalHashProgress> progress = internalProgressLimiter;
 
-                InternalHashRunResult result = action switch
+                InternalHashRunResult result;
+                try
                 {
-                    InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods, matchProgress: matchProgress),
-                    InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods, matchProgress: matchProgress),
-                    _ => throw new ArgumentOutOfRangeException(nameof(action))
-                };
-                internalProgressLimiter.Flush();
-                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                    result = await Task.Run(async () => action switch
+                    {
+                        InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods, matchProgress: matchProgress),
+                        InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods, matchProgress: matchProgress),
+                        _ => throw new ArgumentOutOfRangeException(nameof(action))
+                    }, effectiveToken);
+                }
+                finally
+                {
+                    internalProgressLimiter.Flush();
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                    await matchProgress.DrainAsync();
+                }
 
                 stopwatch.Stop();
                 string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
@@ -1132,7 +1111,7 @@ namespace AssetsManager.Views
             };
 
             var taskToken = _taskCancellationManager != null ? _taskCancellationManager.PrepareNewOperation() : CancellationToken.None;
-            var runCancellation = new CancellationTokenSource();
+            using var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, taskToken);
             var effectiveToken = linkedCts.Token;
@@ -1168,7 +1147,7 @@ namespace AssetsManager.Views
                         uiProgress,
                         HashLabProgressUpdateInterval);
                     IProgress<HashGuessProgress> progress = scanProgressLimiter;
-                    var summary = await _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, progress, effectiveToken);
+                    var summary = await Task.Run(() => _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, progress, effectiveToken), effectiveToken);
                     scanProgressLimiter.Flush();
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     stopwatch.Stop();
@@ -1200,10 +1179,10 @@ namespace AssetsManager.Views
                         uiProgress,
                         HashLabProgressUpdateInterval);
                     IProgress<InternalHashProgress> progress = inventoryProgressLimiter;
-                    await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, effectiveToken);
+                    await Task.Run(() => _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, effectiveToken), effectiveToken);
                     inventoryProgressLimiter.Flush();
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-                    var summary = await _binRstHashGuessingService.GetSummaryAsync(effectiveToken);
+                    var summary = await Task.Run(() => _binRstHashGuessingService.GetSummaryAsync(effectiveToken), effectiveToken);
                     stopwatch.Stop();
                     string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.ProgressValue = 100;

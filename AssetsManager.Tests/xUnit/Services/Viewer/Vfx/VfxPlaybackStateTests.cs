@@ -23,20 +23,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void SelectingModelNotifiesPanelBindings()
-        {
-            var panel = new ViewerPanelModel();
-            var model = new SceneModel { Name = "Aurora" };
-            string changedProperty = null;
-            panel.PropertyChanged += (_, args) => changedProperty = args.PropertyName;
-
-            panel.SelectedModel = model;
-
-            Assert.Same(model, panel.SelectedModel);
-            Assert.Equal(nameof(ViewerPanelModel.HasSelectedModel), changedProperty);
-        }
-
-        [Fact]
         public void EmitterDiagnosticItemNotifiesSoloMuteAndVisibilityEvents()
         {
             var item = new VfxEmitterDiagnosticItem { Name = "Sparks" };

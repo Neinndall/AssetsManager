@@ -5,7 +5,7 @@
                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
                 xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
                 xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
-                xmlns:viewer="clr-namespace:AssetsManager.Views.Controls.Viewer"
+                xmlns:viewer="clr-namespace:AssetsManager.Views.Dialogs.Controls"
                 mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
                 HeaderTitle="3D Mesh Analyzer" 
                 HeaderIcon="CubeOutline"
@@ -92,7 +92,7 @@
                                 </Grid>
                             </Border>
                         </Border>
-                        <viewer:ViewerViewportControl Grid.Row="1" x:Name="OldViewport" IsDiffMode="True" Margin="0"/>
+                        <viewer:SknDiffViewportControl Grid.Row="1" x:Name="OldViewport" Margin="0"/>
                     </Grid>
                 </Border>
 
@@ -123,7 +123,7 @@
                                 </Grid>
                             </Border>
                         </Border>
-                        <viewer:ViewerViewportControl Grid.Row="1" x:Name="NewViewport" IsDiffMode="True" Margin="0"/>
+                        <viewer:SknDiffViewportControl Grid.Row="1" x:Name="NewViewport" Margin="0"/>
                     </Grid>
                 </Border>
             </Grid>

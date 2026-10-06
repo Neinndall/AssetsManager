@@ -17,49 +17,50 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Padding="28,16"
+                Padding="28,12"
                 Background="{StaticResource CardBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,0,1">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.ColumnSpan="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="44"
-                            Height="44"
+                <Grid VerticalAlignment="Center" Margin="0,0,24,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Width="42"
+                            Height="42"
                             Margin="0,0,14,0"
                             Background="{StaticResource SidebarBackground}"
                             BorderBrush="{StaticResource BorderColor}"
                             BorderThickness="1"
                             CornerRadius="10">
                         <materialIcons:MaterialIcon Kind="PaletteSwatchOutline"
-                                                    Width="24"
-                                                    Height="24"
+                                                    Width="22"
+                                                    Height="22"
                                                     Foreground="{StaticResource AccentBrush}"
                                                     HorizontalAlignment="Center"
                                                     VerticalAlignment="Center"/>
                     </Border>
-                    <StackPanel VerticalAlignment="Center">
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <TextBlock Text="CHROMA LIBRARY"
-                                   FontSize="18"
+                                   FontSize="16"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock Text="{Binding StatusText}"
                                    Margin="0,2,0,0"
                                    FontSize="11"
                                    Foreground="{StaticResource TextSecondary}"
+                                   TextTrimming="CharacterEllipsis"
                                    Opacity="0.8"/>
                     </StackPanel>
-                </StackPanel>
+                </Grid>
 
-                <WrapPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,12,0,0"
+                <WrapPanel Grid.Column="1"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
@@ -297,29 +298,35 @@
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,1,0,0">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid VerticalAlignment="Center" Margin="0,0,24,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
                     <materialIcons:MaterialIcon Kind="CubeOutline"
                                                 Width="18"
                                                 Height="18"
                                                 Margin="0,0,9,0"
+                                                VerticalAlignment="Center"
                                                 Foreground="{StaticResource AccentBrush}"/>
-                    <StackPanel>
+                    <StackPanel Grid.Column="1">
                         <TextBlock Text="{Binding SelectionText}"
                                    FontSize="11"
                                    FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis"
                                    Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Open chromas in Studio tabs or add them to the current scene" TextWrapping="Wrap"
+                        <TextBlock Text="Open in tabs or add to a scene." TextTrimming="CharacterEllipsis"
                                    Margin="0,2,0,0"
                                    FontSize="10"
                                    Foreground="{StaticResource TextMuted}"/>
                     </StackPanel>
-                </StackPanel>
+                </Grid>
 
-                <WrapPanel Grid.Row="1" Margin="0,10,0,0" Orientation="Horizontal"
+                <WrapPanel Grid.Column="1" Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
                     <Button Style="{StaticResource SecondaryButton}"

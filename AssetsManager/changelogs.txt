@@ -6,6 +6,8 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - 3D Studio / Added a new home screen with direct project opening, recent projects and Chroma Library access.
+  - 3D Studio / Added a resizable Project Files panel with folder navigation, project search and texture previews.
   - 3D Studio / Removed duration labels from the clip tree while keeping the Bind pose label.
   - Viewer / Removed legacy synchronization controls; scene synchronization is managed in the 3D Studio Inspector.
   - Viewer / Models opened from Project Browser now start fully framed, respecting their scale and viewport size.
@@ -171,6 +173,14 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Guessing Lab / Moved preparation, inventory, saving and export off the UI thread for GAME, LCU, BIN and RST; batched live matches while preserving cancellation results.
+  - Hash Guessing Lab / Reduced GAME WAD Grep memory retention by caching only regalia paths that match the current targets.
+  - Log / Starts collapsed while keeping the toolbar available to expand it.
+  - Project Browser / Squared the panel corners and removed doubled borders beside the sidebar and bottom resize divider.
+  - Chroma Library / Compacted the header and selection footer by aligning their actions in a single row.
+  - Viewer / Restored the Model Viewer heading with a green Interactive Studio badge, action cards and aligned section headers; compact recent rows scroll within the list.
+  - Chroma Library / Opens directly in Viewer after choosing its skins folder.
+  - Project Browser / Restored the folder tree, file grid and optional texture thumbnails in 3D Studio.
   - 3D Studio / Refined Inspector synchronization with compact icon rows, clearer labels and highlighted active options.
   - 3D Studio / Removed the separator from the project menu.
   - 3D Studio / Chroma Library now opens from the workspace toolbar and loads variants into Studio tabs or the current scene.
@@ -486,6 +496,7 @@ Improvements
   - Input and confirmation dialogs now support Enter/Escape keys with automatic focus.
 
 Changes
+  - Viewer / Removed the classic model viewer; 3D Studio is now the only 3D workspace.
   - Viewer / Renamed VFX Studio to 3D Studio with compact entry cards for models, chromas, animations, maps and visual effects.
   - Diagnostics / Added a clip audit to inspect animation names and file sources.
   - VFX Studio / Renamed the champion visibility tooltip to Show/Hide Champion.
@@ -500,6 +511,10 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Explorer / Restored reading and comparison of current PBE material BINs with wide name hashes.
+  - Hash Guessing Lab / Fixed excessive memory use when WAD Grep encounters incompatible BIN data.
+  - Log / Fixed startup folding and restored the last resized height when reopening with the arrow.
+  - 3D Studio / Removed the empty space above the viewport when no scenes are open.
   - VFX Studio / Restored screen-space texture mapping and separate alpha UVs on particle meshes.
   - VFX Studio / Corrected emitter texture scrolling direction on flipped effects and unintended scrolling on meshes.
   - VFX Studio / Fixed soft-particle effects disappearing too early or fading with the wrong color and transparency.

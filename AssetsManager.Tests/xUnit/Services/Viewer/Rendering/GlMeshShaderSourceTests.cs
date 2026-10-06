@@ -1,3 +1,4 @@
+using AssetsManager.Views.Models.Dialogs.Controls;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Rendering;
@@ -86,9 +87,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         public void DefaultStudioLightingMatchesReferenceCharacterLighting()
         {
             var studio = GlMeshRenderer.StudioCharacterLighting(
-                ViewerViewportModel.DefaultAmbientIntensity,
-                ViewerViewportModel.DefaultLightRotation,
-                ViewerViewportModel.DefaultLightHeight);
+                SknDiffViewportModel.DefaultAmbientIntensity,
+                SknDiffViewportModel.DefaultLightRotation,
+                SknDiffViewportModel.DefaultLightHeight);
             var reference = GlMeshRenderer.ReferenceCharacterLighting();
 
             Assert.Equal(reference.LightDirection.X, studio.LightDirection.X, 6);

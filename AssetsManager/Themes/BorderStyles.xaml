@@ -87,15 +87,6 @@
         </Setter>
     </Style>
 
-    <!-- [ViewerPanelControl.xaml] Hero stat badge (compact counter for the hero card) -->
-    <Style x:Key="HeroStatBadgeStyle" TargetType="Border">
-        <Setter Property="Background" Value="#15FFFFFF"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="10,6"/>
-        <Setter Property="BorderBrush" Value="#22FFFFFF"/>
-        <Setter Property="BorderThickness" Value="1"/>
-    </Style>
-
     <!-- [WadComparisonOverviewControl.xaml] Overview display card style -->
     <Style x:Key="OverviewDisplayCard" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource CardBackground}"/>

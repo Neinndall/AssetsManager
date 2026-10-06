@@ -21,9 +21,13 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             string hashesPath = GetOption(args, "--hashes") ?? FindInput("hashes", "hashes.game.txt");
             string unknownsPath = GetOption(args, "--unknowns") ?? FindInput("hash_lab", "unknowns.game.txt");
             string wadFilter = GetOption(args, "--wad");
+            bool traceChunks = args.Contains("--trace-chunks", StringComparer.OrdinalIgnoreCase);
+            using var cancellation = new CancellationTokenSource();
+            if (int.TryParse(GetOption(args, "--seconds"), out int seconds) && seconds > 0)
+                cancellation.CancelAfter(TimeSpan.FromSeconds(seconds));
             if (!Directory.Exists(root) || !File.Exists(hashesPath) || !File.Exists(unknownsPath))
             {
-                Console.WriteLine("Usage: game-grep-full-profile [--root <PBE>] [--hashes <hashes.game.txt>] [--unknowns <unknowns.game.txt>]");
+                Console.WriteLine("Usage: game-grep-full-profile [--root <PBE>] [--hashes <hashes.game.txt>] [--unknowns <unknowns.game.txt>] [--wad <filter>] [--seconds <limit>]");
                 return;
             }
 
@@ -48,7 +52,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             long allocated = GC.GetAllocatedBytesForCurrentThread();
             long skippedMedia = 0;
 
-            for (int wadIndex = 0; wadIndex < wads.Length && engine.RemainingUnknownCount > 0; wadIndex++)
+            for (int wadIndex = 0; wadIndex < wads.Length && engine.RemainingUnknownCount > 0 && !cancellation.IsCancellationRequested; wadIndex++)
             {
                 string wadPath = wads[wadIndex];
                 var wadTimer = Stopwatch.StartNew();
@@ -60,6 +64,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                     using var wad = new WadFile(wadPath);
                     foreach ((ulong hash, WadChunk chunk) in wad.Chunks)
                     {
+                        cancellation.Token.ThrowIfCancellationRequested();
                         if (chunk.Compression == WadChunkCompression.Satellite) continue;
                         string sourcePath = knownPaths.TryGetValue(hash, out string path) ? path : hash.ToString("x16");
                         string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
@@ -69,6 +74,8 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                             skippedMedia++;
                             continue;
                         }
+                        if (traceChunks)
+                            Console.WriteLine($"CHUNK {hash:x16} {sourcePath}: {chunk.CompressedSize:N0} compressed / {chunk.UncompressedSize:N0} decompressed bytes; managed {GC.GetTotalMemory(false) / 1_000_000:N0} MB");
                         using var owner = wad.LoadChunkDecompressed(chunk);
                         ArraySegment<byte> data = owner.DangerousGetArray();
                         if (extension.Length == 0)
@@ -78,10 +85,13 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                         }
 
                         long beforeCandidates = engine.CheckedCandidates;
+                        long beforeAllocated = GC.GetAllocatedBytesForCurrentThread();
                         int beforeMatches = engine.Matches.Count;
                         var timer = Stopwatch.StartNew();
-                        guesser.GrepWad(engine, data, sourcePath, wadPath, hash, CancellationToken.None);
+                        guesser.GrepWad(engine, data, sourcePath, wadPath, hash, cancellation.Token);
                         timer.Stop();
+                        if (traceChunks)
+                            Console.WriteLine($"DONE {hash:x16}: {timer.Elapsed.TotalMilliseconds:N0} ms; allocated {(GC.GetAllocatedBytesForCurrentThread() - beforeAllocated) / 1_000_000:N0} MB; managed {GC.GetTotalMemory(false) / 1_000_000:N0} MB");
                         var stat = new ChunkStat(sourcePath, Path.GetFileName(wadPath), extension, timer.Elapsed,
                             engine.CheckedCandidates - beforeCandidates, engine.Matches.Count - beforeMatches);
                         AddAggregate(extensions, extension.Length == 0 ? "<none>" : extension, stat.Elapsed, stat.Candidates, stat.Matches, 1);
@@ -90,6 +100,10 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                         wadChunks++;
                         if (engine.RemainingUnknownCount == 0) break;
                     }
+                }
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+                {
+                    Console.WriteLine("\nProfile time limit reached; no hash files were modified.");
                 }
                 catch (Exception exception)
                 {
@@ -113,6 +127,11 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 Console.WriteLine($"{stat.Elapsed,12:hh\\:mm\\:ss\\.fff} | {stat.Candidates,12:N0} | {stat.Matches,4:N0} | {stat.Wad} | {stat.Path}");
             Console.WriteLine($"\nTotal: {total.Elapsed:hh\\:mm\\:ss\\.fff} | Chunks: {chunkCount:N0} | Matches: {engine.Matches.Count:N0} | Remaining: {engine.RemainingUnknownCount:N0}");
             Console.WriteLine($"Allocated: {(GC.GetAllocatedBytesForCurrentThread() - allocated) / 1_000_000:N0} MB cumulative; skipped known media: {skippedMedia:N0}");
+            using var process = Process.GetCurrentProcess();
+            Console.WriteLine($"Peak working set: {process.PeakWorkingSet64 / 1_000_000:N0} MB; private memory at end: {process.PrivateMemorySize64 / 1_000_000:N0} MB.");
+            Console.WriteLine($"Managed memory before collection: {GC.GetTotalMemory(false) / 1_000_000:N0} MB; retained after collection: {GC.GetTotalMemory(true) / 1_000_000:N0} MB.");
+            GC.KeepAlive(guesser);
+            GC.KeepAlive(knownPaths);
         }
 
         private static void AddAggregate(Dictionary<string, Aggregate> values, string name, TimeSpan elapsed, long candidates, int matches, long calls)

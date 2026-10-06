@@ -103,9 +103,6 @@ namespace AssetsManager.Views.Models.Viewer
                 OnPropertyChanged();
             }
         }
-
-        public ObservableRangeCollection<AnimationData> Animations { get; set; }
-
         public RigResource Skeleton { get; set; }
         internal SkinPoseDefinition PoseDefinition { get; set; } = SkinPoseDefinition.Empty;
         public IAnimationAsset CurrentAnimation { get; set; }
@@ -208,7 +205,6 @@ namespace AssetsManager.Views.Models.Viewer
             UpdateTransform();
 
             Parts = new ObservableRangeCollection<ModelPart>();
-            Animations = new ObservableRangeCollection<AnimationData>();
         }
 
         public bool AddPart(ModelPart part)
@@ -332,7 +328,6 @@ namespace AssetsManager.Views.Models.Viewer
                     dict.Clear();
                 }
             }
-            Animations?.Clear();
 
             if (_userTransformGroup.Children.Contains(_scaleTransform))
             {

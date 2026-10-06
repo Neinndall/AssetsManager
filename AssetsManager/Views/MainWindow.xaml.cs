@@ -68,7 +68,7 @@ namespace AssetsManager.Views
         private List<SerializableChunkDiff> _diffsForExtraction;
 
         private GridLength _lastLogHeight = new GridLength(180);
-        private bool _isLogMinimized = false;
+        private bool _isLogMinimized = true;
 
         public MainWindow(
             IServiceProvider serviceProvider,
@@ -438,15 +438,16 @@ namespace AssetsManager.Views
 
                 LogViewRow.Height = _lastLogHeight;
                 _isLogMinimized = false;
-                LogView.ViewModel.SetLogVisibility(true); // <--- Restaurar flecha
+                LogView.ViewModel.SetLogVisibility(true);
             }
             else
             {
                 // Minimize
-                _lastLogHeight = LogViewRow.Height;
-                LogViewRow.Height = GridLength.Auto;
+                // A splitter can leave a star-sized row; restore its actual pixel height.
+                _lastLogHeight = new GridLength(LogViewRow.ActualHeight);
+                LogViewRow.Height = new GridLength(38);
                 _isLogMinimized = true;
-                LogView.ViewModel.SetLogVisibility(false); // <--- Restaurar flecha
+                LogView.ViewModel.SetLogVisibility(false);
             }
         }
 

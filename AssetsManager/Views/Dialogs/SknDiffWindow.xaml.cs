@@ -1,3 +1,4 @@
+using AssetsManager.Views.Dialogs.Controls;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -32,7 +33,7 @@ namespace AssetsManager.Views.Dialogs
         private bool _isBulkUpdatingMeshParts;
         private readonly List<SceneModel> _diffOverlayScenes = new();
         private readonly Dictionary<SceneModel, string> _diffOverlayOwners = new();
-        private readonly Dictionary<SceneModel, ViewerViewportControl> _diffOverlayViewports = new();
+        private readonly Dictionary<SceneModel, SknDiffViewportControl> _diffOverlayViewports = new();
         private readonly Dictionary<string, MeshGeometry3D> _addedGeometryCache = new();
         private readonly Dictionary<string, MeshGeometry3D> _removedGeometryCache = new();
 
@@ -248,7 +249,7 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private static void UpdateViewportSceneDisplay(ViewerViewportControl viewport, SceneModel scene, string path)
+        private static void UpdateViewportSceneDisplay(SknDiffViewportControl viewport, SceneModel scene, string path)
         {
             int count = 0;
             if (scene != null)
@@ -264,7 +265,7 @@ namespace AssetsManager.Views.Dialogs
         }
 
         private bool _isSyncing = false;
-        private void SyncCameras(ViewerViewportControl source, ViewerViewportControl target)
+        private void SyncCameras(SknDiffViewportControl source, SknDiffViewportControl target)
         {
             if (_isSyncing || source.Viewport3D.Camera == null || target.Viewport3D.Camera == null) return;
             
@@ -438,7 +439,7 @@ namespace AssetsManager.Views.Dialogs
             return true;
         }
 
-        private void AddDiffOverlay(ViewerViewportControl viewport, string ownerPartName, string name, MeshGeometry3D mesh, System.Numerics.Vector4 tint, float alphaCutoff)
+        private void AddDiffOverlay(SknDiffViewportControl viewport, string ownerPartName, string name, MeshGeometry3D mesh, System.Numerics.Vector4 tint, float alphaCutoff)
         {
             bool isVisible = IsPartUserVisible(ownerPartName);
             var part = new ModelPart(name, new GeometryModel3D(mesh, null))
@@ -470,7 +471,7 @@ namespace AssetsManager.Views.Dialogs
             // Clear old overlays without disturbing the primary diff scenes.
             foreach (var overlay in _diffOverlayScenes)
             {
-                if (_diffOverlayViewports.TryGetValue(overlay, out ViewerViewportControl viewport))
+                if (_diffOverlayViewports.TryGetValue(overlay, out SknDiffViewportControl viewport))
                     viewport.RemoveModel(overlay);
                 else
                     overlay.Dispose();
@@ -633,13 +634,13 @@ namespace AssetsManager.Views.Dialogs
         private bool _isSyncingToolbarVisibility = false;
         private void ViewportViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(ViewerViewportModel.IsToolbarVisible))
+            if (e.PropertyName == nameof(SknDiffViewportModel.IsToolbarVisible))
             {
                 if (_isSyncingToolbarVisibility) return;
                 _isSyncingToolbarVisibility = true;
                 try
                 {
-                    var isVisible = ((ViewerViewportModel)sender).IsToolbarVisible;
+                    var isVisible = ((SknDiffViewportModel)sender).IsToolbarVisible;
                     OldViewport.ViewModel.IsToolbarVisible = isVisible;
                     NewViewport.ViewModel.IsToolbarVisible = isVisible;
                 }

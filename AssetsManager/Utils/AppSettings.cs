@@ -50,6 +50,12 @@ namespace AssetsManager.Utils
         // Preserve the existing settings key across the Studio rename.
         [JsonProperty("VfxStudio")]
         public StudioSettings Studio { get; set; } = new();
+        private IList<string> _studioRecentProjects = new SafeList<string>();
+        public IList<string> StudioRecentProjects
+        {
+            get => _studioRecentProjects;
+            set => _studioRecentProjects = WrapList(value);
+        }
         public bool AssetWatcherUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
         public bool SaveJsonHistory { get; set; }
@@ -264,8 +270,7 @@ namespace AssetsManager.Utils
                     }
                 }
 
-                // The normal Viewer owns only its ordinary scene preferences. View mode, wire overlay
-                // and translated game shaders belong to 3D Studio, matching the reference viewport.
+                // Migrate the former shared display settings into the Studio preferences.
                 if (jsonObject["VfxStudio"] == null && jsonObject["StudioParameters"] is JObject studioJson &&
                     (studioJson["VfxCameraPreset"] != null || studioJson["VfxWireframeMode"] != null))
                 {
