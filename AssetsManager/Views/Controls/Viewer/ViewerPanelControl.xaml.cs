@@ -7,13 +7,11 @@ using System.Windows.Input;
 using Microsoft.Win32;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using AssetsManager.Utils.Framework;
 using AssetsManager.Utils;
 using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Interaction;
-using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Formatting;
@@ -30,21 +28,17 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class ViewerPanelControl : UserControl
     {
-        private readonly SynchronizationService _synchronization = new();
         private readonly ViewerPanelModel _viewModel;
         public ViewerPanelModel ViewModel => _viewModel;
 
         public SknLoadingService SknLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
-        public TaskCancellationManager TaskCancellationManager { get; set; }
         public ViewerProjectExplorerControl ProjectExplorer { get; set; }
 
         // Peer Controls (Direct communication)
         public ViewerWindowModel WindowViewModel { get; set; }
         public ViewerViewportControl Viewport { get; set; }
-
-        public ObservableRangeCollection<AnimationModel> AnimationModels => _viewModel.AnimationModels;
 
         private AnimationModel _currentlyPlayingAnimation;
         private CancellationTokenSource _modelLoadingCts;
@@ -73,24 +67,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void OnLoadedModelsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            if (e.NewItems != null)
-            {
-                foreach (SceneModel model in e.NewItems)
-                {
-                    model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
-                    model.IsTextureSyncEnabled = _viewModel.IsTextureSyncEnabled;
-                    model.MeshVisibilityChanged += HandleMeshVisibilityChanged;
-                    model.MeshTextureChanged += HandleMeshTextureChanged;
-                }
-            }
-            if (e.OldItems != null)
-            {
-                foreach (SceneModel model in e.OldItems)
-                {
-                    model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
-                    model.MeshTextureChanged -= HandleMeshTextureChanged;
-                }
-            }
             UpdateHeroStats();
         }
 
@@ -105,27 +81,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 HandleSelectedModelChanged();
             }
-            else if (e.PropertyName == nameof(ViewerPanelModel.IsAnimationSyncEnabled))
-            {
-                if (_viewModel.IsAnimationSyncEnabled)
-                {
-                    SyncLoadingForAllModels();
-                }
-            }
-            else if (e.PropertyName == nameof(ViewerPanelModel.IsMeshSyncEnabled))
-            {
-                foreach (var model in _viewModel.LoadedModels)
-                {
-                    model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
-                }
-            }
-            else if (e.PropertyName == nameof(ViewerPanelModel.IsTextureSyncEnabled))
-            {
-                foreach (var model in _viewModel.LoadedModels)
-                {
-                    model.IsTextureSyncEnabled = _viewModel.IsTextureSyncEnabled;
-                }
-            }
             else if (e.PropertyName == nameof(ViewerPanelModel.SelectedModelParts))
             {
                 UpdateHeroStats();
@@ -136,22 +91,6 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             Cleanup();
         }
-
-        private void HandleMeshVisibilityChanged(ModelPart sourcePart)
-        {
-            if (_viewModel.IsMeshSyncEnabled)
-                _synchronization.SynchronizeParts(sourcePart, _viewModel.LoadedModels, textures: false);
-        }
-
-        private void HandleMeshTextureChanged(ModelPart sourcePart)
-        {
-            if (_viewModel.IsTextureSyncEnabled)
-                _synchronization.SynchronizeParts(sourcePart, _viewModel.LoadedModels, textures: true);
-        }
-
-        private void SyncLoadingForAllModels() =>
-            SynchronizationService.ShareAnimations(
-                _viewModel.AnimationModels.Select(animation => animation.AnimationData), _viewModel.LoadedModels);
 
         private void HandleSelectedModelChanged()
         {
@@ -262,14 +201,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _viewModel.AnimationModels.CollectionChanged -= OnAnimationModelsCollectionChanged;
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
-                // Also detach MeshVisibilityChanged and MeshTextureChanged from any model still in the list,
-                // in case Cleanup is called before ResetScene.
-                foreach (var model in _viewModel.LoadedModels)
-                {
-                    model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
-                    model.MeshTextureChanged -= HandleMeshTextureChanged;
-                }
-
                 _modelLoadingCts?.Cancel();
                 _modelLoadingCts?.Dispose();
                 _modelLoadingCts = null;
@@ -285,8 +216,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private void SafeDisposeModel(SceneModel model)
         {
             if (model == null) return;
-            model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
-            model.MeshTextureChanged -= HandleMeshTextureChanged;
 
             // Dispose animations that are not shared with any OTHER loaded model
             foreach (var anim in model.Animations)
@@ -487,13 +416,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 Viewport?.AddModel(newModel);
                 _viewModel.SelectedModelParts = newModel.Parts;
 
-                // Sync current animations (v3.2.3.1)
-                if (_viewModel.IsAnimationSyncEnabled && _viewModel.AnimationModels.Count > 0)
-                {
-                    SynchronizationService.ShareAnimations(
-                        _viewModel.AnimationModels.Select(animation => animation.AnimationData), new[] { newModel });
-                }
-
                 _viewModel.LoadedModels.Add(newModel);
                 _viewModel.SelectedModel = newModel;
                 ModelsListBox.SelectedItem = newModel;
@@ -534,14 +456,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 var animationData = new AnimationData { AnimationAsset = animationAsset, Name = animationName };
                 var animationModel = new AnimationModel(animationData);
 
-                if (_viewModel.IsAnimationSyncEnabled)
-                {
-                    SynchronizationService.ShareAnimations(new[] { animationData }, _viewModel.LoadedModels);
-                }
-                else
-                {
-                    _viewModel.SelectedModel.Animations.Add(animationData);
-                }
+                _viewModel.SelectedModel.Animations.Add(animationData);
 
                 _viewModel.AnimationModels.Add(animationModel);
             }

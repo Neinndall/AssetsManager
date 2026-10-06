@@ -23,7 +23,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer;
 public sealed class SynchronizationServiceTests
 {
     [Fact]
-    public void VisibilityMatchesNamesAndDoesNotReenterThroughModelEvents()
+    public void VisibilityMatchesNamesAndDoesNotReenterThroughPartEvents()
     {
         var synchronization = new SynchronizationService();
         var first = Model("Body");
@@ -33,9 +33,10 @@ public sealed class SynchronizationServiceTests
         int events = 0;
         foreach (SceneModel model in models)
         {
-            model.IsMeshSyncEnabled = true;
-            model.MeshVisibilityChanged += part =>
+            ModelPart part = model.Parts[0];
+            part.PropertyChanged += (_, e) =>
             {
+                if (e.PropertyName != nameof(ModelPart.IsVisible)) return;
                 events++;
                 synchronization.SynchronizeParts(part, models, textures: false);
             };
@@ -44,7 +45,6 @@ public sealed class SynchronizationServiceTests
         Assert.False(second.Parts[0].IsVisible);
         Assert.True(unrelated.Parts[0].IsVisible);
         Assert.Equal(2, events);
-        Assert.All(models, model => Assert.True(model.IsMeshSyncEnabled));
     }
 
     [Fact]
@@ -57,8 +57,12 @@ public sealed class SynchronizationServiceTests
         var models = new[] { first, second, third };
         foreach (SceneModel model in models)
         {
-            model.IsTextureSyncEnabled = true;
-            model.MeshTextureChanged += part => synchronization.SynchronizeParts(part, models, textures: true);
+            ModelPart part = model.Parts[0];
+            part.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ModelPart.SelectedTextureName))
+                    synchronization.SynchronizeParts(part, models, textures: true);
+            };
         }
         first.Parts[0].SelectedTextureName = "base";
         Assert.Equal("base.dds", second.Parts[0].SelectedTextureName);
@@ -66,7 +70,6 @@ public sealed class SynchronizationServiceTests
         Assert.Empty(third.Parts[0].AllTextures);
         first.Parts[0].SelectedTextureName = "extra";
         Assert.Equal("chroma_extra", third.Parts[0].SelectedTextureName);
-        Assert.All(models, model => Assert.True(model.IsTextureSyncEnabled));
     }
 
     [Fact]
@@ -78,18 +81,6 @@ public sealed class SynchronizationServiceTests
         second.Parts[0].SelectedTextureName = "chroma";
         new SynchronizationService().SynchronizeParts(first.Parts[0], new[] { second }, textures: true);
         Assert.Equal("chroma", second.Parts[0].SelectedTextureName);
-    }
-
-    [Fact]
-    public void NormalViewerSharesMissingAnimationsAndKeepsTargetVersions()
-    {
-        var source = new AnimationData { Name = "Idle" };
-        var target = new SceneModel();
-        var own = new AnimationData { Name = "Idle" };
-        target.Animations.Add(own);
-        SynchronizationService.ShareAnimations(new[] { source, new AnimationData { Name = "Run" } }, new[] { target });
-        Assert.Equal(2, target.Animations.Count);
-        Assert.Same(own, SynchronizationService.MatchingAnimation(target, new AnimationData { Name = "IDLE" }));
     }
 
     [Fact]

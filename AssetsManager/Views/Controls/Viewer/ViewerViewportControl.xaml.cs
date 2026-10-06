@@ -55,8 +55,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public ViewerPanelControl Panel { get; set; }
-        public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
-        public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
 
         [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
         private static extern IntPtr wglGetProcAddress(string procName);
@@ -676,21 +674,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_activeSceneModel == null || animationModel?.AnimationData?.AnimationAsset == null) return;
 
             _activeAnimationModel = animationModel;
-            if (Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true)
-            {
-                foreach (SceneModel model in _loadedModels)
-                {
-                    AnimationData data = SynchronizationService.MatchingAnimation(model, animationModel.AnimationData);
-                    if (data != null)
-                        ActivateAnimation(model, data);
-                    else if (model.CurrentAnimation != null)
-                        DeactivateAnimation(model);
-                }
-            }
-            else
-            {
-                ActivateAnimation(_activeSceneModel, animationModel.AnimationData);
-            }
+            ActivateAnimation(_activeSceneModel, animationModel.AnimationData);
 
             Panel?.SetAnimationPlayingState(animationModel, true, true);
         }
@@ -701,21 +685,8 @@ namespace AssetsManager.Views.Controls.Viewer
             if (!IsAnimationActive(animationModel))
             {
                 _activeAnimationModel = animationModel;
-                if (Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true)
-                {
-                    foreach (SceneModel model in _loadedModels)
-                    {
-                        AnimationData data = SynchronizationService.MatchingAnimation(model, animationModel.AnimationData);
-                        if (data == null) continue;
-                        ActivateAnimation(model, data);
-                        model.IsAnimationPaused = true;
-                    }
-                }
-                else
-                {
-                    ActivateAnimation(_activeSceneModel, animationModel.AnimationData);
-                    _activeSceneModel.IsAnimationPaused = true;
-                }
+                ActivateAnimation(_activeSceneModel, animationModel.AnimationData);
+                _activeSceneModel.IsAnimationPaused = true;
                 Panel?.SetAnimationPlayingState(animationModel, false, true);
             }
 
@@ -726,7 +697,9 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (model == null || data?.AnimationAsset == null) return;
 
-            SynchronizationService.StartAnimation(model, data);
+            model.CurrentAnimation = data.AnimationAsset;
+            model.AnimationTime = 0d;
+            model.IsAnimationPaused = false;
             _lastModelUpdates.Remove(model);
         }
 
@@ -735,40 +708,18 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_activeAnimationModel != animationToToggle || _activeSceneModel == null) return;
 
             bool newPausedState = !_activeSceneModel.IsAnimationPaused;
-            if (Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true)
-            {
-                foreach (SceneModel model in _loadedModels)
-                {
-                    SynchronizationService.PauseAnimation(model, newPausedState);
-                }
-            }
-            else
-            {
-                SynchronizationService.PauseAnimation(_activeSceneModel, newPausedState);
-            }
+            if (_activeSceneModel.CurrentAnimation != null)
+                _activeSceneModel.IsAnimationPaused = newPausedState;
 
             Panel?.SetAnimationPlayingState(_activeAnimationModel, !newPausedState, true);
         }
 
         public void SeekAnimation(TimeSpan time)
         {
-            if (_activeSceneModel == null) return;
-
-            void SeekModel(SceneModel model)
-            {
-                if (model?.CurrentAnimation == null) return;
-                SynchronizationService.SeekAnimation(model, time.TotalSeconds);
-                _lastModelUpdates.Remove(model);
-            }
-
-            if (Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true)
-            {
-                foreach (SceneModel model in _loadedModels) SeekModel(model);
-            }
-            else
-            {
-                SeekModel(_activeSceneModel);
-            }
+            if (_activeSceneModel?.CurrentAnimation == null) return;
+            _activeSceneModel.AnimationTime = SynchronizationService.ClampTime(
+                time.TotalSeconds, _activeSceneModel.CurrentAnimation.Duration);
+            _lastModelUpdates.Remove(_activeSceneModel);
         }
 
         public void StopAnimation()
@@ -776,12 +727,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_activeAnimationModel != null)
                 Panel?.SetAnimationPlayingState(_activeAnimationModel, false, false);
 
-            if (Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true)
-            {
-                foreach (SceneModel model in _loadedModels)
-                    DeactivateAnimation(model);
-            }
-            else if (_activeSceneModel != null)
+            if (_activeSceneModel != null)
             {
                 DeactivateAnimation(_activeSceneModel);
             }
@@ -793,7 +739,11 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (model == null) return;
             _lastModelUpdates.Remove(model);
-            SynchronizationService.StopAnimation(model);
+            model.CurrentAnimation = null;
+            model.AnimationTime = 0d;
+            model.IsAnimationPaused = true;
+            // Clearing the palette restores the authored pose through the existing lighting path.
+            model.SkinningMatrices = null;
         }
 
         public void RemoveAnimation(AnimationModel animationModel)
@@ -999,35 +949,17 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_loadedModels.Count == 0) return;
 
-            bool isPlaybackSync = Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true &&
-                                  _activeSceneModel?.CurrentAnimation != null;
             double speed = _activeAnimationModel?.Speed ?? 1.0;
-
-            // Advance the active model first so synchronized models consume the current
-            // frame's master time rather than the previous frame's value.
             if (_activeSceneModel?.CurrentAnimation != null && !_activeSceneModel.IsAnimationPaused)
                 AdvanceAnimationClock(_activeSceneModel, deltaTime * speed);
-
-            double masterTime = _activeSceneModel?.AnimationTime ?? 0d;
-            bool masterPaused = _activeSceneModel?.IsAnimationPaused ?? true;
 
             foreach (SceneModel model in _loadedModels)
             {
                 if (model.CurrentAnimation == null || model.Skeleton == null || model.SkinnedMesh == null)
                     continue;
 
-                if (model != _activeSceneModel)
-                {
-                    if (isPlaybackSync)
-                    {
-                        model.AnimationTime = masterTime;
-                        model.IsAnimationPaused = masterPaused;
-                    }
-                    else if (!model.IsAnimationPaused)
-                    {
-                        AdvanceAnimationClock(model, deltaTime * speed);
-                    }
-                }
+                if (model != _activeSceneModel && !model.IsAnimationPaused)
+                    AdvanceAnimationClock(model, deltaTime * speed);
 
                 double playbackTime = model.AnimationTime;
 

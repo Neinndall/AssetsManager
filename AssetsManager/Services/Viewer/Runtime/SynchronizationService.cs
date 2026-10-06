@@ -13,7 +13,7 @@ using LeagueToolkit.Core.Animation;
 
 namespace AssetsManager.Services.Viewer.Runtime;
 
-/// <summary>Shared synchronization rules; viewers retain scene membership and runtime ownership.</summary>
+/// <summary>Studio scene synchronization rules; the control retains actor membership and runtime ownership.</summary>
 internal sealed class SynchronizationService
 {
     private bool _applying;
@@ -55,54 +55,12 @@ internal sealed class SynchronizationService
             ? target.AvailableTextureNames[index] : null;
     }
 
-    internal static void ShareAnimations(IEnumerable<AnimationData> animations, IEnumerable<SceneModel> targets)
-    {
-        AnimationData[] source = animations.ToArray();
-        foreach (SceneModel target in targets)
-        foreach (AnimationData animation in source)
-            if (!target.Animations.Any(item => item.Name == animation.Name))
-                target.Animations.Add(animation);
-    }
-
-    internal static AnimationData MatchingAnimation(SceneModel model, AnimationData source) =>
-        source == null ? null : model?.Animations.FirstOrDefault(item =>
-            string.Equals(item.Name, source.Name, StringComparison.OrdinalIgnoreCase));
-
     internal static AnimationClipCatalogItem MatchingClip(IEnumerable<AnimationClipCatalogItem> clips,
         AnimationClipCatalogItem source) => source == null ? null : clips.FirstOrDefault(item =>
             string.Equals(item.Name, source.Name, StringComparison.OrdinalIgnoreCase));
 
-    internal static void StartAnimation(SceneModel model, AnimationData animation)
-    {
-        if (model == null || animation?.AnimationAsset == null) return;
-        model.CurrentAnimation = animation.AnimationAsset;
-        model.AnimationTime = 0d;
-        model.IsAnimationPaused = false;
-    }
-
-    internal static void PauseAnimation(SceneModel model, bool paused)
-    {
-        if (model?.CurrentAnimation != null) model.IsAnimationPaused = paused;
-    }
-
     internal static double ClampTime(double time, double duration) =>
         duration > 0d ? Math.Clamp(time, 0d, duration) : Math.Max(0d, time);
-
-    internal static void SeekAnimation(SceneModel model, double time)
-    {
-        if (model?.CurrentAnimation != null)
-            model.AnimationTime = ClampTime(time, model.CurrentAnimation.Duration);
-    }
-
-    internal static void StopAnimation(SceneModel model)
-    {
-        if (model == null) return;
-        model.CurrentAnimation = null;
-        model.AnimationTime = 0d;
-        model.IsAnimationPaused = true;
-        // A cleared live palette restores the authored pose without changing the model's lighting path.
-        model.SkinningMatrices = null;
-    }
 
     internal static string SkeletonSignature(RigResource skeleton)
     {

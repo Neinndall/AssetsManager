@@ -16,10 +16,6 @@ namespace AssetsManager.Views.Models.Viewer
     {
         // --- UI State Properties (v3.2.2.0) ---
         private bool _isMainContentVisible = false;
-        private bool _isAnimationSyncEnabled = false;
-        private bool _isAnimationPlaybackSyncEnabled = false;
-        private bool _isMeshSyncEnabled = false;
-        private bool _isTextureSyncEnabled = false;
         private ViewerViewportModel _viewportViewModel;
 
         // --- Data Collections ---
@@ -60,30 +56,6 @@ namespace AssetsManager.Views.Models.Viewer
 
         public ObservableRangeCollection<SceneModel> LoadedModels => _loadedModels;
         public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
-        public bool IsMeshSyncEnabled
-        {
-            get => _isMeshSyncEnabled;
-            set { if (_isMeshSyncEnabled != value) { _isMeshSyncEnabled = value; OnPropertyChanged(); } }
-        }
-
-        public bool IsTextureSyncEnabled
-        {
-            get => _isTextureSyncEnabled;
-            set { if (_isTextureSyncEnabled != value) { _isTextureSyncEnabled = value; OnPropertyChanged(); } }
-        }
-
-        public bool IsAnimationSyncEnabled
-        {
-            get => _isAnimationSyncEnabled;
-            set { if (_isAnimationSyncEnabled != value) { _isAnimationSyncEnabled = value; OnPropertyChanged(); } }
-        }
-
-        public bool IsAnimationPlaybackSyncEnabled
-        {
-            get => _isAnimationPlaybackSyncEnabled;
-            set { if (_isAnimationPlaybackSyncEnabled != value) { _isAnimationPlaybackSyncEnabled = value; OnPropertyChanged(); } }
-        }
-
         public ObservableRangeCollection<ModelPart> SelectedModelParts
         {
             get => _selectedModelParts;

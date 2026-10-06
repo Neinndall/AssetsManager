@@ -26,7 +26,6 @@ namespace AssetsManager.Views.Models.Viewer
                 SetField(ref _name, PathUtils.TruncateAtDot(value));
             }
         }
-        public string SourceType { get; set; } = "Model"; // "Model" or "Chroma"
         public string FilePath { get; set; } = string.Empty;
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
@@ -148,20 +147,6 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        private bool _isMeshSyncEnabled;
-        public bool IsMeshSyncEnabled
-        {
-            get => _isMeshSyncEnabled;
-            set => SetField(ref _isMeshSyncEnabled, value);
-        }
-
-        private bool _isTextureSyncEnabled;
-        public bool IsTextureSyncEnabled
-        {
-            get => _isTextureSyncEnabled;
-            set => SetField(ref _isTextureSyncEnabled, value);
-        }
-
         private bool _areAllPartsVisible = true;
         public bool AreAllPartsVisible
         {
@@ -191,8 +176,6 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-        public event Action<ModelPart> MeshVisibilityChanged;
-        public event Action<ModelPart> MeshTextureChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
@@ -291,24 +274,7 @@ namespace AssetsManager.Views.Models.Viewer
         {
             if (e.PropertyName == nameof(ModelPart.IsVisible))
             {
-                if (sender is ModelPart part)
-                {
-                    if (!_isUpdatingVisibility && IsMeshSyncEnabled)
-                    {
-                        MeshVisibilityChanged?.Invoke(part);
-                    }
-                }
                 UpdateMasterVisibility();
-            }
-            else if (e.PropertyName == nameof(ModelPart.SelectedTextureName))
-            {
-                if (sender is ModelPart part)
-                {
-                    if (IsTextureSyncEnabled)
-                    {
-                        MeshTextureChanged?.Invoke(part);
-                    }
-                }
             }
         }
 
@@ -389,20 +355,6 @@ namespace AssetsManager.Views.Models.Viewer
                 foreach (var d in PropertyChanged.GetInvocationList())
                 {
                     PropertyChanged -= (PropertyChangedEventHandler)d;
-                }
-            }
-            if (MeshVisibilityChanged != null)
-            {
-                foreach (var d in MeshVisibilityChanged.GetInvocationList())
-                {
-                    MeshVisibilityChanged -= (Action<ModelPart>)d;
-                }
-            }
-            if (MeshTextureChanged != null)
-            {
-                foreach (var d in MeshTextureChanged.GetInvocationList())
-                {
-                    MeshTextureChanged -= (Action<ModelPart>)d;
                 }
             }
         }

@@ -18,7 +18,6 @@ namespace AssetsManager.Views
 
         private readonly ViewerWindowModel _viewModel;
         private readonly LogService _logService;
-        private readonly TaskCancellationManager _taskCancellationManager;
         private readonly AppSettings _appSettings;
         private readonly SknLoadingService _sknLoadingService;
         private readonly MapViewerSceneService _mapViewerSceneService;
@@ -36,7 +35,6 @@ namespace AssetsManager.Views
 
         public ViewerWindow(
             LogService logService,
-            TaskCancellationManager taskCancellationManager,
             AppSettings appSettings,
             SknLoadingService sknLoadingService,
             MapViewerSceneService mapViewerSceneService,
@@ -46,7 +44,6 @@ namespace AssetsManager.Views
         {
             _viewModel = new ViewerWindowModel();
             _logService = logService;
-            _taskCancellationManager = taskCancellationManager;
             _appSettings = appSettings;
             _sknLoadingService = sknLoadingService;
             _mapViewerSceneService = mapViewerSceneService;
@@ -138,7 +135,6 @@ namespace AssetsManager.Views
             _panelControl.SknLoadingService = _sknLoadingService;
             _panelControl.LogService = _logService;
             _panelControl.CustomMessageBoxService = _customMessageBoxService;
-            _panelControl.TaskCancellationManager = _taskCancellationManager;
             _panelControl.WindowViewModel = _viewModel;
             _panelControl.Viewport = _viewportControl;
             _panelControl.ViewModel.ViewportViewModel = _viewportControl.ViewModel;

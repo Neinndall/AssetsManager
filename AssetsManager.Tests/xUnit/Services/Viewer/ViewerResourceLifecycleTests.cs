@@ -56,16 +56,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
         public void SceneDisposalIsIdempotentAndDetachesPartEvents()
         {
             var part = new ModelPart { Name = "Eyes" };
-            var scene = new SceneModel { IsMeshSyncEnabled = true };
-            int visibilityChanges = 0;
-            scene.MeshVisibilityChanged += _ => visibilityChanges++;
+            var scene = new SceneModel();
             scene.Parts.Add(part);
 
             scene.Dispose();
             scene.Dispose();
+            bool visible = scene.IsVisible;
+            bool allVisible = scene.AreAllPartsVisible;
+            part.IsVisible = false;
             part.IsVisible = true;
 
-            Assert.Equal(0, visibilityChanges);
+            Assert.Equal(visible, scene.IsVisible);
+            Assert.Equal(allVisible, scene.AreAllPartsVisible);
+            Assert.Empty(scene.Parts);
         }
 
         [Fact]

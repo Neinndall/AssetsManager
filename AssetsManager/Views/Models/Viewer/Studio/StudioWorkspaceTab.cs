@@ -13,8 +13,8 @@ namespace AssetsManager.Views.Models.Viewer
 
     /// <summary>
     /// One independently addressable 3D Studio workspace document. A Skin tab is a scene of one or
-    /// more Character actors; a MAP tab carries its browser node as Payload. The tab only owns navigation
-    /// state; heavyweight Champion/MAP resources remain owned by StudioControl and are swapped
+    /// more Character actors; a MAP tab carries its browser node as Payload. Navigation and scene settings
+    /// belong to the tab; heavyweight Champion/MAP resources remain owned by StudioControl and are swapped
     /// into the single viewport when the tab becomes active.
     /// </summary>
     public sealed class StudioWorkspaceTab : INotifyPropertyChanged
