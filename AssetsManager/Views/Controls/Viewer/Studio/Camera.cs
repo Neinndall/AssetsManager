@@ -2,8 +2,6 @@ using System;
 using System.Numerics;
 using System.Windows;
 using System.Windows.Media.Media3D;
-using AssetsManager.Services.Viewer.Interaction;
-using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils;
@@ -181,7 +179,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_model.IsSkinWorkspace)
             {
-                VfxDefinitionBounds characters = SceneCharacterBounds();
+                VfxDefinitionBounds characters = SceneCharacterFramingBounds();
                 if (IsFiniteBounds(characters)) return characters;
             }
 
@@ -207,18 +205,6 @@ namespace AssetsManager.Views.Controls.Viewer
                    bounds.Max.Y >= bounds.Min.Y &&
                    bounds.Max.Z >= bounds.Min.Z &&
                    (bounds.Max - bounds.Min).LengthSquared() > 1e-8f;
-        }
-
-        private static VfxDefinitionBounds CharacterPreviewBounds(SceneModel model)
-        {
-            if (model == null) return default;
-            Rect3D bounds = ViewerInteractionService.GetWorldBounds(
-                model, GlMeshRenderer.CreateWorldMatrix(model, mirrorCharacterX: true));
-            if (bounds.IsEmpty) return default;
-            return new VfxDefinitionBounds(
-                new Vector3((float)bounds.X, (float)bounds.Y, (float)bounds.Z),
-                new Vector3((float)(bounds.X + bounds.SizeX),
-                    (float)(bounds.Y + bounds.SizeY), (float)(bounds.Z + bounds.SizeZ)));
         }
 
         private Vector3 CurrentPreviewGround()
@@ -279,12 +265,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 up);
         }
 
-        private static VfxDefinitionBounds DefaultPreviewBounds()
+        private static VfxDefinitionBounds DefaultPreviewBounds(Vector3 ground = default, float scale = 1f)
         {
-            float reach = VfxSystemBounds.StandingReach;
+            float reach = VfxSystemBounds.StandingReach * scale;
             return new VfxDefinitionBounds(
-                new Vector3(-reach, 0f, -reach),
-                new Vector3(reach, VfxRigMotion.ChampionHeight, reach));
+                ground + new Vector3(-reach, 0f, -reach),
+                ground + new Vector3(reach, VfxRigMotion.ChampionHeight * scale, reach));
         }
 
     }

@@ -805,24 +805,20 @@ namespace AssetsManager.Views.Controls.Viewer
             RefreshCharacterInteractionTarget();
         }
 
-        /// <summary>World bounds of every visible Character in the Skin scene for camera framing.</summary>
-        private VfxDefinitionBounds SceneCharacterBounds()
+        /// <summary>Stable reference bounds follow actor placement without depending on mesh loading or dimensions.</summary>
+        private VfxDefinitionBounds SceneCharacterFramingBounds()
         {
             var min = new Vector3(float.PositiveInfinity);
             var max = new Vector3(float.NegativeInfinity);
-            void Include(SceneModel model)
+            foreach (StudioSceneActor actor in _model.SelectedWorkspaceTab.Actors)
             {
-                VfxDefinitionBounds bounds = CharacterPreviewBounds(model);
-                if (!IsFiniteBounds(bounds)) return;
+                if (!actor.IsVisible) continue;
+                VfxDefinitionBounds bounds = DefaultPreviewBounds(
+                    new Vector3((float)actor.PositionX, (float)actor.PositionY, (float)actor.PositionZ),
+                    (float)actor.ScaleMultiplier);
+                if (!IsFiniteBounds(bounds)) continue;
                 min = Vector3.Min(min, bounds.Min);
                 max = Vector3.Max(max, bounds.Max);
-            }
-
-            if (_championModel != null && IsFocusedActorVisible)
-                Include(_championModel);
-            foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
-            {
-                if (actor.IsVisible) Include(runtime.Model);
             }
             return new VfxDefinitionBounds(min, max);
         }

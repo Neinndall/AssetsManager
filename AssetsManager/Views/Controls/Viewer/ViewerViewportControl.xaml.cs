@@ -110,6 +110,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _lastRenderedAt = renderTime;
             UpdateScene(frameDelta);
             RenderScene(framebufferWidth, framebufferHeight, frameDelta);
+            OpenTkControl.Opacity = 1d;
             RecordRenderedFrame();
             ProcessPendingSnapshot();
             _firstRenderedFrame.TrySetResult(true);
@@ -127,8 +128,9 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             else
             {
-                // Clear to standard dark theme color (#18181b)
-                _gl.ClearColor(0.094f, 0.094f, 0.106f, 1.0f);
+                Color background = ((SolidColorBrush)FindResource("ViewportBackground")).Color;
+                _gl.ClearColor(background.R / 255f, background.G / 255f,
+                    background.B / 255f, background.A / 255f);
             }
 
             _gl.Clear((uint)(Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit | Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit));
@@ -488,6 +490,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (!IsLoaded || !IsVisible)
             {
+                OpenTkControl.Opacity = 0d;
                 if (_isCompositionTargetHooked)
                 {
                     CompositionTarget.Rendering -= OnCompositionTargetRendering;

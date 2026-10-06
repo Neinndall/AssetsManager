@@ -91,6 +91,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     Key = key,
                     Kind = StudioWorkspaceTabKind.Skin
                 };
+                // Opening a skin inherits the visible camera; only an explicit Fit reframes it.
+                if (_cameraController != null && _dummyViewport.Camera is ProjectionCamera camera)
+                    tab.CameraState = StudioWorkspaceCameraState.Capture(camera, _model.PreviewCameraPreset);
                 StudioSceneActor actor = CreateSceneActor(skin);
                 tab.Actors.Add(actor);
                 tab.FocusedActor = actor;

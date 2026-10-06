@@ -167,6 +167,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public void Deactivate()
         {
             _pendingSnapshot = null;
+            OpenTkControl.Opacity = 0d;
             CloseAllToolbarPopups();
             _isActive = false;
             _pendingSystem = null;

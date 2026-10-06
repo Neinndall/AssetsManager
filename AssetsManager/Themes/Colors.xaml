@@ -10,6 +10,7 @@
     <!-- DARK THEME CORE (Refined deep tones) -->
     <SolidColorBrush x:Key="DarkBackground" Color="#FF0F111A"/>    <!-- Deeper Dark -->
     <SolidColorBrush x:Key="SidebarBackground" Color="#FF161925"/> <!-- Slightly lighter than bg -->
+    <SolidColorBrush x:Key="ViewportBackground" Color="#FF14171F"/>
     <SolidColorBrush x:Key="CardBackground" Color="#FF1E2233"/>    <!-- Elevated layer -->
     
     <!-- ACCENT PALETTE (Modern & Balanced) -->

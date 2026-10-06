@@ -12,7 +12,7 @@
     <Border x:Name="ViewportOuterBorder">
         <Border.Style>
             <Style TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
+                <Setter Property="Background" Value="{StaticResource ViewportBackground}"/>
                 <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
                 <Setter Property="BorderThickness" Value="1"/>
                 <Setter Property="CornerRadius" Value="0"/>
@@ -32,6 +32,7 @@
             <Grid>
                 <!-- 3D VIEWPORT (Silk.NET OpenGL) -->
                 <glWpfControl:GLWpfControl x:Name="OpenTkControl"
+                                           Opacity="0"
                                            ClipToBounds="True"
                                            Ready="OpenTkControl_Ready"
                                            Render="OpenTkControl_Render"/>

@@ -241,7 +241,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (!snapshot) AdvanceCharacterAutoRotate(dt);
 
-            // Update background clear color matching main viewer (Dark Studio)
+            // Match the dark native frame to the WPF surface visible before it is ready.
             switch (_model.BgMode)
             {
                 case "Light":
@@ -252,7 +252,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     _gl.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
                     break;
                 default: // Dark Studio
-                    _gl.ClearColor(0.08f, 0.09f, 0.12f, 1.0f);
+                    Color background = ((SolidColorBrush)ViewportBackgroundSurface.Background).Color;
+                    _gl.ClearColor(background.R / 255f, background.G / 255f,
+                        background.B / 255f, background.A / 255f);
                     break;
             }
 
@@ -506,7 +508,11 @@ namespace AssetsManager.Views.Controls.Viewer
                     emitter.ActiveParticleCount = _vfxRenderer.GetEmitterLiveCount(emitter.SourceOrder);
             }
 
-            if (!snapshot) QueuePlayheadRefresh();
+            if (!snapshot)
+            {
+                OpenTkControl.Opacity = 1d;
+                QueuePlayheadRefresh();
+            }
         }
 
         /// <summary>Copies the depth the map geometry just wrote, before structures and characters draw over it.</summary>
