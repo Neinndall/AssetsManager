@@ -19,12 +19,16 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 ? feed.Replace("gl_Position = uViewProj * vec4(p, 1.0);", "particleWorld = p; particleNormal = worldSurface;")
                 : feed.Replace("world += normalize(eyeRay) * uDepthPushPull;", "world += vec3(0.0);")
                     .Replace("gl_Position = uViewProj * vec4(world, 1.0);", "particleWorld = world; particleNormal = normalize(cross(right, up));");
+            bool transformsMeshUv = mesh && program.Vertex.Sidecar.Blocks
+                .SelectMany(block => block.Members)
+                .Any(member => member.Name is "vParticleUVTransform" or "vParticleUVTransformMult");
             var inputs = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["a_POSITION"] = "vec4(particleWorld, 1.0)",
                 ["a_NORMAL"] = "vec4(particleNormal, 0.0)",
                 ["a_COLOR"] = mesh ? "vMeshColor.bgra" : "particleTint.bgra",
-                ["a_TEXCOORD"] = "vec4(particleBaseUv, 0.0, particleErosion)",
+                ["a_TEXCOORD"] = transformsMeshUv
+                    ? "vec4(aUv, 0.0, particleErosion)" : "vec4(particleBaseUv, 0.0, particleErosion)",
                 ["a_TEXCOORD1"] = "vec4(uHasTexMult != 0 ? particleMultUv : particleLookup, 0.0, 0.0)",
                 ["a_BLENDWEIGHT"] = "vec4(1.0, 0.0, 0.0, 0.0)",
                 ["a_BLENDINDICES"] = "vec4(0.0)"
@@ -41,6 +45,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 }, RegexOptions.Multiline);
             vertex = Regex.Replace(vertex, @"\bvoid main\(\)", "void gameParticleMain()", RegexOptions.CultureInvariant);
             string shared = "vec3 particleWorld; vec3 particleNormal; vec4 particleTint; vec2 particleBaseUv; vec2 particleMultUv; vec2 particleLookup; float particleErosion;\n";
+            if (mesh) shared += "vec4 particleUvRowU; vec4 particleUvRowV; vec4 particleMultRowU; vec4 particleMultRowV;\n";
             string helpers = Helpers(mesh);
             if (mesh) helpers = helpers.Replace("vColorDynamics", "uGameLookupDrivers");
             string geometry = feed + "\n" + helpers;
@@ -51,8 +56,13 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 ["mWorld"] = Identity(),
                 ["BONES"] = Identity().Take(3).ToArray(),
                 ["kColorFactor"] = new[] { "particleTint" },
-                ["vParticleUVTransform"] = new[] { "vec4(0.0, 0.0, particleBaseUv.x, 0.0)", "vec4(0.0, 0.0, particleBaseUv.y, 0.0)" },
-                ["vParticleUVTransformMult"] = new[] { "vec4(0.0, 0.0, particleMultUv.x, 0.0)", "vec4(0.0, 0.0, particleMultUv.y, 0.0)" },
+                // Screen UVs and separate alpha UVs need the affine basis, not a resolved vertex UV.
+                ["vParticleUVTransform"] = mesh
+                    ? new[] { "particleUvRowU", "particleUvRowV" }
+                    : new[] { "vec4(0.0, 0.0, particleBaseUv.x, 0.0)", "vec4(0.0, 0.0, particleBaseUv.y, 0.0)" },
+                ["vParticleUVTransformMult"] = mesh
+                    ? new[] { "particleMultRowU", "particleMultRowV" }
+                    : new[] { "vec4(0.0, 0.0, particleMultUv.x, 0.0)", "vec4(0.0, 0.0, particleMultUv.y, 0.0)" },
                 ["COLOR_LOOKUP_UV"] = new[] { "vec4(particleLookup, 0.0, 0.0)" },
                 ["cAlphaErosionParams"] = new[] { "vec4(particleErosion, uErosionSliceWidth, 1.0 / max(uErosionFeatherIn, 0.0001), 1.0 / max(uErosionFeatherOut, 0.0001))" }
             };
@@ -114,7 +124,22 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
         private static string[] Identity() => new[] { "vec4(1.0,0.0,0.0,0.0)", "vec4(0.0,1.0,0.0,0.0)", "vec4(0.0,0.0,1.0,0.0)", "vec4(0.0,0.0,0.0,1.0)" };
 
-        private static string Helpers(bool mesh) => (mesh ? "uniform vec4 uColor;\nuniform float uErosionDrive;\n" : string.Empty) + @"
+        private const string MeshUvHelpers = @"
+void particleUvRows(vec2 scale, float angle, vec2 offset, vec2 center,
+                    ivec2 flip, vec2 cell, vec2 divisions, out vec4 rowU, out vec4 rowV){
+    float cosine = cos(angle); float sine = sin(angle);
+    vec2 along = vec2(scale.x * cosine, -scale.y * sine);
+    vec2 across = vec2(scale.x * sine, scale.y * cosine);
+    vec2 mirrored = vec2(1.0) - vec2(flip) * 2.0;
+    vec2 origin = center + offset - vec2(dot(along, center), dot(across, center));
+    origin = origin * mirrored + vec2(flip) + cell;
+    vec2 div = max(round(divisions), vec2(1.0));
+    rowU = vec4(along * mirrored.x, origin.x, 0.0) / div.x;
+    rowV = vec4(across * mirrored.y, origin.y, 0.0) / div.y;
+}
+";
+
+        private static string Helpers(bool mesh) => (mesh ? "uniform vec4 uColor;\nuniform float uErosionDrive;\n" + MeshUvHelpers : string.Empty) + @"
 uniform int uGamePremultiplied;
 uniform int uHasTexMult;
 uniform int uColorLookUpTypeX;
@@ -137,6 +162,10 @@ void particleFeed(){
     if (uColorLookUpTypeX != 0) particleLookup.x += uColorLookUpOffsets.x;
     if (uColorLookUpTypeY != 0) particleLookup.y += uColorLookUpOffsets.y;
 " + (mesh ? @"
+    particleUvRows(uUvScale, uUvRotation, uBirthUvOffset + uEmitterUvOffset, uUvTransformCenter,
+                   ivec2(uFlipU, uFlipV), vCell, uTexDiv, particleUvRowU, particleUvRowV);
+    particleUvRows(uUvScaleMult, uUvRotationMult, uUvOffsetMult + uEmitterUvOffsetMult, uUvTransformCenterMult,
+                   ivec2(uFlipUMult, uFlipVMult), vCellMult, uTexDivMult, particleMultRowU, particleMultRowV);
     particleTint = uColor;
     particleErosion = uErosionDrive;
 " : @"

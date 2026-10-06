@@ -500,6 +500,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Restored screen-space texture mapping and separate alpha UVs on particle meshes.
   - VFX Studio / Corrected emitter texture scrolling direction on flipped effects and unintended scrolling on meshes.
   - VFX Studio / Fixed soft-particle effects disappearing too early or fading with the wrong color and transparency.
   - Viewer / Restored the original viewport background consistently across Normal Viewer and 3D Studio, including startup.
