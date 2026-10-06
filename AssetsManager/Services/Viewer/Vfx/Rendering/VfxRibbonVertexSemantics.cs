@@ -64,7 +64,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 instances[instanceOffset + 19],
                 instances[instanceOffset + 20]);
             baseOffset = VfxUvSemantics.Periodic(
-                baseOffset + definition.EmitterUvScrollRate * state.RenderTime,
+                baseOffset + VfxUvSemantics.PreFlipEmitterScroll(definition.EmitterUvScrollRate, state.RenderTime,
+                    renderState.FlipU, renderState.FlipV),
                 renderState.TextureAddressMode);
             Vector2 baseScale = new(
                 instances[instanceOffset + 21],
@@ -89,7 +90,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 instances[instanceOffset + 29],
                 instances[instanceOffset + 30]);
             multOffset = VfxUvSemantics.Periodic(
-                multOffset + definition.TextureMultEmitterUvScrollRate * state.RenderTime,
+                multOffset + VfxUvSemantics.PreFlipEmitterScroll(definition.TextureMultEmitterUvScrollRate, state.RenderTime,
+                    definition.TextureMultFlipU, definition.TextureMultFlipV),
                 definition.TextureMultAddressMode);
             Vector2 multScale = new(
                 instances[instanceOffset + 31],

@@ -6042,6 +6042,59 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(0.375f, vertex[17], precision: 5);
         }
 
+        [Theory]
+        [InlineData(0, 0)] [InlineData(0, 1)] [InlineData(0, 2)] [InlineData(0, 3)]
+        [InlineData(1, 0)] [InlineData(1, 1)] [InlineData(1, 2)] [InlineData(1, 3)]
+        [InlineData(2, 0)] [InlineData(2, 1)] [InlineData(2, 2)] [InlineData(2, 3)]
+        [InlineData(3, 0)] [InlineData(3, 1)] [InlineData(3, 2)] [InlineData(3, 3)]
+        public void RibbonEmitterPanPreservesParticleScrollAndAddressPeriods(int address, int flips)
+        {
+            bool flipU = (flips & 1) != 0;
+            bool flipV = (flips & 2) != 0;
+            VfxEmitterDefinition definition = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default with
+            {
+                TextureAddressMode = address, FlipU = flipU, FlipV = flipV
+            }) with
+            {
+                IsMeshPrimitive = false, PrimitiveKind = VfxPrimitiveKind.CameraTrail,
+                EmitterUvScrollRate = new Vector2(0.25f, -0.5f),
+                TextureMultEmitterUvScrollRate = new Vector2(-0.125f, 0.25f),
+                TextureMultAddressMode = address, TextureMultFlipU = !flipU, TextureMultFlipV = !flipV
+            };
+            var state = new VfxPlaybackRuntime.EmitterState
+            {
+                Def = definition, Instances = new float[VfxPlaybackRuntime.InstanceStride],
+                InstanceCount = 1, RenderTime = 1000.25f, Age = 1f
+            };
+            state.Instances[19] = 0.1f;
+            state.Instances[20] = -0.2f;
+            state.Instances[29] = -0.15f;
+            state.Instances[30] = 0.3f;
+            state.Instances[21] = state.Instances[22] = state.Instances[31] = state.Instances[32] = 1;
+            var vertex = new float[VfxTrailGeometry.VertexStride];
+            VfxRibbonVertexSemantics.Pack(state, 0, vertex, 0, 0.2f, 0.4f, transpose: false);
+
+            // Particle offsets still flip; the emitter's positive/negative pan is added afterwards.
+            float[] expected =
+            {
+                (flipU ? 0.7f : 0.3f) + 0.25f * state.RenderTime,
+                (flipV ? 0.8f : 0.2f) - 0.5f * state.RenderTime,
+                (!flipU ? 0.95f : 0.05f) - 0.125f * state.RenderTime,
+                (!flipV ? 0.3f : 0.7f) + 0.25f * state.RenderTime
+            };
+            float[] actual = { vertex[0], vertex[1], vertex[17], vertex[18] };
+            float period = address == 0 ? 1 : address == 1 ? 2 : 0;
+            for (int axis = 0; axis < 4; axis++)
+            {
+                if (period > 0)
+                {
+                    expected[axis] -= MathF.Floor(expected[axis] / period) * period;
+                    actual[axis] -= MathF.Floor(actual[axis] / period) * period;
+                }
+                Assert.InRange(Math.Abs(expected[axis] - actual[axis]), 0, 0.0001f);
+            }
+        }
+
         [Fact]
         public void ArbitraryTrailUsesParticleSideInsteadOfFacingCamera()
         {

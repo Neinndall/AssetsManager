@@ -6,7 +6,6 @@ using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
-using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
@@ -155,10 +154,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 Math.Max(1f, es.TextureMultHeight));
             Vector2 uvCenterMult = es.Def.TextureMultTransformCenter;
             _meshUniforms.Uniform2(_meshUniforms.UvTransformCenterMult, uvCenterMult.X, uvCenterMult.Y);
-            Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
-                    es.Def.TextureMultEmitterUvScrollRate * es.RenderTime,
-                    es.Def.TextureMultAddressMode);
-            _meshUniforms.Uniform2(_meshUniforms.EmitterUvOffsetMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
+            // The emitter-clock pan is a quad/ribbon operation; mesh UVs retain their particle scroll.
+            _meshUniforms.Uniform2(_meshUniforms.EmitterUvOffsetMult, 0f, 0f);
             _meshUniforms.Uniform1(_meshUniforms.FlipUMult, es.Def.TextureMultFlipU ? 1 : 0);
             _meshUniforms.Uniform1(_meshUniforms.FlipVMult, es.Def.TextureMultFlipV ? 1 : 0);
             _meshUniforms.Uniform1(_meshUniforms.AddressModeMult, es.Def.TextureMultAddressMode);
@@ -350,10 +347,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 ApplyEmitterBlendState(es.Def, isDistortion);
             }
 
-            Vector2 emitterUvOffset = VfxUvSemantics.Periodic(
-                    es.Def.EmitterUvScrollRate * es.RenderTime,
-                    renderState.TextureAddressMode);
-            _meshUniforms.Uniform2(_meshUniforms.EmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
+            _meshUniforms.Uniform2(_meshUniforms.EmitterUvOffset, 0f, 0f);
             // Material parameters and textures are shared by every particle in this emitter pass.
             if (native) BindGameParticle(es, true, passIndex, sharedPalettePhase);
             for (int i = 0; i < instanceCount; i++)

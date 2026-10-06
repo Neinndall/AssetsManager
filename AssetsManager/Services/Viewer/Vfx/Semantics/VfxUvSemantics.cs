@@ -15,6 +15,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
                 ? Vector2.Clamp(value, new Vector2(-1f), Vector2.One)
                 : new Vector2(Fract(value.X), Fract(value.Y));
 
+        // The emitter pan lands after the layer flips. Its pre-flip carrier must cancel their sign.
+        internal static Vector2 PreFlipEmitterScroll(Vector2 rate, float time, bool flipU, bool flipV)
+            => rate * time * new Vector2(flipU ? -1f : 1f, flipV ? -1f : 1f);
+
         internal static Vector2 Periodic(Vector2 value, int addressMode)
         {
             float period = addressMode switch

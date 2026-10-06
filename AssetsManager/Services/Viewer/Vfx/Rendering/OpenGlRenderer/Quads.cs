@@ -23,7 +23,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _particleUniforms.Uniform2(_particleUniforms.TexDiv, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
             _particleUniforms.Uniform2(_particleUniforms.TexSize, Math.Max(1f, es.TextureWidth), Math.Max(1f, es.TextureHeight));
             Vector2 emitterUvOffset = VfxUvSemantics.Periodic(
-                es.Def.EmitterUvScrollRate * es.RenderTime,
+                VfxUvSemantics.PreFlipEmitterScroll(es.Def.EmitterUvScrollRate, es.RenderTime,
+                    renderState.FlipU, renderState.FlipV),
                 renderState.TextureAddressMode);
             _particleUniforms.Uniform2(_particleUniforms.EmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
             Vector2 uvCenter = es.Def.UvTransformCenter;
@@ -36,7 +37,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 Math.Max(1f, es.TextureMultWidth),
                 Math.Max(1f, es.TextureMultHeight));
             Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
-                es.Def.TextureMultEmitterUvScrollRate * es.RenderTime,
+                VfxUvSemantics.PreFlipEmitterScroll(es.Def.TextureMultEmitterUvScrollRate, es.RenderTime,
+                    es.Def.TextureMultFlipU, es.Def.TextureMultFlipV),
                 es.Def.TextureMultAddressMode);
             _particleUniforms.Uniform2(_particleUniforms.UvScrollRateMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
             Vector2 uvCenterMult = es.Def.TextureMultTransformCenter;
