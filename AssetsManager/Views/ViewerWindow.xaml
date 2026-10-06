@@ -106,11 +106,15 @@
                     <StackPanel x:Name="DefaultEmptyStateContent" Visibility="{Binding IsLoadingVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                         <!-- HERO HEADER: Centered Model -->
                         <StackPanel Margin="0,0,0,36" HorizontalAlignment="Center">
-                            <Border Background="#1A00E676" CornerRadius="6" Padding="10,4" HorizontalAlignment="Center" Margin="0,0,0,12">
-                                <TextBlock Text="3D WORKSPACE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
-                            </Border>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
+                                <Border Background="#1A00E676" CornerRadius="6" Padding="10,4">
+                                    <TextBlock Text="3D WORKSPACE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
+                                </Border>
+                                <TextBlock Text="INTERACTIVE STUDIO" FontSize="11" FontWeight="Bold"
+                                           Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            </StackPanel>
                             <TextBlock Text="Model Viewer" FontSize="42" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Explore 3D models, animations, chromas and maps." FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" TextAlignment="Center"/>
+                            <TextBlock Text="Visualize 3D champions, animations, maps, vfx and shaders in real-time." FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" TextAlignment="Center"/>
                         </StackPanel>
 
                         <!-- Action Cards -->

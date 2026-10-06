@@ -1122,10 +1122,13 @@ namespace AssetsManager.Views.Controls.Viewer
             Vector3D lookDirection;
             Vector3D upDirection = new Vector3D(0.00, 1.00, 0.00);
 
-            if (TryGetModelBounds(out var center, out var maxDim, out var horizontalDim))
+            if (TryGetModelBounds(out var center, out _, out var radius))
             {
-                double distance = maxDim * 1.25;
-                if (distance < 50) distance = 250;
+                double aspect = OpenTkControl.ActualHeight > 0d
+                    ? Math.Max(1d, OpenTkControl.ActualWidth) / OpenTkControl.ActualHeight
+                    : 1d;
+                double distance = CameraPresets.CalculatePerspectiveFrameDistance(
+                    radius, CameraPresets.OrbitFieldOfView, aspect);
 
                 double heightFactor = 0.15;
                 double horizontalAngle = Math.PI / 2;
@@ -1194,32 +1197,26 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool TryGetModelBounds(
             out Point3D center,
             out double maxDim,
-            out double horizontalDim)
+            out double radius)
         {
             center = new Point3D();
             maxDim = 0;
-            horizontalDim = 0;
+            radius = 0;
 
             if (_activeSceneModel?.Parts?.Count > 0)
             {
-                var bounds = Rect3D.Empty;
-                foreach (var part in _activeSceneModel.Parts)
-                {
-                    if (part.Geometry?.Geometry is MeshGeometry3D mesh)
-                        bounds.Union(mesh.Bounds);
-                }
+                Rect3D bounds = ViewerInteractionService.GetWorldBounds(_activeSceneModel);
 
                 if (!bounds.IsEmpty)
                 {
-                    double centerX = bounds.X + bounds.SizeX / 2 + _activeSceneModel.PositionX;
-                    double centerY = bounds.Y + bounds.SizeY * 0.5 + _activeSceneModel.PositionY;
-                    double centerZ = bounds.Z + bounds.SizeZ / 2 + _activeSceneModel.PositionZ;
+                    double centerX = bounds.X + bounds.SizeX / 2;
+                    double centerY = bounds.Y + bounds.SizeY * 0.5;
+                    double centerZ = bounds.Z + bounds.SizeZ / 2;
                     center = new Point3D(centerX, centerY, centerZ);
 
                     maxDim = Math.Max(bounds.SizeX, Math.Max(bounds.SizeY, bounds.SizeZ));
                     if (maxDim <= 0) maxDim = 150;
-                    horizontalDim = Math.Max(bounds.SizeX, bounds.SizeZ);
-                    if (horizontalDim <= 0) horizontalDim = maxDim;
+                    radius = Math.Max(1d, new Vector3D(bounds.SizeX, bounds.SizeY, bounds.SizeZ).Length / 2d);
 
                     return true;
                 }

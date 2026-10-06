@@ -161,7 +161,7 @@ namespace AssetsManager.Utils.Viewport
             };
         }
 
-        internal static double CalculateMapFrameDistance(double radius, double fovDegrees, double aspect)
+        internal static double CalculatePerspectiveFrameDistance(double radius, double fovDegrees, double aspect)
         {
             if (!double.IsFinite(radius) || radius <= 0d ||
                 !double.IsFinite(fovDegrees) || fovDegrees <= 0d || fovDegrees >= 180d ||
@@ -173,7 +173,7 @@ namespace AssetsManager.Utils.Viewport
             double vertical = fovDegrees * Math.PI / 180d;
             double horizontal = 2d * Math.Atan(Math.Tan(vertical / 2d) * aspect);
             double half = Math.Min(vertical, horizontal) / 2d;
-            return radius / Math.Sin(half) * 1.15d;
+            return radius / Math.Max(Math.Sin(half), 1e-4d) * 1.15d;
         }
     }
 }

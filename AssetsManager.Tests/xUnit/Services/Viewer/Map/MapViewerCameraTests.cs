@@ -14,7 +14,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         {
             double radius = System.Math.Sqrt(1500d * 1500d + 300d * 300d + 1500d * 1500d);
 
-            double distance = CameraPresets.CalculateMapFrameDistance(
+            double distance = CameraPresets.CalculatePerspectiveFrameDistance(
                 radius,
                 45d,
                 16d / 9d);
@@ -27,8 +27,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         {
             double radius = System.Math.Sqrt(1500d * 1500d + 300d * 300d + 1500d * 1500d);
 
-            double wide = CameraPresets.CalculateMapFrameDistance(radius, 45d, 16d / 9d);
-            double narrow = CameraPresets.CalculateMapFrameDistance(radius, 45d, 0.5d);
+            double wide = CameraPresets.CalculatePerspectiveFrameDistance(radius, 45d, 16d / 9d);
+            double narrow = CameraPresets.CalculatePerspectiveFrameDistance(radius, 45d, 0.5d);
 
             Assert.True(narrow > wide);
         }

@@ -65,6 +65,24 @@ namespace AssetsManager.Services.Viewer.Interaction
             return bounds;
         }
 
+        internal static Rect3D GetWorldBounds(SceneModel model, Matrix4x4? worldMatrix = null)
+        {
+            Rect3D local = GetLocalBounds(model);
+            if (local.IsEmpty) return local;
+
+            Matrix4x4 world = worldMatrix ?? CreateWorldMatrix(model);
+            Rect3D bounds = Rect3D.Empty;
+            for (int corner = 0; corner < 8; corner++)
+            {
+                Vector3 point = Vector3.Transform(new Vector3(
+                    (float)(local.X + ((corner & 1) != 0 ? local.SizeX : 0d)),
+                    (float)(local.Y + ((corner & 2) != 0 ? local.SizeY : 0d)),
+                    (float)(local.Z + ((corner & 4) != 0 ? local.SizeZ : 0d))), world);
+                bounds.Union(new Point3D(point.X, point.Y, point.Z));
+            }
+            return bounds;
+        }
+
         public static SceneModel PickModel(
             IEnumerable<SceneModel> models,
             System.Windows.Point screenPoint,

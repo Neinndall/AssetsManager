@@ -212,24 +212,13 @@ namespace AssetsManager.Views.Controls.Viewer
         private static VfxDefinitionBounds CharacterPreviewBounds(SceneModel model)
         {
             if (model == null) return default;
-            Rect3D local = ViewerInteractionService.GetLocalBounds(model);
-            if (local.IsEmpty) return default;
-
-            Matrix4x4 world = GlMeshRenderer.CreateWorldMatrix(model, mirrorCharacterX: true);
-            Vector3 min = new(float.PositiveInfinity);
-            Vector3 max = new(float.NegativeInfinity);
-            double[] xs = { local.X, local.X + local.SizeX };
-            double[] ys = { local.Y, local.Y + local.SizeY };
-            double[] zs = { local.Z, local.Z + local.SizeZ };
-            foreach (double x in xs)
-            foreach (double y in ys)
-            foreach (double z in zs)
-            {
-                Vector3 point = Vector3.Transform(new Vector3((float)x, (float)y, (float)z), world);
-                min = Vector3.Min(min, point);
-                max = Vector3.Max(max, point);
-            }
-            return new VfxDefinitionBounds(min, max);
+            Rect3D bounds = ViewerInteractionService.GetWorldBounds(
+                model, GlMeshRenderer.CreateWorldMatrix(model, mirrorCharacterX: true));
+            if (bounds.IsEmpty) return default;
+            return new VfxDefinitionBounds(
+                new Vector3((float)bounds.X, (float)bounds.Y, (float)bounds.Z),
+                new Vector3((float)(bounds.X + bounds.SizeX),
+                    (float)(bounds.Y + bounds.SizeY), (float)(bounds.Z + bounds.SizeZ)));
         }
 
         private Vector3 CurrentPreviewGround()

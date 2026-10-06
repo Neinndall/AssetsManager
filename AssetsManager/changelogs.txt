@@ -6,6 +6,8 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Viewer / Models opened from Project Browser now start fully framed, respecting their scale and viewport size.
+  - Viewer / Restored the Interactive Studio label and updated the start menu description.
   - Viewer / The start menu initializes only the selected viewer and pauses hidden viewports.
   - 3D Studio / Added scene synchronization controls for submesh visibility, textures, compatible animation loading and playback in the Inspector.
   - VFX Studio / Added Take 4K Snapshot to save the current viewport as a high-resolution PNG.

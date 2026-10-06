@@ -4,6 +4,7 @@ using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Utils.Rendering;
+using AssetsManager.Utils.Viewport;
 
 namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
@@ -79,7 +80,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             float aspect,
             Vector3 direction)
         {
-            float fov = float.IsFinite(verticalFovDegrees) && verticalFovDegrees > 0f
+            float fov = float.IsFinite(verticalFovDegrees) && verticalFovDegrees > 0f && verticalFovDegrees < 180f
                 ? verticalFovDegrees
                 : 45f;
             float safeAspect = float.IsFinite(aspect) && aspect > 0f ? aspect : 1f;
@@ -87,11 +88,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 ? Vector3.Normalize(direction)
                 : Vector3.UnitZ;
 
-            float vertical = fov * (MathF.PI / 180f);
-            float horizontal = 2f * MathF.Atan(MathF.Tan(vertical * 0.5f) * safeAspect);
-            float halfAngle = MathF.Min(vertical, horizontal) * 0.5f;
-            float sine = MathF.Max(MathF.Sin(halfAngle), 1e-4f);
-            float distance = bounds.Radius / sine * CameraMargin;
+            float distance = (float)CameraPresets.CalculatePerspectiveFrameDistance(bounds.Radius, fov, safeAspect);
             Vector3 target = bounds.Center;
             return new VfxCameraFrame(target + safeDirection * distance, target);
         }

@@ -658,7 +658,7 @@ namespace AssetsManager.Views.Controls.Viewer
             double radius = Math.Sqrt(1500d * 1500d + 300d * 300d + 1500d * 1500d);
             double aspect = Math.Max(1d, OpenTkControl.ActualWidth) /
                             Math.Max(1d, OpenTkControl.ActualHeight);
-            double distance = CameraPresets.CalculateMapFrameDistance(radius, 45d, aspect);
+            double distance = CameraPresets.CalculatePerspectiveFrameDistance(radius, 45d, aspect);
             Point3D position = target + direction * distance;
             _cameraController.SnapTo(position, target - position, VfxCameraUpDirection);
         }
