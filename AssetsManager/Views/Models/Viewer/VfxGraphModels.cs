@@ -367,7 +367,8 @@ namespace AssetsManager.Views.Models.Viewer
         float BeginIn,
         float DeltaIn,
         float BeginOut,
-        float DeltaOut);
+        float DeltaOut,
+        int Target = 0); // 0: color and alpha, 1: color only, 2: alpha only (BIN 0x3bf176bc).
 
     public sealed record VfxReflectionDefinition(
         float DirectOpacity,

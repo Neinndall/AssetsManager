@@ -12,7 +12,7 @@ using LeagueToolkit.Core.Wad;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-field-values &lt;fieldName&gt; [--with otherField,...]`: every value one field takes inside the VFX emitters
+    /// `vfx-field-values &lt;fieldName|0xhash&gt; [--with otherField,...]`: every value one field takes inside the VFX emitters
     /// of the installed skin and map BINs, searched in the emitter and the structs nested in it, tallied by the
     /// emitter's primitive and by where the field sits. `--with` adds the values of other emitter fields beside it.
     /// </summary>
@@ -29,11 +29,13 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
         {
             if (args.Length < 1)
             {
-                Console.WriteLine("Usage: vfx-field-values <fieldName> [--with otherField,...]");
+                Console.WriteLine("Usage: vfx-field-values <fieldName|0xhash> [--with otherField,...]");
                 return;
             }
 
-            uint target = VfxParsingHash.Fnv1a(args[0]);
+            uint target = args[0].StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
+                          uint.TryParse(args[0].AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint rawHash)
+                ? rawHash : VfxParsingHash.Fnv1a(args[0]);
             string[] with = args.SkipWhile(arg => arg != "--with").Skip(1).FirstOrDefault()?.Split(',') ?? Array.Empty<string>();
             var names = new Dictionary<uint, string>();
             foreach (string name in PrimitiveNames.Concat(new[] { "VfxMeshDefinitionData", "VfxEmitterDefinitionData" }))

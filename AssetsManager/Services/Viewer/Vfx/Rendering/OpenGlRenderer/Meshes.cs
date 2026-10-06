@@ -293,7 +293,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             bool meshUsesSoftParticles = ShouldUseSoftParticles(es.Def, _capture.DepthTexture != 0);
             _meshUniforms.Uniform1(_meshUniforms.HasSoftParticle, meshUsesSoftParticles ? 1 : 0);
             Vector4 meshSoftParams = ResolveSoftParticleParams(es.Def.SoftParticle);
-            Vector4 meshSoftControl = ResolveSoftParticleControl(es.Def.BlendMode);
+            Vector4 meshSoftControl = ResolveSoftParticleControl(es.Def.SoftParticle?.Target ?? 0);
             _meshUniforms.Uniform4(_meshUniforms.SoftParticleParams, meshSoftParams.X, meshSoftParams.Y, meshSoftParams.Z, meshSoftParams.W);
             _meshUniforms.Uniform4(_meshUniforms.SoftParticleControl, meshSoftControl.X, meshSoftControl.Y, meshSoftControl.Z, meshSoftControl.W);
             _meshUniforms.Uniform4(_meshUniforms.DepthProjection, _depthProjectionValue.X, _depthProjectionValue.Y,

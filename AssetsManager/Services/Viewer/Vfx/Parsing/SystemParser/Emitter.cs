@@ -249,7 +249,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     GetF32(sp, F_softBeginIn) ?? 0f,
                     GetF32(sp, F_softDeltaIn) ?? 0f,
                     GetF32(sp, F_softBeginOut) ?? 0f,
-                    GetF32(sp, F_softDeltaOut) ?? 0f);
+                    GetF32(sp, F_softDeltaOut) ?? 0f,
+                    NormalizeEnumByte(GetU8(sp, F_softTarget), 2, 0));
             }
             VfxReflectionDefinition reflection = null;
             if (Get(p, F_reflectionDefinition) is BinTreeStruct reflectionData)

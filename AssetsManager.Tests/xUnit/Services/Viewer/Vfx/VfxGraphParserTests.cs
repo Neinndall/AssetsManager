@@ -13,6 +13,36 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 {
     public sealed class VfxGraphParserTests
     {
+        [Theory]
+        [InlineData(-1, 0)]
+        [InlineData(0, 0)]
+        [InlineData(1, 1)]
+        [InlineData(2, 2)]
+        [InlineData(255, 0)]
+        public void SoftParticleTargetSurvivesBinRoundTrip(int authored, int expected)
+        {
+            var fields = new List<BinTreeProperty>
+            {
+                new BinTreeF32(Fnv1a.HashLower("beginIn"), 20f),
+                new BinTreeF32(Fnv1a.HashLower("deltaIn"), 10f),
+                new BinTreeF32(Fnv1a.HashLower("beginOut"), 60f),
+                new BinTreeF32(Fnv1a.HashLower("deltaOut"), 10f)
+            };
+            if (authored >= 0) fields.Add(new BinTreeU8(0x3bf176bc, (byte)authored));
+            var emitter = new BinTreeStruct(0, Fnv1a.HashLower("VfxEmitterDefinitionData"), new BinTreeProperty[]
+            {
+                new BinTreeStruct(Fnv1a.HashLower("softParticleParams"), Fnv1a.HashLower("VfxSoftParticleDefinitionData"), fields)
+            });
+            var system = new BinTreeObject("Effects/SoftTarget", "VfxSystemDefinitionData", new BinTreeProperty[]
+            {
+                new BinTreeContainer(Fnv1a.HashLower("complexEmitterDefinitionData"), BinPropertyType.Struct, new BinTreeProperty[] { emitter })
+            });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+            var parsed = Assert.Single(Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+            Assert.Equal(new VfxSoftParticleDefinition(20f, 10f, 60f, 10f, expected), parsed.SoftParticle);
+        }
+
         [Fact]
         public void ParsesVelocityEmissionFunctionAndVariableStartFromAuthoredBinFields()
         {

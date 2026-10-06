@@ -127,7 +127,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal static Vector4 ResolveSoftParticleParams(VfxSoftParticleDefinition soft)
             => VfxShaderParameterUtils.ResolveSoftParticleParams(soft);
 
-        internal static Vector4 ResolveSoftParticleControl(int blendMode)
-            => VfxShaderParameterUtils.ResolveSoftParticleControl(blendMode);
+        internal static Vector4 ResolveSoftParticleControl(int target)
+            => VfxShaderParameterUtils.ResolveSoftParticleControl(target);
     }
 }

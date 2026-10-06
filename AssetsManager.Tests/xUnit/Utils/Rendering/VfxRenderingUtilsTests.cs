@@ -37,19 +37,31 @@ namespace AssetsManager.Tests.xUnit.Utils.Rendering
             Assert.Equal(0.75f, selectMain.W);
         }
 
-        [Fact]
-        public void SoftParticleControlDistinguishesAdditiveAndBlendModes()
+        [Theory]
+        [InlineData(0, 0f, 1f, 0f, 1f)]
+        [InlineData(1, 0f, 1f, 1f, 0f)]
+        [InlineData(2, 1f, 0f, 0f, 1f)]
+        [InlineData(99, 0f, 1f, 0f, 1f)]
+        public void SoftParticleControlFollowsTheAuthoredTarget(int target, float x, float y, float z, float w)
+            => Assert.Equal(new Vector4(x, y, z, w), VfxShaderParameterUtils.ResolveSoftParticleControl(target));
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(2)]
+        public void NativeParticleParametersUseTheSoftTargetIndependentlyOfBlend(int target)
         {
-            // Modes 1 and 4 (Additive)
-            Assert.Equal(new Vector4(1f, 0f, 0f, 1f), VfxShaderParameterUtils.ResolveSoftParticleControl(1));
-            Assert.Equal(new Vector4(1f, 0f, 0f, 1f), VfxShaderParameterUtils.ResolveSoftParticleControl(4));
-
-            // Mode 5 (Premultiplied / Blend)
-            Assert.Equal(new Vector4(0f, 1f, 0f, 1f), VfxShaderParameterUtils.ResolveSoftParticleControl(5));
-
-            // Other modes (Default Alpha Blend)
-            Assert.Equal(new Vector4(0f, 1f, 1f, 0f), VfxShaderParameterUtils.ResolveSoftParticleControl(0));
-            Assert.Equal(new Vector4(0f, 1f, 1f, 0f), VfxShaderParameterUtils.ResolveSoftParticleControl(2));
+            foreach (int blend in new[] { 0, 1, 4, 5, 6 })
+            {
+                var definition = CreateDefinition() with
+                {
+                    BlendMode = blend, SoftParticle = new VfxSoftParticleDefinition(20, 10, 60, 10, target)
+                };
+                var parameters = new Dictionary<string, Vector4>();
+                VfxShaderParameterUtils.PopulateNativeParameters(parameters, definition, 0);
+                Assert.Equal(new Vector4(20, 60, 0.1f, 0.1f), parameters["cSoftParticleParams"]);
+                Assert.Equal(VfxShaderParameterUtils.ResolveSoftParticleControl(target), parameters["cSoftParticleControl"]);
+            }
         }
 
         [Fact]

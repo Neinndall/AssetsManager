@@ -37,6 +37,59 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         public void SceneIntersectionFadeMatchesTheWorldSpaceGap(
             VfxPrimitiveKind primitive, int mode, float gap, bool orthographic, bool fallback, float near, float far, float distance)
         {
+            int target = mode == 1 ? 2 : mode == 5 ? 0 : 1;
+            float fraction = primitive == VfxPrimitiveKind.AttachedMesh ? 1 : gap / 10;
+            RenderAndAssert(primitive, mode, gap, orthographic, fallback, near, far, distance,
+                new VfxSoftParticleDefinition(0, 10, 100, 10, target), fraction * fraction * (3 - 2 * fraction));
+        }
+
+        public static IEnumerable<object[]> FadeContractCases()
+        {
+            foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh })
+            foreach (int mode in new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 })
+            foreach (bool orthographic in new[] { false, true })
+            foreach (bool fallback in new[] { false, true })
+            foreach (int target in new[] { 0, 1, 2 })
+            foreach (var band in new[]
+                     {
+                         (20f, 10f, 60f, 10f, 25f, 0.5f),
+                         (20f, 10f, 60f, 10f, 65f, 0.5f),
+                         (20f, 10f, 60f, 10f, 75f, 0f),
+                         (0f, 10f, 0f, 10f, 25f, 1f),
+                         (0f, 10f, -5f, 10f, 25f, 1f),
+                         (5f, 0f, 20f, 0f, 4f, 0f),
+                         (5f, 0f, 20f, 0f, 6f, 1f),
+                         (5f, 0f, 20f, 0f, 19f, 1f),
+                         (5f, 0f, 20f, 0f, 21f, 0f)
+                     })
+                yield return new object[] { primitive, mode, orthographic, fallback, target,
+                    band.Item1, band.Item2, band.Item3, band.Item4, band.Item5, band.Item6 };
+        }
+
+        [Theory]
+        [MemberData(nameof(FadeContractCases))]
+        public void SoftFadeHonorsAuthoredTargetAndBands(VfxPrimitiveKind primitive, int mode, bool orthographic,
+            bool fallback, int target, float beginIn, float deltaIn, float beginOut, float deltaOut, float gap, float fade)
+            => RenderAndAssert(primitive, mode, gap, orthographic, fallback, 1, 401, 200,
+                new VfxSoftParticleDefinition(beginIn, deltaIn, beginOut, deltaOut, target), fade);
+
+        public static IEnumerable<object[]> AlphaOnlyCases()
+        {
+            foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh })
+            foreach (int mode in new[] { 0, 3, 5, 6, 7, 8 })
+            foreach (bool fallback in new[] { false, true })
+                yield return new object[] { primitive, mode, fallback };
+        }
+
+        [Theory]
+        [MemberData(nameof(AlphaOnlyCases))]
+        public void AlphaOnlyFadePreservesRgbWhenAlphaTestingIsDisabled(VfxPrimitiveKind primitive, int mode, bool fallback)
+            => RenderAndAssert(primitive, mode, 4, false, fallback, 1, 401, 200,
+                new VfxSoftParticleDefinition(5, 0, 20, 0, 2), 0, alphaReference: 0);
+
+        private static void RenderAndAssert(VfxPrimitiveKind primitive, int mode, float gap, bool orthographic,
+            bool fallback, float near, float far, float distance, VfxSoftParticleDefinition soft, float fade, byte? alphaReference = null)
+        {
             string install = InstalledSkins.FindInstall();
             if (install == null) return;
             using var context = new HiddenWglContext();
@@ -65,8 +118,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     null, 0, 0, false, false, mode, VfxCurve3.Const(Vector3.One), null,
                     VfxCurve4.Const(Vector4.One), null, null, null, null, VfxCurve3.Const(Vector3.Zero),
                     "white.tex", Vector2.One, 1, false, mesh, PrimitiveKind: primitive,
-                    RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true },
-                    SoftParticle: new VfxSoftParticleDefinition(0, 10, 100, 10),
+                    RenderState: VfxEmitterRenderState.Default with
+                    {
+                        DisableBackfaceCull = true,
+                        AlphaReference = alphaReference ?? VfxEmitterRenderState.Default.AlphaReference
+                    },
+                    SoftParticle: soft,
                     Beam: new VfxBeamDefinition(0, 0, 1, VfxCurve3.Const(Vector3.One),
                         VfxCurve4.Const(Vector4.One), false, Vector3.Zero, Vector3.Zero),
                     Trail: new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 0, 0, 0));
@@ -139,14 +196,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.ReadPixels(32, 32, 1, 1, PixelFormat.Rgba, PixelType.UnsignedByte, pixel.AsSpan());
 
                 // Attached meshes have no soft fade in the original shader. Other paths fade over a ten-unit gap.
-                float fraction = primitive == VfxPrimitiveKind.AttachedMesh ? 1 : gap / 10;
-                float fade = fraction * fraction * (3 - 2 * fraction);
-                Vector4 expected = ComposeSoft(mode, prepared, background, fade);
+                Vector4 expected = ComposeSoft(mode, prepared, background, fade, soft.Target, definition.RenderState.AlphaReference);
                 for (int channel = 0; channel < 4; channel++)
                     Assert.True(Math.Abs(pixel[channel] - MathF.Round(expected[channel] * 255)) <= 2,
                         $"{primitive}, mode={mode}, gap={gap}, ortho={orthographic}, fallback={fallback}, range={near}..{far}, distance={distance}: " +
                         $"channel {channel} expected {MathF.Round(expected[channel] * 255)}, got {pixel[channel]}; " +
-                        $"RGBA=({string.Join(",", pixel)}).");
+                        $"RGBA=({string.Join(",", pixel)}), soft={soft}.");
                 Assert.Equal(GLEnum.NoError, gl.GetError());
             }
             finally
@@ -159,16 +214,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             }
         }
 
-        private static Vector4 ComposeSoft(int mode, Vector4 source, Vector4 background, float fade)
+        private static Vector4 ComposeSoft(int mode, Vector4 source, Vector4 background, float fade, int target, byte alphaReference)
         {
-            if (mode is 1 or 5) source.W *= fade;
-            if (mode != 1) source *= new Vector4(fade, fade, fade, 1);
+            if (target != 1) source.W *= fade;
+            if (target != 2) source *= new Vector4(fade, fade, fade, 1);
+            // Alpha testing runs on the faded alpha before framebuffer blending, in both shader paths.
+            if (alphaReference != 0 && source.W < alphaReference / 255f) return background;
             Vector4 result = mode switch
             {
                 0 => source + background,
                 1 => source * source.W + background * (1 - source.W),
+                2 => background * (Vector4.One - source),
                 3 => source,
+                4 => source * source.W + background,
                 5 => source + background * (1 - source.W),
+                6 => Vector4.Min(source, background),
+                7 => Vector4.Max(source, background),
+                8 => new Vector4(
+                    source.X * (1 - background.W) + background.X * background.W,
+                    source.Y * (1 - background.W) + background.Y * background.W,
+                    source.Z * (1 - background.W) + background.Z * background.W,
+                    source.W + background.W),
                 _ => throw new ArgumentOutOfRangeException(nameof(mode))
             };
             return Vector4.Clamp(result, Vector4.Zero, Vector4.One);

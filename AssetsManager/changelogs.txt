@@ -500,6 +500,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Fixed soft-particle effects disappearing too early or fading with the wrong color and transparency.
   - Viewer / Restored the original viewport background consistently across Normal Viewer and 3D Studio, including startup.
   - 3D Studio / Startup, opening skins and Fit to view now share the same preset framing without shifting the viewport.
   - Hash Lab / Improved challenge config discovery and TFT loadout resource resolution.

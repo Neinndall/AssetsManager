@@ -76,20 +76,20 @@ namespace AssetsManager.Utils.Rendering
         public static Vector4 ResolveSoftParticleParams(VfxSoftParticleDefinition soft)
         {
             if (soft is null) return Vector4.Zero;
-            bool fadesIn = soft.DeltaIn != 0f;
+            // Each begin is an independent scene gap. A non-positive beginOut disables fade-out.
             return new Vector4(
-                fadesIn ? soft.BeginIn : -1e9f,
-                soft.BeginIn + soft.DeltaIn + soft.BeginOut,
-                fadesIn ? 1f / soft.DeltaIn : 1f,
-                soft.DeltaOut == 0f ? 0f : 1f / soft.DeltaOut);
+                soft.BeginIn,
+                soft.BeginOut <= 0f ? 1e8f : soft.BeginOut,
+                1f / MathF.Max(soft.DeltaIn, 1e-8f),
+                1f / MathF.Max(soft.DeltaOut, 1e-8f));
         }
 
-        public static Vector4 ResolveSoftParticleControl(int blendMode)
-            => blendMode switch
+        public static Vector4 ResolveSoftParticleControl(int target)
+            => target switch
             {
-                1 or 4 => new Vector4(1f, 0f, 0f, 1f),
-                5 => new Vector4(0f, 1f, 0f, 1f),
-                _ => new Vector4(0f, 1f, 1f, 0f)
+                1 => new Vector4(0f, 1f, 1f, 0f), // Color only.
+                2 => new Vector4(1f, 0f, 0f, 1f), // Alpha only.
+                _ => new Vector4(0f, 1f, 0f, 1f) // Both, including the default and unknown values.
             };
 
         public static bool ShouldApplySoftFade(VfxEmitterDefinition definition, bool hasDepthTexture)
@@ -127,7 +127,7 @@ namespace AssetsManager.Utils.Rendering
                 parameters["cPaletteSrcMixerMain"] = ResolvePaletteSourceMixColor(definition.PaletteDefinition);
                 parameters["kColorFactor"] = Vector4.One;
                 parameters["cSoftParticleParams"] = ResolveSoftParticleParams(definition.SoftParticle);
-                parameters["cSoftParticleControl"] = ResolveSoftParticleControl(definition.BlendMode);
+                parameters["cSoftParticleControl"] = ResolveSoftParticleControl(definition.SoftParticle?.Target ?? 0);
                 parameters["vFresnel"] = ResolveFresnel(definition.Reflection);
                 parameters["vReflection"] = ResolveReflection(definition.Reflection);
                 parameters["vReflectionFColor"] = ResolveReflectionTint(definition.Reflection);

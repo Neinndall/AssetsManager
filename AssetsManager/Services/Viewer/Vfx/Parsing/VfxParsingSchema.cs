@@ -236,6 +236,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static readonly uint F_erosionSliceWidth = VfxParsingHash.Fnv1a("erosionSliceWidth");
         internal static readonly uint F_erosionMapAddressMode = VfxParsingHash.Fnv1a("erosionMapAddressMode");
         internal static readonly uint F_erosionMapChannelMixer = VfxParsingHash.Fnv1a("erosionMapChannelMixer");
+        // The unnamed byte selects whether the soft fade reaches color, alpha, or both.
+        internal const uint F_softTarget = 0x3bf176bc;
         internal static readonly uint F_softParticleParams = VfxParsingHash.Fnv1a("softParticleParams");
         internal static readonly uint F_softBeginIn = VfxParsingHash.Fnv1a("beginIn");
         internal static readonly uint F_softDeltaIn = VfxParsingHash.Fnv1a("deltaIn");
