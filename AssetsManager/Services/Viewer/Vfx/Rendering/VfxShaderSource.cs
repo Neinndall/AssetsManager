@@ -236,6 +236,7 @@ uniform int uLegacyOrientation;
 uniform int uPivotUp;
 uniform int uIsGroundLayer;
 uniform int uPrimitiveKind;
+uniform int uUvMode;
 uniform int uFlipU;
 uniform int uFlipV;
 uniform int uFlipUMult;
@@ -260,6 +261,7 @@ out vec2 vLocalUvMult;
 out vec2 vCornerUv;
 out vec3 vColorDynamics;
 out vec2 vRibbonLookup;
+out vec3 vScreenUv;
 vec3 rotateEuler(vec3 p, vec3 r){
     float sz = sin(r.z); float cz = cos(r.z);
     p = vec3(p.x * cz - p.y * sz, p.x * sz + p.y * cz, p.z);
@@ -383,6 +385,26 @@ void main(){
     vErosionDrive = aUvErosion.y;
     vErosionMixer = vec4(aUvErosion.zw, aErosionMixerZW);
     vColorDynamics = vec3(aAgeVelX.x, length(aAgeVelX.yzw), aUvMultDynamics.y);
+    vScreenUv = vec3(0.0, 0.0, 1.0);
+    if (uUvMode == 1 && uPrimitiveKind != 8 && uPrimitiveKind != 10) {
+        // QUAD_ScreenSpaceUV applies the authored affine rows to clip xy/w. Ribbon packing
+        // retains the original transform lanes alongside its resolved per-vertex UVs.
+        vec4 screenClip = uViewProj * vec4(world, 1.0);
+        vec2 screenUv = (screenClip.xy / screenClip.w - uUvTransformCenter) * aUvBase.zw;
+        float uvSin = sin(aUvErosion.x); float uvCos = cos(aUvErosion.x);
+        screenUv = vec2(screenUv.x * uvCos - screenUv.y * uvSin,
+                        screenUv.x * uvSin + screenUv.y * uvCos);
+        vec2 screenOffset = aUvBase.xy + uEmitterUvOffset;
+        if (trailPrimitive && (uAddressMode == 0 || uAddressMode == 1)) {
+            float period = uAddressMode == 1 ? 2.0 : 1.0;
+            screenOffset -= floor(screenOffset / period) * period;
+        }
+        screenUv += uUvTransformCenter + screenOffset;
+        if (uFlipU != 0) screenUv.x = 1.0 - screenUv.x;
+        if (uFlipV != 0) screenUv.y = 1.0 - screenUv.y;
+        // Weight by clip.w before interpolation, as the original VS/PS pair does.
+        vScreenUv = vec3((vCell + screenUv) / max(round(uTexDiv), vec2(1.0)), 1.0) * screenClip.w;
+    }
 }";
 
 
@@ -642,6 +664,7 @@ in vec2 vLocalUvMult;
 in vec2 vCornerUv;
 in vec3 vColorDynamics;
 in vec2 vRibbonLookup;
+in vec3 vScreenUv;
 uniform sampler2D uTex;
 uniform int uHasTex;
 uniform int uPrimitiveKind;
@@ -749,6 +772,8 @@ void main(){
         fragColor = distortedScene(vUv, atlasUvRaw(vLocalUv, vCell, uTexDiv), vColor);
         return;
     }
+    if (uUvMode == 1 && uPrimitiveKind != 8 && uPrimitiveKind != 10)
+        vUv = vScreenUv.xy / vScreenUv.z;
     vec4 t;
     if (uHasTex != 0) {
         t = texture(uTex, vUv);
