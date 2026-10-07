@@ -700,12 +700,13 @@ namespace AssetsManager.Services.Hashes
 
         private async Task EnsureInventoryAsync(string rootDirectory, bool includeBin, bool includeRst, IProgress<InternalHashProgress> progress, CancellationToken cancellationToken)
         {
+            if (includeBin) await _store.MigrateBinXxh3UnknownsAsync(cancellationToken);
             foreach (string domain in GetSelectedDomains(includeBin, includeRst))
             {
                 bool isBinDomain = string.Equals(domain, "bin", StringComparison.Ordinal);
                 string marker = Path.Combine(_directories.HashLabPath, $"internal.{domain}.patch.txt");
                 if (File.Exists(marker) && (!isBinDomain ||
-                    File.Exists(Path.Combine(_directories.HashLabPath, "unknowns.bin.xxh3.txt")))) continue;
+                    File.Exists(Path.Combine(_directories.HashLabPath, "unknowns.bin.xxh364.txt")))) continue;
 
                 await BuildInventoryAsync(rootDirectory, isBinDomain, !isBinDomain, progress, cancellationToken);
             }

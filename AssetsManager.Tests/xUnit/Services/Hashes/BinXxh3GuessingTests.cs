@@ -104,7 +104,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 
             Assert.Contains(MaterialHash, await store.LoadUnknownAsync(InternalHashKind.BinXxh3, CancellationToken.None));
             Assert.Equal("ccdb6584d78a04f6", (await File.ReadAllTextAsync(
-                Path.Combine(bridge.Directories.HashLabPath, "unknowns.bin.xxh3.txt"))).Trim());
+                Path.Combine(bridge.Directories.HashLabPath, "unknowns.bin.xxh364.txt"))).Trim());
             InternalHashSummary summary = await store.LoadSummaryAsync(CancellationToken.None);
             Assert.Equal(1, summary.BinXxh3);
             Assert.Equal(summary.BinEntries + summary.BinFields + summary.BinTypes + summary.BinHashes + 1, summary.BinTotal);
@@ -253,6 +253,68 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 CancellationToken.None, new HashSet<string> { "bin-context-xxh3" });
             Assert.Single(enabled.Matches);
             Assert.Equal(markerAfterMigration, await File.ReadAllTextAsync(marker));
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task PreviousUnknownFileNamesMergeWithoutLosingFullWidthValues(bool loadSummary)
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            Directory.CreateDirectory(bridge.Directories.HashLabPath);
+            const ulong first = 0xbc0d4a1d0012f3d3;
+            const ulong second = 0x450167cc0457491d;
+            const ulong historical = 0xf123456789abcdef;
+            string oldUnknown = Path.Combine(bridge.Directories.HashLabPath, "unknowns.bin.xxh3.txt");
+            string oldCurrent = Path.Combine(bridge.Directories.HashLabPath, "current.bin.xxh3.txt");
+            string canonical = Path.Combine(bridge.Directories.HashLabPath, "unknowns.bin.xxh364.txt");
+            await File.WriteAllTextAsync(oldUnknown, $"{MaterialHash:x16}\n{first:x16}\n0000000000000000\n");
+            await File.WriteAllTextAsync(oldCurrent, $"{second:x16}\n{first:x16}\n");
+            await File.WriteAllTextAsync(canonical, $"{historical:x16}\n{first:x16}\n");
+            await File.WriteAllTextAsync(Path.Combine(bridge.Directories.HashesPath, "hashes.bin.xxh364.txt"),
+                $"{MaterialHash:x16} {Material}\n");
+            string rst = Path.Combine(bridge.Directories.HashLabPath, "unknowns.rst.xxh3.38.txt");
+            const string rstContents = "0000000012345678\n";
+            await File.WriteAllTextAsync(rst, rstContents);
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+
+            if (loadSummary) await store.LoadSummaryAsync(CancellationToken.None);
+            else await store.SaveMatchesAsync(Array.Empty<InternalHashGuessMatch>(), CancellationToken.None);
+
+            Assert.False(File.Exists(oldUnknown));
+            Assert.False(File.Exists(oldCurrent));
+            Assert.Equal(new[] { $"{second:x16}", $"{first:x16}", $"{historical:x16}" },
+                await File.ReadAllLinesAsync(canonical));
+            Assert.Equal(3, (await store.LoadSummaryAsync(CancellationToken.None)).BinXxh3);
+            Assert.Equal(rstContents, await File.ReadAllTextAsync(rst));
+            Assert.Equal(3, (await store.LoadCurrentUnknownAsync(InternalHashKind.BinXxh3, CancellationToken.None)).Count);
+        }
+
+        [Fact]
+        public async Task PreviousUnknownNameMigratesWithoutRebuildingAnExistingInventory()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            Directory.CreateDirectory(bridge.Directories.HashLabPath);
+            string root = bridge.CreateDirectory("renamed-inventory");
+            string marker = Path.Combine(bridge.Directories.HashLabPath, "internal.bin.patch.txt");
+            await File.WriteAllTextAsync(marker, "existing inventory");
+            await File.WriteAllTextAsync(Path.Combine(bridge.Directories.HashLabPath, "unknowns.bin.xxh3.txt"),
+                $"{MaterialHash:x16}\n");
+            await File.WriteAllTextAsync(Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt"),
+                $"{Fnv1a.HashLower(Material):x8} {Material}\n");
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            using var http = new HttpClient(new SchemaHandler());
+            var service = Service(bridge, store, resolver, http);
+
+            Assert.Single((await service.RunContentGuessingAsync(root, true, false, null, CancellationToken.None,
+                new HashSet<string> { "bin-context-xxh3" })).Matches);
+            Assert.Equal("existing inventory", await File.ReadAllTextAsync(marker));
+            Assert.True(File.Exists(Path.Combine(bridge.Directories.HashLabPath, "unknowns.bin.xxh364.txt")));
+            Assert.False(File.Exists(Path.Combine(bridge.Directories.HashLabPath, "unknowns.bin.xxh3.txt")));
+            Assert.Empty(await store.LoadUnknownAsync(InternalHashKind.BinXxh3, CancellationToken.None));
         }
 
         [Fact]
