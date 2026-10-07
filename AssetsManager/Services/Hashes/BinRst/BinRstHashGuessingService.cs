@@ -1708,9 +1708,8 @@ namespace AssetsManager.Services.Hashes
         {
             try
             {
-                using Stream stream = wad.OpenChunk(chunk);
                 Span<byte> buffer = stackalloc byte[4];
-                int read = stream.Read(buffer);
+                int read = wad.ReadChunkDecompressed(chunk, buffer);
                 if (read < 3) return string.Empty;
                 if (read == 3) return Encoding.ASCII.GetString(buffer.Slice(0, 3));
                 return Encoding.ASCII.GetString(buffer);

@@ -15,6 +15,7 @@ using static AssetsManager.Services.Hashes.BinRstHashGuessingService;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
+using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 using Xunit;
 
@@ -22,6 +23,48 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 {
     public sealed class BinRstHashGuessingTests
     {
+        [Theory]
+        [InlineData(WadChunkCompression.None)]
+        [InlineData(WadChunkCompression.Zstd)]
+        public async Task InventoryFindsKnownUnknownAndMisnamedBinsAfterSignatureReads(WadChunkCompression compression)
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            string root = bridge.CreateDirectory("Game");
+            string[] paths = { "data/known.bin", "assets/misnamed.tex", "data/unknown.bin" };
+            uint[] entryHashes = { 0x11111111, 0x22222222, 0x33333333 };
+            var entries = new List<WadBakeEntry>();
+            for (int index = 0; index < paths.Length; index++)
+            {
+                using var output = new MemoryStream();
+                CreateEntryTree(entryHashes[index], "SyntheticClass", "SyntheticField", "SyntheticValue").Write(output);
+                byte[] data = output.ToArray();
+                entries.Add(new WadBakeEntry(paths[index], () => new MemoryStream(data), compression));
+            }
+            entries.Insert(1, new WadBakeEntry("assets/not-a-bin.tex", () => new MemoryStream(new byte[65536]), compression));
+            entries.Insert(2, new WadBakeEntry("assets/short.dat", () => new MemoryStream("PR"u8.ToArray()), compression));
+            WadBuilder.Bake(entries, Path.Combine(root, "test.wad.client"), new WadBakeSettings());
+            await File.WriteAllTextAsync(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.game.txt"),
+                string.Join("\n", paths.Take(2).Select(path => $"{XxHash64Ext.Hash(path):x16} {path}")) + "\n");
+
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            var persistence = new HashGuessPersistenceService(new HashGuessingStore(bridge.Directories), store);
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            using var httpClient = new HttpClient(new StaticMetaSchemaHandler());
+            var metaSchema = new MetaSchemaHashSource(httpClient, bridge.Directories, bridge.LogService);
+            var service = new BinRstHashGuessingService(store, persistence, resolver, bridge.Directories, bridge.LogService, metaSchema);
+
+            InternalHashInventory inventory = await service.BuildInventoryAsync(root, true, false, null, CancellationToken.None);
+
+            Assert.Equal(3, inventory.ScannedBins);
+            Assert.Equal(0, inventory.ScannedStringTables);
+            Assert.True(entryHashes.Select(hash => (ulong)hash).ToHashSet().SetEquals(
+                await store.LoadUnknownAsync(InternalHashKind.BinEntries, CancellationToken.None)));
+            Assert.Contains((ulong)Fnv1a.HashLower("SyntheticField"),
+                await store.LoadUnknownAsync(InternalHashKind.BinFields, CancellationToken.None));
+        }
+
         [Fact]
         public async Task HashResolverSkipsEmptyCatalogWarmupAndLoadsLaterCatalogs()
         {
