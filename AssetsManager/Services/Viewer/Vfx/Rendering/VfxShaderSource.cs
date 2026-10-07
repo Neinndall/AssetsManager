@@ -524,7 +524,7 @@ void main(){
         vec2 uv = vec2(customAddress(held.x, uMaterialAddressU), customAddress(held.y, uMaterialAddressV));
         float coverage = customCoverage(held.x, uMaterialAddressU) * customCoverage(held.y, uMaterialAddressV);
         vec4 texel = uHasTex != 0 ? texture(uTex, uv) * coverage : vec4(1.0);
-        vec4 color = texel * uColor * uMaterialTint;
+        vec4 color = texel * uColor * vMeshColor * uMaterialTint;
         if (color.a < uAlphaCutoff) discard;
         if (uMaterialPremultiplied != 0) color.rgb *= color.a;
         fragColor = color;

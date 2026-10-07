@@ -101,7 +101,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Assert.Contains("if (uMaterialPremultiplied != 0) color.rgb *= color.a;", fragment);
             }
 
-            Assert.Contains("vec4 color = texel * uColor * uMaterialTint;", VfxShaderSource.MeshFragment);
+            Assert.Contains("vec4 color = texel * uColor * vMeshColor * uMaterialTint;", VfxShaderSource.MeshFragment);
             Assert.Contains("vec4 color = texel * vColor * uMaterialTint;", VfxShaderSource.ParticleFragment);
             foreach (string fragment in new[] { VfxShaderSource.MeshFragment, VfxShaderSource.ParticleFragment })
             {
