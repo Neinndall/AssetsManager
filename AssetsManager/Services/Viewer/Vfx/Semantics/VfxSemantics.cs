@@ -65,11 +65,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
         bool WritesColor);
 
     /// <summary>
-    /// Decodes authored particle stencil metadata for diagnostics. The VFX preview deliberately
-    /// does not execute these operations because its scene has no gameplay stencil population.
+    /// Decodes the compare and write operations of complex particle emitters.
     /// </summary>
     public static class VfxStencilSemantics
     {
+        public const byte Mask = 0x3f;
         private static readonly VfxStencilDescriptor Disabled = new(
             VfxStencilOperationKind.Disabled,
             WritesStencil: false,
@@ -80,10 +80,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
             descriptor = authoredMode switch
             {
                 0 => Disabled,
-                1 or 4 => new VfxStencilDescriptor(
+                1 => new VfxStencilDescriptor(
                     VfxStencilOperationKind.WriteReference,
                     WritesStencil: true,
-                    WritesColor: false),
+                    WritesColor: true),
                 2 => new VfxStencilDescriptor(
                     VfxStencilOperationKind.TestEqual,
                     WritesStencil: false,
@@ -91,6 +91,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
                 3 => new VfxStencilDescriptor(
                     VfxStencilOperationKind.TestNotEqual,
                     WritesStencil: false,
+                    WritesColor: true),
+                4 => new VfxStencilDescriptor(
+                    VfxStencilOperationKind.TestNotEqual,
+                    WritesStencil: true,
                     WritesColor: true),
                 _ => default
             };
@@ -103,12 +107,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
         {
             ArgumentNullException.ThrowIfNull(renderState);
             ArgumentNullException.ThrowIfNull(referenceIds);
-            if (renderState.StencilReference != 0)
-                return renderState.StencilReference;
-            return renderState.StencilReferenceId != 0 &&
+            return (byte)((renderState.StencilReferenceId != 0 &&
                 referenceIds.TryGetValue(renderState.StencilReferenceId, out byte reference)
                     ? reference
-                    : (byte)0;
+                    : renderState.StencilReference) & Mask);
         }
     }
 

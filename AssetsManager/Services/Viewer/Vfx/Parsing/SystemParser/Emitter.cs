@@ -275,7 +275,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 GetU8(p, F_blendMode) ?? (int?)(AsU32(Get(p, F_blendMode))),
                 maxInclusive: 8,
                 fallback: (byte)VfxAuthoredDefaults.BlendMode);
-            byte stencilMode = NormalizeEnumByte(
+            byte stencilMode = isSimpleEmitter ? (byte)0 : NormalizeEnumByte(
                 GetU8(p, F_stencilMode),
                 maxInclusive: 4,
                 fallback: VfxAuthoredDefaults.StencilMode);
@@ -388,7 +388,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     RenderPhase: (byte)(GetU8(p, F_renderPhaseOverride) ?? VfxAuthoredDefaults.RenderPhaseOverride),
                     StencilMode: stencilMode,
                     StencilReference: stencilReference,
-                    StencilReferenceId: AsU32(Get(p, F_stencilReferenceId)) ?? 0u,
+                    StencilReferenceId: stencilMode == 0 ? 0u : AsU32(Get(p, F_stencilReferenceId)) ?? 0u,
                     WriteAlphaOnly: GetBool(p, F_writeAlphaOnly),
                     SortEmittersByPosition: GetBool(p, F_sortEmittersByPos),
                     FlipWinding: GetBool(p, F_flipWinding)),

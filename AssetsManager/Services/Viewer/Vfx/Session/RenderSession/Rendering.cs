@@ -10,6 +10,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 {
     public sealed partial class VfxRenderSession
     {
+        private VfxStencilScene _preparedStencilScene;
         public void Render(
             Matrix4x4 viewProjection,
             Matrix4x4 view,
@@ -61,6 +62,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             StudioViewMode viewMode = StudioViewMode.Lit,
             bool wireOverlay = false)
         {
+            _preparedStencilScene = null;
             ProcessPendingGpuState();
             if (!_ready || _graphs.Count == 0)
                 return false;
@@ -116,7 +118,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             return _renderQueue.Count > 0;
         }
 
-        public IDisposable BeginPreparedRenderBatch() => _renderer.BeginRenderBatch();
+        void AssetsManager.Services.Viewer.Rendering.IPreparedParticlePass.PrepareStencilScene(VfxStencilScene scene)
+            => PrepareStencilScene(scene);
+
+        private void PrepareStencilScene(VfxStencilScene scene)
+        {
+            foreach (var graph in _graphs) graph.AddStencilClaims(scene, _preparedShaded);
+            _preparedStencilScene = scene;
+        }
+
+        public IDisposable BeginPreparedRenderBatch()
+        {
+            if (_preparedStencilScene == null) PrepareStencilScene(new VfxStencilScene());
+            VfxStencilScene scene = _preparedStencilScene;
+            _preparedStencilScene = null;
+            return _renderer.BeginRenderBatch(scene);
+        }
 
         public void CapturePreparedEarlyDistortionFrame()
         {

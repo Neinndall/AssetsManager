@@ -57,6 +57,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private Vector4 _depthProjectionValue;
         private int _renderBatchDepth;
         private GlStateSnapshot _renderBatchState;
+        private VfxStencilScene _stencilScene;
 
         private sealed class GlStateSnapshot
         {
@@ -214,12 +215,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         /// self-contained outside a batch, while shaded/wire/distortion passes can avoid repeating
         /// synchronous glGet state queries within the same frame.
         /// </summary>
-        internal IDisposable BeginRenderBatch()
+        internal IDisposable BeginRenderBatch(VfxStencilScene stencilScene = null)
         {
             if (!_ready)
                 return new RenderBatchScope(null);
             if (_renderBatchDepth++ == 0)
+            {
                 _renderBatchState = CaptureGlState();
+                _stencilScene = stencilScene;
+            }
             return new RenderBatchScope(this);
         }
 
@@ -233,6 +237,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
             GlStateSnapshot state = _renderBatchState;
             _renderBatchState = null;
+            _stencilScene = null;
             if (state != null)
                 RestoreGlState(state);
         }
@@ -364,6 +369,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _depthProjectionValue = new Vector4(projection.M33, projection.M43, projection.M34, projection.M44);
 
             GlStateSnapshot ownedState = _renderBatchDepth == 0 ? CaptureGlState() : null;
+            VfxStencilScene stencilScene = _stencilScene;
+            if (stencilScene == null)
+            {
+                stencilScene = new VfxStencilScene();
+                foreach (var entry in renderQueue)
+                    stencilScene.Add(entry.Emitter.Def, entry.Emitter.IsVisible && !entry.Emitter.Def.Disabled &&
+                        VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer).Draws);
+            }
 
             ResetEmitterDrawScratch();
             try
@@ -446,16 +459,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 VfxPlaybackRuntime.EmitterState es = draw.Entry.Emitter;
                 int passIndex = draw.PassIndex;
                 if (es.InstanceCount == 0) continue;
-                if (!es.IsVisible) continue;
+                if (!es.IsVisible || es.Def.Disabled) continue;
                 if (!VfxRenderPhaseSemantics.Resolve(es.Def, es.HudLayer).Draws) continue;
                 if (useWireframe)
                     _gl.Disable(EnableCap.CullFace);
 
-                // LTK keeps WriteAlphaOnly/stencil as inspector metadata. Its VFX preview has no
-                // gameplay stencil buffer, so applying either here would hide or recolor effects
-                // that LTK deliberately draws as ordinary RGBA.
                 _gl.ColorMask(true, true, true, true);
-                _gl.Disable(EnableCap.StencilTest);
+                ApplyEmitterStencilState(es.Def, stencilScene, useWireframe);
                 // Never synthesize an AttachedMesh proxy. Render only geometry that was
                 // resolved from the real owner scene and filtered by authored submesh masks.
                 if (es.Def.IsMeshPrimitive && es.MeshVao == 0)

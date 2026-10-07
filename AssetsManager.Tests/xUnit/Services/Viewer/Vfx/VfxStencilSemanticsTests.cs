@@ -9,10 +9,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
     {
         [Theory]
         [InlineData(0, VfxStencilOperationKind.Disabled, false, true)]
-        [InlineData(1, VfxStencilOperationKind.WriteReference, true, false)]
+        [InlineData(1, VfxStencilOperationKind.WriteReference, true, true)]
         [InlineData(2, VfxStencilOperationKind.TestEqual, false, true)]
         [InlineData(3, VfxStencilOperationKind.TestNotEqual, false, true)]
-        [InlineData(4, VfxStencilOperationKind.WriteReference, true, false)]
+        [InlineData(4, VfxStencilOperationKind.TestNotEqual, true, true)]
         public void MapsVerifiedAuthoredModes(
             byte mode,
             VfxStencilOperationKind operation,
@@ -32,12 +32,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void ExplicitReferenceTakesPriorityOverReferenceId()
+        public void ReferenceIdReplacesExplicitReference()
         {
             var state = State(stencilReference: 12, stencilReferenceId: 0x12345678);
             var ids = new Dictionary<uint, byte> { [0x12345678] = 9 };
 
-            Assert.Equal(12, VfxStencilSemantics.ResolveReference(state, ids));
+            Assert.Equal(9, VfxStencilSemantics.ResolveReference(state, ids));
         }
 
         [Fact]

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Services.Viewer.Rendering
 {
@@ -10,6 +11,7 @@ namespace AssetsManager.Services.Viewer.Rendering
     /// </summary>
     internal interface IPreparedParticlePass
     {
+        void PrepareStencilScene(VfxStencilScene scene) { }
         IDisposable BeginPreparedRenderBatch();
         void CapturePreparedEarlyDistortionFrame() { }
         void RenderPreparedEarlyDistortionPass() { }
@@ -31,6 +33,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             batches.Clear();
             try
             {
+                var stencilScene = new VfxStencilScene();
+                foreach (IPreparedParticlePass pass in passes)
+                    pass.PrepareStencilScene(stencilScene);
                 foreach (IPreparedParticlePass pass in passes)
                     batches.Add(pass.BeginPreparedRenderBatch());
                 foreach (IPreparedParticlePass pass in passes)

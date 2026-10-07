@@ -36,6 +36,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private bool _preparedWireframe;
         private float _preparedWireOpacity;
         private bool _ready;
+        private VfxStencilScene _preparedStencilScene;
         internal bool CacheDrawBindings { set => _renderer.CacheDrawBindings = value; }
         internal (int Programs, int UniformBuffers) LastDrawBindingCounts => _renderer.LastDrawBindingCounts;
 
@@ -86,6 +87,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             StudioViewMode viewMode = StudioViewMode.Lit,
             bool wireOverlay = false)
         {
+            _preparedStencilScene = null;
             if (!_ready || runtimes == null || runtimes.Count == 0)
                 return false;
 
@@ -144,7 +146,19 @@ namespace AssetsManager.Services.Viewer.Rendering
             return _queue.Count > 0;
         }
 
-        public IDisposable BeginPreparedRenderBatch() => _renderer.BeginRenderBatch();
+        public void PrepareStencilScene(VfxStencilScene scene)
+        {
+            foreach (var graph in _graphs) graph.AddStencilClaims(scene, _preparedShaded);
+            _preparedStencilScene = scene;
+        }
+
+        public IDisposable BeginPreparedRenderBatch()
+        {
+            if (_preparedStencilScene == null) PrepareStencilScene(new VfxStencilScene());
+            VfxStencilScene scene = _preparedStencilScene;
+            _preparedStencilScene = null;
+            return _renderer.BeginRenderBatch(scene);
+        }
 
         public void CapturePreparedEarlyDistortionFrame()
         {

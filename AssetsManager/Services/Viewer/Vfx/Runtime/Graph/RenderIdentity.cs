@@ -10,6 +10,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
     public sealed partial class VfxPlaybackGraphRuntime
     {
+        private readonly List<(VfxEmitterDefinition Definition, int Root, bool Hud, bool NeedsOwner)> _stencilDefinitions = new();
+
+        internal void AddStencilClaims(VfxStencilScene scene, bool shaded)
+        {
+            // Draw components exist for the definition tree even when a child pool has not
+            // spawned yet. Their visible writers must participate in the preview's fallback.
+            foreach (var claim in _stencilDefinitions)
+            {
+                if (claim.NeedsOwner && _jointTransformProvider == null) continue;
+                scene.Add(claim.Definition, shaded && RootIsVisible(claim.Root) && !claim.Definition.Disabled &&
+                    VfxRenderPhaseSemantics.Resolve(claim.Definition, claim.Hud).Draws);
+            }
+        }
+
         private VfxPlaybackRuntime CreateRuntime(
             VfxSystemDefinition definition,
             Matrix4x4 localTransform,
@@ -50,8 +64,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             _renderRanks.Clear();
             _renderRoots.Clear();
+            _stencilDefinitions.Clear();
             int nextRank = 0;
-            CollectRenderRanks(rootDefinition, string.Empty, 0, -1, ref nextRank);
+            CollectRenderRanks(rootDefinition, string.Empty, 0, -1, false, ref nextRank);
         }
 
         private void CollectRenderRanks(
@@ -59,6 +74,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             string path,
             int depth,
             int rootSourceOrder,
+            bool needsOwner,
             ref int nextRank)
         {
             if (definition is null || depth > MaximumGraphDepth) return;
@@ -74,6 +90,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             {
                 _renderRanks[(renderPath, sourceOrder)] = nextRank++;
                 _renderRoots[(renderPath, sourceOrder)] = depth == 0 ? sourceOrder : rootSourceOrder;
+                if ((definition.Emitters[sourceOrder].RenderState?.StencilMode ?? 0) != 0)
+                    _stencilDefinitions.Add((definition.Emitters[sourceOrder],
+                        depth == 0 ? sourceOrder : rootSourceOrder, definition.HudLayer, needsOwner));
             }
 
             if (depth >= MaximumGraphDepth) return;
@@ -98,7 +117,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         : $"{path}/{sourceOrder}";
                     string childPath = $"{emitterPath}.{slot}";
                     int childRoot = depth == 0 ? sourceOrder : rootSourceOrder;
-                    CollectRenderRanks(childDefinition, childPath, depth + 1, childRoot, ref nextRank);
+                    bool childNeedsOwner = needsOwner ||
+                        (childSet.Bones is { Count: > 0 } && !emitter.MeshIsSkinned);
+                    CollectRenderRanks(childDefinition, childPath, depth + 1, childRoot, childNeedsOwner, ref nextRank);
                 }
             }
         }
