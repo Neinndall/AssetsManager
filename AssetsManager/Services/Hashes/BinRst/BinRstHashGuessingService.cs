@@ -700,7 +700,6 @@ namespace AssetsManager.Services.Hashes
 
         private async Task EnsureInventoryAsync(string rootDirectory, bool includeBin, bool includeRst, IProgress<InternalHashProgress> progress, CancellationToken cancellationToken)
         {
-            if (includeBin) await _store.MigrateBinXxh3UnknownsAsync(cancellationToken);
             foreach (string domain in GetSelectedDomains(includeBin, includeRst))
             {
                 bool isBinDomain = string.Equals(domain, "bin", StringComparison.Ordinal);

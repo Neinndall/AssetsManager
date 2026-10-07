@@ -497,7 +497,7 @@ Improvements
   - Input and confirmation dialogs now support Enter/Escape keys with automatic focus.
 
 Changes
-  - Hash Lab / Renamed BIN XXH3-64 unknown files to match their hash catalog, preserving existing unknowns.
+  - Hash Lab / Renamed BIN XXH3-64 unknown files to match their hash catalog.
   - Viewer / Removed the classic model viewer; 3D Studio is now the only 3D workspace.
   - Viewer / Renamed VFX Studio to 3D Studio with compact entry cards for models, chromas, animations, maps and visual effects.
   - Diagnostics / Added a clip audit to inspect animation names and file sources.

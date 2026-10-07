@@ -57,35 +57,6 @@ namespace AssetsManager.Services.Hashes
         public Task<HashSet<ulong>> LoadCurrentUnknownAsync(InternalHashKind kind, CancellationToken cancellationToken) =>
             LoadUnknownAsync(kind, cancellationToken);
 
-        internal async Task MigrateBinXxh3UnknownsAsync(CancellationToken cancellationToken)
-        {
-            await _lock.WaitAsync(cancellationToken);
-            try
-            {
-                await MigrateBinXxh3UnknownsUnderLockAsync(cancellationToken);
-            }
-            finally
-            {
-                _lock.Release();
-            }
-        }
-
-        private async Task MigrateBinXxh3UnknownsUnderLockAsync(CancellationToken cancellationToken)
-        {
-            const InternalHashKind kind = InternalHashKind.BinXxh3;
-            string primary = GetPrimaryUnknownPath(kind);
-            string[] previousPaths = GetUnknownPaths(kind).Where(path => path != primary && File.Exists(path)).ToArray();
-            if (previousPaths.Length == 0) return;
-
-            var unknowns = await LoadUnknownAsync(kind, cancellationToken);
-            var known = await LoadKnownAsync(kind, cancellationToken);
-            unknowns.ExceptWith(known.Keys);
-            unknowns.Remove(0);
-            // Retire previous files only after their merged contents have been committed.
-            await WriteUnknownAtomicallyAsync(primary, unknowns, kind, cancellationToken);
-            foreach (string path in previousPaths) File.Delete(path);
-        }
-
         public async Task<IReadOnlyList<InternalHashGuessMatch>> LoadResearchAsync(CancellationToken cancellationToken)
         {
             await _lock.WaitAsync(cancellationToken);
@@ -113,7 +84,6 @@ namespace AssetsManager.Services.Hashes
             try
             {
                 Directory.CreateDirectory(_directories.HashLabPath);
-                await MigrateBinXxh3UnknownsUnderLockAsync(cancellationToken);
                 List<InternalHashGuessMatch> research = await SaveResearchAsync(
                     Array.Empty<InternalHashGuessMatch>(), cancellationToken);
                 await PromoteMatchesToKnownCatalogsAsync(research, cancellationToken);
@@ -152,7 +122,6 @@ namespace AssetsManager.Services.Hashes
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                await MigrateBinXxh3UnknownsUnderLockAsync(cancellationToken);
                 List<InternalHashGuessMatch> research = await SaveResearchAsync(materialized, cancellationToken);
                 IReadOnlyList<InternalHashGuessMatch> verified =
                     await PromoteMatchesToKnownCatalogsAsync(research, cancellationToken);
@@ -320,7 +289,6 @@ namespace AssetsManager.Services.Hashes
 
         public async Task<InternalHashSummary> LoadSummaryAsync(CancellationToken cancellationToken)
         {
-            await MigrateBinXxh3UnknownsAsync(cancellationToken);
             var counts = new Dictionary<InternalHashKind, int>();
             foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
                 counts[kind] = (await LoadUnknownAsync(kind, cancellationToken)).Count;
@@ -374,11 +342,6 @@ namespace AssetsManager.Services.Hashes
             yield return GetPrimaryUnknownPath(kind);
             string legacyCurrent = GetCurrentPath(kind);
             if (File.Exists(legacyCurrent)) yield return legacyCurrent;
-            if (kind == InternalHashKind.BinXxh3)
-            {
-                yield return Path.Combine(_directories.HashLabPath, "unknowns.bin.xxh3.txt");
-                yield return Path.Combine(_directories.HashLabPath, "current.bin.xxh3.txt");
-            }
             if (kind == InternalHashKind.RstXxh64)
                 foreach (int bits in new[] { 38, 39, 40 }) yield return Path.Combine(_directories.HashLabPath, $"unknowns.rst.xxh64.{bits}.txt");
         }
