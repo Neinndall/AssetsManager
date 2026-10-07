@@ -146,7 +146,7 @@ namespace AssetsManager.Services.Hashes
 
         private BinaryHashCache LoadHashCache(string path)
         {
-            if (!File.Exists(path)) return null;
+            if (!File.Exists(path) && !File.Exists(Path.ChangeExtension(path, ".bin"))) return null;
 
             var cache = new BinaryHashCache(path, _logService);
             cache.Load();

@@ -15,6 +15,57 @@ namespace AssetsManager.Tests.xUnit.Parsers
 {
     public sealed class BinRitobinSerializerTests
     {
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task PreviewAndDiffResolveEntryHeadingsWithoutDependingOnHashProperties(bool hasMatchingHashProperty)
+        {
+            const uint entryHash = 0x6cf1ce8a;
+            const string entryPath = "Characters/Evelynn/Skins/Skin10/Materials/EvelynnSkin10_staticDef";
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt"),
+                $"{entryHash:x8} {entryPath}{Environment.NewLine}");
+            WriteHashes(bridge, "hashes.bintypes.txt", "StaticMaterialDef");
+            WriteHashes(bridge, "hashes.binfields.txt", "name", "objectPath", "texturePath", "target");
+            File.AppendAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binfields.txt"),
+                $"deadbeef UnrelatedFieldName{Environment.NewLine}");
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            resolver.LoadBinHashes();
+            var serializer = new BinRitobinSerializer(resolver);
+            BinTree Create(string texturePath) => new(new[]
+            {
+                new BinTreeObject(entryHash, Fnv1a.HashLower("StaticMaterialDef"), new BinTreeProperty[]
+                {
+                    new BinTreeHash64(Fnv1a.HashLower("name"), 0xccdb6584d78a04f6),
+                    hasMatchingHashProperty
+                        ? new BinTreeHash(Fnv1a.HashLower("objectPath"), entryHash)
+                        : new BinTreeString(Fnv1a.HashLower("objectPath"), "no matching generic hash"),
+                    new BinTreeString(Fnv1a.HashLower("texturePath"), texturePath),
+                    new BinTreeObjectLink(Fnv1a.HashLower("target"), entryHash)
+                }),
+                new BinTreeObject(0xdeadbeef, Fnv1a.HashLower("StaticMaterialDef"), Array.Empty<BinTreeProperty>())
+            }, Array.Empty<string>());
+            byte[] before = WriteTree(Create("before.tex"));
+            byte[] after = WriteTree(Create("after.tex"));
+
+            Assert.Equal(entryPath, resolver.ResolveBinEntry(entryHash));
+            string preview = await serializer.WriteBinTreeAsRitobinAsync(before);
+            var diff = await serializer.WriteBinDiffAsRitobinAsync(before, after);
+
+            string heading = $"\"{entryPath}\" = StaticMaterialDef";
+            Assert.Contains(heading, preview);
+            Assert.Contains(heading, diff.OldRitobin);
+            Assert.Contains(heading, diff.NewRitobin);
+            Assert.DoesNotContain("0x6cf1ce8a =", preview);
+            Assert.Contains("0xdeadbeef = StaticMaterialDef", preview);
+            Assert.Contains($"target: link = \"{entryPath}\"", preview);
+            Assert.Contains("before.tex", diff.OldRitobin);
+            Assert.Contains("after.tex", diff.NewRitobin);
+        }
+
         [Fact]
         public async Task PreviewAndDiffPreserveWideMaterialNamesAndFollowingFields()
         {
@@ -140,6 +191,119 @@ namespace AssetsManager.Tests.xUnit.Parsers
             string ritobin = await serializer.WriteBinTreeAsRitobinAsync(WriteTree(tree));
 
             Assert.Contains($"objectPath: hash = \"{objectPath}\"", ritobin);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task SerializationWaitsForHashCatalogs(bool diffFirst)
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            WriteHashes(bridge, "hashes.binentries.txt", "test/entry");
+            WriteHashes(bridge, "hashes.bintypes.txt", "RootType");
+            WriteHashes(bridge, "hashes.binfields.txt", "value");
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            var serializer = new BinRitobinSerializer(resolver);
+            byte[] Create(string value) => WriteTree(new BinTree(new[]
+            {
+                new BinTreeObject(Fnv1a.HashLower("test/entry"), Fnv1a.HashLower("RootType"),
+                    new BinTreeProperty[] { new BinTreeString(Fnv1a.HashLower("value"), value) })
+            }, Array.Empty<string>()));
+
+            string text;
+            if (diffFirst)
+            {
+                var diff = await serializer.WriteBinDiffAsRitobinAsync(Create("before"), Create("after"));
+                text = diff.OldRitobin + diff.NewRitobin;
+                Assert.Contains("value: string = \"before\"", diff.OldRitobin);
+                Assert.Contains("value: string = \"after\"", diff.NewRitobin);
+            }
+            else
+            {
+                text = await serializer.WriteBinTreeAsRitobinAsync(Create("before"));
+                Assert.Contains("value: string = \"before\"", text);
+            }
+
+            Assert.Contains("\"test/entry\" = RootType", text);
+            Assert.Equal("test/entry", resolver.ResolveBinEntry(Fnv1a.HashLower("test/entry")));
+        }
+
+        [Fact]
+        public async Task SerializerResolvesAllHashDomainsInsideNestedPropertyKinds()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            WriteHashes(bridge, "hashes.binentries.txt", "test/entry", "EntryCatalogValue", "Referenced/Entry");
+            WriteHashes(bridge, "hashes.binhashes.txt", "HashCatalogValue");
+            WriteHashes(bridge, "hashes.bintypes.txt", "RootType", "EmbeddedType", "PointerType", "StaticMaterialDef", "TypeCatalogValue");
+            WriteHashes(bridge, "hashes.binfields.txt", "FieldCatalogValue", "direct", "embedded", "pointer", "ordered",
+                "unordered", "mapping", "linkedMapping", "optional", "emptyOptional", "name", "nested", "target", "texture", "unknown");
+            const ulong gameHash = 0x1234567887654321;
+            const ulong lcuHash = 0x2345678998765432;
+            const ulong wideHash = 0xccdb6584d78a04f6;
+            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.game.txt"), $"{gameHash:x16} assets/known.tex\n");
+            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.lcu.txt"), $"{lcuHash:x16} plugins/known.png\n");
+            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.bin.xxh364.txt"), $"{wideHash:x16} Materials/WideName\n");
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            await resolver.LoadAllHashesAsync();
+            var serializer = new BinRitobinSerializer(resolver);
+            BinTreeEmbedded Embedded(uint name) => new(name, Fnv1a.HashLower("EmbeddedType"), new BinTreeProperty[]
+            {
+                new BinTreeHash(Fnv1a.HashLower("nested"), Fnv1a.HashLower("EntryCatalogValue")),
+                new BinTreeObjectLink(Fnv1a.HashLower("target"), Fnv1a.HashLower("Referenced/Entry")),
+                new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), gameHash)
+            });
+            var emptyOptional = new BinTreeOptional(Fnv1a.HashLower("emptyOptional"), new BinTreeHash(0, 1)) { Value = null };
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(Fnv1a.HashLower("test/entry"), Fnv1a.HashLower("RootType"), new BinTreeProperty[]
+                {
+                    new BinTreeHash(Fnv1a.HashLower("direct"), Fnv1a.HashLower("HashCatalogValue")),
+                    Embedded(Fnv1a.HashLower("embedded")),
+                    new BinTreeStruct(Fnv1a.HashLower("pointer"), Fnv1a.HashLower("PointerType"), new BinTreeProperty[]
+                    {
+                        new BinTreeHash(Fnv1a.HashLower("nested"), Fnv1a.HashLower("FieldCatalogValue")),
+                        new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), lcuHash)
+                    }),
+                    new BinTreeContainer(Fnv1a.HashLower("ordered"), BinPropertyType.Embedded, new[] { Embedded(0) }),
+                    new BinTreeUnorderedContainer(Fnv1a.HashLower("unordered"), BinPropertyType.Hash, new BinTreeProperty[]
+                    {
+                        new BinTreeHash(0, Fnv1a.HashLower("TypeCatalogValue")),
+                        new BinTreeHash(0, 0xabcdef01)
+                    }),
+                    new BinTreeMap(Fnv1a.HashLower("mapping"), BinPropertyType.Hash, BinPropertyType.Embedded, new[]
+                    {
+                        new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, Fnv1a.HashLower("HashCatalogValue")), Embedded(0))
+                    }),
+                    new BinTreeMap(Fnv1a.HashLower("linkedMapping"), BinPropertyType.ObjectLink, BinPropertyType.WadChunkLink, new[]
+                    {
+                        new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                            new BinTreeObjectLink(0, Fnv1a.HashLower("Referenced/Entry")), new BinTreeWadChunkLink(0, lcuHash))
+                    }),
+                    new BinTreeOptional(Fnv1a.HashLower("optional"), new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialDef"), new BinTreeProperty[]
+                    {
+                        new BinTreeHash64(Fnv1a.HashLower("name"), wideHash),
+                        Embedded(Fnv1a.HashLower("embedded"))
+                    })),
+                    emptyOptional,
+                    new BinTreeHash(Fnv1a.HashLower("unknown"), 0xabcdef02),
+                    new BinTreeStruct(0xabcdef03, 0xabcdef04, new[] { new BinTreeWadChunkLink(0xabcdef05, 0xabcdef0612345678) })
+                })
+            }, Array.Empty<string>());
+
+            string text = await serializer.WriteBinTreeAsRitobinAsync(WriteTree(tree));
+
+            foreach (string expected in new[]
+            {
+                "\"test/entry\" = RootType", "direct: hash = \"HashCatalogValue\"", "embedded: embed = EmbeddedType",
+                "nested: hash = \"EntryCatalogValue\"", "target: link = \"Referenced/Entry\"", "texture: file = \"assets/known.tex\"",
+                "pointer: pointer = PointerType", "nested: hash = \"FieldCatalogValue\"", "texture: file = \"plugins/known.png\"",
+                "ordered: list[embed]", "unordered: list2[hash]", "\"TypeCatalogValue\"", "mapping: map[hash,embed]",
+                "\"HashCatalogValue\" = EmbeddedType", "linkedMapping: map[link,file]", "\"Referenced/Entry\" = \"plugins/known.png\"",
+                "optional: option[embed]", "StaticMaterialDef", "name: hash = \"Materials/WideName\"", "emptyOptional: option[hash] = {}",
+                "0xabcdef01", "unknown: hash = 0xabcdef02", "0xabcdef03: pointer = 0xabcdef04", "0xabcdef05: file = 0xabcdef0612345678"
+            }) Assert.Contains(expected, text);
         }
 
         private static BinTree CreateTypedTree(string nestedValue, string dependency)
