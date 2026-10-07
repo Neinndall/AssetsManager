@@ -572,6 +572,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gameShaders?.Dispose();
             _gameUniforms.Clear();
             if (!_ready) return;
+            foreach (uint sampler in _stockSamplers)
+                if (sampler != 0) _gl.DeleteSampler(sampler);
+            Array.Clear(_stockSamplers);
             _textures.Dispose();
             _gl.DeleteBuffer(_trailVbo);
             _gl.DeleteVertexArray(_trailVao);

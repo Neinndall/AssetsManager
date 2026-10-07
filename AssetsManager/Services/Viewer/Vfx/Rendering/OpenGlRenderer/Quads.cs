@@ -145,13 +145,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             {
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _textures.FallbackTransparentTexture);
-                ApplyAddressMode(renderState.TextureAddressMode);
-                ApplyTextureSampling();
+                BindStockSampler(0, renderState.TextureAddressMode);
                 if (es.TextureMult != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture1);
                     _gl.BindTexture(TextureTarget.Texture2D, es.TextureMult);
-                    ApplyAddressMode(es.Def.TextureMultAddressMode);
+                    BindStockSampler(1, es.Def.TextureMultAddressMode);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (_capture.ColorTexture != 0)
@@ -168,15 +167,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     _gl.BindTexture(
                         TextureTarget.Texture2D,
                         es.DistortionTexture != 0 ? es.DistortionTexture : _textures.FallbackTransparentTexture);
-                    ApplyAddressMode(2);
-                    ApplyTextureSampling();
+                    BindStockSampler(3, 2);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (es.ErosionTexture != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture4);
                     _gl.BindTexture(TextureTarget.Texture2D, es.ErosionTexture);
-                    ApplyAddressMode(2);
+                    BindStockSampler(4, 2);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (_capture.DepthTexture != 0)
@@ -189,14 +187,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.BindTexture(TextureTarget.Texture2D, es.ColorGradientTexture != 0
                     ? es.ColorGradientTexture
                     : _textures.FallbackTransparentTexture);
-                ApplyAddressMode(2);
-                ApplyTextureSampling();
+                BindStockSampler(7, 2);
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + 8));
                 _gl.BindTexture(TextureTarget.Texture2D, es.PaletteTexture != 0
                     ? es.PaletteTexture
                     : _textures.FallbackTransparentTexture);
-                ApplyAddressMode(2);
-                ApplyTextureSampling();
+                BindStockSampler(8, 2);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
             if (native) BindGameParticle(es, false, passIndex, sharedPalettePhase);

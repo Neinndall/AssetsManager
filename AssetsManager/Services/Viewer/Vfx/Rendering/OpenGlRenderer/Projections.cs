@@ -60,6 +60,7 @@ public sealed partial class VfxOpenGlRenderer
             uniforms.Uniform1(uniforms.TerrainDepth, 5);
             _gl.ActiveTexture(TextureUnit.Texture5);
             _gl.BindTexture(TextureTarget.Texture2D, _terrainDepthTexture);
+            _gl.BindSampler(5, 0);
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
         _gl.UniformMatrix4(uniforms.ViewProj, 1, false, in viewProj.M11);
@@ -104,24 +105,22 @@ public sealed partial class VfxOpenGlRenderer
         else ApplyBlendMode(definition.BlendMode, false);
         _gl.ActiveTexture(TextureUnit.Texture0);
         _gl.BindTexture(TextureTarget.Texture2D, emitter.Texture != 0 ? emitter.Texture : _textures.FallbackTransparentTexture);
-        ApplyAddressMode(state.TextureAddressMode);
-        ApplyTextureSampling();
+        BindStockSampler(0, state.TextureAddressMode);
         _gl.ActiveTexture(TextureUnit.Texture7);
         _gl.BindTexture(TextureTarget.Texture2D, emitter.ColorGradientTexture != 0
             ? emitter.ColorGradientTexture : _textures.FallbackTransparentTexture);
-        ApplyAddressMode(2);
-        ApplyTextureSampling();
+        BindStockSampler(7, 2);
         if (emitter.TextureMult != 0)
         {
             _gl.ActiveTexture(TextureUnit.Texture1);
             _gl.BindTexture(TextureTarget.Texture2D, emitter.TextureMult);
-            ApplyAddressMode(2);
+            BindStockSampler(1, 2);
         }
         if (emitter.ErosionTexture != 0)
         {
             _gl.ActiveTexture(TextureUnit.Texture4);
             _gl.BindTexture(TextureTarget.Texture2D, emitter.ErosionTexture);
-            ApplyAddressMode(2);
+            BindStockSampler(4, 2);
         }
         _gl.ActiveTexture(TextureUnit.Texture0);
         ReadOnlySpan<float> decals = _projectionGeometry.Prepare(definition, instances);

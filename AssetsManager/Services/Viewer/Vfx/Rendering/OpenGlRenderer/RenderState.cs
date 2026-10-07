@@ -7,17 +7,30 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
     public sealed partial class VfxOpenGlRenderer
     {
-        private void ApplyAddressMode(int addressMode)
+        private readonly uint[] _stockSamplers = new uint[4];
+
+        private void BindStockSampler(uint unit, int addressMode)
         {
-            var wrap = addressMode switch
+            int mode = addressMode is >= 0 and <= 3 ? addressMode : 0;
+            uint sampler = _stockSamplers[mode];
+            if (sampler == 0)
             {
-                1 => TextureWrapMode.MirroredRepeat,
-                2 => TextureWrapMode.ClampToEdge,
-                3 => TextureWrapMode.ClampToBorder,
-                _ => TextureWrapMode.Repeat,
-            };
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)wrap);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)wrap);
+                sampler = _gl.GenSampler();
+                var wrap = mode switch
+                {
+                    1 => TextureWrapMode.MirroredRepeat,
+                    2 => TextureWrapMode.ClampToEdge,
+                    3 => TextureWrapMode.ClampToBorder,
+                    _ => TextureWrapMode.Repeat,
+                };
+                _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)wrap);
+                _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)wrap);
+                _gl.SamplerParameter(sampler, SamplerParameterI.MinFilter, (int)TextureMinFilter.Linear);
+                _gl.SamplerParameter(sampler, SamplerParameterI.MagFilter, (int)TextureMagFilter.Linear);
+                _stockSamplers[mode] = sampler;
+            }
+            // Addressing belongs to a layer, so sharing its texture must not change another sampler.
+            _gl.BindSampler(unit, sampler);
         }
 
         private void ApplyEmitterDepthState(VfxEmitterDefinition definition, bool isDistortion)
@@ -67,20 +80,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _instanceDepths = new float[Math.Max(instanceCount, 64)];
             if (_instanceOrder.Length < instanceCount)
                 _instanceOrder = new int[Math.Max(instanceCount, 64)];
-        }
-
-        private void ApplyTextureSampling()
-        {
-            // LTK's VFX texture loader always uses linear filtering. isTexturePixelated is
-            // inspector metadata in 1.19.6 and does not change the particle material sampler.
-            _gl.TexParameter(
-                TextureTarget.Texture2D,
-                TextureParameterName.TextureMinFilter,
-                (int)TextureMinFilter.Linear);
-            _gl.TexParameter(
-                TextureTarget.Texture2D,
-                TextureParameterName.TextureMagFilter,
-                (int)TextureMagFilter.Linear);
         }
 
         private void ApplyWireframeBlend()

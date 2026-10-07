@@ -514,6 +514,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Shared particle textures now keep each layer's wrapping without affecting other layers.
   - VFX Studio / Corrected screen-space texture mapping on quads, rays and trails.
   - 3D Studio / The Inspector toggle now returns to OFF when the project is closed or the Studio is exited.
   - 3D Studio / Project Files folders now open with a single click, while Ctrl and Shift remain available for selection.

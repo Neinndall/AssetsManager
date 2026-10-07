@@ -184,7 +184,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             ApplyCustomMaterialUniforms(
                 customMaterial,
                 _meshUniforms);
-            if (!native) ApplyAddressMode(renderState.TextureAddressMode);
+            if (!native) BindStockSampler(0, renderState.TextureAddressMode);
             float alphaCutoff = customMaterial?.AlphaCutoff ?? renderState.AlphaCutoff;
             _meshUniforms.Uniform1(_meshUniforms.AlphaCutoff, alphaCutoff);
             _meshUniforms.Uniform1(
@@ -203,8 +203,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.BindTexture(
                     TextureTarget.Texture2D,
                     es.DistortionTexture != 0 ? es.DistortionTexture : _textures.FallbackTransparentTexture);
-                ApplyAddressMode(2);
-                ApplyTextureSampling();
+                BindStockSampler(2, 2);
                 _gl.ActiveTexture(TextureUnit.Texture3);
                 _gl.BindTexture(TextureTarget.Texture2D, _capture.ColorTexture);
                 _gl.ActiveTexture(TextureUnit.Texture0);
@@ -240,19 +239,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _meshUniforms.Uniform1(_meshUniforms.ClampUv, renderState.ClampUvScroll ? 1 : 0);
             if (!native)
             {
-                ApplyTextureSampling();
                 if (es.TextureMult != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture1);
                     _gl.BindTexture(TextureTarget.Texture2D, es.TextureMult);
-                    ApplyAddressMode(es.Def.TextureMultAddressMode);
+                    BindStockSampler(1, es.Def.TextureMultAddressMode);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (es.ErosionTexture != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture4);
                     _gl.BindTexture(TextureTarget.Texture2D, es.ErosionTexture);
-                    ApplyAddressMode(2);
+                    BindStockSampler(4, 2);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
             }
@@ -308,14 +306,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.BindTexture(TextureTarget.Texture2D, es.ColorGradientTexture != 0
                     ? es.ColorGradientTexture
                     : _textures.FallbackTransparentTexture);
-                ApplyAddressMode(2);
-                ApplyTextureSampling();
+                BindStockSampler(7, 2);
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + 8));
                 _gl.BindTexture(TextureTarget.Texture2D, es.PaletteTexture != 0
                     ? es.PaletteTexture
                     : _textures.FallbackTransparentTexture);
-                ApplyAddressMode(2);
-                ApplyTextureSampling();
+                BindStockSampler(8, 2);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
             if (wireframePass)
