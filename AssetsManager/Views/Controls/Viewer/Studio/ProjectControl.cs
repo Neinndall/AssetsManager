@@ -106,6 +106,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ReleaseCurrentProject()
         {
+            _model.InspectorVisible = false;
             _model.IsChromaLibraryVisible = false;
             StudioChromaLibrary.Reset();
             _pendingSnapshot = null;
