@@ -399,6 +399,32 @@ namespace AssetsManager.Services.Hashes
                         _log.LogDebug($"Learned BIN templates resolved {learnedHits} hashes.");
                         if (learned.LastVocabularyGate is { } vocabularyGate) LogGate(vocabularyGate);
                     }
+                    if (ShouldRunBin("bin-context-xxh3") && matcher.GetRemainingCount(InternalHashKind.BinXxh3) > 0)
+                    {
+                        progress?.Report(CreateProgress(matcher, stopwatch, "Checking BIN names against XXH3-64 values", scanned));
+                        // Stream the existing names once; no additional full catalog or candidate matrix is retained.
+                        string catalog = _store.GetKnownPath(InternalHashKind.BinEntries);
+                        if (File.Exists(catalog))
+                        {
+                            using var reader = new StreamReader(catalog);
+                            int lines = 0;
+                            while (matcher.GetRemainingCount(InternalHashKind.BinXxh3) > 0 && !ContentBudgetExceeded() &&
+                                reader.ReadLine() is string line)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                if (line.Length > 9 && line[8] == ' ' && uint.TryParse(line.AsSpan(0, 8),
+                                    NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint entryHash))
+                                {
+                                    string name = line[9..];
+                                    if (Fnv1a.HashLower(name) == entryHash)
+                                        matcher.CheckBinXxh3Candidate(name, "hashes.binentries.txt",
+                                            strategy: InternalHashGuessStrategy.CrossDictionary);
+                                }
+                                if ((++lines & 0x1fff) == 0)
+                                    progress?.Report(CreateProgress(matcher, stopwatch, "Checking BIN names against XXH3-64 values", scanned));
+                            }
+                        }
+                    }
                 }, cancellationToken);
 
                 int checkedCount = matcher.CheckedCandidates > int.MaxValue ? int.MaxValue : (int)matcher.CheckedCandidates;
@@ -678,7 +704,8 @@ namespace AssetsManager.Services.Hashes
             {
                 bool isBinDomain = string.Equals(domain, "bin", StringComparison.Ordinal);
                 string marker = Path.Combine(_directories.HashLabPath, $"internal.{domain}.patch.txt");
-                if (File.Exists(marker)) continue;
+                if (File.Exists(marker) && (!isBinDomain ||
+                    File.Exists(Path.Combine(_directories.HashLabPath, "unknowns.bin.xxh3.txt")))) continue;
 
                 await BuildInventoryAsync(rootDirectory, isBinDomain, !isBinDomain, progress, cancellationToken);
             }
@@ -694,7 +721,8 @@ namespace AssetsManager.Services.Hashes
             InternalHashKind.BinEntries or
             InternalHashKind.BinFields or
             InternalHashKind.BinTypes or
-            InternalHashKind.BinHashes;
+            InternalHashKind.BinHashes or
+            InternalHashKind.BinXxh3;
 
         private static string[] EnumerateWadContainers(string rootDirectory, bool includeBin, bool includeRst)
         {
@@ -774,6 +802,7 @@ namespace AssetsManager.Services.Hashes
             [InternalHashKind.BinFields] = new(),
             [InternalHashKind.BinTypes] = new(),
             [InternalHashKind.BinHashes] = new(),
+            [InternalHashKind.BinXxh3] = new(),
             [InternalHashKind.RstXxh3] = new(),
             [InternalHashKind.RstXxh64] = new()
         };
@@ -804,6 +833,7 @@ namespace AssetsManager.Services.Hashes
             if (property.NameHash != 0) observed[InternalHashKind.BinFields].Add(property.NameHash);
             switch (property)
             {
+                case BinTreeHash64 hash when hash.Value != 0: observed[InternalHashKind.BinXxh3].Add(hash.Value); break;
                 case BinTreeHash hash when hash.Value != 0: observed[InternalHashKind.BinHashes].Add(hash.Value); break;
                 case BinTreeObjectLink link when link.Value != 0: observed[InternalHashKind.BinEntries].Add(link.Value); break;
                 case BinTreeStruct structure:

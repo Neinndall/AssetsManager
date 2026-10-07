@@ -284,6 +284,7 @@ namespace AssetsManager.Views
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-structures", Name = "ContextualStructures", Description = "CommunityDragon patterns for characters, spells, TFT, augments, maps and loadouts", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-learned", Name = "LearnedTemplates", Description = "Learn naming templates from resolved hashes and apply them to their unresolved siblings", BadgeText = "🐢 SLOW", BadgeBrush = accentOrange });
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-strings", Name = "LiteralBinStrings", Description = "Scan all binary strings against local target domains", BadgeText = "⚡ ~3s", BadgeBrush = accentOrange });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-xxh3", Name = "XXH3-64 Names", Description = "Match 64-bit BIN values against local strings and known BIN entry names", BadgeText = "FAST", BadgeBrush = accentGreen });
             _allMethods.Add(binContext);
 
             var binSchema = new HashMethodItemModel
@@ -401,7 +402,7 @@ namespace AssetsManager.Views
                         if (selectedIndex == 2)
                         {
                             TxtUnknownCount.Text = $"{summary.BinTotal:N0} unresolved";
-                            TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Types: {summary.BinTypes:N0}\nFields: {summary.BinFields:N0} · Hashes: {summary.BinHashes:N0}";
+                            TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Types: {summary.BinTypes:N0}\nFields: {summary.BinFields:N0} · Hashes: {summary.BinHashes:N0}\nXXH3-64: {summary.BinXxh3:N0}";
                         }
                         else
                         {
@@ -1189,7 +1190,7 @@ namespace AssetsManager.Views
                     _viewModel.ProgressText = "100%";
                     _viewModel.IsProgressIndeterminate = false;
                     _viewModel.StatusText = includeBin
-                        ? $"Completed in {elapsedTime}: Found {summary.BinTotal:N0} unknown hashes in scope ({summary.BinEntries:N0} entries, {summary.BinFields:N0} fields, {summary.BinTypes:N0} types)."
+                        ? $"Completed in {elapsedTime}: Found {summary.BinTotal:N0} unknown hashes in scope ({summary.BinEntries:N0} entries, {summary.BinFields:N0} fields, {summary.BinTypes:N0} types, {summary.BinHashes:N0} hashes, {summary.BinXxh3:N0} XXH3-64)."
                         : $"Completed in {elapsedTime}: Found {summary.RstTotal:N0} unknown hashes in scope ({summary.RstXxh3:N0} XXH3, {summary.RstXxh64:N0} XXH64).";
                 }
 

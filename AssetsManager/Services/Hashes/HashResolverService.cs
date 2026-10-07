@@ -27,6 +27,7 @@ namespace AssetsManager.Services.Hashes
         private BinaryHashCache _gameCache;
         private BinaryHashCache _lcuCache;
         private BinaryHashCache _binHashCache;
+        private BinaryHashCache _binXxh3Cache;
         private BinaryHashCache _binEntryCache;
         private BinaryHashCache _binFieldCache;
         private BinaryHashCache _binTypeCache;
@@ -42,6 +43,8 @@ namespace AssetsManager.Services.Hashes
             "hashes.game.txt",
             "hashes.lcu.txt",
             "hashes.binhashes.txt",
+            "hashes.bin.xxh364.txt",
+            "hashes.bin.xxh3.txt",
             "hashes.binentries.txt",
             "hashes.binfields.txt",
             "hashes.bintypes.txt",
@@ -124,6 +127,8 @@ namespace AssetsManager.Services.Hashes
             if (_binHashesLoaded) return;
             var hashesDir = _directoriesCreator.HashesPath;
             _binHashCache = LoadHashCache(Path.Combine(hashesDir, "hashes.binhashes.txt"));
+            _binXxh3Cache = LoadHashCache(Path.Combine(hashesDir, "hashes.bin.xxh364.txt"))
+                ?? LoadHashCache(Path.Combine(hashesDir, "hashes.bin.xxh3.txt"));
             _binEntryCache = LoadHashCache(Path.Combine(hashesDir, "hashes.binentries.txt"));
             _binFieldCache = LoadHashCache(Path.Combine(hashesDir, "hashes.binfields.txt"));
             _binTypeCache = LoadHashCache(Path.Combine(hashesDir, "hashes.bintypes.txt"));
@@ -189,6 +194,8 @@ namespace AssetsManager.Services.Hashes
 
         public string ResolveBinHash(uint hash) => _binHashCache?.Resolve(hash) ?? hash.ToString("x8");
 
+        public string ResolveBinXxh3(ulong hash) => _binXxh3Cache?.Resolve(hash) ?? hash.ToString("x16");
+
         public string ResolveBinEntry(uint hash) => _binEntryCache?.Resolve(hash) ?? hash.ToString("x8");
 
         public string ResolveBinField(uint hash) => _binFieldCache?.Resolve(hash) ?? hash.ToString("x8");
@@ -242,6 +249,7 @@ namespace AssetsManager.Services.Hashes
 
         public void ReloadBinRstHashes()
         {
+            _binXxh3Cache?.Dispose();
             _binHashCache?.Dispose();
             _binEntryCache?.Dispose();
             _binFieldCache?.Dispose();
@@ -274,6 +282,8 @@ namespace AssetsManager.Services.Hashes
 
         public void Dispose()
         {
+            _binXxh3Cache?.Dispose();
+            _binXxh3Cache = null;
             _gameCache?.Dispose();
             _lcuCache?.Dispose();
             _binHashCache?.Dispose();

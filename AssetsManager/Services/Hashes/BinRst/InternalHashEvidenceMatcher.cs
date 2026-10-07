@@ -183,6 +183,53 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
+        internal static ulong ComputeBinXxh3(string value)
+        {
+            string candidate = NormalizeCandidate(value).ToLowerInvariant();
+            int byteCount = Encoding.UTF8.GetByteCount(candidate);
+            Span<byte> bytes = byteCount <= 1536 ? stackalloc byte[byteCount] : new byte[byteCount];
+            Encoding.UTF8.GetBytes(candidate, bytes);
+            return XxHash3.HashToUInt64(bytes);
+        }
+
+        internal bool CheckBinXxh3Candidate(
+            string value,
+            string source,
+            string sourceWad = null,
+            string sourceBin = null,
+            ulong? observedHash = null,
+            InternalHashGuessStrategy strategy = InternalHashGuessStrategy.BinContent)
+        {
+            if (GetRemainingCount(InternalHashKind.BinXxh3) == 0) return false;
+            CheckedCandidates++;
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 512) return false;
+            string candidate = NormalizeCandidate(value);
+            ulong hash = ComputeBinXxh3(candidate);
+            // BIN values retain all 64 bits; RST's packed-key masks never apply here.
+            if (observedHash.HasValue && observedHash.Value != hash) return false;
+            if (!_targets[InternalHashKind.BinXxh3].Remove(hash)) return false;
+            var match = new InternalHashGuessMatch
+            {
+                Hash = hash,
+                LookupHash = hash,
+                HashBits = 64,
+                Value = candidate,
+                Kind = InternalHashKind.BinXxh3,
+                Strategy = strategy,
+                Source = source,
+                SourceWad = sourceWad,
+                SourceBin = sourceBin,
+                IsVerified = true,
+                VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                Confidence = InternalHashConfidence.Verified,
+                Evidence = InternalHashEvidence.ObservedHashPair,
+                EvidenceOrigin = InternalHashEvidenceOrigin.ShippedData
+            };
+            _matches[(match.Kind, hash, candidate)] = match;
+            Publish(match, null);
+            return true;
+        }
+
         internal bool CheckContextualCandidate(
             InternalHashKind kind,
             string value,
@@ -193,7 +240,7 @@ namespace AssetsManager.Services.Hashes
             IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null)
         {
             CheckedCandidates++;
-            if (string.IsNullOrWhiteSpace(value) || value.Length > 512)
+            if (kind == InternalHashKind.BinXxh3 || string.IsNullOrWhiteSpace(value) || value.Length > 512)
             {                return false;
             }
 
@@ -267,7 +314,7 @@ namespace AssetsManager.Services.Hashes
             NoiseGate gate)
         {
             if (countCheck) CheckedCandidates++;
-            if (kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64 ||
+            if (kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64 or InternalHashKind.BinXxh3 ||
                 string.IsNullOrWhiteSpace(value) ||
                 value.Length > 512)
             {                return false;

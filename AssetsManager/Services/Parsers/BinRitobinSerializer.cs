@@ -177,6 +177,7 @@ namespace AssetsManager.Services.Parsers
             var classHashes = new HashSet<uint>();
             var propertyHashes = new HashSet<uint>();
             var binHashes = new HashSet<uint>();
+            var binHashes64 = new HashSet<ulong>();
             var wadHashes = new HashSet<ulong>();
 
             foreach (BinTree tree in trees)
@@ -186,7 +187,7 @@ namespace AssetsManager.Services.Parsers
                     entryHashes.Add(treeObject.PathHash);
                     classHashes.Add(treeObject.ClassHash);
                     foreach (BinTreeProperty property in treeObject.Properties.Values)
-                        CollectProperty(property, propertyHashes, classHashes, entryHashes, binHashes, wadHashes);
+                        CollectProperty(property, propertyHashes, classHashes, entryHashes, binHashes, binHashes64, wadHashes);
                 }
 
                 foreach (BinTreeDataOverride dataOverride in tree.DataOverrides)
@@ -198,6 +199,7 @@ namespace AssetsManager.Services.Parsers
                         classHashes,
                         entryHashes,
                         binHashes,
+                        binHashes64,
                         wadHashes,
                         includeName: false);
                 }
@@ -208,7 +210,8 @@ namespace AssetsManager.Services.Parsers
                 Resolve(classHashes, _hashResolver.ResolveBinType),
                 Resolve(propertyHashes, _hashResolver.ResolveBinField),
                 Resolve(binHashes, _hashResolver.ResolveBinHashGeneral),
-                ResolveWadHashes(wadHashes));
+                ResolveWadHashes(wadHashes),
+                ResolveWideHashes(binHashes64, _hashResolver.ResolveBinXxh3));
         }
 
         private static void CollectProperty(
@@ -217,6 +220,7 @@ namespace AssetsManager.Services.Parsers
             ISet<uint> classHashes,
             ISet<uint> entryHashes,
             ISet<uint> binHashes,
+            ISet<ulong> binHashes64,
             ISet<ulong> wadHashes,
             bool includeName = true)
         {
@@ -229,24 +233,27 @@ namespace AssetsManager.Services.Parsers
                     if (structure.ClassHash is not 0)
                         classHashes.Add(structure.ClassHash);
                     foreach (BinTreeProperty child in structure.Properties.Values)
-                        CollectProperty(child, propertyHashes, classHashes, entryHashes, binHashes, wadHashes);
+                        CollectProperty(child, propertyHashes, classHashes, entryHashes, binHashes, binHashes64, wadHashes);
                     break;
                 case BinTreeMap map:
                     foreach (var pair in map)
                     {
-                        CollectProperty(pair.Key, propertyHashes, classHashes, entryHashes, binHashes, wadHashes, false);
-                        CollectProperty(pair.Value, propertyHashes, classHashes, entryHashes, binHashes, wadHashes, false);
+                        CollectProperty(pair.Key, propertyHashes, classHashes, entryHashes, binHashes, binHashes64, wadHashes, false);
+                        CollectProperty(pair.Value, propertyHashes, classHashes, entryHashes, binHashes, binHashes64, wadHashes, false);
                     }
                     break;
                 case BinTreeContainer container:
                     foreach (BinTreeProperty element in container.Elements)
-                        CollectProperty(element, propertyHashes, classHashes, entryHashes, binHashes, wadHashes, false);
+                        CollectProperty(element, propertyHashes, classHashes, entryHashes, binHashes, binHashes64, wadHashes, false);
                     break;
                 case BinTreeOptional optional when optional.Value is not null:
-                    CollectProperty(optional.Value, propertyHashes, classHashes, entryHashes, binHashes, wadHashes, false);
+                    CollectProperty(optional.Value, propertyHashes, classHashes, entryHashes, binHashes, binHashes64, wadHashes, false);
                     break;
                 case BinTreeObjectLink objectLink:
                     entryHashes.Add(objectLink.Value);
+                    break;
+                case BinTreeHash64 hash64:
+                    binHashes64.Add(hash64.Value);
                     break;
                 case BinTreeHash hash:
                     binHashes.Add(hash.Value);
@@ -266,6 +273,17 @@ namespace AssetsManager.Services.Parsers
                 string value = resolver(hash);
                 if (!string.Equals(value, hash.ToString("x8", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase))
                     yield return new KeyValuePair<uint, string>(hash, value);
+            }
+        }
+
+        private static IEnumerable<KeyValuePair<ulong, string>> ResolveWideHashes(
+            IEnumerable<ulong> hashes, Func<ulong, string> resolver)
+        {
+            foreach (ulong hash in hashes)
+            {
+                string value = resolver(hash);
+                if (!string.Equals(value, hash.ToString("x16", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase))
+                    yield return new KeyValuePair<ulong, string>(hash, value);
             }
         }
 

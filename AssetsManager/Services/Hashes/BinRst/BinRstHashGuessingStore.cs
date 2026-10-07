@@ -24,8 +24,10 @@ namespace AssetsManager.Services.Hashes
         public async Task<Dictionary<ulong, string>> LoadKnownAsync(InternalHashKind kind, CancellationToken cancellationToken)
         {
             var result = new Dictionary<ulong, string>();
-            int width = IsRst(kind) ? 16 : 8;
+            int width = IsWide(kind) ? 16 : 8;
             string path = GetKnownPath(kind);
+            if (kind == InternalHashKind.BinXxh3 && !File.Exists(path))
+                path = Path.Combine(_directories.HashesPath, "hashes.bin.xxh3.txt");
             if (File.Exists(path))
             {
                 using var reader = new StreamReader(path);
@@ -188,7 +190,7 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken)
         {
             List<InternalHashGuessMatch> verified = research
-                .Where(match => match.CanPromote)
+                .Where(IsPromotableMatch)
                 .GroupBy(match => (match.Kind, match.Hash))
                 .Where(group => group
                     .Select(match => match.Value)
@@ -199,7 +201,7 @@ namespace AssetsManager.Services.Hashes
                 .ToList();
 
             IReadOnlyList<InternalHashGuessMatch> collisions = research
-                .Where(match => match.CanPromote)
+                .Where(IsPromotableMatch)
                 .GroupBy(match => (match.Kind, match.Hash))
                 .Where(group => group
                     .Select(match => match.Value)
@@ -217,9 +219,11 @@ namespace AssetsManager.Services.Hashes
                 var matchesForKind = verified.Where(match => match.Kind == kind).ToList();
                 if (matchesForKind.Count == 0) continue;
 
-                int width = IsRst(kind) ? 16 : 8;
+                int width = IsWide(kind) ? 16 : 8;
                 string path = GetKnownPath(kind);
-                var mergedMap = new Dictionary<ulong, string>();
+                var mergedMap = kind == InternalHashKind.BinXxh3
+                    ? await LoadKnownAsync(kind, cancellationToken)
+                    : new Dictionary<ulong, string>();
                 if (File.Exists(path))
                 {
                     using var reader = new StreamReader(path);
@@ -240,6 +244,12 @@ namespace AssetsManager.Services.Hashes
 
             return verified;
         }
+
+        private static bool IsPromotableMatch(InternalHashGuessMatch match) =>
+            match.CanPromote && (match.Kind != InternalHashKind.BinXxh3 ||
+                (match.HashBits == 64 && match.LookupHash == match.Hash &&
+                 !string.IsNullOrWhiteSpace(match.Value) && match.Value.Length <= 512 &&
+                 InternalHashEvidenceMatcher.ComputeBinXxh3(match.Value) == match.Hash));
 
         private async Task WriteCollisionsAsync(
             IReadOnlyCollection<InternalHashGuessMatch> collisions,
@@ -286,6 +296,7 @@ namespace AssetsManager.Services.Hashes
             {
                 BinEntries = counts[InternalHashKind.BinEntries], BinFields = counts[InternalHashKind.BinFields],
                 BinTypes = counts[InternalHashKind.BinTypes], BinHashes = counts[InternalHashKind.BinHashes],
+                BinXxh3 = counts[InternalHashKind.BinXxh3],
                 RstXxh3 = counts[InternalHashKind.RstXxh3], RstXxh64 = counts[InternalHashKind.RstXxh64]
             };
         }
@@ -306,7 +317,7 @@ namespace AssetsManager.Services.Hashes
 
         private async Task WriteUnknownAtomicallyAsync(string path, IEnumerable<ulong> hashes, InternalHashKind kind, CancellationToken cancellationToken)
         {
-            string format = IsRst(kind) ? "x16" : "x8";
+            string format = IsWide(kind) ? "x16" : "x8";
             await WriteTextAtomicallyAsync(path, hashes.OrderBy(hash => hash).Select(hash => hash.ToString(format)), cancellationToken);
         }
 
@@ -336,10 +347,12 @@ namespace AssetsManager.Services.Hashes
         }
 
         private static bool IsRst(InternalHashKind kind) => kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64;
+        private static bool IsWide(InternalHashKind kind) => IsRst(kind) || kind == InternalHashKind.BinXxh3;
         private static string GetSuffix(InternalHashKind kind) => kind switch
         {
             InternalHashKind.BinEntries => "binentries", InternalHashKind.BinFields => "binfields",
             InternalHashKind.BinTypes => "bintypes", InternalHashKind.BinHashes => "binhashes",
+            InternalHashKind.BinXxh3 => "bin.xxh3",
             InternalHashKind.RstXxh3 => "rst.xxh3.38", InternalHashKind.RstXxh64 => "rst.xxh64",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
@@ -347,6 +360,7 @@ namespace AssetsManager.Services.Hashes
         {
             InternalHashKind.BinEntries => "hashes.binentries.txt", InternalHashKind.BinFields => "hashes.binfields.txt",
             InternalHashKind.BinTypes => "hashes.bintypes.txt", InternalHashKind.BinHashes => "hashes.binhashes.txt",
+            InternalHashKind.BinXxh3 => "hashes.bin.xxh364.txt",
             InternalHashKind.RstXxh3 => "hashes.rst.xxh3.txt", InternalHashKind.RstXxh64 => "hashes.rst.xxh64.txt",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };

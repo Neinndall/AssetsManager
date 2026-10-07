@@ -10,7 +10,8 @@ namespace AssetsManager.Views.Models.Hashes
         BinTypes,
         BinHashes,
         RstXxh3,
-        RstXxh64
+        RstXxh64,
+        BinXxh3
     }
 
     public enum InternalHashGuessStrategy
@@ -96,7 +97,7 @@ namespace AssetsManager.Views.Models.Hashes
                 InternalHashEvidence.ContainerElementConvention or
                 InternalHashEvidence.RegistrationBracketMatch or
                 InternalHashEvidence.BinObjectLatticePattern;
-        public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64
+        public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64 or InternalHashKind.BinXxh3
             ? Hash.ToString("x16")
             : ((uint)Hash).ToString("x8");
         public string DomainText => Kind switch
@@ -105,6 +106,7 @@ namespace AssetsManager.Views.Models.Hashes
             InternalHashKind.BinFields => "BIN Fields",
             InternalHashKind.BinTypes => "BIN Types",
             InternalHashKind.BinHashes => "BIN Hashes",
+            InternalHashKind.BinXxh3 => "BIN XXH3-64",
             InternalHashKind.RstXxh3 => "RST XXH3",
             InternalHashKind.RstXxh64 => "RST XXH64",
             _ => "Unknown Domain"
@@ -141,9 +143,10 @@ namespace AssetsManager.Views.Models.Hashes
         public int BinFields { get; init; }
         public int BinTypes { get; init; }
         public int BinHashes { get; init; }
+        public int BinXxh3 { get; init; }
         public int RstXxh3 { get; init; }
         public int RstXxh64 { get; init; }
-        public int BinTotal => BinEntries + BinFields + BinTypes + BinHashes;
+        public int BinTotal => BinEntries + BinFields + BinTypes + BinHashes + BinXxh3;
         public int RstTotal => RstXxh3 + RstXxh64;
     }
 

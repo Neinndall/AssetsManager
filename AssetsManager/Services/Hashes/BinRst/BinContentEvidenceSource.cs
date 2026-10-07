@@ -128,6 +128,26 @@ namespace AssetsManager.Services.Hashes
                 MatchResolvedHashPathLeafEvidence(tree, matcher, path, wadPath, resolver);
             if (ShouldRun("bin-context-objectlocal"))
                 MatchObjectLocalHashEvidence(tree, matcher, path, wadPath);
+            if (ShouldRun("bin-context-xxh3") && localTargets[InternalHashKind.BinXxh3].Count > 0 &&
+                matcher.GetRemainingCount(InternalHashKind.BinXxh3) > 0)
+            {
+                foreach (var item in tree.Objects)
+                {
+                    string entry = matcher.TryGetVerifiedValue(InternalHashKind.BinEntries, item.Key, out string matched)
+                        ? matched : resolver?.ResolveBinEntry(item.Key);
+                    if (string.IsNullOrEmpty(entry) || entry == item.Key.ToString("x8")) continue;
+                    foreach (BinTreeHash64 hash in item.Value.Properties.Values.OfType<BinTreeHash64>())
+                        matcher.CheckBinXxh3Candidate(entry, path, wadPath, path, hash.Value);
+                }
+                VisitBinStrings(tree, value =>
+                {
+                    if (matcher.GetRemainingCount(InternalHashKind.BinXxh3) == 0 ||
+                        string.IsNullOrWhiteSpace(value) || value.Length > 512) return;
+                    ulong hash = InternalHashEvidenceMatcher.ComputeBinXxh3(value);
+                    if (localTargets[InternalHashKind.BinXxh3].Contains(hash))
+                        matcher.CheckBinXxh3Candidate(value, path, wadPath, path, hash);
+                });
+            }
             if (matcher.Remaining > 0 &&
                 (ShouldRun("bin-context-strings") || ShouldRun("rst-content-binstrings")))
             {
@@ -142,7 +162,8 @@ namespace AssetsManager.Services.Hashes
                 [InternalHashKind.BinEntries] = new(),
                 [InternalHashKind.BinFields] = new(),
                 [InternalHashKind.BinTypes] = new(),
-                [InternalHashKind.BinHashes] = new()
+                [InternalHashKind.BinHashes] = new(),
+                [InternalHashKind.BinXxh3] = new()
             };
             foreach (var pair in tree.Objects)
             {
@@ -161,6 +182,7 @@ namespace AssetsManager.Services.Hashes
                 if (property.NameHash != 0) targets[InternalHashKind.BinFields].Add(property.NameHash);
                 switch (property)
                 {
+                    case BinTreeHash64 hash when hash.Value != 0: targets[InternalHashKind.BinXxh3].Add(hash.Value); break;
                     case BinTreeHash hash when hash.Value != 0: targets[InternalHashKind.BinHashes].Add(hash.Value); break;
                     case BinTreeObjectLink link when link.Value != 0: targets[InternalHashKind.BinEntries].Add(link.Value); break;
                     case BinTreeStruct structure:
