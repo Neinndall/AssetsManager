@@ -517,8 +517,6 @@ Bug Fixes
   - 3D Studio / Project Files folders now open with a single click, while Ctrl and Shift remain available for selection.
   - Selection / Right-clicking outside a selected group selects only the clicked item in grids and trees, including comparison results.
   - 3D Studio / Moved the parent-folder arrow beside the Project Files breadcrumb, with spacing from the toolbar tools.
-  - Explorer / BIN patch previews and comparisons now show every override with resolved names and preserve repeated changes.
-  - Explorer / BIN previews and comparisons wait for hash catalogs to finish loading.
   - Hashes / Valid binary hash caches remain usable when their text catalog is unavailable.
   - Explorer / BIN previews and comparisons now resolve known entry names even when no hash property references them.
   - 3D Studio / Project Files selection now uses the same highlight color as hover.

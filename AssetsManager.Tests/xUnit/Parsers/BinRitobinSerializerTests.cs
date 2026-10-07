@@ -193,42 +193,6 @@ namespace AssetsManager.Tests.xUnit.Parsers
             Assert.Contains($"objectPath: hash = \"{objectPath}\"", ritobin);
         }
 
-        [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task SerializationWaitsForHashCatalogs(bool diffFirst)
-        {
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            WriteHashes(bridge, "hashes.binentries.txt", "test/entry");
-            WriteHashes(bridge, "hashes.bintypes.txt", "RootType");
-            WriteHashes(bridge, "hashes.binfields.txt", "value");
-            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
-            var serializer = new BinRitobinSerializer(resolver);
-            byte[] Create(string value) => WriteTree(new BinTree(new[]
-            {
-                new BinTreeObject(Fnv1a.HashLower("test/entry"), Fnv1a.HashLower("RootType"),
-                    new BinTreeProperty[] { new BinTreeString(Fnv1a.HashLower("value"), value) })
-            }, Array.Empty<string>()));
-
-            string text;
-            if (diffFirst)
-            {
-                var diff = await serializer.WriteBinDiffAsRitobinAsync(Create("before"), Create("after"));
-                text = diff.OldRitobin + diff.NewRitobin;
-                Assert.Contains("value: string = \"before\"", diff.OldRitobin);
-                Assert.Contains("value: string = \"after\"", diff.NewRitobin);
-            }
-            else
-            {
-                text = await serializer.WriteBinTreeAsRitobinAsync(Create("before"));
-                Assert.Contains("value: string = \"before\"", text);
-            }
-
-            Assert.Contains("\"test/entry\" = RootType", text);
-            Assert.Equal("test/entry", resolver.ResolveBinEntry(Fnv1a.HashLower("test/entry")));
-        }
-
         [Fact]
         public async Task SerializerResolvesAllHashDomainsInsideNestedPropertyKinds()
         {

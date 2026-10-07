@@ -3,13 +3,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using AssetsManager.Services.Hashes;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Toolkit.Ritobin;
-using Newtonsoft.Json;
 
 namespace AssetsManager.Services.Parsers
 {
@@ -22,30 +20,28 @@ namespace AssetsManager.Services.Parsers
             _hashResolver = hashResolver;
         }
 
-        public async Task<string> WriteBinTreeAsRitobinAsync(byte[] data)
+        public Task<string> WriteBinTreeAsRitobinAsync(byte[] data)
         {
             ArgumentNullException.ThrowIfNull(data);
-            await _hashResolver.LoadAllHashesAsync();
-            return await Task.Run(() =>
+            return Task.Run(() =>
             {
                 if (ImageAutoAtlas.IsImaa(data))
                     return WriteImaaAsRitobin(data);
 
                 BinTree tree = ReadTree(data);
                 using RitobinWriter writer = CreateWriter(tree);
-                return WriteTreeAsRitobin(tree, writer);
+                return writer.WritePropertyBin(tree);
             });
         }
 
-        public async Task<(string OldRitobin, string NewRitobin)> WriteBinDiffAsRitobinAsync(
+        public Task<(string OldRitobin, string NewRitobin)> WriteBinDiffAsRitobinAsync(
             byte[] oldData,
             byte[] newData)
         {
             ArgumentNullException.ThrowIfNull(oldData);
             ArgumentNullException.ThrowIfNull(newData);
 
-            await _hashResolver.LoadAllHashesAsync();
-            return await Task.Run(() =>
+            return Task.Run(() =>
             {
                 if (ImageAutoAtlas.IsImaa(oldData) || ImageAutoAtlas.IsImaa(newData))
                 {
@@ -62,7 +58,7 @@ namespace AssetsManager.Services.Parsers
                 if (oldTree.IsOverride || newTree.IsOverride)
                 {
                     using RitobinWriter fullWriter = CreateWriter(oldTree, newTree);
-                    return (WriteTreeAsRitobin(oldTree, fullWriter), WriteTreeAsRitobin(newTree, fullWriter));
+                    return (fullWriter.WritePropertyBin(oldTree), fullWriter.WritePropertyBin(newTree));
                 }
 
                 BinTreeDiff diff = oldTree.Diff(newTree);
@@ -172,66 +168,6 @@ namespace AssetsManager.Services.Parsers
         {
             using var stream = new MemoryStream(data, writable: false);
             return new BinTree(stream);
-        }
-
-        private string WriteTreeAsRitobin(BinTree tree, RitobinWriter writer)
-        {
-            string text = writer.WritePropertyBin(tree);
-            if (!tree.IsOverride) return text;
-
-            string propHeader = $"#PROP_text{Environment.NewLine}type: string = \"PROP\"{Environment.NewLine}";
-            if (!text.StartsWith(propHeader, StringComparison.Ordinal))
-                throw new InvalidOperationException("Unexpected Ritobin file header.");
-
-            var result = new StringBuilder();
-            result.AppendLine("#PROP_text");
-            result.AppendLine("type: string = \"PTCH\"");
-            result.Append(text.AsSpan(propHeader.Length)).AppendLine();
-            if (tree.DataOverrides.Count == 0)
-            {
-                result.AppendLine("patches: map[hash,embed] = {}");
-                return result.ToString();
-            }
-
-            result.AppendLine("patches: map[hash,embed] = {");
-            foreach (BinTreeDataOverride dataOverride in tree.DataOverrides)
-            {
-                string entryName = _hashResolver.ResolveBinEntry(dataOverride.ObjectPathHash);
-                string target = string.Equals(entryName, dataOverride.ObjectPathHash.ToString("x8", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase)
-                    ? $"0x{dataOverride.ObjectPathHash:x}"
-                    : JsonConvert.ToString(entryName);
-                result.Append("    ").Append(target).AppendLine(" = patch {");
-                result.Append("        path: string = ").AppendLine(JsonConvert.ToString(dataOverride.PropertyPath));
-                result.Append(WritePatchValue(dataOverride.Property, writer));
-                result.AppendLine("    }");
-            }
-            result.AppendLine("}");
-            return result.ToString();
-        }
-
-        private static string WritePatchValue(BinTreeProperty property, RitobinWriter writer)
-        {
-            // LeagueToolkit exposes whole-tree output only. An isolated wrapper reuses its typed
-            // property rendering without cloning values, renaming nested fields or losing hash domains.
-            var wrapper = new BinTree(new[]
-            {
-                new BinTreeObject(0, 0, new[] { property })
-            }, Array.Empty<string>());
-            string text = writer.WritePropertyBin(wrapper);
-            string entryHeader = $"entries: map[hash,embed] = {{{Environment.NewLine}";
-            string footer = $"    }}{Environment.NewLine}}}";
-            int entryStart = text.IndexOf(entryHeader, StringComparison.Ordinal);
-            if (entryStart < 0 || !text.EndsWith(footer, StringComparison.Ordinal))
-                throw new InvalidOperationException("Unexpected Ritobin property wrapper.");
-            int objectHeaderEnd = text.IndexOf(Environment.NewLine, entryStart + entryHeader.Length, StringComparison.Ordinal);
-            int propertyStart = objectHeaderEnd + Environment.NewLine.Length;
-            if (objectHeaderEnd < 0 || propertyStart >= text.Length - footer.Length)
-                throw new InvalidOperationException("Missing Ritobin patch value.");
-            ReadOnlySpan<char> value = text.AsSpan(propertyStart, text.Length - footer.Length - propertyStart);
-            int nameEnd = value.IndexOf(": ");
-            if (nameEnd < 0)
-                throw new InvalidOperationException("Missing Ritobin patch value type.");
-            return "        value" + value[nameEnd..].ToString();
         }
 
         private RitobinWriter CreateWriter(params BinTree[] trees)
