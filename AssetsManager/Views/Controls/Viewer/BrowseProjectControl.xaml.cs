@@ -6,13 +6,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Controls.Explorer;
+using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
 using Microsoft.Win32;
 
@@ -52,6 +52,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             InitializeComponent();
             FilesList.ItemsSource = _files;
+            SelectionBehavior.AddPrimaryActionHandler(FilesList, Files_PrimaryAction);
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
             IsVisibleChanged += OnVisibilityChanged;
@@ -222,9 +223,14 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_folder != null) Navigate(Directory.GetParent(_folder)?.FullName ?? _folder);
         }
-        private void Files_DoubleClick(object sender, MouseButtonEventArgs e)
+        private void Files_PrimaryAction(object sender, RoutedEventArgs e)
         {
-            if (FilesList.SelectedItem is ProjectBrowserFile { IsDirectory: true } item) Navigate(item.FullPath);
+            if (e.OriginalSource is ListBoxItem { DataContext: ProjectBrowserFile { IsDirectory: true } item }
+                && FilesList.Items.Contains(item))
+            {
+                Navigate(item.FullPath);
+                e.Handled = true;
+            }
         }
         private void Reveal_Click(object sender, RoutedEventArgs e)
         {

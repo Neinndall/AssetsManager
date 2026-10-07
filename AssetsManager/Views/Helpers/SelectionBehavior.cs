@@ -101,6 +101,31 @@ namespace AssetsManager.Views.Helpers
             {
                 if (item is TreeViewItem && FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) != item) return;
 
+                if (item is ListBoxItem listItem && ItemsControl.ItemsControlFromItemContainer(listItem) is ListBox list)
+                {
+                    if (!listItem.IsSelected)
+                    {
+                        ClearAllMultiSelected(list.ItemsSource ?? list.Items);
+                        list.UnselectAll();
+                        SetItemSelected(listItem, true);
+                    }
+                    else listItem.Focus();
+                    e.Handled = true;
+                    return;
+                }
+
+                if (item is TreeViewItem treeItem && FindAncestor<TreeView>(treeItem) is TreeView tree)
+                {
+                    if (!GetIsMultiSelected(treeItem.DataContext))
+                    {
+                        ClearAllMultiSelected(tree.ItemsSource ?? tree.Items);
+                        tree.SetValue(RangeAnchorProperty, treeItem.DataContext);
+                    }
+                    SetItemSelected(treeItem, true);
+                    e.Handled = true;
+                    return;
+                }
+
                 if (GetIsMultiSelected(item.DataContext) || IsItemSelected(item)) return;
 
                 SetItemSelected(item, true);

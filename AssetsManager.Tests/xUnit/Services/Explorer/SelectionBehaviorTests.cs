@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using AssetsManager.Views.Controls.Viewer;
@@ -233,6 +234,164 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer
             Assert.True(first.IsMultiSelected);
             Assert.True(middle.IsMultiSelected);
             Assert.True(target.IsMultiSelected);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void GridRightClickSelectsTargetOrPreservesItsExistingGroup(bool targetAlreadySelected)
+        {
+            Exception failure = null;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    var states = new[] { new SelectionState(), new SelectionState(), new SelectionState() };
+                    var list = new ListBox
+                    {
+                        ItemsSource = states,
+                        SelectionMode = SelectionMode.Extended,
+                        Template = new ControlTemplate(typeof(ListBox)) { VisualTree = new FrameworkElementFactory(typeof(ItemsPresenter)) },
+                        ItemsPanel = new ItemsPanelTemplate(new FrameworkElementFactory(typeof(StackPanel)))
+                    };
+                    list.ApplyTemplate();
+                    list.Measure(new Size(240, 240));
+                    list.Arrange(new Rect(0, 0, 240, 240));
+                    list.UpdateLayout();
+                    var containers = new ListBoxItem[states.Length];
+                    for (int i = 0; i < states.Length; i++)
+                    {
+                        containers[i] = Assert.IsType<ListBoxItem>(list.ItemContainerGenerator.ContainerFromIndex(i));
+                        SelectionBehavior.SetEnableUnifiedSelection(containers[i], true);
+                        SelectionBehavior.SetPreserveSelectionOnRightClick(containers[i], true);
+                    }
+                    containers[0].IsSelected = containers[1].IsSelected = true;
+                    states[0].IsMultiSelected = states[1].IsMultiSelected = true;
+                    // A stale model flag must not make an unselected container join the group.
+                    states[2].IsMultiSelected = true;
+                    int target = targetAlreadySelected ? 1 : 2;
+                    int primaryActions = 0;
+                    SelectionBehavior.AddPrimaryActionHandler(list, (_, _) => primaryActions++);
+                    var rightClick = new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Right)
+                    {
+                        RoutedEvent = UIElement.PreviewMouseRightButtonDownEvent
+                    };
+
+                    containers[target].RaiseEvent(rightClick);
+
+                    Assert.True(rightClick.Handled);
+                    Assert.Equal(0, primaryActions);
+                    Assert.Equal(targetAlreadySelected ? 2 : 1, list.SelectedItems.Count);
+                    Assert.True(list.SelectedItems.Contains(states[target]));
+                    Assert.Equal(targetAlreadySelected, states[0].IsSelected);
+                    Assert.Equal(targetAlreadySelected, states[1].IsSelected);
+                    Assert.Equal(!targetAlreadySelected, states[2].IsSelected);
+                    if (!targetAlreadySelected)
+                        Assert.All(states, state => Assert.False(state.IsMultiSelected));
+                }
+                catch (Exception ex) { failure = ex; }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+            Assert.Null(failure);
+        }
+
+        [Theory]
+        [InlineData(false, false, false)]
+        [InlineData(false, false, true)]
+        [InlineData(false, true, false)]
+        [InlineData(true, false, false)]
+        [InlineData(true, false, true)]
+        [InlineData(true, true, false)]
+        public void TreeRightClickUsesGroupMembershipForExplorerAndComparisonNodes(
+            bool comparison, bool targetInGroup, bool targetIsPrimary)
+        {
+            Exception failure = null;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    ISelectableTreeNode[] states;
+                    ISelectableTreeNode hidden;
+                    ISelectableTreeNode collapsedRoot;
+                    if (comparison)
+                    {
+                        states = new ISelectableTreeNode[]
+                        {
+                            new SerializableChunkDiff { NewPath = "first.bin" },
+                            new SerializableChunkDiff { NewPath = "second.bin" },
+                            new SerializableChunkDiff { NewPath = "target.bin" }
+                        };
+                        var diff = new SerializableChunkDiff { NewPath = "hidden.bin", IsMultiSelected = true };
+                        var type = new DiffTypeGroupViewModel { IsMultiSelected = true };
+                        type.Diffs.Add(diff);
+                        var wad = new WadGroupViewModel { IsMultiSelected = true };
+                        wad.Types.Add(type);
+                        hidden = diff;
+                        collapsedRoot = wad;
+                    }
+                    else
+                    {
+                        states = new ISelectableTreeNode[]
+                        {
+                            new FileSystemNodeModel("first", NodeType.VirtualFile),
+                            new FileSystemNodeModel("second", NodeType.VirtualFile),
+                            new FileSystemNodeModel("target", NodeType.VirtualFile)
+                        };
+                        var child = new FileSystemNodeModel("hidden", NodeType.VirtualFile) { IsMultiSelected = true };
+                        var root = new FileSystemNodeModel("collapsed", NodeType.VirtualDirectory) { IsMultiSelected = true };
+                        root.Children.Add(child);
+                        hidden = child;
+                        collapsedRoot = root;
+                    }
+                    var tree = new TreeView
+                    {
+                        ItemsSource = new[] { states[0], states[1], states[2], collapsedRoot },
+                        Template = new ControlTemplate(typeof(TreeView)) { VisualTree = new FrameworkElementFactory(typeof(ItemsPresenter)) },
+                        ItemsPanel = new ItemsPanelTemplate(new FrameworkElementFactory(typeof(StackPanel)))
+                    };
+                    tree.ApplyTemplate();
+                    tree.Measure(new Size(240, 240));
+                    tree.Arrange(new Rect(0, 0, 240, 240));
+                    tree.UpdateLayout();
+                    var containers = new TreeViewItem[states.Length];
+                    for (int i = 0; i < states.Length; i++)
+                    {
+                        containers[i] = Assert.IsType<TreeViewItem>(tree.ItemContainerGenerator.ContainerFromIndex(i));
+                        SelectionBehavior.SetSingleClickExpand(containers[i], true);
+                        SelectionBehavior.SetPreserveSelectionOnRightClick(containers[i], true);
+                    }
+                    states[0].IsMultiSelected = states[1].IsMultiSelected = true;
+                    int target = targetInGroup ? 1 : 2;
+                    containers[targetIsPrimary ? target : 0].IsSelected = true;
+                    int primaryActions = 0;
+                    SelectionBehavior.AddPrimaryActionHandler(tree, (_, _) => primaryActions++);
+                    var rightClick = new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Right)
+                    {
+                        RoutedEvent = UIElement.PreviewMouseRightButtonDownEvent
+                    };
+
+                    containers[target].RaiseEvent(rightClick);
+
+                    Assert.True(rightClick.Handled);
+                    Assert.Same(states[target], tree.SelectedItem);
+                    Assert.True(states[target].IsSelected);
+                    Assert.Equal(targetInGroup, states[0].IsMultiSelected);
+                    Assert.Equal(targetInGroup, states[1].IsMultiSelected);
+                    Assert.False(states[2].IsMultiSelected);
+                    Assert.Equal(targetInGroup, hidden.IsMultiSelected);
+                    Assert.Equal(targetInGroup, collapsedRoot.IsMultiSelected);
+                    Assert.False(collapsedRoot.IsExpanded);
+                    Assert.False(containers[target].IsExpanded);
+                    Assert.Equal(0, primaryActions);
+                }
+                catch (Exception ex) { failure = ex; }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+            Assert.Null(failure);
         }
 
         private sealed class SelectionState : IMultiSelectable
