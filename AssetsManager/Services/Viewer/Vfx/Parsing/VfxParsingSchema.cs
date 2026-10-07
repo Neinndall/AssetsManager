@@ -157,7 +157,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static readonly uint F_emissionSurface = VfxParsingHash.Fnv1a("EmissionSurface");
         internal static readonly uint F_emissionMesh = VfxParsingHash.Fnv1a("meshName");
         internal static readonly uint F_emissionSkeleton = VfxParsingHash.Fnv1a("skeletonName");
-        internal static readonly uint F_emissionAnimation = VfxParsingHash.Fnv1a("AnimationName");
         internal static readonly uint F_emissionSubmeshes = VfxParsingHash.Fnv1a("Submeshes");
         internal static readonly uint F_emissionJointMask = VfxParsingHash.Fnv1a("JointMask");
         internal static readonly uint F_emissionMeshScale = VfxParsingHash.Fnv1a("meshScale");

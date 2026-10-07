@@ -68,9 +68,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
             if (d.EmissionMesh is { } emissionMesh && _emissionSurfaces.TryGetValue(d, out IVfxEmissionSurfaceSampler loaded)
                 && loaded is VfxEmitterEmissionSampler combined && combined.Mesh is { } meshSampler
-                && meshSampler.TrySample(s.Age, _rng, out VfxSurfaceBirth meshBirth))
+                && meshSampler.TrySample(SimulationTime, _rng, out VfxSurfaceBirth meshBirth))
             {
-                localOffset += meshBirth.Position;
+                localOffset += meshBirth.Position * emissionMesh.Scale;
                 if (emissionMesh.UseNormal)
                 {
                     vel = meshBirth.Normal * vel.Length();
@@ -84,13 +84,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 _emissionSurfaces.TryGetValue(d, out IVfxEmissionSurfaceSampler surfaceSampler))
             {
                 IVfxEmissionSurfaceSampler sampler = surfaceSampler is VfxEmitterEmissionSampler pair ? pair.Surface : surfaceSampler;
-                onEmissionSurface = sampler?.TrySample(s.Age, _rng, out surfaceBirth) == true;
+                onEmissionSurface = sampler?.TrySample(SimulationTime, _rng, out surfaceBirth) == true;
                 if (onEmissionSurface)
-                    localOffset += surfaceBirth.Position;
+                    localOffset += surfaceBirth.Position * d.EmissionSurface.Scale;
             }
 
             if (onEmissionSurface && d.EmissionSurface.UseNormal)
+            {
                 vel = surfaceBirth.Normal * vel.Length();
+                birthAcceleration = surfaceBirth.Normal * birthAcceleration.Length();
+            }
 
             Matrix4x4 placement = EmitterPlacement(d);
             vel = Vector3.TransformNormal(vel, spawnRotation);

@@ -38,9 +38,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 ApplyRigTransform();
                 ApplySpellTransforms(next);
                 if (_boneTransformSampler != null)
-                    UpdateBoneTransforms((name, hash) => _boneTransformSampler(next, name, hash));
+                    ApplyBoneTransforms((name, hash) => _boneTransformSampler(next, name, hash));
                 else if (_boneTransformProvider != null)
-                    UpdateBoneTransforms(_boneTransformProvider);
+                    ApplyBoneTransforms(_boneTransformProvider);
                 foreach (var graph in _graphs) graph.Update((float)(next - previous));
                 KillGraphsAt(next);
                 TryCaptureCheckpoint(next);

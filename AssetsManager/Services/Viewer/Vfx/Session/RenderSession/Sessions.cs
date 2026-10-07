@@ -53,7 +53,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     _worldTransform,
                     system.PlaybackSeed,
                     _logService,
-                    system.OwnerSceneContext);
+                    system.OwnerSceneContext,
+                    SampleEmissionBoneTransform);
                 _graph.SetPinnedBirthChance(_pinnedBirthChance);
                 _graphs.Add(_graph);
                 _graphPlacements[_graph] = Matrix4x4.Identity;
@@ -131,7 +132,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     _worldTransform,
                     step.Seed,
                     _logService,
-                    ownerSceneContext);
+                    ownerSceneContext,
+                    SampleEmissionBoneTransform);
                 graph.SetStartDelay((float)Math.Max(0d, step.StartTime));
                 _graphs.Add(graph);
                 _graphPlacements[graph] = Matrix4x4.Identity;
@@ -247,7 +249,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     _worldTransform,
                     IdleEffectSeed,
                     _logService,
-                    ownerSceneContext);
+                    ownerSceneContext,
+                    SampleEmissionBoneTransform);
 
                 _graphs.Add(idleGraph);
                 _graphPlacements[idleGraph] = Matrix4x4.Identity;
@@ -309,7 +312,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         _worldTransform,
                         AnimationClipCueSeed,
                         _logService,
-                        ownerSceneContext);
+                        ownerSceneContext,
+                        SampleEmissionBoneTransform);
 
                     eventGraph.SetStartDelay(startSeconds);
 

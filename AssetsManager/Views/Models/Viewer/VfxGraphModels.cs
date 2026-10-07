@@ -291,7 +291,6 @@ namespace AssetsManager.Views.Models.Viewer
         VfxEmissionSurfaceKind Kind,
         string MeshPath,
         string SkeletonPath,
-        string AnimationPath,
         IReadOnlyList<uint> Submeshes,
         IReadOnlyList<uint> Joints,
         float Scale = 1f,

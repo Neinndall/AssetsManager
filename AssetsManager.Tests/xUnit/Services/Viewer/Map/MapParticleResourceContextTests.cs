@@ -59,7 +59,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                     VfxEmissionSurfaceKind.Mesh,
                     "assets/vfx/surface.skn",
                     "assets/vfx/surface.skl",
-                    "assets/vfx/surface.anm",
                     Array.Empty<uint>(),
                     Array.Empty<uint>())
             };
@@ -77,7 +76,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Contains("assets/vfx/variant_b.anm", paths);
             Assert.Contains("assets/vfx/surface.skn", paths);
             Assert.Contains("assets/vfx/surface.skl", paths);
-            Assert.Contains("assets/vfx/surface.anm", paths);
+            Assert.DoesNotContain("assets/vfx/surface.anm", paths);
             Assert.Contains("assets/characters/test/skin.skn", paths);
             Assert.Contains("assets/characters/test/skin.skl", paths);
         }

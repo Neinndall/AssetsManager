@@ -325,9 +325,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public void SetBoneTransformSampler(Func<double, string, uint, Matrix4x4?> sampler)
         {
-            ClearCheckpoints();
+            if (Equals(_boneTransformSampler, sampler)) return;
             _boneTransformSampler = sampler;
+            if (sampler is null)
+            {
+                _boneTransformProvider = null;
+                ApplyBoneTransforms(null);
+            }
+            ReplayAfterLineageResourceChange();
         }
+
+        private Matrix4x4? SampleEmissionBoneTransform(float time, string name, uint hash)
+            => _boneTransformSampler is { } sampler
+                ? sampler(time, name, hash)
+                : _boneTransformProvider?.Invoke(name, hash);
 
         /// <summary>
         /// Installs newly loaded emission surfaces on one graph. Like driver.setSurfaces,

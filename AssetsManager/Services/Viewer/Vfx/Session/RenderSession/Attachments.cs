@@ -9,7 +9,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
     {
         public void UpdateBoneTransforms(Func<string, uint, Matrix4x4?> boneTransformProvider)
         {
+            bool sourceChanged = _boneTransformSampler is null && !Equals(_boneTransformProvider, boneTransformProvider);
             _boneTransformProvider = boneTransformProvider;
+            ApplyBoneTransforms(boneTransformProvider);
+            if (sourceChanged) ReplayAfterLineageResourceChange();
+        }
+
+        private void ApplyBoneTransforms(Func<string, uint, Matrix4x4?> boneTransformProvider)
+        {
             if (_graphs.Count == 0) return;
 
             Func<string, Matrix4x4?> jointProvider = boneTransformProvider is null

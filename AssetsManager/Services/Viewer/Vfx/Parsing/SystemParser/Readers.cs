@@ -133,12 +133,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 held.ClassHash == EmissionSkeletonClass ? VfxEmissionSurfaceKind.Skeleton : VfxEmissionSurfaceKind.Mesh,
                 ReadAsset(properties, F_emissionMesh, ".skn"),
                 ReadAsset(properties, F_emissionSkeleton, ".skl"),
-                ReadAsset(properties, F_emissionAnimation, ".anm"),
                 ReadHashContainer(Get(properties, F_emissionSubmeshes)),
                 ReadHashContainer(Get(properties, F_emissionJointMask)),
                 GetF32(properties, F_emissionMeshScale) ?? 1f,
-                Math.Clamp(GetI32(properties, F_emissionMaxJointWeights) ?? GetU8(properties, F_emissionMaxJointWeights) ?? 4, 0, 4),
-                GetBool(properties, F_emissionUseSurfaceNormal, defaultValue: true));
+                Math.Clamp(GetI32(properties, F_emissionMaxJointWeights) ?? GetU8(properties, F_emissionMaxJointWeights) ?? 4, 1, 4),
+                held.ClassHash == EmissionSkeletonClass || GetBool(properties, F_emissionUseSurfaceNormal, defaultValue: true));
         }
 
         private static IReadOnlyList<uint> ReadHashContainer(BinTreeProperty property)

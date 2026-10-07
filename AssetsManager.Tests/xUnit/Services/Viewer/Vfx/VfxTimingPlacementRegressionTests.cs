@@ -125,7 +125,7 @@ public sealed class VfxTimingPlacementRegressionTests
     {
         var mesh = new VfxMeshData(new float[] { 0,0,0, 2,0,0, 0,2,0, 100,0,0, 120,0,0, 100,20,0 },
             Array.Empty<float>(), Array.Empty<float>(), Array.Empty<float>(), new uint[] { 0,1,2, 3,4,5 });
-        var sampler = new VfxStaticEmissionMeshSampler(mesh, 2f);
+        var sampler = new VfxStaticEmissionMeshSampler(mesh);
         var expected = new VfxLtkRandom(7);
         bool large = expected.NextUnitFloat() * 202f >= 2f;
         float u = expected.NextUnitFloat(), v = expected.NextUnitFloat();
@@ -134,29 +134,29 @@ public sealed class VfxTimingPlacementRegressionTests
         Vector3 c = a + new Vector3(0f, large ? 20f : 2f, 0f);
         var random = new VfxLtkRandom(7);
         Assert.True(sampler.TrySample(0f, random, out var birth));
-        Near(2f * (a * ((1f - u) * (1f - v)) + b * ((1f - u) * v) + c * u), birth.Position);
+        Near(a * ((1f - u) * (1f - v)) + b * ((1f - u) * v) + c * u, birth.Position);
         Near(Vector3.UnitZ, birth.Normal);
         Assert.Equal(expected.State, random.State);
         int largeCount = 0;
         for (int i = 0; i < 1000; i++)
         {
             Assert.True(sampler.TrySample(0f, random, out birth));
-            if (birth.Position.X >= 200f) largeCount++;
+            if (birth.Position.X >= 100f) largeCount++;
         }
         Assert.InRange(largeCount, 950, 1000);
     }
 
     [Fact]
-    public void BothEmissionSurfacesAddOffsetsAndOnlyTheStaticMeshRedirectsAcceleration()
+    public void BothEmissionSurfacesAddOffsetsAndRedirectAcceleration()
     {
         var emitter = Emitter() with { ParticleLifetime = VfxCurveF.Const(1f),
             BirthVelocity = VfxCurve3.Const(new Vector3(3f, 0f, 0f)), BirthAcceleration = VfxCurve3.Const(new Vector3(2f, 0f, 0f)),
             SpawnShape = new VfxSpawnShape(VfxSpawnShapeKind.Legacy, VfxCurve3.Const(new Vector3(-2f, 0f, 0f)),
                 new[] { Vector3.UnitZ }, new[] { VfxCurveF.Const(90f) }),
             OffsetLifetimeScaling = new Vector3(2f, 0f, 0f), OffsetLifeScalingSymmetryMode = 1,
-            EmissionMesh = new VfxEmissionMeshDefinition("static.scb"),
-            EmissionSurface = new VfxEmissionSurfaceDefinition(VfxEmissionSurfaceKind.Mesh, "posed.skn", null, null,
-                Array.Empty<uint>(), Array.Empty<uint>(), 1f, 4, true) };
+            EmissionMesh = new VfxEmissionMeshDefinition("static.scb", 2f),
+            EmissionSurface = new VfxEmissionSurfaceDefinition(VfxEmissionSurfaceKind.Mesh, "posed.skn", null,
+                Array.Empty<uint>(), Array.Empty<uint>(), 3f, 4, true) };
         var runtime = Create(emitter);
         runtime.SetEmissionSurfaces(new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>
         {
@@ -165,9 +165,9 @@ public sealed class VfxTimingPlacementRegressionTests
         });
         runtime.Update(.01f);
         var particle = Assert.Single(runtime.Emitters[0].Particles);
-        Near(new Vector3(10f, 18f, 0f), particle.Pos);
+        Near(new Vector3(20f, 58f, 0f), particle.Pos);
         Near(new Vector3(0f, 0f, 3f), particle.Vel);
-        Near(new Vector3(-2f, 0f, 0f), particle.BirthAcceleration);
+        Near(new Vector3(0f, 0f, 2f), particle.BirthAcceleration);
         Assert.Equal(5f, particle.Life, 4);
         var checkpoint = runtime.CaptureSnapshot();
         runtime.Update(.1f);

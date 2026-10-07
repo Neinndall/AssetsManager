@@ -624,8 +624,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.True(parsed.MeshAlignYawToCamera);
         }
 
-        [Fact]
-        public void ParsesMainBranchMeshAnimationVariantsEmissionSurfaceAndCustomMaterialLink()
+        [Theory]
+        [InlineData(0, 1)]
+        [InlineData(7, 4)]
+        public void ParsesMainBranchMeshAnimationVariantsEmissionSurfaceAndCustomMaterialLink(byte authoredWeights, int expectedWeights)
         {
             const uint materialHash = 0x13572468u;
             var meshDefinition = new BinTreeStruct(
@@ -662,7 +664,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                         BinPropertyType.Hash,
                         new BinTreeProperty[] { new BinTreeHash(0, 33) }),
                     new BinTreeF32(Fnv1a.HashLower("meshScale"), 1.5f),
-                    new BinTreeU8(Fnv1a.HashLower("maxJointWeights"), 7)
+                    new BinTreeU8(Fnv1a.HashLower("maxJointWeights"), authoredWeights)
                 });
             var emitter = new BinTreeStruct(
                 0,
@@ -708,11 +710,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(VfxEmissionSurfaceKind.Mesh, parsed.EmissionSurface.Kind);
             Assert.Equal("Effects/Surface.skn", parsed.EmissionSurface.MeshPath);
             Assert.Equal("Effects/Surface.skl", parsed.EmissionSurface.SkeletonPath);
-            Assert.Equal("Effects/Surface.anm", parsed.EmissionSurface.AnimationPath);
             Assert.Equal(new uint[] { 11, 22 }, parsed.EmissionSurface.Submeshes);
             Assert.Equal(new uint[] { 33 }, parsed.EmissionSurface.Joints);
             Assert.Equal(1.5f, parsed.EmissionSurface.Scale);
-            Assert.Equal(4, parsed.EmissionSurface.MaxJointWeights);
+            Assert.Equal(expectedWeights, parsed.EmissionSurface.MaxJointWeights);
             Assert.True(parsed.EmissionSurface.UseNormal);
         }
 
@@ -1007,7 +1008,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void LegacyEmissionSurfaceUsesOuterClassAndAuthoredNormalFlag()
+        public void LegacySkeletonSurfaceAlwaysRedirectsBirthPhysics()
         {
             var emissionSurface = new BinTreeStruct(
                 Fnv1a.HashLower("emissionSurfaceDefinition"),
@@ -1040,7 +1041,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.NotNull(parsed);
             Assert.Equal(VfxEmissionSurfaceKind.Skeleton, parsed.Kind);
             Assert.Equal("Effects/Legacy.skl", parsed.SkeletonPath);
-            Assert.False(parsed.UseNormal);
+            Assert.True(parsed.UseNormal);
             Assert.Equal(1f, parsed.Scale);
             Assert.Equal(4, parsed.MaxJointWeights);
         }

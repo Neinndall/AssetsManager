@@ -23,13 +23,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
     internal sealed class VfxStaticEmissionMeshSampler : IVfxEmissionSurfaceSampler
     {
         private readonly VfxMeshData _mesh;
-        private readonly float _scale;
         private readonly double[] _reach;
         private readonly double _total;
-        internal VfxStaticEmissionMeshSampler(VfxMeshData mesh, float scale)
+        internal VfxStaticEmissionMeshSampler(VfxMeshData mesh)
         {
             _mesh = mesh;
-            _scale = scale;
             _reach = new double[(mesh.Indices?.Length ?? 0) / 3];
             double total = 0d;
             for (int triangle = 0; triangle < _reach.Length; triangle++)
@@ -60,7 +58,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             while (triangle + 1 < _reach.Length && pick >= _reach[triangle]) triangle++;
             if (!Corners(triangle, out Vector3 a, out Vector3 b, out Vector3 c)) return false;
             float u = rng.NextUnitFloat(), v = rng.NextUnitFloat();
-            birth = new VfxSurfaceBirth((a * ((1f - u) * (1f - v)) + b * ((1f - u) * v) + c * u) * _scale,
+            birth = new VfxSurfaceBirth(a * ((1f - u) * (1f - v)) + b * ((1f - u) * v) + c * u,
                 Vector3.Normalize(Vector3.Cross(b - a, c - a)));
             return true;
         }
@@ -76,6 +74,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         int ParentIndexAt(int index);
         ReadOnlySpan<Matrix4x4> EvaluatePalette(float seconds);
         void EvaluateJointPositions(float seconds, Span<Vector3> positions);
+        void EvaluateRestJointPositions(Span<Vector3> positions);
     }
 
     /// <summary>LTK-compatible uniform-by-triangle mesh surface sampling.</summary>
@@ -83,19 +82,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
     {
         private readonly VfxMeshData _mesh;
         private readonly IVfxEmissionSurfacePose _pose;
-        private readonly float _scale;
         private readonly int _maxJointWeights;
 
         internal VfxMeshEmissionSurfaceSampler(
             VfxMeshData mesh,
             IVfxEmissionSurfacePose pose,
-            float scale,
             int maxJointWeights)
         {
             _mesh = mesh;
             _pose = pose;
-            _scale = float.IsFinite(scale) ? scale : 1f;
-            _maxJointWeights = Math.Clamp(maxJointWeights, 0, 4);
+            _maxJointWeights = Math.Clamp(maxJointWeights, 1, 4);
         }
 
         public bool TrySample(float time, VfxLtkRandom rng, out VfxSurfaceBirth birth)
@@ -131,10 +127,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 v0 * (1f - root) +
                 v1 * (root * (1f - along)) +
                 v2 * (root * along);
-            position *= _scale;
 
-            Vector3 normal = Vector3.Cross(v1 - v0, v2 - v0);
-            if (normal.LengthSquared() > 1e-12f)
+            Vector3 normal = Vector3.Zero;
+            if (_mesh.Normals is { } normals && normals.Length == _mesh.Positions.Length)
+            {
+                normal = VertexAt(i0, palette, normals, direction: true) * (1f - root) +
+                    VertexAt(i1, palette, normals, direction: true) * (root * (1f - along)) +
+                    VertexAt(i2, palette, normals, direction: true) * (root * along);
+            }
+            if (normal.LengthSquared() == 0f) normal = Vector3.Cross(v1 - v0, v2 - v0);
+            if (normal.LengthSquared() > 0f)
                 normal = Vector3.Normalize(normal);
             else
                 normal = Vector3.Zero;
@@ -143,10 +145,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             return true;
         }
 
-        private Vector3 VertexAt(int vertexIndex, ReadOnlySpan<Matrix4x4> palette)
+        private Vector3 VertexAt(int vertexIndex, ReadOnlySpan<Matrix4x4> palette,
+            float[] source = null, bool direction = false)
         {
-            Vector3 bind = ReadPosition(_mesh.Positions, vertexIndex);
-            if (_pose is null || _maxJointWeights <= 0 || palette.IsEmpty)
+            Vector3 bind = ReadPosition(source ?? _mesh.Positions, vertexIndex);
+            if (_pose is null || palette.IsEmpty)
                 return bind;
 
             float[] indices = _pose.BoneIndices;
@@ -166,7 +169,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 int influence = (int)indices[offset + part];
                 if (!float.IsFinite(weight) || weight <= 0f || (uint)influence >= palette.Length)
                     continue;
-                skinned += Vector3.Transform(bind, palette[influence]) * weight;
+                Vector3 transformed = direction
+                    ? Vector3.TransformNormal(bind, palette[influence])
+                    : Vector3.Transform(bind, palette[influence]);
+                if (direction && transformed.LengthSquared() > 0f) transformed = Vector3.Normalize(transformed);
+                skinned += transformed * weight;
                 sum += weight;
             }
 
@@ -177,22 +184,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             => new(positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]);
     }
 
-    /// <summary>LTK-compatible skeleton sampling weighted by posed bone-segment length.</summary>
+    /// <summary>Rest-length-weighted bone births with a random perpendicular direction.</summary>
     internal sealed class VfxSkeletonEmissionSurfaceSampler : IVfxEmissionSurfaceSampler
     {
         private readonly IVfxEmissionSurfacePose _pose;
         private readonly int[] _slots;
         private readonly Vector3[] _positions;
         private readonly double[] _lengths;
-        private readonly float _scale;
+        private readonly double _total;
 
         internal VfxSkeletonEmissionSurfaceSampler(
             IVfxEmissionSurfacePose pose,
-            IReadOnlyList<uint> jointMask,
-            float scale)
+            IReadOnlyList<uint> jointMask)
         {
             _pose = pose ?? throw new ArgumentNullException(nameof(pose));
-            _scale = float.IsFinite(scale) ? scale : 1f;
             var mask = (jointMask ?? Array.Empty<uint>()).ToHashSet();
             _slots = Enumerable.Range(0, pose.JointCount)
                 .Where(index => pose.ParentIndexAt(index) >= 0 &&
@@ -200,28 +205,26 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 .ToArray();
             _positions = new Vector3[pose.JointCount];
             _lengths = new double[_slots.Length];
+            pose.EvaluateRestJointPositions(_positions);
+            double total = 0d;
+            for (int index = 0; index < _slots.Length; index++)
+            {
+                int slot = _slots[index];
+                total += Vector3.Distance(_positions[slot], _positions[pose.ParentIndexAt(slot)]);
+                _lengths[index] = total;
+            }
+            _total = total;
         }
 
         public bool TrySample(float time, VfxLtkRandom rng, out VfxSurfaceBirth birth)
         {
             ArgumentNullException.ThrowIfNull(rng);
             birth = default;
-            if (_slots.Length == 0)
+            if (!(_total > 0d))
                 return false;
 
             _pose.EvaluateJointPositions(time, _positions);
-            double total = 0d;
-            for (int index = 0; index < _slots.Length; index++)
-            {
-                int slot = _slots[index];
-                int parentIndex = _pose.ParentIndexAt(slot);
-                total += Vector3.Distance(_positions[slot], _positions[parentIndex]);
-                _lengths[index] = total;
-            }
-            if (!(total > 0d))
-                return false;
-
-            double pick = rng.NextUnitFloat() * total;
+            double pick = rng.NextUnitFloat() * _total;
             int selected = 0;
             while (selected < _slots.Length - 1 && pick >= _lengths[selected])
                 selected++;
@@ -230,12 +233,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             int parentJoint = _pose.ParentIndexAt(joint);
             Vector3 parent = _positions[parentJoint];
             Vector3 child = _positions[joint];
-            Vector3 position = Vector3.Lerp(parent, child, rng.NextUnitFloat()) * _scale;
-            Vector3 normal = child - parent;
-            if (normal.LengthSquared() > 1e-12f)
-                normal = Vector3.Normalize(normal);
-            else
-                normal = Vector3.Zero;
+            Vector3 position = Vector3.Lerp(parent, child, rng.NextUnitFloat());
+            Vector3 bone = child - parent;
+            bone = bone.LengthSquared() > 0f ? Vector3.Normalize(bone) : Vector3.UnitY;
+            Vector3 across = Vector3.Normalize(Vector3.Cross(MathF.Abs(bone.X) < 0.9f ? Vector3.UnitX : Vector3.UnitY, bone));
+            Vector3 over = Vector3.Cross(bone, across);
+            float angle = rng.NextUnitFloat() * (MathF.PI * 2f);
+            Vector3 normal = across * MathF.Cos(angle) + over * MathF.Sin(angle);
 
             birth = new VfxSurfaceBirth(position, normal);
             return true;

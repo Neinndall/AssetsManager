@@ -137,7 +137,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             ApplyRigTransform();
             ApplySpellTransforms(0d);
             if (_boneTransformSampler != null)
-                UpdateBoneTransforms((name, hash) => _boneTransformSampler(0, name, hash));
+                ApplyBoneTransforms((name, hash) => _boneTransformSampler(0, name, hash));
+            else
+                ApplyBoneTransforms(_boneTransformProvider);
         }
 
         /// <summary>

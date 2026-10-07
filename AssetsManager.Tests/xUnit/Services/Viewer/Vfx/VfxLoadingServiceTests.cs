@@ -1229,8 +1229,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             }
         }
 
-        [Fact]
-        public void PreparePlaybackInstallsAuthoredMeshEmissionSurface()
+        [Theory]
+        [InlineData(false, 1)]
+        [InlineData(true, 1)]
+        [InlineData(false, 0)]
+        [InlineData(false, GpuSkinningData.MaxBones + 1)]
+        public void PreparePlaybackRequiresBothMeshAndSkeletonForEmissionSurface(bool missingSkeleton, int influences)
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxEmissionSurface", Guid.NewGuid().ToString("N"));
             string searchDirectory = Path.Combine(root, "data", "characters", "hero", "skins");
@@ -1239,14 +1243,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Directory.CreateDirectory(assetDirectory);
             string meshPath = Path.Combine(assetDirectory, "surface.skn");
             WriteTwoRangeSkinnedMesh(meshPath);
+            var rigBuilder = new LeagueToolkit.Core.Animation.Builders.RigResourceBuilder();
+            for (int index = 0; index < Math.Max(1, influences); index++)
+                rigBuilder.CreateJoint(index == 0 ? "Root" : $"Extra{index}").WithInfluence(influences > 0)
+                    .WithLocalTransform(Matrix4x4.Identity).WithInverseBindTransform(Matrix4x4.Identity);
+            var rig = rigBuilder.Build();
+            using (var stream = File.Create(Path.Combine(assetDirectory, "surface.skl"))) rig.Write(stream);
 
             VfxEmitterDefinition emitter = CreateEmitter(VfxPrimitiveKind.CameraQuad) with
             {
                 EmissionSurface = new VfxEmissionSurfaceDefinition(
                     VfxEmissionSurfaceKind.Mesh,
                     "assets/effects/surface.skn",
-                    null,
-                    null,
+                    missingSkeleton ? null : "assets/effects/surface.skl",
                     Array.Empty<uint>(),
                     Array.Empty<uint>(),
                     Scale: 1f,
@@ -1269,6 +1278,24 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 runtime.Update(0.02f);
 
                 var particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+                if (missingSkeleton)
+                {
+                    Assert.Equal(Vector3.Zero, particle.Pos);
+                    return;
+                }
+                using var resolver = new VfxResourceResolver();
+                var gpuPose = resolver.ResolveMeshAnimation("assets/effects/surface.skn",
+                    "assets/effects/surface.skl", null, searchDirectory);
+                if (influences == 0 || influences > GpuSkinningData.MaxBones) Assert.Null(gpuPose);
+                else Assert.NotNull(gpuPose);
+                var cpuPose = resolver.ResolveMeshAnimation("assets/effects/surface.skn",
+                    "assets/effects/surface.skl", null, searchDirectory, requireGpuSkinning: false);
+                Assert.NotNull(cpuPose);
+                Assert.Equal(influences, cpuPose.PaletteCount);
+                Assert.Same(cpuPose, resolver.ResolveMeshAnimation("assets/effects/surface.skn",
+                    "assets/effects/surface.skl", null, searchDirectory, requireGpuSkinning: false));
+                Assert.Same(gpuPose, resolver.ResolveMeshAnimation("assets/effects/surface.skn",
+                    "assets/effects/surface.skl", null, searchDirectory));
                 Assert.NotEqual(Vector3.Zero, particle.Pos);
                 Assert.Equal(particle.Pos.X * 2f, particle.Pos.Y, precision: 4);
                 Assert.Equal(particle.Pos.X * 3f, particle.Pos.Z, precision: 4);
@@ -1278,6 +1305,158 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
             }
         }
+        [Fact]
+        public void EmissionPoseMatchesHostNamesAndKeepsMissingJointsInRestPose()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerBoundSurface", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                string meshPath = Path.Combine(root, "surface.skn");
+                string skeletonPath = Path.Combine(root, "surface.skl");
+                WriteTwoRangeSkinnedMesh(meshPath);
+                var builder = new LeagueToolkit.Core.Animation.Builders.RigResourceBuilder();
+                builder.CreateJoint("Root").WithInfluence(true).WithLocalTransform(Matrix4x4.Identity)
+                    .WithInverseBindTransform(Matrix4x4.Identity);
+                builder.CreateJoint("Missing").WithLocalTransform(Matrix4x4.CreateTranslation(0, 9, 0))
+                    .WithInverseBindTransform(Matrix4x4.CreateTranslation(0, -9, 0));
+                using (var stream = File.Create(skeletonPath)) builder.Build().Write(stream);
+                using var source = VfxAnimatedMesh.Load(meshPath, skeletonPath);
+                float offset = .2f;
+                var bound = source.CreateEmissionPose((time, name, hash) =>
+                {
+                    Assert.Equal(Fnv1a.HashLower(name), hash);
+                    return name == "Root" ? Matrix4x4.CreateTranslation((time + offset) * 10, 0, 0) : null;
+                });
+                var unbound = source.CreateEmissionPose(null);
+                var positions = new Vector3[2];
+                bound.EvaluateJointPositions(.5f, positions);
+                Assert.Equal(new Vector3(7, 0, 0), positions[0]);
+                Assert.Equal(new Vector3(0, 9, 0), positions[1]);
+                Assert.Equal(new Vector3(7, 0, 0), bound.EvaluatePalette(.5f)[0].Translation);
+                Assert.Equal(Matrix4x4.Identity, unbound.EvaluatePalette(.5f)[0]);
+                offset = .4f;
+                Assert.Equal(new Vector3(9, 0, 0), bound.EvaluatePalette(.5f)[0].Translation);
+                Assert.Equal(Matrix4x4.Identity, unbound.EvaluatePalette(.5f)[0]);
+            }
+            finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+        }
+
+        [Fact]
+        public void LoadedEmissionSurfaceUsesRunTimeAcrossDelayedRootsAndPoseReplay()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerSurfaceReplay", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                WriteTwoRangeSkinnedMesh(Path.Combine(root, "surface.skn"));
+                var builder = new LeagueToolkit.Core.Animation.Builders.RigResourceBuilder();
+                builder.CreateJoint("Root").WithInfluence(true).WithLocalTransform(Matrix4x4.Identity)
+                    .WithInverseBindTransform(Matrix4x4.Identity);
+                using (var stream = File.Create(Path.Combine(root, "surface.skl"))) builder.Build().Write(stream);
+                var emitter = CreateEmitter(VfxPrimitiveKind.CameraQuad) with
+                {
+                    IsSingleParticle = false, Rate = VfxCurveF.Const(20),
+                    ParticleLifetime = VfxCurveF.Const(2),
+                    EmissionSurface = new VfxEmissionSurfaceDefinition(VfxEmissionSurfaceKind.Mesh,
+                        "surface.skn", "surface.skl", Array.Empty<uint>(), Array.Empty<uint>(), UseNormal: false)
+                };
+                var definition = new VfxSystemDefinition(1, "surface", "surface", new[] { emitter });
+                var systems = new Dictionary<uint, VfxSystemDefinition> { [1] = definition };
+                var resources = new Dictionary<uint, uint>();
+                using var service = new VfxLoadingService();
+                using var logger = new LoggerConfiguration().CreateLogger();
+                var log = new LogService(logger);
+                float sampledTime = -1;
+                var bound = service.PreparePlaybackGraph(definition, systems, resources, root, Matrix4x4.Identity,
+                    1234, log, emissionPoseSampler: (time, name, hash) =>
+                    {
+                        sampledTime = time;
+                        return name == "Root" ? Matrix4x4.CreateTranslation(time * 10, 0, 0) : null;
+                    });
+                var unbound = service.PreparePlaybackGraph(definition, systems, resources, root, Matrix4x4.Identity, 1234, log);
+                bound.SetStartDelay(.4f);
+                unbound.SetStartDelay(.4f);
+                bound.Update(.3f);
+                unbound.Update(.3f);
+                Assert.Equal(-1, sampledTime);
+                bound.Update(.2f);
+                unbound.Update(.2f);
+                Assert.Equal(.5f, sampledTime, 5);
+                var boundParticles = bound.Root.Emitters[0].Particles;
+                var plainParticles = unbound.Root.Emitters[0].Particles;
+                Assert.NotEmpty(boundParticles);
+                Assert.Equal(plainParticles.Count, boundParticles.Count);
+                for (int index = 0; index < boundParticles.Count; index++)
+                    Assert.Equal(plainParticles[index].Pos + new Vector3(5, 0, 0), boundParticles[index].Pos);
+
+                var child = definition with { PathHash = 2 };
+                var parentEmitter = emitter with { EmissionSurface = null, IsSingleParticle = true,
+                    ChildParticleSet = new VfxChildParticleSetDefinition(new[] { new VfxChildSystemReference("child", 2, 0) },
+                        false, VfxCurveF.Zero, VfxCurve3.Const(Vector3.Zero), 0) };
+                var parent = definition with { Emitters = new[] { parentEmitter } };
+                var family = new Dictionary<uint, VfxSystemDefinition> { [1] = parent, [2] = child };
+                var childTimes = new List<float>();
+                var posedFamily = service.PreparePlaybackGraph(parent, family, resources, root, Matrix4x4.Identity,
+                    1234, log, emissionPoseSampler: (time, name, hash) =>
+                    {
+                        childTimes.Add(time);
+                        return name == "Root" ? Matrix4x4.CreateTranslation(time * 10, 0, 0) : null;
+                    });
+                var plainFamily = service.PreparePlaybackGraph(parent, family, resources, root, Matrix4x4.Identity, 1234, log);
+                foreach (var graph in new[] { posedFamily, plainFamily })
+                {
+                    graph.SetStartDelay(.4f);
+                    graph.Update(.5f);
+                    graph.Update(.1f);
+                }
+                Assert.NotEmpty(childTimes);
+                Assert.All(childTimes, time => Assert.Equal(.6f, time, 5));
+                Assert.True(posedFamily.Runtimes.Count > 1);
+                var posedChild = posedFamily.Runtimes[1].Emitters[0].Particles;
+                var plainChild = plainFamily.Runtimes[1].Emitters[0].Particles;
+                Assert.NotEmpty(posedChild);
+                Assert.Equal(plainChild.Count, posedChild.Count);
+                for (int index = 0; index < posedChild.Count; index++)
+                    Assert.Equal(plainChild[index].Pos + new Vector3(6, 0, 0), posedChild[index].Pos);
+
+                VfxSystemModel Model() => new() { Name = "surface", Definition = definition,
+                    SystemCatalog = systems, ResourceMap = resources, SearchDirectory = root,
+                    PlaybackSeed = 1234, TotalDuration = 2 };
+                using var replay = new AssetsManager.Services.Viewer.Vfx.Session.VfxRenderSession();
+                using var straight = new AssetsManager.Services.Viewer.Vfx.Session.VfxRenderSession();
+                replay.SetSystem(Model());
+                straight.SetSystem(Model());
+                Func<double, string, uint, Matrix4x4?> sampler = (time, name, hash) => name == "Root"
+                    ? Matrix4x4.CreateTranslation((float)time * 10, 0, 0) : null;
+                straight.SetBoneTransformSampler(sampler);
+                straight.Seek(.8);
+                replay.Seek(.8);
+                Assert.NotEqual(straight.Graphs[0].Root.Emitters[0].Particles, replay.Graphs[0].Root.Emitters[0].Particles);
+                replay.SetBoneTransformSampler(sampler);
+                Assert.Equal(.8, replay.CurrentTime, 6);
+                Assert.Equal(straight.Graphs[0].Root.Emitters[0].Particles, replay.Graphs[0].Root.Emitters[0].Particles);
+                replay.Seek(1.1);
+                replay.Seek(.8);
+                Assert.Equal(straight.Graphs[0].Root.Emitters[0].Particles, replay.Graphs[0].Root.Emitters[0].Particles);
+                replay.SetBoneTransformSampler(null);
+                straight.SetBoneTransformSampler(null);
+                Assert.Equal(.8, replay.CurrentTime, 6);
+                Assert.Equal(straight.Graphs[0].Root.Emitters[0].Particles, replay.Graphs[0].Root.Emitters[0].Particles);
+                Func<string, uint, Matrix4x4?> bind = (name, hash) => name == "Root"
+                    ? Matrix4x4.CreateTranslation(0, 6, 0) : null;
+                replay.UpdateBoneTransforms(bind);
+                using var bindFromStart = new AssetsManager.Services.Viewer.Vfx.Session.VfxRenderSession();
+                bindFromStart.SetSystem(Model());
+                bindFromStart.UpdateBoneTransforms(bind);
+                bindFromStart.Seek(.8);
+                Assert.Equal(bindFromStart.Graphs[0].Root.Emitters[0].Particles, replay.Graphs[0].Root.Emitters[0].Particles);
+                replay.UpdateBoneTransforms(null);
+                Assert.Equal(straight.Graphs[0].Root.Emitters[0].Particles, replay.Graphs[0].Root.Emitters[0].Particles);
+            }
+            finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+        }
+
         private static void WriteTwoRangeSkinnedMesh(
             string path,
             ushort[] secondRangeIndices = null,

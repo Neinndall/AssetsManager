@@ -29,6 +29,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         private readonly Dictionary<string, int> _jointsByName;
         private readonly Matrix4x4[] _worldTransforms;
         private readonly Matrix4x4[] _palette;
+        private readonly Matrix4x4[] _restWorldTransforms;
         private readonly Dictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> _pose = new();
         private float _evaluatedTime = float.NaN;
 
@@ -53,6 +54,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 .ToDictionary(static group => group.Key, static group => group.First().index, StringComparer.OrdinalIgnoreCase);
             _worldTransforms = new Matrix4x4[skeleton.Joints.Count];
             _palette = new Matrix4x4[skeleton.Influences.Count];
+            _restWorldTransforms = new Matrix4x4[skeleton.Joints.Count];
+            foreach (int index in _hierarchyOrder)
+            {
+                Matrix4x4 local = skeleton.Joints[index].LocalTransform;
+                int parent = _hierarchyParents[index];
+                _restWorldTransforms[index] = parent >= 0 ? local * _restWorldTransforms[parent] : local;
+            }
         }
 
         public float[] BoneIndices { get; }
@@ -60,12 +68,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         internal int PaletteCount => _palette.Length;
         public int JointCount => _skeleton.Joints.Count;
 
-        internal static VfxAnimatedMesh Load(string meshPath, string skeletonPath, string animationPath = null)
+        internal static VfxAnimatedMesh Load(string meshPath, string skeletonPath, string animationPath = null,
+            bool requireGpuSkinning = true)
         {
             using var mesh = SkinnedMesh.ReadFromSimpleSkin(meshPath);
             RigResource skeleton = LoadSkeletonResource(skeletonPath);
-            if (skeleton.Joints.Count > GpuSkinningData.MaxBones ||
-                skeleton.Influences.Count == 0 || skeleton.Influences.Count > GpuSkinningData.MaxBones)
+            // CPU emission surfaces can use an empty palette or a rig beyond the shader's bone limit.
+            if (requireGpuSkinning && (skeleton.Joints.Count > GpuSkinningData.MaxBones ||
+                skeleton.Influences.Count == 0 || skeleton.Influences.Count > GpuSkinningData.MaxBones))
             {
                 throw new InvalidDataException("VFX mesh skeleton is outside the supported GPU skinning limits.");
             }
@@ -131,6 +141,59 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         public uint JointHashAt(int index) => _jointNameHashes[index];
 
         public int ParentIndexAt(int index) => _hierarchyParents[index];
+
+        public void EvaluateRestJointPositions(Span<Vector3> positions)
+        {
+            for (int index = 0; index < _restWorldTransforms.Length; index++)
+                positions[index] = _restWorldTransforms[index].Translation;
+        }
+
+        // A cached SKN/SKL can feed several actors. Keep each host's palette separate and
+        // read its temporal pose directly so a seek never depends on the last rendered frame.
+        internal IVfxEmissionSurfacePose CreateEmissionPose(Func<float, string, uint, Matrix4x4?> sampler)
+            => new BoundEmissionPose(this, sampler);
+
+        private sealed class BoundEmissionPose : IVfxEmissionSurfacePose
+        {
+            private readonly VfxAnimatedMesh _source;
+            private readonly Func<float, string, uint, Matrix4x4?> _sampler;
+            private readonly Matrix4x4[] _palette;
+
+            internal BoundEmissionPose(VfxAnimatedMesh source, Func<float, string, uint, Matrix4x4?> sampler)
+            {
+                _source = source;
+                _sampler = sampler;
+                _palette = new Matrix4x4[source._palette.Length];
+            }
+
+            public int JointCount => _source.JointCount;
+            public float[] BoneIndices => _source.BoneIndices;
+            public float[] BoneWeights => _source.BoneWeights;
+            public uint JointHashAt(int index) => _source.JointHashAt(index);
+            public int ParentIndexAt(int index) => _source.ParentIndexAt(index);
+            public void EvaluateRestJointPositions(Span<Vector3> positions) => _source.EvaluateRestJointPositions(positions);
+
+            private Matrix4x4 WorldAt(int slot, float time)
+                => _sampler?.Invoke(time, _source._skeleton.Joints[slot].Name, _source._jointNameHashes[slot])
+                    ?? _source._restWorldTransforms[slot];
+
+            public void EvaluateJointPositions(float seconds, Span<Vector3> positions)
+            {
+                for (int slot = 0; slot < JointCount; slot++) positions[slot] = WorldAt(slot, seconds).Translation;
+            }
+
+            public ReadOnlySpan<Matrix4x4> EvaluatePalette(float seconds)
+            {
+                for (int influence = 0; influence < _palette.Length; influence++)
+                {
+                    int slot = _source._skeleton.Influences[influence];
+                    _palette[influence] = (uint)slot < JointCount
+                        ? _source._skeleton.Joints[slot].InverseBindTransform * WorldAt(slot, seconds)
+                        : Matrix4x4.Identity;
+                }
+                return _palette;
+            }
+        }
 
         public void EvaluateJointPositions(float seconds, Span<Vector3> positions)
         {

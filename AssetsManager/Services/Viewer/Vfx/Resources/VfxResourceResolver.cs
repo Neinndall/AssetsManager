@@ -212,7 +212,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             string skeletonPath,
             string animationPath,
             string searchDirectory,
-            LogService log = null)
+            LogService log = null,
+            bool requireGpuSkinning = true)
         {
             if (string.IsNullOrWhiteSpace(meshPath) ||
                 string.IsNullOrWhiteSpace(skeletonPath) ||
@@ -222,7 +223,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             }
 
             string animationKey = string.IsNullOrWhiteSpace(animationPath) ? "<bind>" : animationPath;
-            string key = CreateKey($"{meshPath}|{skeletonPath}|{animationKey}", searchDirectory);
+            string key = CreateKey($"{meshPath}|{skeletonPath}|{animationKey}|{requireGpuSkinning}", searchDirectory);
             if (_meshAnimations.TryGetValue(key, out VfxAnimatedMesh cached)) return cached;
 
             string resolvedMesh = ResolvePath(meshPath, searchDirectory, VfxMeshFormatSemantics.SkinnedExtensions);
@@ -239,7 +240,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
             try
             {
-                var animation = VfxAnimatedMesh.Load(resolvedMesh, resolvedSkeleton, resolvedAnimation);
+                var animation = VfxAnimatedMesh.Load(resolvedMesh, resolvedSkeleton, resolvedAnimation, requireGpuSkinning);
                 _meshAnimations[key] = animation;
                 return animation;
             }

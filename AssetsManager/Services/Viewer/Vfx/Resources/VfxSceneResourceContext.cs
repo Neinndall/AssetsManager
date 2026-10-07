@@ -220,7 +220,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                     {
                         Add(requests, surface.MeshPath, VfxMeshFormatSemantics.SceneExtensions);
                         Add(requests, surface.SkeletonPath, SkeletonExtensions);
-                        Add(requests, surface.AnimationPath, AnimationExtensions);
                     }
                 }
             }

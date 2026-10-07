@@ -205,7 +205,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     VfxEmissionSurfaceKind.Mesh,
                     "surface.skn",
                     null,
-                    null,
                     Array.Empty<uint>(),
                     Array.Empty<uint>(),
                     UseNormal: true)
@@ -240,7 +239,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 EmissionSurface = new VfxEmissionSurfaceDefinition(
                     VfxEmissionSurfaceKind.Mesh,
                     "surface.skn",
-                    null,
                     null,
                     Array.Empty<uint>(),
                     Array.Empty<uint>())
@@ -2461,7 +2459,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     VfxEmissionSurfaceKind.Mesh,
                     "surface.skn",
                     null,
-                    null,
                     Array.Empty<uint>(),
                     Array.Empty<uint>())
             };
@@ -2502,7 +2499,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 EmissionSurface = new VfxEmissionSurfaceDefinition(
                     VfxEmissionSurfaceKind.Mesh,
                     "surface.skn",
-                    null,
                     null,
                     Array.Empty<uint>(),
                     Array.Empty<uint>())
@@ -2577,7 +2573,6 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 EmissionSurface = new VfxEmissionSurfaceDefinition(
                     VfxEmissionSurfaceKind.Mesh,
                     "surface.skn",
-                    null,
                     null,
                     Array.Empty<uint>(),
                     Array.Empty<uint>())
