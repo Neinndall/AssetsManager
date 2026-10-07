@@ -37,7 +37,7 @@
                     <Setter TargetName="HoverSurface" Property="Background" Value="{StaticResource HoverColor}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                    <Setter TargetName="HoverSurface" Property="Background" Value="#223EDBBC"/>
+                    <Setter TargetName="HoverSurface" Property="Background" Value="{StaticResource HoverColor}"/>
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
@@ -61,6 +61,9 @@
                     <Button Click="Up_Click" Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0" ToolTip="Parent folder">
                         <icons:MaterialIcon Kind="ArrowUp" Width="14" Height="14"/>
                     </Button>
+                    <Button Click="Reveal_Click" Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0" ToolTip="Show in Explorer">
+                        <icons:MaterialIcon Kind="OpenInNew" Width="14" Height="14"/>
+                    </Button>
                 </StackPanel>
                 <explorer:BreadcrumbControl x:Name="Breadcrumbs" Grid.Column="1" Margin="12,0" FontSize="10" ItemClicked="Breadcrumbs_ItemClicked"/>
                 <shared:SearchBoxControl x:Name="SearchBox" Grid.Column="2" Height="26" Tag="Search project files..." SearchTextChanged="Search_TextChanged"/>
@@ -68,9 +71,6 @@
                     <Button Click="OpenStudio_Click" Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0" ToolTip="Open project in 3D Studio"
                             Visibility="{Binding IsStandalone, ElementName=BrowserRoot, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <icons:MaterialIcon Kind="CubeOutline" Width="14" Height="14"/>
-                    </Button>
-                    <Button Click="Reveal_Click" Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0" ToolTip="Show in Explorer">
-                        <icons:MaterialIcon Kind="FolderOpenOutline" Width="14" Height="14"/>
                     </Button>
                     <Button Click="Close_Click" Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0" ToolTip="Close project browser">
                         <icons:MaterialIcon Kind="Close" Width="14" Height="14"/>
@@ -97,17 +97,21 @@
             <GridSplitter x:Name="PreviewSplitter" Grid.Column="3" Width="4" HorizontalAlignment="Stretch" Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Visibility="Collapsed"/>
             <Border x:Name="PreviewPanel" Grid.Column="4" Width="240" MinWidth="160" BorderBrush="{StaticResource BorderColor}" BorderThickness="1,0,0,0" Padding="12,8" Visibility="Collapsed">
                 <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                    <Grid Margin="0,0,0,6">
-                        <TextBlock Text="TEXTURE PREVIEW" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                        <Button Click="ClosePreview_Click" Style="{StaticResource TransparentIconButton}" Width="22" Height="22" Padding="0" HorizontalAlignment="Right" ToolTip="Close preview">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <icons:MaterialIcon Kind="ImageOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"/>
+                            <TextBlock Text="TEXTURE PREVIEW" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Click="ClosePreview_Click" Style="{StaticResource TransparentIconButton}" Width="22" Height="22" Padding="0" ToolTip="Close preview">
                             <icons:MaterialIcon Kind="Close" Width="12" Height="12"/>
                         </Button>
                     </Grid>
-                    <Image x:Name="PreviewImage" Grid.Row="1" Stretch="Uniform"/>
-                    <TextBlock x:Name="PreviewMessage" Grid.Row="1" Text="Select a texture to preview it." TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="SelectionLabel" Grid.Row="2" FontSize="10" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" Margin="0,6"/>
-                    <Button Grid.Row="3" Click="Reveal_Click" Style="{StaticResource SecondaryButton}" Content="Show in Explorer" Height="28" Padding="12,0"/>
+                    <TextBlock x:Name="SelectionLabel" Grid.Row="1" FontSize="11" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" Margin="0,2,0,8"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    <Image x:Name="PreviewImage" Grid.Row="2" Stretch="Uniform"/>
+                    <TextBlock x:Name="PreviewMessage" Grid.Row="2" Text="Select a texture to preview it." TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Grid>
             </Border>
         </Grid>

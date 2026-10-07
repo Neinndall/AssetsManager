@@ -41,7 +41,7 @@ namespace AssetsManager.Views.Controls.Viewer
         }
         public static readonly DependencyProperty IsThumbnailEnabledProperty = DependencyProperty.Register(
             nameof(IsThumbnailEnabled), typeof(bool), typeof(BrowseProjectControl),
-            new PropertyMetadata(false, (sender, e) => ((BrowseProjectControl)sender).OnThumbnailModeChanged()));
+            new PropertyMetadata(true, (sender, e) => ((BrowseProjectControl)sender).OnThumbnailModeChanged()));
         public bool IsThumbnailEnabled
         {
             get => (bool)GetValue(IsThumbnailEnabledProperty);
