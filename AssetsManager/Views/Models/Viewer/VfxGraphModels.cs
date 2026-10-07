@@ -64,9 +64,10 @@ namespace AssetsManager.Views.Models.Viewer
         VfxSystemAuthoredFeatures AuthoredFeatures = null,
         VfxDragMotion DragMotion = VfxDragMotion.Stepped,
         float BuildUpTime = 0f,
-        IReadOnlyDictionary<uint, uint> ResourceMap = null);
+        IReadOnlyDictionary<uint, uint> ResourceMap = null,
+        bool HudLayer = false);
 
-    /// <summary>One emitter inside a system. Curves are absolute-valued (sampled over normalised particle age 0..1).</summary>
+    /// <summary>One emitter inside a system, with curves sampled on emitter phase or particle age according to their role.</summary>
     public sealed record VfxEmitterDefinition(
         string Name,
         VfxCurveF Rate,                 // particles per second
@@ -219,7 +220,14 @@ namespace AssetsManager.Views.Models.Viewer
         VfxProjectionDefinition Projection = null,
         VfxCurve2? RateByVelocityFunction = null,
         float? MaximumRateByVelocity = null,
-        bool HasVariableStartTime = false)
+        bool HasVariableStartTime = false,
+        bool OverridesMaterials = false,
+        float ChanceToNotExist = 0f,
+        VfxEmissionMeshDefinition EmissionMesh = null,
+        Vector3 OffsetLifetimeScaling = default,
+        byte OffsetLifeScalingSymmetryMode = 0,
+        Vector3? PostRotateOrientation = null,
+        bool IsHudLayer = false)
     {
         /// <summary>LTK drawKind.ts: this emitter reaches the quad renderer.</summary>
         public bool DrawsAsProjection => PrimitiveKind == VfxPrimitiveKind.PlanarProjection;
@@ -240,10 +248,10 @@ namespace AssetsManager.Views.Models.Viewer
             CustomMaterial is not null && CustomMaterial.BindingKind != ModelMaterialBindingKind.Missing;
 
         /// <summary>
-        /// LTK drawKind.ts: a resolved CustomMaterial owns the shading path and suppresses the
-        /// legacy distortion pass. A missing linked material falls back to the authored emitter.
+        /// A resolved custom material suppresses legacy distortion; authored phase overrides
+        /// and distortion bits select which remaining emitters warp the scene.
         /// </summary>
-        public bool DrawsAsDistortion => Distortion is not null && !DrawsAsProjection && !HasResolvedCustomMaterial;
+        public bool DrawsAsDistortion => AssetsManager.Services.Viewer.Vfx.Semantics.VfxRenderPhaseSemantics.Resolve(this).Distorts;
 
         /// <summary>
         /// Riot suppresses a beam's ribbon when its primitive also names a mesh. Because a beam
@@ -262,6 +270,8 @@ namespace AssetsManager.Views.Models.Viewer
     }
 
     public sealed record VfxProjectionDefinition(float YRange = 5f, float Fading = 200f);
+
+    public sealed record VfxEmissionMeshDefinition(string MeshPath, float Scale = 1f, bool UseNormal = true);
 
     public sealed record VfxSystemAuthoredFeatures(
         bool HasMaterialOverrides = false,
@@ -315,7 +325,8 @@ namespace AssetsManager.Views.Models.Viewer
         byte StencilReference = VfxAuthoredDefaults.StencilReference,
         uint StencilReferenceId = 0,
         bool WriteAlphaOnly = false,
-        bool SortEmittersByPosition = false)
+        bool SortEmittersByPosition = false,
+        bool FlipWinding = false)
     {
         public static readonly VfxEmitterRenderState Default = new(
             0,
@@ -338,16 +349,14 @@ namespace AssetsManager.Views.Models.Viewer
     /// <summary>Riot's screen-space particle distortion stage (heat haze/refraction).</summary>
     public sealed record VfxDistortionDefinition(float Strength, int Mode, string NormalMapTexturePath);
 
-    /// <summary>The authored repeating emission window, relative to the first emission.</summary>
-    public sealed record VfxEmissionPeriod(float Length, float Active)
+    /// <summary>The authored emission window on the system clock; either field may be absent.</summary>
+    public sealed record VfxEmissionPeriod(float? Length, float? Active)
     {
         public static VfxEmissionPeriod FromAuthored(float? length, float? active)
-            => length is { } seconds && seconds > 0f
-                ? new(seconds, Math.Clamp(active ?? seconds, 0f, seconds))
-                : null;
+            => length.HasValue || active.HasValue ? new(length, active) : null;
 
         public bool IsActive(float seconds)
-            => seconds < 0f || seconds % Length <= Active;
+            => Active is not { } active || active > (Length is { } length ? seconds % length : seconds);
     }
 
     public sealed record VfxFlexShapeDefinition(
@@ -442,7 +451,11 @@ namespace AssetsManager.Views.Models.Viewer
     {
         None = 0,
         Importance = 1,
-        Colorblind = 2
+        Colorblind = 2,
+        Never = 3,
+        Spectator = 4,
+        HudLayer = 5,
+        NoRate = 6
     }
 
     /// <summary>

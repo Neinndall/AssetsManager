@@ -5,15 +5,18 @@ namespace AssetsManager.Services.Viewer.Rendering
 {
     /// <summary>
     /// A particle renderer whose frame was already prepared (soft-depth grab done). The Studio drives
-    /// every participant through the same phases so all colour draws land before any renderer captures
-    /// the frame used by distortion, keeping one global particle pass across independent owners.
+    /// every participant through early distortion, under colour, late distortion and over colour,
+    /// keeping captures and draws in the same global order across independent owners.
     /// </summary>
     internal interface IPreparedParticlePass
     {
         IDisposable BeginPreparedRenderBatch();
+        void CapturePreparedEarlyDistortionFrame() { }
+        void RenderPreparedEarlyDistortionPass() { }
         void RenderPreparedColorPass();
         void CapturePreparedDistortionFrame();
         void RenderPreparedDistortionPass();
+        void RenderPreparedPostColorPass() { }
     }
 
     internal static class PreparedParticlePasses
@@ -31,11 +34,17 @@ namespace AssetsManager.Services.Viewer.Rendering
                 foreach (IPreparedParticlePass pass in passes)
                     batches.Add(pass.BeginPreparedRenderBatch());
                 foreach (IPreparedParticlePass pass in passes)
+                    pass.CapturePreparedEarlyDistortionFrame();
+                foreach (IPreparedParticlePass pass in passes)
+                    pass.RenderPreparedEarlyDistortionPass();
+                foreach (IPreparedParticlePass pass in passes)
                     pass.RenderPreparedColorPass();
                 foreach (IPreparedParticlePass pass in passes)
                     pass.CapturePreparedDistortionFrame();
                 foreach (IPreparedParticlePass pass in passes)
                     pass.RenderPreparedDistortionPass();
+                foreach (IPreparedParticlePass pass in passes)
+                    pass.RenderPreparedPostColorPass();
             }
             finally
             {

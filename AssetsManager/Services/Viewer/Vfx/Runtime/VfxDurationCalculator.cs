@@ -32,7 +32,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             if (emitter is null) return 0;
             float[] authoredValues = emitter.ParticleLifetime.Values is { Length: > 0 } values
-                ? values.Append(emitter.ParticleLifetime.Constant).ToArray()
+                ? values
                 : new[] { emitter.ParticleLifetime.Constant };
             float[] probabilityValues = ProbabilityValues(emitter.ParticleLifetime.Prob);
             double[] possibleLifetimes = authoredValues
@@ -65,10 +65,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             foreach (VfxEmitterDefinition emitter in system.Emitters)
             {
                 if (emitter.Disabled) continue;
-                double emitting = emitter.EmitterLifetime ?? EndlessSpan;
+                double lifetime = GetMaximumParticleLifetime(emitter);
+                if (double.IsPositiveInfinity(lifetime)) lifetime = EndlessSpan;
                 span = Math.Max(
                     span,
-                    emitter.TimeBeforeFirstEmission + emitting + GetMaximumParticleLifetime(emitter));
+                    LastBirth(emitter, emitter.TimeBeforeFirstEmission + EndlessSpan) + lifetime);
             }
             return Math.Min(span, MaximumSpan);
         }
@@ -109,16 +110,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             double systemEnd = 0;
             foreach (VfxEmitterDefinition emitter in system.Emitters.Where(item => !item.Disabled))
             {
+                if (VfxPlaybackRuntime.EmissionEnd(emitter) is { } end && emitter.TimeBeforeFirstEmission > end) continue;
                 double particleLifetime = GetMaximumParticleLifetime(emitter);
                 if (double.IsInfinity(particleLifetime))
                 {
                     path.Remove(system);
                     return double.PositiveInfinity;
                 }
-                if (emitter.EmitterLifetime is { } life && emitter.TimeBeforeFirstEmission > life) continue;
-                double lastEmission = emitter.IsSingleParticle
-                    ? emitter.TimeBeforeFirstEmission
-                    : Math.Max(emitter.TimeBeforeFirstEmission, emitter.EmitterLifetime ?? 0);
+                double lastEmission = LastBirth(emitter, emitter.TimeBeforeFirstEmission);
                 double emitterEnd = lastEmission + particleLifetime;
 
                 if (depth < MaximumGraphDepth && emitter.ChildParticleSet is { Children.Count: > 0 } childSet)
@@ -152,6 +151,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
             path.Remove(system);
             return systemEnd;
+        }
+
+        private static double LastBirth(VfxEmitterDefinition emitter, double endlessEnd)
+        {
+            if (emitter.IsSingleParticle) return emitter.TimeBeforeFirstEmission;
+            double end = VfxPlaybackRuntime.EmissionEnd(emitter) ?? endlessEnd;
+            if (emitter.EmissionPeriod is { Length: null, Active: { } active }) end = Math.Min(end, active);
+            return Math.Max(end, 0d);
         }
     }
 }

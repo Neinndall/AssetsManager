@@ -52,7 +52,7 @@ public sealed class VfxProjectionTests
     [Fact]
     public void SimpleFootprintUsesXAndYItsRotationStreamAndWhiteModulation()
     {
-        var emitter = ReadEmitter(false) with { AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasLegacySimple: true) };
+        var emitter = ReadEmitter(false) with { IsSimpleEmitter = true, AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasLegacySimple: true) };
         var source = Instance();
         source[9] = MathF.PI / 12f;
         float[] decal = new VfxProjectionGeometry().Prepare(emitter, source).ToArray();
@@ -160,6 +160,7 @@ public sealed class VfxProjectionTests
                 new BinTreeProperty[] { new BinTreeF32(Fnv1a.HashLower("mYRange"), 20f),
                     new BinTreeF32(Fnv1a.HashLower("mFading"), 80f) }) } : Array.Empty<BinTreeProperty>();
         var emitter = new BinTreeStruct(0, Fnv1a.HashLower("VfxEmitterDefinitionData"), new BinTreeProperty[] {
+            new BinTreeBitBool(Fnv1a.HashLower("isSingleParticle"), true),
             new BinTreeStruct(Fnv1a.HashLower("primitive"), Fnv1a.HashLower(primitiveClass), properties) });
         var obj = new BinTreeObject("Effects/Projection", "VfxSystemDefinitionData", new BinTreeProperty[] {
             new BinTreeContainer(Fnv1a.HashLower("complexEmitterDefinitionData"), BinPropertyType.Struct,

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
@@ -12,11 +13,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 {
     internal static partial class VfxSystemParser
     {
-        private static VfxEmitterDefinition ParseEmitter(BinTreeStruct s, bool isSimpleEmitter)
+        private static VfxEmitterDefinition ParseEmitter(BinTreeStruct s, bool isSimpleEmitter, bool hudLayer = false)
         {
             var p = s.Properties;
 
-            var legacy = Get(p, F_legacySimple) as BinTreeStruct;
+            var authoredLegacy = Get(p, F_legacySimple) as BinTreeStruct;
+            var legacy = isSimpleEmitter
+                ? Get(p, F_legacySimple) as BinTreeStruct ?? new BinTreeStruct(0, 0, Array.Empty<BinTreeProperty>())
+                : null;
             var legacyBirthScale = legacy is null ? null : ReadCurveF(legacy.Properties, F_legacyBirthScale, 1f);
             Vector2 legacyScaleBias = legacy is null
                 ? Vector2.One
@@ -287,21 +291,34 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 GetU8(p, F_colorLookUpY),
                 maxInclusive: 3,
                 fallback: VfxAuthoredDefaults.ColorLookUpTypeY);
-            byte lingerType = NormalizeEnumByte(GetU8(p, F_particleLingerType), 2, 0);
+            byte lingerType = (byte)Math.Min(GetU8(p, F_particleLingerType) ?? 0, 3);
             byte uvMode = NormalizeEnumByte(GetU8(p, F_uvMode), 5, 0);
             VfxEmissionSurfaceDefinition emissionSurface = ReadEmissionSurface(p);
             uint customMaterialPathHash = ReadCustomMaterialPathHash(p);
             byte importance = (byte)(GetU8(p, F_importance) ?? VfxAuthoredDefaults.Importance);
+            VfxCurveF rate = ReadCurveF(p, F_rate) ?? VfxCurveF.Zero;
+            VfxCurve2? velocityRate = ReadCurve2(p, F_rateByVelocityFunction);
+            if (velocityRate?.Constant == Vector2.Zero) velocityRate = null;
+            bool noRate = !isSingle && Get(p, F_flexRate) is not BinTreeStruct && !HasElements(p, F_materialOverrideDefinitions)
+                && VfxPlaybackRuntime.CurveMaximum(rate) == 0f;
             byte colorblindVisibility = (byte)(GetU8(p, F_colorblindVisibility) ?? VfxAuthoredDefaults.ColorblindVisibility);
-            VfxCullReason culled = importance == 4
-                ? VfxCullReason.Importance
-                : (!isSimpleEmitter && colorblindVisibility == 2 ? VfxCullReason.Colorblind : VfxCullReason.None);
-            bool disabled = GetBool(p, F_disabled) || culled != VfxCullReason.None;
+            bool off = GetBool(p, F_disabled);
+            int policy = Get(p, F_filtering) is BinTreeStruct filteringData
+                ? GetU8(filteringData.Properties, F_spectatorPolicy) ?? 0 : 0;
+            VfxCullReason culled = off ? VfxCullReason.None
+                : policy is not (0 or 1) ? VfxCullReason.Spectator
+                : isSimpleEmitter && hudLayer ? VfxCullReason.HudLayer
+                : noRate ? VfxCullReason.NoRate
+                : importance == 4 ? VfxCullReason.Importance
+                : !isSimpleEmitter && colorblindVisibility == 2 ? VfxCullReason.Colorblind
+                : !isSimpleEmitter && colorblindVisibility > 2 ? VfxCullReason.Never
+                : VfxCullReason.None;
+            bool disabled = off || culled != VfxCullReason.None;
 
-            return new VfxEmitterDefinition(
+            var definition = new VfxEmitterDefinition(
                 Name: GetString(p, F_emitterName) ?? string.Empty,
-                Rate: ReadCurveF(p, F_rate) ?? VfxCurveF.Zero,
-                RateByVelocityFunction: ReadCurve2(p, F_rateByVelocityFunction),
+                Rate: rate,
+                RateByVelocityFunction: velocityRate,
                 MaximumRateByVelocity: GetOptionalF32(p, F_maximumRateByVelocity),
                 HasVariableStartTime: GetBool(p, F_hasVariableStartTime),
                 ParticleLifetime: ReadCurveF(p, F_particleLife, 3f) ?? VfxCurveF.Const(3f),
@@ -373,7 +390,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     StencilReference: stencilReference,
                     StencilReferenceId: AsU32(Get(p, F_stencilReferenceId)) ?? 0u,
                     WriteAlphaOnly: GetBool(p, F_writeAlphaOnly),
-                    SortEmittersByPosition: GetBool(p, F_sortEmittersByPos)),
+                    SortEmittersByPosition: GetBool(p, F_sortEmittersByPos),
+                    FlipWinding: GetBool(p, F_flipWinding)),
                 MiscRenderFlags: (byte)(GetU8(p, F_miscRenderFlags) ?? 0),
                 MeshRenderFlags: (byte)(GetU8(p, F_meshRenderFlags) ?? VfxAuthoredDefaults.MeshRenderFlags),
                 UseNavmeshMask: GetBool(p, F_useNavmeshMask),
@@ -447,9 +465,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 LegacyOrientation: legacyOrientation,
                 LegacyScaleUpFromOrigin: legacyScaleUpFromOrigin,
                 LegacyLockedToEmitter: legacyLockedToEmitter,
-                LegacyHasFixedOrbit: legacyHasFixedOrbit,
-                LegacyFixedOrbitType: legacyFixedOrbitType,
-                LegacyParticleBind: legacyParticleBind,
+                LegacyHasFixedOrbit: authoredLegacy is not null && GetBool(authoredLegacy.Properties, F_legacyHasFixedOrbit),
+                LegacyFixedOrbitType: authoredLegacy is not null ? NormalizeEnumByte(GetU8(authoredLegacy.Properties, F_legacyFixedOrbitType), 5, 1) : legacyFixedOrbitType,
+                LegacyParticleBind: authoredLegacy is not null ? GetVec2(authoredLegacy.Properties, F_legacyParticleBind) ?? Vector2.Zero : legacyParticleBind,
                 DepthPushPull: GetF32(p, F_depthPushPull) ?? 0f,
                 Beam: beam,
                 Linger: linger,
@@ -472,8 +490,42 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     HasRotationOverride: HasValue(p, F_rotationOverride),
                     HasScaleOverride: HasValue(p, F_scaleOverride),
                     HasPeriodControl: HasValue(p, F_period) || HasValue(p, F_timeActiveDuringPeriod),
-                    HasLegacySimple: legacy is not null,
-                    HasTextureMultLayer: hasTextureMultLayer));
+                    HasLegacySimple: HasValue(p, F_legacySimple),
+                    HasTextureMultLayer: hasTextureMultLayer),
+                OverridesMaterials: HasElements(p, F_materialOverrideDefinitions),
+                ChanceToNotExist: isSimpleEmitter ? 0f : GetF32(p, F_chanceToNotExist) ?? 0f,
+                EmissionMesh: !isSimpleEmitter && ReadAsset(p, F_emissionMeshName, ".scb") is { } emissionMeshPath
+                    ? new VfxEmissionMeshDefinition(emissionMeshPath,
+                        GetF32(p, F_staticEmissionMeshScale) ?? 1f, GetBool(p, F_useEmissionMeshNormal, true)) : null,
+                OffsetLifetimeScaling: isSimpleEmitter ? Vector3.Zero : AsVec3(Get(p, F_offsetLifetimeScaling)) ?? Vector3.Zero,
+                OffsetLifeScalingSymmetryMode: (byte)(GetU8(p, F_offsetLifeScalingSymmetryMode) ?? 0),
+                PostRotateOrientation: !isSimpleEmitter && GetBool(p, F_hasPostRotateOrientation)
+                    ? AsVec3(Get(p, F_postRotateOrientationAxis)) ?? Vector3.Zero : null,
+                IsHudLayer: hudLayer);
+            definition = definition with { TextureMultEmitterUvScrollRate = definition.EmitterUvScrollRate,
+                IsGroundLayer = definition.RenderState.RenderPhase == 5 ||
+                (definition.RenderState.RenderPhase == 7 && !hudLayer && definition.IsGroundLayer) };
+            if (!isSimpleEmitter) return definition;
+            return definition with
+            {
+                LegacyBirthScale = legacyBirthScale ?? VfxCurveF.Const(1f),
+                LegacyScale = legacyScaleCurve ?? VfxCurveF.Const(1f),
+                LegacyRotation = legacyRotationCurve ?? VfxCurveF.Zero,
+                BirthScale = ScalarSizeCurve(legacyBirthScale ?? VfxCurveF.Const(1f)),
+                ScaleOverLife = ScalarScaleCurve(legacyScaleCurve ?? VfxCurveF.Const(1f)),
+                BirthRotation = ScalarRotationCurve(ReadCurveF(legacy.Properties, F_legacyBirthRotation) ?? VfxCurveF.Zero),
+                BirthRotationalVelocity = ScalarRotationCurve(ReadCurveF(legacy.Properties, F_legacyBirthRotVel) ?? VfxCurveF.Zero),
+                BirthAcceleration = null, AccelerationOverLife = null, VelocityOverLife = null,
+                Acceleration = null, BirthDrag = null, DragOverLife = null, BindWeight = null,
+                EmissionSurface = null, TranslationOverride = null, RotationOverride = null, ScaleOverride = null,
+                RateByVelocityFunction = null, HasVariableStartTime = false, IsEmitterSpace = false,
+                ParticleLingerType = 0, Linger = null,
+                RenderState = definition.RenderState with { ClampUvScroll = legacyUvScroll == Vector2.Zero && definition.RenderState.ClampUvScroll },
+                EmitterUvScrollRate = GetVec2(p, F_emitterUvScroll) ?? Vector2.Zero,
+                TextureMultEmitterUvScrollRate = GetVec2(p, F_emitterUvScroll) ?? Vector2.Zero,
+                BirthUvScrollRateCurve = legacyUvScroll == Vector2.Zero ? birthUvScrollRate : VfxCurve2.Const(legacyUvScroll),
+                UvScrollRate = legacyUvScroll == Vector2.Zero ? definition.UvScrollRate : legacyUvScroll
+            };
         }
     }
 }

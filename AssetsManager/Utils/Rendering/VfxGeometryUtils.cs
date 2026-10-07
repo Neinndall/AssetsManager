@@ -19,7 +19,7 @@ namespace AssetsManager.Utils.Rendering
         public static bool ShouldDirectionOrientBillboard(VfxEmitterDefinition definition)
         {
             if (definition is null || !definition.IsDirectionOriented) return false;
-            if (definition.AuthoredFeatures?.HasLegacySimple == true) return false;
+            if (definition.IsSimpleEmitter) return false;
             return definition.PrimitiveKind is VfxPrimitiveKind.CameraQuad or VfxPrimitiveKind.CameraUnitQuad;
         }
 
@@ -89,9 +89,8 @@ namespace AssetsManager.Utils.Rendering
 
         public static float ResolveEmitterPhase(VfxEmitterDefinition definition, float age)
         {
-            float lifetime = definition?.EmitterLifetime ?? 0f;
-            if (lifetime <= 0f || !float.IsFinite(lifetime) || !float.IsFinite(age)) return 0f;
-            return Math.Clamp(age / lifetime, 0f, 1f);
+            return definition is null || !float.IsFinite(age) ? 0f
+                : AssetsManager.Services.Viewer.Vfx.Runtime.VfxPlaybackRuntime.EmitterPhase(definition, age);
         }
     }
 }

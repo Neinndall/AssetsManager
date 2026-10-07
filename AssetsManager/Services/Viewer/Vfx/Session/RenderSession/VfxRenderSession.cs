@@ -82,6 +82,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private readonly List<VfxRenderQueueEntry> _renderQueue = new();
         private readonly List<VfxRenderQueueEntry> _shadedRenderQueue = new();
         private readonly List<VfxRenderQueueEntry> _distortionRenderQueue = new();
+        private readonly List<VfxRenderQueueEntry> _earlyDistortionRenderQueue = new();
+        private readonly List<VfxRenderQueueEntry> _postColorRenderQueue = new();
         private readonly Dictionary<object, int> _renderGraphOrders = new();
         private readonly Dictionary<VfxPlaybackGraphRuntime, Matrix4x4> _graphPlacements = new();
         private readonly List<(double Time, uint EffectKey)> _scheduledEffectKills = new();

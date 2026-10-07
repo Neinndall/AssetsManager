@@ -105,6 +105,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             // LTK quad/ribbon preludes draw in WORLD; mesh preludes draw in mirrored ENGINE_WORLD.
             bool mirrored = mesh && (emitter.Def.PrimitiveKind != VfxPrimitiveKind.AttachedMesh ||
                 _ownerWorldTransform.GetDeterminant() < 0f);
+            if (mesh && emitter.Def.RenderState?.FlipWinding == true) mirrored = !mirrored;
             _gl.FrontFace(mirrored ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
         }
 

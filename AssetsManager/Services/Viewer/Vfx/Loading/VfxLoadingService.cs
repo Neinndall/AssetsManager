@@ -354,8 +354,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 transform,
                 seed,
                 log,
-                ownerSceneContext,
-                applyDefinitionTransform: true);
+                ownerSceneContext);
 
         internal VfxPlaybackRuntime PreparePlaybackAtWorldTransform(
             VfxSystemDefinition definition,
@@ -370,8 +369,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 worldTransform,
                 seed,
                 log,
-                ownerSceneContext,
-                applyDefinitionTransform: false);
+                ownerSceneContext);
 
         private VfxPlaybackRuntime PreparePlaybackCore(
             VfxSystemDefinition definition,
@@ -379,16 +377,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             Matrix4x4 transform,
             int seed,
             LogService log,
-            VfxOwnerSceneContext ownerSceneContext,
-            bool applyDefinitionTransform)
+            VfxOwnerSceneContext ownerSceneContext)
         {
             ArgumentNullException.ThrowIfNull(definition);
             definition = ResolveMeshAvailability(definition, searchDirectory);
             var runtime = new VfxPlaybackRuntime(seed);
-            Matrix4x4 resolvedTransform = applyDefinitionTransform
-                ? definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * transform
-                : transform;
-            runtime.SetSystem(definition, resolvedTransform);
+            runtime.SetSystem(definition, transform);
 
             PrepareRuntimeResources(runtime, searchDirectory, log, ownerSceneContext);
 
@@ -612,8 +606,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     childTransform,
                     childSeed,
                     log,
-                    ownerSceneContext,
-                    applyDefinitionTransform: false));
+                    ownerSceneContext));
             IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> emissionSurfaces =
                 PrepareEmissionSurfaces(resolvedSystems.Values, searchDirectory, log);
             if (emissionSurfaces.Count > 0)
@@ -632,9 +625,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 foreach (VfxEmitterDefinition emitter in definition?.Emitters ?? Array.Empty<VfxEmitterDefinition>())
                 {
                     VfxEmissionSurfaceDefinition surface = emitter?.EmissionSurface;
-                    if (surface is null) continue;
-                    IVfxEmissionSurfaceSampler sampler = PrepareEmissionSurface(surface, searchDirectory, log);
-                    if (sampler is not null) surfaces.TryAdd(emitter, sampler);
+                    IVfxEmissionSurfaceSampler sampler = surface is null ? null : PrepareEmissionSurface(surface, searchDirectory, log);
+                    IVfxEmissionSurfaceSampler staticSampler = null;
+                    if (emitter?.EmissionMesh is { } emissionMesh &&
+                        _resources.ResolveMesh(emissionMesh.MeshPath, searchDirectory) is { } staticMesh)
+                        staticSampler = new VfxStaticEmissionMeshSampler(staticMesh, emissionMesh.Scale);
+                    if (staticSampler is not null) surfaces.TryAdd(emitter, new VfxEmitterEmissionSampler(staticSampler, sampler));
+                    else if (sampler is not null) surfaces.TryAdd(emitter, sampler);
                 }
             }
             return surfaces;

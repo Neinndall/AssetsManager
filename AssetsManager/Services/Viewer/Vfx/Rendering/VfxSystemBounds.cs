@@ -40,7 +40,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             ArgumentNullException.ThrowIfNull(system);
 
-            Matrix4x4 world = system.Transform.GetValueOrDefault(Matrix4x4.Identity);
+            Matrix4x4 world = system.HudLayer ? Matrix4x4.Identity : system.Transform.GetValueOrDefault(Matrix4x4.Identity);
             Matrix4x4 worldBasis = world;
             worldBasis.M41 = 0f;
             worldBasis.M42 = 0f;
@@ -51,18 +51,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             IReadOnlyList<Vector3> rigStops = RigStops(rigSettings);
             foreach (Vector3 stop in rigStops)
             {
-                Vector3 stood = Vector3.Transform(stop + Vector3.UnitY * rigSettings.Height, world);
+                Vector3 stood = stop + Vector3.UnitY * rigSettings.Height;
+                if (system.HudLayer) stood += system.Transform?.Translation ?? Vector3.Zero;
                 Grow(ref min, ref max, stood - new Vector3(StandingReach));
                 Grow(ref min, ref max, stood + new Vector3(StandingReach));
             }
 
-            Vector3 rootOrigin = Vector3.Transform(
-                rigStops[0] + Vector3.UnitY * rigSettings.Height,
-                world);
+            Vector3 rootOrigin = rigStops[0] + Vector3.UnitY * rigSettings.Height;
+            if (system.HudLayer) rootOrigin += system.Transform?.Translation ?? Vector3.Zero;
             foreach (VfxEmitterDefinition emitter in system.Emitters)
             {
                 if (emitter.Disabled) continue;
-                GrowEmitter(ref min, ref max, emitter, worldBasis, rootOrigin);
+                GrowEmitter(ref min, ref max, emitter, worldBasis, world.Translation, rootOrigin);
             }
 
             if (!VectorMathUtils.IsFinite(min) || !VectorMathUtils.IsFinite(max))
@@ -98,9 +98,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             VfxRigSettings rigSettings)
         {
             ArgumentNullException.ThrowIfNull(system);
-            Matrix4x4 world = system.Transform.GetValueOrDefault(Matrix4x4.Identity);
             Vector3 origin = RigStops(rigSettings)[0];
-            return Vector3.Transform(origin, world);
+            return origin + (system.HudLayer ? system.Transform?.Translation ?? Vector3.Zero : Vector3.Zero);
         }
 
         internal static VfxOrthographicFrame FrameOrthographic(
@@ -144,21 +143,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             ref Vector3 max,
             VfxEmitterDefinition emitter,
             Matrix4x4 worldBasis,
+            Vector3 definitionOffset,
             Vector3 rootOrigin)
         {
             Vector3 rotation = emitter.RotationOverride.GetValueOrDefault() * (MathF.PI / 180f);
-            Matrix4x4 frame =
+            Matrix4x4 overrides =
                 Matrix4x4.CreateScale(emitter.ScaleOverride ?? Vector3.One) *
                 Matrix4x4.CreateRotationZ(rotation.Z) *
                 Matrix4x4.CreateRotationX(rotation.X) *
-                Matrix4x4.CreateRotationY(rotation.Y) *
-                worldBasis *
-                Matrix4x4.CreateTranslation(rootOrigin);
+                Matrix4x4.CreateRotationY(rotation.Y);
+            Matrix4x4 frame = worldBasis * overrides;
+            frame.Translation = rootOrigin + emitter.TranslationOverride.GetValueOrDefault()
+                + Vector3.TransformNormal(definitionOffset, overrides);
 
             Vector3 origin = emitter.EmitterPosition.Sample(0f);
-            Vector3 offset = origin + emitter.TranslationOverride.GetValueOrDefault();
+            Vector3 offset = origin;
 
-            GrowCross(ref min, ref max, origin, frame);
+            GrowCross(ref min, ref max, Vector3.Zero, frame);
             GrowPoint(ref min, ref max, offset, frame);
             GrowCross(ref min, ref max, offset, frame);
 

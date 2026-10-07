@@ -8,8 +8,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
     {
         internal sealed record EmitterSnapshot(
             Vector3 BasePos,
-            Vector3? StepStartBasePos,
-            Vector3 FieldBasePos,
             Vector3 SystemOrigin,
             Vector3 SystemTarget,
             Vector3 PlacementRight,
@@ -17,6 +15,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             Vector3 PlacementForward,
             float SharedRandom,
             bool SharedRandomRolled,
+            bool Absent,
             float EmittedThrough,
             float Age,
             float FinishedAt,
@@ -58,8 +57,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 int[] noiseFired = (int[])state.NoiseFired.Clone();
                 emitters[index] = new EmitterSnapshot(
                     state.BasePos,
-                    state.StepStartBasePos,
-                    state.FieldBasePos,
                     state.SystemOrigin,
                     state.SystemTarget,
                     state.PlacementRight,
@@ -67,6 +64,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     state.PlacementForward,
                     state.SharedRandom,
                     state.SharedRandomRolled,
+                    state.Absent,
                     state.EmittedThrough,
                     state.Age,
                     state.FinishedAt,
@@ -80,7 +78,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     particles);
                 // Conservative accounting keeps the session checkpoint budget bounded without
                 // depending on CLR struct layout details.
-                bytes += 192L + particles.LongLength * 256L + noiseLast.LongLength * sizeof(float) +
+                bytes += 192L + particles.LongLength * 512L + noiseLast.LongLength * sizeof(float) +
                          noiseFired.LongLength * sizeof(int);
             }
 
@@ -129,16 +127,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 EmitterState state = _emitters[index];
                 EmitterSnapshot saved = snapshot.Emitters[index];
                 state.BasePos = saved.BasePos;
-                state.StepStartBasePos = saved.StepStartBasePos;
-                state.FieldBasePos = saved.FieldBasePos;
                 state.SystemOrigin = saved.SystemOrigin;
                 state.SystemOrientation = systemOrientation;
+                state.PlacementTransform = EmitterPlacement(state.Def);
                 state.SystemTarget = saved.SystemTarget;
                 state.PlacementRight = saved.PlacementRight;
                 state.PlacementUp = saved.PlacementUp;
                 state.PlacementForward = saved.PlacementForward;
                 state.SharedRandom = saved.SharedRandom;
                 state.SharedRandomRolled = saved.SharedRandomRolled;
+                state.Absent = saved.Absent;
                 state.EmittedThrough = saved.EmittedThrough;
                 state.Age = saved.Age;
                 state.FinishedAt = saved.FinishedAt;

@@ -26,8 +26,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public bool IsVisible { get; set; } = true;
             public Vector3 BasePos;                 // world spawn origin (placement + emitterPosition)
             /// <summary>The spawn origin where the previous step ended, which a step's births spread from.</summary>
-            internal Vector3? StepStartBasePos;
-            internal Vector3 FieldBasePos;          // emitterPosition under the frame basis, excluding translationOverride
             public Vector3 SystemOrigin, SystemTarget;
             /// <summary>The system's world turn without scale, which turns a beam's local-space end offsets.</summary>
             internal Matrix4x4 SystemOrientation = Matrix4x4.Identity;
@@ -56,6 +54,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public object PendingColorGradient;
             internal float SharedRandom;
             internal bool SharedRandomRolled;
+            internal bool Absent;
+            internal Matrix4x4 DefinitionTransform = Matrix4x4.Identity;
+            internal bool HudLayer;
             internal float EmittedThrough;
             internal float Age;                     // emitter age (seconds)
             internal float FinishedAt = -1f;
@@ -171,10 +172,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         internal struct Particle
         {
-            public Vector3 Pos, Vel, Travel, BirthOrbitalVelocity, BirthDrag;
+            public Vector3 Pos, Vel, Travel, BirthOrbitalVelocity, BirthDrag, BirthAcceleration;
+            public Vector3 LocalPosition, BirthAnchor, BoundOffset, Placed, Drift, InitialRotation;
             public Vector3 AnalyticTerminal, AnalyticOffset;
             public Matrix4x4 BirthFrame;
-            public Quaternion SpawnRotation;
             public float Age, Life;
             public uint Serial;
             public Vector3 TrailTiling;
@@ -185,13 +186,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public Vector3 RotationalVelocity, RotationalAcceleration;
             public float RangeRandom;
             public Vector2 BirthUvOffset, BirthUvScrollRate;
-            public Vector2 IntegratedUvOffset;
             public Vector2 TextureMultBirthUvOffset, TextureMultBirthUvScrollRate;
-            public Vector2 IntegratedTextureMultUvOffset;
-            public float BirthUvRotateRate, IntegratedUvRotation;
-            public float TextureMultBirthUvRotateRate, IntegratedTextureMultUvRotation;
+            public float BirthUvRotateRate;
+            public float TextureMultBirthUvRotateRate;
             public float LingerFrom;
-            public float Rot, RotVel;
             public float StartFrame, FrameRate;
         }
     }

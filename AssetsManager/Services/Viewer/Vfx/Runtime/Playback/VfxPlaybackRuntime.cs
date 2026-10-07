@@ -27,6 +27,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private VfxLtkRandom _rng;
         private float? _pinnedBirthChance;
         private uint _particleSerial;
+        private float? _driverTime;
+        private float SimulationTime => _driverTime ?? CurrentTime;
         public float CurrentTime { get; private set; }
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private Matrix4x4 _orientationRootTransform = Matrix4x4.Identity;
@@ -91,8 +93,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 float emitterT = EmitterTime(es);
                 Vector3 nextBasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(emitterT), placement);
                 es.BasePos = nextBasePos;
-                es.FieldBasePos = EmitterFieldPosition(es.Def, emitterT);
-                es.SystemOrigin = nextOrigin;
+                es.SystemOrigin = nextOrigin + (_definition?.HudLayer == true ? _definition.Transform?.Translation ?? Vector3.Zero : Vector3.Zero);
                 es.SystemOrientation = systemOrientation;
                 es.SystemTarget = Vector3.Transform(new Vector3(600f, 0f, 0f), worldTransform);
                 es.PlacementRight = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitX, placement), Vector3.UnitX);
@@ -123,7 +124,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         internal void SetInitialRandomState(uint state)
         {
             _initialRandomState = state == 0 ? new VfxLtkRandom(_seed).State : state;
-            _rng.State = _initialRandomState;
+            _rng = VfxLtkRandom.FromState(_initialRandomState);
+            ResetRunState();
         }
 
         internal void SetPinnedBirthChance(float? chance)
@@ -200,9 +202,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 var emitterState = new EmitterState
                 {
                     Def = e,
+                    DefinitionTransform = system.HudLayer ? Matrix4x4.Identity : system.Transform ?? Matrix4x4.Identity,
+                    HudLayer = system.HudLayer,
                     SourceOrder = emitterIndex,
                     BasePos = Vector3.Transform(e.EmitterPosition.Sample(0f), EmitterTransform(e, worldTransform)),
-                    FieldBasePos = Vector3.Transform(e.EmitterPosition.Sample(0f), EmitterFieldTransform(e, worldTransform)),
                     PlacementRight = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX),
                     PlacementUp = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY),
                     PlacementForward = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ),
@@ -265,9 +268,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 s.NoiseLast = Array.Empty<float>();
                 s.NoiseFired = Array.Empty<int>();
                 s.BasePos = Vector3.Transform(s.Def.EmitterPosition.Sample(0f), EmitterPlacement(s.Def));
-                s.StepStartBasePos = null;
-                s.FieldBasePos = EmitterFieldPosition(s.Def, 0f);
-                s.EmittedThrough = s.Def.TimeBeforeFirstEmission;
+                s.EmittedThrough = 0f;
+                s.Absent = s.Def.ChanceToNotExist > 0f && s.Def.ChanceToNotExist > _rng.NextUnitFloat();
                 s.Age = 0;
                 s.FinishedAt = -1f;
                 s.BurstDone = false;
@@ -307,8 +309,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         public bool IsComplete
             => _isKilled || _emitters.Count == 0 || _emitters.TrueForAll(state =>
-                (state.Def.Disabled || IsStopped || state.BurstDone ||
-                 (state.Def.EmitterLifetime is { } lifetime && state.Age > lifetime)) &&
+                (state.Def.Disabled || state.Absent || (IsStopped && state.Age > StopWaitSeconds(state.Def)) || state.BurstDone ||
+                 (EmissionEnd(state.Def) is { } lifetime && state.Age > lifetime)) &&
                 state.Particles.Count == 0);
 
         /// <summary>
@@ -351,6 +353,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 emitter.InvalidateInstances();
             }
             LiveParticleCount = 0;
+        }
+
+        internal void UpdateAtTime(float dt, float driverTime)
+        {
+            _driverTime = driverTime;
+            try { Update(dt); }
+            finally { _driverTime = null; }
         }
 
     }

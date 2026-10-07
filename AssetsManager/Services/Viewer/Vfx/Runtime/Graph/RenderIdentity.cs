@@ -21,7 +21,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             Matrix4x4 effectiveLocalTransform = depth == 0
                 ? Matrix4x4.Identity
-                : ComposeChildTransform(definition.Transform.GetValueOrDefault(Matrix4x4.Identity), localTransform);
+                : localTransform;
             VfxPlaybackRuntime runtime = _runtimeFactory(
                 definition,
                 effectiveLocalTransform * _rootTransform,

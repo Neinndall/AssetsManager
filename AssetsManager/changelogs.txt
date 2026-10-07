@@ -513,6 +513,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Corrected particle emission timing, local motion, child placement, mesh emission and distortion ordering.
   - Explorer / Restored reading and comparison of current PBE material BINs with wide name hashes.
   - Hash Guessing Lab / Fixed excessive memory use when WAD Grep encounters incompatible BIN data.
   - Log / Fixed startup folding and restored the last resized height when reopening with the arrow.

@@ -88,7 +88,7 @@ public sealed class VfxSystemBoundsTests
     }
 
     [Fact]
-    public void SystemTransformMovesRigAndEmitterBoundsTogether()
+    public void DefinitionTransformMovesEmitterBoundsWhileRigStaysAtItsOrigin()
     {
         VfxEmitterDefinition emitter = Emitter() with
         {
@@ -105,7 +105,7 @@ public sealed class VfxSystemBoundsTests
 
         VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(system, VfxRigPreset.Still);
 
-        Assert.Equal(-50f, bounds.Min.X, precision: 4);
+        Assert.Equal(-100f, bounds.Min.X, precision: 4);
         Assert.Equal(308f, bounds.Max.X, precision: 4);
     }
 

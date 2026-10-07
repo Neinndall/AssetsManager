@@ -8,6 +8,7 @@ using AssetsManager.Utils.Rendering;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
@@ -446,6 +447,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 int passIndex = draw.PassIndex;
                 if (es.InstanceCount == 0) continue;
                 if (!es.IsVisible) continue;
+                if (!VfxRenderPhaseSemantics.Resolve(es.Def, es.HudLayer).Draws) continue;
                 if (useWireframe)
                     _gl.Disable(EnableCap.CullFace);
 

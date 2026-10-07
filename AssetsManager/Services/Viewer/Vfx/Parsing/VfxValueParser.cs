@@ -127,11 +127,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static VfxProbTable[] ReadProbTables(IReadOnlyDictionary<uint, BinTreeProperty> valueProps)
         {
             if (Get(valueProps, F_probTables) is not BinTreeContainer pc || pc.Elements.Count == 0) return null;
+            // The engine gates the entire table list on the first channel's table.
+            if (pc.Elements[0] is not BinTreeStruct { ClassHash: not 0 }) return null;
             var tables = new VfxProbTable[pc.Elements.Count];
             bool any = false;
             for (int tableIndex = 0; tableIndex < pc.Elements.Count; tableIndex++)
             {
-                if (pc.Elements[tableIndex] is not BinTreeStruct s) continue;
+                if (pc.Elements[tableIndex] is not BinTreeStruct { ClassHash: not 0 } s) continue;
 
                 // LTK treats the table itself as present even with no keys. In that case
                 // singleValue (schema default 1) is the multiplier for the whole channel.

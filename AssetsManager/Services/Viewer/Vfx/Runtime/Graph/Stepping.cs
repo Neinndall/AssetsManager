@@ -21,7 +21,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             // LTK steps the opened/root system first, then walks its child lineage recursively.
             // Each child subtree is advanced and reaped before the parent consumes this step's
             // child births, so the shared lineage budget is observed in the same depth-first order.
-            Root.Update(deltaTime);
+            Root.UpdateAtTime(deltaTime, _sourceTime);
             StepChildrenOf(Root, deltaTime);
 
             if (_pendingChildren.Count > 0)
@@ -63,7 +63,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     child.IsStopped = true;
                 }
 
-                child.Update(deltaTime);
+                child.UpdateAtTime(deltaTime, _sourceTime);
                 StepChildrenOf(child, deltaTime);
             }
 
@@ -136,7 +136,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private void SyncRenderTime(VfxPlaybackRuntime runtime)
         {
             foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+            {
+                if (emitter.RenderTime != _sourceTime) emitter.InvalidateInstances();
                 emitter.RenderTime = _sourceTime;
+            }
         }
     }
 }

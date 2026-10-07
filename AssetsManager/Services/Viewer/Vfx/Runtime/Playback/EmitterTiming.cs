@@ -9,33 +9,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
     {
         private ParticleLifecycleInfo LifecycleInfo(EmitterState state, in Particle particle, bool died)
         {
-            float particleT = ParticleAge01(particle.Age, particle.Life);
             float emitterT = EmitterTime(state);
-            Vector3 position = particle.Pos;
+            Vector3 position = DrawnPosition(particle, state);
             Vector3 orbitalAngles = particle.BirthOrbitalVelocity * particle.Age;
             Matrix4x4 orbitalTurn = OrbitalTurn(orbitalAngles);
-            if (orbitalTurn != Matrix4x4.Identity)
-            {
-                Vector3 origin = state.SystemOrigin;
-                position = origin + Vector3.Transform(position - origin, orbitalTurn);
-            }
-            if (state.Def.Acceleration is { } worldAcceleration && float.IsFinite(particle.Life))
-            {
-                float reached = particleT * particle.Life * particle.Life;
-                position += worldAcceleration.Sample(emitterT) * reached;
-            }
 
-            float legacyRoll = state.Def.LegacyRotation?.Sample(particleT) * (MathF.PI / 180f) ?? 0f;
-            Matrix4x4 basis = ParticleBasis(particle, state, particle.Travel, orbitalTurn, legacyRoll);
+            // Billboard travel alignment belongs to the draw, not to a child's inherited bearing.
+            Matrix4x4 basis = StandingBasis(particle, state, orbitalTurn, 0f);
             Matrix4x4 frame = state.Def.ParticleIsLocalOrientation
-                ? new Matrix4x4(
-                    state.PlacementRight.X, state.PlacementRight.Y, state.PlacementRight.Z, 0f,
-                    state.PlacementUp.X, state.PlacementUp.Y, state.PlacementUp.Z, 0f,
-                    state.PlacementForward.X, state.PlacementForward.Y, state.PlacementForward.Z, 0f,
-                    0f, 0f, 0f, 1f)
+                ? state.SystemOrientation
                 : VectorMathUtils.OrientationOnly(particle.BirthFrame);
-            if (orbitalTurn != Matrix4x4.Identity)
-                frame = VectorMathUtils.OrientationOnly(frame * orbitalTurn);
 
             float particleTime = died && float.IsFinite(particle.Life) ? particle.Life : particle.Age;
             return new ParticleLifecycleInfo(
@@ -54,11 +37,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         }
 
         internal static float EmitterTime(EmitterState state)
+            => EmitterPhase(state.Def, state.Age);
+
+        internal static float EmitterPhase(VfxEmitterDefinition definition, float age)
         {
-            VfxEmitterDefinition definition = state.Def;
-            return definition.EmitterLifetime is > 0f
-                ? Math.Clamp(state.Age / definition.EmitterLifetime.Value, 0f, 1f)
-                : 0f;
+            float span = MathF.Min(EmissionEnd(definition) ?? float.PositiveInfinity,
+                MathF.Min(definition.EmissionPeriod?.Length ?? float.PositiveInfinity,
+                    definition.EmissionPeriod?.Active ?? float.PositiveInfinity));
+            return float.IsPositiveInfinity(span) || MathF.Abs(span) <= 1e-6f
+                ? 0f : (age - definition.TimeBeforeFirstEmission) / span;
+        }
+
+        internal static float CurveMaximum(VfxCurveF curve)
+            => curve.Values is { Length: > 0 } values ? System.Linq.Enumerable.Max(values) : curve.Constant;
+
+        internal static float? EmissionEnd(VfxEmitterDefinition definition)
+        {
+            float? end = definition.EmitterLifetime;
+            if (definition.IsSimpleEmitter || !definition.IsSingleParticle || definition.OverridesMaterials) return end;
+            float particle = CurveMaximum(definition.ParticleLifetime);
+            if (particle == -1f) return end;
+            return end is null || end > particle + 10f ? particle : end;
         }
 
         internal static bool IsSimpleListEmitter(VfxEmitterDefinition definition)
@@ -66,7 +65,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         internal static float LingerSeconds(VfxEmitterDefinition definition)
         {
-            float lifetime = IsSimpleListEmitter(definition) ? 0f : MathF.Max(0f, definition.ParticleLifetime.Constant);
+            float lifetime = IsSimpleListEmitter(definition) ? 0f : CurveMaximum(definition.ParticleLifetime);
             return MathF.Min(lifetime + 10f, MathF.Max(0f, definition.ParticleLinger));
         }
 
@@ -74,44 +73,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             float lifetime = IsSimpleListEmitter(definition)
                 ? 0f
-                : definition.EmitterLifetime ?? float.PositiveInfinity;
+                : EmissionEnd(definition) ?? float.PositiveInfinity;
             return MathF.Min(lifetime + 10f, MathF.Max(0f, definition.EmitterLinger));
         }
 
-        private static float LingerProgress(EmitterState state)
-        {
-            if (state.FinishedAt < 0f) return 0f;
-            float seconds = LingerSeconds(state.Def);
-            return seconds > 0f ? Math.Clamp((state.Age - state.FinishedAt) / seconds, 0f, 1f) : 1f;
-        }
-
         private Matrix4x4 EmitterPlacement(VfxEmitterDefinition definition)
-            => EmitterTransform(definition, definition.IsLocalOrientation ? _worldTransform : _orientationRootTransform);
-
-        private Vector3 EmitterFieldPosition(VfxEmitterDefinition definition, float emitterT)
         {
             Matrix4x4 world = definition.IsLocalOrientation ? _worldTransform : _orientationRootTransform;
-            return Vector3.Transform(definition.EmitterPosition.Sample(emitterT), EmitterFieldTransform(definition, world));
-        }
-
-        private Matrix4x4 FieldLocalOrientation()
-        {
-            if (!Matrix4x4.Invert(_orientationRootTransform, out Matrix4x4 inverseRoot))
-                return Matrix4x4.Identity;
-            return VectorMathUtils.OrientationOnly(_worldTransform * inverseRoot);
+            if (_definition?.HudLayer == true) world.Translation += _definition.Transform?.Translation ?? Vector3.Zero;
+            return EmitterTransform(definition, world);
         }
 
         private static Matrix4x4 EmitterTransform(VfxEmitterDefinition definition, Matrix4x4 world)
         {
             Vector3 rotation = definition.RotationOverride.GetValueOrDefault() * (MathF.PI / 180f);
-            return Matrix4x4.CreateTranslation(definition.TranslationOverride.GetValueOrDefault()) *
-                EmitterFieldTransform(definition, world, rotation);
-        }
-
-        private static Matrix4x4 EmitterFieldTransform(VfxEmitterDefinition definition, Matrix4x4 world)
-        {
-            Vector3 rotation = definition.RotationOverride.GetValueOrDefault() * (MathF.PI / 180f);
-            return EmitterFieldTransform(definition, world, rotation);
+            Matrix4x4 frame = EmitterFieldTransform(definition, world, rotation);
+            Vector3 translation = Vector3.TransformNormal(definition.TranslationOverride.GetValueOrDefault(), world);
+            frame.Translation = world.Translation + translation;
+            return frame;
         }
 
         private static Matrix4x4 EmitterFieldTransform(VfxEmitterDefinition definition, Matrix4x4 world, Vector3 rotation)
@@ -121,12 +100,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         private Vector3 EmitterOdometerPosition(VfxEmitterDefinition definition, float emitterT)
         {
-            Vector3 rotation = definition.RotationOverride.GetValueOrDefault() * (MathF.PI / 180f);
-            Matrix4x4 world = definition.IsLocalOrientation ? _worldTransform : _orientationRootTransform;
-            Matrix4x4 spawnFrame = Matrix4x4.CreateScale(definition.ScaleOverride ?? Vector3.One) *
-                Matrix4x4.CreateRotationZ(rotation.Z) * Matrix4x4.CreateRotationX(rotation.X) *
-                Matrix4x4.CreateRotationY(rotation.Y) * world;
-            return Vector3.Transform(definition.EmitterPosition.Sample(emitterT), spawnFrame);
+            return Vector3.Transform(definition.EmitterPosition.Sample(emitterT), EmitterPlacement(definition));
         }
 
         private void AdvanceTrailOdometer(EmitterState state, float emitterT)

@@ -15,18 +15,17 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
     public sealed class VfxEmissionPeriodTests
     {
         [Theory]
-        [InlineData(null, 0.5f, null)]
-        [InlineData(0f, 0.5f, null)]
-        [InlineData(-2f, 0.5f, null)]
-        [InlineData(2f, null, 2f)]
-        [InlineData(2f, -1f, 0f)]
-        [InlineData(2f, 3f, 2f)]
+        [InlineData(null, 0.5f, 0.5f)]
+        [InlineData(0f, 0.5f, 0.5f)]
+        [InlineData(-2f, 0.5f, 0.5f)]
+        [InlineData(2f, null, null)]
+        [InlineData(2f, -1f, -1f)]
+        [InlineData(2f, 3f, 3f)]
         [InlineData(2f, 0.5f, 0.5f)]
-        public void ParserNormalizesAuthoredWindows(float? length, float? active, float? expectedActive)
+        public void ParserPreservesIndependentAuthoredWindows(float? length, float? active, float? expectedActive)
         {
             var emitter = ParseEmitter(length, active);
-            if (expectedActive is null) Assert.Null(emitter.EmissionPeriod);
-            else Assert.Equal(new VfxEmissionPeriod(length.Value, expectedActive.Value), emitter.EmissionPeriod);
+            Assert.Equal(new VfxEmissionPeriod(length, expectedActive), emitter.EmissionPeriod);
         }
 
         [Theory]
@@ -41,12 +40,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Theory]
         [InlineData(-0.1f, true)]
         [InlineData(0f, true)]
-        [InlineData(0.5f, true)]
+        [InlineData(0.5f, false)]
         [InlineData(0.625f, false)]
         [InlineData(1.875f, false)]
         [InlineData(2f, true)]
-        [InlineData(2.5f, true)]
-        public void ActiveWindowMatchesLtkInclusiveBoundary(float age, bool active)
+        [InlineData(2.5f, false)]
+        public void ActiveWindowMatchesLtkStrictBoundary(float age, bool active)
             => Assert.Equal(active, new VfxEmissionPeriod(2f, 0.5f).IsActive(age));
 
         [Fact]
@@ -63,13 +62,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(count, state.Particles.Count);
             Assert.True(state.Particles[0].Age > before);
             Assert.True(state.Particles[0].Pos.X > position.X);
-            Assert.Equal(state.Age, state.EmittedThrough);
+            Assert.Equal(0.375f, state.EmittedThrough);
+            runtime.Update(0.125f);
+            Assert.Equal(count, state.Particles.Count);
             runtime.Update(0.125f);
             Assert.Equal(count + 12, state.Particles.Count);
         }
 
         [Fact]
-        public void CycleStartsAtFirstEmissionAndBurstDoesNotRepeat()
+        public void CycleUsesSystemAgeAndDelayedBurstDoesNotRepeat()
         {
             var runtime = CreateRuntime(ParseEmitter(2f, 0.5f) with
             {
@@ -79,6 +80,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             for (int i = 0; i < 5; i++) runtime.Update(0.125f);
             Assert.Empty(Assert.Single(runtime.Emitters).Particles);
             runtime.Update(0.125f);
+            Assert.Empty(Assert.Single(runtime.Emitters).Particles);
+            for (int i = 0; i < 10; i++) runtime.Update(0.125f);
             int count = Assert.Single(runtime.Emitters).Particles.Count;
             Assert.Equal(100, count);
             for (int i = 0; i < 20; i++) runtime.Update(0.125f);
@@ -90,7 +93,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         {
             var runtime = CreateRuntime(ParseEmitter(2f, null));
             for (int i = 0; i < 16; i++) runtime.Update(0.125f);
-            Assert.Equal(200, Assert.Single(runtime.Emitters).Particles.Count);
+            // Each 0.125-second batch truncates to 12, and the exact cycle boundary owes zero.
+            Assert.Equal(180, Assert.Single(runtime.Emitters).Particles.Count);
         }
 
         [Fact]
@@ -132,6 +136,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             int count = state.Particles.Count;
             Assert.True(count > 0);
             for (int i = 0; i < 11; i++) graph.Update(0.125f);
+            Assert.Equal(count, state.Particles.Count);
+            graph.Update(0.125f);
             Assert.Equal(count, state.Particles.Count);
             graph.Update(0.125f);
             Assert.True(state.Particles.Count > count);
@@ -177,7 +183,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
             return Assert.Single(Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters) with
             {
-                Rate = VfxCurveF.Const(100f),
+                Rate = VfxCurveF.Const(100f), Disabled = false, Culled = VfxCullReason.None,
                 ParticleLifetime = VfxCurveF.Const(60f),
                 EmitterLifetime = null,
                 IsSingleParticle = false,

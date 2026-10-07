@@ -81,14 +81,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             for (int index = firstNewborn; index < state.Particles.Count; index++)
             {
                 Particle particle = state.Particles[index];
-                Vector3 drift = state.Def.VelocityOverLife?.Sample(emitterT) ?? Vector3.Zero;
-                drift = Vector3.TransformNormal(drift, particle.BirthFrame);
+                Vector3 drift = LifeVector(state.Def.VelocityOverLife, ParticleAge01(particle.Age, particle.Life), particle.Serial, SimulationTime);
                 Vector3 moving = particle.Vel + drift;
                 Vector3 kept = particle.Vel;
 
                 // Riot runs the field pass on a newborn with dt=0. Only the unscaled noise
                 // impulses and orbital turn can change that birth step, and the delta persists.
-                ApplyFields(fields, state, emitterT, preparedNoise, fieldOrigin, particle.Pos, particle.Serial, 0f, ref moving, ref kept);
+                ApplyFields(fields, state, emitterT, preparedNoise, fieldOrigin, particle.LocalPosition, particle.Serial, 0f, ref moving, ref kept);
                 particle.Vel = kept;
                 state.Particles[index] = particle;
             }
@@ -109,7 +108,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             if (fields is null) return;
 
             Vector3 before = moving;
-            Matrix4x4 localOrientation = FieldLocalOrientation();
+            Matrix4x4 localOrientation = state.SystemOrientation;
 
             // Riot samples every field at emitter life, not particle life, and applies
             // fields after the particle's own drag in this exact order. Acceleration fields

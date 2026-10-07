@@ -41,6 +41,9 @@ namespace AssetsManager.Utils.Rendering
             int order = leftState.RenderPass.CompareTo(rightState.RenderPass);
             if (order != 0) return order;
 
+            order = (left?.IsSimpleEmitter ?? false).CompareTo(right?.IsSimpleEmitter ?? false);
+            if (order != 0) return order;
+
             order = ResolveBlendRank(left?.BlendMode ?? 0).CompareTo(ResolveBlendRank(right?.BlendMode ?? 0));
             if (order != 0) return order;
 

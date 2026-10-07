@@ -42,7 +42,7 @@ public sealed class VfxEmissionContractTests
     }
 
     [Fact]
-    public void EmitterBirthCurvesIncludeTimeBeforeEmission()
+    public void EmitterBirthCurvesExcludeTimeBeforeEmission()
     {
         var runtime = Create(Emitter() with
         {
@@ -52,7 +52,7 @@ public sealed class VfxEmissionContractTests
         });
         runtime.Update(0.5f);
         var particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
-        Assert.InRange(particle.BirthSize.X, 4.99f, 5.01f);
+        Assert.Equal(0f, particle.BirthSize.X);
     }
 
     [Fact]
@@ -68,9 +68,10 @@ public sealed class VfxEmissionContractTests
         });
         runtime.Update(0.01f);
         var particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
-        Assert.InRange(particle.Pos.X, -0.0001f, 0.0001f);
-        Assert.InRange(particle.Pos.Y, 21.999f, 22.001f);
-        Assert.Equal(2, particle.Vel.Y, 4);
+        Assert.Equal(10f, particle.Pos.X, 4);
+        Assert.Equal(2f, particle.Pos.Y, 4);
+        Assert.Equal(Vector3.UnitX, particle.Vel);
+        Assert.Equal(2f, Vector3.TransformNormal(particle.Vel, particle.BirthFrame).Y, 4);
         Assert.Equal(new Vector3(2), particle.BirthSize);
     }
 
@@ -85,7 +86,7 @@ public sealed class VfxEmissionContractTests
     }
 
     [Fact]
-    public void BirthAccelerationIsNotIntegratedLikeLtk()
+    public void BirthAccelerationIntegratesInTheBirthFrameLikeLtk()
     {
         var runtime = Create(Emitter() with
         {
@@ -98,8 +99,8 @@ public sealed class VfxEmissionContractTests
         runtime.Update(0.1f);
 
         var particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
-        Assert.Equal(Vector3.Zero, particle.Vel);
-        Assert.Equal(bornAt, particle.Pos);
+        Assert.Equal(new Vector3(10f, 0f, 0f), particle.Vel);
+        Assert.Equal(bornAt + Vector3.UnitX, particle.Pos);
     }
 
     [Fact]
@@ -120,7 +121,7 @@ public sealed class VfxEmissionContractTests
             marked.Update(0.1f);
         }
 
-        Assert.Equal(2, plain.LiveParticleCount);
+        Assert.Equal(3, plain.LiveParticleCount);
         Assert.Equal(plain.LiveParticleCount, marked.LiveParticleCount);
     }
 
@@ -174,11 +175,12 @@ public sealed class VfxEmissionContractTests
         var runtime = new VfxPlaybackRuntime(7);
         runtime.SetSystem(new VfxSystemDefinition(1, "test", "test", new[] { first, second }), Vector3.Zero);
 
+        runtime.SetParticleCapacity(1500);
         runtime.Update(0.01f);
 
-        Assert.Equal(32768, runtime.LiveParticleCount);
-        Assert.Equal(20000, runtime.Emitters[0].Particles.Count);
-        Assert.Equal(12768, runtime.Emitters[1].Particles.Count);
+        Assert.Equal(1500, runtime.LiveParticleCount);
+        Assert.Equal(1000, runtime.Emitters[0].Particles.Count);
+        Assert.Equal(500, runtime.Emitters[1].Particles.Count);
     }
 
     [Fact]
@@ -199,8 +201,9 @@ public sealed class VfxEmissionContractTests
         var runtime = new VfxPlaybackRuntime(7);
         runtime.SetSystem(new VfxSystemDefinition(1, "test", "test", new[] { fill, blocked }), Vector3.Zero);
 
+        runtime.SetParticleCapacity(1000);
         runtime.Update(0.01f);
-        Assert.Equal(32768, runtime.LiveParticleCount);
+        Assert.Equal(1000, runtime.LiveParticleCount);
         Assert.Empty(runtime.Emitters[1].Particles);
 
         runtime.Update(0.5f);
@@ -228,8 +231,9 @@ public sealed class VfxEmissionContractTests
         var runtime = new VfxPlaybackRuntime(7);
         runtime.SetSystem(new VfxSystemDefinition(1, "test", "test", new[] { growing, expiringFill }), Vector3.Zero);
 
+        runtime.SetParticleCapacity(1000);
         runtime.Update(0.01f);
-        Assert.Equal(32768, runtime.LiveParticleCount);
+        Assert.Equal(1000, runtime.LiveParticleCount);
 
         runtime.Update(0.1f);
 
@@ -255,12 +259,13 @@ public sealed class VfxEmissionContractTests
         runtime.SetTransform(Matrix4x4.CreateTranslation(20f, 0f, 0f));
         runtime.Update(0.25f);
 
-        VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
-        Assert.Equal(0f, particle.TrailBirthDistance, precision: 5);
+        var particles = Assert.Single(runtime.Emitters).Particles;
+        Assert.Equal(2, particles.Count);
+        Assert.All(particles, particle => Assert.Equal(0f, particle.TrailBirthDistance, precision: 5));
     }
 
     [Fact]
-    public void TrailOdometerExcludesTranslationOverrideLikeLtk()
+    public void TrailOdometerIncludesTranslationOverrideTurnedBySystem()
     {
         var runtime = Create(Emitter() with
         {
@@ -278,7 +283,8 @@ public sealed class VfxEmissionContractTests
 
         VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
         Assert.Equal(2, state.Particles.Count);
-        Assert.All(state.Particles, particle => Assert.Equal(0f, particle.TrailBirthDistance, precision: 5));
+        Assert.Equal(0f, state.Particles[0].TrailBirthDistance, precision: 5);
+        Assert.Equal(MathF.Sqrt(200f), state.Particles[1].TrailBirthDistance, precision: 5);
     }
 
     [Fact]
@@ -432,6 +438,7 @@ public sealed class VfxEmissionContractTests
     {
         var runtime = Create(Emitter() with
         {
+            IsSimpleEmitter = true, IsRotationEnabled = true,
             BirthRotation = VfxCurve3.Const(new Vector3(0f, 0f, -30.7f)),
             LegacyRotation = VfxCurveF.Const(400.5f),
             AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasLegacySimple: true)
@@ -441,7 +448,7 @@ public sealed class VfxEmissionContractTests
 
         VfxPlaybackRuntime.EmitterState emitter = Assert.Single(runtime.Emitters);
         Assert.Equal(1, emitter.InstanceCount);
-        Assert.Equal(9f * (MathF.PI / 180f), emitter.Instances[9], precision: 5);
+        Assert.Equal(40f * (MathF.PI / 180f), emitter.Instances[9], precision: 5);
     }
 
     [Fact]
@@ -469,7 +476,7 @@ public sealed class VfxEmissionContractTests
             runtime.Update(0.1f);
 
         VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
-        Assert.InRange(particle.BirthRotation.X, 0.075f, 0.082f);
+        Assert.Equal(MathF.PI / 6f, particle.BirthRotation.X, 5);
     }
 
     [Theory]

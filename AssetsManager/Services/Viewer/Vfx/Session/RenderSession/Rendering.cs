@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Session
@@ -18,9 +19,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (!PrepareRenderFrame(viewProjection, view, viewMode, wireOverlay)) return;
 
             using IDisposable renderBatch = BeginPreparedRenderBatch();
+            CapturePreparedEarlyDistortionFrame();
+            RenderPreparedEarlyDistortionPass();
             RenderPreparedColorPass();
             CapturePreparedDistortionFrame();
             RenderPreparedDistortionPass();
+            RenderPreparedPostColorPass();
         }
 
         private void QueueGpuResourcePurge()
@@ -99,26 +103,38 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
             _shadedRenderQueue.Clear();
             _distortionRenderQueue.Clear();
+            _earlyDistortionRenderQueue.Clear();
+            _postColorRenderQueue.Clear();
             foreach (VfxRenderQueueEntry entry in _renderQueue)
             {
-                if (entry.Emitter.Def.DrawsAsDistortion)
-                    _distortionRenderQueue.Add(entry);
-                else
-                    _shadedRenderQueue.Add(entry);
+                VfxRenderPhases phases = VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer);
+                if (phases.EarlyDistortion) _earlyDistortionRenderQueue.Add(entry);
+                if (phases.LateDistortion) _distortionRenderQueue.Add(entry);
+                if (phases.Under) _shadedRenderQueue.Add(entry);
+                if (phases.Over) _postColorRenderQueue.Add(entry);
             }
             return _renderQueue.Count > 0;
         }
 
         public IDisposable BeginPreparedRenderBatch() => _renderer.BeginRenderBatch();
 
-        public void RenderPreparedColorPass()
+        public void CapturePreparedEarlyDistortionFrame()
         {
-            if (_preparedShaded && _shadedRenderQueue.Count > 0)
-                _renderer.Render(_shadedRenderQueue, _preparedViewProjection, _preparedView);
+            if (_preparedShaded && _earlyDistortionRenderQueue.Count > 0)
+                _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
+        }
 
-            // LTK keeps every wire twin on the particle colour layer, including the twin of a
-            // distorting solid. Overlay wires therefore belong in the captured frame and the
-            // distortion layer is drawn over them afterwards.
+        public void RenderPreparedEarlyDistortionPass()
+        {
+            if (_preparedShaded && _earlyDistortionRenderQueue.Count > 0)
+                _renderer.Render(_earlyDistortionRenderQueue, _preparedViewProjection, _preparedView);
+        }
+
+        public void RenderPreparedPostColorPass()
+        {
+            if (_preparedShaded && _postColorRenderQueue.Count > 0)
+                _renderer.Render(_postColorRenderQueue, _preparedViewProjection, _preparedView);
+            // Wire twins draw over both colour phases and the late warp.
             if (_preparedWireframe && _renderQueue.Count > 0)
             {
                 _renderer.Render(
@@ -128,6 +144,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     wireframePass: true,
                     wireframeOpacity: _preparedWireOpacity);
             }
+        }
+
+        public void RenderPreparedColorPass()
+        {
+            if (_preparedShaded && _shadedRenderQueue.Count > 0)
+                _renderer.Render(_shadedRenderQueue, _preparedViewProjection, _preparedView);
         }
 
         internal bool HasPreparedDistortionPass =>
@@ -179,6 +201,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _renderQueue.Clear();
             _shadedRenderQueue.Clear();
             _distortionRenderQueue.Clear();
+            _earlyDistortionRenderQueue.Clear();
+            _postColorRenderQueue.Clear();
             _renderGraphOrders.Clear();
             _graphPlacements.Clear();
             _scheduledEffectKills.Clear();

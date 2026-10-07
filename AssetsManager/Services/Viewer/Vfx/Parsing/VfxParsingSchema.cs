@@ -24,6 +24,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static readonly uint F_transform = VfxParsingHash.Fnv1a("transform");
         internal static readonly uint F_systemFlags = VfxParsingHash.Fnv1a("flags");
         internal static readonly uint F_buildUpTime = VfxParsingHash.Fnv1a("buildUpTime");
+        internal static readonly uint F_drawingLayer = VfxParsingHash.Fnv1a("drawingLayer");
         internal const int DefaultSystemFlags = 0xd4;
         internal const int AnalyticDragMotionFlag = 0x100;
         internal static readonly uint[] EmitterLists =
@@ -39,6 +40,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         // emitter fields
         internal static readonly uint F_emitterName   = VfxParsingHash.Fnv1a("emitterName");
         internal static readonly uint F_rate          = VfxParsingHash.Fnv1a("rate");
+        internal static readonly uint F_flexRate = VfxParsingHash.Fnv1a("flexRate");
         internal static readonly uint F_particleLife  = VfxParsingHash.Fnv1a("particleLifetime");
         internal static readonly uint F_lifetime      = VfxParsingHash.Fnv1a("lifetime");
         internal static readonly uint F_particleLinger= VfxParsingHash.Fnv1a("particleLinger");
@@ -60,6 +62,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static readonly uint F_timeBefore    = VfxParsingHash.Fnv1a("timeBeforeFirstEmission");
         internal static readonly uint F_isSingle      = VfxParsingHash.Fnv1a("isSingleParticle");
         internal static readonly uint F_disabled      = VfxParsingHash.Fnv1a("disabled");
+        internal static readonly uint F_chanceToNotExist = VfxParsingHash.Fnv1a("ChanceToNotExist");
+        internal static readonly uint F_spectatorPolicy = VfxParsingHash.Fnv1a("spectatorPolicy");
+        internal static readonly uint F_staticEmissionMeshScale = VfxParsingHash.Fnv1a("emissionMeshScale");
+        internal static readonly uint F_offsetLifetimeScaling = VfxParsingHash.Fnv1a("offsetLifetimeScaling");
+        internal static readonly uint F_offsetLifeScalingSymmetryMode = VfxParsingHash.Fnv1a("offsetLifeScalingSymmetryMode");
+        internal static readonly uint F_hasPostRotateOrientation = VfxParsingHash.Fnv1a("hasPostRotateOrientation");
+        internal static readonly uint F_postRotateOrientationAxis = VfxParsingHash.Fnv1a("postRotateOrientationAxis");
+        internal const uint F_flipWinding = 0xd1ee8634;
         internal static readonly uint F_importance    = VfxParsingHash.Fnv1a("importance");
         internal static readonly uint F_colorblindVisibility = VfxParsingHash.Fnv1a("colorblindVisibility");
         internal static readonly uint F_miscRenderFlags = VfxParsingHash.Fnv1a("miscRenderFlags");

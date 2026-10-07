@@ -15,7 +15,7 @@ internal sealed class VfxProjectionGeometry
         if (_instances.Length < source.Length)
             _instances = new float[Math.Max(source.Length, Math.Max(VfxPlaybackRuntime.InstanceStride * 64, _instances.Length * 2))];
         source.CopyTo(_instances);
-        bool simple = definition.AuthoredFeatures?.HasLegacySimple == true;
+        bool simple = definition.IsSimpleEmitter;
         for (int at = 0; at < source.Length; at += VfxPlaybackRuntime.InstanceStride)
         {
             Span<float> decal = _instances.AsSpan(at, VfxPlaybackRuntime.InstanceStride);

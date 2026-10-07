@@ -1234,7 +1234,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new BinTreeProperty[]
                 {
                     new BinTreeContainer(
-                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        Fnv1a.HashLower("simpleEmitterDefinitionData"),
                         BinPropertyType.Struct,
                         new BinTreeProperty[] { emitter })
                 });
@@ -1298,7 +1298,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new BinTreeProperty[]
                 {
                     new BinTreeContainer(
-                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        Fnv1a.HashLower("simpleEmitterDefinitionData"),
                         BinPropertyType.Struct,
                         new BinTreeProperty[] { emitter })
                 });
@@ -1340,7 +1340,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 new BinTreeProperty[]
                 {
                     new BinTreeContainer(
-                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        Fnv1a.HashLower("simpleEmitterDefinitionData"),
                         BinPropertyType.Struct,
                         new BinTreeProperty[] { emitter })
                 });
@@ -1408,7 +1408,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal((byte)0, parsed.RenderState.StencilMode);
             Assert.Equal((byte)0, parsed.RenderState.StencilReference);
             Assert.False(parsed.RenderState.HasStencil);
-            Assert.Equal((byte)0, parsed.ParticleLingerType);
+            Assert.Equal((byte)3, parsed.ParticleLingerType);
             Assert.Equal((byte)0, parsed.UvMode);
             Assert.Equal(VfxAuthoredDefaults.ColorLookUpTypeX, parsed.ColorLookUpTypeX);
             Assert.Equal(VfxAuthoredDefaults.ColorLookUpTypeY, parsed.ColorLookUpTypeY);
@@ -2555,6 +2555,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Fnv1a.HashLower("VfxEmitterDefinitionData"),
                 new BinTreeProperty[]
                 {
+                    new BinTreeBitBool(Fnv1a.HashLower("isSingleParticle"), true),
                     new BinTreeString(Fnv1a.HashLower("emitterName"), "LowSpec"),
                     new BinTreeU8(Fnv1a.HashLower("importance"), importance)
                 });
@@ -2587,6 +2588,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Fnv1a.HashLower("VfxEmitterDefinitionData"),
                 new BinTreeProperty[]
                 {
+                    new BinTreeBitBool(Fnv1a.HashLower("isSingleParticle"), true),
                     new BinTreeString(Fnv1a.HashLower("emitterName"), "Colorblind"),
                     new BinTreeU8(Fnv1a.HashLower("colorblindVisibility"), 2)
                 });

@@ -43,13 +43,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             string path = GetString(o.Properties, F_particlePath) ?? "";
 
             var emitters = new List<VfxEmitterDefinition>();
+            bool hudLayer = GetU8(o.Properties, F_drawingLayer) == 1;
             foreach (uint listHash in EmitterLists)
             {
                 if (Get(o.Properties, listHash) is not BinTreeContainer c) continue;
                 bool simple = listHash == EmitterLists[1];
                 foreach (var el in c.Elements)
                     if (el is BinTreeStruct s && s.ClassHash == EmitterClass)
-                        emitters.Add(ParseEmitter(s, simple));
+                        emitters.Add(ParseEmitter(s, simple, hudLayer));
             }
             if (Get(o.Properties, F_shimmerEmitterDefinitionData) is BinTreeContainer shimmerContainer)
             {
@@ -82,7 +83,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     HasMaterialOverrides: HasElements(o.Properties, F_materialOverrideDefinitions),
                     HasAssetRemapping: HasElements(o.Properties, F_assetRemappingTable)),
                 (systemFlags & AnalyticDragMotionFlag) != 0 ? VfxDragMotion.Analytic : VfxDragMotion.Stepped,
-                buildUpTime);
+                buildUpTime,
+                HudLayer: hudLayer);
         }
 
     }

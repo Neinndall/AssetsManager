@@ -134,7 +134,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 : 1f;
 
         private Matrix4x4 RootAuthoredWorld(VfxPlaybackGraphRuntime graph)
-            => graph.Root.Definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * _worldTransform;
+            => _worldTransform;
 
         internal static Matrix4x4 IdleFallbackTransform(
             Matrix4x4 baseTransform,

@@ -132,11 +132,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _resourceMap = resourceMap ?? throw new ArgumentNullException(nameof(resourceMap));
             _runtimeFactory = runtimeFactory ?? throw new ArgumentNullException(nameof(runtimeFactory));
             _initialSeed = seed;
-            // The root definition transform is the outermost authored VFX factor in LTK.
-            // The constructor receives the scene/world transform that follows it.
-            Matrix4x4 rootDefinitionTransform =
-                rootDefinition.Transform.GetValueOrDefault(Matrix4x4.Identity);
-            _rootTransform = rootDefinitionTransform * rootTransform;
+            // Definition transforms affect each particle, independently of its rig origin.
+            _rootTransform = rootTransform;
             _orientationRootTransform = _rootTransform;
             BuildRenderRanks(rootDefinition);
 
@@ -171,7 +168,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         }
         internal int InitialSeed => _initialSeed;
         internal bool HasEmissionSurfaceDefinitions => ResourceDefinitions.Any(static definition =>
-            definition?.Emitters?.Any(static emitter => emitter?.EmissionSurface is not null) == true);
+            definition?.Emitters?.Any(static emitter => emitter?.EmissionSurface is not null || emitter?.EmissionMesh is not null) == true);
         internal int LiveChildSystemCount => Math.Max(0, _runtimes.Count - 1) + _pendingChildren.Count;
         internal int HeldChildParticleCapacity => _heldChildParticleCapacity;
         public bool IsComplete => _pendingChildren.Count == 0 && _runtimes.Count == 1 && Root.IsComplete;

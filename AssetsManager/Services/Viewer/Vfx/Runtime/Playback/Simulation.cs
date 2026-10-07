@@ -24,9 +24,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         private void StepEmitters(float dt, Vector3 systemDelta)
         {
-            // LTK integrates and retires the entire shared pool before any emitter is
-            // allowed to consume slots for newborns. Keep the per-emitter storage, but
-            // preserve that system-wide phase ordering.
+            // Retire existing particles across the system before consuming the shared capacity.
             EnsureStepScratch();
             int availableParticleSlots = _particleCapacity;
             for (int index = 0; index < _emitters.Count; index++)
@@ -60,8 +58,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         _stepContexts[index].FieldOrigin,
                         _newbornStarts[index]);
                 }
-                state.StepStartBasePos = state.BasePos;
-                state.RenderTime = CurrentTime;
+                state.RenderTime = SimulationTime;
                 state.InvalidateInstances();
                 live += state.Particles.Count;
             }
@@ -79,23 +76,26 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private void SettleEmitter(EmitterState state, float dt)
         {
             VfxEmitterDefinition definition = state.Def;
-            bool finished = IsStopped
+            byte kind = definition.IsSimpleEmitter ? (byte)0 : definition.ParticleLingerType;
+            if (kind > 2 || (!IsStopped && kind != 2)) return;
+            bool finished = !definition.IsSimpleEmitter && definition.IsSingleParticle && !definition.OverridesMaterials
+                && state.BurstDone && state.EmittedThrough < state.Age;
+            finished |= IsStopped
                 ? state.Age > StopWaitSeconds(definition)
-                : definition.ParticleLingerType == 2 &&
-                  definition.EmitterLifetime is { } lifetime &&
+                : EmissionEnd(definition) is { } lifetime &&
                   state.Age > lifetime;
-            if (!finished || state.FinishedAt >= 0f) return;
+            if (!finished || (kind != 0 && state.FinishedAt >= 0f)) return;
 
-            state.FinishedAt = state.Age;
+            if (state.FinishedAt < 0f) state.FinishedAt = state.Age;
             float seconds = LingerSeconds(definition);
-            bool capped = definition.ParticleLingerType == 0;
+            bool capped = kind == 0;
             for (int index = 0; index < state.Particles.Count; index++)
             {
                 Particle particle = state.Particles[index];
-                particle.LingerFrom = particle.Age + dt;
+                if (particle.LingerFrom < 0f) particle.LingerFrom = particle.Age + dt;
                 particle.Life = capped
                     ? MathF.Min(particle.Life, seconds)
-                    : particle.LingerFrom + seconds;
+                    : particle.Age + dt + seconds;
                 state.Particles[index] = particle;
             }
         }
@@ -103,26 +103,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private EmitterStepContext IntegrateEmitter(EmitterState s, float dt, Vector3 systemDelta)
         {
             var d = s.Def;
-            float previousEmitterT = EmitterTime(s);
-            Vector3 previousEmitterPosition = d.EmitterPosition.Sample(previousEmitterT);
             s.Age += dt;
 
             SettleEmitter(s, dt);
             float emitterT = EmitterTime(s);
             Vector3 emitterPosition = d.EmitterPosition.Sample(emitterT);
-            Vector3 emitterPositionDelta = emitterPosition - previousEmitterPosition;
-            Vector3 previousFieldBasePos = s.FieldBasePos;
-            // LTK rides emitter-space fields on EmitterPosition under the emitter's basis, but
-            // translationOverride belongs to the spawn frame only and must not move field centres.
-            Vector3 fieldOrigin = d.IsEmitterSpace
-                ? previousFieldBasePos - systemDelta
-                : s.SystemOrigin - systemDelta;
+            Vector3 fieldOrigin = Vector3.Zero;
             Matrix4x4 placement = EmitterPlacement(d);
             s.PlacementTransform = placement;
             s.BasePos = Vector3.Transform(emitterPosition, placement);
-            s.FieldBasePos = EmitterFieldPosition(d, emitterT);
 
-            PreparedNoiseField[] preparedNoise = PrepareNoiseFields(d.Fields, s, emitterT, CurrentTime, fieldOrigin);
+            PreparedNoiseField[] preparedNoise = PrepareNoiseFields(d.Fields, s, emitterT, SimulationTime, fieldOrigin);
 
             // Existing particles are integrated before this step's births. Riot spawns new
             // particles with a zero-sized birth step, so they remain exactly at their birth
@@ -130,8 +121,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             for (int i = s.Particles.Count - 1; i >= 0; i--)
             {
                 var p = s.Particles[i];
-                Vector3 positionBeforeStep = p.Pos;
-
                 p.Age += dt;
                 if (p.Age >= p.Life)
                 {
@@ -147,80 +136,52 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 }
 
                 float particleT = ParticleAge01(p.Age, p.Life);
-                Vector3 kinematicShift = Vector3.Zero;
-                if (d.IsEmitterSpace && emitterPositionDelta != Vector3.Zero)
-                    kinematicShift += Vector3.TransformNormal(emitterPositionDelta, p.BirthFrame);
                 if (d.BindWeight is { } bindWeight && systemDelta != Vector3.Zero)
                 {
-                    // LTK forwards the authored bind value verbatim. Values outside 0..1
-                    // intentionally over-/counter-follow the moving system origin.
-                    float bind = bindWeight.Sample(emitterT);
-                    if (bind != 0f) kinematicShift += systemDelta * bind;
+                    // Positive values are uncapped; nonpositive values do not bind.
+                    float bind = bindWeight.Sample(particleT);
+                    if (bind > 0f) p.BoundOffset += systemDelta * bind;
                 }
 
-                float lingerT = LingerProgress(s);
-                Vector3 acceleration = s.FinishedAt >= 0f && d.Linger?.Acceleration is { } lingerAcceleration
-                    ? lingerAcceleration.Sample(lingerT)
-                    : d.AccelerationOverLife?.Sample(emitterT) ?? Vector3.Zero;
-                acceleration = Vector3.TransformNormal(acceleration, p.BirthFrame);
-                // LTK does not carry a per-particle birthAcceleration term. Only the
-                // emitter's acceleration (or keyed linger replacement) is integrated.
-                p.Vel += acceleration * dt;
+                bool lingering = p.LingerFrom >= 0f;
+                Vector3 acceleration = LifeVector(lingering ? d.Linger?.Acceleration ?? d.AccelerationOverLife
+                    : d.AccelerationOverLife, particleT, p.Serial, SimulationTime);
+                p.Vel += (p.BirthAcceleration + acceleration) * dt;
 
-                Vector3 authoredVelocity = s.FinishedAt >= 0f && d.Linger?.Velocity is { } lingerVelocity
-                    ? lingerVelocity.Sample(lingerT)
-                    : d.VelocityOverLife?.Sample(emitterT) ?? Vector3.Zero;
-                authoredVelocity = Vector3.TransformNormal(authoredVelocity, p.BirthFrame);
+                Vector3 authoredVelocity = LifeVector(lingering ? d.Linger?.Velocity ?? d.VelocityOverLife
+                    : d.VelocityOverLife, particleT, p.Serial, SimulationTime);
                 Vector3 moving = p.Vel + authoredVelocity;
-                Vector3 dragOverLife = s.FinishedAt >= 0f && d.Linger?.Drag is { } lingerDrag
-                    ? lingerDrag.Sample(lingerT)
-                    : d.DragOverLife?.Sample(emitterT) ?? Vector3.Zero;
+                Vector3 dragOverLife = LifeVector(lingering ? d.Linger?.Drag ?? d.DragOverLife
+                    : d.DragOverLife, particleT, p.Serial, SimulationTime);
                 Vector3 drag = p.BirthDrag + dragOverLife;
                 if (_dragMotion == VfxDragMotion.Analytic)
-                    ApplyAnalyticDrag(ref p, ref moving, drag, dt);
+                    ApplyAnalyticDrag(ref p, ref moving, p.BirthDrag, dt);
                 else
                     ApplySteppedDrag(ref p.Vel, ref moving, drag, dt);
 
                 // Force fields read the particle where the step began. Bind/root travel and the
                 // emitter-space EmitterPosition shift are added only after the field pass, as in LTK.
-                ApplyFields(d.Fields, s, emitterT, preparedNoise, fieldOrigin, p.Pos, p.Serial, dt, ref moving, ref p.Vel);
-                p.Pos += moving * dt + kinematicShift;
+                ApplyFields(d.Fields, s, emitterT, preparedNoise, fieldOrigin, p.LocalPosition, p.Serial, dt, ref moving, ref p.Vel);
+                p.LocalPosition += moving * dt;
 
                 // Birth angular velocity and acceleration always integrate. rotation0 is
                 // a separate integrated value authored per 1/60 second and is gated only
                 // by isRotationEnabled.
-                // The engine's closed form (w + a * age / 2) * age: sampling the acceleration at the step's
-                // mid age sums to exactly that, whatever the frame rate.
-                p.BirthRotation += (p.RotationalVelocity + p.RotationalAcceleration * (p.Age - 0.5f * dt)) * dt;
-                if (d.IsRotationEnabled && d.RotationOverLife is { } rotationCurve)
-                {
-                    Vector3 rotationRate = rotationCurve.Sample(particleT);
-                    if (s.FinishedAt >= 0f && d.Linger?.Rotation is { } lingerRotation)
-                    {
-                        // LTK samples LingerRotation on the particle's rewritten age01,
-                        // unlike linger acceleration/velocity/drag which use emitter linger progress.
-                        rotationRate = lingerRotation.Sample(particleT);
-                    }
-                    p.BirthRotation += rotationRate * (60f * MathF.PI / 180f) * dt;
-                }
+                RebuildRotation(ref p, s);
 
-                if (d.ParticleUvScrollRate is { } uvScroll)
-                    p.IntegratedUvOffset += uvScroll.Sample(particleT) * dt;
-                if (d.ParticleUvRotateRate is { } uvRotate)
-                    p.IntegratedUvRotation += uvRotate.Sample(particleT) * dt;
-                if (d.TextureMultParticleUvScroll is { } multScroll)
-                    p.IntegratedTextureMultUvOffset += multScroll.Sample(particleT) * dt;
-                if (d.TextureMultParticleUvRotate is { } multRotate)
-                    p.IntegratedTextureMultUvRotation += multRotate.Sample(particleT) * dt;
-
-                Vector3 displacement = p.Pos - positionBeforeStep;
-                p.Travel = dt > 0f ? displacement / dt : Vector3.Zero;
+                Vector3 placed = MatrixTranslation(p, s);
+                p.Drift = dt > 0f ? (placed - p.Placed) / dt : Vector3.Zero;
+                p.Placed = placed;
+                p.Pos = (d.ParticleIsLocalOrientation ? placed : Vector3.TransformNormal(placed, p.BirthFrame)) + p.BirthAnchor + p.BoundOffset;
+                p.Travel = d.ParticleIsLocalOrientation ? p.Drift : Vector3.TransformNormal(p.Drift, p.BirthFrame);
+                float weight = d.BindWeight?.Sample(particleT) ?? 0f;
+                if (weight > 0f && dt > 0f) p.Travel += systemDelta * (weight / dt);
                 s.Particles[i] = p;
                 if (d.ChildParticleSet is { Children.Count: > 0 })
                     ParticleUpdated?.Invoke(this, d, LifecycleInfo(s, p, died: false));
             }
 
-            return new EmitterStepContext(emitterT, preparedNoise, fieldOrigin, dt);
+            return new EmitterStepContext(emitterT, preparedNoise, fieldOrigin, dt, systemDelta);
         }
 
         private int EmitEmitter(
@@ -233,37 +194,36 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             // The step that crosses the emitter's lifetime still emits, counted only up to the lifetime,
             // so an emitter shorter than one frame emits at any frame rate. Its window opens at the later
             // of the step's start and the first emission, so a lifetime over before that never emits.
-            bool emitting = !d.Disabled
-                            && !IsStopped
+            float? end = EmissionEnd(d);
+            bool emitting = !d.Disabled && !s.Absent
+                            && (!IsStopped || s.Age <= StopWaitSeconds(d))
                             && s.Age >= d.TimeBeforeFirstEmission
-                            && (d.EmitterLifetime is not { } life ||
+                            && (end is not { } life ||
                                 MathF.Max(s.Age - context.Dt, d.TimeBeforeFirstEmission) <= life);
             if (!emitting || (d.IsSingleParticle && s.BurstDone)) return -1;
-            if (d.EmissionPeriod is { } period && !period.IsActive(s.Age - d.TimeBeforeFirstEmission))
+            if (d.EmissionPeriod is { } period && !period.IsActive(s.Age))
             {
-                // A cycle's pause discards emission debt without stopping existing particles.
-                s.EmittedThrough = s.Age;
                 return -1;
             }
             {
                 // LTK samples rate directly. Legacy rateIsPeriod is retained in the model
                 // for inspection but does not reinterpret the simulation rate.
-                float rate = MathF.Max(0f, d.Rate.Sample(emitterT));
+                float rate;
                 if (d.RateByVelocityFunction is { } velocityRate)
                 {
-                    Vector2 function = velocityRate.Sample(emitterT);
-                    float speed = s.StepStartBasePos is { } start && context.Dt > 0f
-                        ? Vector3.Distance(s.BasePos, start) / context.Dt : 0f;
+                    Vector2 function = velocityRate.Constant;
+                    float speed = context.Dt > 0f ? context.SystemDelta.Length() / context.Dt : 0f;
                     rate = Math.Clamp(speed * function.X + function.Y, 0f, MathF.Max(0f, d.MaximumRateByVelocity ?? 300f));
-                    if (rate <= 0f && s.InitialEmissionDone) s.EmittedThrough = s.Age;
                 }
+                else rate = MathF.Max(0f, BirthScalar(d.Rate, emitterT));
                 if (!float.IsFinite(rate)) rate = 0f;
-                float emittingUntil = d.EmitterLifetime is { } lifetime ? MathF.Min(s.Age, lifetime) : s.Age;
-                float owed = MathF.Min(
-                    MathF.Truncate(MathF.Max(0f, emittingUntil - s.EmittedThrough) * rate),
-                    MathF.Truncate(rate * 0.33f) + 1f);
-                int requestedCount = owed >= int.MaxValue ? int.MaxValue : (int)MathF.Max(0f, owed);
-                if (!s.InitialEmissionDone && !d.HasVariableStartTime)
+                float emittingUntil = end is { } lifetime ? MathF.Min(s.Age, lifetime) : s.Age;
+                float cycleStart = d.EmissionPeriod?.Length is { } length
+                    ? MathF.Truncate(s.Age / length) * length : 0f;
+                int requestedCount = Math.Min(
+                    WrappedCount(MathF.Max(0f, emittingUntil - MathF.Max(cycleStart, s.EmittedThrough)) * rate),
+                    (WrappedCount(rate * 0.33f) + 1) & ushort.MaxValue);
+                if (!s.InitialEmissionDone)
                 {
                     if (d.IsSingleParticle)
                     {
@@ -272,18 +232,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         int wrapped = (int)(Math.Truncate((double)rate) % (ushort.MaxValue + 1d));
                         requestedCount = Math.Max(1, wrapped);
                     }
-                    else
+                    else if (!d.HasVariableStartTime)
                     {
                         requestedCount = Math.Max(1, requestedCount);
                     }
                 }
                 if (d.Trail?.MaxAddedPerFrame is > 0)
                     requestedCount = Math.Min(requestedCount, d.Trail.MaxAddedPerFrame);
+                requestedCount = Math.Min(requestedCount, 1000);
                 if (requestedCount <= 0) return -1;
 
                 // LTK advances a trail odometer only when an emission batch is actually due,
-                // before attempting the shared-pool spawn. TranslationOverride and shape offset
-                // do not participate; only EmitterPosition stood on the spawn frame does.
+                // before attempting the shared-pool spawn, including the translation override.
                 AdvanceTrailOdometer(s, emitterT);
 
                 // LTK advances the emitter by the requested batch even if its shared pool
@@ -299,21 +259,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 int firstNewborn = s.Particles.Count;
                 // The engine spreads a step's births along the emitter's travel during the step, the last
                 // one at its current origin, rather than stacking them all on that origin.
-                Vector3 travelled = s.StepStartBasePos is { } stepStart ? s.BasePos - stepStart : Vector3.Zero;
+                Vector3 origin = EmitterPlacement(d).Translation;
                 for (int born = 0; born < actualCount; born++)
-                    Spawn(s, emitterT, s.BasePos - travelled * (1f - (born + 1f) / requestedCount));
+                {
+                    float beforeEnd = 1f - (born + 1f) / requestedCount;
+                    Spawn(s, emitterT, origin - context.SystemDelta * beforeEnd, context.Dt * beforeEnd);
+                }
 
                 if (actualCount < requestedCount)
                 {
                     // emit.ts draws the failed particle's roll (and its per-particle chance)
                     // before pool.spawn reports a full pool, then breaks the batch.
-                    _rng.NextUnitFloat();
                     if (!d.ParticlesShareRandomValue) _rng.NextUnitFloat();
                 }
 
                 s.InitialEmissionDone = true;
                 s.BurstDone = d.IsSingleParticle;
-                s.EmittedThrough = rate > 0f ? s.EmittedThrough + requestedCount / rate : s.Age;
+                s.EmittedThrough = s.Age;
                 return actualCount > 0 ? firstNewborn : -1;
             }
         }
@@ -322,7 +284,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             float EmitterT,
             PreparedNoiseField[] PreparedNoise,
             Vector3 FieldOrigin,
-            float Dt);
+            float Dt,
+            Vector3 SystemDelta);
+
+        private static int WrappedCount(float value)
+            => (int)(Math.Truncate((double)value) % (ushort.MaxValue + 1d));
 
         private static void ApplyAnalyticDrag(ref Particle particle, ref Vector3 moving, Vector3 drag, float dt)
         {
@@ -331,9 +297,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 float dragAxis = axis == 0 ? drag.X : axis == 1 ? drag.Y : drag.Z;
                 if (dragAxis <= 0f)
                 {
-                    Vector3 kept = particle.Vel;
-                    ApplySteppedDragAxis(ref kept, ref moving, dragAxis, dt, axis);
-                    particle.Vel = kept;
                     continue;
                 }
                 if (dt <= 0f) continue;
@@ -356,29 +319,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     moving.Z += contribution;
                     particle.AnalyticOffset.Z = next;
                 }
-            }
-        }
-
-        private static void ApplySteppedDragAxis(ref Vector3 kept, ref Vector3 moving, float dragAxis, float dt, int axis)
-        {
-            float movingAxis = axis == 0 ? moving.X : axis == 1 ? moving.Y : moving.Z;
-            if (dragAxis == 0f || movingAxis == 0f) return;
-            float change = -dragAxis * movingAxis * dt;
-            if ((change + movingAxis) * movingAxis < 0f) change = -movingAxis;
-            if (axis == 0)
-            {
-                moving.X += change;
-                kept.X += change;
-            }
-            else if (axis == 1)
-            {
-                moving.Y += change;
-                kept.Y += change;
-            }
-            else
-            {
-                moving.Z += change;
-                kept.Z += change;
             }
         }
 

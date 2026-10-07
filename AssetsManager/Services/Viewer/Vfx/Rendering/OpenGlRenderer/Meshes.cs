@@ -350,6 +350,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _meshUniforms.Uniform2(_meshUniforms.EmitterUvOffset, 0f, 0f);
             // Material parameters and textures are shared by every particle in this emitter pass.
             if (native) BindGameParticle(es, true, passIndex, sharedPalettePhase);
+            else _gl.FrontFace(es.Def.RenderState?.FlipWinding == true ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
             for (int i = 0; i < instanceCount; i++)
             {
                 int o = i * Stride;

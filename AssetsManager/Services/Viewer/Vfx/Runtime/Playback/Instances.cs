@@ -54,7 +54,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector3 scaleMul = ResolveScaleMultiplier(s, p);
                 Vector4 col = lingering && d.Linger?.Color is { } lingerColor
                     ? p.BirthColor * lingerColor.SampleOver(particleLingerT, Vector4.One)
-                    : VfxColorSemantics.ResolveParticle(p.BirthColor, d.ColorOverLife, t);
+                    : p.BirthColor * LifeColor(d.ColorOverLife, t, p.Serial, s.RenderTime);
+                col *= d.ModulationFactor ?? Vector4.One;
                 // UNLIT_DECAL consumes MODULATE_COLOR directly, without billboard preprocessing.
                 if (!d.DrawsAsProjection)
                     col = VfxColorSemantics.PremultiplyForAddOrSubtract(
@@ -67,25 +68,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 // sampler wraps that counter against its own texDiv grid at draw time, so do
                 // not collapse it to the base grid here (texDivMult may be different).
                 int authoredFrames = Math.Max(1, d.NumFrames);
-                float playedFrame = PositiveModulo(p.StartFrame + p.Age * p.FrameRate, authoredFrames);
+                float playedFrame = PositiveModulo(p.StartFrame + (p.FrameRate > 0f ? p.Age * p.FrameRate : 0f), authoredFrames);
                 float frame = MathF.Floor(d.StartFrame + playedFrame);
 
-                Vector3 position = p.Pos;
+                Vector3 position = DrawnPosition(p, s);
                 Vector3 orbitalAngles = p.BirthOrbitalVelocity * p.Age;
                 Matrix4x4 orbitalTurn = OrbitalTurn(orbitalAngles);
-                if (orbitalTurn != Matrix4x4.Identity)
-                {
-                    Vector3 origin = new(_worldTransform.M41, _worldTransform.M42, _worldTransform.M43);
-                    position = origin + Vector3.Transform(position - origin, orbitalTurn);
-                }
-                if (d.Acceleration is { } worldAcceleration && float.IsFinite(p.Life))
-                {
-                    float reached = t * p.Life * p.Life;
-                    position += worldAcceleration.Sample(emitterT) * reached;
-                }
-                float sizeX = p.BirthSize.X * scaleMul.X;
-                float sizeY = p.BirthSize.Y * scaleMul.Y;
-                float sizeZ = p.BirthSize.Z * scaleMul.Z;
+                Vector3 drawnSize = ResolveDrawnSize(s, p);
+                float sizeX = drawnSize.X * scaleMul.X;
+                float sizeY = drawnSize.Y * scaleMul.Y;
+                float sizeZ = drawnSize.Z * scaleMul.Z;
                 if (d.PrimitiveKind == VfxPrimitiveKind.ArbitraryQuad)
                 {
                     sizeX *= 2f;
@@ -98,7 +90,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 float stretch = ResolveDirectionStretch(d, direction);
                 if (stretch != 1f)
                 {
-                    if (d.PrimitiveKind == VfxPrimitiveKind.Mesh) sizeZ *= stretch;
+                    if (d.PrimitiveKind == VfxPrimitiveKind.ArbitraryQuad) sizeX *= stretch;
                     else sizeY *= stretch;
                 }
                 buf[k++] = position.X; buf[k++] = position.Y; buf[k++] = position.Z;
@@ -110,9 +102,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 buf[k++] = t;
                 buf[k++] = direction.X; buf[k++] = direction.Y; buf[k++] = direction.Z;
                 Vector3 currentRotation = p.BirthRotation;
-                float legacyRollDegrees = d.LegacyRotation?.Sample(t) ?? 0f;
+                float legacyRollDegrees = 0f;
                 float legacyRoll = legacyRollDegrees * (MathF.PI / 180f);
-                if (d.AuthoredFeatures?.HasLegacySimple == true)
+                if (d.IsSimpleEmitter)
                 {
                     float spinDegrees = currentRotation.Z * (180f / MathF.PI) + legacyRollDegrees;
                     spinDegrees = ((MathF.Truncate(spinDegrees) % 360f) + 360f) % 360f;
@@ -145,11 +137,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     p.BirthUvOffset + p.BirthUvScrollRate * p.Age,
                     renderState.ClampUvScroll);
                 Vector2 uvOffset = VfxUvSemantics.Periodic(
-                    uvRamp + p.IntegratedUvOffset,
+                    uvRamp + IntegratedUv(d.ParticleUvScrollRate, p),
                     renderState.TextureAddressMode);
                 Vector2 uvScale = d.UvScale?.SampleOver(t, Vector2.One) ?? Vector2.One;
                 float uvRotationDegrees = (d.UvRotation?.Sample(t) ?? 0f) + p.BirthUvRotateRate * p.Age
-                    + p.IntegratedUvRotation;
+                    + IntegratedUv(d.ParticleUvRotateRate, p);
                 float uvRotation = uvRotationDegrees * (MathF.PI / 180f);
                 buf[k++] = uvOffset.X; buf[k++] = uvOffset.Y;
                 buf[k++] = uvScale.X; buf[k++] = uvScale.Y;
@@ -165,13 +157,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     p.TextureMultBirthUvOffset + p.TextureMultBirthUvScrollRate * p.Age,
                     d.TextureMultClampUvScroll);
                 Vector2 textureMultUvOffset = VfxUvSemantics.Periodic(
-                    textureMultRamp + p.IntegratedTextureMultUvOffset,
+                    textureMultRamp + IntegratedUv(d.TextureMultParticleUvScroll, p),
                     d.TextureMultAddressMode);
                 Vector2 textureMultUvScale = d.TextureMultUvScale?.SampleOver(t, Vector2.One) ?? Vector2.One;
 
                 float textureMultUvRotationDegrees = (d.TextureMultUvRotation?.Sample(t) ?? 0f)
                     + p.TextureMultBirthUvRotateRate * p.Age
-                    + p.IntegratedTextureMultUvRotation;
+                    + IntegratedUv(d.TextureMultParticleUvRotate, p);
                 buf[k++] = textureMultUvOffset.X; buf[k++] = textureMultUvOffset.Y;
                 buf[k++] = textureMultUvScale.X; buf[k++] = textureMultUvScale.Y;
                 buf[k++] = textureMultUvRotationDegrees * (MathF.PI / 180f);

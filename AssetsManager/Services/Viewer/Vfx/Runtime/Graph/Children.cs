@@ -352,29 +352,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             if (Matrix4x4.Invert(_rootTransform, out Matrix4x4 inverseRoot))
                 childLocalTransform = childWorldTransform * inverseRoot;
 
-            Matrix4x4 effectiveLocal = ComposeChildTransform(
-                definition.Transform.GetValueOrDefault(Matrix4x4.Identity),
-                childLocalTransform);
+            Matrix4x4 effectiveLocal = childLocalTransform;
             _localTransforms[runtime] = effectiveLocal;
             runtime.SetTransform(
                 effectiveLocal * _rootTransform,
                 effectiveLocal * _orientationRootTransform);
         }
-
-        private static Matrix4x4 ComposeChildTransform(Matrix4x4 authored, Matrix4x4 bearing)
-        {
-            Vector3 authoredOffset = authored.Translation;
-            authored.M41 = 0f;
-            authored.M42 = 0f;
-            authored.M43 = 0f;
-            Matrix4x4 result = authored * bearing;
-            Vector3 origin = bearing.Translation + authoredOffset;
-            result.M41 = origin.X;
-            result.M42 = origin.Y;
-            result.M43 = origin.Z;
-            return result;
-        }
-
 
         private static int ChildSeed(int seed, string path, uint serial)
         {

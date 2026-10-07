@@ -700,7 +700,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Assert.Null(state.PendingMesh);
                 Assert.Equal(VfxPrimitiveKind.AttachedMesh, state.Def.PrimitiveKind);
                 Assert.False(state.Def.IsVisual);
-                Assert.Equal(authoredTransform * Matrix4x4.CreateTranslation(3f, 0f, 0f), runtime.WorldTransform);
+                Assert.Equal(Matrix4x4.CreateTranslation(3f, 0f, 0f), runtime.WorldTransform);
+                Assert.Equal(authoredTransform, state.DefinitionTransform);
             }
             finally
             {
@@ -731,7 +732,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 7,
                 new LogService(logger));
 
-            Assert.Equal(authoredTransform * placement, graph.Root.WorldTransform);
+            Assert.Equal(placement, graph.Root.WorldTransform);
+            Assert.Equal(authoredTransform, graph.Root.Definition.Transform);
         }
 
         [Fact]

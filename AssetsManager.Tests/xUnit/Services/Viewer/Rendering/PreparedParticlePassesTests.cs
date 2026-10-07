@@ -8,7 +8,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
     public sealed class PreparedParticlePassesTests
     {
         [Fact]
-        public void EveryOwnerDrawsColourBeforeAnyDistortionCapture()
+        public void EveryOwnerCompletesEachPhaseBeforeTheNextPhaseStarts()
         {
             var log = new List<string>();
             var passes = new List<IPreparedParticlePass> { new RecordingPass("map", log), new RecordingPass("actor", log) };
@@ -19,9 +19,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 new[]
                 {
                     "map:begin", "actor:begin",
+                    "map:earlyCapture", "actor:earlyCapture",
+                    "map:early", "actor:early",
                     "map:color", "actor:color",
                     "map:capture", "actor:capture",
                     "map:distortion", "actor:distortion",
+                    "map:post", "actor:post",
                     "actor:end", "map:end"
                 },
                 log);
@@ -72,6 +75,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
 
             public void CapturePreparedDistortionFrame() => _log.Add($"{_name}:capture");
             public void RenderPreparedDistortionPass() => _log.Add($"{_name}:distortion");
+            public void CapturePreparedEarlyDistortionFrame() => _log.Add($"{_name}:earlyCapture");
+            public void RenderPreparedEarlyDistortionPass() => _log.Add($"{_name}:early");
+            public void RenderPreparedPostColorPass() => _log.Add($"{_name}:post");
         }
 
         private sealed class Scope : IDisposable

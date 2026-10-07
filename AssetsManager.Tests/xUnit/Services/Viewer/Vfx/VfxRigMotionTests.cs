@@ -92,9 +92,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.NotEmpty(state.Particles);
             Assert.All(state.Particles, particle =>
             {
-                Assert.Equal(50f, particle.Vel.X, precision: 4);
-                Assert.Equal(100f, particle.Vel.Y, precision: 4);
-                Assert.Equal(0f, particle.Vel.Z, precision: 4);
+                Vector3 worldVelocity = Vector3.TransformNormal(particle.Vel, particle.BirthFrame);
+                Assert.Equal(50f, worldVelocity.X, precision: 4);
+                Assert.Equal(100f, worldVelocity.Y, precision: 4);
+                Assert.Equal(0f, worldVelocity.Z, precision: 4);
             });
         }
 
@@ -273,7 +274,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void StandaloneSoftStopStopsNewEmissionAtTheConfiguredTime()
+        public void StandaloneSoftStopKeepsEmissionUntilAbsoluteEmitterLinger()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with
             {
@@ -304,7 +305,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             session.Update(0.3f);
 
-            Assert.Equal(particlesAtStop, Assert.Single(root.Emitters).Particles.Count);
+            Assert.True(Assert.Single(root.Emitters).Particles.Count > particlesAtStop);
         }
 
         [Fact]
@@ -523,7 +524,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void RootSystemTransformWrapsRigOriginAndTargetLikeLtk()
+        public void RootDefinitionTransformDoesNotScaleRigOriginOrTarget()
         {
             var session = new VfxRenderSession();
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One);
@@ -545,7 +546,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
             Assert.Equal(Vector3.Zero, root.WorldTransform.Translation);
-            Assert.Equal(new Vector3(1200f, 0f, 0f), Assert.Single(root.Emitters).SystemTarget);
+            Assert.Equal(new Vector3(600f, 0f, 0f), Assert.Single(root.Emitters).SystemTarget);
         }
 
         [Fact]

@@ -7,7 +7,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
     public sealed partial class VfxPlaybackRuntime
     {
-        private void Spawn(EmitterState s, float emitterT, Vector3 basePos)
+        private void Spawn(EmitterState s, float emitterT, Vector3 anchor, float age)
         {
             var d = s.Def;
             if (d.ParticlesShareRandomValue && !s.SharedRandomRolled)
@@ -15,35 +15,37 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 s.SharedRandom = _rng.NextUnitFloat();
                 s.SharedRandomRolled = true;
             }
-            float roll = _rng.NextUnitFloat();
             // The ordinary chance is drawn even while inspection pins a replacement value. This
             // keeps every later RNG draw on the same stream as the unpinned run.
             float drawnChance = d.ParticlesShareRandomValue ? s.SharedRandom : _rng.NextUnitFloat();
             float sharedRoll = _pinnedBirthChance ?? drawnChance;
 
-            float life = d.ParticleLifetime.SampleBirth(emitterT, _rng, sharedRoll);
+            float roll = sharedRoll;
+            float life = BirthScalar(d.ParticleLifetime, emitterT);
             // A negative particleLifetime (usually -1) never expires: the particle stays until its system is
             // removed (Akshan's E hook mesh, Bloom's pre-warmed waterfall glow, whose emitter stops after 1 s).
             // Retiring it at its first step hid every such particle.
             if (life < 0f)
                 life = float.PositiveInfinity;
-            var birthScale = d.BirthScale.SampleBirthOver(emitterT, _rng, Vector3.One, sharedRoll);
-            if (d.LegacyBirthScale is { } legacyBirthScale)
+            var vel = BirthVector(d.BirthVelocity, emitterT);
+            var birthAcceleration = BirthVector(d.BirthAcceleration, emitterT);
+            var birthRotation = d.IsSimpleEmitter
+                ? d.BirthRotation?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero : BirthVector(d.BirthRotation, emitterT);
+            var rotVel = d.IsSimpleEmitter
+                ? d.BirthRotationalVelocity?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero : BirthVector(d.BirthRotationalVelocity, emitterT);
+            var birthScale = d.IsSimpleEmitter ? Vector3.One : BirthVector(d.BirthScale, emitterT, Vector3.One);
+            if (d.IsSimpleEmitter && d.LegacyBirthScale is { } legacyBirthScale)
             {
                 float scalar = legacyBirthScale.SampleBirth(emitterT, _rng, sharedRoll);
                 Vector2 bias = d.LegacyScaleBias ?? Vector2.One;
                 birthScale = new Vector3(scalar * bias.X, scalar * bias.Y, scalar);
             }
-            // isUniformScale promotes the first authored component to every axis for all
-            // particle kinds, not only mesh primitives.
-            if (d.IsUniformScale)
+            if (UsesUniformScale(d))
                 birthScale = new Vector3(birthScale.X);
-            var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
-            var birthOrbitalVelocity = d.BirthOrbitalVelocity?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
-            var birthDrag = d.BirthDrag?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
-            var birthRotation = d.BirthRotation?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
-            var rotVel = d.BirthRotationalVelocity?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
-            var rotationalAcceleration = d.BirthRotationalAcceleration?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero;
+            var rotationalAcceleration = BirthVector(d.BirthRotationalAcceleration, emitterT);
+            var birthDrag = BirthVector(d.BirthDrag, emitterT);
+            var birthOrbitalVelocity = BirthVector(d.BirthOrbitalVelocity, emitterT);
+            var birthColor = BirthColor(d.BirthColor, emitterT);
             Vector2 birthUvOffset = d.BirthUvOffset?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector2.Zero;
             Vector2 birthUvScrollRate = d.BirthUvScrollRateCurve?.SampleBirth(emitterT, _rng, sharedRoll) ?? d.UvScrollRate;
             float birthUvRotateRate = d.BirthUvRotateRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? 0f;
@@ -54,15 +56,35 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
             Matrix4x4 spawnRotation = Matrix4x4.Identity;
             var localOffset = d.SpawnShape is { } shape
-                ? shape.SampleOffset(_rng, emitterT, sharedRoll, out spawnRotation)
+                ? SampleSpawnShape(shape, emitterT, out spawnRotation)
                 : Vector3.Zero;
+
+            Vector3 rawOffset = Vector3.TransformNormal(localOffset, Matrix4x4.Transpose(spawnRotation));
+            byte symmetry = d.OffsetLifeScalingSymmetryMode;
+            if ((symmetry & 1) != 0) rawOffset.X = MathF.Abs(rawOffset.X);
+            if ((symmetry & 2) != 0) rawOffset.Y = MathF.Abs(rawOffset.Y);
+            if ((symmetry & 4) != 0) rawOffset.Z = MathF.Abs(rawOffset.Z);
+            life = MathF.Max(0f, life + Vector3.Dot(rawOffset, d.OffsetLifetimeScaling));
+
+            if (d.EmissionMesh is { } emissionMesh && _emissionSurfaces.TryGetValue(d, out IVfxEmissionSurfaceSampler loaded)
+                && loaded is VfxEmitterEmissionSampler combined && combined.Mesh is { } meshSampler
+                && meshSampler.TrySample(s.Age, _rng, out VfxSurfaceBirth meshBirth))
+            {
+                localOffset += meshBirth.Position;
+                if (emissionMesh.UseNormal)
+                {
+                    vel = meshBirth.Normal * vel.Length();
+                    birthAcceleration = meshBirth.Normal * birthAcceleration.Length();
+                }
+            }
 
             bool onEmissionSurface = false;
             VfxSurfaceBirth surfaceBirth = default;
             if (d.EmissionSurface is not null &&
                 _emissionSurfaces.TryGetValue(d, out IVfxEmissionSurfaceSampler surfaceSampler))
             {
-                onEmissionSurface = surfaceSampler.TrySample(s.Age, _rng, out surfaceBirth);
+                IVfxEmissionSurfaceSampler sampler = surfaceSampler is VfxEmitterEmissionSampler pair ? pair.Surface : surfaceSampler;
+                onEmissionSurface = sampler?.TrySample(s.Age, _rng, out surfaceBirth) == true;
                 if (onEmissionSurface)
                     localOffset += surfaceBirth.Position;
             }
@@ -71,10 +93,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 vel = surfaceBirth.Normal * vel.Length();
 
             Matrix4x4 placement = EmitterPlacement(d);
-            var worldOffset = Vector3.TransformNormal(localOffset, placement);
             vel = Vector3.TransformNormal(vel, spawnRotation);
-            vel = Vector3.TransformNormal(vel, placement);
-            Vector3 finalBirthSize = birthScale * ExtractScale(placement);
+            birthAcceleration = Vector3.TransformNormal(birthAcceleration, spawnRotation);
+            Matrix4x4 birthFrame = placement;
+            birthFrame.Translation = Vector3.Zero;
+            Vector3 finalBirthSize = birthScale * ExtractScale(s.DefinitionTransform * birthFrame);
             Vector3 analyticTerminal = Vector3.Zero;
             Vector3 analyticOffset = Vector3.Zero;
             if (_dragMotion == VfxDragMotion.Analytic)
@@ -87,34 +110,32 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 vel = Vector3.Zero;
             }
 
-            s.Particles.Add(new Particle
+            var particle = new Particle
             {
-                Pos = basePos + worldOffset,
+                LocalPosition = (d.IsEmitterSpace ? Vector3.Zero : d.EmitterPosition.Sample(emitterT)) + localOffset,
+                BirthAnchor = anchor,
+                BirthAcceleration = birthAcceleration,
                 Vel = vel,
                 BirthOrbitalVelocity = birthOrbitalVelocity,
                 BirthDrag = birthDrag,
                 AnalyticTerminal = analyticTerminal,
                 AnalyticOffset = analyticOffset,
-                BirthFrame = placement,
-                SpawnRotation = Quaternion.CreateFromRotationMatrix(spawnRotation),
-                Age = 0f,
+                BirthFrame = birthFrame,
+                Age = age,
                 Life = life,
                 Serial = _particleSerial++,
-                TrailTiling = d.Trail?.BirthTilingSize.SampleBirth(emitterT, _rng, sharedRoll)
-                    ?? d.Beam?.BirthTilingSize.SampleBirth(emitterT, _rng, sharedRoll)
-                    ?? Vector3.Zero,
+                TrailTiling = BirthVector(d.Trail?.BirthTilingSize ?? d.Beam?.BirthTilingSize, emitterT),
                 TrailBirthDistance = s.TrailDistance,
                 BirthSize = finalBirthSize,
-                BirthColor = VfxColorSemantics.ResolveBirth(d.BirthColor, emitterT, _rng, sharedRoll),
+                BirthColor = birthColor,
+                InitialRotation = birthRotation * (MathF.PI / 180f),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
                 RotationalVelocity = rotVel * (MathF.PI / 180f),
                 RotationalAcceleration = rotationalAcceleration * (MathF.PI / 180f),
-                Rot = birthRotation.X * (MathF.PI / 180f),
-                RotVel = rotVel.X * (MathF.PI / 180f),
                 RangeRandom = roll,
-                StartFrame = d.RandomStartFrame && d.NumFrames > 1 ? roll * d.NumFrames : 0f,
+                StartFrame = d.RandomStartFrame ? roll * Math.Max(d.NumFrames, 0) : 0f,
                 FrameRate = (d.FrameRate ?? 0f) *
-                    (d.BirthFrameRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? 1f),
+                    (d.IsSimpleEmitter ? 1f : d.BirthFrameRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? 1f),
                 BirthUvOffset = birthUvOffset,
                 BirthUvScrollRate = birthUvScrollRate,
                 BirthUvRotateRate = birthUvRotateRate,
@@ -122,7 +143,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 TextureMultBirthUvScrollRate = textureMultBirthUvScrollRate,
                 TextureMultBirthUvRotateRate = textureMultBirthUvRotateRate,
                 LingerFrom = -1f
-            });
+            };
+            RebuildRotation(ref particle, s);
+            particle.Placed = MatrixTranslation(particle, s);
+            particle.Pos = (d.ParticleIsLocalOrientation ? particle.Placed : Vector3.TransformNormal(particle.Placed, birthFrame)) + anchor;
+            s.Particles.Add(particle);
             ParticleLifecycle?.Invoke(this, d, LifecycleInfo(s, s.Particles[^1], died: false));
         }
     }

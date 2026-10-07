@@ -33,7 +33,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             float legacyRoll)
         {
             if (emitter.Def.IsDirectionOriented &&
-                emitter.Def.PrimitiveKind != VfxPrimitiveKind.Ray &&
+                emitter.Def.PrimitiveKind is VfxPrimitiveKind.CameraQuad or VfxPrimitiveKind.CameraUnitQuad &&
                 direction.LengthSquared() > 0f)
             {
                 Vector3 up = Vector3.Normalize(direction);
@@ -58,8 +58,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         internal static Matrix4x4 ResolveStandingBasisForRender(EmitterState emitter, in Particle particle)
         {
             ArgumentNullException.ThrowIfNull(emitter);
-            float particleT = ParticleAge01(particle.Age, particle.Life);
-            float legacyRoll = emitter.Def.LegacyRotation?.Sample(particleT) * (MathF.PI / 180f) ?? 0f;
+            float legacyRoll = 0f;
             Matrix4x4 orbitalTurn = OrbitalTurn(particle.BirthOrbitalVelocity * particle.Age);
             return StandingBasis(particle, emitter, orbitalTurn, legacyRoll);
         }
@@ -68,7 +67,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             in Particle particle,
             EmitterState emitter,
             Matrix4x4 orbitalTurn,
-            float legacyRoll)
+            float legacyRoll,
+            bool normalize = true)
         {
             Vector3 rotation = particle.BirthRotation;
             Matrix4x4 standing =
@@ -76,24 +76,40 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Matrix4x4.CreateRotationX(rotation.X) *
                 Matrix4x4.CreateRotationY(rotation.Y);
 
+            if (emitter.Def.PostRotateOrientation is { } post)
+            {
+                post *= MathF.PI / 180f;
+                standing *= OrbitalTurn(post);
+            }
+
             Matrix4x4 frame;
             if (emitter.Def.ParticleIsLocalOrientation)
             {
-                frame = new Matrix4x4(
-                    emitter.PlacementRight.X, emitter.PlacementRight.Y, emitter.PlacementRight.Z, 0f,
-                    emitter.PlacementUp.X, emitter.PlacementUp.Y, emitter.PlacementUp.Z, 0f,
-                    emitter.PlacementForward.X, emitter.PlacementForward.Y, emitter.PlacementForward.Z, 0f,
-                    0f, 0f, 0f, 1f);
+                standing *= emitter.SystemOrientation;
+                frame = Matrix4x4.Identity;
             }
             else
             {
-                frame = VectorMathUtils.OrientationOnly(particle.BirthFrame);
+                frame = particle.BirthFrame;
             }
 
-            Matrix4x4 basis = standing * frame;
-            if (orbitalTurn != Matrix4x4.Identity)
-                basis *= orbitalTurn;
-            return VectorMathUtils.OrientationOnly(basis);
+            Matrix4x4 basis = standing * orbitalTurn;
+            Matrix4x4 definition = emitter.DefinitionTransform;
+            definition.Translation = Vector3.Zero;
+            basis *= definition;
+            if (emitter.Def.IsDirectionOriented && emitter.Def.PrimitiveKind is
+                VfxPrimitiveKind.ArbitraryQuad or VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh &&
+                particle.Drift.LengthSquared() > 0f)
+            {
+                Vector3 forward = Vector3.Normalize(particle.Drift);
+                Vector3 axis = MathF.Abs(forward.Y) < 0.99999f ? Vector3.UnitY : Vector3.UnitX;
+                Vector3 right = Vector3.Normalize(Vector3.Cross(axis, forward));
+                Vector3 up = Vector3.Cross(forward, right);
+                basis *= new Matrix4x4(right.X, right.Y, right.Z, 0f,
+                    up.X, up.Y, up.Z, 0f, forward.X, forward.Y, forward.Z, 0f, 0f, 0f, 0f, 1f);
+            }
+            basis *= frame;
+            return normalize ? VectorMathUtils.OrientationOnly(basis) : basis;
         }
     }
 }

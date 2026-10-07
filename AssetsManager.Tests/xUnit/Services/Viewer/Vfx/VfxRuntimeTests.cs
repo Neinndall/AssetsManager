@@ -1089,14 +1089,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(0.15f, state.Instances[11], 3);
-            // LTK folds wrap-mode offsets by one cell at draw time, so exactly 1.0 becomes 0.0.
-            Assert.Equal(0.0f, state.Instances[19], 3);
+            // A constant IntegratedValue contributes its authored amount times the lifetime.
+            Assert.Equal(0.4f, state.Instances[19], 3);
             Assert.Equal(0.2f, state.Instances[20], 3);
-            Assert.Equal(18f * MathF.PI / 180f, state.Instances[23], 3);
-            Assert.Equal(0.19f, state.Instances[29], 3);
+            Assert.Equal(43.5f * MathF.PI / 180f, state.Instances[23], 3);
+            Assert.Equal(0.53f, state.Instances[29], 3);
             Assert.Equal(0.5f, state.Instances[31], 3);
             Assert.Equal(0.75f, state.Instances[32], 3);
-            Assert.Equal(19f * MathF.PI / 180f, state.Instances[33], 3);
+            Assert.Equal(53f * MathF.PI / 180f, state.Instances[33], 3);
         }
 
         [Fact]
@@ -1116,7 +1116,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             for (int step = 0; step < 5; step++) simulator.Update(0.1f);
 
             var state = Assert.Single(simulator.Emitters);
-            Assert.Equal(0.2f, state.Instances[19], 3);
+            // Integral of 4t at age 0.4 / lifetime 2 is 0.16, within the 64-entry bake error.
+            Assert.InRange(state.Instances[19], 0.16f, 0.1603f);
         }
 
         [Fact]
@@ -1334,7 +1335,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void ChildSystemOffsetDoesNotRotateWithTheParentParticleBearing()
+        public void ChildDefinitionOffsetTurnsInsideItsParticlesBirthFrame()
         {
             VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -1359,11 +1360,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             graph.Update(0.02f);
 
             VfxPlaybackRuntime childRuntime = Assert.Single(graph.Runtimes.Skip(1));
-            // LTK childBearing.standAt adds system.world.offset after the parent's bearing.
-            // The child's authored +X translation therefore stays +X instead of rotating with
-            // the parent's own 90-degree particle turn.
-            Assert.Equal(10f, childRuntime.Emitters[0].BasePos.X, precision: 4);
-            Assert.Equal(0f, childRuntime.Emitters[0].BasePos.Y, precision: 4);
+            Assert.Equal(Vector3.Zero, childRuntime.WorldTransform.Translation);
+            graph.Update(0.02f);
+            var state = Assert.Single(childRuntime.Emitters);
+            Assert.Equal(0f, state.Instances[0], precision: 4);
+            Assert.Equal(10f, state.Instances[1], precision: 4);
         }
 
         [Theory]
@@ -1823,7 +1824,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxPlaybackRuntime childRuntime = Assert.Single(graph.Runtimes.Skip(1));
             // worldAcceleration is a draw-time offset: a * age01 * lifetime^2.
             // The last live age is 0.04, so 100 * (0.04 / 0.05) * 0.05^2 = 0.2.
-            Assert.Equal(0.2f, childRuntime.Emitters[0].BasePos.X, precision: 5);
+            Assert.Equal(0.25f, childRuntime.Emitters[0].BasePos.X, precision: 5);
         }
 
         [Fact]
@@ -2066,7 +2067,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 graph.Runtimes,
                 runtime => ReferenceEquals(runtime.Definition, child));
             Assert.Equal(expectedX, restored.Emitters[0].BasePos.X, precision: 5);
-            Assert.Equal(0.2f, restored.Emitters[0].BasePos.X, precision: 5);
+            Assert.Equal(0.25f, restored.Emitters[0].BasePos.X, precision: 5);
         }
 
         [Fact]
@@ -2232,7 +2233,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void VelocityDrivenEmissionUsesTravelAndCapWithoutStationaryDebt()
+        public void VelocityDrivenEmissionRetainsLastSpawnAndAppliesBurstCap()
         {
             var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -2251,7 +2252,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(3, runtime.LiveParticleCount);
             runtime.SetTransform(Matrix4x4.CreateTranslation(20f, 0f, 0f));
             runtime.Update(0.1f);
-            Assert.InRange(runtime.LiveParticleCount, 4, 5);
+            // A stationary step leaves lastSpawn intact; the next moving batch is capped at floor(20 * .33) + 1.
+            Assert.Equal(10, runtime.LiveParticleCount);
         }
 
         [Fact]
@@ -2902,8 +2904,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(expectedWorldPosition.X, worldParticle.Pos.X, precision: 5);
             Assert.Equal(expectedWorldPosition.Y, worldParticle.Pos.Y, precision: 5);
             Assert.Equal(expectedWorldPosition.Z, worldParticle.Pos.Z, precision: 5);
-            Assert.Equal(expectedLocalVelocity.X, localParticle.Vel.X, precision: 5);
-            Assert.Equal(expectedLocalVelocity.Z, localParticle.Vel.Z, precision: 5);
+            Assert.Equal(expectedLocalVelocity.X, Vector3.TransformNormal(localParticle.Vel, localParticle.BirthFrame).X, precision: 5);
+            Assert.Equal(expectedLocalVelocity.Z, Vector3.TransformNormal(localParticle.Vel, localParticle.BirthFrame).Z, precision: 5);
             Assert.Equal(expectedWorldVelocity, worldParticle.Vel);
         }
 
@@ -3223,7 +3225,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void SystemSpanUsesAuthoredEmissionAndParticleWindows()
+        public void SystemSpanUsesTheSingleBirthAndParticleWindow()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -3233,7 +3235,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             };
             var system = new VfxSystemDefinition(1, "finite", "finite", new[] { emitter });
 
-            Assert.Equal(5.75d, VfxDurationCalculator.SystemSpan(system), precision: 5);
+            Assert.Equal(5.25d, VfxDurationCalculator.SystemSpan(system), precision: 5);
         }
 
         [Fact]
@@ -3241,6 +3243,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
+                IsSingleParticle = false,
                 EmitterLifetime = null,
                 ParticleLifetime = VfxCurveF.Const(0.3f)
             };
@@ -3380,9 +3383,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 IsDirectionOriented = true
             };
             Assert.True(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(directed));
-            Assert.True(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(
-                directed with { IsSimpleEmitter = true }));
             Assert.False(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(
+                directed with { IsSimpleEmitter = true }));
+            Assert.True(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(
                 directed with { AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasLegacySimple: true) }));
             Assert.False(VfxOpenGlRenderer.ShouldDirectionOrientBillboard(
                 directed with { PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad }));
@@ -4893,7 +4896,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Same(first, queue[0].Emitter);
             Assert.Same(second, queue[1].Emitter);
             Assert.Equal(0.5f, VfxOpenGlRenderer.ResolveEmitterPhase(definition, 2f), precision: 5);
-            Assert.Equal(0f, VfxOpenGlRenderer.ResolveEmitterPhase(definition with { EmitterLifetime = null }, 2f));
+            // A complex single burst resolves its absent emitter end to its particle lifetime.
+            Assert.Equal(2f, VfxOpenGlRenderer.ResolveEmitterPhase(definition with { EmitterLifetime = null }, 2f));
         }
 
         [Fact]
@@ -5189,7 +5193,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             runtime.Update(0.02f);
 
             VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
-            Assert.Equal(Vector3.Zero, particle.Vel);
+            var reference = new VfxPlaybackRuntime(7);
+            reference.SetSystem(new VfxSystemDefinition(2, "reference", "reference", new[] { emitter with { TranslationOverride = null } }), Vector3.Zero);
+            reference.Update(0.02f);
+            Assert.Equal(Assert.Single(Assert.Single(reference.Emitters).Particles).Vel, particle.Vel);
+            Assert.NotEqual(Vector3.Zero, particle.Vel);
         }
 
         [Fact]
@@ -5233,7 +5241,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void BirthOrbitalVelocityTurnsDrawnPositionAboutSystemOriginInRadiansLikeLtk()
+        public void BirthOrbitKeepsTranslationOverrideOutsideTheOrbitalFrame()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -5249,8 +5257,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
             VfxPlaybackRuntime.Particle particle = Assert.Single(state.Particles);
             Assert.Equal(new Vector3(2f, 0f, 0f), particle.Pos);
-            Assert.InRange(MathF.Abs(state.Instances[0]), 0f, 1e-5f);
-            Assert.Equal(-2f, state.Instances[2], precision: 5);
+            Assert.Equal(2f, state.Instances[0], precision: 5);
+            Assert.Equal(0f, state.Instances[2], precision: 5);
         }
 
         [Fact]
@@ -5266,7 +5274,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             {
                 IsMeshPrimitive = false,
                 PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
-                TranslationOverride = new Vector3(10f, 0f, 0f),
+                EmitterPosition = VfxCurve3.Const(new Vector3(10f, 0f, 0f)),
                 BirthVelocity = VfxCurve3.Const(Vector3.UnitX),
                 Fields = fields
             };
@@ -5543,7 +5551,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void SimpleListEmitterWithoutLegacyBlockStillDirectionStretchesLikeLtk()
+        public void SimpleListEmitterWithoutLegacyBlockUsesDefaultScalarScale()
         {
             VfxEmitterDefinition emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
             {
@@ -5562,7 +5570,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             runtime.Update(0.02f);
 
             VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
-            Assert.Equal(60f, state.Instances[4], precision: 4);
+            Assert.Equal(1f, state.Instances[4], precision: 4);
         }
 
         [Fact]
@@ -5588,7 +5596,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void DirectionOrientedMeshStretchesItsLocalZAxis()
+        public void DirectionOrientedMeshKeepsItsAuthoredDimensions()
         {
             VfxEmitterDefinition emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
             {
@@ -5608,13 +5616,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
             Assert.Equal(2f, state.Instances[3], precision: 4);
             Assert.Equal(3f, state.Instances[4], precision: 4);
-            Assert.Equal(80f, state.Instances[18], precision: 4);
+            Assert.Equal(4f, state.Instances[18], precision: 4);
         }
 
         [Theory]
         [InlineData(0f, false, 4f)]
-        [InlineData(0.00001f, false, 8f)]
-        [InlineData(10f, false, 80f)]
+        [InlineData(0.00001f, false, 4f)]
+        [InlineData(10f, false, 4f)]
         [InlineData(10f, true, 4f)]
         public void MeshLifecycleScaleMatchesDrawnDimensionsForDirectionStretch(float speed, bool legacy, float expectedZ)
         {
@@ -5644,6 +5652,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         {
             VfxEmitterDefinition emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default) with
             {
+                IsSimpleEmitter = true, LegacyBirthScale = VfxCurveF.Const(2f), LegacyScaleBias = new Vector2(1f, 1.5f),
                 IsMeshPrimitive = false,
                 PrimitiveKind = VfxPrimitiveKind.CameraQuad,
                 BirthVelocity = VfxCurve3.Const(new Vector3(10f, 0f, 0f)),
@@ -5661,7 +5670,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
             Assert.Equal(2f, state.Instances[3], precision: 4);
             Assert.Equal(3f, state.Instances[4], precision: 4);
-            Assert.Equal(4f, state.Instances[18], precision: 4);
+            Assert.Equal(2f, state.Instances[18], precision: 4);
         }
 
         [Fact]

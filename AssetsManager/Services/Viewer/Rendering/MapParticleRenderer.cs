@@ -6,6 +6,7 @@ using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
 
@@ -22,6 +23,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly List<VfxRenderQueueEntry> _queue = new();
         private readonly List<VfxRenderQueueEntry> _shaded = new();
         private readonly List<VfxRenderQueueEntry> _distortion = new();
+        private readonly List<VfxRenderQueueEntry> _earlyDistortion = new();
+        private readonly List<VfxRenderQueueEntry> _postColor = new();
         private readonly List<VfxPlaybackGraphRuntime> _graphs = new();
         private readonly Dictionary<object, int> _graphOrders = new();
         private VfxOpenGlRenderer _renderer;
@@ -58,9 +61,12 @@ namespace AssetsManager.Services.Viewer.Rendering
                 return;
 
             using IDisposable renderBatch = BeginPreparedRenderBatch();
+            CapturePreparedEarlyDistortionFrame();
+            RenderPreparedEarlyDistortionPass();
             RenderPreparedColorPass();
             CapturePreparedDistortionFrame();
             RenderPreparedDistortionPass();
+            RenderPreparedPostColorPass();
         }
 
         internal void SetSun(MapSunData sun)
@@ -125,22 +131,38 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             _shaded.Clear();
             _distortion.Clear();
+            _earlyDistortion.Clear();
+            _postColor.Clear();
             foreach (VfxRenderQueueEntry entry in _queue)
             {
-                if (entry.Emitter.Def.DrawsAsDistortion)
-                    _distortion.Add(entry);
-                else
-                    _shaded.Add(entry);
+                VfxRenderPhases phases = VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer);
+                if (phases.EarlyDistortion) _earlyDistortion.Add(entry);
+                if (phases.LateDistortion) _distortion.Add(entry);
+                if (phases.Under) _shaded.Add(entry);
+                if (phases.Over) _postColor.Add(entry);
             }
             return _queue.Count > 0;
         }
 
         public IDisposable BeginPreparedRenderBatch() => _renderer.BeginRenderBatch();
 
-        public void RenderPreparedColorPass()
+        public void CapturePreparedEarlyDistortionFrame()
         {
-            if (_preparedShaded && _shaded.Count > 0)
-                _renderer.Render(_shaded, _preparedViewProjection, _preparedView);
+            if (_preparedShaded && _earlyDistortion.Count > 0)
+                _renderer.CaptureScene(_preparedViewportWidth, _preparedViewportHeight, true, false);
+        }
+
+        public void RenderPreparedEarlyDistortionPass()
+        {
+            if (_preparedShaded && _earlyDistortion.Count > 0)
+                _renderer.Render(_earlyDistortion, _preparedViewProjection, _preparedView);
+        }
+
+        public void RenderPreparedPostColorPass()
+        {
+            if (_preparedShaded && _postColor.Count > 0)
+                _renderer.Render(_postColor, _preparedViewProjection, _preparedView);
+            // Wire twins draw over both colour phases and the late warp.
             if (_preparedWireframe && _queue.Count > 0)
             {
                 _renderer.Render(
@@ -150,6 +172,12 @@ namespace AssetsManager.Services.Viewer.Rendering
                     wireframePass: true,
                     wireframeOpacity: _preparedWireOpacity);
             }
+        }
+
+        public void RenderPreparedColorPass()
+        {
+            if (_preparedShaded && _shaded.Count > 0)
+                _renderer.Render(_shaded, _preparedViewProjection, _preparedView);
         }
 
         internal bool HasPreparedDistortionPass => _preparedShaded && _distortion.Count > 0;
@@ -175,6 +203,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _queue.Clear();
             _shaded.Clear();
             _distortion.Clear();
+            _earlyDistortion.Clear();
+            _postColor.Clear();
             _graphs.Clear();
             _graphOrders.Clear();
         }
@@ -189,6 +219,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _queue.Clear();
             _shaded.Clear();
             _distortion.Clear();
+            _earlyDistortion.Clear();
+            _postColor.Clear();
             _graphs.Clear();
             _graphOrders.Clear();
             _ready = false;

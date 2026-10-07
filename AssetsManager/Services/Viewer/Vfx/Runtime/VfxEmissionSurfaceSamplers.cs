@@ -6,6 +6,66 @@ using AssetsManager.Services.Viewer.Vfx.Resources;
 
 namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
+    internal sealed class VfxEmitterEmissionSampler : IVfxEmissionSurfaceSampler
+    {
+        internal IVfxEmissionSurfaceSampler Mesh { get; }
+        internal IVfxEmissionSurfaceSampler Surface { get; }
+        internal VfxEmitterEmissionSampler(IVfxEmissionSurfaceSampler mesh, IVfxEmissionSurfaceSampler surface)
+            => (Mesh, Surface) = (mesh, surface);
+        public bool TrySample(float time, VfxLtkRandom rng, out VfxSurfaceBirth birth)
+        {
+            birth = default;
+            return Surface?.TrySample(time, rng, out birth) == true;
+        }
+    }
+
+    /// <summary>Static emission mesh: area-weighted triangles with League's two-draw corner blend.</summary>
+    internal sealed class VfxStaticEmissionMeshSampler : IVfxEmissionSurfaceSampler
+    {
+        private readonly VfxMeshData _mesh;
+        private readonly float _scale;
+        private readonly double[] _reach;
+        private readonly double _total;
+        internal VfxStaticEmissionMeshSampler(VfxMeshData mesh, float scale)
+        {
+            _mesh = mesh;
+            _scale = scale;
+            _reach = new double[(mesh.Indices?.Length ?? 0) / 3];
+            double total = 0d;
+            for (int triangle = 0; triangle < _reach.Length; triangle++)
+            {
+                if (Corners(triangle, out Vector3 a, out Vector3 b, out Vector3 c))
+                    total += Vector3.Cross(b - a, c - a).Length() / 2d;
+                _reach[triangle] = total;
+            }
+            _total = total;
+        }
+        private bool Corners(int triangle, out Vector3 a, out Vector3 b, out Vector3 c)
+        {
+            a = b = c = default;
+            int count = (_mesh.Positions?.Length ?? 0) / 3;
+            uint i = _mesh.Indices[triangle * 3], j = _mesh.Indices[triangle * 3 + 1], k = _mesh.Indices[triangle * 3 + 2];
+            if (i >= count || j >= count || k >= count) return false;
+            a = Vertex((int)i); b = Vertex((int)j); c = Vertex((int)k);
+            return true;
+        }
+        private Vector3 Vertex(int index)
+            => new(_mesh.Positions[index * 3], _mesh.Positions[index * 3 + 1], _mesh.Positions[index * 3 + 2]);
+        public bool TrySample(float time, VfxLtkRandom rng, out VfxSurfaceBirth birth)
+        {
+            birth = default;
+            if (!(_total >= 1e-5d)) return false;
+            double pick = rng.NextUnitFloat() * _total;
+            int triangle = 0;
+            while (triangle + 1 < _reach.Length && pick >= _reach[triangle]) triangle++;
+            if (!Corners(triangle, out Vector3 a, out Vector3 b, out Vector3 c)) return false;
+            float u = rng.NextUnitFloat(), v = rng.NextUnitFloat();
+            birth = new VfxSurfaceBirth((a * ((1f - u) * (1f - v)) + b * ((1f - u) * v) + c * u) * _scale,
+                Vector3.Normalize(Vector3.Cross(b - a, c - a)));
+            return true;
+        }
+    }
+
     /// <summary>Pose data consumed by authored mesh and skeleton emission surfaces.</summary>
     internal interface IVfxEmissionSurfacePose
     {
