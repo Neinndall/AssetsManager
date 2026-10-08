@@ -26,6 +26,11 @@ namespace AssetsManager.Tests.Diagnostics
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "game-learned-links")
+            {
+                GameLearnedLinksDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && args[0] == "animation-catalog-audit")
             {
                 AnimationCatalogAuditDiagnostic.Run(args.Skip(1).ToArray());

@@ -46,7 +46,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 .Select(l => ulong.TryParse(l.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong h) ? h : 0)
                 .Where(h => h != 0).ToHashSet();
             int initial = unknown.Count;
-            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Path.Combine(directories.HashesPath, "hashes.game.txt")), log, ResolveBin);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Path.Combine(directories.HashesPath, "hashes.game.txt")), log, ResolveBin, resolver.ResolveBinXxh3);
             var engine = new HashGuessEngine(HashGuessDomain.Game, unknown, null);
             var stopwatch = Stopwatch.StartNew();
 

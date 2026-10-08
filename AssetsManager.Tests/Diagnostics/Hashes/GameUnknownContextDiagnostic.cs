@@ -68,6 +68,10 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 {
                     if (chunk.Compression == WadChunkCompression.Satellite) continue;
                     bool isUnknown = unknown.TryGetValue(chunkHash, out Unknown self);
+                    string knownPath = Game(chunkHash);
+                    if (!isUnknown && knownPath != null &&
+                        !knownPath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) &&
+                        !knownPath.EndsWith(".inibin", StringComparison.OrdinalIgnoreCase)) continue;
                     byte[] bytes;
                     try
                     {
@@ -157,7 +161,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             {
                 Line();
                 Line($"== {group.Key}: {group.Count()} ({group.Count(p => p.Value.References.Count > 0)} referenced)");
-                foreach (var (hash, info) in group.OrderBy(p => p.Value.Wad).Take(40))
+                foreach (var (hash, info) in group.OrderBy(p => p.Value.Wad).Take(args.Contains("--all") ? int.MaxValue : 40))
                 {
                     Line($"{hash:x16} {info.Size,9:N0}B {info.Wad}");
                     foreach (string entry in info.RootEntries) Line($"      root: {entry}");
