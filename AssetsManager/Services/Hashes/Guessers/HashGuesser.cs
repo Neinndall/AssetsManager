@@ -231,7 +231,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             bool inferDigits,
             CancellationToken cancellationToken,
             string source,
-            Action<int> progress = null)
+            Action<int> progress = null,
+            IReadOnlySet<string> unpaddedFormatsAlreadyChecked = null)
         {
             ArgumentNullException.ThrowIfNull(engine);
             ArgumentNullException.ThrowIfNull(paths);
@@ -251,7 +252,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                 ReadOnlySpan<char> formatPrefix = format.AsSpan(0, marker);
                 ReadOnlySpan<char> formatSuffix = format.AsSpan(marker + 8);
 
-                for (int value = 0; value < numberLimit; value++)
+                int limit = effectiveDigits == 2 && unpaddedFormatsAlreadyChecked?.Contains(format) == true
+                    ? Math.Min(numberLimit, 10) : numberLimit;
+                for (int value = 0; value < limit; value++)
                 {
                     bool formatted = formatSpecifier != null
                         ? value.TryFormat(numSpan, out int charsWritten, formatSpecifier, CultureInfo.InvariantCulture)
@@ -299,7 +302,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        private IReadOnlyList<string> BuildNumberFormats(IEnumerable<string> knownPaths, int? effectiveDigits)
+        protected IReadOnlyList<string> BuildNumberFormats(IEnumerable<string> knownPaths, int? effectiveDigits)
         {
             if (ReferenceEquals(knownPaths, KnownPaths))
             {

@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Lab / GAME GrepWad now learns filename patterns from resolved BIN links, and Basic Suite covers borrowed Jade skin textures and skips repeated numeric variants while preserving coverage.
   - Hash Lab / Added BIN XXH3-64 name guessing and a separate 64-bit local catalog for Explorer previews.
   - 3D Studio / Added a new home screen with direct project opening, recent projects and Chroma Library access.
   - 3D Studio / Added a resizable Project Files panel with folder navigation, project search and texture previews.

@@ -25,12 +25,14 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
     {
         private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scannedWadCharacters = new();
         private readonly ConditionalWeakTable<HashGuessEngine, RegaliaMatchIndex> _regaliaMatches = new();
+        private readonly ConditionalWeakTable<HashGuessEngine, GameBinLinkTemplateIndex> _linkTemplates = new();
         private sealed record RegaliaMatchIndex(HashSet<ulong> Targets, Dictionary<ulong, string> Paths);
 
         internal override void ReleaseMemory()
         {
             base.ReleaseMemory();
             _regaliaMatches.Clear();
+            _linkTemplates.Clear();
         }
 
         internal override bool ShouldGrepExtension(string extension) =>
@@ -189,6 +191,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     GuessSkinRoleTextures(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessSkinCharacterBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessSiblingLinkPaths(engine, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
+                    BinTree linkTree = GetCachedBinTree();
+                    if (linkTree != null)
+                        _linkTemplates.GetValue(engine, static _ => new GameBinLinkTemplateIndex()).Guess(engine, linkTree, HashFile.Load(),
+                            _resolveBinHash, _resolveBinHash64, sourceWadPath, sourceChunkHash, cancellationToken);
                 }
 
                 GuessChampionSpecialBins(engine, sourceWadPath, cancellationToken);

@@ -43,6 +43,15 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
         protected override bool AnchorNumberMatchesToFileName => true;
 
+        internal int SubstituteBasicPaddedNumbers(HashGuessEngine engine, CancellationToken cancellationToken,
+            int maximum = 200, Action<int> progress = null)
+        {
+            var unpadded = Corpus.GetOrCreate("game-basic-unpadded-number-formats",
+                _ => BuildNumberFormats(KnownPaths, null).ToHashSet(StringComparer.Ordinal));
+            return _SubstituteNumbers(engine, KnownPaths, maximum, digits: 2, inferDigits: false,
+                cancellationToken, "Generated numeric variant", progress, unpadded);
+        }
+
         internal IEnumerable<HashGuessCandidate> SubstituteBasicNumbers(int maximum = 100)
         {
             foreach (HashGuessCandidate candidate in SubstituteNumbers(maximum))
@@ -240,6 +249,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             IReadOnlyDictionary<string, RecallContext> RecallContexts = Corpus.GetOrCreate(
                 "recall-contexts",
                 BuildRecallContexts);
+            var borrowedJadeTextures = Corpus.GetOrCreate("jade-borrowed-body-textures", BuildJadeBorrowedBodyTextures);
 
             int checkedCount = 0;
             const string source = "GAME character files";
@@ -401,6 +411,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         }
                     }
                 }
+
+                string originalCharacter = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase)
+                    ? character[5..] : character;
+                if (borrowedJadeTextures.TryGetValue(originalCharacter, out List<string> borrowedTextures))
+                    checkedCount += CheckCharacterPaths(borrowedTextures);
 
                 // Recall textures
                 if (RecallContexts.TryGetValue(character, out RecallContext recallContext))
@@ -730,6 +745,43 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
                 return result;
             });
+        }
+
+        private static Dictionary<string, List<string>> BuildJadeBorrowedBodyTextures(IReadOnlyList<string> knownPaths)
+        {
+            var directories = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            var textures = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            var skinPattern = new Regex(@"^assets/characters/([^/]+)/skins/(?:skin\d+|base)/", RegexOptions.CultureInvariant);
+            var bodyPattern = new Regex(@"^([^/]+)_(?:skin\d+|base)_tx_cm\.(?:tex|dds)$", RegexOptions.CultureInvariant);
+            foreach (string path in knownPaths)
+            {
+                Match skin = skinPattern.Match(path);
+                if (!skin.Success) continue;
+                string character = skin.Groups[1].Value;
+                if (character.StartsWith("jade_", StringComparison.Ordinal))
+                {
+                    character = character[5..];
+                    if (!directories.TryGetValue(character, out var folders)) directories[character] = folders = new();
+                    folders.Add(path[..skin.Length]);
+                }
+                else
+                {
+                    string filename = path[skin.Length..];
+                    Match body = bodyPattern.Match(filename);
+                    if (!body.Success || body.Groups[1].Value != character) continue;
+                    if (!textures.TryGetValue(character, out var names)) textures[character] = names = new();
+                    names.Add(filename);
+                }
+            }
+            var result = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (var pair in directories)
+            {
+                if (!textures.TryGetValue(pair.Key, out var names)) continue;
+                // Jade can borrow a different numbered skin while retaining the original filename.
+                result[pair.Key] = pair.Value.OrderBy(value => value, StringComparer.Ordinal)
+                    .SelectMany(folder => names.OrderBy(value => value, StringComparer.Ordinal).Select(name => folder + name)).ToList();
+            }
+            return result;
         }
 
         private static Dictionary<string, List<string>> BuildJadeChampFiles(IReadOnlyList<string> knownPaths)

@@ -45,7 +45,8 @@ namespace AssetsManager.Services.Hashes
             _gameHashFile = new HashFile(HashGuessDomain.Game, Path.Combine(_directoriesCreator.HashesPath, "hashes.game.txt"));
             _lcuHashFile = new HashFile(HashGuessDomain.Lcu, Path.Combine(_directoriesCreator.HashesPath, "hashes.lcu.txt"));
             _binEntriesHashFile = new HashFile(HashGuessDomain.Game, Path.Combine(_directoriesCreator.HashesPath, "hashes.binentries.txt"));
-            _gameGuesser = new GameHashGuesser(_gameHashFile, _logService, _hashResolverService.ResolveBinHashGeneral);
+            _gameGuesser = new GameHashGuesser(_gameHashFile, _logService, _hashResolverService.ResolveBinHashGeneral,
+                _hashResolverService.ResolveBinXxh3);
             _lcuGuesser = new LcuHashGuesser(_lcuHashFile, _logService);
         }
 
@@ -432,11 +433,10 @@ namespace AssetsManager.Services.Hashes
                     if (engine.RemainingUnknownCount > 0)
                     {
                         int progressOffsetPadded = checkedCandidates;
-                        checkedCandidates += _gameGuesser.SubstituteNumbers(
+                        checkedCandidates += _gameGuesser.SubstituteBasicPaddedNumbers(
                             engine,
                             cancellationToken,
                             maximum: 200,
-                            digits: 2,
                             progress: count => progress?.Report(
                                 engine.CreateProgress("GAME Basic: padded numeric variants", progressOffsetPadded + count)));
                     }

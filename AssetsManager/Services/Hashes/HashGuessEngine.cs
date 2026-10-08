@@ -105,7 +105,8 @@ namespace AssetsManager.Services.Hashes
             ReadOnlySpan<char> suffix,
             HashGuessStrategy strategy,
             string source,
-            ulong sourceChunkHash = 0)
+            ulong sourceChunkHash = 0,
+            ulong? expectedHash = null)
         {
             CheckedCandidates++;
             int totalLength = prefix.Length + word.Length + suffix.Length;
@@ -121,7 +122,7 @@ namespace AssetsManager.Services.Hashes
             suffix.CopyTo(buffer[(prefix.Length + word.Length)..]);
 
             ulong hash = XxHash64Ext.Hash(buffer);
-            if (!_unknownHashes.Contains(hash))
+            if ((expectedHash.HasValue && hash != expectedHash.Value) || !_unknownHashes.Contains(hash))
             {
                 DiscardedCandidates++;
                 return false;

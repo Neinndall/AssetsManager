@@ -34,13 +34,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             .ToArray();
         private readonly LogService _logService;
         private readonly Func<uint, string> _resolveBinHash;
+        private readonly Func<ulong, string> _resolveBinHash64;
 
-        internal GameHashGuesser(HashFile hashFile, LogService logService = null, Func<uint, string> resolveBinHash = null)
+        internal GameHashGuesser(HashFile hashFile, LogService logService = null, Func<uint, string> resolveBinHash = null,
+            Func<ulong, string> resolveBinHash64 = null)
             : base(hashFile, "*.wad.client")
         {
             if (hashFile.Domain != HashGuessDomain.Game) throw new ArgumentException("GAME guesser requires a GAME hash file.", nameof(hashFile));
             _logService = logService;
             _resolveBinHash = resolveBinHash;
+            _resolveBinHash64 = resolveBinHash64;
         }
 
         internal GameHashGuesser() : this(new HashFile(HashGuessDomain.Game, Array.Empty<string>())) { }
