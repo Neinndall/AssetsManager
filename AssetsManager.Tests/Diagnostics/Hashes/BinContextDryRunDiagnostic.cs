@@ -41,6 +41,8 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             var casing = BinPathCasing.FromKnownNames((await store.LoadKnownAsync(InternalHashKind.BinEntries, CancellationToken.None)).Values);
             bool learnedEnabled = selected == null || selected.Contains("bin-context-learned");
             var learned = learnedEnabled ? new BinLearnedTemplateSource(resolver, casing) : null;
+            var entryPatterns = selected == null || selected.Contains("bin-context-structures")
+                ? new BinEntryPathPatternSource(resolver) : null;
 
             var stopwatch = Stopwatch.StartNew();
             int bins = 0;
@@ -62,17 +64,18 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                     catch { continue; }
                     string path = resolver.ResolveHash(chunkHash);
                     if (path.Length == 16 && !path.Contains('/')) path = $"[unknown_bin_{chunkHash:x16}]";
-                    BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, path, wadPath, resolver, selected, casing);
+                    BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, path, wadPath, resolver, selected, casing, entryPatterns);
                     learned?.Observe(tree, matcher, path, wadPath);
                     bins++;
                 }
             }
             int learnedHits = learned?.Apply(matcher) ?? 0;
+            entryPatterns?.Apply(matcher);
             var gate = matcher.ResolveUntargetedGate();
 
             var output = new StringBuilder();
             void Line(string text = "") { Console.WriteLine(text); output.AppendLine(text); }
-            Line($"BINs: {bins}; elapsed {stopwatch.Elapsed:mm\\:ss}; learned-template hits {learnedHits}");
+            Line($"BINs: {bins}; elapsed {stopwatch.Elapsed:mm\\:ss}; learned-template hits {learnedHits}; checked candidates {matcher.CheckedCandidates}");
             Line($"Untargeted gate: {gate.Hits} hits, {gate.ExpectedChanceMatches:F4} expected chance matches, accepted={gate.Accepted}");
             if (learned?.LastVocabularyGate is { } vocabulary)
                 Line($"Vocabulary gate: {vocabulary.Hits} hits, {vocabulary.ExpectedChanceMatches:F4} expected chance matches, accepted={vocabulary.Accepted}");

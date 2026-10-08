@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Lab / BIN Context now finds more resolver keys, scripts, spells, TFT properties, anvils and game mode entries.
   - Hash Lab / GAME GrepWad now resolves short asset names and checks atlas candidates with less overhead.
   - Hash Lab / GAME GrepWad now learns filename patterns from resolved BIN links, and Basic Suite covers borrowed Jade skin textures and skips repeated numeric variants while preserving coverage.
   - Hash Lab / Added BIN XXH3-64 name guessing and a separate 64-bit local catalog for Explorer previews.

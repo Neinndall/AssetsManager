@@ -53,12 +53,13 @@ namespace AssetsManager.Services.Hashes
         }
 
         internal IReadOnlyCollection<InternalHashGuessMatch> Matches => _matches.Values;
-        internal int Remaining => _targets.Sum(pair => Math.Max(0, pair.Value.Count - _matched[pair.Key].Count));
+        // Verified checks already remove their hashes; research findings remain pending.
+        internal int Remaining => _targets.Sum(pair => pair.Value.Count);
         internal long CheckedCandidates { get; private set; }
 
         internal int GetRemainingCount(InternalHashKind kind) =>
             _targets.TryGetValue(kind, out HashSet<ulong> values)
-                ? Math.Max(0, values.Count - _matched[kind].Count)
+                ? values.Count
                 : 0;
 
         internal bool TryGetVerifiedValue(InternalHashKind kind, uint hash, out string value) =>
@@ -239,6 +240,7 @@ namespace AssetsManager.Services.Hashes
             InternalHashEvidence evidence = InternalHashEvidence.ObservedHashPair,
             IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null)
         {
+            if (observedHash is uint observed && !IsTargetOrMatched(kind, observed)) return false;
             CheckedCandidates++;
             if (kind == InternalHashKind.BinXxh3 || string.IsNullOrWhiteSpace(value) || value.Length > 512)
             {                return false;
@@ -372,6 +374,9 @@ namespace AssetsManager.Services.Hashes
 
         internal bool IsRemaining(InternalHashKind kind, ulong hash) =>
             _targets.TryGetValue(kind, out HashSet<ulong> values) && values.Contains(hash);
+
+        internal bool IsTargetOrMatched(InternalHashKind kind, uint hash) =>
+            IsRemaining(kind, hash) || _matched[kind].Contains(hash);
 
         internal bool CheckSchemaCandidate(
             InternalHashKind kind,

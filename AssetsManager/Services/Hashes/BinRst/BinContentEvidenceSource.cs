@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Meta;
@@ -112,7 +113,9 @@ namespace AssetsManager.Services.Hashes
             string wadPath = null,
             HashResolverService resolver = null,
             IReadOnlySet<string> selectedSubMethods = null,
-            BinPathCasing casing = null)
+            BinPathCasing casing = null,
+            BinEntryPathPatternSource entryPatterns = null,
+            CancellationToken cancellationToken = default)
         {
             bool ShouldRun(string id) => selectedSubMethods == null || selectedSubMethods.Contains(id);
             IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = CollectLocalTargets(tree);
@@ -123,7 +126,12 @@ namespace AssetsManager.Services.Hashes
             if (ShouldRun("bin-context-owning"))
                 MatchOwningEntryStringEvidence(tree, matcher, path, wadPath);
             if (ShouldRun("bin-context-structures"))
-                MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver, localTargets, casing);
+            {
+                MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver, localTargets, casing, cancellationToken);
+                var patterns = entryPatterns ?? new BinEntryPathPatternSource(resolver);
+                patterns.Observe(tree, matcher, path, wadPath, cancellationToken);
+                if (entryPatterns == null) patterns.Apply(matcher, cancellationToken);
+            }
             if (ShouldRun("bin-context-pathleaf"))
                 MatchResolvedHashPathLeafEvidence(tree, matcher, path, wadPath, resolver);
             if (ShouldRun("bin-context-objectlocal"))
@@ -854,12 +862,14 @@ namespace AssetsManager.Services.Hashes
             string wadPath = null,
             HashResolverService resolver = null,
             IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null,
-            BinPathCasing casing = null)
+            BinPathCasing casing = null,
+            CancellationToken cancellationToken = default)
         {
             localTargets ??= CollectLocalTargets(tree);
             casing ??= BinPathCasing.Empty;
             foreach (var pair in tree.Objects)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 BinTreeObject item = pair.Value;
                 MatchEntry(pair.Key, pair.Value);
                 if (ObjectPathTypes.Contains(item.ClassHash))
@@ -904,10 +914,13 @@ namespace AssetsManager.Services.Hashes
 
             void MatchEntry(uint entryHash, BinTreeObject item)
             {
+                if (matcher.IsRemaining(InternalHashKind.BinEntries, entryHash))
+                    foreach (string candidate in BinEntryPathPatternSource.ImmediateEntryCandidates(item))
+                        if (MatchObservedEntry(entryHash, candidate)) break;
                 if (TryGetString(item.Properties, "AugmentNameId", out string generalAugName))
                 {
                     MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/Augments/{generalAugName}");
-                    foreach (int mapId in new[] { 11, 12, 21, 22, 30, 33, 35 })
+                    foreach (int mapId in BinEntryPathPatternSource.MapIds)
                     {
                         MatchObservedEntry(entryHash, $"Maps/Shipping/Map{mapId}/AugmentTags/{generalAugName}");
                     }
@@ -1224,7 +1237,7 @@ namespace AssetsManager.Services.Hashes
                         MatchEntryFromCandidates(entryHash, item, "mName", Enumerable.Range(1, 29)
                             .Select(set => (Func<string, string>)(value => $"Maps/Shipping/Map22/Sets/TFTSet{set}/Traits/{value}")));
                     else if (classHash == Fnv1a.HashLower("MapSkin"))
-                        MatchEntryFromCandidates(entryHash, item, "name", new[] { 11, 12, 21, 22, 30, 33, 35 }
+                        MatchEntryFromCandidates(entryHash, item, "name", BinEntryPathPatternSource.MapIds
                             .Select(map => (Func<string, string>)(value => $"Maps/Shipping/Map{map}/MapSkins/{value}")));
                     else if (classHash == Fnv1a.HashLower("AugmentData") || classHash == Fnv1a.HashLower("TftAugmentData"))
                     {
@@ -1233,7 +1246,7 @@ namespace AssetsManager.Services.Hashes
                             TryGetString(item.Properties, "name", out augName))
                         {
                             MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/Augments/{augName}");
-                            foreach (int mapId in new[] { 11, 12, 21, 22, 30, 33, 35 })
+                            foreach (int mapId in BinEntryPathPatternSource.MapIds)
                             {
                                 MatchObservedEntry(entryHash, $"Maps/Shipping/Map{mapId}/AugmentTags/{augName}");
                             }
@@ -1830,7 +1843,7 @@ namespace AssetsManager.Services.Hashes
                 if (TryGetString(item.Properties, "mScriptName", out string name))
                 {
                     var candidates = new List<string> { $"Items/Spells/{name}", $"Shared/Spells/{name}" };
-                    candidates.AddRange(new[] { 11, 12, 21, 22, 30, 33, 35 }.Select(map => $"Maps/Shipping/Map{map}/Spells/{name}"));
+                    candidates.AddRange(BinEntryPathPatternSource.MapIds.Select(map => $"Maps/Shipping/Map{map}/Spells/{name}"));
                     int digitCount = name.TakeWhile(char.IsAsciiDigit).Count();
                     if (digitCount > 0) candidates.Add($"Items/{name[..digitCount]}/Spells/{name}");
                     if (TryGetTftSet(name, out int spellSet)) candidates.Add($"Maps/Shipping/Map22/Sets/TFTSet{spellSet}/Spells/{name}");
@@ -1854,6 +1867,17 @@ namespace AssetsManager.Services.Hashes
 
                     foreach (string candidate in candidates)
                         if (MatchObservedEntry(entryHash, candidate)) break;
+
+                    if (matcher.IsRemaining(InternalHashKind.BinEntries, entryHash))
+                        foreach (int map in BinEntryPathPatternSource.MapIds)
+                        {
+                            foreach (string prefix in BinEntryPathPatternSource.CharacterPrefixes(name))
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                if (MatchObservedEntry(entryHash, $"Maps/Shipping/Map{map}/Spells/{prefix}/{name}")) break;
+                            }
+                            if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) break;
+                        }
                 }
 
                 if (item.Properties.TryGetValue(Fnv1a.HashLower("mSpell"), out BinTreeProperty spellProperty) && spellProperty is BinTreeStruct spell &&
@@ -1873,6 +1897,8 @@ namespace AssetsManager.Services.Hashes
                 foreach (var pair in map)
                 {
                     if (pair.Key is not BinTreeHash key || pair.Value is not BinTreeObjectLink link) continue;
+                    // Named catalog keys need no probes; retain matched keys for collision checks.
+                    if (!matcher.IsTargetOrMatched(InternalHashKind.BinHashes, key.Value)) continue;
                     string target = ResolveEntryPath(link.Value);
                     if (string.IsNullOrWhiteSpace(target)) continue;
                     if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, target, path, wadPath, key.Value)) continue;
@@ -1881,17 +1907,18 @@ namespace AssetsManager.Services.Hashes
                     string basename = target[(slash + 1)..];
                     if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename, path, wadPath, key.Value) ||
                         matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename + "_BV2", path, wadPath, key.Value)) continue;
-                    if (basename.Contains("Base_", StringComparison.Ordinal))
-                        matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename.Replace("Base_", "", StringComparison.Ordinal), path, wadPath, key.Value);
-                    for (int skin = 1; skin < 90; skin++)
-                    {
-                        string prefix = $"Skin{skin:00}_";
-                        if (basename.Contains(prefix, StringComparison.Ordinal))
+                    foreach (string candidate in BinEntryPathPatternSource.ResourceKeyCandidates(basename))
+                        if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, candidate, path, wadPath, key.Value)) break;
+                    // Preserve the previous single-skin-token rule when several different skins occur.
+                    if (matcher.IsRemaining(InternalHashKind.BinHashes, key.Value))
+                        for (int skin = 1; skin < 90; skin++)
                         {
-                            matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename.Replace(prefix, "", StringComparison.Ordinal), path, wadPath, key.Value);
+                            string token = $"Skin{skin:00}_";
+                            if (!basename.Contains(token, StringComparison.Ordinal)) continue;
+                            matcher.CheckContextualCandidate(InternalHashKind.BinHashes,
+                                basename.Replace(token, "", StringComparison.Ordinal), path, wadPath, key.Value);
                             break;
                         }
-                    }
                 }
             }
 

@@ -262,6 +262,7 @@ namespace AssetsManager.Services.Hashes
                 ? BinPathCasing.FromKnownNames((await _store.LoadKnownAsync(InternalHashKind.BinEntries, cancellationToken)).Values)
                 : BinPathCasing.Empty;
             BinLearnedTemplateSource learned = ShouldRunBin("bin-context-learned") ? new BinLearnedTemplateSource(_resolver, casing) : null;
+            BinEntryPathPatternSource entryPatterns = ShouldRunBin("bin-context-structures") ? new BinEntryPathPatternSource(_resolver) : null;
             int totalSources = wads.Length + looseBins.Length;
             int scanned = 0;
             int contentStartedCandidates = matcher.CheckedCandidates > int.MaxValue
@@ -330,10 +331,12 @@ namespace AssetsManager.Services.Hashes
                                             wadPath,
                                             _resolver,
                                             selectedSubMethods,
-                                            casing);
+                                            casing,
+                                            entryPatterns,
+                                            cancellationToken);
                                         learned?.Observe(tree, matcher, path, wadPath);
                                     }
-                                    catch (Exception)
+                                    catch (Exception ex) when (ex is not OperationCanceledException)
                                     {
                                         // Ignore malformed individual chunks and continue scanning
                                     }
@@ -353,7 +356,7 @@ namespace AssetsManager.Services.Hashes
                                 }
                             }
                         }
-                        catch (Exception)
+                        catch (Exception ex) when (ex is not OperationCanceledException)
                         {
                             // Skip corrupted container
                         }
@@ -379,10 +382,12 @@ namespace AssetsManager.Services.Hashes
                                     loosePath,
                                     resolver: _resolver,
                                     selectedSubMethods: selectedSubMethods,
-                                    casing: casing);
+                                    casing: casing,
+                                    entryPatterns: entryPatterns,
+                                    cancellationToken: cancellationToken);
                                 learned?.Observe(tree, matcher, loosePath, null);
                             }
-                            catch (Exception)
+                            catch (Exception ex) when (ex is not OperationCanceledException)
                             {
                                 // Continue
                             }
@@ -398,6 +403,11 @@ namespace AssetsManager.Services.Hashes
                         int learnedHits = learned.Apply(matcher);
                         _log.LogDebug($"Learned BIN templates resolved {learnedHits} hashes.");
                         if (learned.LastVocabularyGate is { } vocabularyGate) LogGate(vocabularyGate);
+                    }
+                    if (entryPatterns != null)
+                    {
+                        progress?.Report(CreateProgress(matcher, stopwatch, "Resolving linked BIN entries", scanned));
+                        entryPatterns.Apply(matcher, cancellationToken);
                     }
                     if (ShouldRunBin("bin-context-xxh3") && matcher.GetRemainingCount(InternalHashKind.BinXxh3) > 0)
                     {
