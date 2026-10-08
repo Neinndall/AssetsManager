@@ -66,7 +66,7 @@ internal sealed class GameBinLinkTemplateIndex
                         string value = Transform(identifier.Value, variant);
                         // Keep the variant key even when another transformation is identical: its
                         // spelling can diverge for a later identifier (camelCase vs snake_case).
-                        if (value.Length < 4) continue;
+                        if (value.Length < 3) continue;
                         var key = new Key(type, link.NameHash, identifier.Key, variant);
                         if (resolved && TryLearn(path, value, out Template template))
                             Learn(key, template);
@@ -166,7 +166,7 @@ internal sealed class GameBinLinkTemplateIndex
     private static bool IsNamedIdentifier(string name) => !string.IsNullOrWhiteSpace(name) &&
         !name.StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
         !(name.Length is 8 or 16 && name.All(char.IsAsciiHexDigit));
-    private static bool IsIdentifier(string value) => value.Length is >= 4 and <= 128 &&
+    private static bool IsIdentifier(string value) => value.Length is >= 3 and <= 128 &&
         value.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-');
     private static string Transform(string value, int variant) => variant switch
     {

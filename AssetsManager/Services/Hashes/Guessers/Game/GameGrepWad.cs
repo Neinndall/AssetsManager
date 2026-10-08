@@ -2256,17 +2256,17 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             IReadOnlyDictionary<ulong, string> knownDict = HashFile.Load();
 
             // Ensure any sprite hash not in HashFile is marked unknown in engine
-            bool hasUnresolvedSprites = false;
+            var unresolvedSprites = new HashSet<ulong>();
             foreach (var sprite in atlas.Sprites)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (engine.UnknownHashes.Contains(sprite.SpriteHash) || !knownDict.ContainsKey(sprite.SpriteHash))
                 {
                     engine.EnsureUnknown(sprite.SpriteHash);
-                    hasUnresolvedSprites = true;
+                    unresolvedSprites.Add(sprite.SpriteHash);
                 }
             }
-            if (!hasUnresolvedSprites) return;
+            if (unresolvedSprites.Count == 0) return;
 
             var candidateDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -2301,36 +2301,17 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             foreach (string baseDir in candidateDirs)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                string normalizedDirectory = PathUtils.NormalizePath(baseDir);
                 foreach (string pattern in candidatePatterns)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    Check(engine, $"{baseDir}/{pattern}", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
-
-                    // If all sprites in this atlas are resolved, stop immediately
-                    bool stillHasUnresolved = false;
-                    foreach (var sprite in atlas.Sprites)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (engine.UnknownHashes.Contains(sprite.SpriteHash))
-                        {
-                            stillHasUnresolved = true;
-                            break;
-                        }
-                    }
-                    if (!stillHasUnresolved || engine.RemainingUnknownCount == 0) break;
+                    bool matched = engine.CheckNormalizedParts(normalizedDirectory, "/", pattern,
+                        HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+                    // Misses cannot change the outstanding sprite set; rescan only after a hit.
+                    if (matched) unresolvedSprites.RemoveWhere(hash => !engine.UnknownHashes.Contains(hash));
+                    if (unresolvedSprites.Count == 0 || engine.RemainingUnknownCount == 0) break;
                 }
-
-                bool anyRemaining = false;
-                foreach (var sprite in atlas.Sprites)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (engine.UnknownHashes.Contains(sprite.SpriteHash))
-                    {
-                        anyRemaining = true;
-                        break;
-                    }
-                }
-                if (!anyRemaining || engine.RemainingUnknownCount == 0) break;
+                if (unresolvedSprites.Count == 0 || engine.RemainingUnknownCount == 0) break;
             }
         }
 

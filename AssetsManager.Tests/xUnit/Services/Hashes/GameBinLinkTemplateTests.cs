@@ -113,6 +113,52 @@ public sealed class GameBinLinkTemplateTests
     }
 
     [Fact]
+    public void LearnsShortAnimationIdentifiers()
+    {
+        const string seed = "assets/animations/run_loop.anm";
+        const string target = "assets/animations/die_loop.anm";
+        var index = new GameBinLinkTemplateIndex();
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+        var known = new Dictionary<ulong, string> { [XxHash64Ext.Hash(seed)] = seed };
+        index.Guess(engine, Tree("Run", XxHash64Ext.Hash(seed)), known, null, null, "seed", 1, CancellationToken.None);
+        index.Guess(engine, Tree("Die", XxHash64Ext.Hash(target)), known, null, null, "target", 2, CancellationToken.None);
+        Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+    }
+
+    [Fact]
+    public void AtlasRetainsUnrelatedMatchesAndNewUnresolvedSprites()
+    {
+        const string directory = "assets/items/icons2d/autoatlas/largeicons";
+        const string unrelated = directory + "/a_icon.png";
+        const string sprite = directory + "/b_icon.png";
+        var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+        {
+            "assets/items/icons2d/a_icon.png", "assets/items/icons2d/b_icon.png"
+        }));
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(unrelated) });
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+        writer.Write(new byte[] { 0x49, 0x4d, 0x41, 0x41 });
+        writer.Write(1U);
+        writer.Write(1UL);
+        writer.Write(2U);
+        foreach (ulong hash in new[] { XxHash64Ext.Hash(sprite), 42UL })
+        {
+            writer.Write(hash);
+            for (int i = 0; i < 4; i++) writer.Write(0f);
+            writer.Write(0U);
+        }
+        guesser.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()),
+            "ASSETS\\ITEMS\\ICONS2D\\AUTOATLAS\\LARGEICONS\\atlas_info.bin", "atlas.wad", 7);
+        Assert.Equal(2, engine.Matches.Count);
+        Assert.Equal(sprite, engine.Matches[XxHash64Ext.Hash(sprite)].Path);
+        Assert.Equal(unrelated, engine.Matches[XxHash64Ext.Hash(unrelated)].Path);
+        Assert.Equal("atlas.wad", engine.Matches[XxHash64Ext.Hash(sprite)].SourceWadPath);
+        Assert.Equal(7UL, engine.Matches[XxHash64Ext.Hash(sprite)].SourceChunkHash);
+        Assert.Equal(new[] { 42UL }, engine.UnknownHashes);
+    }
+
+    [Fact]
     public void CharacterFilesProjectBorrowedBodyTexturesIntoObservedJadeSkins()
     {
         const string target = "assets/characters/jade_lux/skins/skin301/lux_skin07_tx_cm.tex";

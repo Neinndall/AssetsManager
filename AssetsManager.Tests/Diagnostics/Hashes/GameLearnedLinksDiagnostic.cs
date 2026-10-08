@@ -9,6 +9,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
 using AssetsManager.Services.Hashes.Guessers.Game;
 using AssetsManager.Views.Models.Hashes;
+using AssetsManager.Services.Parsers;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Wad;
 
@@ -41,6 +42,7 @@ internal static class GameLearnedLinksDiagnostic
         string ResolveWide(ulong h) => names.GetValueOrDefault(h, h.ToString("x16"));
         var guesser = new GameHashGuesser(hashFile, null, Resolve, ResolveWide);
         bool grep = args.Contains("--grep");
+        bool atlas = args.Contains("--atlas");
         string root = args.FirstOrDefault(a => a.StartsWith("--root="))?[7..]
             ?? @"C:\Riot Games\League of Legends (PBE)\Game";
         string filter = args.FirstOrDefault(a => a.StartsWith("--wad="))?[6..];
@@ -56,16 +58,20 @@ internal static class GameLearnedLinksDiagnostic
         {
             if (filter != null && !wadPath.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
             using var wad = new WadFile(wadPath);
-            if (!wad.Chunks.Keys.Any(unknown.Contains) && filter == null) continue;
+            if (!atlas && !wad.Chunks.Keys.Any(unknown.Contains) && filter == null) continue;
             int count = 0;
             foreach (var chunk in wad.Chunks.Values)
             {
-                if (!known.TryGetValue(chunk.PathHash, out string path) || !path.EndsWith(".bin", StringComparison.Ordinal)) continue;
+                known.TryGetValue(chunk.PathHash, out string path);
+                if (!atlas && (path == null || !path.EndsWith(".bin", StringComparison.Ordinal))) continue;
+                if (atlas && (chunk.Compression == WadChunkCompression.Satellite || chunk.UncompressedSize < 24 || chunk.UncompressedSize > 32_768)) continue;
                 if (!visited.Add((chunk.PathHash, chunk.Checksum))) continue;
                 try
                 {
                     using var data = wad.LoadChunkDecompressed(chunk);
-                    if (grep)
+                    if (atlas && !ImageAutoAtlas.IsAtlas(data.Span)) continue;
+                    path ??= chunk.PathHash.ToString("x16");
+                    if (grep || atlas)
                         guesser.GrepWad(engine, data.DangerousGetArray(), path, wadPath, chunk.PathHash, CancellationToken.None);
                     else
                     {
@@ -78,7 +84,7 @@ internal static class GameLearnedLinksDiagnostic
             }
             Console.WriteLine($"WAD {Path.GetFileName(wadPath)}: {count} BINs; {engine.CheckedCandidates} candidates; {engine.Matches.Count} matches");
         }
-        string summary = $"{(basic ? "Character files" : grep ? "GrepWad BIN cohort" : "Learned links")}: {unknown.Count} initial; {engine.CheckedCandidates} candidates; {engine.Matches.Count} matches; {engine.RemainingUnknownCount} remaining; {watch.Elapsed}. Nothing persisted.";
+        string summary = $"{(basic ? "Character files" : atlas ? "GrepWad atlas cohort" : grep ? "GrepWad BIN cohort" : "Learned links")}: {unknown.Count} initial; {engine.CheckedCandidates} candidates; {engine.Matches.Count} matches; {engine.RemainingUnknownCount} remaining; {watch.Elapsed}. Nothing persisted.";
         Console.WriteLine(summary);
         if (output != null)
             File.WriteAllLines(output, new[] { summary }.Concat(engine.Matches.Values.OrderBy(m => m.Path)
