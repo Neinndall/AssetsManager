@@ -2011,6 +2011,53 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(2, checkedCandidates);
         }
 
+        [Theory]
+        [InlineData("large_alpha_beta.tex", "alpha_beta.tex")]
+        [InlineData("alpha_large_beta.dds", "alpha_beta.dds")]
+        [InlineData("alpha_beta_large.tex", "alpha_beta.tex")]
+        [InlineData("alpha_beta_large.patch_2026.tex", "alpha_beta.patch_2026.tex")]
+        [InlineData("alpha_large_beta.anm", "alpha_beta.anm")]
+        public void GameBasenameVariantsRemoveOneTokenWithoutChangingFoldersOrDecorations(string source, string target)
+        {
+            const string folder = "assets/characters/example_name/skins/skin7/";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { folder + source }));
+            var engine = CreateEngine(HashGuessDomain.Game, folder + target, "assets/characters/example/skins/skin7/" + target);
+            game.RemoveBasenameTokens(engine, CancellationToken.None);
+            Assert.Equal(folder + target, Assert.Single(engine.Matches).Value.Path);
+        }
+
+        [Fact]
+        public void GameBasenameTokenRemovalKeepsSingleTokenFilenamesAndHonorsBudget()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "assets/ui/alpha_beta.tex", "assets/ui/solo.tex" }));
+            var engine = CreateEngine(HashGuessDomain.Game, "assets/ui/beta.tex", "assets/ui/alpha.tex", "assets/ui/.tex");
+            Assert.Equal(1, game.RemoveBasenameTokens(engine, CancellationToken.None, candidateBudget: 1));
+            Assert.Equal("assets/ui/beta.tex", Assert.Single(engine.Matches).Value.Path);
+            Assert.Single(engine.Matches);
+            Assert.Throws<OperationCanceledException>(() => game.RemoveBasenameTokens(engine, new CancellationToken(true)));
+        }
+
+        [Theory]
+        [InlineData("solo.tex")]
+        [InlineData("_solo.tex")]
+        [InlineData("solo_.tex")]
+        public void GameBasenameTokenRemovalDoesNotProduceAnEmptyFilename(string filename)
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "assets/ui/" + filename }));
+            var engine = CreateEngine(HashGuessDomain.Game, "assets/ui/.tex");
+            game.RemoveBasenameTokens(engine, CancellationToken.None);
+            Assert.Empty(engine.Matches);
+        }
+
+        [Fact]
+        public void GameBasenamePrefixesDoNotRemoveTokens()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "assets/ui/alpha_large_beta.tex" }));
+            var engine = CreateEngine(HashGuessDomain.Game, "assets/ui/alpha_beta.tex");
+            game.CheckBasenamePrefixes(engine, CancellationToken.None);
+            Assert.Empty(engine.Matches);
+        }
+
         [Fact]
         public void LcuBuildWordlistUsesFullFilteredPaths()
         {

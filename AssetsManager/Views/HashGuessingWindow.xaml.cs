@@ -129,6 +129,7 @@ namespace AssetsManager.Views
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-locales", Name = "SubstituteLang", Description = "28 region and language translations", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-extensions", Name = "SubstituteExtensions", Description = "Cross-extension permutations (.dds, .tex, .bin, .anm)", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-prefixes", Name = "CheckBasenamePrefixes", Description = "Basename prefixes (2x_, 4x_, sd_, tft_, common_, base_, sru_, icon_)", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-tokenremoval", Name = "RemoveBasenameTokens", Description = "Shorter texture and animation filenames by removing one name token", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-numbers", Name = "SubstituteBasicNumbers", Description = "Sequential numbers (1 to 200) and padded variants (01 to 99)", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
             _allMethods.Add(gameBasic);
 

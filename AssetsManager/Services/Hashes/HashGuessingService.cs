@@ -420,6 +420,14 @@ namespace AssetsManager.Services.Hashes
                         progress: count => progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", progressOffset + count)));
                 }
 
+                if (engine.RemainingUnknownCount > 0 && ShouldRun("game-basic-tokenremoval"))
+                {
+                    progress?.Report(engine.CreateProgress("GAME Basic: basename token removal", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.RemoveBasenameTokens(engine, cancellationToken,
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: basename token removal", progressOffset + count)));
+                }
+
                 if (engine.RemainingUnknownCount > 0 && ShouldRun("game-basic-numbers"))
                 {
                     progress?.Report(engine.CreateProgress("GAME Basic: numeric variants", checkedCandidates));

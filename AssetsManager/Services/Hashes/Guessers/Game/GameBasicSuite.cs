@@ -103,6 +103,41 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             return checkedCount;
         }
 
+        internal int RemoveBasenameTokens(HashGuessEngine engine, CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue, Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0 || engine.RemainingUnknownCount == 0) return 0;
+            int checkedCount = 0;
+            foreach (string path in KnownPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!path.EndsWith(".tex", StringComparison.Ordinal) && !path.EndsWith(".dds", StringComparison.Ordinal) &&
+                    !path.EndsWith(".anm", StringComparison.Ordinal)) continue;
+                int start = path.LastIndexOf('/') + 1;
+                int end = path.IndexOf('.', start);
+                for (int tokenStart = start; tokenStart < end;)
+                {
+                    int separator = path.IndexOf('_', tokenStart, end - tokenStart);
+                    int tokenEnd = separator < 0 ? end : separator;
+                    if (tokenEnd > tokenStart && (separator >= 0 || tokenStart > start))
+                    {
+                        int cutStart = separator >= 0 ? tokenStart : tokenStart - 1;
+                        int cutEnd = separator >= 0 ? separator + 1 : tokenEnd;
+                        if (cutEnd - cutStart >= end - start) { tokenStart = tokenEnd + 1; continue; }
+                        engine.CheckNormalizedParts(path.AsSpan(0, cutStart), ReadOnlySpan<char>.Empty, path.AsSpan(cutEnd),
+                            HashGuessStrategy.WordlistVariant, "GAME basename token removal");
+                        checkedCount++;
+                        if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
+                        if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
+                    }
+                    tokenStart = tokenEnd + 1;
+                }
+            }
+            return checkedCount;
+        }
+
         internal int SubstituteLang(
             HashGuessEngine engine,
             CancellationToken cancellationToken,

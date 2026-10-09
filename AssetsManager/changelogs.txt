@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Lab / GAME Basic Suite also finds shorter texture and animation filenames by removing individual name tokens.
   - Hash Lab / GAME Basic Suite finds reused files in companion and map containers, including new skins.
   - Hash Lab / GAME guessing finds more animations and avoids repeated character guesses.
   - Hash Lab / BIN Context now finds more resolver keys, scripts, spells, TFT properties, anvils and game mode entries.

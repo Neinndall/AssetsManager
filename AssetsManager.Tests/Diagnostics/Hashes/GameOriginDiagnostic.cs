@@ -25,13 +25,15 @@ internal static class GameOriginDiagnostic
         var pending = File.ReadLines(Path.Combine(local, "hash_lab", "unknowns.game.txt"))
             .Where(l => ulong.TryParse(l.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _))
             .Select(l => ulong.Parse(l.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture)).ToHashSet();
-        if (args.Contains("--basic-copies", StringComparer.Ordinal) || args.Contains("--banners", StringComparer.Ordinal))
+        if (args.Contains("--basic-copies", StringComparer.Ordinal) || args.Contains("--banners", StringComparer.Ordinal) || args.Contains("--token-removal", StringComparer.Ordinal))
         {
+            var timer = System.Diagnostics.Stopwatch.StartNew();
             var production = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Path.Combine(local, "hashes", "hashes.game.txt")));
-            var dryRun = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(pending), m => Console.WriteLine($"MATCH {m.Hash:x16} {m.Path}"));
+            var dryRun = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(pending), m => Console.WriteLine($"MATCH {m.Hash:x16} {m.Path} [{m.SourceWadPath}]"));
             if (args.Contains("--basic-copies", StringComparer.Ordinal)) production.GuessIdenticalCopies(dryRun, root, CancellationToken.None);
+            else if (args.Contains("--token-removal", StringComparer.Ordinal)) production.RemoveBasenameTokens(dryRun, CancellationToken.None);
             else production.GuessEsportsBanners(dryRun, null, CancellationToken.None);
-            Console.WriteLine($"Production dry run: {dryRun.Matches.Count} hits; {dryRun.CheckedCandidates:N0} candidates; nothing persisted");
+            Console.WriteLine($"Production dry run: {dryRun.Matches.Count} hits; {dryRun.CheckedCandidates:N0} candidates; {timer.Elapsed.TotalSeconds:F1}s; nothing persisted");
             return;
         }
         string[] wads = Directory.GetFiles(Path.Combine(root, "Game"), "*.wad.client", SearchOption.AllDirectories);
