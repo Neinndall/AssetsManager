@@ -88,5 +88,45 @@ namespace AssetsManager.Services.Viewer.Semantics
         /// </summary>
         internal static Matrix4x4 VfxWorldTransform(Matrix4x4 authoredTransform) =>
             Matrix4x4.CreateScale(-1f, 1f, 1f) * SceneTransform(authoredTransform);
+
+        internal static (Vector3 Center, float Radius) PoseReach(Vector3[] positions)
+        {
+            if (positions == null || positions.Length == 0) return (Vector3.Zero, float.PositiveInfinity);
+            Vector3 min = new(float.PositiveInfinity), max = new(float.NegativeInfinity);
+            foreach (Vector3 position in positions)
+            {
+                min = Vector3.Min(min, position);
+                max = Vector3.Max(max, position);
+            }
+            return ((min + max) * 0.5f, Vector3.Distance(min, max));
+        }
+
+        internal static bool PoseInView(Vector3 center, float radius, Matrix4x4 world, Matrix4x4 viewProjection)
+        {
+            // Twice the bind-pose radius allows for animation, matching the map preview's pose slack.
+            center = Vector3.Transform(center, world);
+            float scale = MathF.Sqrt(MathF.Max(
+                world.M11 * world.M11 + world.M12 * world.M12 + world.M13 * world.M13,
+                MathF.Max(world.M21 * world.M21 + world.M22 * world.M22 + world.M23 * world.M23,
+                    world.M31 * world.M31 + world.M32 * world.M32 + world.M33 * world.M33)));
+            radius *= scale;
+            if (!float.IsFinite(radius)) return true;
+            var m = viewProjection;
+            Span<Vector4> planes = stackalloc Vector4[6]
+            {
+                new(m.M14 + m.M11, m.M24 + m.M21, m.M34 + m.M31, m.M44 + m.M41),
+                new(m.M14 - m.M11, m.M24 - m.M21, m.M34 - m.M31, m.M44 - m.M41),
+                new(m.M14 + m.M12, m.M24 + m.M22, m.M34 + m.M32, m.M44 + m.M42),
+                new(m.M14 - m.M12, m.M24 - m.M22, m.M34 - m.M32, m.M44 - m.M42),
+                new(m.M14 + m.M13, m.M24 + m.M23, m.M34 + m.M33, m.M44 + m.M43),
+                new(m.M14 - m.M13, m.M24 - m.M23, m.M34 - m.M33, m.M44 - m.M43)
+            };
+            foreach (Vector4 plane in planes)
+            {
+                Vector3 normal = new(plane.X, plane.Y, plane.Z);
+                if (Vector3.Dot(normal, center) + plane.W < -radius * normal.Length()) return false;
+            }
+            return true;
+        }
     }
 }

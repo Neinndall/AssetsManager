@@ -35,7 +35,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             IReadOnlyDictionary<uint, MapVisibilityControllerData> controllers =
                 new MapVisibilityParser().ParseControllers(MaterialsTree());
 
-            Assert.Equal(MapVisibilityControllerKind.PrimaryFlags, controllers[Mountain].Kind);
+            Assert.Equal(MapVisibilityControllerKind.Terrain, controllers[Mountain].Kind);
             Assert.Equal(4, controllers[Mountain].Mask);
             Assert.Equal(MapVisibilityControllerKind.SecondaryFlags, controllers[BaronTunnel].Kind);
             Assert.Equal(4, controllers[BaronTunnel].Mask);
@@ -116,7 +116,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
-        public void UnknownAndCyclicControllersDoNotHangOrHide()
+        public void UndeclaredPlaceableControllersAndCyclicParentsAreHidden()
         {
             var controllers = new Dictionary<uint, MapVisibilityControllerData>
             {
@@ -125,8 +125,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             };
             var visibility = new MapSceneVisibility(MapVisibilityDefinitions.Empty, controllers, MapVisibilityState.FromFlags(1));
 
-            Assert.True(MapVisibilitySemantics.IsVisible(visibility, visibility.Opening, 0x01, 0xdeadbeef));
-            Assert.True(MapVisibilitySemantics.IsVisible(visibility, visibility.Opening, 0x01, 1));
+            Assert.False(MapVisibilitySemantics.IsVisible(visibility, visibility.Opening, 0x01, 0xdeadbeef));
+            Assert.True(MapVisibilitySemantics.IsMeshVisible(visibility, visibility.Opening, 0x01, 0xdeadbeef));
+            Assert.False(MapVisibilitySemantics.IsVisible(visibility, visibility.Opening, 0x01, 1));
             Assert.False(MapVisibilitySemantics.IsVisible(visibility, visibility.Opening, 0x02, null));
         }
 
@@ -192,7 +193,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             model.MapMutators.Single().IsEnabled = true;
 
             Assert.Equal(3, requests.Count);
-            Assert.Equal(new MapVisibilityState(0x05, 4, new[] { "SR_Hall_Of_Legends" }), requests[^1]);
+            Assert.Equal(new MapVisibilityState(0x05, 4, new[] { "SR_Hall_Of_Legends" }, hasSecondaryOverride: true), requests[^1]);
             Assert.True(model.MapLayers[1].IsEnabled);
 
             model.RequestMapLayerFlags(0x04);
@@ -250,7 +251,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             new(hash, type, new BinTreeProperty[]
             {
                 new BinTreeHash(Fnv1a.HashLower("PathHash"), hash),
-                new BinTreeBool(Fnv1a.HashLower("DefaultVisible"), false),
+                new BinTreeBool(Fnv1a.HashLower("DefaultVisible"), hash == BaronBase),
                 new BinTreeU8(field, mask)
             });
 

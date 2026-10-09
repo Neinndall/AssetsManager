@@ -18,6 +18,8 @@ namespace AssetsManager.Services.Viewer.Parsing
         internal static readonly uint ChildControllerClass = Fnv1a.HashLower("ChildMapVisibilityController");
         internal static readonly uint NamedControllerClass = 0xe07edfa4;
         internal static readonly uint VisFlagsControllerClass = 0x6b863734;
+        internal static readonly uint LogicDriverControllerClass = Fnv1a.HashLower("LogicDriverVisibilityController");
+        internal const uint ProviderControllerClass = 0xf9cfefd4;
 
         // Unnamed Riot classes whose u8 field is a bit set of the primary (0xc406a533) or
         // secondary (0xec733fe2) domain; both share the name/DefaultVisible layout of 0xe07edfa4.
@@ -87,13 +89,10 @@ namespace AssetsManager.Services.Viewer.Parsing
             }
             if (type == ChildControllerClass)
             {
-                uint mode = properties.TryGetValue(ParentModeField, out BinTreeProperty modeProperty) &&
-                            modeProperty is BinTreeU32 value
-                    ? value.Value
-                    : 0u;
+                ulong mode = ReadUnsigned(properties, ParentModeField) ?? 0;
                 return new MapVisibilityControllerData(
                     entry.PathHash,
-                    MapVisibilityControllerKind.Child,
+                    mode <= 3 ? MapVisibilityControllerKind.Child : MapVisibilityControllerKind.Driven,
                     Parents: ReadLinks(properties, ParentsField),
                     ParentMode: (MapVisibilityParentMode)mode);
             }
@@ -101,7 +100,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             {
                 return new MapVisibilityControllerData(
                     entry.PathHash,
-                    MapVisibilityControllerKind.PrimaryFlags,
+                    MapVisibilityControllerKind.Terrain,
                     Mask: ReadByte(properties, PrimaryFlagsField),
                     DefaultVisible: ReadBool(properties, DefaultVisibleField, fallback: true));
             }
@@ -118,15 +117,19 @@ namespace AssetsManager.Services.Viewer.Parsing
                     entry.PathHash,
                     MapVisibilityControllerKind.SecondaryFlags,
                     Mask: ReadByte(properties, SecondaryFlagsField),
-                    DefaultVisible: ReadBool(properties, DefaultVisibleField, fallback: true));
+                    DefaultVisible: ReadBool(properties, DefaultVisibleField, fallback: true),
+                    TerrainMask: ReadByte(properties, PrimaryFlagsField));
             }
             if (type == NamedControllerClass)
             {
                 return new MapVisibilityControllerData(
                     entry.PathHash,
                     MapVisibilityControllerKind.Named,
-                    DefaultVisible: ReadBool(properties, DefaultVisibleField, fallback: true));
+                    DefaultVisible: ReadBool(properties, DefaultVisibleField, fallback: true),
+                    TerrainMask: ReadByte(properties, PrimaryFlagsField));
             }
+            if (type == LogicDriverControllerClass || type == ProviderControllerClass)
+                return new MapVisibilityControllerData(entry.PathHash, MapVisibilityControllerKind.Driven);
             return null;
         }
 
@@ -191,7 +194,6 @@ namespace AssetsManager.Services.Viewer.Parsing
             return container.Elements
                 .OfType<BinTreeObjectLink>()
                 .Select(link => link.Value)
-                .Where(hash => hash != 0)
                 .ToArray();
         }
 
@@ -215,10 +217,18 @@ namespace AssetsManager.Services.Viewer.Parsing
                 : resolved;
         }
 
-        private static int ReadByte(IReadOnlyDictionary<uint, BinTreeProperty> properties, uint field) =>
-            properties.TryGetValue(field, out BinTreeProperty property) && property is BinTreeU8 value
-                ? value.Value
-                : 0;
+        private static int ReadByte(IReadOnlyDictionary<uint, BinTreeProperty> properties, uint field)
+            => ReadUnsigned(properties, field) is ulong value && value <= byte.MaxValue ? (int)value : 0;
+
+        private static ulong? ReadUnsigned(IReadOnlyDictionary<uint, BinTreeProperty> properties, uint field)
+            => properties.TryGetValue(field, out BinTreeProperty property) ? property switch
+            {
+                BinTreeU8 value => value.Value,
+                BinTreeU16 value => value.Value,
+                BinTreeU32 value => value.Value,
+                BinTreeU64 value => value.Value,
+                _ => null
+            } : null;
 
         private static bool ReadBool(IReadOnlyDictionary<uint, BinTreeProperty> properties, uint field, bool fallback) =>
             properties.TryGetValue(field, out BinTreeProperty property)

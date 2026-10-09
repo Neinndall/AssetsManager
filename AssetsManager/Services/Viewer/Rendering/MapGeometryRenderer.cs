@@ -132,6 +132,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private MapSceneData _scene;
         private MapSunData _previewSun;
         private DrawPlan _plan;
+        private readonly MapGeometryDrawQueue _visibleDrawQueue = new();
         private int _visibilityFlags;
         private string _mapSkin;
         private readonly Dictionary<MapTextureReference, uint> _environmentCubes = new();
@@ -447,6 +448,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 solidPlan = _programPlan;
             }
 
+            _visibleDrawQueue.Prepare(_scene.Geometry, solidPlan, viewProjection, eye);
             PrepareStockFrame(viewProjection);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindVertexArray(_vao);
@@ -463,14 +465,14 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gl.UseProgram(_program);
                     _gl.Uniform1(_uWireframePass, 0);
                     if (transparentPass != true)
-                        DrawGroups(solidPlan.OpaqueGroups, solidMode, shadersEnabled, in gameFrame);
+                        DrawGroups(_visibleDrawQueue.Opaque, solidMode, shadersEnabled, in gameFrame);
                     if (transparentPass != false)
                     {
                         GameShaderRuntime.Frame transparentFrame = WithScreenCapture(
                             gameFrame,
                             solidPlan,
                             shadersEnabled && solidMode == StudioViewMode.Lit);
-                        DrawGroups(solidPlan.TransparentGroups, solidMode, shadersEnabled, in transparentFrame);
+                        DrawGroups(_visibleDrawQueue.Transparent, solidMode, shadersEnabled, in transparentFrame);
                     }
                 }
 
@@ -486,8 +488,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                         PreviewWireColor.Z,
                         wireOpacity);
                     ApplyWireframeState(wireOpacity);
-                    DrawWireGroups(_plan.OpaqueGroups);
-                    DrawWireGroups(_plan.TransparentGroups);
+                    DrawWireGroups(_visibleDrawQueue.Opaque);
+                    DrawWireGroups(_visibleDrawQueue.Transparent);
                 }
             }
             finally

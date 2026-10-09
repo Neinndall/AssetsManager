@@ -35,6 +35,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             internal MapCharacterAssetData Asset;
             internal Func<string, uint?> ProgramTextureLookup;
             internal Vector3 BoundsCenter;
+            internal float PoseRadius;
             internal uint Vao;
             internal uint PositionVbo;
             internal uint NormalVbo;
@@ -222,7 +223,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             Vector3 errored = erroredLinear ?? DefaultErrored;
             if (transparentPass != true)
             {
-                BuildQueues(groups, cameraPosition, timeSeconds, hidden);
+                BuildQueues(groups, cameraPosition, timeSeconds, viewProjection, hidden);
                 PreparePassQueues(shadersEnabled && viewMode == StudioViewMode.Lit);
             }
             if (_opaque.Count == 0 && _transparent.Count == 0)
@@ -309,6 +310,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             IReadOnlyList<MapCharacterRuntimeGroup> groups,
             Vector3 cameraPosition,
             float timeSeconds,
+            Matrix4x4 viewProjection,
             IReadOnlySet<string> hidden = null)
         {
             _opaque.Clear();
@@ -324,6 +326,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
                 if (group.PreviewClip != null && group.PreviewPlacement != null)
                 {
+                    if (!group.AnimationGroups.Any(animation => animation.Placements.Any(placement =>
+                            PlacementInView(resources, placement, viewProjection, hidden)))) continue;
                     Matrix4x4[] previewJoints = group.Animation.EvaluateClip(
                         group.Asset,
                         group.PreviewClip,
@@ -333,6 +337,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
                     foreach (MapCharacterAnimationPlacementGroup animationGroup in group.AnimationGroups)
                     {
+                        if (!animationGroup.Placements.Any(placement => PlacementInView(resources, placement, viewProjection, hidden)))
+                            continue;
                         Matrix4x4[] authoredJoints = group.Animation.Evaluate(
                             group.Asset,
                             animationGroup.Animation,
@@ -342,6 +348,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
                         foreach (MapCharacterRuntimePlacement runtimePlacement in animationGroup.Placements)
                         {
+                            if (!PlacementInView(resources, runtimePlacement, viewProjection, hidden)) continue;
                             bool previewPlacement = ReferenceEquals(runtimePlacement.Placement, group.PreviewPlacement);
                             QueuePlacement(
                                 group,
@@ -359,10 +366,12 @@ namespace AssetsManager.Services.Viewer.Rendering
 
                 foreach (MapCharacterAnimationPlacementGroup animationGroup in group.AnimationGroups)
                 {
+                    if (!animationGroup.Placements.Any(placement => PlacementInView(resources, placement, viewProjection, hidden)))
+                        continue;
                     Matrix4x4[] joints = group.Animation.Evaluate(group.Asset, animationGroup.Animation, timeSeconds);
                     Matrix4x4[] palette = GetPalette(resources, animationGroup.Animation);
                     FillInfluencePalette(palette, joints, resources.InfluenceJointSlots);
-                    QueuePlacements(group, resources, animationGroup.Placements, palette, cameraPosition, hidden, timeSeconds);
+                    QueuePlacements(group, resources, animationGroup.Placements, palette, cameraPosition, hidden, timeSeconds, viewProjection);
                 }
             }
         }
@@ -374,10 +383,12 @@ namespace AssetsManager.Services.Viewer.Rendering
             Matrix4x4[] palette,
             Vector3 cameraPosition,
             IReadOnlySet<string> hidden,
-            float timeSeconds)
+            float timeSeconds,
+            Matrix4x4 viewProjection)
         {
             foreach (MapCharacterRuntimePlacement runtimePlacement in placements)
             {
+                if (!PlacementInView(resources, runtimePlacement, viewProjection, hidden)) continue;
                 QueuePlacement(
                     group,
                     resources,
@@ -389,6 +400,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                     previewVisibility: false);
             }
         }
+
+        private static bool PlacementInView(SkinResources resources, MapCharacterRuntimePlacement placement,
+            Matrix4x4 viewProjection, IReadOnlySet<string> hidden)
+            => !MapOutlineSemantics.IsHidden(hidden, placement.Placement.ChunkHash, placement.Placement.KeyHash) &&
+               MapCharacterSemantics.PoseInView(resources.BoundsCenter, resources.PoseRadius, placement.World, viewProjection);
 
         private void QueuePlacement(
             MapCharacterRuntimeGroup group,
@@ -701,6 +717,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             {
                 Asset = asset,
                 BoundsCenter = MeshBoundsCenter(asset.Mesh?.Positions),
+                PoseRadius = MapCharacterSemantics.PoseReach(asset.Mesh?.Positions).Radius,
                 Vao = _gl.GenVertexArray(),
                 HasSkin = mesh.HasSkin,
                 InfluenceJointSlots = BuildInfluenceJointSlots(asset.Skeleton),

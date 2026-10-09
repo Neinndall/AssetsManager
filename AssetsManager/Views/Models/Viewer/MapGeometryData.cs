@@ -44,10 +44,10 @@ namespace AssetsManager.Views.Models.Viewer
             if (layer is < 0 or > 7)
                 return false;
 
-            return (Visibility & (1 << layer)) != 0;
+            return IsVisibleForFlags(1 << layer);
         }
 
-        public bool IsVisibleForFlags(int flags) => (Visibility & flags) != 0;
+        public bool IsVisibleForFlags(int flags) => Visibility == 0xff || (Visibility & flags) != 0;
     }
 
     internal sealed record MapGeometrySubmeshData(

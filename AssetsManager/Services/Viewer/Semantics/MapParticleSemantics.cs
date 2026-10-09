@@ -27,13 +27,14 @@ namespace AssetsManager.Services.Viewer.Semantics
             => PlayedFor(particles, null, MapVisibilityState.FromFlags(flags));
 
         /// <summary>
-        /// Particles the previewed game state plays. Transitional and start-disabled placements
-        /// belong to gameplay events, so a static state never starts them.
+        /// Visible particles and explicitly requested events. Transitional placements never loop.
         /// </summary>
         public static IReadOnlyList<MapParticleData> PlayedFor(
             IEnumerable<MapParticleData> particles,
             MapSceneVisibility visibility,
-            MapVisibilityState state)
+            MapVisibilityState state,
+            bool events = false,
+            IReadOnlySet<string> picked = null)
         {
             if (particles == null)
                 return Array.Empty<MapParticleData>();
@@ -42,12 +43,13 @@ namespace AssetsManager.Services.Viewer.Semantics
                 .Where(particle =>
                     particle != null &&
                     !particle.Transitional &&
-                    !particle.StartDisabled &&
-                    MapVisibilitySemantics.IsVisible(
+                    ((!particle.StartDisabled && MapVisibilitySemantics.IsVisible(
                         visibility,
                         state,
                         particle.Placeable.Visibility,
-                        particle.VisibilityController))
+                        particle.VisibilityController)) ||
+                     (state != null && MapVisibilitySemantics.LayerVisible(particle.Visibility, state.Flags) &&
+                      (events || picked?.Contains(MapOutlineSemantics.ItemId(particle.ChunkHash, particle.KeyHash)) == true))))
                 .ToArray();
         }
 

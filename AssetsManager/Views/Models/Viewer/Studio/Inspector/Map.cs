@@ -210,7 +210,9 @@ namespace AssetsManager.Views.Models.Viewer
             RequestMapVisibility(new MapVisibilityState(
                 _mapVisibility.Flags,
                 _mapVisibility.SecondaryFlags,
-                MapMutators.Where(option => option.IsEnabled).Select(option => option.Name)));
+                MapMutators.Where(option => option.IsEnabled).Select(option => option.Name),
+                _mapVisibility.ControllerOverrides,
+                _mapVisibility.HasSecondaryOverride));
         }
 
         private void RequestMapVisibility(MapVisibilityState state)

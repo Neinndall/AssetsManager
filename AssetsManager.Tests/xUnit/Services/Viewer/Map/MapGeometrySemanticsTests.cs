@@ -168,6 +168,33 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal(0, MapGeometrySemantics.OpeningFlags(Layered((0, 3))));
         }
 
+        [Fact]
+        public void UnlayeredMeshesDrawWithoutFlagsButDoNotInventLayerChoices()
+        {
+            var geometry = Layered((255, 12));
+            Assert.Single(MapGeometrySemantics.DrawnMeshesForFlags(geometry, 0));
+            Assert.Empty(MapGeometrySemantics.Layers(geometry));
+            Assert.Equal(0, MapGeometrySemantics.OpeningFlags(geometry));
+            Assert.Equal(new MapGeometryLayerData(2, 15),
+                Assert.Single(MapGeometrySemantics.Layers(Layered((255, 12), (4, 3)))));
+        }
+
+        [Fact]
+        public void LayerChoicesFollowControllerChangesRatherThanAuthoredMasks()
+        {
+            var geometry = Layered((1, 12), (255, 3));
+            geometry = new MapGeometryData(geometry.Positions, geometry.Normals, geometry.Uv0, geometry.Uv1,
+                geometry.Indices, new[]
+            {
+                geometry.Meshes[0] with { VisibilityControllerPathHash = 7 }, geometry.Meshes[1]
+            }, geometry.Submeshes, geometry.Materials);
+            var visibility = new MapSceneVisibility(null, new Dictionary<uint, MapVisibilityControllerData>
+            {
+                [7] = new(7, MapVisibilityControllerKind.Terrain, Mask: 4, DefaultVisible: false)
+            }, MapVisibilityState.FromFlags(1));
+            Assert.Equal(new MapGeometryLayerData(2, 15), Assert.Single(MapGeometrySemantics.Layers(geometry, visibility)));
+        }
+
         private static MapGeometryData Layered(params (byte Visibility, int Triangles)[] meshes)
         {
             var submeshes = new List<MapGeometrySubmeshData>();

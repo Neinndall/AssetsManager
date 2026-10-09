@@ -50,7 +50,9 @@ namespace AssetsManager.Views.Models.Viewer
         Child,
         PrimaryFlags,
         SecondaryFlags,
-        Named
+        Named,
+        Terrain,
+        Driven
     }
 
     /// <summary>
@@ -61,7 +63,7 @@ namespace AssetsManager.Views.Models.Viewer
     {
         All = 0,
         Any = 1,
-        NotAll = 2,
+        One = 2,
         None = 3
     }
 
@@ -72,7 +74,8 @@ namespace AssetsManager.Views.Models.Viewer
         bool DefaultVisible = true,
         string MutatorName = null,
         IReadOnlyList<uint> Parents = null,
-        MapVisibilityParentMode ParentMode = MapVisibilityParentMode.All);
+        MapVisibilityParentMode ParentMode = MapVisibilityParentMode.All,
+        int TerrainMask = 0);
 
     /// <summary>
     /// The game state a MAP preview is evaluated against: primary/secondary domain masks and the
@@ -85,11 +88,17 @@ namespace AssetsManager.Views.Models.Viewer
         public int Flags { get; }
         public int SecondaryFlags { get; }
         public IReadOnlyList<string> Mutators { get; }
+        public IReadOnlyDictionary<uint, bool> ControllerOverrides { get; }
+        public bool HasSecondaryOverride { get; }
 
-        public MapVisibilityState(int flags, int secondaryFlags = 1, IEnumerable<string> mutators = null)
+        public MapVisibilityState(int flags, int secondaryFlags = 1, IEnumerable<string> mutators = null,
+            IReadOnlyDictionary<uint, bool> controllerOverrides = null, bool hasSecondaryOverride = false)
         {
             Flags = flags & 0xff;
             SecondaryFlags = secondaryFlags & 0xff;
+            HasSecondaryOverride = hasSecondaryOverride;
+            ControllerOverrides = new System.Collections.ObjectModel.ReadOnlyDictionary<uint, bool>(
+                controllerOverrides?.ToDictionary(pair => pair.Key, pair => pair.Value) ?? new Dictionary<uint, bool>());
             Mutators = mutators?
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Select(name => name.Trim())
@@ -104,20 +113,32 @@ namespace AssetsManager.Views.Models.Viewer
             !string.IsNullOrWhiteSpace(name) &&
             Mutators.Any(mutator => string.Equals(mutator, name, StringComparison.OrdinalIgnoreCase));
 
-        public MapVisibilityState WithFlags(int flags) => new(flags, SecondaryFlags, Mutators);
+        public MapVisibilityState WithFlags(int flags) => new(flags, SecondaryFlags, Mutators, ControllerOverrides, HasSecondaryOverride);
 
-        public MapVisibilityState WithSecondaryFlags(int flags) => new(Flags, flags, Mutators);
+        public MapVisibilityState WithSecondaryFlags(int flags) => new(Flags, flags, Mutators, ControllerOverrides, true);
+
+        public MapVisibilityState WithControllerOverride(uint hash, bool? visible)
+        {
+            var next = ControllerOverrides.ToDictionary(pair => pair.Key, pair => pair.Value);
+            if (visible.HasValue) next[hash] = visible.Value;
+            else next.Remove(hash);
+            return new(Flags, SecondaryFlags, Mutators, next, HasSecondaryOverride);
+        }
 
         public MapVisibilityState WithMutator(string name, bool applied) =>
             new(Flags, SecondaryFlags, applied
                 ? Mutators.Append(name)
-                : Mutators.Where(mutator => !string.Equals(mutator, name, StringComparison.OrdinalIgnoreCase)));
+                : Mutators.Where(mutator => !string.Equals(mutator, name, StringComparison.OrdinalIgnoreCase)),
+                ControllerOverrides, HasSecondaryOverride);
 
         public bool Equals(MapVisibilityState other) =>
             other != null &&
             Flags == other.Flags &&
             SecondaryFlags == other.SecondaryFlags &&
-            Mutators.SequenceEqual(other.Mutators, StringComparer.OrdinalIgnoreCase);
+            HasSecondaryOverride == other.HasSecondaryOverride &&
+            Mutators.SequenceEqual(other.Mutators, StringComparer.OrdinalIgnoreCase) &&
+            ControllerOverrides.Count == other.ControllerOverrides.Count &&
+            ControllerOverrides.All(pair => other.ControllerOverrides.TryGetValue(pair.Key, out bool value) && value == pair.Value);
 
         public override bool Equals(object obj) => Equals(obj as MapVisibilityState);
 
@@ -126,8 +147,14 @@ namespace AssetsManager.Views.Models.Viewer
             var hash = new HashCode();
             hash.Add(Flags);
             hash.Add(SecondaryFlags);
+            hash.Add(HasSecondaryOverride);
             foreach (string mutator in Mutators)
                 hash.Add(mutator, StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in ControllerOverrides.OrderBy(pair => pair.Key))
+            {
+                hash.Add(pair.Key);
+                hash.Add(pair.Value);
+            }
             return hash.ToHashCode();
         }
 

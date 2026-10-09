@@ -694,7 +694,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _model.SetMapVisibility(
                 runtime.Scene.Visibility,
-                MapGeometrySemantics.Layers(runtime.Scene.Geometry),
+                MapGeometrySemantics.Layers(runtime.Scene.Geometry, runtime.Scene.Visibility),
                 runtime.Visibility);
         }
 

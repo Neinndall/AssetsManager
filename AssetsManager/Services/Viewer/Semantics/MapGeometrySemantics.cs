@@ -74,33 +74,22 @@ namespace AssetsManager.Services.Viewer.Semantics
             MapSceneVisibility visibility,
             MapVisibilityState state) =>
             mesh != null &&
-            MapVisibilitySemantics.IsVisible(
+            MapVisibilitySemantics.IsMeshVisible(
                 visibility,
                 state,
                 mesh.Visibility,
                 mesh.VisibilityControllerPathHash);
 
-        internal static IReadOnlyList<MapGeometryLayerData> Layers(MapGeometryData geometry)
+        internal static IReadOnlyList<MapGeometryLayerData> Layers(MapGeometryData geometry, MapSceneVisibility visibility = null)
         {
             ArgumentNullException.ThrowIfNull(geometry);
-            var triangles = new int[MapGeometryData.LayerCount];
-            int named = 0;
-            foreach (MapGeometryMeshData mesh in geometry.Meshes)
-            {
-                named |= mesh.Visibility;
-                int drawn = MeshTriangles(geometry, mesh);
-                for (int layer = 0; layer < MapGeometryData.LayerCount; layer++)
-                {
-                    if (mesh.IsVisibleOnLayer(layer))
-                        triangles[layer] = checked(triangles[layer] + drawn);
-                }
-            }
-
+            var unlayered = new HashSet<MapGeometryMeshData>(DrawnMeshesFor(geometry, visibility, MapVisibilityState.FromFlags(0)), ReferenceEqualityComparer.Instance);
             var layers = new List<MapGeometryLayerData>();
             for (int layer = 0; layer < MapGeometryData.LayerCount; layer++)
             {
-                if ((named & (1 << layer)) != 0)
-                    layers.Add(new MapGeometryLayerData(layer, triangles[layer]));
+                MapGeometryMeshData[] drawn = DrawnMeshesFor(geometry, visibility, MapVisibilityState.FromFlags(1 << layer)).ToArray();
+                if (drawn.Length != unlayered.Count || drawn.Any(mesh => !unlayered.Contains(mesh)))
+                    layers.Add(new MapGeometryLayerData(layer, drawn.Sum(mesh => MeshTriangles(geometry, mesh))));
             }
             return layers;
         }

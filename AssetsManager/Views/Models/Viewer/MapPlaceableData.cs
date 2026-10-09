@@ -27,10 +27,10 @@ namespace AssetsManager.Views.Models.Viewer
         {
             if ((uint)layer >= 8u)
                 return false;
-            return (Visibility & (1 << layer)) != 0;
+            return IsVisibleForFlags(1 << layer);
         }
 
-        public bool IsVisibleForFlags(int flags) => (Visibility & flags) != 0;
+        public bool IsVisibleForFlags(int flags) => Visibility == EveryLayer || (Visibility & flags) != 0;
     }
 
     /// <summary>

@@ -1,17 +1,42 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Semantics
 {
     /// <summary>
-    /// Evaluates map visibility like the engine: the primary mask must share a bit with the item
-    /// mask and its IMapVisibilityController graph must answer true for the previewed game state.
+    /// Controllers replace layer masks. Undeclared links fall back to layers for meshes only.
     /// </summary>
     internal static class MapVisibilitySemantics
     {
-        private const int MaxDepth = 32;
+        // Weak keys release old scenes and temporary states; shared graph evaluation keeps cycles consistent.
+        private static readonly ConditionalWeakTable<MapSceneVisibility, ControllerGraph> Graphs = new();
+
+        private sealed class ControllerGraph
+        {
+            private readonly IReadOnlyDictionary<uint, MapVisibilityControllerData> _controllers;
+            private readonly ConditionalWeakTable<MapVisibilityState, Dictionary<uint, bool>> _states = new();
+            private readonly ConditionalWeakTable<MapVisibilityState, Dictionary<uint, bool>>.CreateValueCallback _compute;
+
+            internal ControllerGraph(MapSceneVisibility scene)
+            {
+                _controllers = scene.Controllers;
+                _compute = Compute;
+            }
+
+            internal bool Visible(MapVisibilityState state, uint hash)
+                => _states.GetValue(state, _compute).TryGetValue(hash, out bool visible) && visible;
+
+            private Dictionary<uint, bool> Compute(MapVisibilityState state)
+            {
+                var known = new Dictionary<uint, bool>();
+                var open = new HashSet<uint>();
+                foreach (uint hash in _controllers.Keys) Evaluate(_controllers, hash, state, open, known);
+                return known;
+            }
+        }
 
         internal static bool IsVisible(
             MapSceneVisibility visibility,
@@ -19,57 +44,81 @@ namespace AssetsManager.Services.Viewer.Semantics
             byte mask,
             uint? controller)
         {
-            if (state == null || (mask & state.Flags) == 0)
-                return false;
-            return controller is not uint hash || hash == 0 ||
-                   Evaluate(visibility?.Controllers, hash, state, 0);
+            if (state == null) return false;
+            return controller is not uint hash || hash == 0
+                ? LayerVisible(mask, state.Flags)
+                : IsControllerVisible(visibility, state, hash);
         }
+
+        internal static bool IsMeshVisible(
+            MapSceneVisibility visibility, MapVisibilityState state, byte mask, uint controller)
+            => state != null && (controller == 0 || visibility?.Controllers.ContainsKey(controller) != true
+                ? LayerVisible(mask, state.Flags)
+                : IsControllerVisible(visibility, state, controller));
+
+        internal static bool LayerVisible(byte mask, int flags) => mask == 0xff || (mask & flags) != 0;
 
         internal static bool IsControllerVisible(
             MapSceneVisibility visibility,
             MapVisibilityState state,
             uint controller) =>
-            controller == 0 || Evaluate(visibility?.Controllers, controller, state, 0);
+            state != null && (controller == 0 || visibility != null &&
+                Graphs.GetValue(visibility, static scene => new ControllerGraph(scene)).Visible(state, controller));
 
         private static bool Evaluate(
             IReadOnlyDictionary<uint, MapVisibilityControllerData> controllers,
             uint hash,
             MapVisibilityState state,
-            int depth)
+            HashSet<uint> open,
+            Dictionary<uint, bool> known)
         {
-            // A link to an object this document does not define behaves as no controller.
-            if (controllers == null || depth > MaxDepth || !controllers.TryGetValue(hash, out MapVisibilityControllerData controller))
-                return true;
+            if (known.TryGetValue(hash, out bool cached)) return cached;
+            if (controllers == null || !controllers.TryGetValue(hash, out MapVisibilityControllerData controller) || !open.Add(hash))
+                return false;
 
-            return controller.Kind switch
+            bool visible = state.ControllerOverrides.TryGetValue(hash, out bool replacement) ? replacement : controller.Kind switch
             {
                 MapVisibilityControllerKind.Mutator => state.HasMutator(controller.MutatorName),
                 MapVisibilityControllerKind.PrimaryFlags => (state.Flags & controller.Mask) != 0,
-                MapVisibilityControllerKind.SecondaryFlags => (state.SecondaryFlags & controller.Mask) != 0,
-                MapVisibilityControllerKind.Named => controller.DefaultVisible,
-                MapVisibilityControllerKind.Child => EvaluateChild(controllers, controller, state, depth),
-                _ => true
+                MapVisibilityControllerKind.Terrain => controller.DefaultVisible || (state.Flags & controller.Mask) != 0,
+                // Stage bits select an authored preview state only when the user explicitly changes it.
+                MapVisibilityControllerKind.SecondaryFlags => state.HasSecondaryOverride
+                    ? (state.SecondaryFlags & controller.Mask) != 0
+                    : controller.DefaultVisible || (state.Flags & controller.TerrainMask) != 0,
+                MapVisibilityControllerKind.Named => controller.DefaultVisible || (state.Flags & controller.TerrainMask) != 0,
+                MapVisibilityControllerKind.Child => EvaluateChild(controllers, controller, state, open, known),
+                _ => false
             };
+            open.Remove(hash);
+            known[hash] = visible;
+            return visible;
         }
 
         private static bool EvaluateChild(
             IReadOnlyDictionary<uint, MapVisibilityControllerData> controllers,
             MapVisibilityControllerData controller,
             MapVisibilityState state,
-            int depth)
+            HashSet<uint> open,
+            Dictionary<uint, bool> known)
         {
             IReadOnlyList<uint> parents = controller.Parents ?? Array.Empty<uint>();
-            if (parents.Count == 0)
-                return true;
-
-            int visible = parents.Count(parent => Evaluate(controllers, parent, state, depth + 1));
+            int visible = parents.Count(parent => Evaluate(controllers, parent, state, open, known));
             return controller.ParentMode switch
             {
                 MapVisibilityParentMode.Any => visible > 0,
-                MapVisibilityParentMode.NotAll => visible < parents.Count,
+                MapVisibilityParentMode.One => visible == 1,
                 MapVisibilityParentMode.None => visible == 0,
-                _ => visible == parents.Count
+                MapVisibilityParentMode.All => visible == parents.Count,
+                _ => false
             };
+        }
+
+        internal static MapVisibilityState WithControllerState(
+            MapSceneVisibility visibility, MapVisibilityState state, uint hash, bool visible)
+        {
+            MapVisibilityState computed = state.WithControllerOverride(hash, null);
+            return IsControllerVisible(visibility, computed, hash) == visible
+                ? computed : computed.WithControllerOverride(hash, visible);
         }
 
         /// <summary>
