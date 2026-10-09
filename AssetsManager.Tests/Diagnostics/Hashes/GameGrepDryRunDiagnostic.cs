@@ -26,6 +26,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             string root = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)) ?? @"C:\Riot Games\League of Legends (PBE)";
             string outPath = args.FirstOrDefault(a => a.StartsWith("--out=", StringComparison.Ordinal))?[6..];
             string extraNames = args.FirstOrDefault(a => a.StartsWith("--bin-names=", StringComparison.Ordinal))?[12..];
+            string wadFilter = args.FirstOrDefault(a => a.StartsWith("--wad=", StringComparison.Ordinal))?[6..];
             var directories = new DirectoriesCreator();
             var log = new LogService(new Serilog.LoggerConfiguration().MinimumLevel.Warning().CreateLogger());
             using var resolver = new HashResolverService(directories, log);
@@ -52,6 +53,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
 
             foreach (string wadPath in guesser.FindWads(root))
             {
+                if (wadFilter != null && !Path.GetFileName(wadPath).Contains(wadFilter, StringComparison.OrdinalIgnoreCase)) continue;
                 using var wad = new WadFile(wadPath);
                 foreach (var chunk in wad.Chunks.Values)
                 {

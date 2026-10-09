@@ -2466,11 +2466,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 .ToList();
             if (namedLinks.Count == 0) yield break;
 
+            var resolvedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (AnimationFileLink link in namedLinks)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string resolved = _resolveBinHash?.Invoke(link.NameHash);
-                if (IsAnimationStem(resolved)) yield return resolved;
+                if (IsAnimationStem(resolved))
+                {
+                    if (Fnv1a.HashLower(resolved) == link.NameHash) resolvedNames.Add(resolved);
+                    yield return resolved;
+                }
             }
             if (targetHashes.Count == 0) yield break;
 
@@ -2504,6 +2509,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     string prefixed = prefix + "_" + stem;
                     if (nameHashes.Contains(Fnv1a.HashLower(prefixed))) yield return prefixed;
                 }
+            }
+
+            // Clip labels can be numbered even when none of their filenames is catalogued yet.
+            foreach (HashGuessCandidate candidate in GenerateNumberCandidates(
+                         resolvedNames.Where(name => name.Any(char.IsAsciiDigit)).Select(name => $"animations/{name}.anm"),
+                         numberLimit: 360, candidateBudget: int.MaxValue, includeCommonPadding: true))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string stem = GetBasename(candidate.Path)[..^4];
+                if (nameHashes.Contains(Fnv1a.HashLower(stem))) yield return stem;
             }
 
         }
@@ -2648,6 +2663,17 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             {
                 string directory = $"{root}/characters/{character}/{(includeThemeLayout ? "themes" : "skins")}/{sk}/animations/";
                 var values = new List<string> { directory, directory + character + "_", directory + character + "_" + sk + "_", directory + sk + "_" };
+                // Folder padding and the filename's skin token are independent in shipped clips.
+                if (!includeThemeLayout && !sk.Equals(paddedSkin, StringComparison.Ordinal))
+                {
+                    values.Add(directory + character + "_" + paddedSkin + "_");
+                    values.Add(directory + paddedSkin + "_");
+                }
+                if (!includeThemeLayout && !sk.Equals(skin, StringComparison.Ordinal))
+                {
+                    values.Add(directory + character + "_" + skin + "_");
+                    values.Add(directory + skin + "_");
+                }
                 if (!includeThemeLayout && character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
                 {
                     values.Add(directory + character[5..] + "_");
@@ -2691,6 +2717,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private static IEnumerable<string> ExpandAnimationStemVariants(string stem)
         {
             yield return stem;
+            for (int i = 1; i < stem.Length; i++)
+            {
+                if (!char.IsAsciiDigit(stem[i]) || char.IsAsciiDigit(stem[i - 1])) continue;
+                if (stem[i - 1] == '_') yield return stem.Remove(i - 1, 1);
+                else if (stem[i - 1] != '-') yield return stem.Insert(i, "_");
+            }
             if (stem.StartsWith("crit", StringComparison.OrdinalIgnoreCase))
                 yield return "attack_" + stem;
             if (stem.Contains("variant", StringComparison.OrdinalIgnoreCase))

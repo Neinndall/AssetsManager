@@ -53,8 +53,23 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 hashes.Add(42);
                 Assert.Equal(expected.Distinct(), guesser.MatchAnimationVariants(name + ".anm", character, skin, hashes, modifiers, suffixes, theme));
                 Assert.Equal(new[] { 42UL }, hashes);
-                Assert.Equal(expected.Distinct(), GameHashGuesser.EnumerateAnimationNameVariants(character, skin, name, modifiers, suffixes, theme).Distinct());
+                var legacy = expected.ToHashSet(StringComparer.Ordinal);
+                Assert.Equal(expected.Distinct(), GameHashGuesser.EnumerateAnimationNameVariants(character, skin, name, modifiers, suffixes, theme).Distinct().Where(legacy.Contains));
             }
+        }
+
+        [Theory]
+        [InlineData("skin3", "skin03", "skin3_win_01")]
+        [InlineData("skin03", "skin3", "skin03_win_01")]
+        [InlineData("skin3", "skin03", "example_skin3_win_01")]
+        public void AnimationFolderAndFilenamePaddingAreIndependent(string skin, string directorySkin, string filename)
+        {
+            string path = $"assets/characters/example/skins/{directorySkin}/animations/{filename}.anm";
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var remaining = new HashSet<ulong> { XxHash64Ext.Hash(path), 42 };
+            Assert.Equal(new[] { path }, guesser.MatchAnimationVariants("win_01", "example", skin, remaining));
+            Assert.Equal(new[] { 42UL }, remaining);
+            Assert.Contains(path, GameHashGuesser.EnumerateAnimationNameVariants("example", skin, "win_01"));
         }
 
         [Fact]

@@ -33,6 +33,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
         {
             string root = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)) ?? @"C:\Riot Games\League of Legends (PBE)";
             string outPath = args.FirstOrDefault(a => a.StartsWith("--out=", StringComparison.Ordinal))?[6..];
+            string wadFilter = args.FirstOrDefault(a => a.StartsWith("--wad=", StringComparison.Ordinal))?[6..];
             var directories = new DirectoriesCreator();
             var unknown = File.ReadLines(Path.Combine(directories.HashLabPath, "unknowns.game.txt"))
                 .Select(l => ulong.TryParse(l.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong h) ? h : 0)
@@ -62,6 +63,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             var derivedLines = new List<string>();
             foreach (string wadPath in Directory.EnumerateFiles(Path.Combine(root, "Game"), "*.wad.client", SearchOption.AllDirectories))
             {
+                if (wadFilter != null && !Path.GetFileName(wadPath).Contains(wadFilter, StringComparison.OrdinalIgnoreCase)) continue;
                 string wadName = Path.GetRelativePath(Path.Combine(root, "Game"), wadPath).Replace('\\', '/');
                 using var wad = new WadFile(wadPath);
                 foreach (var (chunkHash, chunk) in wad.Chunks)
@@ -130,7 +132,8 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                             .Take(3)
                             .Select(s => $"{s.Field}={s.Path}");
                         var strings = siblings.OfType<BinTreeString>().Take(3).Select(s => $"{Named(resolver.ResolveBinField, s.NameHash)}=\"{s.Value}\"");
-                        target.References.Add($"{owner}.{field} in {Entry(entryHash)} ({binPath})\n            siblings: {string.Join(" | ", knownSiblings.Concat(strings))}");
+                        var names = siblings.OfType<BinTreeHash>().Take(3).Select(s => $"{Named(resolver.ResolveBinField, s.NameHash)}={Named(resolver.ResolveBinHashGeneral, s.Value)}");
+                        target.References.Add($"{owner}.{field} in {Entry(entryHash)} ({binPath})\n            siblings: {string.Join(" | ", knownSiblings.Concat(strings).Concat(names))}");
                         break;
                     case BinTreeStruct structure:
                         foreach (var child in structure.Properties.Values)

@@ -225,12 +225,14 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 .ToList();
 
             var characterList = new List<string>(rawCharacters);
+            var characterNames = new HashSet<string>(rawCharacters, StringComparer.OrdinalIgnoreCase);
             foreach (string ch in rawCharacters)
             {
                 if (!ch.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) &&
                     !ch.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
                 {
-                    characterList.Add($"jade_{ch}");
+                    string alias = $"jade_{ch}";
+                    if (characterNames.Add(alias)) characterList.Add(alias);
                 }
             }
 

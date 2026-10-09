@@ -186,6 +186,11 @@ namespace AssetsManager.Tests.Diagnostics
                 GameUnknownsAuditDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "game-pattern-lab", StringComparison.OrdinalIgnoreCase))
+            {
+                GamePatternLabDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "game-texture-probe", StringComparison.OrdinalIgnoreCase))
             {
                 GameTextureProbeDiagnostic.Run(args.Skip(1).ToArray());
