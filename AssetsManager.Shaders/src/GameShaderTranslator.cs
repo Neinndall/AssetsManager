@@ -636,6 +636,8 @@ namespace AssetsManager.Shaders
                 SetOption(options, CompilerOption.GLSLVersion, 300u, context);
                 SetOption(options, CompilerOption.GLSLES, true, context);
                 SetOption(options, CompilerOption.GLSLVulkanSemantics, false, context);
+                // Draws have no base instance, so InstanceIndex needs no synthesized offset uniform.
+                SetOption(options, CompilerOption.GLSLSupportNonzeroBaseInstance, false, context);
                 SetOption(options, CompilerOption.GLSLESDefaultFloatPrecisionHighp, true, context);
                 SetOption(options, CompilerOption.GLSLESDefaultIntPrecisionHighp, true, context);
                 SetOption(options, CompilerOption.RelaxNanChecks, true, context);
