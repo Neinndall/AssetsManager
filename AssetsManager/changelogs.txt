@@ -180,6 +180,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Lab / Reduced repeated work when guessing reused GAME files.
   - Viewer / Improved compatibility of native shaders used for instanced drawing.
   - 3D Studio / Project Files now shows thumbnails by default, groups Explorer access with navigation and displays texture names above the preview.
   - Hash Guessing Lab / Moved preparation, inventory, saving and export off the UI thread for GAME, LCU, BIN and RST; batched live matches while preserving cancellation results.

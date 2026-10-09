@@ -475,10 +475,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         }
 
         /// <summary>
-        /// Skins reuse other characters' files unchanged and keep their file name
-        /// (sett/skins/skin76/brand_skin53_additivescroll_tx_cm.tex). An unresolved chunk whose WAD
-        /// checksum equals a named chunk is tried with every copy's file name, in the copies' folders
-        /// and in every known folder of the character its WAD belongs to.
+        /// Reuses filenames from matching WAD checksums in source, character and container folders.
         /// </summary>
         internal int GuessIdenticalCopies(
             HashGuessEngine engine,
@@ -490,7 +487,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (engine.RemainingUnknownCount == 0 || string.IsNullOrWhiteSpace(rootDirectory)) return 0;
 
             IReadOnlyDictionary<ulong, string> knownPaths = HashFile.Load();
-            var copiesByChecksum = new Dictionary<ulong, List<string>>();
+            var copiesByChecksum = new Dictionary<ulong, List<(string Path, bool Pending)>>();
             var unresolved = new List<(ulong Hash, ulong Checksum, string Character, string Wad, int Size)>();
             var localFolders = new Dictionary<string, Dictionary<string, HashSet<string>>>(StringComparer.Ordinal);
             string[] wadPaths = FindWads(rootDirectory);
@@ -506,35 +503,29 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         localFolders[wadPath] = wadFolders = new(StringComparer.OrdinalIgnoreCase);
                     foreach (var (hash, chunk) in wad.Chunks)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (chunk.Compression == LeagueToolkit.Core.Wad.WadChunkCompression.Satellite) continue;
-                        if (engine.UnknownHashes.Contains(hash))
-                        {
+                        bool pending = engine.UnknownHashes.Contains(hash);
+                        if (pending)
                             unresolved.Add((hash, chunk.Checksum, character, wadPath, chunk.UncompressedSize));
-                        }
-                        else if (knownPaths.TryGetValue(hash, out string path))
+                        if (!knownPaths.TryGetValue(hash, out string path)) continue;
+                        if (!copiesByChecksum.TryGetValue(chunk.Checksum, out var copies)) copiesByChecksum[chunk.Checksum] = copies = new();
+                        copies.Add((path, pending));
+                        if (pending || wadFolders == null) continue;
+                        int separator = path.LastIndexOf('/');
+                        if (separator < 0) continue;
+                        string extension = Path.GetExtension(path);
+                        if (!wadFolders.TryGetValue(extension, out var folders)) wadFolders[extension] = folders = new(StringComparer.OrdinalIgnoreCase);
+                        folders.Add(path[..separator].ToLowerInvariant());
+                        if (!path.StartsWith("data/characters/", StringComparison.OrdinalIgnoreCase) ||
+                            !path.Contains("/skins/", StringComparison.OrdinalIgnoreCase) || !path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) continue;
+                        string skin = Path.GetFileNameWithoutExtension(path);
+                        if (!skin.Equals("base", StringComparison.OrdinalIgnoreCase) &&
+                            !(skin.StartsWith("skin", StringComparison.OrdinalIgnoreCase) && skin.Length > 4 && skin.AsSpan(4).IndexOfAnyExceptInRange('0', '9') < 0)) continue;
+                        foreach (string textureExtension in new[] { ".tex", ".dds" })
                         {
-                            if (!copiesByChecksum.TryGetValue(chunk.Checksum, out List<string> copies))
-                                copiesByChecksum[chunk.Checksum] = copies = new List<string>();
-                            if (copies.Count < 64) copies.Add(path);
-                            int separator = path.LastIndexOf('/');
-                            if (wadFolders != null && separator >= 0)
-                            {
-                                string extension = Path.GetExtension(path);
-                                if (!wadFolders.TryGetValue(extension, out var folders)) wadFolders[extension] = folders = new(StringComparer.OrdinalIgnoreCase);
-                                folders.Add(path[..separator].ToLowerInvariant());
-                                if (path.StartsWith("data/characters/", StringComparison.OrdinalIgnoreCase) &&
-                                    path.Contains("/skins/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    string skin = Path.GetFileNameWithoutExtension(path);
-                                    if (skin.Equals("base", StringComparison.OrdinalIgnoreCase) ||
-                                        skin.StartsWith("skin", StringComparison.OrdinalIgnoreCase) && skin.Length > 4 && skin.AsSpan(4).IndexOfAnyExceptInRange('0', '9') < 0)
-                                    foreach (string textureExtension in new[] { ".tex", ".dds" })
-                                    {
-                                        if (!wadFolders.TryGetValue(textureExtension, out var textureFolders)) wadFolders[textureExtension] = textureFolders = new(StringComparer.OrdinalIgnoreCase);
-                                        textureFolders.Add("assets/" + path[5..^4].ToLowerInvariant());
-                                    }
-                                }
-                            }
+                            if (!wadFolders.TryGetValue(textureExtension, out var textureFolders)) wadFolders[textureExtension] = textureFolders = new(StringComparer.OrdinalIgnoreCase);
+                            textureFolders.Add("assets/" + path[5..^4].ToLowerInvariant());
                         }
                     }
                 }
@@ -557,7 +548,9 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             foreach (var (hash, checksum, character, _, _) in unresolved)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!engine.UnknownHashes.Contains(hash) || !copiesByChecksum.TryGetValue(checksum, out List<string> copies)) continue;
+                if (!engine.UnknownHashes.Contains(hash) || !copiesByChecksum.TryGetValue(checksum, out var allCopies)) continue;
+                var copies = allCopies.Where(copy => !copy.Pending).Take(64).Select(copy => copy.Path).ToArray();
+                if (copies.Length == 0) continue;
                 var names = new HashSet<string>(copies.Select(GetBasename), StringComparer.OrdinalIgnoreCase);
                 var folders = new HashSet<string>(copies.Select(path => path[..Math.Max(0, path.LastIndexOf('/'))].ToLowerInvariant()), StringComparer.Ordinal);
                 foreach (string owner in new[] { character, $"jade_{character}" })
@@ -578,35 +571,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             // Multi-character containers have no character named after their WAD. Use their actual folders.
             // Empty BINs offer no naming evidence; the legacy pass above still handles them.
-            var wantedChecksums = unresolved.Where(target => target.Size > 16 && target.Checksum != 0 && engine.UnknownHashes.Contains(target.Hash))
-                .Select(target => target.Checksum).ToHashSet();
-            var namesByChecksum = new Dictionary<ulong, HashSet<string>>();
-            if (wantedChecksums.Count > 0)
-            foreach (string wadPath in wadPaths)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                try
-                {
-                    using var wad = new LeagueToolkit.Core.Wad.WadFile(wadPath);
-                    foreach (var (hash, chunk) in wad.Chunks)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (chunk.Compression == LeagueToolkit.Core.Wad.WadChunkCompression.Satellite ||
-                            !wantedChecksums.Contains(chunk.Checksum) || !knownPaths.TryGetValue(hash, out string path)) continue;
-                        if (!namesByChecksum.TryGetValue(chunk.Checksum, out var names)) namesByChecksum[chunk.Checksum] = names = new(StringComparer.OrdinalIgnoreCase);
-                        names.Add(GetBasename(path));
-                    }
-                }
-                catch (Exception exception) when (exception is not OperationCanceledException)
-                {
-                    _logService?.LogDebug($"GAME identical copies skipped '{wadPath}': {exception.Message}");
-                }
-            }
             foreach (var (hash, checksum, _, wadPath, size) in unresolved)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (size <= 16 || !engine.UnknownHashes.Contains(hash) ||
-                    !namesByChecksum.TryGetValue(checksum, out var names) || !localFolders.TryGetValue(wadPath, out var wadFolders)) continue;
+                if (size <= 16 || checksum == 0 || !engine.UnknownHashes.Contains(hash) ||
+                    !copiesByChecksum.TryGetValue(checksum, out var copies) || !localFolders.TryGetValue(wadPath, out var wadFolders)) continue;
+                var names = copies.Select(copy => GetBasename(copy.Path)).Distinct(StringComparer.OrdinalIgnoreCase);
                 foreach (string name in names)
                 {
                     if (!wadFolders.TryGetValue(Path.GetExtension(name), out var folders)) continue;
