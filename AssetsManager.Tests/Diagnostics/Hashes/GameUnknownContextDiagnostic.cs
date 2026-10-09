@@ -159,6 +159,10 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             void Line(string text = "") { Console.WriteLine(text); output.AppendLine(text); }
             var located = unknown.Where(p => p.Value.Wad != null).ToList();
             Line($"Unknown GAME hashes: {unknown.Count}; located {located.Count}; referenced by a BIN link {located.Count(p => p.Value.References.Count > 0)}; unresolved BINs derivable from their root entry: {derivedBins}");
+            Line("Primary BIN reference (one attribution per referenced hash):");
+            foreach (var group in located.Where(p => p.Value.References.Count > 0)
+                         .GroupBy(p => p.Value.References[0].Split(" in ", StringSplitOptions.None)[0]).OrderByDescending(g => g.Count()))
+                Line($"  {group.Count(),4} {group.Key}");
             foreach (string line in derivedLines) Line($"  DERIVED {line}");
             foreach (var group in located.GroupBy(p => p.Value.Type).OrderByDescending(g => g.Count()))
             {

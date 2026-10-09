@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using AssetsManager.Utils;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 
@@ -200,6 +201,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             if (data.Length >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF) return "JPG";
             if (data.Length >= 4 && data[0] == 0x1B && data[1] == 0x4C && data[2] == 0x75 && data[3] == 0x61) return "LUA_BYTECODE";
 
+            if (FileTypeDetector.IsEncryptedRiotTex(data)) return "TEX_ENCRYPTED";
             if (asciiMagic.StartsWith("TEX\0", StringComparison.Ordinal)) return "TEX";
             if (asciiMagic.StartsWith("PROP", StringComparison.Ordinal) ||
                 asciiMagic.StartsWith("PTCH", StringComparison.Ordinal)) return "PROPERTY_BIN";
