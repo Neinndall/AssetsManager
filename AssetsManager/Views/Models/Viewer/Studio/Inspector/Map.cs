@@ -19,6 +19,7 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<MapVisibilityStateOption> MapTransformations { get; } = new();
         public ObservableCollection<MapVisibilityStateOption> MapSecondaryStates { get; } = new();
         public ObservableCollection<MapMutatorOption> MapMutators { get; } = new();
+        public ObservableCollection<MapVisibilityControllerOption> OtherMapControllers { get; } = new();
 
         public MapVariantData SelectedMapVariant
         {
@@ -37,11 +38,14 @@ namespace AssetsManager.Views.Models.Viewer
         public bool HasMapTransformations => MapTransformations.Count > 1;
         public bool HasMapSecondaryStates => MapSecondaryStates.Count > 1;
         public bool HasMapMutators => MapMutators.Count > 0;
+        public bool HasOtherMapControllers => OtherMapControllers.Count > 0;
+        public bool AreOtherMapControllersCustomized => OtherMapControllers.Any(controller => controller.IsOverridden);
 
         /// <summary>Raised when the user asks for another map state; the owner loads and applies it.</summary>
         internal event Action<MapVisibilityState> MapVisibilityRequested;
 
         private MapVisibilityState _mapVisibility;
+        private MapSceneVisibility _mapVisibilityScene;
         private bool _isSyncingMapVisibility;
         private MapVisibilityStateOption _selectedMapTransformation;
         private MapVisibilityStateOption _selectedMapSecondaryState;
@@ -126,16 +130,19 @@ namespace AssetsManager.Views.Models.Viewer
         internal void SetMapVisibility(
             MapSceneVisibility visibility,
             IEnumerable<MapGeometryLayerData> layers,
-            MapVisibilityState state)
+            MapVisibilityState state,
+            MapGeometryData geometry = null)
         {
             _isSyncingMapVisibility = true;
             try
             {
                 _mapVisibility = state;
+                _mapVisibilityScene = visibility;
                 MapLayers.Clear();
                 MapTransformations.Clear();
                 MapSecondaryStates.Clear();
                 MapMutators.Clear();
+                OtherMapControllers.Clear();
                 _selectedMapTransformation = null;
                 _selectedMapSecondaryState = null;
 
@@ -156,6 +163,8 @@ namespace AssetsManager.Views.Models.Viewer
                             state.HasMutator(mutator),
                             OnMapMutatorChanged));
                     }
+                    foreach (var row in MapControllerListing.Build(visibility, geometry))
+                        OtherMapControllers.Add(new MapVisibilityControllerOption(row, OnMapControllerChanged));
                 }
 
                 SyncMapVisibilitySelection();
@@ -170,6 +179,8 @@ namespace AssetsManager.Views.Models.Viewer
             OnPropertyChanged(nameof(HasMapTransformations));
             OnPropertyChanged(nameof(HasMapSecondaryStates));
             OnPropertyChanged(nameof(HasMapMutators));
+            OnPropertyChanged(nameof(HasOtherMapControllers));
+            OnPropertyChanged(nameof(AreOtherMapControllersCustomized));
             OnPropertyChanged(nameof(SelectedMapTransformation));
             OnPropertyChanged(nameof(SelectedMapSecondaryState));
         }
@@ -194,6 +205,24 @@ namespace AssetsManager.Views.Models.Viewer
             OnPropertyChanged(nameof(ActiveMapLayerCount));
             OnPropertyChanged(nameof(SelectedMapTransformation));
             OnPropertyChanged(nameof(SelectedMapSecondaryState));
+            OnPropertyChanged(nameof(AreOtherMapControllersCustomized));
+        }
+
+        internal void ResetOtherMapControllers()
+        {
+            if (_mapVisibility == null || !AreOtherMapControllersCustomized) return;
+            var hashes = OtherMapControllers.Select(controller => controller.PathHash).ToHashSet();
+            RequestMapVisibility(new MapVisibilityState(
+                _mapVisibility.Flags, _mapVisibility.SecondaryFlags, _mapVisibility.Mutators,
+                _mapVisibility.ControllerOverrides.Where(pair => !hashes.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value),
+                _mapVisibility.HasSecondaryOverride));
+        }
+
+        private void OnMapControllerChanged(uint hash, bool visible)
+        {
+            if (_isSyncingMapVisibility || _mapVisibility == null ||
+                !OtherMapControllers.Any(controller => controller.CanToggle && controller.PathHash == hash)) return;
+            RequestMapVisibility(MapVisibilitySemantics.WithControllerState(_mapVisibilityScene, _mapVisibility, hash, visible));
         }
 
         /// <summary>Raw mask bits edited by the user; the transformation selector follows a matching preset.</summary>
@@ -231,6 +260,9 @@ namespace AssetsManager.Views.Models.Viewer
                 layer.IsEnabled = (state.Flags & (1 << layer.Index)) != 0;
             foreach (MapMutatorOption mutator in MapMutators)
                 mutator.Sync(state.HasMutator(mutator.Name));
+            foreach (MapVisibilityControllerOption controller in OtherMapControllers)
+                controller.Sync(MapVisibilitySemantics.IsControllerVisible(_mapVisibilityScene, state, controller.PathHash),
+                    state.ControllerOverrides.ContainsKey(controller.PathHash));
 
             MapVisibilityStateOption custom = MapTransformations.FirstOrDefault(option => option.IsCustom);
             MapVisibilityStateOption match = MapTransformations.FirstOrDefault(option =>

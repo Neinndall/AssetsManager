@@ -695,8 +695,11 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.SetMapVisibility(
                 runtime.Scene.Visibility,
                 MapGeometrySemantics.Layers(runtime.Scene.Geometry, runtime.Scene.Visibility),
-                runtime.Visibility);
+                runtime.Visibility,
+                runtime.Scene.Geometry);
         }
+
+        internal void ResetOtherMapControllers_Click(object sender, RoutedEventArgs e) => _model.ResetOtherMapControllers();
 
         private static Vector3? StableMapOrigin(MapSceneData scene) =>
             scene?.Origin ??

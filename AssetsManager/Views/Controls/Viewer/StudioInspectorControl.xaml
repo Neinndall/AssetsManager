@@ -134,6 +134,89 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <StackPanel Margin="0,8,0,0" Visibility="{Binding HasOtherMapControllers, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ToggleButton x:Name="OtherMapControllersToggle" IsChecked="False" Style="{StaticResource CollapsibleSectionHeaderStyle}"
+                                      ToolTip="Additional visibility controllers outside transformations, pit states and decorations">
+                            <Grid Margin="8,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="OTHER CONTROLLERS" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                <materialIcons:MaterialIcon Grid.Column="1" Style="{StaticResource AnimatedChevronStyle}" Margin="8,0,0,0"/>
+                            </Grid>
+                        </ToggleButton>
+                        <Button Grid.Column="1" Style="{StaticResource TransparentIconButton}" Width="24" Height="24" Padding="4" Margin="4,0,0,0"
+                                IsEnabled="{Binding AreOtherMapControllersCustomized}" Click="ResetOtherMapControllers_Click"
+                                ToolTip="Restore the automatic states of other controllers">
+                            <materialIcons:MaterialIcon Kind="Restore" Width="13" Height="13"/>
+                        </Button>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding OtherMapControllers}" Margin="0,4,0,0"
+                                  Visibility="{Binding IsChecked, ElementName=OtherMapControllersToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="{Binding Indent}" MinHeight="25" ToolTip="{Binding Tooltip}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="20"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="20"/>
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                              Visibility="{Binding CanToggle, Converter={StaticResource BoolToVisibilityConverter}}"
+                                              VerticalAlignment="Center" Margin="0" ToolTip="{Binding OverrideText}"
+                                              AutomationProperties.Name="{Binding DisplayLabel}"/>
+                                    <TextBlock Text="{Binding Relation}" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"
+                                               Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"
+                                               Visibility="{Binding IsDependent, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding DisplayLabel}" FontSize="9.5" TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" Margin="0,0,4,0" MouseLeftButtonUp="MapControllerLabel_Click">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding CanToggle}" Value="True">
+                                                        <Setter Property="Cursor" Value="Hand"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsVisible}" Value="False">
+                                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsOverridden}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Grid.Column="2" Text="{Binding MeshCountText}" FontSize="8.5" Foreground="{StaticResource TextMuted}"
+                                               VerticalAlignment="Center" ToolTip="{Binding MaterialTooltip}" Margin="0,0,4,0"
+                                               Visibility="{Binding HasMeshes, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <materialIcons:MaterialIcon Grid.Column="3" Width="12" Height="12" ToolTip="{Binding StateText}"
+                                                                Visibility="{Binding IsDependent, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <materialIcons:MaterialIcon.Style>
+                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                <Setter Property="Kind" Value="EyeOff"/>
+                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsVisible}" Value="True">
+                                                        <Setter Property="Kind" Value="Eye"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialIcons:MaterialIcon.Style>
+                                    </materialIcons:MaterialIcon>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
             </StackPanel>
         </DataTemplate>
     </UserControl.Resources>

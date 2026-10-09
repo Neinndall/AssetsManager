@@ -32,6 +32,7 @@ New Features
   - VFX Studio / With shaders on, map brush tints follow the selected Variant, reflective materials reflect the map environment and terrain materials use the map terrain paint.
   - VFX Studio / Free map navigation: zoom toward the cursor without getting stuck, move with WASD (Shift faster, Ctrl slower) and double click to fly to a spot.
   - VFX Studio / Maps now switch rift transformations, Baron pit states and decorations like in game, with their terrain, structures and VFX.
+  - VFX Studio / Added a collapsible Other controllers section for additional map visibility controls, preserving transformation, pit and decoration selectors.
   - VFX Studio / Particle emitters now respect their authored repeating emission windows and pauses.
   - VFX Studio / Map monsters opened or added over a map stand where the game spawns them, facing the same way (jungle camps, Baron, Rift Herald, every drake in the dragon pit).
   - VFX Studio / Added GMESH and TMESH particle meshes with their authored normals, UVs and submeshes.

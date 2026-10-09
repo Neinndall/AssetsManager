@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
@@ -16,6 +17,12 @@ namespace AssetsManager.Views.Controls.Viewer
         private void CollapseInspectorSections_Click(object sender, RoutedEventArgs e) => Owner?.CollapseInspectorSections_Click(sender, e);
         private void InspectorRigPreset_SelectionChanged(object sender, SelectionChangedEventArgs e) => Owner?.InspectorRigPreset_SelectionChanged(sender, e);
         private void MapLayerCheckBox_Click(object sender, RoutedEventArgs e) => Owner?.MapLayerCheckBox_Click(sender, e);
+        private void ResetOtherMapControllers_Click(object sender, RoutedEventArgs e) => Owner?.ResetOtherMapControllers_Click(sender, e);
+        private void MapControllerLabel_Click(object sender, MouseButtonEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is MapVisibilityControllerOption { CanToggle: true } controller)
+                controller.IsVisible = !controller.IsVisible;
+        }
         private void MapPostControl_Changed(object sender, RoutedEventArgs e) => Owner?.MapPostControl_Changed(sender, e);
         private void MapPostReset_Click(object sender, RoutedEventArgs e) => Owner?.MapPostReset_Click(sender, e);
         private void MapPostToggle_Click(object sender, RoutedEventArgs e) => Owner?.MapPostToggle_Click(sender, e);

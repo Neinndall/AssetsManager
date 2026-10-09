@@ -47,7 +47,8 @@ namespace AssetsManager.Services.Viewer.Parsing
         private static readonly uint PublicNameField = Fnv1a.HashLower("PublicName");
         private static readonly uint BitIndexField = Fnv1a.HashLower("BitIndex");
 
-        public IReadOnlyDictionary<uint, MapVisibilityControllerData> ParseControllers(BinTree materials)
+        public IReadOnlyDictionary<uint, MapVisibilityControllerData> ParseControllers(BinTree materials,
+            Func<uint, string> resolveName = null, Func<uint, string> resolveEntry = null)
         {
             var result = new Dictionary<uint, MapVisibilityControllerData>();
             if (materials?.Objects == null)
@@ -57,7 +58,10 @@ namespace AssetsManager.Services.Viewer.Parsing
             {
                 MapVisibilityControllerData controller = ReadController(entry);
                 if (controller != null)
-                    result[entry.PathHash] = controller;
+                    result[entry.PathHash] = controller with
+                    {
+                        Name = ReadHashName(entry.Properties, NameField, resolveName) ?? ResolvedName(entry.PathHash, resolveEntry)
+                    };
             }
             return result;
         }
@@ -102,7 +106,8 @@ namespace AssetsManager.Services.Viewer.Parsing
                     entry.PathHash,
                     MapVisibilityControllerKind.Terrain,
                     Mask: ReadByte(properties, PrimaryFlagsField),
-                    DefaultVisible: ReadBool(properties, DefaultVisibleField, fallback: true));
+                    DefaultVisible: ReadBool(properties, DefaultVisibleField, fallback: true),
+                    StageMask: ReadByte(properties, SecondaryFlagsField));
             }
             if (type == VisFlagsControllerClass)
             {
@@ -126,7 +131,8 @@ namespace AssetsManager.Services.Viewer.Parsing
                     entry.PathHash,
                     MapVisibilityControllerKind.Named,
                     DefaultVisible: ReadBool(properties, DefaultVisibleField, fallback: true),
-                    TerrainMask: ReadByte(properties, PrimaryFlagsField));
+                    TerrainMask: ReadByte(properties, PrimaryFlagsField),
+                    StageMask: ReadByte(properties, SecondaryFlagsField));
             }
             if (type == LogicDriverControllerClass || type == ProviderControllerClass)
                 return new MapVisibilityControllerData(entry.PathHash, MapVisibilityControllerKind.Driven);
@@ -209,10 +215,15 @@ namespace AssetsManager.Services.Viewer.Parsing
         {
             if (!properties.TryGetValue(field, out BinTreeProperty property) || property is not BinTreeHash hash)
                 return null;
-            string resolved = resolveHash?.Invoke(hash.Value);
+            return ResolvedName(hash.Value, resolveHash);
+        }
+
+        private static string ResolvedName(uint hash, Func<uint, string> resolveHash)
+        {
+            string resolved = resolveHash?.Invoke(hash);
             return string.IsNullOrWhiteSpace(resolved) ||
-                   resolved.Equals(hash.Value.ToString("x8"), StringComparison.OrdinalIgnoreCase) ||
-                   resolved.Equals($"0x{hash.Value:x8}", StringComparison.OrdinalIgnoreCase)
+                   resolved.Equals(hash.ToString("x8"), StringComparison.OrdinalIgnoreCase) ||
+                   resolved.Equals($"0x{hash:x8}", StringComparison.OrdinalIgnoreCase)
                 ? null
                 : resolved;
         }

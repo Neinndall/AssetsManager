@@ -285,7 +285,9 @@ namespace AssetsManager.Services.Viewer.Loading
             MapGeometryData geometry)
         {
             var parser = new MapVisibilityParser();
-            IReadOnlyDictionary<uint, MapVisibilityControllerData> controllers = parser.ParseControllers(materials);
+            IReadOnlyDictionary<uint, MapVisibilityControllerData> controllers = parser.ParseControllers(materials,
+                _hashResolver == null ? null : _hashResolver.ResolveBinHash,
+                _hashResolver == null ? null : _hashResolver.ResolveBinEntry);
             MapVisibilityDefinitions definitions = parser.ParseDefinitions(
                 mapDocument,
                 _hashResolver == null ? null : _hashResolver.ResolveBinHash);

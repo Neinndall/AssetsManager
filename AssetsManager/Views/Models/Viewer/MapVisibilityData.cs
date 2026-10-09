@@ -75,7 +75,9 @@ namespace AssetsManager.Views.Models.Viewer
         string MutatorName = null,
         IReadOnlyList<uint> Parents = null,
         MapVisibilityParentMode ParentMode = MapVisibilityParentMode.All,
-        int TerrainMask = 0);
+        int TerrainMask = 0,
+        int StageMask = 0,
+        string Name = null);
 
     /// <summary>
     /// The game state a MAP preview is evaluated against: primary/secondary domain masks and the
