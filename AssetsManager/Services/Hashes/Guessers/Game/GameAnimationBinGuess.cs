@@ -16,6 +16,14 @@ namespace AssetsManager.Services.Hashes.Guessers.Game;
 
 internal sealed partial class GameHashGuesser
 {
+    internal long GuessBinReferencedAnimations(HashGuessEngine engine, string rootDirectory,
+        CancellationToken cancellationToken, long candidateBudget = long.MaxValue, Action<long> progress = null)
+    {
+        if (string.IsNullOrWhiteSpace(rootDirectory) || candidateBudget <= 0 || engine.RemainingUnknownCount == 0) return 0;
+        var containers = FindPendingAnimationContainers(rootDirectory, engine, cancellationToken);
+        return SubstituteReferencedAnimationSuffixes(engine, containers, cancellationToken, candidateBudget, progress);
+    }
+
     private HashSet<(string Character, string Container)> FindPendingAnimationContainers(
         string rootDirectory, HashGuessEngine engine, CancellationToken cancellationToken)
     {

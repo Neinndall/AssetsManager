@@ -57,6 +57,18 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 if (engine.RemainingUnknownCount == 0) return checkedCandidates;
             }
 
+            if (ShouldRun("game-custom-animation-bin"))
+            {
+                progress?.Report(engine.CreateProgress("GAME Custom: BIN-referenced animations", checkedCandidates));
+                int progressOffset = checkedCandidates;
+                long binCheckedCandidates = GuessBinReferencedAnimations(engine, rootDirectory, cancellationToken,
+                    progress: count => progress?.Report(engine.CreateProgress(
+                        "GAME Custom: BIN-referenced animations",
+                        (int)Math.Min(int.MaxValue, progressOffset + count))));
+                checkedCandidates = (int)Math.Min(int.MaxValue, checkedCandidates + binCheckedCandidates);
+                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            }
+
             if (ShouldRun("game-custom-animations"))
             {
                 progress?.Report(engine.CreateProgress(
@@ -143,11 +155,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             {
                 checkedCandidates = GuessLocalNamePatterns(engine, rootDirectory, animations: true,
                     cancellationToken, candidateBudget, progress);
-                if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) return checkedCandidates;
-                var containers = FindPendingAnimationContainers(rootDirectory, engine, cancellationToken);
-                long localCheckedCandidates = checkedCandidates;
-                checkedCandidates += SubstituteReferencedAnimationSuffixes(engine, containers, cancellationToken,
-                    candidateBudget - checkedCandidates, count => progress?.Invoke(localCheckedCandidates + count));
                 if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) return checkedCandidates;
             }
 

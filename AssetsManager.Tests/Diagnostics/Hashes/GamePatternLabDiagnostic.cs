@@ -57,6 +57,8 @@ internal static class GamePatternLabDiagnostic
                 m => Console.WriteLine($"EXISTING {m.Hash:x16} {m.Path}"));
             var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known.Values));
             Measure("Token removal", token => guesser.RemoveBasenameTokens(baseline, token));
+            Measure("BIN-referenced animations", token => guesser.GuessBinReferencedAnimations(baseline, root, token,
+                candidateBudget: 100_000_000));
             Measure("Custom animations", token => guesser.SubstituteAnimationBuildListWords(baseline, token,
                 candidateBudget: 100_000_000, rootDirectory: root));
             Measure("Custom textures", token => guesser.SubstituteTextureBuildListWords(baseline, token,

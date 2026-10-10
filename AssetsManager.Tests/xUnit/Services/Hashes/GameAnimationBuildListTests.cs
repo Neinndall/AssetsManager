@@ -93,7 +93,7 @@ public sealed class GameAnimationBuildListTests
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public void CustomAnimationMethodReadsInstalledBinAndSkipsMalformedBins(bool malformed, bool earlierCopy)
+    public void CustomBinAnimationMethodReadsInstalledBinAndSkipsMalformedBins(bool malformed, bool earlierCopy)
     {
         string directory = Path.Combine(Path.GetTempPath(), "assetsmanager-animation-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -129,13 +129,28 @@ public sealed class GameAnimationBuildListTests
             }, Path.Combine(directory, "test.wad.client"), new WadBakeSettings());
             var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Paths));
             var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(Target), 42 });
-            long attempts = guesser.SubstituteAnimationBuildListWords(engine, CancellationToken.None, 100, rootDirectory: directory);
-            Assert.InRange(attempts, 1, 100);
+            long attempts = guesser.GuessBinReferencedAnimations(engine, directory, CancellationToken.None, 100);
+            Assert.InRange(attempts, malformed ? 0 : 1, 100);
+            if (malformed)
+            {
+                Assert.Equal(0, attempts);
+                Assert.Empty(engine.Matches);
+            }
             if (!malformed)
             {
                 var match = Assert.Single(engine.Matches).Value;
                 Assert.Equal(Target, match.Path);
                 Assert.Equal("GAME Custom: BIN-referenced animation suffixes", match.SourceWadPath);
+
+                var selected = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(Target) });
+                guesser.RunCustomAttacks(selected, null, CancellationToken.None,
+                    new HashSet<string> { "game-custom-animation-bin" }, directory);
+                Assert.Equal(Target, Assert.Single(selected.Matches).Value.Path);
+
+                var unselected = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(Target) });
+                Assert.Equal(0, guesser.RunCustomAttacks(unselected, null, CancellationToken.None,
+                    new HashSet<string>(), directory));
+                Assert.Empty(unselected.Matches);
             }
         }
         finally { Directory.Delete(directory, true); }
