@@ -10,24 +10,30 @@ using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 using Xunit;
 using Xunit.Abstractions;
+using AssetsManager.Tests.Support;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Loading;
 
-public sealed class KaynFormInvestigationTests
+public sealed class KaynFormInvestigationTests : IClassFixture<InstalledChampionProjects>
 {
     private readonly ITestOutputHelper _output;
+    private readonly string _root;
 
-    public KaynFormInvestigationTests(ITestOutputHelper output) => _output = output;
+    public KaynFormInvestigationTests(ITestOutputHelper output, InstalledChampionProjects projects)
+    {
+        _output = output;
+        _root = projects.GetRoot("Kayn");
+    }
 
-    private static string SkinBin => Path.Combine(KaynDiagnosticFactAttribute.Root,
+    private string SkinBin => Path.Combine(_root,
         "data", "characters", "kayn", "skins", "skin32.bin");
 
-    [KaynDiagnosticFact]
+    [InstalledChampionFact("Kayn")]
     public void InspectParsedForms()
     {
         using var loader = new VfxLoadingService();
         var bundle = loader.Load(SkinBin, null);
-        using var skn = SkinnedMesh.ReadFromSimpleSkin(Path.Combine(KaynDiagnosticFactAttribute.Root,
+        using var skn = SkinnedMesh.ReadFromSimpleSkin(Path.Combine(_root,
             "assets", "characters", "kayn", "skins", "skin32", "kayn_skin32.skn"));
         var names = skn.Ranges.Select(range => range.Material)
             .ToDictionary(name => Fnv1a.HashLower(name), name => name);
@@ -58,12 +64,16 @@ public sealed class KaynFormInvestigationTests
             $"BINs: {bundle.LoadedBins.Count}");
     }
 
-    [KaynDiagnosticFact]
+    [InstalledChampionFact("Kayn")]
     public void InspectAnimationGearUpdaters()
     {
-        using var stream = File.OpenRead(Path.Combine(KaynDiagnosticFactAttribute.Root,
+        using var stream = File.OpenRead(Path.Combine(_root,
             "data", "characters", "kayn", "animations", "skin32.bin"));
         var tree = new BinTree(stream);
+        Assert.Contains(tree.Objects.Values, graph =>
+            graph.Properties.TryGetValue(Fnv1a.HashLower("mClipDataMap"), out var property) &&
+            property is BinTreeMap map && map.Any(entry => entry.Value is BinTreeStruct clip &&
+                clip.ClassHash != Fnv1a.HashLower("AtomicClipData")));
         foreach (var graph in tree.Objects.Values)
         {
             _output.WriteLine($"ANIMATION OBJECT {graph.PathHash:x8} class={graph.ClassHash:x8}: " +
@@ -84,14 +94,17 @@ public sealed class KaynFormInvestigationTests
         }
     }
 
-    [KaynDiagnosticFact]
+    [InstalledChampionFact("Kayn")]
     public void InspectSkin()
     {
         using var stream = File.OpenRead(SkinBin);
         var tree = new BinTree(stream);
         _output.WriteLine("Dependencies: " + string.Join("\n", tree.Dependencies));
-        foreach (var upgrade in tree.Objects.Values.Where(
-            obj => obj.ClassHash == Fnv1a.HashLower("GearSkinUpgrade")))
+        var upgrades = tree.Objects.Values.Where(
+            obj => obj.ClassHash == Fnv1a.HashLower("GearSkinUpgrade")).ToArray();
+        // The base form is implicit; Assassin and Slayer are the two authored upgrades.
+        Assert.Equal(2, upgrades.Length);
+        foreach (var upgrade in upgrades)
         {
             _output.WriteLine($"GEAR {upgrade.PathHash:x8}");
             foreach (var property in upgrade.Properties.Values)
@@ -117,17 +130,5 @@ public sealed class KaynFormInvestigationTests
             foreach (var child in structure.Properties.Values) Dump(child, depth + 1);
         if (property is BinTreeContainer container)
             foreach (var child in container.Elements) Dump(child, depth + 1);
-    }
-}
-
-// Opt in with an extracted WAD folder; ordinary test runs need no local game assets.
-public sealed class KaynDiagnosticFactAttribute : FactAttribute
-{
-    public static string Root => Environment.GetEnvironmentVariable("ASSETSMANAGER_KAYN_DIAGNOSTIC_ROOT");
-
-    public KaynDiagnosticFactAttribute()
-    {
-        if (string.IsNullOrWhiteSpace(Root) || !Directory.Exists(Root))
-            Skip = "Set ASSETSMANAGER_KAYN_DIAGNOSTIC_ROOT to an extracted Kayn WAD folder.";
     }
 }

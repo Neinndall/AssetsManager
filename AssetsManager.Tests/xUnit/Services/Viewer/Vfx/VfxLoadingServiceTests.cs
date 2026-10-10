@@ -971,6 +971,38 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             }
         }
 
+        [Theory]
+        [InlineData("version")]
+        [InlineData("property")]
+        [InlineData("signature")]
+        [InlineData("truncated")]
+        public void FolderCatalogContinuesAfterAnIncompatibleBin(string failure)
+        {
+            string root = Directory.CreateTempSubdirectory("am-project-bin-").FullName;
+            try
+            {
+                string valid = Path.Combine(root, "skin0.bin");
+                WriteSkinBin(valid);
+                byte[] damaged = File.ReadAllBytes(valid);
+                if (failure == "version") BitConverter.TryWriteBytes(damaged.AsSpan(4, 4), 99u);
+                else if (failure == "signature") damaged[0] = 0;
+                else if (failure == "truncated") damaged = damaged[..6];
+                else
+                {
+                    int field = damaged.AsSpan().IndexOf(BitConverter.GetBytes(Fnv1a.HashLower("simpleSkin")));
+                    Assert.True(field >= 0);
+                    damaged[field + 4] = 0x7f;
+                }
+                File.WriteAllBytes(Path.Combine(root, "incompatible.bin"), damaged);
+                var catalog = StudioProjectCatalog.ScanBrowser(root, System.Threading.CancellationToken.None, null);
+                Assert.Equal(valid, Assert.Single(catalog.Entries).BinPath);
+                Assert.NotEmpty(catalog.Roots);
+                Assert.Throws<OperationCanceledException>(() =>
+                    StudioProjectCatalog.Scan(root, new System.Threading.CancellationToken(true)));
+            }
+            finally { Directory.Delete(root, recursive: true); }
+        }
+
         [Fact]
         public void FolderCatalogPrioritizesChampionOverCompanionPet()
         {

@@ -9,10 +9,12 @@ using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 using Xunit;
 using Xunit.Abstractions;
+using AssetsManager.Tests.Support;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers;
 
-public sealed class SknDynamicMaterialParameterTests(ITestOutputHelper output)
+public sealed class SknDynamicMaterialParameterTests(ITestOutputHelper output, InstalledChampionProjects projects)
+    : IClassFixture<InstalledChampionProjects>
 {
     private static uint H(string name) => Fnv1a.HashLower(name);
     private static BinTreeStruct Driver(string type, params BinTreeProperty[] fields) => new(H("driver"), H(type), fields);
@@ -62,10 +64,10 @@ public sealed class SknDynamicMaterialParameterTests(ITestOutputHelper output)
         Assert.Equal(new Vector4(expected, 0, 0, 0), Assert.Single(Parse(driver)).Evaluate(gear));
     }
 
-    [SettDiagnosticFact]
+    [InstalledChampionFact("Sett")]
     public void InspectSett66FormGeometryAndSamplers()
     {
-        string root = Environment.GetEnvironmentVariable("ASSETSMANAGER_SETT_DIAGNOSTIC_ROOT");
+        string root = projects.GetRoot("Sett");
         using var loader = new AssetsManager.Services.Viewer.Vfx.Loading.VfxLoadingService();
         var bundle = loader.Load(Path.Combine(root, "data/characters/sett/skins/skin66.bin"), null);
         var trees = bundle.LoadedBins.Select(path =>
@@ -75,12 +77,16 @@ public sealed class SknDynamicMaterialParameterTests(ITestOutputHelper output)
         }).ToArray();
         using var mesh = LeagueToolkit.Core.Mesh.SkinnedMesh.ReadFromSimpleSkin(
             Path.Combine(root, "assets/characters/sett/skins/skin66/sett_skin66.skn"));
+        Assert.NotNull(bundle.OwnerSceneContext);
+        Assert.NotEmpty(bundle.CharacterForms);
+        Assert.NotEmpty(mesh.Ranges);
         var names = mesh.Ranges.Select(range => range.Material).Distinct().ToDictionary(H, name => name);
         string Name(uint hash) => names.GetValueOrDefault(hash) ?? $"{hash:x8}";
         var paths = Directory.EnumerateFiles(root, "*.tex", SearchOption.AllDirectories)
             .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
             .ToDictionary(path => XxHash64Ext.Hash(path.ToLowerInvariant()), path => path);
         var metadata = SknMaterialTextureResolver.ReadMetadata(trees, hash => paths.GetValueOrDefault(hash) ?? $"{hash:x16}");
+        Assert.NotEmpty(metadata.OverrideMaterials);
         void Dump(BinTreeProperty property, int depth)
         {
             string value = property.GetType().GetProperty("Value")?.GetValue(property)?.ToString() ?? "";
@@ -116,10 +122,10 @@ public sealed class SknDynamicMaterialParameterTests(ITestOutputHelper output)
 
     }
 
-    [SettDiagnosticFact]
+    [InstalledChampionFact("Sett")]
     public void Sett66FormsResolveAuthoredParametersAndAllTextureSamplers()
     {
-        string root = Environment.GetEnvironmentVariable("ASSETSMANAGER_SETT_DIAGNOSTIC_ROOT");
+        string root = projects.GetRoot("Sett");
         using var stream = File.OpenRead(Path.Combine(root, "data/characters/sett/skins/skin66.bin"));
         var tree = new BinTree(stream);
         var paths = Directory.EnumerateFiles(root, "*.tex", SearchOption.AllDirectories)
@@ -152,15 +158,5 @@ public sealed class SknDynamicMaterialParameterTests(ITestOutputHelper output)
                 Assert.Equal(material.ResolveTextureSwap("Color_Mask_Texture", gear), material.ResolveTextureSwap("AdditiveScroll_Mask", gear));
             }
         }
-    }
-}
-
-public sealed class SettDiagnosticFactAttribute : FactAttribute
-{
-    public SettDiagnosticFactAttribute()
-    {
-        string root = Environment.GetEnvironmentVariable("ASSETSMANAGER_SETT_DIAGNOSTIC_ROOT");
-        if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
-            Skip = "Set ASSETSMANAGER_SETT_DIAGNOSTIC_ROOT to an extracted Sett WAD folder.";
     }
 }

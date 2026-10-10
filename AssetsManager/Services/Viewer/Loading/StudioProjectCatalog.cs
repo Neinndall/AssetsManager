@@ -10,6 +10,7 @@ using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
+using LeagueToolkit.Utils.Exceptions;
 
 namespace AssetsManager.Services.Viewer.Loading;
 
@@ -129,7 +130,8 @@ internal static class StudioProjectCatalog
                 (skin ? skins : effects).Add(entry);
             }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException
+                or InvalidPropertyTypeException or InvalidFileVersionException or InvalidFileSignatureException or NotSupportedException)
             {
                 log?.LogWarning($"Unable to classify project BIN '{path}': {ex.Message}");
             }

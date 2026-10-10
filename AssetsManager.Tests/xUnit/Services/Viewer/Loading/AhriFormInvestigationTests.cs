@@ -13,15 +13,19 @@ using LeagueToolkit.Hashing;
 using Xunit;
 using Xunit.Abstractions;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
+using AssetsManager.Tests.Support;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Loading;
 
-public sealed class AhriFormInvestigationTests(ITestOutputHelper output)
+public sealed class AhriFormInvestigationTests(ITestOutputHelper output, InstalledChampionProjects projects)
+    : IClassFixture<InstalledChampionProjects>
 {
-    [AhriDiagnosticFact]
+    private readonly string _root = projects.GetRoot("Ahri");
+
+    [InstalledChampionFact("Ahri")]
     public void InspectFormMaterialBindings()
     {
-        string binPath = Path.Combine(AhriDiagnosticFactAttribute.Root,
+        string binPath = Path.Combine(_root,
             "data", "characters", "ahri", "skins", "skin86.bin");
         using var loader = new VfxLoadingService();
         var bundle = loader.Load(binPath, null);
@@ -30,18 +34,19 @@ public sealed class AhriFormInvestigationTests(ITestOutputHelper output)
             using var stream = File.OpenRead(path);
             return new BinTree(stream);
         }).ToArray();
-        var texturePaths = Directory.EnumerateFiles(AhriDiagnosticFactAttribute.Root, "*", SearchOption.AllDirectories)
+        var texturePaths = Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories)
             .Where(path => Path.GetExtension(path).Equals(".tex", StringComparison.OrdinalIgnoreCase))
-            .Select(path => Path.GetRelativePath(AhriDiagnosticFactAttribute.Root, path).Replace('\\', '/'))
+            .Select(path => Path.GetRelativePath(_root, path).Replace('\\', '/'))
             .ToDictionary(path => XxHash64Ext.Hash(path.ToLowerInvariant()), path => path);
         string ResolvePath(ulong hash) => texturePaths.GetValueOrDefault(hash) ?? $"{hash:x16}";
         var metadata = SknMaterialTextureResolver.ReadMetadata(trees, ResolvePath);
+        Assert.NotEmpty(metadata.OverrideMaterials);
         foreach (var texture in metadata.OverrideMaterials.Values.SelectMany(material => material.TextureSwaps)
             .SelectMany(swap => swap.Options).Select(option => option.TexturePath).Distinct())
         {
             output.WriteLine("SWAP " + texture);
             Assert.Contains(texture, metadata.ReferencedTexturePaths);
-            Assert.True(File.Exists(Path.Combine(AhriDiagnosticFactAttribute.Root, texture)), texture);
+            Assert.True(File.Exists(Path.Combine(_root, texture)), texture);
         }
         foreach (var sample in new[]
         {
@@ -115,16 +120,16 @@ public sealed class AhriFormInvestigationTests(ITestOutputHelper output)
             foreach (var child in container.Elements) Dump(child, depth + 1);
     }
 
-    [AhriDiagnosticFact]
+    [InstalledChampionFact("Ahri")]
     public void InspectHallOfLegendsForms()
     {
         foreach (int skin in new[] { 85, 86 })
         {
             using var loader = new VfxLoadingService();
-            string binPath = Path.Combine(AhriDiagnosticFactAttribute.Root,
+            string binPath = Path.Combine(_root,
                 "data", "characters", "ahri", "skins", $"skin{skin}.bin");
             var bundle = loader.Load(binPath, null);
-            string meshPath = Path.Combine(AhriDiagnosticFactAttribute.Root,
+            string meshPath = Path.Combine(_root,
                 "assets", "characters", "ahri", "skins", $"skin{skin}", $"ahri_skin{skin}.skn");
             using var mesh = SkinnedMesh.ReadFromSimpleSkin(meshPath);
             var names = mesh.Ranges.Select(range => range.Material)
@@ -150,16 +155,5 @@ public sealed class AhriFormInvestigationTests(ITestOutputHelper output)
             }
             Assert.NotEmpty(bundle.LoadedBins);
         }
-    }
-}
-
-public sealed class AhriDiagnosticFactAttribute : FactAttribute
-{
-    public static string Root => Environment.GetEnvironmentVariable("ASSETSMANAGER_AHRI_DIAGNOSTIC_ROOT");
-
-    public AhriDiagnosticFactAttribute()
-    {
-        if (string.IsNullOrWhiteSpace(Root) || !Directory.Exists(Root))
-            Skip = "Set ASSETSMANAGER_AHRI_DIAGNOSTIC_ROOT to an extracted Ahri WAD folder.";
     }
 }
