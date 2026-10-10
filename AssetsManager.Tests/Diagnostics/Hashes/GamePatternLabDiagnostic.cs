@@ -60,7 +60,7 @@ internal static class GamePatternLabDiagnostic
             Measure("Custom animations", token => guesser.SubstituteAnimationBuildListWords(baseline, token,
                 candidateBudget: 100_000_000, rootDirectory: root));
             Measure("Custom textures", token => guesser.SubstituteTextureBuildListWords(baseline, token,
-                candidateBudget: 100_000_000));
+                candidateBudget: 100_000_000, rootDirectory: root));
             foreach (ulong hash in targets.Except(baseline.Matches.Keys))
                 Console.WriteLine($"ADDITIONAL_TO_MEASURED {hash:x16}");
             var located = new HashSet<ulong>();
@@ -70,6 +70,7 @@ internal static class GamePatternLabDiagnostic
                 located.UnionWith(wad.Chunks.Keys.Where(targets.Contains));
             }
             Console.WriteLine($"Located {located.Count}/{targets.Count} targets in installed GAME. No persistence.");
+            Console.WriteLine("Comparisons use bounded candidate budgets; they do not establish exhaustive coverage.");
             return;
 
             void Measure(string name, Action<CancellationToken> action)

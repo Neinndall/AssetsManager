@@ -40,6 +40,41 @@ public sealed class GameAnimationBuildListTests
     }
 
     [Fact]
+    public void ProjectsLearnedActionsWithoutKnownAnimationInTargetContainer()
+    {
+        const string target = "assets/characters/petexample/skins/skin05/animations/petexample_skin5_main_idle02.anm";
+        string outside = target.Replace("/skin05/", "/skin06/").Replace("_skin5_", "_skin6_");
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
+        {
+            XxHash64Ext.Hash(target), XxHash64Ext.Hash(outside)
+        });
+        var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+        {
+            "assets/characters/teacher/skins/skin0/animations/teacher_skin0_main_idle02.anm"
+        }));
+        guesser.SubstituteReferencedAnimationNames(engine,
+            new HashSet<(string, string)> { ("petexample", "skin5") }, CancellationToken.None);
+        Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+        Assert.Equal(1, engine.RemainingUnknownCount);
+    }
+
+    [Fact]
+    public void NumericRoundsCombineCountersFromNewlyResolvedAnimations()
+    {
+        const string prefix = "assets/characters/petexample/skins/skin05/animations/petexample_skin5_main_idle";
+        string first = prefix + "08.anm", compound = prefix + "08_2.anm";
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
+        {
+            XxHash64Ext.Hash(first), XxHash64Ext.Hash(compound)
+        });
+        var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { prefix + "02.anm" }));
+        guesser.SubstituteReferencedAnimationNames(engine,
+            new HashSet<(string, string)> { ("petexample", "skin5") }, CancellationToken.None);
+        Assert.Equal(2, engine.Matches.Count);
+        Assert.Equal(0, engine.RemainingUnknownCount);
+    }
+
+    [Fact]
     public void BudgetAndCancellationApplyToDirectedCandidates()
     {
         var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { 42 });
