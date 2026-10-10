@@ -172,12 +172,13 @@
                             SnapsToDevicePixels="True">
                         <Grid>
                             <ScrollViewer x:Name="TableScrollViewer"
-                                          Style="{StaticResource ModernGridViewScrollViewer}"
+                                          Style="{DynamicResource {x:Static GridView.GridViewScrollViewerStyleKey}}"
                                           HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                           VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                 <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
                             </ScrollViewer>
                             <Border DataContext="{Binding ElementName=TableScrollViewer}"
+                                    Background="{TemplateBinding Background}"
                                     Style="{StaticResource ModernGridViewScrollCorner}"/>
                         </Grid>
                     </Border>

@@ -133,29 +133,20 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Some system ScrollViewer templates use this brush for the scrollbar corner. -->
+    <!-- The system corner brush for standard ScrollViewer templates. -->
     <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}"
                      Color="{Binding Color, Source={StaticResource ScrollBarBackground}}"/>
 
-    <!-- Shared scroll viewer appearance. Ordinary viewers inherit this implicitly. -->
-    <Style x:Key="ModernScrollViewer" TargetType="{x:Type ScrollViewer}">
-        <Setter Property="Background" Value="{StaticResource ScrollBarBackground}"/>
-    </Style>
-    <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ModernScrollViewer}"/>
-
-    <!-- GridView requires WPF's dedicated template to synchronize headers and rows. -->
-    <Style x:Key="ModernGridViewScrollViewer" TargetType="{x:Type ScrollViewer}"
-           BasedOn="{StaticResource {x:Static GridView.GridViewScrollViewerStyleKey}}">
-        <Setter Property="Background" Value="{StaticResource ScrollBarBackground}"/>
+    <Style TargetType="{x:Type ScrollViewer}">
+        <Setter Property="Background" Value="Transparent"/>
     </Style>
 
-    <!-- WPF hardcodes two white 1px rectangles at the GridView scrollbar junction. -->
+    <!-- GridView's built-in ScrollViewer template draws white 1px corner borders. -->
     <Style x:Key="ModernGridViewScrollCorner" TargetType="{x:Type Border}">
         <Setter Property="Width" Value="8"/>
         <Setter Property="Height" Value="8"/>
         <Setter Property="HorizontalAlignment" Value="Right"/>
         <Setter Property="VerticalAlignment" Value="Bottom"/>
-        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="IsHitTestVisible" Value="False"/>
         <Setter Property="Visibility" Value="Collapsed"/>
         <Style.Triggers>
