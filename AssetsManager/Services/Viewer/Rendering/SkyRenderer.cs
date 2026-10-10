@@ -10,7 +10,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 {
     /// <summary>
     /// Draws the active Studio sky cube. The source can be the generic AssetsManager environment or
-    /// an authored MAP cubemap; all GPU creation/replacement stays deferred to Render while the GL context is current.
+    /// an authored MAP cubemap; GPU preparation and drawing require the viewport's current GL context.
     /// </summary>
     internal sealed class SkyRenderer : IDisposable
     {
@@ -97,7 +97,7 @@ void main() {
         internal void Render(Matrix4x4 view, Matrix4x4 projection)
         {
             if (!_ready) return;
-            ApplyPendingCube();
+            Prepare();
             if (_texture == 0) return;
 
             Matrix4x4 skyView = view;
@@ -131,9 +131,9 @@ void main() {
             }
         }
 
-        private void ApplyPendingCube()
+        internal void Prepare()
         {
-            if (!_replacePending) return;
+            if (!_ready || !_replacePending) return;
             _replacePending = false;
             if (_texture != 0)
             {

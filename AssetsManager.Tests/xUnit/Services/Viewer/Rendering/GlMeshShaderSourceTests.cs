@@ -138,6 +138,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
 
             Assert.Equal("Lit", settings.Studio.ViewMode);
             Assert.False(settings.Studio.WireOverlay);
+            Assert.False(new StudioModel().TimelineVisible);
         }
 
         [Fact]

@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Resources;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Tests.Support;
 using AssetsManager.Tests.xUnit.Infrastructure;
@@ -364,6 +365,45 @@ public sealed class GroundAppearanceTests
         Assert.False(gl.IsTexture(ground));
         Assert.False(gl.IsProgram(groundProgram));
         Assert.False(gl.IsProgram(stage));
+        Assert.Equal(GLEnum.NoError, gl.GetError());
+    });
+
+    [Fact]
+    public void SkyCanBePreparedWithoutDrawingAndReusesItsTextureUntilReplaced() => RunSta(() =>
+    {
+        using var context = new HiddenWglContext();
+        using var gl = GL.GetApi(context.GetProcAddress);
+        using var renderer = new SkyRenderer();
+        var faces = new byte[6][];
+        for (int face = 0; face < faces.Length; face++)
+            faces[face] = new byte[] { 255, 0, 0, 255 };
+        renderer.SetCube(new CubeMapData(1, 1, faces));
+        renderer.Prepare();
+        renderer.Initialize(gl);
+
+        gl.ClearColor(0, 1, 0, 1);
+        gl.Clear(ClearBufferMask.ColorBufferBit);
+        renderer.Prepare();
+        uint Texture() => (uint)typeof(SkyRenderer)
+            .GetField("_texture", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .GetValue(renderer);
+        uint texture = Texture();
+        Assert.True(gl.IsTexture(texture));
+        renderer.Prepare();
+        Assert.Equal(texture, Texture());
+        byte[] pixel = new byte[4];
+        gl.ReadPixels(0, 0, 1, 1, GlPixelFormat.Rgba, PixelType.UnsignedByte, pixel.AsSpan());
+        Assert.Equal(new byte[] { 0, 255, 0, 255 }, pixel);
+
+        renderer.SetCube(null);
+        renderer.Prepare();
+        Assert.Equal(0u, Texture());
+        Assert.False(gl.IsTexture(texture));
+        renderer.SetCube(new CubeMapData(1, 1, faces));
+        renderer.Prepare();
+        texture = Texture();
+        renderer.Dispose();
+        Assert.False(gl.IsTexture(texture));
         Assert.Equal(GLEnum.NoError, gl.GetError());
     });
 

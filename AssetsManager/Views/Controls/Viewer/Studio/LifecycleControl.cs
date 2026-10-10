@@ -35,7 +35,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 AppSettings.PropertyChanged -= OnGroundLogoSettingsChanged;
                 AppSettings.PropertyChanged += OnGroundLogoSettingsChanged;
             }
-            _groundTextureDirty = true;
+            if (_groundTextureLoaded) _groundTextureDirty = true;
             LoadPreviewDisplayPreferences();
             UpdateViewportClip();
             UpdateInspectorColumnVisibility();
@@ -300,6 +300,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _glInitializationSteps.Clear();
             _environmentLoadCancellation.Cancel();
             Task pendingEnvironmentLoad = _environmentLoadingTask ?? Task.CompletedTask;
+            _environmentLoadingTask = null;
             // Wait off the UI thread before clearing caches a finishing loader could repopulate.
             _ = Task.Run(async () =>
             {
@@ -312,7 +313,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             });
             _groundAppearance = default;
-            _genericSkyCube = null;
             ReleaseProjectFiles();
             StudioChromaLibrary.Reset();
             UnsubscribeGroundLogoSettings();

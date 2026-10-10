@@ -258,7 +258,11 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.ShowPreviewGround && _groundTextureLoaded,
                     _model.ShowPreviewStage);
             }
-            if (_model.ShowPreviewSky) ApplyPendingSkyGpuState();
+            if (_model.ShowPreviewSky)
+            {
+                ApplyPendingSkyGpuState();
+                _skyRenderer?.Prepare();
+            }
         }
 
         private void RenderViewportScene(int width, int height, float dt, bool snapshot = false)
@@ -345,7 +349,7 @@ namespace AssetsManager.Views.Controls.Viewer
             TryInspectPendingSystem();
             _vfxRenderer?.ProcessPendingGpuState();
             RequestEnvironmentPreparation();
-            bool showEnvironment = HasEnvironmentContent && _environmentLoadingTask is not { IsCompleted: false };
+            bool showEnvironment = HasEnvironmentContent;
             PrepareEnvironmentGpuResources();
             ApplyPendingMapGpuState();
             _mapGeometryRenderer?.ProcessRetainedResources();

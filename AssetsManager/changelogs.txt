@@ -545,6 +545,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Studio prepares Sky before its first display and keeps ready environment elements visible during texture updates.
   - Viewer / Studio keeps Ground, Grid, Stage and Sky hidden until a model or scene is loaded.
   - Tables / Removed the white corner where horizontal and vertical scrollbars meet.
   - VFX Studio / Map visibility now follows its controllers, with camera culling and corrected transparent draw order.
