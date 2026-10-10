@@ -36,6 +36,54 @@ internal static class GamePatternLabDiagnostic
             m => Console.WriteLine($"MATCH {m.Hash:x16} {m.Path} [{m.SourceWadPath}]"));
         var timer = Stopwatch.StartNew();
         Console.WriteLine($"Pattern lab: {unknown.Count} unknowns, persistence disabled");
+        if (args.Contains("--custom-local", StringComparer.Ordinal))
+        {
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known.Values));
+            foreach (bool animationPatterns in new[] { true, false })
+            {
+                var run = new HashGuessEngine(HashGuessDomain.Game, unknown.ToHashSet(),
+                    match => Console.WriteLine($"MATCH {match.Hash:x16} {match.Path}"));
+                timer.Restart();
+                long count = guesser.GuessLocalNamePatterns(run, root, animationPatterns, CancellationToken.None, long.MaxValue, null);
+                Console.WriteLine($"Custom {(animationPatterns ? "Animation" : "Texture")} local patterns: {run.Matches.Count} hits; {count:N0} checks; {timer.Elapsed.TotalSeconds:F2}s; complete");
+            }
+            return;
+        }
+        if (Option("--compare-edits") is string report)
+        {
+            var targets = File.ReadLines(report).Where(l => l.StartsWith("MATCH ", StringComparison.Ordinal))
+                .Select(l => ulong.Parse(l.AsSpan(6, 16), NumberStyles.HexNumber, CultureInfo.InvariantCulture)).ToHashSet();
+            var baseline = new HashGuessEngine(HashGuessDomain.Game, targets.Append(42UL).ToHashSet(),
+                m => Console.WriteLine($"EXISTING {m.Hash:x16} {m.Path}"));
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known.Values));
+            Measure("Token removal", token => guesser.RemoveBasenameTokens(baseline, token));
+            Measure("Custom animations", token => guesser.SubstituteAnimationBuildListWords(baseline, token,
+                candidateBudget: 100_000_000, rootDirectory: root));
+            Measure("Custom textures", token => guesser.SubstituteTextureBuildListWords(baseline, token,
+                candidateBudget: 100_000_000));
+            foreach (ulong hash in targets.Except(baseline.Matches.Keys))
+                Console.WriteLine($"ADDITIONAL_TO_MEASURED {hash:x16}");
+            var located = new HashSet<ulong>();
+            foreach (string file in guesser.FindWads(root))
+            {
+                using var wad = new WadFile(file);
+                located.UnionWith(wad.Chunks.Keys.Where(targets.Contains));
+            }
+            Console.WriteLine($"Located {located.Count}/{targets.Count} targets in installed GAME. No persistence.");
+            return;
+
+            void Measure(string name, Action<CancellationToken> action)
+            {
+                using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                var watch = Stopwatch.StartNew();
+                long before = baseline.CheckedCandidates;
+                int hits = baseline.Matches.Count;
+                bool complete = true;
+                try { action(stop.Token); }
+                catch (OperationCanceledException) when (stop.IsCancellationRequested) { complete = false; }
+                Console.WriteLine($"{name}: {baseline.Matches.Count - hits} matches; {baseline.CheckedCandidates - before:N0} checks; {watch.Elapsed.TotalSeconds:F2}s; completedWithinBudget={complete}");
+            }
+        }
         if (args.Contains("--exe", StringComparer.Ordinal))
         {
             string binary = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(Path.Combine(root, "Game", "League of Legends.exe")));
@@ -130,6 +178,12 @@ internal static class GamePatternLabDiagnostic
                     .GroupBy(p => p[..p.LastIndexOf('/')], StringComparer.Ordinal)
                     .OrderByDescending(g => g.Count()).ToArray();
                 foreach (var family in families.Take(12)) Console.WriteLine($"  FAMILY {family.Count()} {family.Key}");
+                if (args.Contains("--edit-tokens", StringComparer.Ordinal))
+                {
+                    GameHashGuesser.SubstituteLocalNameWords(engine, families.SelectMany(family => family), cancellation.Token);
+                    Console.WriteLine($"Local name patterns: {engine.CheckedCandidates:N0} candidates, {engine.Matches.Count} hits");
+                    continue;
+                }
                 if (args.Contains("--swap", StringComparer.Ordinal))
                 {
                     var frequencies = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -222,7 +276,9 @@ internal static class GamePatternLabDiagnostic
                 }
                 Console.WriteLine($"Local recombination: {engine.CheckedCandidates - before:N0} candidates, {engine.Matches.Count - hits} hits; {cappedFamilies} families reached the candidate limit");
             }
-            Console.WriteLine("Configured rules complete (local recombination is capped at 2,000,000 candidates per family)");
+            Console.WriteLine(args.Contains("--edit-tokens", StringComparer.Ordinal)
+                ? "Local name patterns complete"
+                : "Configured rules complete (local recombination is capped at 2,000,000 candidates per family)");
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {

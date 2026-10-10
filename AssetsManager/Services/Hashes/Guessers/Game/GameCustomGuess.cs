@@ -83,7 +83,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     cancellationToken,
                     progress: count => progress?.Report(engine.CreateProgress(
                         "GAME Custom: texture build-list",
-                        (int)Math.Min(int.MaxValue, progressOffset + count))));
+                        (int)Math.Min(int.MaxValue, progressOffset + count))),
+                    rootDirectory: rootDirectory);
                 checkedCandidates = (int)Math.Min(int.MaxValue, checkedCandidates + textureCheckedCandidates);
             }
 
@@ -140,10 +141,13 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             long checkedCandidates = 0;
             if (!string.IsNullOrWhiteSpace(rootDirectory))
             {
-                progress?.Invoke(0);
+                checkedCandidates = GuessLocalNamePatterns(engine, rootDirectory, animations: true,
+                    cancellationToken, candidateBudget, progress);
+                if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) return checkedCandidates;
                 var containers = FindPendingAnimationContainers(rootDirectory, engine, cancellationToken);
-                checkedCandidates = SubstituteReferencedAnimationSuffixes(engine, containers, cancellationToken,
-                    Math.Min(candidateBudget, 50_000_000), progress);
+                long localCheckedCandidates = checkedCandidates;
+                checkedCandidates += SubstituteReferencedAnimationSuffixes(engine, containers, cancellationToken,
+                    candidateBudget - checkedCandidates, count => progress?.Invoke(localCheckedCandidates + count));
                 if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) return checkedCandidates;
             }
 
@@ -265,12 +269,17 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             HashGuessEngine engine,
             CancellationToken cancellationToken,
             long candidateBudget = long.MaxValue,
-            Action<long> progress = null)
+            Action<long> progress = null,
+            string rootDirectory = null)
         {
             if (engine.RemainingUnknownCount == 0 || candidateBudget <= 0) return 0;
 
+            long localCheckedCandidates = string.IsNullOrWhiteSpace(rootDirectory) ? 0 :
+                GuessLocalNamePatterns(engine, rootDirectory, animations: false, cancellationToken, candidateBudget, progress);
+            if (engine.RemainingUnknownCount == 0 || localCheckedCandidates >= candidateBudget) return localCheckedCandidates;
             var familyIndex = Corpus.GetOrCreate("skin-texture-families", paths => new GameTextureFamilyIndex(paths, cancellationToken));
-            return familyIndex.RunBuildList(engine, cancellationToken, candidateBudget, progress);
+            return localCheckedCandidates + familyIndex.RunBuildList(engine, cancellationToken,
+                candidateBudget - localCheckedCandidates, count => progress?.Invoke(localCheckedCandidates + count));
         }
     }
 }

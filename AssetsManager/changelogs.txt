@@ -183,6 +183,8 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Lab / Custom GAME learns local filename word variations for animations, textures, augment icons and map pieces.
+  - Hash Lab / Custom GAME animation guessing no longer stops its BIN-referenced search at 50 million candidates.
   - Viewer / Studio prepares enabled environment elements on entry, with textures loading in the background.
   - Hash Lab / The results divider now widens and glows on hover like the logger divider.
   - Hash Lab / Added a checklist icon to the Included Strategies heading.
