@@ -106,6 +106,7 @@ namespace AssetsManager.Utils
             value is ConcurrentDictionary<TKey, TValue> cd ? cd : new ConcurrentDictionary<TKey, TValue>(value ?? new Dictionary<TKey, TValue>());
 
         private ConcurrentDictionary<string, long> _hashesSizes = new ConcurrentDictionary<string, long>();
+        // Informational snapshot of local catalog sizes; synchronization reads the files directly.
         public IDictionary<string, long> HashesSizes
         {
             get => _hashesSizes;
@@ -488,7 +489,7 @@ namespace AssetsManager.Utils
             AudioPlaylists = defaultSettings.AudioPlaylists;
             ApiSettings = defaultSettings.ApiSettings;
             SyncHashesWithCDTB = defaultSettings.SyncHashesWithCDTB;
-            // HashesSizes is intentionally not reset to preserve local cache state.
+            // Preserve the last recorded local catalog sizes.
         }
     }
 

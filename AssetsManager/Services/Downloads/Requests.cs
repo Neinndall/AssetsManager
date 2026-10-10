@@ -6,7 +6,6 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Hashes;
 
 namespace AssetsManager.Services.Downloads
 {
@@ -25,34 +24,42 @@ namespace AssetsManager.Services.Downloads
             _logService = logService;
         }
 
-        public async Task DownloadHashesAsync(string fileName, string downloadDirectory)
+        public async Task<bool> DownloadHashesAsync(string fileName, string downloadDirectory)
         {
             var url = $"{BaseUrl.TrimEnd('/')}/{fileName}";
+            var filePath = Path.Combine(downloadDirectory, fileName);
+            var tempPath = filePath + ".tmp";
 
             try
             {
-                var filePath = Path.Combine(downloadDirectory, fileName);
-                var tempPath = filePath + ".tmp";
-                var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+                using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
+                Directory.CreateDirectory(downloadDirectory);
 
-                if (response.IsSuccessStatusCode)
+                await using (var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                 {
-                    await using (var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
-                    {
-                        await response.Content.CopyToAsync(fileStream);
-                    }
-
-                    if (File.Exists(filePath)) File.Delete(filePath);
-                    File.Move(tempPath, filePath);
+                    await response.Content.CopyToAsync(fileStream);
+                    long? expectedLength = response.Content.Headers.ContentLength;
+                    if (fileStream.Length == 0 || (expectedLength.HasValue && fileStream.Length != expectedLength.Value))
+                        throw new InvalidDataException($"Incomplete hash download for {fileName}.");
                 }
-                else
+                // Guessing may have enlarged the local catalog while the download was in progress.
+                if (File.Exists(filePath) && new FileInfo(filePath).Length >= new FileInfo(tempPath).Length)
                 {
-                    _logService.LogError($"Error downloading {fileName}. Status code: {response.StatusCode}");
+                    _logService.LogDebug($"Kept {fileName}: the local catalog is already equal or larger.");
+                    return true;
                 }
+                File.Move(tempPath, filePath, overwrite: true);
+                return true;
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Exception downloading {fileName}.");
+                return false;
+            }
+            finally
+            {
+                if (File.Exists(tempPath)) File.Delete(tempPath);
             }
         }
 
@@ -75,14 +82,11 @@ namespace AssetsManager.Services.Downloads
             await DownloadSpecificHashesAsync(new List<string> { "hashes.rst.xxh3.txt", "hashes.rst.xxh64.txt" });
         }
 
-        public async Task DownloadSpecificHashesAsync(List<string> filesToDownload)
+        public async Task<bool> DownloadSpecificHashesAsync(List<string> filesToDownload)
         {
-            var tasks = new List<Task>();
-            foreach (var fileName in filesToDownload)
-            {
-                tasks.Add(DownloadHashesAsync(fileName, _directoriesCreator.HashesPath));
-            }
-            await Task.WhenAll(tasks);
+            bool[] results = await Task.WhenAll(filesToDownload.Distinct(StringComparer.Ordinal).Select(
+                fileName => DownloadHashesAsync(fileName, _directoriesCreator.HashesPath)));
+            return results.All(succeeded => succeeded);
         }
 
         public async Task<string> DownloadJsonContentAsync(string url)

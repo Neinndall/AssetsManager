@@ -84,11 +84,9 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Theory]
-        [InlineData("#include\t\"../shared/common.hlsl\"", "assets/shaders/shared/common.hlsl")]
-        [InlineData("  # include  \"../shared/common.hlsl\"", "assets/shaders/shared/common.hlsl")]
+        [InlineData("#include \"../shared/common.hlsl\"", "assets/shaders/shared/common.hlsl")]
         [InlineData("#include \"assets/shaders/shared/common.hlsl\"", "assets/shaders/shared/common.hlsl")]
-        [InlineData("#include <../shared/common.hlsl>", "assets/shaders/shared/common.hlsl")]
-        public void ShaderIncludesResolveWhitespaceAndVirtualPaths(string text, string expected)
+        public void ShaderIncludesResolveVirtualPaths(string text, string expected)
             => AssertGrepReference(System.Text.Encoding.ASCII.GetBytes(text), "assets/shaders/effects/main.hlsl", expected);
 
         [Theory]

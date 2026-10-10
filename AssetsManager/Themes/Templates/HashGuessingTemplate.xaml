@@ -93,8 +93,7 @@
         <Grid Margin="0,0,0,6">
             <Border x:Name="StrategyBackground" Background="{StaticResource SidebarBackground}" CornerRadius="8"/>
             <CheckBox x:Name="StrategyCheckBox" IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                      Style="{StaticResource HashGuessingStrategyCheckBox}" Margin="12,10" HorizontalContentAlignment="Stretch"
-                      ToolTip="{Binding Description}">
+                      Style="{StaticResource HashGuessingStrategyCheckBox}" Margin="12,10" HorizontalContentAlignment="Stretch">
                 <StackPanel>
                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
                     <TextBlock Text="{Binding Description}" Margin="0,2,0,0" FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
@@ -105,10 +104,6 @@
         <DataTemplate.Triggers>
             <Trigger SourceName="StrategyCheckBox" Property="IsMouseOver" Value="True">
                 <Setter TargetName="StrategyBackground" Property="Background" Value="{StaticResource HoverColor}"/>
-                <Setter TargetName="StrategyOutline" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-            </Trigger>
-            <Trigger SourceName="StrategyCheckBox" Property="IsKeyboardFocusWithin" Value="True">
-                <Setter TargetName="StrategyOutline" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
             </Trigger>
         </DataTemplate.Triggers>
     </DataTemplate>

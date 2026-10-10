@@ -321,6 +321,10 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 HashesIndicatorColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
             }
+            else if (HashesStatus == "Sync failed")
+            {
+                HashesIndicatorColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12"));
+            }
             else
             {
                 HashesIndicatorColor = Brushes.Gray;
@@ -374,6 +378,14 @@ namespace AssetsManager.Views.Models.Monitor
                 SystemHealthFooterText = "Syncing Databases...";
                 SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB")); // Blue
                 SystemHealthFooterIconKind = MaterialIconKind.Sync;
+                return;
+            }
+
+            if (HashesStatus == "Sync failed")
+            {
+                SystemHealthFooterText = "Hash sync incomplete";
+                SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12"));
+                SystemHealthFooterIconKind = MaterialIconKind.AlertCircleOutline;
                 return;
             }
 
@@ -608,11 +620,11 @@ namespace AssetsManager.Views.Models.Monitor
             });
         }
 
-        private void OnHashSyncCompleted()
+        private void OnHashSyncCompleted(bool succeeded)
         {
             Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                HashesStatus = "Synced";
+                HashesStatus = succeeded ? "Synced" : "Sync failed";
                 UpdateSystemHealthFooter();
             });
         }

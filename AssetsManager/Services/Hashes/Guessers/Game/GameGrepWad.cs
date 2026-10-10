@@ -51,6 +51,9 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             cancellationToken.ThrowIfCancellationRequested();
             if (data.Count == 0) return;
 
+            // Local wrappers for Check (CDTB check) and CheckIter (CDTB check_iter) keep
+            // the current engine, source WAD/chunk and cancellation context on every call.
+            // The candidate overload also preserves each candidate's strategy.
             void CheckGame(string path, HashGuessStrategy strategy = HashGuessStrategy.BinLengthPath)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -250,10 +253,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
                 string directory = PathUtils.NormalizeSeparators(Path.GetDirectoryName(sourcePath));
                 if (string.IsNullOrEmpty(directory)) return;
-                foreach (Match match in Regex.Matches(text, @"^[ \t]*#[ \t]*include[ \t]*(?:""([^""\r\n]+)""|<([^>\r\n]+)>)", RegexOptions.Multiline | RegexOptions.CultureInvariant))
+                foreach (Match match in Regex.Matches(text, @"#include ""([^""]+)"""))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    string reference = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+                    string reference = match.Groups[1].Value;
                     if (!IsAscii(reference)) continue;
                     CheckGame(ResolveGrepReference(directory, reference), HashGuessStrategy.ShaderInclude);
                 }

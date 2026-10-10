@@ -392,7 +392,7 @@ namespace AssetsManager.Views
                     var summary = await Task.Run(() => _hashGuessingService.GetUnknownSummaryAsync(domain, CancellationToken.None));
                     if (DomainSelector != null && DomainSelector.SelectedIndex == selectedIndex)
                     {
-                        TxtUnknownCount.Text = $"{summary.Total:N0} unresolved";
+                        TxtUnknownCount.Text = $"{summary.Total:N0} unknowns";
                         TxtUnknownBreakdown.Text = $"Current: {summary.Current:N0} · Recent: {summary.Recent:N0}";
                     }
                 }
@@ -403,12 +403,12 @@ namespace AssetsManager.Views
                     {
                         if (selectedIndex == 2)
                         {
-                            TxtUnknownCount.Text = $"{summary.BinTotal:N0} unresolved";
+                            TxtUnknownCount.Text = $"{summary.BinTotal:N0} unknowns";
                             TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Types: {summary.BinTypes:N0}\nFields: {summary.BinFields:N0} · Hashes: {summary.BinHashes:N0}\nXXH3-64: {summary.BinXxh3:N0}";
                         }
                         else
                         {
-                            TxtUnknownCount.Text = $"{summary.RstTotal:N0} unresolved";
+                            TxtUnknownCount.Text = $"{summary.RstTotal:N0} unknowns";
                             TxtUnknownBreakdown.Text = $"XXH3: {summary.RstXxh3:N0} · XXH64: {summary.RstXxh64:N0}";
                         }
                     }
@@ -424,7 +424,7 @@ namespace AssetsManager.Views
 
         private void ShowLiveUnknownCount(int remaining, int resolved)
         {
-            TxtUnknownCount.Text = $"{remaining:N0} unresolved";
+            TxtUnknownCount.Text = $"{remaining:N0} unknowns";
             TxtUnknownBreakdown.Text = $"Resolved: {resolved:N0} · Pending: {remaining:N0}";
         }
 

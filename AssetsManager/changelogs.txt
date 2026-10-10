@@ -183,6 +183,9 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Lab / Simplified the unknown hash summary and removed strategy and results divider tooltips.
+  - Hash Lab / Strategy rows keep their neutral border on hover and focus.
+  - Hash Lab / Restored CDTB shader include matching after checking the installed GAME files.
   - Hash Lab / GAME WAD guessing preserves nested animation labels and reaches nested BIN texture scopes and patch overrides.
   - Hash Lab / BIN-referenced animation guessing is independently selectable in Custom GAME.
   - Hash Lab / Custom GAME explores BIN-referenced animation skins and themes without known filename seeds, including compound numeric variants.
@@ -550,6 +553,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Hash synchronization compares actual local file sizes, preserves larger catalogs and reports failed downloads accurately.
   - Hash Lab / Repeated unknown files retain their detected type during scanning, and GAME property BINs can be searched without a filename extension.
   - Hash Lab / GAME WAD guessing preserves explicit file extensions and resolves relative preload, shader and atlas references correctly.
   - Hash Lab / Resolving one skin's materials no longer skips later skins in the same BIN.
