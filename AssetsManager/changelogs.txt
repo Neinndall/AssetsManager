@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Settings / Added Stage visibility alongside Ground, Grid and Sky for 3D Studio.
   - Hash Lab / GAME Basic Suite also finds shorter texture and animation filenames by removing individual name tokens.
   - Hash Lab / GAME Basic Suite finds reused files in companion and map containers, including new skins.
   - Hash Lab / GAME guessing finds more animations and avoids repeated character guesses.
@@ -181,6 +182,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / Studio opens with a loading state, prepares preview textures in the background and initializes renderers progressively.
   - Hash Lab / The results divider now widens and glows on hover like the logger divider.
   - Hash Lab / Added a checklist icon to the Included Strategies heading.
   - Hash Lab / Results have more room by default, with a draggable divider to resize strategies and matches.

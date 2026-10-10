@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using AssetsManager.Services.Viewer.Animation;
@@ -20,6 +21,12 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         private ViewportFrameScheduler _viewportFrameScheduler;
         private bool _groundTextureDirty = true;
+        private int _groundTextureVersion;
+        private bool _isGlStarting;
+        private GroundAppearance _groundAppearance;
+        private bool _groundAppearancePending;
+        private Task _previewAssetsTask = Task.CompletedTask;
+        private readonly CancellationTokenSource _previewAssetsCancellation = new();
 
         private void OnControlLoaded(object sender, RoutedEventArgs e)
         {
@@ -53,7 +60,8 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (_isCleanedUp) return;
                 _groundTextureDirty = true;
-                StudioViewportView.OpenTkControl.InvalidateVisual();
+                _groundTextureVersion++;
+                _ = PreparePreviewAssetsAsync();
             });
         }
 
@@ -198,12 +206,15 @@ namespace AssetsManager.Views.Controls.Viewer
                 _viewportFrameScheduler.Stop();
         }
 
-        private void EnsureOpenGlStarted()
+        private async void EnsureOpenGlStarted()
         {
-            if (!_isActive || _isGlStarted || _isCleanedUp || !IsLoaded || !IsVisible) return;
+            if (!_isActive || _isGlStarted || _isGlStarting || _isCleanedUp || !IsLoaded || !IsVisible) return;
 
+            _isGlStarting = true;
             try
             {
+                await PreparePreviewAssetsAsync();
+                if (!_isActive || _isCleanedUp || !IsLoaded || !IsVisible) return;
                 var settings = new OpenTK.Wpf.GLWpfControlSettings
                 {
                     MajorVersion = 3,
@@ -219,12 +230,60 @@ namespace AssetsManager.Views.Controls.Viewer
                 LogService?.LogError(ex, "Failed to initialize the 3D Studio OpenGL viewport.");
                 _model.LogMessages.Add($"[ERROR] Failed to initialize the OpenGL viewport: {ex.Message}");
             }
+            finally
+            {
+                _isGlStarting = false;
+            }
         }
 
         private void OnControlUnloaded(object sender, RoutedEventArgs e)
         {
             UnsubscribeGroundLogoSettings();
             Deactivate();
+        }
+
+        private async Task PreparePreviewAssetsAsync()
+        {
+            try
+            {
+                await _previewAssetsTask;
+                if (_isCleanedUp || !_isActive) return;
+                bool ground = _model.ShowPreviewGround && _groundTextureDirty;
+                int groundVersion = _groundTextureVersion;
+                bool sky = _model.ShowPreviewSky && _genericSkyCube == null;
+                if (!ground && !sky) return;
+                CancellationToken token = _previewAssetsCancellation.Token;
+                var loading = Task.Run(() =>
+                {
+                    token.ThrowIfCancellationRequested();
+                    var appearance = ground ? SceneElements.LoadGroundAppearance(AppSettings, LogService) : default;
+                    token.ThrowIfCancellationRequested();
+                    var cube = sky ? SceneElements.LoadGenericSkyCube(AppSettings, LogService) : null;
+                    token.ThrowIfCancellationRequested();
+                    return (Ground: appearance, Sky: cube);
+                }, token);
+                _previewAssetsTask = loading;
+                var assets = await loading;
+                if (_isCleanedUp) return;
+                if (ground)
+                {
+                    _groundAppearance = assets.Ground;
+                    _groundAppearancePending = true;
+                    _groundTextureDirty = groundVersion != _groundTextureVersion;
+                }
+                if (sky)
+                {
+                    _genericSkyCube = assets.Sky;
+                    _skyCubeDirty = true;
+                }
+                StudioViewportView.OpenTkControl.InvalidateVisual();
+                if (_groundTextureDirty && _model.ShowPreviewGround) _ = PreparePreviewAssetsAsync();
+            }
+            catch (OperationCanceledException) when (_previewAssetsCancellation.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to prepare Studio preview textures.");
+            }
         }
 
         /// <summary>
@@ -238,6 +297,23 @@ namespace AssetsManager.Views.Controls.Viewer
             _isExitPending = false;
             Deactivate();
             _isCleanedUp = true;
+            _glInitializationSteps.Clear();
+            _previewAssetsCancellation.Cancel();
+            Task pendingAssets = _previewAssetsTask;
+            _previewAssetsTask = Task.CompletedTask;
+            // Wait off the UI thread before clearing caches a finishing loader could repopulate.
+            _ = Task.Run(async () =>
+            {
+                try { await pendingAssets; }
+                catch (OperationCanceledException) { }
+                finally
+                {
+                    SceneElements.ClearSceneCache();
+                    _previewAssetsCancellation.Dispose();
+                }
+            });
+            _groundAppearance = default;
+            _genericSkyCube = null;
             ReleaseProjectFiles();
             StudioChromaLibrary.Reset();
             UnsubscribeGroundLogoSettings();

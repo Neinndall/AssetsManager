@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Vfx.Loading;
@@ -28,6 +29,7 @@ namespace AssetsManager.Views
         private StudioControl _studio;
         private ChromaSelectionControl _homeChromas;
         private bool _isCleanedUp;
+        private Task<bool> _studioEntryTask;
 
         public ViewerWindow(LogService logService, AppSettings appSettings,
             SknLoadingService sknLoadingService, MapViewerSceneService mapViewerSceneService,
@@ -62,24 +64,48 @@ namespace AssetsManager.Views
 
         private void RefreshRecentProjects() => _model.SetRecentProjects(_appSettings.StudioRecentProjects);
 
-        private void EnterStudio()
+        private Task<bool> EnterStudioAsync()
         {
-            if (_isCleanedUp) return;
-            if (_studio == null)
+            if (_studioEntryTask is { IsCompleted: false }) return _studioEntryTask;
+            return _studioEntryTask = EnterStudioCoreAsync();
+        }
+
+        private async Task<bool> EnterStudioCoreAsync()
+        {
+            if (_isCleanedUp) return false;
+            _model.IsEnteringStudio = true;
+            try
             {
-                _studio = new StudioControl
+                // Let the click finish and the opening state render before constructing WPF controls.
+                await Dispatcher.Yield(DispatcherPriority.Background);
+                if (_isCleanedUp || !IsLoaded) return false;
+                if (_studio == null)
                 {
-                    LogService = _logService, AppSettings = _appSettings,
-                    SknLoadingService = _sknLoadingService, MapViewerSceneService = _mapSceneService,
-                    ChromaLoadingService = _chromaLoadingService, VfxLoadingService = _vfxLoadingService,
-                    CustomMessageBoxService = _messageBox
-                };
-                _studio.ExitRequested += OnStudioExitRequested;
-                StudioHost.Content = _studio;
+                    _studio = new StudioControl
+                    {
+                        LogService = _logService, AppSettings = _appSettings,
+                        SknLoadingService = _sknLoadingService, MapViewerSceneService = _mapSceneService,
+                        ChromaLoadingService = _chromaLoadingService, VfxLoadingService = _vfxLoadingService,
+                        CustomMessageBoxService = _messageBox
+                    };
+                    _studio.ExitRequested += OnStudioExitRequested;
+                    StudioHost.Content = _studio;
+                }
+                _model.IsStudioVisible = true;
+                _model.IsChromaLibraryVisible = false;
+                _studio.Activate();
+                return true;
             }
-            _model.IsStudioVisible = true;
-            _model.IsChromaLibraryVisible = false;
-            _studio.Activate();
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to open 3D Studio.");
+                _model.IsStudioVisible = false;
+                return false;
+            }
+            finally
+            {
+                _model.IsEnteringStudio = false;
+            }
         }
 
         private void OnStudioExitRequested(object sender, EventArgs e)
@@ -89,20 +115,20 @@ namespace AssetsManager.Views
             RefreshRecentProjects();
         }
 
-        private void OpenStudio_Click(object sender, RoutedEventArgs e) => EnterStudio();
+        private async void OpenStudio_Click(object sender, RoutedEventArgs e) => await EnterStudioAsync();
 
-        private void OpenProject_Click(object sender, RoutedEventArgs e)
+        private async void OpenProject_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new OpenFolderDialog { Title = "Open 3D Studio project folder" };
-            if (dialog.ShowDialog(Window.GetWindow(this)) == true) OpenProject(dialog.FolderName);
+            if (dialog.ShowDialog(Window.GetWindow(this)) == true) await OpenProjectAsync(dialog.FolderName);
         }
 
-        private void OpenRecent_Click(object sender, RoutedEventArgs e)
+        private async void OpenRecent_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button { DataContext: StudioRecentProject project }) OpenProject(project.Path);
+            if (sender is Button { DataContext: StudioRecentProject project }) await OpenProjectAsync(project.Path);
         }
 
-        private void OpenProject(string path)
+        private async Task OpenProjectAsync(string path)
         {
             if (_isCleanedUp) return;
             if (!Directory.Exists(path))
@@ -110,7 +136,7 @@ namespace AssetsManager.Views
                 _messageBox.ShowWarning("Project unavailable", "This project folder is no longer available. Open its new location or remove it from recent projects.", Window.GetWindow(this));
                 return;
             }
-            EnterStudio();
+            if (!await EnterStudioAsync()) return;
             _studio.LoadExtractedContainer(path);
         }
 
@@ -167,10 +193,10 @@ namespace AssetsManager.Views
         private async void OnHomeChromasSourceChangeRequested(object sender, EventArgs e)
             => await ChooseHomeChromaFolderAsync();
 
-        private void OnHomeChromasSelectionRequested(IReadOnlyList<ChromaSkinModel> selected, bool addToScene)
+        private async void OnHomeChromasSelectionRequested(IReadOnlyList<ChromaSkinModel> selected, bool addToScene)
         {
             if (selected.Count == 0 || _isCleanedUp) return;
-            EnterStudio();
+            if (!await EnterStudioAsync()) return;
             _studio.LoadChromas(selected, addToScene);
         }
 

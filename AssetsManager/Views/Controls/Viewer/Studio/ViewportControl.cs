@@ -1,5 +1,6 @@
 using AssetsManager.Services.Viewer.Resources;
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
@@ -19,6 +20,7 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         private readonly OpenGlSnapshotService _snapshotService = new();
         private OpenGlSnapshotService.SnapshotRequest _pendingSnapshot;
+        private readonly Queue<Action> _glInitializationSteps = new();
 
         [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
         private static extern IntPtr wglGetProcAddress(string procName);
@@ -105,77 +107,96 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_isCleanedUp) return;
 
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
-                if (_previewSurfaceRenderer == null)
+                _glInitializationSteps.Clear();
+                _glInitializationSteps.Enqueue(() =>
                 {
-                    GroundAppearance appearance = SceneElements.LoadGroundAppearance(AppSettings, LogService);
-                    _previewSurfaceRenderer = new PreviewSurfaceRenderer();
-                    _previewSurfaceRenderer.Initialize(_gl, appearance);
-                    _groundTextureDirty = false;
-                }
+                    if (_previewSurfaceRenderer == null)
+                    {
+                        _previewSurfaceRenderer = new PreviewSurfaceRenderer();
+                        _previewSurfaceRenderer.Initialize(_gl, _groundAppearance);
+                        _groundAppearancePending = false;
+                    }
+                });
 
-                if (_championMeshRenderer == null)
+                _glInitializationSteps.Enqueue(() =>
                 {
-                    _championMeshRenderer = new GlMeshRenderer(AppSettings);
-                    _championMeshRenderer.Initialize(_gl);
-                }
+                    if (_championMeshRenderer == null)
+                    {
+                        _championMeshRenderer = new GlMeshRenderer(AppSettings);
+                        _championMeshRenderer.Initialize(_gl);
+                    }
+                });
 
-                if (_mapGeometryRenderer == null)
+                _glInitializationSteps.Enqueue(() =>
                 {
-                    _mapGeometryRenderer = new MapGeometryRenderer(AppSettings);
-                    _mapGeometryRenderer.Initialize(_gl);
-                }
-                if (_skyRenderer == null)
+                    if (_mapGeometryRenderer == null)
+                    {
+                        _mapGeometryRenderer = new MapGeometryRenderer(AppSettings);
+                        _mapGeometryRenderer.Initialize(_gl);
+                    }
+                });
+                _glInitializationSteps.Enqueue(() =>
                 {
-                    _skyRenderer = new SkyRenderer();
-                    _skyRenderer.Initialize(_gl);
-                    _genericSkyCube ??= SceneElements.LoadGenericSkyCube(AppSettings, LogService);
-                    _skyCubeDirty = true;
-                }
-                if (_mapCharacterRenderer == null)
+                    if (_skyRenderer == null)
+                    {
+                        _skyRenderer = new SkyRenderer();
+                        _skyRenderer.Initialize(_gl);
+                        _skyCubeDirty = true;
+                    }
+                });
+                _glInitializationSteps.Enqueue(() =>
                 {
-                    _mapCharacterRenderer = new MapCharacterRenderer(AppSettings);
-                    _mapCharacterRenderer.Initialize(_gl);
-                }
-                if (_mapParticleRenderer == null)
+                    if (_mapCharacterRenderer == null)
+                    {
+                        _mapCharacterRenderer = new MapCharacterRenderer(AppSettings);
+                        _mapCharacterRenderer.Initialize(_gl);
+                    }
+                });
+                _glInitializationSteps.Enqueue(() =>
                 {
-                    _mapParticleRenderer = new MapParticleRenderer();
-                    _mapParticleRenderer.Initialize(_gl, AppSettings);
-                }
-                _championAnimationService ??= new AnimationService(LogService);
+                    if (_mapParticleRenderer == null)
+                    {
+                        _mapParticleRenderer = new MapParticleRenderer();
+                        _mapParticleRenderer.Initialize(_gl, AppSettings);
+                    }
+                });
+                _glInitializationSteps.Enqueue(() =>
+                {
+                    _championAnimationService ??= new AnimationService(LogService);
 
-                if (_characterInteractionController == null)
-                {
-                    _characterInteractionController = new ViewportModelInteractionController(
-                        StudioViewportView.CameraInputSurface,
-                        StudioViewportView.CharacterTransformGizmoCanvas,
-                        () => _dummyViewport.Camera as ProjectionCamera,
-                        _characterInteractionModels);
-                    _characterInteractionController.WorldMatrixProvider =
-                        model => GlMeshRenderer.CreateWorldMatrix(model, mirrorCharacterX: true);
-                    _characterInteractionController.TransformChanged += CharacterInteraction_TransformChanged;
-                    _characterInteractionController.SelectionRequested += CharacterInteraction_SelectionRequested;
-                    RefreshCharacterInteractionTarget();
-                }
+                    if (_characterInteractionController == null)
+                    {
+                        _characterInteractionController = new ViewportModelInteractionController(
+                            StudioViewportView.CameraInputSurface,
+                            StudioViewportView.CharacterTransformGizmoCanvas,
+                            () => _dummyViewport.Camera as ProjectionCamera,
+                            _characterInteractionModels);
+                        _characterInteractionController.WorldMatrixProvider =
+                            model => GlMeshRenderer.CreateWorldMatrix(model, mirrorCharacterX: true);
+                        _characterInteractionController.TransformChanged += CharacterInteraction_TransformChanged;
+                        _characterInteractionController.SelectionRequested += CharacterInteraction_SelectionRequested;
+                        RefreshCharacterInteractionTarget();
+                    }
 
-                if (_cameraController == null)
-                {
-                    _cameraController = new CustomCameraController(_dummyViewport, StudioViewportView.CameraInputSurface);
-                    _cameraController.RotationStarted += CameraController_RotationStarted;
-                    _cameraController.RotationEnded += CameraController_RotationEnded;
-                    ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
-                }
+                    if (_cameraController == null)
+                    {
+                        _cameraController = new CustomCameraController(_dummyViewport, StudioViewportView.CameraInputSurface);
+                        _cameraController.RotationStarted += CameraController_RotationStarted;
+                        _cameraController.RotationEnded += CameraController_RotationEnded;
+                        ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
+                    }
 
-                _model.LogMessages.Add("[GL] OpenGL viewport, preview surfaces and camera controller initialized successfully.");
-                _model.LogMessages.Add(
-                    $"[GL] Vendor={_gl.GetStringS(Silk.NET.OpenGL.StringName.Vendor)} | " +
-                    $"Renderer={_gl.GetStringS(Silk.NET.OpenGL.StringName.Renderer)} | " +
-                    $"OpenGL={_gl.GetStringS(Silk.NET.OpenGL.StringName.Version)} | " +
-                    $"GLSL={_gl.GetStringS(Silk.NET.OpenGL.StringName.ShadingLanguageVersion)}");
-                _gl.GetInteger(Silk.NET.OpenGL.GLEnum.MaxTextureImageUnits, out int textureUnits);
-                _gl.GetInteger(Silk.NET.OpenGL.GLEnum.MaxVertexAttribs, out int vertexAttributes);
-                _model.LogMessages.Add(
-                    $"[GL] Limits: fragment texture units={textureUnits}, vertex attributes={vertexAttributes}.");
-
+                    _model.LogMessages.Add("[GL] OpenGL viewport, preview surfaces and camera controller initialized successfully.");
+                    _model.LogMessages.Add(
+                        $"[GL] Vendor={_gl.GetStringS(Silk.NET.OpenGL.StringName.Vendor)} | " +
+                        $"Renderer={_gl.GetStringS(Silk.NET.OpenGL.StringName.Renderer)} | " +
+                        $"OpenGL={_gl.GetStringS(Silk.NET.OpenGL.StringName.Version)} | " +
+                        $"GLSL={_gl.GetStringS(Silk.NET.OpenGL.StringName.ShadingLanguageVersion)}");
+                    _gl.GetInteger(Silk.NET.OpenGL.GLEnum.MaxTextureImageUnits, out int textureUnits);
+                    _gl.GetInteger(Silk.NET.OpenGL.GLEnum.MaxVertexAttribs, out int vertexAttributes);
+                    _model.LogMessages.Add(
+                        $"[GL] Limits: fragment texture units={textureUnits}, vertex attributes={vertexAttributes}.");
+                });
             }
             catch (Exception ex)
             {
@@ -186,6 +207,21 @@ namespace AssetsManager.Views.Controls.Viewer
         internal void OpenTkControl_Render(TimeSpan delta)
         {
             if (_gl == null) return;
+            if (_glInitializationSteps.Count > 0)
+            {
+                if (!_isActive || !IsVisible || _isCleanedUp) return;
+                // Each callback has a current GL context; return to WPF between renderer stages.
+                try { _glInitializationSteps.Dequeue()(); }
+                catch (Exception ex)
+                {
+                    _glInitializationSteps.Clear();
+                    LogService?.LogError(ex, "Failed to initialize a Studio renderer.");
+                    _model.LogMessages.Add($"[ERROR] GL Init failed: {ex.Message}");
+                    SetRenderLoopRunning(false);
+                }
+                _discardNextSimulationDelta = true;
+                return;
+            }
 
             _championMeshRenderer?.ProcessPendingReleases();
             ProcessSceneActorGpuState();
@@ -219,17 +255,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _gl.Viewport(0, 0, (uint)width, (uint)height);
 
-            if (_groundTextureDirty)
+            if (_groundAppearancePending)
             {
-                _groundTextureDirty = false;
-                try
-                {
-                    _previewSurfaceRenderer?.SetGroundAppearance(SceneElements.LoadGroundAppearance(AppSettings, LogService));
-                }
-                catch (Exception ex)
-                {
-                    LogService?.LogError(ex, "Failed to refresh the 3D Studio ground texture.");
-                }
+                _groundAppearancePending = false;
+                _previewSurfaceRenderer?.SetGroundAppearance(_groundAppearance);
             }
 
             // The first-pose wait ends once a pose landed or nothing is being prepared any more.

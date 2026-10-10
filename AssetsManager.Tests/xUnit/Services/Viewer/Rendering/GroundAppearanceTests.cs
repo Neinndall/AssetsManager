@@ -3,6 +3,7 @@ using System.IO;
 using System.Numerics;
 using System.Runtime.ExceptionServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -102,6 +103,29 @@ public sealed class GroundAppearanceTests
         {
             SceneElements.ClearGroundCache();
         }
+    });
+
+    [Fact]
+    public void GroundPreparedOnWorkerCanBeUsedOnViewportThread() => RunSta(() =>
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        string path = Path.Combine(bridge.RootPath, "startup-logo.png");
+        SavePng(path, SolidBitmap(255, 0, 0));
+        SceneElements.ClearGroundCache();
+        try
+        {
+            var settings = new AppSettings { CustomGroundLogoPath = path, GroundLogoScale = 0.5, GroundLogoOpacity = 0.7 };
+            GroundAppearance appearance = Task.Run(() => SceneElements.LoadGroundAppearance(settings, null)).GetAwaiter().GetResult();
+            Assert.NotNull(appearance.Texture);
+            Assert.NotNull(appearance.Logo);
+            Assert.True(appearance.Texture.IsFrozen);
+            Assert.True(appearance.Logo.IsFrozen);
+            Assert.Equal(2048, appearance.Texture.PixelWidth);
+            Assert.Equal((byte)255, Pixel(appearance.Logo, 0, 0)[2]);
+            Assert.Equal(0.2125f, appearance.LogoUvSize.X, 5);
+            Assert.Equal(0.7f, appearance.Opacity);
+        }
+        finally { SceneElements.ClearGroundCache(); }
     });
 
     [Fact]
