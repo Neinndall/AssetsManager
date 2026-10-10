@@ -199,7 +199,10 @@
                                         </Style>
                                     </StackPanel.Style>
                                     <Grid Margin="0,0,0,8">
-                                        <TextBlock Text="INCLUDED STRATEGIES" Style="{StaticResource LabCaption}" VerticalAlignment="Center"/>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="FormatListChecks" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="INCLUDED STRATEGIES" Style="{StaticResource LabCaption}" VerticalAlignment="Center"/>
+                                        </StackPanel>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                             <Button Style="{StaticResource TransparentIconButton}" Width="28" Height="28" Click="SelectAllSubMethods_Click" ToolTip="Select all strategies" Margin="0,0,4,0">
                                                 <materialIcons:MaterialIcon Kind="SelectAll" Width="16" Height="16"/>
