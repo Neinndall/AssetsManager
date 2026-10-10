@@ -208,7 +208,7 @@ namespace AssetsManager.Tests.xUnit.Parsers
             const ulong wideHash = 0xccdb6584d78a04f6;
             File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.game.txt"), $"{gameHash:x16} assets/known.tex\n");
             File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.lcu.txt"), $"{lcuHash:x16} plugins/known.png\n");
-            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.bin.xxh364.txt"), $"{wideHash:x16} Materials/WideName\n");
+            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.xxh3.txt"), $"{wideHash:x16} Materials/WideName\n");
             using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
             await resolver.LoadAllHashesAsync();
             var serializer = new BinRitobinSerializer(resolver);

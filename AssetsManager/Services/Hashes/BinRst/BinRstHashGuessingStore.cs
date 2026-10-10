@@ -26,8 +26,6 @@ namespace AssetsManager.Services.Hashes
             var result = new Dictionary<ulong, string>();
             int width = IsWide(kind) ? 16 : 8;
             string path = GetKnownPath(kind);
-            if (kind == InternalHashKind.BinXxh3 && !File.Exists(path))
-                path = Path.Combine(_directories.HashesPath, "hashes.bin.xxh3.txt");
             if (File.Exists(path))
             {
                 using var reader = new StreamReader(path);
@@ -360,7 +358,7 @@ namespace AssetsManager.Services.Hashes
         {
             InternalHashKind.BinEntries => "hashes.binentries.txt", InternalHashKind.BinFields => "hashes.binfields.txt",
             InternalHashKind.BinTypes => "hashes.bintypes.txt", InternalHashKind.BinHashes => "hashes.binhashes.txt",
-            InternalHashKind.BinXxh3 => "hashes.bin.xxh364.txt",
+            InternalHashKind.BinXxh3 => "hashes.binhashes.xxh3.txt",
             InternalHashKind.RstXxh3 => "hashes.rst.xxh3.txt", InternalHashKind.RstXxh64 => "hashes.rst.xxh64.txt",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };

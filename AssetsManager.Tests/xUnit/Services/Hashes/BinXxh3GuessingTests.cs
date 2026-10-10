@@ -118,7 +118,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             InternalHashGuessMatch match = Assert.Single(result.Matches);
             Assert.Equal(InternalHashKind.BinXxh3, match.Kind);
             Assert.Equal(Material, match.Value);
-            Assert.Equal("hashes.bin.xxh364.txt", Path.GetFileName(store.GetKnownPath(match.Kind)));
+            Assert.Equal("hashes.binhashes.xxh3.txt", Path.GetFileName(store.GetKnownPath(match.Kind)));
             Assert.Equal(owningEntry ? InternalHashGuessStrategy.BinContent : InternalHashGuessStrategy.CrossDictionary, match.Strategy);
             Assert.Equal($"ccdb6584d78a04f6 {Material}", (await File.ReadAllTextAsync(store.GetKnownPath(match.Kind))).Trim());
             Assert.Empty(await store.LoadUnknownAsync(match.Kind, CancellationToken.None));
@@ -139,13 +139,13 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
-        public async Task PreviousCatalogNameLoadsAndIsPreservedWhenWritingTheRenamedCatalog()
+        public async Task CdtbCatalogLoadsAndPreservesExistingMatchesWhenAppending()
         {
             using var bridge = new AssetsManagerTestBridge();
             bridge.Directories.CreateHashesDirectories();
-            string legacy = Path.Combine(bridge.Directories.HashesPath, "hashes.bin.xxh3.txt");
-            string legacyContent = $"{MaterialHash:x16} {Material}\n";
-            await File.WriteAllTextAsync(legacy, legacyContent);
+            string catalog = Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.xxh3.txt");
+            string catalogContent = $"{MaterialHash:x16} {Material}\n";
+            await File.WriteAllTextAsync(catalog, catalogContent);
             var store = new BinRstHashGuessingStore(bridge.Directories);
             using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
             Assert.True(resolver.HasLocalHashCatalogs);
@@ -162,12 +162,11 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema
             } }, CancellationToken.None);
 
-            Assert.Equal("hashes.bin.xxh364.txt", Path.GetFileName(store.GetKnownPath(InternalHashKind.BinXxh3)));
+            Assert.Equal("hashes.binhashes.xxh3.txt", Path.GetFileName(store.GetKnownPath(InternalHashKind.BinXxh3)));
             var known = await store.LoadKnownAsync(InternalHashKind.BinXxh3, CancellationToken.None);
             Assert.Equal(2, known.Count);
             Assert.Equal(Material, known[MaterialHash]);
             Assert.Equal(nextName, known[nextHash]);
-            Assert.Equal(legacyContent, await File.ReadAllTextAsync(legacy));
             resolver.ReloadBinRstHashes();
             Assert.Equal(Material, resolver.ResolveBinXxh3(MaterialHash));
             Assert.Equal(nextName, resolver.ResolveBinXxh3(nextHash));
@@ -201,7 +200,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             if (knownPaths)
                 await File.WriteAllTextAsync(Path.Combine(bridge.Directories.HashesPath, "hashes.game.txt"),
                     $"{XxHash64Ext.Hash(knownPath):x16} {knownPath}\n{XxHash64Ext.Hash(unknownPath):x16} {unknownPath}\n");
-            await File.WriteAllTextAsync(Path.Combine(bridge.Directories.HashesPath, "hashes.bin.xxh364.txt"),
+            await File.WriteAllTextAsync(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.xxh3.txt"),
                 $"{MaterialHash:x16} {Material}\n");
             var store = new BinRstHashGuessingStore(bridge.Directories);
             using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);

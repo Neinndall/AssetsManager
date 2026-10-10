@@ -43,8 +43,7 @@ namespace AssetsManager.Services.Hashes
             "hashes.game.txt",
             "hashes.lcu.txt",
             "hashes.binhashes.txt",
-            "hashes.bin.xxh364.txt",
-            "hashes.bin.xxh3.txt",
+            "hashes.binhashes.xxh3.txt",
             "hashes.binentries.txt",
             "hashes.binfields.txt",
             "hashes.bintypes.txt",
@@ -127,8 +126,7 @@ namespace AssetsManager.Services.Hashes
             if (_binHashesLoaded) return;
             var hashesDir = _directoriesCreator.HashesPath;
             _binHashCache = LoadHashCache(Path.Combine(hashesDir, "hashes.binhashes.txt"));
-            _binXxh3Cache = LoadHashCache(Path.Combine(hashesDir, "hashes.bin.xxh364.txt"))
-                ?? LoadHashCache(Path.Combine(hashesDir, "hashes.bin.xxh3.txt"));
+            _binXxh3Cache = LoadHashCache(Path.Combine(hashesDir, "hashes.binhashes.xxh3.txt"));
             _binEntryCache = LoadHashCache(Path.Combine(hashesDir, "hashes.binentries.txt"));
             _binFieldCache = LoadHashCache(Path.Combine(hashesDir, "hashes.binfields.txt"));
             _binTypeCache = LoadHashCache(Path.Combine(hashesDir, "hashes.bintypes.txt"));

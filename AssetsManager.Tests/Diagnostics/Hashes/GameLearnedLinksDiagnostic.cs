@@ -31,7 +31,7 @@ internal static class GameLearnedLinksDiagnostic
         var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
             m => Console.WriteLine($"MATCH {m.Hash:x16} {m.Path}"));
         var names = new Dictionary<ulong, string>();
-        foreach (string catalog in new[] { "hashes.binhashes.txt", "hashes.binentries.txt", "hashes.bin.xxh364.txt" })
+        foreach (string catalog in new[] { "hashes.binhashes.txt", "hashes.binentries.txt", "hashes.binhashes.xxh3.txt" })
         foreach (string line in File.ReadLines(Path.Combine(local, "hashes", catalog)))
         {
             int space = line.IndexOf(' ');

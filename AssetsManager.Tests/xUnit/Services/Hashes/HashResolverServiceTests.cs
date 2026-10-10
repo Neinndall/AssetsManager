@@ -21,7 +21,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Catalog("hashes.binentries.txt", "12345678 EntryValue\n00000002 EntryOnly\n");
             Catalog("hashes.binfields.txt", "12345678 FieldValue\n00000003 FieldOnly\n");
             Catalog("hashes.bintypes.txt", "12345678 TypeValue\n00000004 TypeOnly\n");
-            Catalog("hashes.bin.xxh364.txt", "abcdef0112345678 WideValue\n");
+            Catalog("hashes.binhashes.xxh3.txt", "abcdef0112345678 WideValue\n");
             using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
             await resolver.LoadAllHashesAsync();
 
