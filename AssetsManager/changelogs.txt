@@ -181,6 +181,8 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Lab / Restored the sync indicator and shortened the Run button to leave more room for status messages.
+  - Hash Lab / Method and strategy cards use consistent 1.5px outlines without shifting content on hover.
   - Hash Lab / Compact execution controls leave more room for strategies and show progress only when active or available.
   - Hash Lab / GAME Basic now finds TEX textures using image names from the LCU catalog.
   - Hash Lab / Animation Build List prioritizes containers whose BINs reference unknown animations.

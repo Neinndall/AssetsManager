@@ -227,15 +227,15 @@
                                 </Grid.ColumnDefinitions>
                                 <Grid Margin="0,0,16,0" VerticalAlignment="Center">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="22"/>
+                                        <ColumnDefinition Width="23"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <materialIcons:MaterialIcon Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,8,0" RenderTransformOrigin="0.5,0.5">
+                                    <materialIcons:MaterialIcon Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,8,0" RenderTransformOrigin="0.5,0.5">
                                         <materialIcons:MaterialIcon.Style>
                                             <Style TargetType="materialIcons:MaterialIcon">
-                                                <Setter Property="Kind" Value="CircleOutline"/>
-                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                <Setter Property="Kind" Value="Sync"/>
+                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                                 <Setter Property="RenderTransform">
                                                     <Setter.Value>
                                                         <RotateTransform Angle="0"/>
@@ -243,8 +243,6 @@
                                                 </Setter>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="Kind" Value="Sync"/>
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                                         <DataTrigger.EnterActions>
                                                             <BeginStoryboard x:Name="RotationStoryboard">
                                                                 <Storyboard>
@@ -280,11 +278,11 @@
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Button Content="Cancel" Style="{StaticResource SecondaryButton}" Height="36" Margin="0,0,8,0"
                                             Click="Cancel_Click" Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                    <Button x:Name="BtnRunMethod" Style="{StaticResource PrimaryButton}" Height="36" Padding="20,0" Click="RunSelectedMethod_Click"
+                                    <Button x:Name="BtnRunMethod" Style="{StaticResource PrimaryButton}" Height="36" Padding="14,0" Click="RunSelectedMethod_Click"
                                             IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBooleanConverter}}">
                                         <StackPanel Orientation="Horizontal">
-                                            <materialIcons:MaterialIcon Kind="Play" Width="18" Height="18" Margin="0,0,7,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="Run method" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <materialIcons:MaterialIcon Kind="Play" Width="14" Height="14" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Run" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
                                 </StackPanel>
