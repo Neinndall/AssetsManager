@@ -180,8 +180,4 @@
             </Setter.Value>
         </Setter>
     </Style>
-    <Style x:Key="ScrollableTableListView" TargetType="ListView" BasedOn="{StaticResource ModernTableListView}">
-        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
-        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-    </Style>
 </ResourceDictionary>

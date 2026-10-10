@@ -313,8 +313,9 @@
                         <ListView x:Name="ResultsListView"
                                   Grid.Row="1"
                                   ItemsSource="{Binding Matches}"
-                                  Style="{StaticResource ScrollableTableListView}"
+                                  Style="{StaticResource ModernTableListView}"
                                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                                   Loaded="ResultsListView_Loaded"
                                   SizeChanged="ResultsListView_SizeChanged">
                             <ListView.View>
