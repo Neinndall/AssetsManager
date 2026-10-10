@@ -20,7 +20,7 @@
                     <materialIcons:MaterialIcon Kind="FlaskOutline" Width="26" Height="26" Foreground="{StaticResource AccentBrush}"/>
                 </Border>
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock Text="Hash Guessing Lab" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="HASH GUESSING LAB" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="Turn unknown hashes into verified asset names." Margin="0,2,0,0" FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8" TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
             </Grid>

@@ -334,7 +334,7 @@ namespace AssetsManager.Views.Models.Monitor
         private void UpdateGlobalStatus()
         {
             // Priority 1: Critical (Maintenance started - RED)
-            if (PbeStatusText == "Under Maintenance")
+            if (PbeStatusText == "Maintenance")
             {
                 GlobalStatusText = "System Alert";
                 GlobalStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
@@ -437,7 +437,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             else if (!string.IsNullOrEmpty(status))
             {
-                if (status.Contains("Maintenance started at"))
+                if (status.StartsWith("Maintenance ", StringComparison.OrdinalIgnoreCase))
                 {
                     PbeStatusText = "Maintenance";
                     PbeStatusSubtitle = status.Replace("Maintenance ", ""); // "Started at HH:mm"

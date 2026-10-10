@@ -8,9 +8,6 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
 
-    <UserControl.Resources>
-    </UserControl.Resources>
-    
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 0. Dynamic Header Identity Card -->
@@ -67,7 +64,7 @@
                     <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Text" Value="Real-time synchronization of environment status and core metrics."/>
+                                <Setter Property="Text" Value="Server availability, local catalogs and asset activity in one place."/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True"><Setter Property="Text" Value="Local game assets monitoring and real-time change detection after patches."/></DataTrigger>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True"><Setter Property="Text" Value="Audit log of historical changes and version differences."/></DataTrigger>
@@ -83,8 +80,8 @@
             </Grid>
         </Border>
 
-        <!-- 1. NAVIGATION TOOLBAR (SettingsCard Style) -->
-        <Border Grid.Row="1" Style="{StaticResource SettingsCard}" Margin="28,16,28,16" Padding="12,2">
+        <!-- 1. MONITOR DESTINATIONS -->
+        <Border Grid.Row="1" Style="{StaticResource PanelSurface}" Padding="5" Margin="28,12,28,16">
             <UniformGrid Columns="7">
                 <RadioButton x:Name="TabDashboard" Content="Dashboard" IsChecked="True" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="Radar"/>
                 <RadioButton x:Name="TabFileWatcher" Content="Watcher" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="EyeOutline"/>

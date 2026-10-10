@@ -184,6 +184,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Monitor / Dashboard adds a System card with live indicators, separates status and activity cards and refreshes navigation and empty activity.
   - Hash Lab / Simplified the unknown hash summary and removed strategy and results divider tooltips.
   - Hash Lab / Strategy rows keep their neutral border on hover and focus.
   - Hash Lab / Restored CDTB shader include matching after checking the installed GAME files.
@@ -554,6 +555,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Monitor / Maintenance notices consistently update the server card and overall Dashboard alert.
   - 3D Studio / An incompatible BIN no longer interrupts discovery of the remaining project files.
   - Hash synchronization compares actual local file sizes, preserves larger catalogs and reports failed downloads accurately.
   - Hash Lab / Repeated unknown files retain their detected type during scanning, and GAME property BINs can be searched without a filename extension.

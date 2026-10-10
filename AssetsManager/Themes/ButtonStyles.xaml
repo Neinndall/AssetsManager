@@ -676,57 +676,47 @@
         </Setter>
     </Style>
 
-    <!-- [MonitorWindow.xaml] Pestañas de navegación con indicador centrado -->
+    <!-- Monitor destinations retain a fixed layout across pointer and keyboard states. -->
     <Style x:Key="MonitorTabStyle" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="11"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Padding" Value="14,10"/>
+        <Setter Property="Padding" Value="6,8"/>
+        <Setter Property="Margin" Value="3,0"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Grid Background="Transparent">
-                        <!-- Main Container: Centered but aware of internal columns -->
-                        <Grid HorizontalAlignment="Center" VerticalAlignment="Stretch">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                                <ColumnDefinition Width="Auto"/> <!-- Text -->
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Content: Icon (Column 0) -->
-                            <materialIcons:MaterialIcon Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" 
-                                                        Width="16" Height="16" Margin="14,10,8,10" 
-                                                        VerticalAlignment="Center" x:Name="TabIcon" Opacity="0.6"
-                                                        Grid.Column="0"/>
-
-                            <!-- Content: Text (Column 1) -->
-                            <TextBlock Grid.Column="1" Text="{TemplateBinding Content}" Margin="0,10,14,10" 
-                                       VerticalAlignment="Center" x:Name="TabText"/>
-
-                            <!-- Selection Indicator: Now spanning across BOTH Icon and Text -->
-                            <Border x:Name="Indicator" Height="2.5" Grid.ColumnSpan="2" Background="{StaticResource AccentBrush}" 
-                                    VerticalAlignment="Bottom" HorizontalAlignment="Stretch"
-                                    CornerRadius="2,2,0,0" Opacity="0" Margin="14,0,14,-2">
-                                <Border.Effect>
-                                    <DropShadowEffect Color="#FF5C85FF" BlurRadius="10" ShadowDepth="0" Opacity="0.5"/>
-                                </Border.Effect>
-                            </Border>
-                        </Grid>
+                        <Border x:Name="TabBackground" Background="{TemplateBinding Background}" CornerRadius="10"/>
+                        <Border Padding="{TemplateBinding Padding}">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Grid Width="30" Height="30">
+                                    <materialIcons:MaterialIcon x:Name="TabIcon" Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                                                Width="18" Height="18"/>
+                                </Grid>
+                                <TextBlock Text="{TemplateBinding Content}" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
                     </Grid>
-
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                            <Setter TargetName="TabIcon" Property="Opacity" Value="1"/>
-                            <Setter TargetName="TabIcon" Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Setter TargetName="TabBackground" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Indicator" Property="Opacity" Value="1"/>
-                            <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="TabBackground" Property="Background" Value="{StaticResource HoverColor}"/>
                             <Setter TargetName="TabIcon" Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                            <Setter TargetName="TabIcon" Property="Opacity" Value="1"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="TabBackground" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
