@@ -133,11 +133,39 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Explicit GridView scroll viewers also need the themed corner brush. -->
+    <!-- Some system ScrollViewer templates use this brush for the scrollbar corner. -->
     <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}"
                      Color="{Binding Color, Source={StaticResource ScrollBarBackground}}"/>
 
-    <Style TargetType="{x:Type ScrollViewer}">
-        <Setter Property="Background" Value="Transparent"/>
+    <!-- Shared scroll viewer appearance. Ordinary viewers inherit this implicitly. -->
+    <Style x:Key="ModernScrollViewer" TargetType="{x:Type ScrollViewer}">
+        <Setter Property="Background" Value="{StaticResource ScrollBarBackground}"/>
+    </Style>
+    <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource ModernScrollViewer}"/>
+
+    <!-- GridView requires WPF's dedicated template to synchronize headers and rows. -->
+    <Style x:Key="ModernGridViewScrollViewer" TargetType="{x:Type ScrollViewer}"
+           BasedOn="{StaticResource {x:Static GridView.GridViewScrollViewerStyleKey}}">
+        <Setter Property="Background" Value="{StaticResource ScrollBarBackground}"/>
+    </Style>
+
+    <!-- WPF hardcodes two white 1px rectangles at the GridView scrollbar junction. -->
+    <Style x:Key="ModernGridViewScrollCorner" TargetType="{x:Type Border}">
+        <Setter Property="Width" Value="8"/>
+        <Setter Property="Height" Value="8"/>
+        <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Visibility" Value="Collapsed"/>
+        <Style.Triggers>
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding ComputedHorizontalScrollBarVisibility}" Value="Visible"/>
+                    <Condition Binding="{Binding ComputedVerticalScrollBarVisibility}" Value="Visible"/>
+                </MultiDataTrigger.Conditions>
+                <Setter Property="Visibility" Value="Visible"/>
+            </MultiDataTrigger>
+        </Style.Triggers>
     </Style>
 </ResourceDictionary>
