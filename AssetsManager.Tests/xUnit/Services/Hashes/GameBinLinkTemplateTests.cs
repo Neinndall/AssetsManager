@@ -26,6 +26,35 @@ public sealed class GameBinLinkTemplateTests
     private static Dictionary<ulong, string> Known => new() { [XxHash64Ext.Hash(Seed)] = Seed };
 
     [Theory]
+    [InlineData(BinPropertyType.String)]
+    [InlineData(BinPropertyType.Hash)]
+    public void MapIdentifiersRetainContextForNestedLinks(BinPropertyType keyType)
+    {
+        BinTree NamedMap(string name, ulong target)
+        {
+            BinTreeProperty key = keyType switch
+            {
+                BinPropertyType.Hash => new BinTreeHash(0, Fnv1a.HashLower(name)),
+                _ => new BinTreeString(0, name)
+            };
+            var map = new BinTreeMap(40, keyType, BinPropertyType.Struct, new[]
+            {
+                new KeyValuePair<BinTreeProperty, BinTreeProperty>(key,
+                    new BinTreeStruct(0, 200, new BinTreeProperty[] { new BinTreeWadChunkLink(10, target) }))
+            });
+            return new BinTree(new[] { new BinTreeObject(1, 100, new BinTreeProperty[] { map }) }, Array.Empty<string>());
+        }
+        var index = new GameBinLinkTemplateIndex();
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(Target), 42 });
+        string Resolve(uint hash) => hash == Fnv1a.HashLower("ForestSpirit") ? "ForestSpirit" : "MoonGuardian";
+        string ResolveWide(ulong hash) => hash == XxHash64Ext.Hash("ForestSpirit") ? "ForestSpirit" : "MoonGuardian";
+        index.Guess(engine, NamedMap("ForestSpirit", XxHash64Ext.Hash(Seed)), Known, Resolve, ResolveWide, "seed", 1, CancellationToken.None);
+        index.Guess(engine, NamedMap("MoonGuardian", XxHash64Ext.Hash(Target)), Known, Resolve, ResolveWide, "target", 2, CancellationToken.None);
+        Assert.Equal(Target, Assert.Single(engine.Matches).Value.Path);
+        Assert.Contains(42UL, engine.UnknownHashes);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void LearnsFromSiblingsAcrossBinsInEitherOrder(bool pendingFirst)

@@ -183,6 +183,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Lab / GAME WAD guessing preserves nested animation labels and reaches nested BIN texture scopes and patch overrides.
   - Hash Lab / BIN-referenced animation guessing is independently selectable in Custom GAME.
   - Hash Lab / Custom GAME explores BIN-referenced animation skins and themes without known filename seeds, including compound numeric variants.
   - Hash Lab / Custom GAME learns local filename word variations for animations, textures, augment icons and map pieces.
@@ -549,6 +550,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Hash Lab / Resolving one skin's materials no longer skips later skins in the same BIN.
   - Viewer / Studio prepares Sky before its first display and keeps ready environment elements visible during texture updates.
   - Viewer / Studio keeps Ground, Grid, Stage and Sky hidden until a model or scene is loaded.
   - Tables / Removed the white corner where horizontal and vertical scrollbars meet.

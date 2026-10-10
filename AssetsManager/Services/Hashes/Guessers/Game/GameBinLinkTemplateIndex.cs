@@ -89,14 +89,16 @@ internal sealed class GameBinLinkTemplateIndex
                     foreach (var pair in m)
                     {
                         var context = inherited;
-                        if (pair.Key is BinTreeHash hash)
+                        string name = pair.Key switch
                         {
-                            string name = resolveName?.Invoke(hash.Value);
-                            if (IsNamedIdentifier(name))
-                            {
-                                context = new List<Identifier>(inherited);
-                                AddNamed(context, new IdentifierKey(0, p.NameHash, 2), name);
-                            }
+                            BinTreeHash hash => resolveName?.Invoke(hash.Value),
+                            BinTreeString text => text.Value,
+                            _ => null
+                        };
+                        if (IsNamedIdentifier(name))
+                        {
+                            context = new List<Identifier>(inherited);
+                            AddNamed(context, new IdentifierKey(0, p.NameHash, 2), name);
                         }
                         Visit(pair.Key, inherited);
                         Visit(pair.Value, context);

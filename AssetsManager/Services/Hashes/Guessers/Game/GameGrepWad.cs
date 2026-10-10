@@ -31,6 +31,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         internal override void ReleaseMemory()
         {
             base.ReleaseMemory();
+            _scannedWadCharacters.Clear();
             _regaliaMatches.Clear();
             _linkTemplates.Clear();
         }
@@ -299,6 +300,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             foreach (BinTreeObject item in tree.Objects.Values)
                 VisitScope(item.Properties.Values);
+            foreach (var patch in tree.DataOverrides) VisitProperty(patch.Property);
 
             void VisitScope(IEnumerable<BinTreeProperty> properties)
             {
@@ -309,25 +311,22 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         hasUnresolvedLink = true;
                 if (hasUnresolvedLink) GuessScope(properties);
 
-                foreach (BinTreeProperty property in properties)
+                foreach (BinTreeProperty property in properties) VisitProperty(property);
+            }
+
+            void VisitProperty(BinTreeProperty property)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                switch (property)
                 {
-                    switch (property)
-                    {
-                        case BinTreeStruct structure:
-                            VisitScope(structure.Properties.Values);
-                            break;
-                        case BinTreeContainer container:
-                            foreach (BinTreeStruct element in container.Elements.OfType<BinTreeStruct>())
-                                VisitScope(element.Properties.Values);
-                            break;
-                        case BinTreeOptional { Value: BinTreeStruct optional }:
-                            VisitScope(optional.Properties.Values);
-                            break;
-                        case BinTreeMap map:
-                            foreach (BinTreeStruct value in map.Select(pair => pair.Value).OfType<BinTreeStruct>())
-                                VisitScope(value.Properties.Values);
-                            break;
-                    }
+                    case BinTreeStruct structure: VisitScope(structure.Properties.Values); break;
+                    case BinTreeContainer container:
+                        foreach (var child in container.Elements) VisitProperty(child);
+                        break;
+                    case BinTreeOptional { Value: not null } optional: VisitProperty(optional.Value); break;
+                    case BinTreeMap map:
+                        foreach (var pair in map) { VisitProperty(pair.Key); VisitProperty(pair.Value); }
+                        break;
                 }
             }
 
@@ -1349,7 +1348,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             foreach (var (obj, simpleSkin, skeleton, targetTexHashes) in skinObjects)
             {
                 targetTexHashes.RemoveWhere(hash => !engine.UnknownHashes.Contains(hash));
-                if (engine.RemainingUnknownCount == 0 || targetTexHashes.Count == 0) break;
+                if (engine.RemainingUnknownCount == 0) break;
+                if (targetTexHashes.Count == 0) continue;
 
                 string refPath = !string.IsNullOrEmpty(simpleSkin) ? simpleSkin : skeleton;
                 if (string.IsNullOrEmpty(refPath)) continue;
@@ -1613,7 +1613,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private static readonly uint StaticMaterialClassHash = Fnv1a.HashLower("StaticMaterialDef");
         private static readonly uint SkinMeshPropertiesHash = Fnv1a.HashLower("skinMeshProperties");
         private static readonly uint MaterialOverrideHash = Fnv1a.HashLower("materialOverride");
-        private static readonly uint MaterialLinkHash = Fnv1a.HashLower("Material");
         private static readonly uint DirectTextureHash = Fnv1a.HashLower("texture");
         private static readonly uint SubmeshNameHash = Fnv1a.HashLower("submesh");
         private static readonly uint SamplerValuesHash = Fnv1a.HashLower("samplerValues");
@@ -2797,7 +2796,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             foreach (var pair in map)
             {
                 uint nameHash = pair.Key is BinTreeHash hash ? hash.Value : 0;
-                foreach (BinTreeProperty path in FindProperties(pair.Value, animationFilePathNameHash).Take(1))
+                foreach (BinTreeProperty path in FindProperties(pair.Value, animationFilePathNameHash))
                 {
                     if (path is BinTreeWadChunkLink link && link.Value != 0)
                     {

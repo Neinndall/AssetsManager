@@ -17,6 +17,131 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 {
     public class GameGrepOptimizationTests
     {
+        [Fact]
+        public void SiblingPathsReachPatchOverrideStructures()
+        {
+            const string target = "assets/ui/cards/moon_guardian.tex";
+            var scope = new BinTreeStruct(10, 100, new BinTreeProperty[]
+            {
+                new BinTreeString(20, "moon_guardian"), new BinTreeString(30, "assets/ui/cards/forest_spirit.tex"),
+                new BinTreeWadChunkLink(40, XxHash64Ext.Hash(target))
+            });
+            var wrapper = new BinTree(new[] { new BinTreeObject(1, 100, new BinTreeProperty[] { scope }) }, Array.Empty<string>());
+            using var serialized = new MemoryStream();
+            wrapper.Write(serialized);
+            // PROP header, class table, object header and property header precede the struct payload.
+            byte[] payload = serialized.ToArray()[35..];
+            using var patch = new MemoryStream();
+            using var writer = new BinaryWriter(patch, System.Text.Encoding.ASCII, true);
+            writer.Write("PTCH"u8); writer.Write(1U); writer.Write(0U);
+            writer.Write("PROP"u8); writer.Write(3U); writer.Write(0U); writer.Write(0U);
+            writer.Write(1U); writer.Write(1U); writer.Write((uint)(1 + 2 + "scope".Length + payload.Length));
+            writer.Write((byte)BinPropertyType.Struct); writer.Write((ushort)"scope".Length);
+            writer.Write("scope"u8); writer.Write(payload);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+            guesser.GrepWad(engine, patch.ToArray(), "example.bin", "example.wad", 1);
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(17)]
+        public void MalformedPropertiesPreserveDottedEntriesAndEmbeddedPaths(int bufferOffset)
+        {
+            const string dotted = "loadouts/tftdamageskins.12345678.bin", embedded = "assets/ui/cards/example.tex";
+            var tree = new BinTree(new[] { new BinTreeObject(0x12345678, 100,
+                new BinTreeProperty[] { new BinTreeString(10, embedded) }) }, Array.Empty<string>());
+            using var serialized = new MemoryStream();
+            tree.Write(serialized);
+            byte[] bytes = serialized.ToArray();
+            bytes[34] = 0xff;
+            var buffer = new byte[bufferOffset + bytes.Length + 9];
+            bytes.CopyTo(buffer, bufferOffset);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = new HashGuessEngine(HashGuessDomain.Game,
+                new HashSet<ulong> { XxHash64Ext.Hash(dotted), XxHash64Ext.Hash(embedded), 42 });
+            guesser.GrepWad(engine, new ArraySegment<byte>(buffer, bufferOffset, bytes.Length), "broken.bin", "Global.wad.client", 7);
+            Assert.Equal(2, engine.Matches.Count);
+            Assert.All(engine.Matches.Values, match => Assert.Equal(7UL, match.SourceChunkHash));
+        }
+
+        [Fact]
+        public void AnimationClipNameAppliesToEveryNestedResource()
+        {
+            const string action = "rare_sequence_zebra";
+            string[] targets = { "assets/characters/example/skins/skin5/animations/first_resource.anm",
+                $"data/characters/example/skins/skin5/animations/{action}.anm" };
+            var resources = targets.Select((path, index) => (BinTreeProperty)new BinTreeStruct((uint)index + 1,
+                Fnv1a.HashLower("AnimationResourceData"), new BinTreeProperty[]
+                {
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("mAnimationFilePath"), XxHash64Ext.Hash(path))
+                })).ToArray();
+            var map = new BinTreeMap(Fnv1a.HashLower("mClipDataMap"), BinPropertyType.Hash, BinPropertyType.Struct,
+                new[] { new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, Fnv1a.HashLower(action)),
+                    new BinTreeStruct(0, 100, resources)) });
+            var tree = new BinTree(new[] { new BinTreeObject(1, 100, new BinTreeProperty[] { map }) }, Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { targets[0] }), null,
+                hash => hash == Fnv1a.HashLower(action) ? action : null);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(targets[1]) });
+            guesser.GrepWad(engine, stream.ToArray(), "data/characters/example/animations/skin5.bin", "example.wad", 1);
+            Assert.Equal(targets[1], Assert.Single(engine.Matches).Value.Path);
+            Assert.All(engine.Matches.Values, match => Assert.Equal(HashGuessStrategy.AnimationBinLink, match.Strategy));
+        }
+
+        [Fact]
+        public void ResolvedSkinObjectDoesNotSkipFollowingSkinObjects()
+        {
+            const string first = "assets/characters/example/skins/skin1/example_skin1_tx_cm.tex";
+            const string second = "assets/characters/other/skins/skin2/custombody_tx_cm.tex";
+            BinTreeObject Skin(uint id, string mesh, string texture) => new(id, Fnv1a.HashLower("SkinCharacterDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeStruct(Fnv1a.HashLower("skinMeshProperties"), Fnv1a.HashLower("SkinMeshDataProperties"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeString(0xd6a00df6, mesh), new BinTreeWadChunkLink(30, XxHash64Ext.Hash(texture))
+                        })
+                });
+            var material = new BinTreeObject(3, Fnv1a.HashLower("StaticMaterialDef"), new BinTreeProperty[]
+            {
+                new BinTreeString(0x8d39bde6, "characters/example/skins/skin1/materials/body"),
+                new BinTreeWadChunkLink(30, XxHash64Ext.Hash(first))
+            });
+            var tree = new BinTree(new[] { Skin(1, "assets/characters/example/skins/skin1/body.skn", first),
+                Skin(2, "assets/characters/other/skins/skin2/custombody.skn", second), material }, Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = new HashGuessEngine(HashGuessDomain.Game,
+                new[] { XxHash64Ext.Hash(first), XxHash64Ext.Hash(second) }.ToHashSet());
+            guesser.GrepWad(engine, stream.ToArray(), "combined.bin", "example.wad", 1);
+            Assert.Equal(2, engine.Matches.Count);
+        }
+
+        [Fact]
+        public void SiblingPathsReachStructInsideContainerMapAndOptional()
+        {
+            const string target = "assets/ui/cards/moon_guardian.tex";
+            var scope = new BinTreeStruct(0, 100, new BinTreeProperty[]
+            {
+                new BinTreeString(10, "Moon_Guardian"), new BinTreeString(20, "assets/ui/cards/forest_spirit.tex"),
+                new BinTreeWadChunkLink(30, XxHash64Ext.Hash(target))
+            });
+            var map = new BinTreeMap(40, BinPropertyType.Hash, BinPropertyType.Optional,
+                new[] { new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, 1), new BinTreeOptional(0, scope)) });
+            var container = new BinTreeContainer(50, BinPropertyType.Map, new BinTreeProperty[] { map });
+            var tree = new BinTree(new[] { new BinTreeObject(1, 100, new BinTreeProperty[] { container }) }, Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+            guesser.GrepWad(engine, stream.ToArray(), "example.bin", "example.wad", 1);
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+        }
+
         [Theory]
         [InlineData("example", "skin1", false)]
         [InlineData("jade_example", "skin01", false)]
