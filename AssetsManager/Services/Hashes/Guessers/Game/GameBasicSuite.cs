@@ -231,6 +231,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         engine.CheckNormalizedParts(stem, ReadOnlySpan<char>.Empty, ".tex".AsSpan(), HashGuessStrategy.CrossDomainGame, source);
                         checkedCount++;
                     }
+                    // Some GAME UI assets retain their original client image format.
+                    if (checkedCount < candidateBudget && engine.RemainingUnknownCount > 0)
+                    {
+                        engine.CheckNormalizedParts(rel, ReadOnlySpan<char>.Empty, ReadOnlySpan<char>.Empty, HashGuessStrategy.CrossDomainGame, source);
+                        checkedCount++;
+                    }
                 }
                 else if (ext.Equals("json", StringComparison.OrdinalIgnoreCase))
                 {

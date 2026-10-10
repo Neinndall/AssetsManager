@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Lab / GAME Basic Suite also discovers original PNG and JPG assets shared with the client.
   - Settings / Added Stage visibility alongside Ground, Grid and Sky for 3D Studio.
   - Hash Lab / GAME Basic Suite also finds shorter texture and animation filenames by removing individual name tokens.
   - Hash Lab / GAME Basic Suite finds reused files in companion and map containers, including new skins.

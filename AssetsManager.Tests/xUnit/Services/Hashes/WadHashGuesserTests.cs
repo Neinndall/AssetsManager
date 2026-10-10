@@ -1622,7 +1622,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.DoesNotContain(lcuEngine.Matches.Values, match => match.Path == webp);
             Assert.Equal(3, lcuCheckedCandidates);
 
-            string[] expectedGameCandidates = { "assets/client/icon.dds", "assets/client/icon.tex", "data/client/config.json" };
+            string[] expectedGameCandidates = { "assets/client/icon.dds", "assets/client/icon.tex", "assets/client/icon.png", "data/client/config.json" };
             var gameEngine = new HashGuessEngine(
                 HashGuessDomain.Game,
                 expectedGameCandidates
@@ -1631,7 +1631,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                     .ToHashSet());
             int gameCheckedCandidates = game.GuessFromLcuHashes(gameEngine, lcu, CancellationToken.None);
             Assert.Equal(1, gameEngine.RemainingUnknownCount);
-            Assert.Equal(3, gameCheckedCandidates);
+            Assert.Equal(4, gameCheckedCandidates);
             Assert.All(expectedGameCandidates, expected =>
                 Assert.Contains(gameEngine.Matches.Values, match => match.Path == expected));
             Assert.DoesNotContain(gameEngine.Matches.Values, match => match.Path == "assets/client/already.dds");
@@ -1663,7 +1663,30 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 
             int checkedCandidates = game.GuessFromLcuHashes(engine, lcu, CancellationToken.None);
 
-            Assert.Equal(2, checkedCandidates);
+            Assert.Equal(3, checkedCandidates);
+        }
+
+        [Theory]
+        [InlineData("png", 2, false)]
+        [InlineData("png", 3, true)]
+        [InlineData("jpg", 2, false)]
+        [InlineData("jpg", 3, true)]
+        public void GameCrossDomainOriginalImageRespectsCandidateBudget(string extension, int budget, bool resolves)
+        {
+            string image = $"assets/ux/icons/new_icon.{extension}";
+            var game = new GameHashGuesser();
+            var lcu = new LcuHashGuesser(new[]
+            {
+                "plugins/rcp-be-lol-game-data/global/default/" + image
+            }, null);
+            var engine = CreateEngine(HashGuessDomain.Game, image);
+
+            int attempts = game.GuessFromLcuHashes(engine, lcu, CancellationToken.None, budget);
+
+            Assert.Equal(budget, attempts);
+            Assert.Equal((long)attempts, engine.CheckedCandidates);
+            Assert.Equal(resolves, engine.Matches.ContainsKey(XxHash64Ext.Hash(image)));
+            Assert.All(engine.Matches.Values, match => Assert.Equal(HashGuessStrategy.CrossDomainGame, match.Strategy));
         }
 
         [Theory]
