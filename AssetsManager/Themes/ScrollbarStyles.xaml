@@ -133,13 +133,11 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Estilo para ScrollViewer para corregir la esquina -->
+    <!-- Explicit GridView scroll viewers also need the themed corner brush. -->
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}"
+                     Color="{Binding Color, Source={StaticResource ScrollBarBackground}}"/>
+
     <Style TargetType="{x:Type ScrollViewer}">
         <Setter Property="Background" Value="Transparent"/>
-        <Style.Resources>
-            <!-- Sobreescribimos el pincel que usa WPF para la esquina (Corner) de forma segura -->
-            <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" 
-                             Color="{Binding Color, Source={StaticResource ScrollBarBackground}}"/>
-        </Style.Resources>
     </Style>
 </ResourceDictionary>
