@@ -222,7 +222,7 @@ namespace AssetsManager.Views.Controls.Viewer
                      e.PropertyName == nameof(StudioModel.PreviewViewMode) ||
                      e.PropertyName == nameof(StudioModel.PreviewWireOverlay))
             {
-                _ = PreparePreviewAssetsAsync();
+                RequestEnvironmentPreparation();
                 StudioViewportView.OpenTkControl?.InvalidateVisual();
                 SavePreviewDisplayPreferences();
             }

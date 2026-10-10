@@ -144,17 +144,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         public void StudioDisplayPreferencesRoundTripWithTheExistingSettingsKey()
         {
             const string savedJson = """
-                {"VfxStudio":{"CameraPreset":"Top","StageVisible":true,"ViewMode":"Untextured","WireOverlay":true}}
+                {"VfxStudio":{"CameraPreset":"Top","ViewMode":"Untextured","WireOverlay":true},"StudioParameters":{"StageVisible":true}}
                 """;
             AppSettings settings = Newtonsoft.Json.JsonConvert.DeserializeObject<AppSettings>(savedJson);
 
             Assert.Equal("Top", settings.Studio.CameraPreset);
-            Assert.True(settings.Studio.StageVisible);
+            Assert.True(settings.StudioParameters.StageVisible);
             Assert.Equal("Untextured", settings.Studio.ViewMode);
             Assert.True(settings.Studio.WireOverlay);
 
             var saved = Newtonsoft.Json.Linq.JObject.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(settings));
             Assert.Null(saved["Studio"]);
+            Assert.Null(saved["VfxStudio"]?["StageVisible"]);
+            Assert.True(saved["StudioParameters"].Value<bool>("StageVisible"));
             Assert.True(Newtonsoft.Json.Linq.JToken.DeepEquals(
                 Newtonsoft.Json.Linq.JObject.Parse(savedJson)["VfxStudio"], saved["VfxStudio"]));
         }

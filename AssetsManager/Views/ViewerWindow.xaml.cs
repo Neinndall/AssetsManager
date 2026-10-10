@@ -73,10 +73,9 @@ namespace AssetsManager.Views
         private async Task<bool> EnterStudioCoreAsync()
         {
             if (_isCleanedUp) return false;
-            _model.IsEnteringStudio = true;
             try
             {
-                // Let the click finish and the opening state render before constructing WPF controls.
+                // Let the click finish before constructing WPF controls.
                 await Dispatcher.Yield(DispatcherPriority.Background);
                 if (_isCleanedUp || !IsLoaded) return false;
                 if (_studio == null)
@@ -101,10 +100,6 @@ namespace AssetsManager.Views
                 _logService.LogError(ex, "Failed to open 3D Studio.");
                 _model.IsStudioVisible = false;
                 return false;
-            }
-            finally
-            {
-                _model.IsEnteringStudio = false;
             }
         }
 

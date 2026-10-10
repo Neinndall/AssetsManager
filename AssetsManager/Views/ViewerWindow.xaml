@@ -155,12 +155,5 @@
                         Visibility="{Binding IsStudioVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         <ContentControl x:Name="ChromaHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                         Visibility="{Binding IsChromaLibraryVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-        <Border Background="{StaticResource SidebarBackground}"
-                Visibility="{Binding IsEnteringStudio, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <StackPanel Width="220" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock Text="Opening Studio..." FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                <ProgressBar IsIndeterminate="True" Height="3" Margin="0,16,0,0" Style="{StaticResource ModernProgressBar}"/>
-            </StackPanel>
-        </Border>
     </Grid>
 </UserControl>

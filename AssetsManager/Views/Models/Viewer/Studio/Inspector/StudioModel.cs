@@ -131,7 +131,7 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        private bool _timelineVisible = true;
+        private bool _timelineVisible;
         private bool _isProjectLoading;
         private string _projectBrowserMessage = "Open a project folder to browse assets.";
 

@@ -38,19 +38,7 @@ namespace AssetsManager.Views.Models.Viewer
                 OnPropertyChanged(nameof(HasActiveContent));
             }
         }
-        private bool _isEnteringStudio;
-        public bool IsEnteringStudio
-        {
-            get => _isEnteringStudio;
-            set
-            {
-                if (_isEnteringStudio == value) return;
-                _isEnteringStudio = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(HasActiveContent));
-            }
-        }
-        public bool HasActiveContent => IsStudioVisible || IsChromaLibraryVisible || IsEnteringStudio;
+        public bool HasActiveContent => IsStudioVisible || IsChromaLibraryVisible;
         public ObservableRangeCollection<StudioRecentProject> RecentProjects { get; } = new();
         public bool HasRecentProjects => RecentProjects.Count > 0;
 

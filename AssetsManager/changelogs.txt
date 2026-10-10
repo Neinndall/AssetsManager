@@ -182,7 +182,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
-  - Viewer / Studio opens with a loading state, prepares preview textures in the background and initializes renderers progressively.
+  - Viewer / Studio prepares enabled environment elements on entry, with textures loading in the background.
   - Hash Lab / The results divider now widens and glows on hover like the logger divider.
   - Hash Lab / Added a checklist icon to the Included Strategies heading.
   - Hash Lab / Results have more room by default, with a draggable divider to resize strategies and matches.
@@ -524,6 +524,8 @@ Improvements
   - Input and confirmation dialogs now support Enter/Escape keys with automatic focus.
 
 Changes
+  - Viewer / Studio starts with Timeline hidden by default.
+  - Settings / Stage visibility is grouped with Ground, Grid and Sky in Studio Parameters.
   - Hash Lab / Uses shared caption and panel styles, the existing table style and the main window background.
   - Hash Lab / Exploratory diagnostics now run in C# without Python dependencies.
   - Hash Lab / Renamed BIN XXH3-64 unknown files to match their hash catalog.
@@ -542,6 +544,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Studio keeps Ground, Grid, Stage and Sky hidden until a model or scene is loaded.
   - Tables / Removed the white corner where horizontal and vertical scrollbars meet.
   - VFX Studio / Map visibility now follows its controllers, with camera culling and corrected transparent draw order.
   - VFX Studio / Shared particle textures now keep each layer's wrapping without affecting other layers.

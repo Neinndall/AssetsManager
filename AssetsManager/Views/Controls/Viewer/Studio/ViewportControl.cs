@@ -110,16 +110,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _glInitializationSteps.Clear();
                 _glInitializationSteps.Enqueue(() =>
                 {
-                    if (_previewSurfaceRenderer == null)
-                    {
-                        _previewSurfaceRenderer = new PreviewSurfaceRenderer();
-                        _previewSurfaceRenderer.Initialize(_gl, _groundAppearance);
-                        _groundAppearancePending = false;
-                    }
-                });
-
-                _glInitializationSteps.Enqueue(() =>
-                {
                     if (_championMeshRenderer == null)
                     {
                         _championMeshRenderer = new GlMeshRenderer(AppSettings);
@@ -133,15 +123,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     {
                         _mapGeometryRenderer = new MapGeometryRenderer(AppSettings);
                         _mapGeometryRenderer.Initialize(_gl);
-                    }
-                });
-                _glInitializationSteps.Enqueue(() =>
-                {
-                    if (_skyRenderer == null)
-                    {
-                        _skyRenderer = new SkyRenderer();
-                        _skyRenderer.Initialize(_gl);
-                        _skyCubeDirty = true;
                     }
                 });
                 _glInitializationSteps.Enqueue(() =>
@@ -186,7 +167,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         ApplyCameraPreset(_model.PreviewCameraPreset, refit: true);
                     }
 
-                    _model.LogMessages.Add("[GL] OpenGL viewport, preview surfaces and camera controller initialized successfully.");
+                    _model.LogMessages.Add("[GL] OpenGL viewport and camera controller initialized successfully.");
                     _model.LogMessages.Add(
                         $"[GL] Vendor={_gl.GetStringS(Silk.NET.OpenGL.StringName.Vendor)} | " +
                         $"Renderer={_gl.GetStringS(Silk.NET.OpenGL.StringName.Renderer)} | " +
@@ -251,15 +232,38 @@ namespace AssetsManager.Views.Controls.Viewer
                 (captureWidth, captureHeight) => RenderViewportScene(captureWidth, captureHeight, 0f, snapshot: true), LogService);
         }
 
+        private void PrepareEnvironmentGpuResources()
+        {
+            if (_model.ShowPreviewSky && ActiveSkyCube != null && _skyRenderer == null)
+            {
+                _skyRenderer = new SkyRenderer();
+                _skyRenderer.Initialize(_gl);
+                _skyCubeDirty = true;
+            }
+            if (_mapSceneRuntime == null &&
+                (_model.ShowPreviewGrid || _model.ShowPreviewStage || (_model.ShowPreviewGround && _groundTextureLoaded)))
+            {
+                if (_previewSurfaceRenderer == null)
+                {
+                    _previewSurfaceRenderer = new PreviewSurfaceRenderer();
+                    _previewSurfaceRenderer.Initialize(_gl, _groundAppearance);
+                }
+                if (_groundAppearancePending && _model.ShowPreviewGround)
+                {
+                    _previewSurfaceRenderer.SetGroundAppearance(_groundAppearance);
+                    _groundAppearancePending = false;
+                }
+                _previewSurfaceRenderer.Prepare(
+                    _model.ShowPreviewGrid,
+                    _model.ShowPreviewGround && _groundTextureLoaded,
+                    _model.ShowPreviewStage);
+            }
+            if (_model.ShowPreviewSky) ApplyPendingSkyGpuState();
+        }
+
         private void RenderViewportScene(int width, int height, float dt, bool snapshot = false)
         {
             _gl.Viewport(0, 0, (uint)width, (uint)height);
-
-            if (_groundAppearancePending)
-            {
-                _groundAppearancePending = false;
-                _previewSurfaceRenderer?.SetGroundAppearance(_groundAppearance);
-            }
 
             // The first-pose wait ends once a pose landed or nothing is being prepared any more.
             if (_championAwaitingFirstPose &&
@@ -340,7 +344,9 @@ namespace AssetsManager.Views.Controls.Viewer
             // preparation are safe even when WPF selected the system before the GL control was ready.
             TryInspectPendingSystem();
             _vfxRenderer?.ProcessPendingGpuState();
-            ApplyPendingSkyGpuState();
+            RequestEnvironmentPreparation();
+            bool showEnvironment = HasEnvironmentContent && _environmentLoadingTask is not { IsCompleted: false };
+            PrepareEnvironmentGpuResources();
             ApplyPendingMapGpuState();
             _mapGeometryRenderer?.ProcessRetainedResources();
 
@@ -354,7 +360,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             // Sky is one Studio display element. MAP scenes supply their authored cubemap when available;
             // otherwise the same renderer falls back to the generic AssetsManager environment.
-            if (_model.ShowPreviewSky)
+            if (showEnvironment && _model.ShowPreviewSky)
                 _skyRenderer?.Render(view, proj);
 
             // PBR game shaders light characters and structures from the same environment the sky shows.
@@ -461,11 +467,11 @@ namespace AssetsManager.Views.Controls.Viewer
                     PrepareSceneActorParticles(sun, viewProj, view, width, height);
                 RenderPreparedParticlePasses();
             }
-            else
+            else if (showEnvironment)
                 _previewSurfaceRenderer?.Render(
                     viewProj,
                     _model.ShowPreviewGrid,
-                    _model.ShowPreviewGround,
+                    _model.ShowPreviewGround && _groundTextureLoaded,
                     _model.ShowPreviewStage);
 
             if (!characterBackdrop)

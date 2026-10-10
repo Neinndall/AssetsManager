@@ -51,6 +51,11 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _stageMode;
 
         private bool _ready;
+        private bool _usesEmbeddedProfile;
+        private GroundAppearance _groundAppearance;
+        private float _groundSize;
+        private float _groundHeight;
+        private float _gridHeight;
 
         private const string GroundVertexShader = @"
 layout(location = 0) in vec3 aPosition;
@@ -150,7 +155,11 @@ void main() {
             if (_ready) return;
 
             _gl = gl;
-            bool gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
+            _usesEmbeddedProfile = GlShaderCompiler.UsesEmbeddedProfile(gl);
+            _groundAppearance = appearance;
+            _groundSize = groundSize;
+            _groundHeight = groundHeight;
+            _gridHeight = gridHeight;
 
             try
             {
@@ -160,10 +169,6 @@ void main() {
                     gl.GetFloat(MaximumTextureAnisotropy, out float maximumAnisotropy);
                     _anisotropy = Math.Clamp(maximumAnisotropy, 1, 16);
                 }
-                _gridRenderer = new GridRenderer();
-                _gridRenderer.Initialize(_gl, gles, gridHeight);
-                InitializeGround(gles, appearance, groundSize, groundHeight);
-                InitializeStage(gles);
                 _ready = true;
             }
             catch
@@ -180,6 +185,7 @@ void main() {
             bool showStage)
         {
             if (!_ready) return;
+            Prepare(showGrid, showGround, showStage);
 
             if (showGround)
                 RenderGround(viewProjection);
@@ -189,6 +195,30 @@ void main() {
 
             if (showGrid)
                 _gridRenderer?.Render(viewProjection);
+        }
+
+        internal void Prepare(bool showGrid, bool showGround, bool showStage)
+        {
+            if (!_ready) return;
+
+            // Create each surface only when requested, on the viewport's current GL context.
+            try
+            {
+                if (showGround && _groundProgram == 0)
+                    InitializeGround(_usesEmbeddedProfile, _groundAppearance, _groundSize, _groundHeight);
+                if (showStage && _stageProgram == 0)
+                    InitializeStage(_usesEmbeddedProfile);
+                if (showGrid && _gridRenderer == null)
+                {
+                    _gridRenderer = new GridRenderer();
+                    _gridRenderer.Initialize(_gl, _usesEmbeddedProfile, _gridHeight);
+                }
+            }
+            catch
+            {
+                DisposeResources();
+                throw;
+            }
         }
 
         private void InitializeGround(bool gles, GroundAppearance appearance, float size, float height)
@@ -227,7 +257,8 @@ void main() {
 
         internal void SetGroundAppearance(GroundAppearance appearance)
         {
-            if (_gl == null) return;
+            _groundAppearance = appearance;
+            if (_gl == null || _groundProgram == 0) return;
             bool groundChanged = !ReferenceEquals(_groundTextureSource, appearance.Texture);
             bool logoChanged = !ReferenceEquals(_logoTextureSource, appearance.Logo);
             uint ground = groundChanged ? 0 : _groundTexture;
@@ -508,6 +539,7 @@ void main() {
                 _gridRenderer = null;
                 _groundTexture = 0;
                 _groundTextureSource = null;
+                _groundAppearance = default;
                 _logoTexture = 0;
                 _logoTextureSource = null;
                 _anisotropy = 1;

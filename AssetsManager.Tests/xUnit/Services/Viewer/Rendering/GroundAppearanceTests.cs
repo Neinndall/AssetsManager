@@ -323,6 +323,50 @@ public sealed class GroundAppearanceTests
         }
     });
 
+    [Fact]
+    public void PreviewSurfacesAllocateOnlyWhenShownAndReleaseTheirGpuResources() => RunSta(() =>
+    {
+        using var context = new HiddenWglContext();
+        using var gl = GL.GetApi(context.GetProcAddress);
+        using var renderer = new PreviewSurfaceRenderer();
+        renderer.Initialize(gl, new GroundAppearance(SolidBitmap(0, 0, 255)));
+
+        uint Resource(string field) => (uint)typeof(PreviewSurfaceRenderer)
+            .GetField(field, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .GetValue(renderer);
+
+        renderer.Render(Matrix4x4.Identity, false, false, false);
+        Assert.Equal(0u, Resource("_groundProgram"));
+        Assert.Equal(0u, Resource("_groundTexture"));
+        Assert.Equal(0u, Resource("_stageProgram"));
+
+        renderer.Prepare(true, false, false);
+        renderer.SetGroundAppearance(new GroundAppearance(SolidBitmap(255, 0, 0)));
+        Assert.Equal(0u, Resource("_groundProgram"));
+        Assert.Equal(0u, Resource("_groundTexture"));
+        Assert.Equal(0u, Resource("_stageProgram"));
+
+        gl.ClearColor(0, 1, 0, 1);
+        gl.Clear(ClearBufferMask.ColorBufferBit);
+        renderer.Prepare(false, false, true);
+        uint stage = Resource("_stageProgram");
+        Assert.True(gl.IsProgram(stage));
+        Assert.Equal(0u, Resource("_groundTexture"));
+
+        renderer.Prepare(false, true, false);
+        uint ground = Resource("_groundTexture");
+        uint groundProgram = Resource("_groundProgram");
+        Assert.True(gl.IsTexture(ground));
+        byte[] pixel = new byte[4];
+        gl.ReadPixels(0, 0, 1, 1, GlPixelFormat.Rgba, PixelType.UnsignedByte, pixel.AsSpan());
+        Assert.Equal(new byte[] { 0, 255, 0, 255 }, pixel);
+        renderer.Dispose();
+        Assert.False(gl.IsTexture(ground));
+        Assert.False(gl.IsProgram(groundProgram));
+        Assert.False(gl.IsProgram(stage));
+        Assert.Equal(GLEnum.NoError, gl.GetError());
+    });
+
     private static BitmapSource SolidBitmap(byte red, byte green, byte blue) =>
         BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[] { blue, green, red, 255 }, 4);
 

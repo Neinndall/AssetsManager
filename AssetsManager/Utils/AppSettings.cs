@@ -402,13 +402,13 @@ namespace AssetsManager.Utils
                     GroundVisible = false,
                     GridVisible = true,
                     SkyVisible = false,
+                    StageVisible = false,
                     TransparentBackground = false,
                     EnableFxaa = true
                 },
                 Studio = new StudioSettings
                 {
                     CameraPreset = "Orbit",
-                    StageVisible = false,
                     ViewMode = "Lit",
                     WireOverlay = false
                 },
@@ -497,6 +497,7 @@ namespace AssetsManager.Utils
         private bool _groundVisible;
         private bool _gridVisible = true;
         private bool _skyVisible;
+        private bool _stageVisible;
         private bool _transparentBackground;
         private bool _enableFxaa = true;
         private string _antiAliasingMode = "Fxaa";
@@ -519,6 +520,12 @@ namespace AssetsManager.Utils
         {
             get => _skyVisible;
             set => SetProperty(ref _skyVisible, value);
+        }
+
+        public bool StageVisible
+        {
+            get => _stageVisible;
+            set => SetProperty(ref _stageVisible, value);
         }
 
         public bool TransparentBackground
@@ -583,7 +590,6 @@ namespace AssetsManager.Utils
     public class StudioSettings
     {
         public string CameraPreset { get; set; } = "Orbit";
-        public bool StageVisible { get; set; }
         public string ViewMode { get; set; } = "Lit";
         public bool WireOverlay { get; set; }
     }

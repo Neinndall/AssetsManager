@@ -44,8 +44,8 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>               <!-- Workspace tabs -->
                     <RowDefinition Height="3*" MinHeight="220"/> <!-- 3D Viewport Card -->
-                    <RowDefinition x:Name="TimelineSplitterRow" Height="6"/> <!-- Resize Splitter -->
-                    <RowDefinition x:Name="TimelineDeckRow" Height="170" MinHeight="170"/> <!-- Timeline Deck Card -->
+                    <RowDefinition x:Name="TimelineSplitterRow" Height="0"/> <!-- Resize Splitter -->
+                    <RowDefinition x:Name="TimelineDeckRow" Height="0" MinHeight="0"/> <!-- Timeline Deck Card -->
                 </Grid.RowDefinitions>
 
                 <!-- Open Skin / MAP workspaces. Mirrors Explorer tab interaction without coupling to FileSystemNodeModel. -->

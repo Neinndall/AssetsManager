@@ -21,12 +21,12 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         private ViewportFrameScheduler _viewportFrameScheduler;
         private bool _groundTextureDirty = true;
-        private int _groundTextureVersion;
-        private bool _isGlStarting;
+        private bool _groundTextureLoaded;
+        private bool _genericSkyLoadAttempted;
         private GroundAppearance _groundAppearance;
         private bool _groundAppearancePending;
-        private Task _previewAssetsTask = Task.CompletedTask;
-        private readonly CancellationTokenSource _previewAssetsCancellation = new();
+        private Task _environmentLoadingTask;
+        private readonly CancellationTokenSource _environmentLoadCancellation = new();
 
         private void OnControlLoaded(object sender, RoutedEventArgs e)
         {
@@ -34,8 +34,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 AppSettings.PropertyChanged -= OnGroundLogoSettingsChanged;
                 AppSettings.PropertyChanged += OnGroundLogoSettingsChanged;
-                AppSettings.ConfigurationSaved -= OnGroundLogoSettingsSaved;
-                AppSettings.ConfigurationSaved += OnGroundLogoSettingsSaved;
             }
             _groundTextureDirty = true;
             LoadPreviewDisplayPreferences();
@@ -43,6 +41,7 @@ namespace AssetsManager.Views.Controls.Viewer
             UpdateInspectorColumnVisibility();
             if (_isActive)
             {
+                RequestEnvironmentPreparation();
                 EnsureOpenGlStarted();
             }
         }
@@ -52,16 +51,14 @@ namespace AssetsManager.Views.Controls.Viewer
             if (SceneElements.IsGroundLogoSetting(e.PropertyName)) RequestGroundTextureRefresh();
         }
 
-        private void OnGroundLogoSettingsSaved(object sender, EventArgs e) => RequestGroundTextureRefresh();
-
         private void RequestGroundTextureRefresh()
         {
             _ = Dispatcher.InvokeAsync(() =>
             {
                 if (_isCleanedUp) return;
                 _groundTextureDirty = true;
-                _groundTextureVersion++;
-                _ = PreparePreviewAssetsAsync();
+                RequestEnvironmentPreparation();
+                StudioViewportView.OpenTkControl.InvalidateVisual();
             });
         }
 
@@ -69,7 +66,6 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (AppSettings == null) return;
             AppSettings.PropertyChanged -= OnGroundLogoSettingsChanged;
-            AppSettings.ConfigurationSaved -= OnGroundLogoSettingsSaved;
         }
 
         private void LoadPreviewDisplayPreferences()
@@ -84,7 +80,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.ShowPreviewSky = viewerSettings.SkyVisible;
                 _model.ShowPreviewGrid = viewerSettings.GridVisible;
                 _model.ShowPreviewGround = viewerSettings.GroundVisible;
-                _model.ShowPreviewStage = studioSettings.StageVisible;
+                _model.ShowPreviewStage = viewerSettings.StageVisible;
 
                 if (Enum.TryParse(studioSettings.CameraPreset, ignoreCase: true, out StudioCameraPreset cameraPreset))
                     _model.PreviewCameraPreset = cameraPreset;
@@ -110,7 +106,7 @@ namespace AssetsManager.Views.Controls.Viewer
             AppSettings.StudioParameters.GroundVisible = _model.ShowPreviewGround;
             AppSettings.Studio.ViewMode = _model.PreviewViewMode.ToString();
             AppSettings.Studio.WireOverlay = _model.PreviewWireOverlay;
-            AppSettings.Studio.StageVisible = _model.ShowPreviewStage;
+            AppSettings.StudioParameters.StageVisible = _model.ShowPreviewStage;
             AppSettings.Studio.CameraPreset = _model.PreviewCameraPreset.ToString();
             _ = SavePreviewDisplayPreferencesAsync();
         }
@@ -156,6 +152,7 @@ namespace AssetsManager.Views.Controls.Viewer
             // The reference preview starts a fresh RAF clock when content becomes visible, so the
             // first resumed frame advances by zero rather than consuming hidden-tab wall time.
             _discardNextSimulationDelta = true;
+            RequestEnvironmentPreparation();
             if (!HasSelectedSystemReady())
             {
                 RequestSystemInspection(_model.SelectedSystem);
@@ -206,15 +203,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 _viewportFrameScheduler.Stop();
         }
 
-        private async void EnsureOpenGlStarted()
+        private void EnsureOpenGlStarted()
         {
-            if (!_isActive || _isGlStarted || _isGlStarting || _isCleanedUp || !IsLoaded || !IsVisible) return;
+            if (!_isActive || _isGlStarted || _isCleanedUp || !IsLoaded || !IsVisible) return;
 
-            _isGlStarting = true;
             try
             {
-                await PreparePreviewAssetsAsync();
-                if (!_isActive || _isCleanedUp || !IsLoaded || !IsVisible) return;
                 var settings = new OpenTK.Wpf.GLWpfControlSettings
                 {
                     MajorVersion = 3,
@@ -230,10 +224,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 LogService?.LogError(ex, "Failed to initialize the 3D Studio OpenGL viewport.");
                 _model.LogMessages.Add($"[ERROR] Failed to initialize the OpenGL viewport: {ex.Message}");
             }
-            finally
-            {
-                _isGlStarting = false;
-            }
         }
 
         private void OnControlUnloaded(object sender, RoutedEventArgs e)
@@ -242,47 +232,57 @@ namespace AssetsManager.Views.Controls.Viewer
             Deactivate();
         }
 
-        private async Task PreparePreviewAssetsAsync()
+        private bool HasEnvironmentContent =>
+            _championModel != null || _mapSceneRuntime != null ||
+            _sceneActorRuntimes.Count > 0 || _vfxRenderer?.ActiveSystem != null;
+
+        private void RequestEnvironmentPreparation()
         {
+            if (!_isActive || _isCleanedUp || _isLoadingPreviewPreferences ||
+                _environmentLoadingTask is { IsCompleted: false }) return;
+
+            bool loadGround = _mapSceneRuntime == null && _model.ShowPreviewGround && _groundTextureDirty;
+            bool loadSky = _model.ShowPreviewSky && ActiveSkyCube == null && !_genericSkyLoadAttempted;
+            if (!loadGround && !loadSky) return;
+
+            // Settings changes during loading leave Ground dirty for the next frame.
+            if (loadGround) _groundTextureDirty = false;
+            if (loadSky) _genericSkyLoadAttempted = true;
+            _environmentLoadingTask = LoadEnvironmentTexturesAsync(loadGround, loadSky);
+        }
+
+        private async Task LoadEnvironmentTexturesAsync(bool loadGround, bool loadSky)
+        {
+            CancellationToken cancellation = _environmentLoadCancellation.Token;
             try
             {
-                await _previewAssetsTask;
-                if (_isCleanedUp || !_isActive) return;
-                bool ground = _model.ShowPreviewGround && _groundTextureDirty;
-                int groundVersion = _groundTextureVersion;
-                bool sky = _model.ShowPreviewSky && _genericSkyCube == null;
-                if (!ground && !sky) return;
-                CancellationToken token = _previewAssetsCancellation.Token;
-                var loading = Task.Run(() =>
+                var textures = await Task.Run(() =>
                 {
-                    token.ThrowIfCancellationRequested();
-                    var appearance = ground ? SceneElements.LoadGroundAppearance(AppSettings, LogService) : default;
-                    token.ThrowIfCancellationRequested();
-                    var cube = sky ? SceneElements.LoadGenericSkyCube(AppSettings, LogService) : null;
-                    token.ThrowIfCancellationRequested();
-                    return (Ground: appearance, Sky: cube);
-                }, token);
-                _previewAssetsTask = loading;
-                var assets = await loading;
+                    cancellation.ThrowIfCancellationRequested();
+                    var ground = loadGround ? SceneElements.LoadGroundAppearance(AppSettings, LogService) : default;
+                    cancellation.ThrowIfCancellationRequested();
+                    var sky = loadSky ? SceneElements.LoadGenericSkyCube(AppSettings, LogService) : null;
+                    cancellation.ThrowIfCancellationRequested();
+                    return (Ground: ground, Sky: sky);
+                }, cancellation);
                 if (_isCleanedUp) return;
-                if (ground)
+                if (loadGround)
                 {
-                    _groundAppearance = assets.Ground;
+                    _groundAppearance = textures.Ground;
+                    _groundTextureLoaded = true;
                     _groundAppearancePending = true;
-                    _groundTextureDirty = groundVersion != _groundTextureVersion;
                 }
-                if (sky)
+                if (loadSky)
                 {
-                    _genericSkyCube = assets.Sky;
+                    _genericSkyCube = textures.Sky;
                     _skyCubeDirty = true;
                 }
-                StudioViewportView.OpenTkControl.InvalidateVisual();
-                if (_groundTextureDirty && _model.ShowPreviewGround) _ = PreparePreviewAssetsAsync();
+                if (_isActive) StudioViewportView.OpenTkControl.InvalidateVisual();
             }
-            catch (OperationCanceledException) when (_previewAssetsCancellation.IsCancellationRequested) { }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
             catch (Exception ex)
             {
-                LogService?.LogError(ex, "Failed to prepare Studio preview textures.");
+                LogService?.LogError(ex, "Failed to prepare Studio environment textures.");
             }
         }
 
@@ -298,18 +298,17 @@ namespace AssetsManager.Views.Controls.Viewer
             Deactivate();
             _isCleanedUp = true;
             _glInitializationSteps.Clear();
-            _previewAssetsCancellation.Cancel();
-            Task pendingAssets = _previewAssetsTask;
-            _previewAssetsTask = Task.CompletedTask;
+            _environmentLoadCancellation.Cancel();
+            Task pendingEnvironmentLoad = _environmentLoadingTask ?? Task.CompletedTask;
             // Wait off the UI thread before clearing caches a finishing loader could repopulate.
             _ = Task.Run(async () =>
             {
-                try { await pendingAssets; }
+                try { await pendingEnvironmentLoad; }
                 catch (OperationCanceledException) { }
                 finally
                 {
                     SceneElements.ClearSceneCache();
-                    _previewAssetsCancellation.Dispose();
+                    _environmentLoadCancellation.Dispose();
                 }
             });
             _groundAppearance = default;
